@@ -10,8 +10,9 @@
 
 <style>
 #app {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--bg-primary, #0b1120);
 }
 </style>

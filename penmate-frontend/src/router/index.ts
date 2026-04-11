@@ -7,6 +7,11 @@ const routes = [
     component: () => import('@/views/Home/index.vue')
   },
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login/index.vue')
+  },
+  {
     path: '/workbench',
     name: 'Workbench',
     component: () => import('@/views/Workbench/index.vue')
@@ -19,4 +24,3 @@ const router = createRouter({
 })
 
 export default router
-
