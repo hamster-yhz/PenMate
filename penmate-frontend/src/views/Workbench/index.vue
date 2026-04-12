@@ -12,6 +12,7 @@
         <span class="word-count">
           <span class="wc-num">{{ wordCount }}</span> 字
         </span>
+        <span class="save-hint" v-if="saveHint">{{ saveHint }}</span>
       </div>
       <div class="header-right">
         <button class="hdr-btn" @click="showStyleManager = true" title="文风设置">
@@ -27,8 +28,22 @@
           <span>模型</span>
         </button>
         <div class="header-divider"></div>
-        <div class="user-avatar" @click="handleLogout">
-          <span>{{ username.charAt(0) }}</span>
+        <!-- User Dropdown -->
+        <div class="user-dropdown-wrap">
+          <div class="user-avatar" @click="userMenuOpen = !userMenuOpen">
+            <span>{{ username.charAt(0) }}</span>
+          </div>
+          <div class="user-dropdown" v-if="userMenuOpen" @mouseleave="userMenuOpen = false">
+            <div class="ud-header">
+              <span class="ud-name">{{ username }}</span>
+              <span class="ud-email">{{ userEmail }}</span>
+            </div>
+            <div class="ud-sep"></div>
+            <button class="ud-item" @click="$router.push('/profile'); userMenuOpen = false">👤 个人中心</button>
+            <button class="ud-item" @click="$router.push('/mybooks'); userMenuOpen = false">📚 我的书架</button>
+            <div class="ud-sep"></div>
+            <button class="ud-item danger" @click="handleLogout">🚪 退出登录</button>
+          </div>
         </div>
       </div>
     </header>
@@ -56,46 +71,73 @@
             </button>
           </div>
 
-          <!-- Outline Tree -->
+          <!-- ======== Outline Tree ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'outline'">
             <div class="tree-actions">
               <button class="tree-btn" @click="addVolume">+ 新卷</button>
             </div>
             <div class="tree-root">
-              <div v-for="vol in outlineData" :key="vol.key" class="tree-node">
+              <div v-for="(vol, vIdx) in outlineData" :key="vol.key" class="tree-node">
                 <div
                   class="tree-item volume"
                   :class="{ expanded: vol.expanded }"
                   @click="vol.expanded = !vol.expanded"
                 >
                   <span class="tree-arrow">{{ vol.expanded ? '▾' : '▸' }}</span>
-                  <span class="tree-label">{{ vol.title }}</span>
-                  <button class="tree-add" @click.stop="addChapter(vol)">+</button>
+                  <!-- Inline edit for volume title -->
+                  <input
+                    v-if="editingNodeKey === vol.key"
+                    v-model="editingNodeValue"
+                    class="tree-edit-input"
+                    @blur="finishEditNode(vol)"
+                    @keydown.enter="finishEditNode(vol)"
+                    @keydown.escape="editingNodeKey = ''"
+                    @click.stop
+                  />
+                  <span v-else class="tree-label">{{ vol.title }}</span>
+                  <div class="tree-item-actions" @click.stop>
+                    <button class="tree-act-btn" @click="startEditNode(vol)" title="重命名">✏️</button>
+                    <button class="tree-act-btn" @click="addChapter(vol)" title="添加章节">+</button>
+                    <button class="tree-act-btn danger" @click="deleteVolume(vIdx)" title="删除">✕</button>
+                  </div>
                 </div>
                 <div v-if="vol.expanded" class="tree-children">
                   <div
-                    v-for="ch in vol.children"
+                    v-for="(ch, cIdx) in vol.children"
                     :key="ch.key"
                     class="tree-item chapter"
                     :class="{ active: activeChapter === ch.key }"
                     @click="selectChapter(ch)"
                   >
                     <span class="tree-dot">◇</span>
-                    <span class="tree-label">{{ ch.title }}</span>
+                    <input
+                      v-if="editingNodeKey === ch.key"
+                      v-model="editingNodeValue"
+                      class="tree-edit-input"
+                      @blur="finishEditNode(ch)"
+                      @keydown.enter="finishEditNode(ch)"
+                      @keydown.escape="editingNodeKey = ''"
+                      @click.stop
+                    />
+                    <span v-else class="tree-label">{{ ch.title }}</span>
+                    <div class="tree-item-actions" @click.stop>
+                      <button class="tree-act-btn" @click="startEditNode(ch)" title="重命名">✏️</button>
+                      <button class="tree-act-btn danger" @click="deleteChapter(vol, cIdx)" title="删除">✕</button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Character Library -->
+          <!-- ======== Character Library ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'characters'">
             <div class="tree-actions">
               <button class="tree-btn" @click="addCharacter">+ 新角色</button>
             </div>
             <div class="char-list">
               <div
-                v-for="char in characters"
+                v-for="(char, cIdx) in characters"
                 :key="char.id"
                 class="char-card"
                 :class="{ expanded: char.expanded }"
@@ -106,40 +148,65 @@
                     <span class="char-name">{{ char.name }}</span>
                     <span class="char-role">{{ char.role }}</span>
                   </div>
+                  <div class="char-actions" @click.stop>
+                    <button class="tree-act-btn danger" @click="deleteCharacter(cIdx)" title="删除角色">✕</button>
+                  </div>
                   <span class="char-toggle">{{ char.expanded ? '▾' : '▸' }}</span>
                 </div>
                 <div class="char-details" v-if="char.expanded">
-                  <div class="char-field">
+                  <div class="char-field-edit">
+                    <span class="cf-label">名字</span>
+                    <input v-model="char.name" class="cf-input" />
+                  </div>
+                  <div class="char-field-edit">
+                    <span class="cf-label">身份</span>
+                    <input v-model="char.role" class="cf-input" />
+                  </div>
+                  <div class="char-field-edit">
                     <span class="cf-label">性格</span>
-                    <span class="cf-value">{{ char.personality }}</span>
+                    <input v-model="char.personality" class="cf-input" />
                   </div>
-                  <div class="char-field">
+                  <div class="char-field-edit">
                     <span class="cf-label">背景</span>
-                    <span class="cf-value">{{ char.background }}</span>
+                    <textarea v-model="char.background" class="cf-input cf-textarea" rows="2"></textarea>
                   </div>
-                  <div class="char-field" v-if="char.ability">
+                  <div class="char-field-edit">
                     <span class="cf-label">能力</span>
-                    <span class="cf-value">{{ char.ability }}</span>
+                    <input v-model="char.ability" class="cf-input" placeholder="可选" />
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- World Settings -->
+          <!-- ======== World Settings ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'world'">
             <div class="tree-actions">
               <button class="tree-btn" @click="addWorldEntry">+ 新设定</button>
             </div>
             <div class="world-list">
-              <div v-for="entry in worldSettings" :key="entry.id" class="world-card">
+              <div v-for="(entry, wIdx) in worldSettings" :key="entry.id" class="world-card">
                 <div class="world-header" @click="entry.expanded = !entry.expanded">
                   <span class="world-icon">{{ entry.icon }}</span>
                   <span class="world-name">{{ entry.name }}</span>
+                  <div class="world-actions" @click.stop>
+                    <button class="tree-act-btn danger" @click="deleteWorldEntry(wIdx)" title="删除">✕</button>
+                  </div>
                   <span class="world-toggle">{{ entry.expanded ? '▾' : '▸' }}</span>
                 </div>
                 <div class="world-body" v-if="entry.expanded">
-                  <p class="world-desc">{{ entry.description }}</p>
+                  <div class="world-edit-field">
+                    <label>名称</label>
+                    <input v-model="entry.name" class="cf-input" />
+                  </div>
+                  <div class="world-edit-field">
+                    <label>图标</label>
+                    <input v-model="entry.icon" class="cf-input cf-icon" />
+                  </div>
+                  <div class="world-edit-field">
+                    <label>详情</label>
+                    <textarea v-model="entry.description" class="cf-input cf-textarea" rows="3"></textarea>
+                  </div>
                 </div>
               </div>
             </div>
@@ -151,13 +218,13 @@
       <main class="panel panel-center">
         <div class="editor-toolbar">
           <div class="toolbar-left">
-            <button class="tb-btn" @click="saveContent" title="保存">💾</button>
-            <button class="tb-btn" title="撤销">↩️</button>
-            <button class="tb-btn" title="重做">↪️</button>
+            <button class="tb-btn" @click="saveContent" title="保存 (Ctrl+S)">💾</button>
+            <button class="tb-btn" @click="editorUndo" title="撤销 (Ctrl+Z)">↩️</button>
+            <button class="tb-btn" @click="editorRedo" title="重做 (Ctrl+Y)">↪️</button>
             <div class="tb-divider"></div>
-            <button class="tb-btn" title="加粗"><b>B</b></button>
-            <button class="tb-btn" title="斜体"><i>I</i></button>
-            <button class="tb-btn" title="引用">❝</button>
+            <button class="tb-btn" @click="wrapSelection('**','**')" title="加粗"><b>B</b></button>
+            <button class="tb-btn" @click="wrapSelection('*','*')" title="斜体"><i>I</i></button>
+            <button class="tb-btn" @click="insertPrefix('> ')" title="引用">❝</button>
           </div>
           <div class="toolbar-right">
             <span class="chapter-label">{{ currentChapterTitle }}</span>
@@ -171,6 +238,13 @@
             class="main-editor"
             placeholder="在此处开始创作，或让AI为你执笔..."
             @input="onEditorInput"
+            @keyup="updateCursorPos"
+            @click="updateCursorPos"
+            @keydown.ctrl.s.prevent="saveContent"
+            @keydown.ctrl.z.prevent="editorUndo"
+            @keydown.ctrl.y.prevent="editorRedo"
+            @keydown.ctrl.b.prevent="wrapSelection('**','**')"
+            @keydown.ctrl.i.prevent="wrapSelection('*','*')"
           ></textarea>
         </div>
 
@@ -274,7 +348,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 // Images
@@ -297,12 +371,15 @@ const router = useRouter()
 
 // --- State ---
 const username = ref('墨客')
+const userEmail = ref('moke@penmate.com')
+const userMenuOpen = ref(false)
 const novelTitle = ref('苍穹剑仙传')
-const wordCount = ref(2847)
-const currentLine = ref(5)
+const wordCount = ref(0)
+const currentLine = ref(1)
 const currentCol = ref(1)
 const selectedText = ref('')
 const isGenerating = ref(false)
+const saveHint = ref('')
 
 // Panel state
 const leftCollapsed = ref(false)
@@ -311,22 +388,29 @@ const showStyleManager = ref(false)
 const showPluginWorkshop = ref(false)
 const showModelSettings = ref(false)
 
+// --- Per-chapter content storage ---
+const chapterContents = ref<Record<string, string>>({
+  '0-0-0': '夜色如墨，月华倾洒。\n\n林风立于山巅，长衫猎猎作响。远处传来一阵若有若无的箫声，仿佛在诉说着千年未了的故事。\n\n他抬眼望去，只见天际处有一柄长剑破空而来，剑身上萦绕着淡金色的灵气，如同一条游龙穿云而过。那是师门传承千年的"天问剑"——传说中唯有心怀大道之人，方能驾驭此剑。\n\n"你终于来了。"身后传来一道苍老却中气十足的声音。\n\n林风没有回头，嘴角微微上扬："师父，弟子等这一天，已经等了三年。"',
+  '0-0-1': '风起青山，云涌四方。\n\n自从林风踏入江湖以来，从未见过如此气势磅礴的场面。千人齐聚于凌霄殿前，各门各派的弟子皆身着门派法袍，剑气纵横间，空气中弥漫着一股肃杀之意。',
+  '0-0-2': '剑意初现，惊鸿一瞥。\n\n当林风第一次真正感受到天问剑意时，整个人仿佛被一道闪电贯穿——不是痛苦，而是一种前所未有的明悟。',
+  '0-1-0': '暗夜之中，一个神秘的组织悄然浮出水面。\n\n他们自称"暗网"，行事低调却触手遍及修仙界每一个角落。',
+  '0-1-1': '地下交易场，灯火幽暗。\n\n形形色色的修士聚集于此，有的遮掩面容，有的大大方方地展示自己的修为境界。'
+})
+
 // Editor
 const editorRef = ref<HTMLTextAreaElement | null>(null)
-const editorContent = ref(
-`夜色如墨，月华倾洒。
-
-林风立于山巅，长衫猎猎作响。远处传来一阵若有若无的箫声，仿佛在诉说着千年未了的故事。
-
-他抬眼望去，只见天际处有一柄长剑破空而来，剑身上萦绕着淡金色的灵气，如同一条游龙穿云而过。那是师门传承千年的"天问剑"——传说中唯有心怀大道之人，方能驾驭此剑。
-
-"你终于来了。"身后传来一道苍老却中气十足的声音。
-
-林风没有回头，嘴角微微上扬："师父，弟子等这一天，已经等了三年。"`
-)
-
+const editorContent = ref('')
 const currentChapterTitle = ref('第一章：神秘黑影')
 const activeChapter = ref('0-0-0')
+
+// Undo/Redo stacks
+const undoStack = ref<string[]>([])
+const redoStack = ref<string[]>([])
+let lastSnapshot = ''
+
+// Inline editing for tree nodes
+const editingNodeKey = ref('')
+const editingNodeValue = ref('')
 
 // Left panel tabs
 const activeLeftTab = ref('outline')
@@ -457,28 +541,112 @@ const messages = ref<ChatMessage[]>([
 
 const chatInput = ref('')
 const chatRef = ref<HTMLElement | null>(null)
-
 let msgIdCounter = 4
 
-// --- Methods ---
+// ===================== METHODS =====================
+
 const updateTitle = (e: Event) => {
   const target = e.target as HTMLElement
   novelTitle.value = target.textContent || '未命名小说'
 }
 
+// --- Editor Input / Cursor ---
 const onEditorInput = () => {
+  chapterContents.value[activeChapter.value] = editorContent.value
   wordCount.value = editorContent.value.replace(/\s/g, '').length
+  if (editorContent.value !== lastSnapshot) {
+    undoStack.value.push(lastSnapshot)
+    if (undoStack.value.length > 50) undoStack.value.shift()
+    redoStack.value = []
+    lastSnapshot = editorContent.value
+  }
 }
 
+const updateCursorPos = () => {
+  if (!editorRef.value) return
+  const el = editorRef.value
+  const pos = el.selectionStart
+  const text = editorContent.value.slice(0, pos)
+  const lines = text.split('\n')
+  currentLine.value = lines.length
+  currentCol.value = (lines[lines.length - 1]?.length || 0) + 1
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  selectedText.value = start !== end ? editorContent.value.slice(start, end) : ''
+}
+
+// --- Undo / Redo ---
+const editorUndo = () => {
+  if (undoStack.value.length === 0) return
+  redoStack.value.push(editorContent.value)
+  const prev = undoStack.value.pop()!
+  editorContent.value = prev
+  lastSnapshot = prev
+  chapterContents.value[activeChapter.value] = prev
+  wordCount.value = prev.replace(/\s/g, '').length
+}
+
+const editorRedo = () => {
+  if (redoStack.value.length === 0) return
+  undoStack.value.push(editorContent.value)
+  const next = redoStack.value.pop()!
+  editorContent.value = next
+  lastSnapshot = next
+  chapterContents.value[activeChapter.value] = next
+  wordCount.value = next.replace(/\s/g, '').length
+}
+
+// --- Text formatting ---
+const wrapSelection = (before: string, after: string) => {
+  if (!editorRef.value) return
+  const el = editorRef.value
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const selected = editorContent.value.slice(start, end)
+  const replacement = before + (selected || '文本') + after
+  editorContent.value = editorContent.value.slice(0, start) + replacement + editorContent.value.slice(end)
+  chapterContents.value[activeChapter.value] = editorContent.value
+  wordCount.value = editorContent.value.replace(/\s/g, '').length
+  nextTick(() => {
+    el.focus()
+    const newPos = start + before.length + (selected || '文本').length
+    el.setSelectionRange(start + before.length, newPos)
+  })
+}
+
+const insertPrefix = (prefix: string) => {
+  if (!editorRef.value) return
+  const el = editorRef.value
+  const pos = el.selectionStart
+  const lineStart = editorContent.value.lastIndexOf('\n', pos - 1) + 1
+  editorContent.value = editorContent.value.slice(0, lineStart) + prefix + editorContent.value.slice(lineStart)
+  chapterContents.value[activeChapter.value] = editorContent.value
+  wordCount.value = editorContent.value.replace(/\s/g, '').length
+  nextTick(() => {
+    el.focus()
+    el.setSelectionRange(pos + prefix.length, pos + prefix.length)
+  })
+}
+
+// --- Chapter switching ---
 const selectChapter = (ch: { key: string; title: string }) => {
+  chapterContents.value[activeChapter.value] = editorContent.value
   activeChapter.value = ch.key
   currentChapterTitle.value = ch.title
+  editorContent.value = chapterContents.value[ch.key] || ''
+  wordCount.value = editorContent.value.replace(/\s/g, '').length
+  undoStack.value = []
+  redoStack.value = []
+  lastSnapshot = editorContent.value
+  nextTick(() => editorRef.value?.focus())
 }
 
+// --- Outline CRUD ---
 const addVolume = () => {
   const idx = outlineData.value.length
+  const nums = ['一','二','三','四','五','六','七','八','九','十']
   outlineData.value.push({
-    title: `第${['一','二','三','四','五','六','七','八'][idx] || idx + 1}卷：新的篇章`,
+    title: `第${nums[idx] || idx + 1}卷：新的篇章`,
     key: `0-${idx}`,
     expanded: true,
     children: []
@@ -487,41 +655,88 @@ const addVolume = () => {
 
 const addChapter = (vol: any) => {
   const idx = vol.children.length
-  vol.children.push({
-    title: `第${idx + 1}章：未命名`,
-    key: `${vol.key}-${idx}`
-  })
+  const newKey = `${vol.key}-${idx}`
+  vol.children.push({ title: `第${idx + 1}章：未命名`, key: newKey })
   vol.expanded = true
+  chapterContents.value[newKey] = ''
 }
 
+const deleteVolume = (vIdx: number) => {
+  const vol = outlineData.value[vIdx]
+  vol.children.forEach((ch: any) => delete chapterContents.value[ch.key])
+  outlineData.value.splice(vIdx, 1)
+}
+
+const deleteChapter = (vol: any, cIdx: number) => {
+  const ch = vol.children[cIdx]
+  delete chapterContents.value[ch.key]
+  if (activeChapter.value === ch.key) {
+    editorContent.value = ''
+    currentChapterTitle.value = ''
+    activeChapter.value = ''
+  }
+  vol.children.splice(cIdx, 1)
+}
+
+// --- Inline node rename ---
+const startEditNode = (node: { key: string; title: string }) => {
+  editingNodeKey.value = node.key
+  editingNodeValue.value = node.title
+}
+
+const finishEditNode = (node: { key: string; title: string }) => {
+  if (editingNodeValue.value.trim()) {
+    node.title = editingNodeValue.value.trim()
+  }
+  editingNodeKey.value = ''
+  if (node.key === activeChapter.value) {
+    currentChapterTitle.value = node.title
+  }
+}
+
+// --- Character CRUD ---
 const addCharacter = () => {
   characters.value.push({
     id: `c${Date.now()}`,
     name: '新角色',
     role: '配角',
-    personality: '待设定',
-    background: '待设定',
+    personality: '',
+    background: '',
     ability: '',
     expanded: true
   })
 }
 
+const deleteCharacter = (idx: number) => {
+  characters.value.splice(idx, 1)
+}
+
+// --- World CRUD ---
 const addWorldEntry = () => {
   worldSettings.value.push({
     id: `w${Date.now()}`,
     icon: '🔮',
     name: '新设定',
-    description: '在此编辑设定内容...',
+    description: '',
     expanded: true
   })
 }
 
-const saveContent = () => {
-  // TODO: Save to backend
+const deleteWorldEntry = (idx: number) => {
+  worldSettings.value.splice(idx, 1)
 }
 
+// --- Save ---
+const saveContent = () => {
+  chapterContents.value[activeChapter.value] = editorContent.value
+  saveHint.value = '✓ 已保存'
+  setTimeout(() => { saveHint.value = '' }, 2000)
+}
+
+// --- Chat merge/replace ---
 const mergeToEditor = (msg: ChatMessage) => {
   editorContent.value += '\n\n' + msg.text.replace(/<[^>]*>/g, '')
+  chapterContents.value[activeChapter.value] = editorContent.value
   wordCount.value = editorContent.value.replace(/\s/g, '').length
 }
 
@@ -533,27 +748,20 @@ const replaceSelected = (msg: ChatMessage) => {
   if (start === end) return
   const plainText = msg.text.replace(/<[^>]*>/g, '')
   editorContent.value = editorContent.value.slice(0, start) + plainText + editorContent.value.slice(end)
+  chapterContents.value[activeChapter.value] = editorContent.value
   wordCount.value = editorContent.value.replace(/\s/g, '').length
 }
 
+// --- Chat send ---
 const sendMessage = async () => {
   if (!chatInput.value.trim() || isGenerating.value) return
-
-  const userMsg: ChatMessage = {
-    id: msgIdCounter++,
-    role: 'user',
-    text: chatInput.value
-  }
+  const userMsg: ChatMessage = { id: msgIdCounter++, role: 'user', text: chatInput.value }
   messages.value.push(userMsg)
   chatInput.value = ''
   isGenerating.value = true
-
   await nextTick()
   scrollChat()
-
-  // Simulate AI response
   await new Promise(r => setTimeout(r, 2500))
-
   const aiMsg: ChatMessage = {
     id: msgIdCounter++,
     role: 'assistant',
@@ -561,36 +769,37 @@ const sendMessage = async () => {
   }
   messages.value.push(aiMsg)
   isGenerating.value = false
-
   await nextTick()
   scrollChat()
 }
 
 const scrollChat = () => {
-  if (chatRef.value) {
-    chatRef.value.scrollTop = chatRef.value.scrollHeight
-  }
+  if (chatRef.value) chatRef.value.scrollTop = chatRef.value.scrollHeight
 }
 
+// --- Approval ---
 const handleApprove = (id: string) => {
   const msg = messages.value.find(m => m.approval?.id === id)
-  if (msg && msg.approval) {
-    msg.approval.resolved = true
-    msg.approval.resolvedAction = 'approved'
-  }
+  if (msg && msg.approval) { msg.approval.resolved = true; msg.approval.resolvedAction = 'approved' }
 }
 
 const handleReject = (id: string) => {
   const msg = messages.value.find(m => m.approval?.id === id)
-  if (msg && msg.approval) {
-    msg.approval.resolved = true
-    msg.approval.resolvedAction = 'rejected'
-  }
+  if (msg && msg.approval) { msg.approval.resolved = true; msg.approval.resolvedAction = 'rejected' }
 }
 
+// --- Auth ---
 const handleLogout = () => {
+  userMenuOpen.value = false
   router.push('/login')
 }
+
+// --- Init ---
+onMounted(() => {
+  editorContent.value = chapterContents.value[activeChapter.value] || ''
+  wordCount.value = editorContent.value.replace(/\s/g, '').length
+  lastSnapshot = editorContent.value
+})
 </script>
 
 <style lang="less" scoped>
@@ -627,675 +836,388 @@ const handleLogout = () => {
 }
 
 .header-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  cursor: pointer;
-  transition: transform 0.3s;
-
+  width: 28px; height: 28px; border-radius: 50%;
+  object-fit: cover; cursor: pointer; transition: transform 0.3s;
   &:hover { transform: scale(1.1); }
 }
 
 .header-brand {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  color: var(--amber-gold);
-  letter-spacing: 0.2em;
+  font-family: var(--font-heading); font-size: 1rem;
+  color: var(--amber-gold); letter-spacing: 0.2em;
 }
 
-.header-divider {
-  width: 1px;
-  height: 20px;
-  background: var(--border-subtle);
-}
+.header-divider { width: 1px; height: 20px; background: var(--border-subtle); }
 
 .novel-title {
-  font-family: var(--font-heading);
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  letter-spacing: 0.1em;
-  padding: 2px 8px;
-  border-radius: 4px;
-  outline: none;
-  transition: background 0.3s;
-
-  &:hover, &:focus {
-    background: rgba(201,169,110,0.06);
-  }
+  font-family: var(--font-heading); font-size: 0.95rem;
+  color: var(--text-primary); letter-spacing: 0.1em;
+  padding: 2px 8px; border-radius: 4px; outline: none; transition: background 0.3s;
+  &:hover, &:focus { background: rgba(201,169,110,0.06); }
 }
 
-.word-count {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
+.word-count { font-size: 0.78rem; color: var(--text-muted); letter-spacing: 0.05em;
+  .wc-num { color: var(--amber-gold); font-weight: 500; }
+}
 
-  .wc-num {
-    color: var(--amber-gold);
-    font-weight: 500;
-  }
+.save-hint {
+  font-size: 0.72rem; color: var(--jade-green);
+  animation: fadeInUp 0.3s ease;
 }
 
 .hdr-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.3s;
-  letter-spacing: 0.05em;
-
-  &:hover {
-    border-color: var(--border-gold);
-    color: var(--amber-gold);
-    background: rgba(201,169,110,0.06);
-  }
-
-  .hdr-icon {
-    width: 18px;
-    height: 18px;
-    border-radius: 3px;
-    object-fit: cover;
-  }
-
-  .hdr-emoji {
-    font-size: 0.9rem;
-  }
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; background: none; border: 1px solid transparent;
+  border-radius: 4px; font-size: 0.78rem; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.3s; letter-spacing: 0.05em;
+  &:hover { border-color: var(--border-gold); color: var(--amber-gold); background: rgba(201,169,110,0.06); }
+  .hdr-icon { width: 18px; height: 18px; border-radius: 3px; object-fit: cover; }
+  .hdr-emoji { font-size: 0.9rem; }
 }
 
+/* User Dropdown */
+.user-dropdown-wrap { position: relative; }
+
 .user-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+  width: 30px; height: 30px; border-radius: 50%;
   background: linear-gradient(135deg, rgba(201,169,110,0.3), rgba(201,169,110,0.1));
   border: 1px solid var(--border-gold);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-heading);
-  font-size: 0.85rem;
-  color: var(--amber-gold);
-  cursor: pointer;
-  transition: all 0.3s;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-heading); font-size: 0.85rem; color: var(--amber-gold);
+  cursor: pointer; transition: all 0.3s;
+  &:hover { box-shadow: 0 0 12px rgba(201,169,110,0.2); }
+}
 
-  &:hover {
-    box-shadow: 0 0 12px rgba(201,169,110,0.2);
-  }
+.user-dropdown {
+  position: absolute; top: 100%; right: 0; margin-top: 8px;
+  width: 200px; background: rgba(17,24,39,0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-gold);
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: fadeInUp 0.2s ease;
+  z-index: 999;
+}
+
+.ud-header { padding: 12px 14px; }
+.ud-name { display: block; font-family: var(--font-heading); font-size: 0.92rem; color: var(--xuan-paper); letter-spacing: 0.1em; }
+.ud-email { display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+.ud-sep { height: 1px; background: var(--border-subtle); }
+
+.ud-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 14px; background: none; border: none;
+  font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;
+  text-align: left; transition: all 0.2s;
+  &:hover { background: rgba(201,169,110,0.06); color: var(--amber-gold); }
+  &.danger { color: #e8a87c; &:hover { background: rgba(192,60,45,0.08); } }
 }
 
 /* ---------- Main Workspace ---------- */
-.wb-main {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
+.wb-main { flex: 1; display: flex; overflow: hidden; }
 
 /* ---------- Panels ---------- */
-.panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  transition: width 0.3s var(--ease-silk);
-}
+.panel { position: relative; display: flex; flex-direction: column; transition: width 0.3s var(--ease-silk); }
 
 .panel-toggle {
-  position: absolute;
-  top: 50%;
-  z-index: 10;
-  width: 16px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(17,24,39,0.9);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  cursor: pointer;
-  transition: all 0.3s;
-
-  &:hover {
-    color: var(--amber-gold);
-    border-color: var(--border-gold);
-  }
+  position: absolute; top: 50%; z-index: 10;
+  width: 16px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(17,24,39,0.9); border: 1px solid var(--border-subtle);
+  color: var(--text-muted); font-size: 0.7rem; cursor: pointer; transition: all 0.3s;
+  &:hover { color: var(--amber-gold); border-color: var(--border-gold); }
 }
 
-.panel-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
+.panel-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 
 /* --- Left Panel --- */
 .panel-left {
-  width: 280px;
-  min-width: 0;
+  width: 280px; min-width: 0;
   border-right: 1px solid var(--border-subtle);
   background: rgba(11,17,32,0.6);
-
-  &.collapsed {
-    width: 0;
-    border-right: none;
-
-    .panel-toggle {
-      right: -16px;
-      border-radius: 0 4px 4px 0;
-    }
+  &.collapsed { width: 0; border-right: none;
+    .panel-toggle { right: -16px; border-radius: 0 4px 4px 0; }
   }
-
   .panel-toggle {
-    right: 0;
-    top: 50%;
+    right: 0; top: 50%;
     transform: translateY(-50%) translateX(100%);
-    border-radius: 0 4px 4px 0;
-    border-left: none;
+    border-radius: 0 4px 4px 0; border-left: none;
   }
 }
 
-.left-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
+.left-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
 
 .ltab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 10px 0;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.3s;
-  letter-spacing: 0.05em;
-
-  &:hover {
-    color: var(--text-secondary);
-  }
-
-  &.active {
-    color: var(--amber-gold);
-    border-bottom-color: var(--amber-gold);
-  }
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 10px 0; background: none; border: none;
+  border-bottom: 2px solid transparent; font-size: 0.78rem;
+  color: var(--text-muted); cursor: pointer; transition: all 0.3s; letter-spacing: 0.05em;
+  &:hover { color: var(--text-secondary); }
+  &.active { color: var(--amber-gold); border-bottom-color: var(--amber-gold); }
 }
 
-.ltab-icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  object-fit: cover;
-}
+.ltab-icon { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; }
 
-.tab-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
+.tab-content { flex: 1; overflow-y: auto; padding: 8px; }
 
-.tree-actions {
-  padding: 4px 0 8px;
-}
+.tree-actions { padding: 4px 0 8px; }
 
 .tree-btn {
-  padding: 4px 12px;
-  font-size: 0.75rem;
-  color: var(--amber-gold);
-  background: rgba(201,169,110,0.06);
-  border: 1px solid rgba(201,169,110,0.15);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s;
-
-  &:hover {
-    background: rgba(201,169,110,0.12);
-    border-color: var(--border-gold);
-  }
+  padding: 4px 12px; font-size: 0.75rem;
+  color: var(--amber-gold); background: rgba(201,169,110,0.06);
+  border: 1px solid rgba(201,169,110,0.15); border-radius: 4px;
+  cursor: pointer; transition: all 0.3s;
+  &:hover { background: rgba(201,169,110,0.12); border-color: var(--border-gold); }
 }
 
 /* Tree styles */
 .tree-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(201,169,110,0.06);
-    color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; border-radius: 4px;
+  font-size: 0.82rem; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.2s;
+  &:hover { background: rgba(201,169,110,0.06); color: var(--text-primary);
+    .tree-item-actions { opacity: 1; }
   }
-
-  &.active {
-    background: rgba(201,169,110,0.1);
-    color: var(--amber-gold);
-  }
+  &.active { background: rgba(201,169,110,0.1); color: var(--amber-gold); }
 }
 
-.tree-children {
-  padding-left: 12px;
+.tree-children { padding-left: 12px; }
+.tree-arrow, .tree-dot { font-size: 0.65rem; color: var(--text-muted); min-width: 12px; }
+.tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Inline edit input */
+.tree-edit-input {
+  flex: 1; padding: 2px 6px;
+  background: rgba(11,17,32,0.7);
+  border: 1px solid var(--border-gold);
+  border-radius: 3px; color: var(--text-primary);
+  font-size: 0.82rem; outline: none;
 }
 
-.tree-arrow, .tree-dot {
-  font-size: 0.65rem;
+/* Tree item action buttons */
+.tree-item-actions {
+  display: flex; gap: 2px; opacity: 0; transition: opacity 0.2s;
+}
+
+.tree-act-btn {
+  padding: 1px 5px; background: none;
+  border: 1px solid transparent; border-radius: 3px;
+  font-size: 0.65rem; cursor: pointer; transition: all 0.2s;
   color: var(--text-muted);
-  min-width: 12px;
-}
-
-.tree-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tree-add {
-  opacity: 0;
-  padding: 0 6px;
-  background: none;
-  border: 1px solid var(--border-subtle);
-  border-radius: 3px;
-  font-size: 0.7rem;
-  color: var(--amber-gold);
-  cursor: pointer;
-  transition: all 0.2s;
-
-  .tree-item:hover & {
-    opacity: 1;
-  }
+  &:hover { color: var(--amber-gold); border-color: var(--border-subtle); background: rgba(201,169,110,0.06); }
+  &.danger:hover { color: #e8a87c; border-color: rgba(192,60,45,0.3); background: rgba(192,60,45,0.08); }
 }
 
 /* Character cards */
-.char-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.char-list { display: flex; flex-direction: column; gap: 6px; }
 
 .char-card {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  overflow: hidden;
+  border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden;
   transition: border-color 0.3s;
-
-  &:hover, &.expanded {
-    border-color: rgba(201,169,110,0.2);
-  }
+  &:hover, &.expanded { border-color: rgba(201,169,110,0.2); }
 }
 
-.char-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-}
+.char-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; }
 
 .char-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   background: linear-gradient(135deg, rgba(201,169,110,0.2), rgba(90,158,111,0.15));
   border: 1px solid rgba(201,169,110,0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-heading);
-  font-size: 0.82rem;
-  color: var(--amber-gold);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-heading); font-size: 0.82rem; color: var(--amber-gold);
 }
 
-.char-meta {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.char-meta { flex: 1; display: flex; flex-direction: column; }
+.char-name { font-size: 0.82rem; color: var(--text-primary); }
+.char-role { font-size: 0.68rem; color: var(--text-muted); }
+.char-toggle { font-size: 0.65rem; color: var(--text-muted); }
+
+.char-actions {
+  opacity: 0; transition: opacity 0.2s;
+  .char-header:hover & { opacity: 1; }
 }
 
-.char-name {
-  font-size: 0.82rem;
-  color: var(--text-primary);
-}
+.char-details { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
 
-.char-role {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
-.char-toggle {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-}
-
-.char-details {
-  padding: 0 10px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.char-field {
-  display: flex;
-  gap: 6px;
-  font-size: 0.75rem;
+/* Editable character fields */
+.char-field-edit {
+  display: flex; align-items: flex-start; gap: 6px; font-size: 0.78rem;
 }
 
 .cf-label {
-  color: var(--amber-gold);
-  min-width: 32px;
-  flex-shrink: 0;
-
+  color: var(--amber-gold); min-width: 32px; flex-shrink: 0;
+  padding-top: 4px;
   &::after { content: '：'; }
 }
 
-.cf-value {
-  color: var(--text-secondary);
-  line-height: 1.5;
+.cf-input {
+  flex: 1; padding: 4px 8px;
+  background: rgba(11,17,32,0.5);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px; color: var(--text-primary);
+  font-family: var(--font-body); font-size: 0.78rem;
+  outline: none; transition: border-color 0.3s;
+  &:focus { border-color: var(--border-gold); }
+  &::placeholder { color: var(--text-muted); }
 }
+
+.cf-textarea { resize: vertical; line-height: 1.5; }
+.cf-icon { max-width: 60px; }
 
 /* World settings */
-.world-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.world-list { display: flex; flex-direction: column; gap: 6px; }
 
 .world-card {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  overflow: hidden;
-
+  border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden;
   &:hover { border-color: rgba(201,169,110,0.2); }
 }
 
 .world-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; cursor: pointer;
 }
 
-.world-icon {
-  font-size: 1rem;
+.world-icon { font-size: 1rem; }
+.world-name { flex: 1; font-size: 0.82rem; color: var(--text-primary); }
+.world-toggle { font-size: 0.65rem; color: var(--text-muted); }
+
+.world-actions {
+  opacity: 0; transition: opacity 0.2s;
+  .world-header:hover & { opacity: 1; }
 }
 
-.world-name {
-  flex: 1;
-  font-size: 0.82rem;
-  color: var(--text-primary);
-}
+.world-body { padding: 6px 10px 10px; }
 
-.world-toggle {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-}
-
-.world-body {
-  padding: 0 10px 10px;
-}
-
-.world-desc {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
+.world-edit-field {
+  display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px;
+  label { font-size: 0.72rem; color: var(--amber-gold); letter-spacing: 0.05em; }
 }
 
 /* --- Center Panel: Editor --- */
 .panel-center {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
   background: rgba(11,17,32,0.3);
 }
 
 .editor-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: flex; justify-content: space-between; align-items: center;
   padding: 6px 16px;
   border-bottom: 1px solid var(--border-subtle);
   background: rgba(11,17,32,0.5);
   flex-shrink: 0;
 }
 
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+.toolbar-left { display: flex; align-items: center; gap: 4px; }
 
 .tb-btn {
-  padding: 4px 8px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  cursor: pointer;
+  padding: 4px 8px; background: none;
+  border: 1px solid transparent; border-radius: 3px;
+  font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;
   transition: all 0.2s;
-
   &:hover {
-    border-color: var(--border-subtle);
-    background: rgba(201,169,110,0.05);
+    border-color: var(--border-subtle); background: rgba(201,169,110,0.05);
     color: var(--text-primary);
   }
+  &:active { background: rgba(201,169,110,0.12); }
 }
 
-.tb-divider {
-  width: 1px;
-  height: 16px;
-  background: var(--border-subtle);
-  margin: 0 4px;
-}
+.tb-divider { width: 1px; height: 16px; background: var(--border-subtle); margin: 0 4px; }
 
 .chapter-label {
-  font-family: var(--font-heading);
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  letter-spacing: 0.1em;
+  font-family: var(--font-heading); font-size: 0.82rem;
+  color: var(--text-muted); letter-spacing: 0.1em;
 }
 
-.editor-area {
-  flex: 1;
-  overflow: hidden;
-  padding: 0;
-}
+.editor-area { flex: 1; overflow: hidden; padding: 0; }
 
 .main-editor {
-  width: 100%;
-  height: 100%;
-  padding: 24px 48px;
-  background: transparent;
-  border: none;
-  resize: none;
-  outline: none;
-  color: var(--text-primary);
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 2;
-  letter-spacing: 0.02em;
-
+  width: 100%; height: 100%; padding: 24px 48px;
+  background: transparent; border: none; resize: none; outline: none;
+  color: var(--text-primary); font-family: var(--font-body);
+  font-size: 1rem; line-height: 2; letter-spacing: 0.02em;
   &::placeholder {
-    color: var(--text-muted);
-    font-family: var(--font-heading);
-    letter-spacing: 0.1em;
+    color: var(--text-muted); font-family: var(--font-heading); letter-spacing: 0.1em;
   }
 }
 
 .editor-statusbar {
-  display: flex;
-  justify-content: space-between;
+  display: flex; justify-content: space-between;
   padding: 4px 16px;
   border-top: 1px solid var(--border-subtle);
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
+  font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0;
 }
 
 /* --- Right Panel: Agent --- */
 .panel-right {
-  width: 340px;
-  min-width: 0;
+  width: 340px; min-width: 0;
   border-left: 1px solid var(--border-subtle);
   background: rgba(11,17,32,0.5);
-
-  &.collapsed {
-    width: 0;
-    border-left: none;
-
-    .right-toggle {
-      left: -16px;
-      border-radius: 4px 0 0 4px;
-    }
+  &.collapsed { width: 0; border-left: none;
+    .right-toggle { left: -16px; border-radius: 4px 0 0 4px; }
   }
-
   .right-toggle {
-    left: 0;
-    top: 50%;
+    left: 0; top: 50%;
     transform: translateY(-50%) translateX(-100%);
-    border-radius: 4px 0 0 4px;
-    border-right: none;
+    border-radius: 4px 0 0 4px; border-right: none;
   }
 }
 
 .agent-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
 }
 
-.agent-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  object-fit: cover;
-}
+.agent-icon { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
 
 .agent-title {
-  flex: 1;
-  font-family: var(--font-heading);
-  font-size: 0.95rem;
-  color: var(--xuan-paper);
-  letter-spacing: 0.1em;
+  flex: 1; font-family: var(--font-heading); font-size: 0.95rem;
+  color: var(--xuan-paper); letter-spacing: 0.1em;
 }
 
 .agent-status {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  color: var(--jade-green);
-
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--jade-green);
-    box-shadow: 0 0 6px var(--jade-green);
-  }
+  display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--jade-green);
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--jade-green); box-shadow: 0 0 6px var(--jade-green); }
 }
 
 /* Chat messages */
 .chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 12px;
 }
 
 .chat-msg {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  &.user {
-    align-items: flex-end;
-
-    .msg-bubble {
-      background: rgba(90, 158, 111, 0.1);
-      border-color: rgba(90, 158, 111, 0.2);
-      margin-left: 24px;
-    }
+  display: flex; flex-direction: column; gap: 8px;
+  &.user { align-items: flex-end;
+    .msg-bubble { background: rgba(90,158,111,0.1); border-color: rgba(90,158,111,0.2); margin-left: 24px; }
   }
-
   &.assistant {
-    .msg-bubble {
-      background: rgba(201, 169, 110, 0.06);
-      border-color: rgba(201, 169, 110, 0.15);
-      margin-right: 12px;
-    }
+    .msg-bubble { background: rgba(201,169,110,0.06); border-color: rgba(201,169,110,0.15); margin-right: 12px; }
   }
 }
 
 .msg-bubble {
-  padding: 10px 14px;
-  border: 1px solid;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  line-height: 1.7;
-  white-space: pre-wrap;
-
-  &.typing {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-  }
+  padding: 10px 14px; border: 1px solid; border-radius: 10px;
+  font-size: 0.85rem; color: var(--text-primary); line-height: 1.7; white-space: pre-wrap;
+  &.typing { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.78rem; }
 }
 
 .msg-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
+  display: flex; gap: 8px; margin-top: 8px;
+  padding-top: 8px; border-top: 1px solid var(--border-subtle);
 }
 
 .msg-btn {
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  color: var(--amber-gold);
-  background: rgba(201,169,110,0.06);
-  border: 1px solid rgba(201,169,110,0.15);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(201,169,110,0.12);
-    border-color: var(--border-gold);
-  }
+  padding: 4px 10px; font-size: 0.72rem;
+  color: var(--amber-gold); background: rgba(201,169,110,0.06);
+  border: 1px solid rgba(201,169,110,0.15); border-radius: 4px;
+  cursor: pointer; transition: all 0.2s;
+  &:hover { background: rgba(201,169,110,0.12); border-color: var(--border-gold); }
 }
 
 .t-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--amber-gold);
+  width: 5px; height: 5px; border-radius: 50%; background: var(--amber-gold);
   animation: typingPulse 1.4s ease-in-out infinite;
-
   &:nth-child(2) { animation-delay: 0.2s; }
   &:nth-child(3) { animation-delay: 0.4s; }
 }
@@ -1305,96 +1227,40 @@ const handleLogout = () => {
   30% { opacity: 1; transform: scale(1.2); }
 }
 
-.t-label {
-  font-size: 0.75rem;
-}
+.t-label { font-size: 0.75rem; }
 
 /* Chat Input */
-.chat-input-area {
-  border-top: 1px solid var(--border-subtle);
-  background: rgba(11,17,32,0.6);
-  flex-shrink: 0;
-}
+.chat-input-area { border-top: 1px solid var(--border-subtle); background: rgba(11,17,32,0.6); flex-shrink: 0; }
 
-.input-plugins {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px 0;
-  flex-wrap: wrap;
-}
-
-.ip-label {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-}
-
+.input-plugins { display: flex; align-items: center; gap: 6px; padding: 6px 12px 0; flex-wrap: wrap; }
+.ip-label { font-size: 0.68rem; color: var(--text-muted); }
 .ip-tag {
-  padding: 1px 8px;
-  font-size: 0.65rem;
-  color: var(--jade-green);
-  background: rgba(90,158,111,0.08);
-  border: 1px solid rgba(90,158,111,0.2);
-  border-radius: 8px;
+  padding: 1px 8px; font-size: 0.65rem; color: var(--jade-green);
+  background: rgba(90,158,111,0.08); border: 1px solid rgba(90,158,111,0.2); border-radius: 8px;
 }
 
-.input-wrap {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  align-items: flex-end;
-}
+.input-wrap { display: flex; gap: 8px; padding: 8px 12px; align-items: flex-end; }
 
 .chat-textarea {
-  flex: 1;
-  padding: 8px 12px;
-  background: rgba(11,17,32,0.5);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-family: var(--font-body);
-  font-size: 0.85rem;
-  resize: none;
-  outline: none;
-  transition: border-color 0.3s;
-
-  &:focus {
-    border-color: var(--border-gold);
-  }
-
-  &::placeholder {
-    color: var(--text-muted);
-  }
+  flex: 1; padding: 8px 12px;
+  background: rgba(11,17,32,0.5); border: 1px solid var(--border-subtle);
+  border-radius: 8px; color: var(--text-primary);
+  font-family: var(--font-body); font-size: 0.85rem;
+  resize: none; outline: none; transition: border-color 0.3s;
+  &:focus { border-color: var(--border-gold); }
+  &::placeholder { color: var(--text-muted); }
 }
 
 .btn-send {
-  padding: 8px 18px;
-  font-family: var(--font-heading);
-  font-size: 0.88rem;
-  letter-spacing: 0.15em;
+  padding: 8px 18px; font-family: var(--font-heading);
+  font-size: 0.88rem; letter-spacing: 0.15em;
   color: var(--amber-gold);
   background: linear-gradient(135deg, rgba(201,169,110,0.15), rgba(201,169,110,0.05));
-  border: 1px solid var(--border-gold);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
-  flex-shrink: 0;
-
-  &:hover:not(:disabled) {
-    box-shadow: var(--shadow-gold);
-    color: var(--xuan-paper);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  border: 1px solid var(--border-gold); border-radius: 8px;
+  cursor: pointer; transition: all 0.3s; flex-shrink: 0;
+  &:hover:not(:disabled) { box-shadow: var(--shadow-gold); color: var(--xuan-paper); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
-.input-hint {
-  padding: 0 12px 6px;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  text-align: right;
-}
+.input-hint { padding: 0 12px 6px; font-size: 0.65rem; color: var(--text-muted); text-align: right; }
 </style>

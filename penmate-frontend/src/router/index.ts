@@ -12,6 +12,16 @@ const routes = [
     component: () => import('@/views/Login/index.vue')
   },
   {
+    path: '/mybooks',
+    name: 'MyBooks',
+    component: () => import('@/views/MyBooks/index.vue')
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/views/Profile/index.vue')
+  },
+  {
     path: '/workbench',
     name: 'Workbench',
     component: () => import('@/views/Workbench/index.vue')
