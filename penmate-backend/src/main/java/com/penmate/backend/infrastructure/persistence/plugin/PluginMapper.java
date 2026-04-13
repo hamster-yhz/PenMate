@@ -1,0 +1,101 @@
+package com.penmate.backend.infrastructure.persistence.plugin;
+
+import com.penmate.backend.domain.plugin.model.PluginCallLog;
+import com.penmate.backend.domain.plugin.model.PluginCatalogItem;
+import com.penmate.backend.domain.plugin.model.PluginProjectInstall;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
+
+@Mapper
+public interface PluginMapper {
+
+    @Select("""
+            SELECT id, code, name, category, provider, status, latest_version, created_at, updated_at
+            FROM plugin_catalog
+            ORDER BY id DESC
+            """)
+    List<PluginCatalogItem> listCatalog();
+
+    @Select("""
+            SELECT id, code, name, category, provider, status, latest_version, created_at, updated_at
+            FROM plugin_catalog
+            WHERE code = #{pluginCode}
+            LIMIT 1
+            """)
+    PluginCatalogItem getCatalogByCode(@Param("pluginCode") String pluginCode);
+
+    @Select("""
+            SELECT id
+            FROM plugin_catalog
+            WHERE code = #{pluginCode}
+            LIMIT 1
+            """)
+    Long findCatalogIdByCode(@Param("pluginCode") String pluginCode);
+
+    @Select("""
+            SELECT i.id, i.project_id, i.plugin_id, c.code AS plugin_code, c.name AS plugin_name,
+                   i.version, CAST(i.config_json AS CHAR) AS config_json,
+                   i.enabled, i.installed_by, i.installed_at, i.updated_at
+            FROM plugin_project_installs i
+            JOIN plugin_catalog c ON c.id = i.plugin_id
+            WHERE i.project_id = #{projectId}
+            ORDER BY i.id DESC
+            """)
+    List<PluginProjectInstall> listProjectInstalls(@Param("projectId") Long projectId);
+
+    @Insert("""
+            INSERT INTO plugin_project_installs(project_id, plugin_id, version, config_json, enabled, installed_by)
+            VALUES (#{projectId}, #{pluginId}, #{version}, #{configJson}, #{enabled}, #{installedBy})
+            ON DUPLICATE KEY UPDATE
+                version = VALUES(version),
+                config_json = VALUES(config_json),
+                enabled = VALUES(enabled),
+                updated_at = CURRENT_TIMESTAMP(3)
+            """)
+    int insertInstall(@Param("projectId") Long projectId,
+                      @Param("pluginId") Long pluginId,
+                      @Param("version") String version,
+                      @Param("configJson") String configJson,
+                      @Param("enabled") boolean enabled,
+                      @Param("installedBy") Long installedBy);
+
+    @Update("""
+            UPDATE plugin_project_installs i
+            JOIN plugin_catalog c ON c.id = i.plugin_id
+            SET i.enabled = COALESCE(#{enabled}, i.enabled),
+                i.config_json = COALESCE(#{configJson}, i.config_json),
+                i.updated_at = CURRENT_TIMESTAMP(3)
+            WHERE i.project_id = #{projectId} AND c.code = #{pluginCode}
+            """)
+    int updateInstall(@Param("projectId") Long projectId,
+                      @Param("pluginCode") String pluginCode,
+                      @Param("enabled") Boolean enabled,
+                      @Param("configJson") String configJson);
+
+    @Update("""
+            UPDATE plugin_project_installs i
+            JOIN plugin_catalog c ON c.id = i.plugin_id
+            SET i.enabled = 0,
+                i.updated_at = CURRENT_TIMESTAMP(3)
+            WHERE i.project_id = #{projectId} AND c.code = #{pluginCode}
+            """)
+    int deleteInstall(@Param("projectId") Long projectId, @Param("pluginCode") String pluginCode);
+
+    @Select("""
+            SELECT id, project_id, plugin_code, tool_name,
+                   CAST(request_json AS CHAR) AS request_json,
+                   CAST(response_json AS CHAR) AS response_json,
+                   latency_ms, status, error_msg, created_at
+            FROM plugin_call_logs
+            WHERE project_id = #{projectId}
+            ORDER BY id DESC
+            LIMIT 100
+            """)
+    List<PluginCallLog> listCallLogs(@Param("projectId") Long projectId);
+}
+

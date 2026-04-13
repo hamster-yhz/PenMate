@@ -1,0 +1,64 @@
+package com.penmate.backend.infrastructure.persistence.iam;
+
+import com.penmate.backend.domain.iam.model.IamRole;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
+
+@Mapper
+public interface IamRoleMapper {
+
+    @Select("""
+            SELECT id, name, code, description, is_system
+            FROM iam_roles
+            WHERE deleted_at IS NULL
+            ORDER BY id DESC
+            """)
+    List<IamRole> findAll();
+
+    @Select("""
+            SELECT id, name, code, description, is_system
+            FROM iam_roles
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    IamRole findById(@Param("id") Long id);
+
+    @Insert("""
+            INSERT INTO iam_roles(name, code, description, is_system)
+            VALUES(#{name}, #{code}, #{description}, #{isSystem})
+            """)
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insert(IamRole role);
+
+    @Update("""
+            UPDATE iam_roles
+            SET name = #{name}, description = #{description}
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int updateBasic(IamRole role);
+
+    @Update("""
+            UPDATE iam_roles
+            SET deleted_at = CURRENT_TIMESTAMP(3)
+            WHERE id = #{id} AND deleted_at IS NULL
+            """)
+    int softDelete(@Param("id") Long id);
+
+    @Insert("""
+            INSERT INTO iam_role_permissions(role_id, permission_id)
+            VALUES(#{roleId}, #{permissionId})
+            """)
+    int assignPermission(@Param("roleId") Long roleId, @Param("permissionId") Long permissionId);
+
+    @Update("""
+            DELETE FROM iam_role_permissions
+            WHERE role_id = #{roleId} AND permission_id = #{permissionId}
+            """)
+    int removePermission(@Param("roleId") Long roleId, @Param("permissionId") Long permissionId);
+}
+

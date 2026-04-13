@@ -1,10 +1,10 @@
 package com.penmate.backend.application.approval;
 
+import com.penmate.backend.application.approval.command.CreateApprovalCommand;
+import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
-import com.penmate.backend.infrastructure.persistence.approval.ApprovalRequestMapper;
-import com.penmate.backend.infrastructure.persistence.audit.AuditLogMapper;
-import com.penmate.backend.interfaces.api.approval.dto.CreateApprovalRequestDto;
-import com.penmate.backend.interfaces.api.approval.dto.ReviewApprovalRequestDto;
+import com.penmate.backend.domain.approval.repository.ApprovalRequestRepository;
+import com.penmate.backend.domain.shared.service.AuditService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,57 +13,57 @@ import java.util.UUID;
 @Service
 public class ApprovalApplicationService {
 
-    private final ApprovalRequestMapper approvalRequestMapper;
-    private final AuditLogMapper auditLogMapper;
+    private final ApprovalRequestRepository approvalRequestRepository;
+    private final AuditService auditService;
 
-    public ApprovalApplicationService(ApprovalRequestMapper approvalRequestMapper,
-                                      AuditLogMapper auditLogMapper) {
-        this.approvalRequestMapper = approvalRequestMapper;
-        this.auditLogMapper = auditLogMapper;
+    public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
+                                      AuditService auditService) {
+        this.approvalRequestRepository = approvalRequestRepository;
+        this.auditService = auditService;
     }
 
-    public ApprovalRequest create(CreateApprovalRequestDto dto, String traceId) {
+    public ApprovalRequest create(CreateApprovalCommand command, String traceId) {
         ApprovalRequest request = new ApprovalRequest();
-        request.setProjectId(dto.getProjectId());
-        request.setTaskId(dto.getTaskId());
-        request.setApprovalType(dto.getApprovalType());
-        request.setPayloadJson(dto.getPayloadJson());
-        request.setRiskLevel(dto.getRiskLevel());
-        request.setRequestedBy(dto.getRequestedBy());
-        int affected = approvalRequestMapper.insert(request);
+        request.setProjectId(command.projectId());
+        request.setTaskId(command.taskId());
+        request.setApprovalType(command.approvalType());
+        request.setPayloadJson(command.payloadJson());
+        request.setRiskLevel(command.riskLevel());
+        request.setRequestedBy(command.requestedBy());
+        int affected = approvalRequestRepository.insert(request);
         if (affected != 1) {
             throw new IllegalArgumentException("Failed to create approval request");
         }
-        writeAudit(traceId, dto.getRequestedBy(), "approval", "create", "agent_approval_requests", String.valueOf(request.getId()), dto.getPayloadJson(), 201);
+        writeAudit(traceId, command.requestedBy(), "approval", "create", "agent_approval_requests", String.valueOf(request.getId()), command.payloadJson(), 201);
         return request;
     }
 
     public List<ApprovalRequest> listByProject(Long projectId) {
-        return approvalRequestMapper.findByProjectId(projectId);
+        return approvalRequestRepository.findByProjectId(projectId);
     }
 
     public ApprovalRequest detail(Long approvalId) {
-        ApprovalRequest request = approvalRequestMapper.findById(approvalId);
+        ApprovalRequest request = approvalRequestRepository.findById(approvalId);
         if (request == null) {
             throw new IllegalArgumentException("Approval request not found");
         }
         return request;
     }
 
-    public void approve(Long approvalId, ReviewApprovalRequestDto dto, String traceId) {
-        int affected = approvalRequestMapper.approve(approvalId, dto.getReviewedBy(), dto.getComment());
+    public void approve(Long approvalId, ReviewApprovalCommand command, String traceId) {
+        int affected = approvalRequestRepository.approve(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
             throw new IllegalArgumentException("Approval is not in pending status or not found");
         }
-        writeAudit(traceId, dto.getReviewedBy(), "approval", "approve", "agent_approval_requests", String.valueOf(approvalId), dto.getComment(), 200);
+        writeAudit(traceId, command.reviewedBy(), "approval", "approve", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
     }
 
-    public void reject(Long approvalId, ReviewApprovalRequestDto dto, String traceId) {
-        int affected = approvalRequestMapper.reject(approvalId, dto.getReviewedBy(), dto.getComment());
+    public void reject(Long approvalId, ReviewApprovalCommand command, String traceId) {
+        int affected = approvalRequestRepository.reject(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
             throw new IllegalArgumentException("Approval is not in pending status or not found");
         }
-        writeAudit(traceId, dto.getReviewedBy(), "approval", "reject", "agent_approval_requests", String.valueOf(approvalId), dto.getComment(), 200);
+        writeAudit(traceId, command.reviewedBy(), "approval", "reject", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
     }
 
     private void writeAudit(String traceId,
@@ -75,7 +75,7 @@ public class ApprovalApplicationService {
                             String requestJson,
                             int responseCode) {
         String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditLogMapper.insert(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
 

@@ -1,6 +1,8 @@
 package com.penmate.backend.interfaces.api.approval;
 
 import com.penmate.backend.application.approval.ApprovalApplicationService;
+import com.penmate.backend.application.approval.command.CreateApprovalCommand;
+import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.interfaces.api.approval.dto.CreateApprovalRequestDto;
 import com.penmate.backend.interfaces.api.approval.dto.ReviewApprovalRequestDto;
@@ -31,8 +33,15 @@ public class ApprovalController {
     public ApiResponse<ApprovalRequest> create(@PathVariable Long projectId,
                                                @Valid @RequestBody CreateApprovalRequestDto dto,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        dto.setProjectId(projectId);
-        ApprovalRequest created = approvalApplicationService.create(dto, traceId);
+        CreateApprovalCommand command = new CreateApprovalCommand(
+                projectId,
+                dto.getTaskId(),
+                dto.getApprovalType(),
+                dto.getPayloadJson(),
+                dto.getRiskLevel(),
+                dto.getRequestedBy()
+        );
+        ApprovalRequest created = approvalApplicationService.create(command, traceId);
         return ApiResponse.success(created, traceId);
     }
 
@@ -57,7 +66,8 @@ public class ApprovalController {
     public ApiResponse<String> approve(@PathVariable Long approvalId,
                                        @Valid @RequestBody ReviewApprovalRequestDto dto,
                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        approvalApplicationService.approve(approvalId, dto, traceId);
+        ReviewApprovalCommand command = new ReviewApprovalCommand(dto.getReviewedBy(), dto.getComment());
+        approvalApplicationService.approve(approvalId, command, traceId);
         return ApiResponse.success("approved", traceId);
     }
 
@@ -65,7 +75,8 @@ public class ApprovalController {
     public ApiResponse<String> reject(@PathVariable Long approvalId,
                                       @Valid @RequestBody ReviewApprovalRequestDto dto,
                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        approvalApplicationService.reject(approvalId, dto, traceId);
+        ReviewApprovalCommand command = new ReviewApprovalCommand(dto.getReviewedBy(), dto.getComment());
+        approvalApplicationService.reject(approvalId, command, traceId);
         return ApiResponse.success("rejected", traceId);
     }
 }
