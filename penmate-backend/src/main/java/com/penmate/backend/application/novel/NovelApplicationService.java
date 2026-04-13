@@ -10,6 +10,7 @@ import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.shared.service.AuditService;
+import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.application.novel.command.NovelCommands.AddMemberCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateCardCommand;
@@ -37,11 +38,14 @@ public class NovelApplicationService {
 
     private final NovelGateway novelGateway;
     private final AuditService auditService;
+    private final RealtimeEventService realtimeEventService;
 
     public NovelApplicationService(NovelGateway novelGateway,
-                                   AuditService auditService) {
+                                   AuditService auditService,
+                                   RealtimeEventService realtimeEventService) {
         this.novelGateway = novelGateway;
         this.auditService = auditService;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public List<NovelProject> listProjects() {
@@ -338,6 +342,12 @@ public class NovelApplicationService {
         if (affected != 1) {
             throw new IllegalArgumentException("Failed to create outline node");
         }
+        realtimeEventService.publishProjectEvent(projectId, "outline.node.created", Map.of(
+                "nodeId", node.getId(),
+                "parentId", node.getParentId(),
+                "title", node.getTitle(),
+                "nodeType", node.getNodeType()
+        ));
         writeAudit(traceId, operatorId, "novel", "create-outline-node", "novel_outline_nodes", String.valueOf(node.getId()), command.title(), 201);
         return node;
     }
@@ -415,6 +425,12 @@ public class NovelApplicationService {
         if (affected != 1) {
             throw new IllegalArgumentException("Failed to update card");
         }
+        realtimeEventService.publishProjectEvent(projectId, "card.updated", Map.of(
+                "cardId", cardId,
+                "cardType", card.getCardType(),
+                "name", card.getName(),
+                "summary", card.getSummary()
+        ));
         writeAudit(traceId, operatorId, "novel", "update-card", "novel_cards", String.valueOf(cardId), command.name(), 200);
         return getCard(projectId, cardId);
     }

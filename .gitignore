@@ -38,6 +38,9 @@ build/
 ### Mac OS ###
 .DS_Store
 
+### Local env ###
+penmate-backend/.env
+
 ### roo ###
 .roo
 .roomodes

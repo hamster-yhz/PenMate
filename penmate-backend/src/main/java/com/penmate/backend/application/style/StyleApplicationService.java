@@ -5,6 +5,7 @@ import com.penmate.backend.application.style.command.StyleCommands.CreateStyleCo
 import com.penmate.backend.application.style.command.StyleCommands.SwitchStyleCommand;
 import com.penmate.backend.application.style.command.StyleCommands.UpdateStyleCommand;
 import com.penmate.backend.domain.shared.service.AuditService;
+import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.domain.style.model.StyleProfile;
 import com.penmate.backend.domain.style.repository.StyleRepository;
 import org.springframework.stereotype.Service;
@@ -19,11 +20,14 @@ public class StyleApplicationService {
 
     private final StyleRepository styleRepository;
     private final AuditService auditService;
+    private final RealtimeEventService realtimeEventService;
 
     public StyleApplicationService(StyleRepository styleRepository,
-                                   AuditService auditService) {
+                                   AuditService auditService,
+                                   RealtimeEventService realtimeEventService) {
         this.styleRepository = styleRepository;
         this.auditService = auditService;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public List<StyleProfile> listStyles(Long projectId) {
@@ -106,6 +110,13 @@ public class StyleApplicationService {
                 Boolean.TRUE.equals(command.warningConfirmed()),
                 command.reason()
         );
+
+        realtimeEventService.publishProjectEvent(projectId, "style.switched", Map.of(
+                "fromStyleId", fromStyle == null ? null : fromStyle.getId(),
+                "toStyleId", toStyle.getId(),
+                "operatorId", command.operatorId(),
+                "reason", command.reason()
+        ));
 
         writeAudit(traceId, command.operatorId(), "style", "switch-style", "style_profiles", String.valueOf(toStyle.getId()), command.reason(), 200);
         return getStyle(projectId, command.toStyleId());

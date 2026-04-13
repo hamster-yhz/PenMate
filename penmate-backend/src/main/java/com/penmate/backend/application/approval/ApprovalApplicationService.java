@@ -5,9 +5,11 @@ import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.approval.repository.ApprovalRequestRepository;
 import com.penmate.backend.domain.shared.service.AuditService;
+import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -15,11 +17,14 @@ public class ApprovalApplicationService {
 
     private final ApprovalRequestRepository approvalRequestRepository;
     private final AuditService auditService;
+    private final RealtimeEventService realtimeEventService;
 
     public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
-                                      AuditService auditService) {
+                                      AuditService auditService,
+                                      RealtimeEventService realtimeEventService) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.auditService = auditService;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public ApprovalRequest create(CreateApprovalCommand command, String traceId) {
@@ -34,6 +39,13 @@ public class ApprovalApplicationService {
         if (affected != 1) {
             throw new IllegalArgumentException("Failed to create approval request");
         }
+        realtimeEventService.publishProjectEvent(command.projectId(), "approval.created", Map.of(
+                "approvalId", request.getId(),
+                "taskId", request.getTaskId(),
+                "approvalType", request.getApprovalType(),
+                "riskLevel", request.getRiskLevel(),
+                "status", request.getStatus()
+        ));
         writeAudit(traceId, command.requestedBy(), "approval", "create", "agent_approval_requests", String.valueOf(request.getId()), command.payloadJson(), 201);
         return request;
     }
@@ -55,6 +67,12 @@ public class ApprovalApplicationService {
         if (affected != 1) {
             throw new IllegalArgumentException("Approval is not in pending status or not found");
         }
+        realtimeEventService.publishProjectEvent(detail(approvalId).getProjectId(), "approval.reviewed", Map.of(
+                "approvalId", approvalId,
+                "status", "approved",
+                "reviewedBy", command.reviewedBy(),
+                "comment", command.comment()
+        ));
         writeAudit(traceId, command.reviewedBy(), "approval", "approve", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
     }
 
@@ -63,6 +81,12 @@ public class ApprovalApplicationService {
         if (affected != 1) {
             throw new IllegalArgumentException("Approval is not in pending status or not found");
         }
+        realtimeEventService.publishProjectEvent(detail(approvalId).getProjectId(), "approval.reviewed", Map.of(
+                "approvalId", approvalId,
+                "status", "rejected",
+                "reviewedBy", command.reviewedBy(),
+                "comment", command.comment()
+        ));
         writeAudit(traceId, command.reviewedBy(), "approval", "reject", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
     }
 

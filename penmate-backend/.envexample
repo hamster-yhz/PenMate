@@ -1,0 +1,67 @@
+# Server
+SERVER_PORT=8080
+
+# MySQL
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=penmate
+DB_USER=root
+DB_PASS=replace-with-db-password
+DB_USE_SSL=false
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_USER=
+REDIS_PASS=
+REDIS_DB=0
+REDIS_TIMEOUT=3s
+
+# RabbitMQ
+RABBIT_HOST=localhost
+RABBIT_PORT=5672
+RABBIT_USER=guest
+RABBIT_PASS=guest
+RABBIT_VHOST=/
+
+# Flyway
+FLYWAY_ENABLED=true
+FLYWAY_BASELINE_ON_MIGRATE=true
+
+# OpenAPI and Swagger
+OPENAPI_ENABLED=true
+SWAGGER_UI_ENABLED=true
+
+# JWT (must be changed in production)
+JWT_SECRET=replace-with-at-least-32-char-secret
+JWT_ISSUER=penmate
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# Idempotency
+IDEMPOTENCY_KEY_PREFIX=idempotency:
+IDEMPOTENCY_TTL_SECONDS=86400
+
+# Object Storage (S3 compatible)
+STORAGE_ENDPOINT=http://localhost:9000
+STORAGE_ACCESS_KEY=minioadmin
+STORAGE_SECRET_KEY=replace-with-storage-secret
+STORAGE_BUCKET=penmate
+STORAGE_REGION=us-east-1
+STORAGE_SECURE=false
+STORAGE_PRESIGN_EXPIRE_MINUTES=15
+
+# Vector DB
+VECTOR_PROVIDER=milvus
+VECTOR_ENDPOINT=http://localhost:19530
+VECTOR_API_KEY=
+VECTOR_COLLECTION_PREFIX=penmate_
+
+# LLM provider
+LLM_PROVIDER=openai
+LLM_BASE_URL=https://api.openai.com
+LLM_API_KEY=
+
+# Actuator
+HEALTH_SHOW_DETAILS=never
+
