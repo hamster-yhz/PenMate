@@ -15,6 +15,10 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * ModelApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class ModelApplicationService {
 
@@ -27,18 +31,42 @@ public class ModelApplicationService {
         this.auditService = auditService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @return 出参：处理结果
+     */
     public List<ModelProvider> listProviders() {
         return modelRepository.listProviders();
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param providerCode 入参：providerCode
+     * @return 出参：处理结果
+     */
     public List<ModelProviderModel> listProviderModels(String providerCode) {
         return modelRepository.listProviderModels(providerCode);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param userId 入参：userId
+     * @return 出参：处理结果
+     */
     public List<ModelUserApiKey> listUserKeys(Long userId) {
         return modelRepository.listUserKeys(userId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param userId 入参：userId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void createKey(Long userId, CreateModelKeyCommand command, String traceId) {
         boolean toDefault = Boolean.TRUE.equals(command.isDefault());
         if (toDefault) {
@@ -59,6 +87,14 @@ public class ModelApplicationService {
         writeAudit(traceId, command.operatorId(), "model", "create-model-key", "model_user_api_keys", userId.toString(), null, 200);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param userId 入参：userId
+     * @param keyId 入参：keyId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void updateKey(Long userId, Long keyId, UpdateModelKeyCommand command, String traceId) {
         if (Boolean.TRUE.equals(command.isDefault())) {
             modelRepository.clearDefaultUserKey(userId);
@@ -80,6 +116,14 @@ public class ModelApplicationService {
         writeAudit(traceId, command.operatorId(), "model", "update-model-key", "model_user_api_keys", keyId.toString(), null, 200);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param userId 入参：userId
+     * @param keyId 入参：keyId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteKey(Long userId, Long keyId, Long operatorId, String traceId) {
         int affected = modelRepository.softDeleteUserKey(userId, keyId);
         if (affected != 1) {
@@ -88,10 +132,23 @@ public class ModelApplicationService {
         writeAudit(traceId, operatorId, "model", "delete-model-key", "model_user_api_keys", keyId.toString(), null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<ModelProjectPolicy> listPolicies(Long projectId) {
         return modelRepository.listProjectPolicies(projectId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void createPolicy(Long projectId, CreatePolicyCommand command, String traceId) {
         boolean toDefault = Boolean.TRUE.equals(command.isDefault());
         if (toDefault) {
@@ -115,6 +172,14 @@ public class ModelApplicationService {
         writeAudit(traceId, command.operatorId(), "model", "create-model-policy", "model_project_policies", projectId.toString(), null, 200);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param policyId 入参：policyId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void updatePolicy(Long projectId, Long policyId, UpdatePolicyCommand command, String traceId) {
         if (Boolean.TRUE.equals(command.isDefault())) {
             modelRepository.clearDefaultPolicy(projectId);
@@ -138,6 +203,14 @@ public class ModelApplicationService {
         writeAudit(traceId, command.operatorId(), "model", "update-model-policy", "model_project_policies", policyId.toString(), null, 200);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param policyId 入参：policyId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deletePolicy(Long projectId, Long policyId, Long operatorId, String traceId) {
         int affected = modelRepository.softDeletePolicy(projectId, policyId);
         if (affected != 1) {
@@ -146,6 +219,14 @@ public class ModelApplicationService {
         writeAudit(traceId, operatorId, "model", "delete-model-policy", "model_project_policies", policyId.toString(), null, 200);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param policyId 入参：policyId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void setDefaultPolicy(Long projectId, Long policyId, Long operatorId, String traceId) {
         modelRepository.clearDefaultPolicy(projectId);
         int affected = modelRepository.setDefaultPolicy(projectId, policyId);

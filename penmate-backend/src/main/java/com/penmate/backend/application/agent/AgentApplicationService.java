@@ -16,6 +16,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * AgentApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class AgentApplicationService {
 
@@ -31,10 +35,24 @@ public class AgentApplicationService {
         this.realtimeEventService = realtimeEventService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<AgentConversation> listConversations(Long projectId) {
         return agentRepository.listConversations(projectId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public AgentConversation createConversation(Long projectId,
                                                 CreateConversationCommand command,
                                                 String traceId) {
@@ -53,11 +71,27 @@ public class AgentApplicationService {
         return conversation;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param conversationId 入参：conversationId
+     * @return 出参：处理结果
+     */
     public List<AgentMessage> listMessages(Long projectId, Long conversationId) {
         ensureConversation(projectId, conversationId);
         return agentRepository.listMessages(conversationId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param conversationId 入参：conversationId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public AgentMessage createMessage(Long projectId,
                                       Long conversationId,
                                       CreateMessageCommand command,
@@ -81,6 +115,14 @@ public class AgentApplicationService {
         return message;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public AgentGenerationTask createGeneration(Long projectId,
                                                 CreateGenerationCommand command,
                                                 String traceId) {
@@ -107,6 +149,13 @@ public class AgentApplicationService {
         return getGeneration(projectId, task.getId());
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param taskId 入参：taskId
+     * @return 出参：处理结果
+     */
     public AgentGenerationTask getGeneration(Long projectId, Long taskId) {
         AgentGenerationTask task = agentRepository.findGenerationTask(projectId, taskId);
         if (task == null) {
@@ -115,6 +164,15 @@ public class AgentApplicationService {
         return task;
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param taskId 入参：taskId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public AgentGenerationTask applyGeneration(Long projectId,
                                                Long taskId,
                                                ApplyGenerationCommand command,

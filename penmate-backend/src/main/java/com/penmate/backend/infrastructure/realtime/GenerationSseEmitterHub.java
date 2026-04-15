@@ -8,6 +8,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * GenerationSseEmitterHub。
+ * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ */
 @Component
 public class GenerationSseEmitterHub {
 
@@ -15,6 +19,12 @@ public class GenerationSseEmitterHub {
 
     private final ConcurrentHashMap<Long, Set<SseEmitter>> emittersByTask = new ConcurrentHashMap<>();
 
+    /**
+     * 创建业务数据。
+     *
+     * @param taskId 入参：taskId
+     * @return 出参：处理结果
+     */
     public SseEmitter create(Long taskId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         emittersByTask.computeIfAbsent(taskId, k -> ConcurrentHashMap.newKeySet()).add(emitter);
@@ -31,6 +41,13 @@ public class GenerationSseEmitterHub {
         return emitter;
     }
 
+    /**
+     * 发布业务状态。
+     *
+     * @param taskId 入参：taskId
+     * @param eventName 入参：eventName
+     * @param data 入参：data
+     */
     public void publish(Long taskId, String eventName, Object data) {
         Set<SseEmitter> emitters = emittersByTask.get(taskId);
         if (emitters == null || emitters.isEmpty()) {
@@ -49,6 +66,11 @@ public class GenerationSseEmitterHub {
         }
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param taskId 入参：taskId
+     */
     public void complete(Long taskId) {
         Set<SseEmitter> emitters = emittersByTask.remove(taskId);
         if (emitters == null) {

@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * ApprovalApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class ApprovalApplicationService {
 
@@ -27,6 +31,13 @@ public class ApprovalApplicationService {
         this.realtimeEventService = realtimeEventService;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public ApprovalRequest create(CreateApprovalCommand command, String traceId) {
         ApprovalRequest request = new ApprovalRequest();
         request.setProjectId(command.projectId());
@@ -50,10 +61,22 @@ public class ApprovalApplicationService {
         return request;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<ApprovalRequest> listByProject(Long projectId) {
         return approvalRequestRepository.findByProjectId(projectId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param approvalId 入参：approvalId
+     * @return 出参：处理结果
+     */
     public ApprovalRequest detail(Long approvalId) {
         ApprovalRequest request = approvalRequestRepository.findById(approvalId);
         if (request == null) {
@@ -62,6 +85,13 @@ public class ApprovalApplicationService {
         return request;
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param approvalId 入参：approvalId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void approve(Long approvalId, ReviewApprovalCommand command, String traceId) {
         int affected = approvalRequestRepository.approve(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
@@ -76,6 +106,13 @@ public class ApprovalApplicationService {
         writeAudit(traceId, command.reviewedBy(), "approval", "approve", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param approvalId 入参：approvalId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void reject(Long approvalId, ReviewApprovalCommand command, String traceId) {
         int affected = approvalRequestRepository.reject(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {

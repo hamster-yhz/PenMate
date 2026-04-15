@@ -33,6 +33,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * NovelApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class NovelApplicationService {
 
@@ -48,10 +52,21 @@ public class NovelApplicationService {
         this.realtimeEventService = realtimeEventService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @return 出参：处理结果
+     */
     public List<NovelProject> listProjects() {
         return novelGateway.findAllProjects();
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public NovelProject getProject(Long projectId) {
         NovelProject project = novelGateway.findProjectById(projectId);
         if (project == null) {
@@ -60,6 +75,13 @@ public class NovelApplicationService {
         return project;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelProject createProject(CreateProjectCommand command, String traceId) {
         NovelProject project = new NovelProject();
         project.setOwnerUserId(command.ownerUserId());
@@ -74,6 +96,14 @@ public class NovelApplicationService {
         return project;
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelProject updateProject(Long projectId, UpdateProjectCommand command, String traceId) {
         NovelProject existing = getProject(projectId);
         existing.setTitle(command.title());
@@ -87,6 +117,13 @@ public class NovelApplicationService {
         return getProject(projectId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteProject(Long projectId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteProject(projectId);
         if (affected != 1) {
@@ -95,10 +132,25 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "delete-project", "novel_projects", String.valueOf(projectId), null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<NovelVolume> listVolumes(Long projectId) {
         return novelGateway.findVolumesByProjectId(projectId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelVolume createVolume(Long projectId, CreateVolumeCommand command, Long operatorId, String traceId) {
         NovelVolume volume = new NovelVolume();
         volume.setProjectId(projectId);
@@ -113,6 +165,16 @@ public class NovelApplicationService {
         return volume;
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param volumeId 入参：volumeId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelVolume updateVolume(Long projectId, Long volumeId, UpdateVolumeCommand command, Long operatorId, String traceId) {
         NovelVolume volume = new NovelVolume();
         volume.setId(volumeId);
@@ -128,6 +190,14 @@ public class NovelApplicationService {
         return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getId())).findFirst().orElse(volume);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param volumeId 入参：volumeId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteVolume(Long projectId, Long volumeId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteVolume(projectId, volumeId);
         if (affected != 1) {
@@ -136,10 +206,23 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "delete-volume", "novel_volumes", String.valueOf(volumeId), null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<NovelChapter> listChapters(Long projectId) {
         return novelGateway.findChaptersByProjectId(projectId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @return 出参：处理结果
+     */
     public NovelChapter getChapter(Long projectId, Long chapterId) {
         NovelChapter chapter = novelGateway.findChapterByIdAndProjectId(projectId, chapterId);
         if (chapter == null) {
@@ -148,6 +231,15 @@ public class NovelApplicationService {
         return chapter;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelChapter createChapter(Long projectId, CreateChapterCommand command, Long operatorId, String traceId) {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(projectId);
@@ -171,6 +263,16 @@ public class NovelApplicationService {
         return chapter;
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelChapter updateChapter(Long projectId, Long chapterId, UpdateChapterCommand command, Long operatorId, String traceId) {
         NovelChapter chapter = getChapter(projectId, chapterId);
         chapter.setVolumeId(command.volumeId());
@@ -193,6 +295,14 @@ public class NovelApplicationService {
         return getChapter(projectId, chapterId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteChapter(Long projectId, Long chapterId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteChapter(projectId, chapterId);
         if (affected != 1) {
@@ -201,6 +311,14 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "delete-chapter", "novel_chapters", String.valueOf(chapterId), null, 200);
     }
 
+    /**
+     * 发布业务状态。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void publishChapter(Long projectId, Long chapterId, Long operatorId, String traceId) {
         int affected = novelGateway.publishChapter(projectId, chapterId);
         if (affected != 1) {
@@ -209,10 +327,25 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "publish-chapter", "novel_chapters", String.valueOf(chapterId), null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<NovelMember> listMembers(Long projectId) {
         return novelGateway.findMembersByProjectId(projectId);
     }
 
+    /**
+     * 新增业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelMember addMember(Long projectId, AddMemberCommand command, Long operatorId, String traceId) {
         NovelMember member = new NovelMember();
         member.setProjectId(projectId);
@@ -226,6 +359,16 @@ public class NovelApplicationService {
         return listMembers(projectId).stream().filter(m -> command.userId().equals(m.getUserId())).findFirst().orElse(member);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param userId 入参：userId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelMember updateMember(Long projectId, Long userId, UpdateMemberCommand command, Long operatorId, String traceId) {
         int affected = novelGateway.updateMemberRole(projectId, userId, command.memberRole());
         if (affected != 1) {
@@ -235,6 +378,14 @@ public class NovelApplicationService {
         return listMembers(projectId).stream().filter(m -> userId.equals(m.getUserId())).findFirst().orElseThrow();
     }
 
+    /**
+     * 移除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param userId 入参：userId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void removeMember(Long projectId, Long userId, Long operatorId, String traceId) {
         int affected = novelGateway.deleteMember(projectId, userId);
         if (affected != 1) {
@@ -243,15 +394,32 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "remove-member", "novel_members", projectId + ":" + userId, null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @return 出参：处理结果
+     */
     public List<NovelChapterVersion> listChapterVersions(Long projectId, Long chapterId) {
         getChapter(projectId, chapterId);
         return novelGateway.findVersionsByChapterId(chapterId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelChapterVersion createChapterVersion(Long projectId, Long chapterId, CreateChapterVersionCommand command, String traceId) {
         NovelChapter chapter = getChapter(projectId, chapterId);
         NovelChapterVersion version = new NovelChapterVersion();
         version.setChapterId(chapterId);
+        // 复杂流程解析：基于当前最大版本号自增，保证版本链连续且可追溯。
         Integer maxVersionNo = novelGateway.maxVersionNo(chapterId);
         version.setVersionNo((maxVersionNo == null ? 0 : maxVersionNo) + 1);
         version.setChangeType(command.changeType());
@@ -269,6 +437,14 @@ public class NovelApplicationService {
         return version;
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param versionNo 入参：versionNo
+     * @return 出参：处理结果
+     */
     public NovelChapterVersion getChapterVersion(Long projectId, Long chapterId, Integer versionNo) {
         getChapter(projectId, chapterId);
         NovelChapterVersion version = novelGateway.findVersionByChapterAndVersion(chapterId, versionNo);
@@ -278,8 +454,19 @@ public class NovelApplicationService {
         return version;
     }
 
+    /**
+     * 恢复历史数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param versionNo 入参：versionNo
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelChapter restoreChapterVersion(Long projectId, Long chapterId, Integer versionNo, Long operatorId, String traceId) {
         NovelChapterVersion version = getChapterVersion(projectId, chapterId, versionNo);
+        // 复杂流程解析：恢复版本时仅回滚内容元数据，不覆盖章节业务字段，确保恢复行为可审计。
         int affected = novelGateway.updateChapterContentMeta(projectId, chapterId, version.getSnapshotObjectKey(), version.getSnapshotEtag(), version.getSnapshotSize(), version.getSnapshotChecksum(), "s3");
         if (affected != 1) {
             throw new IllegalArgumentException("Failed to restore chapter version");
@@ -288,11 +475,25 @@ public class NovelApplicationService {
         return getChapter(projectId, chapterId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @return 出参：处理结果
+     */
     public Map<String, String> getChapterContentUrl(Long projectId, Long chapterId) {
         NovelChapter chapter = getChapter(projectId, chapterId);
         return Map.of("url", "https://object.local/read/" + chapter.getContentObjectKey());
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @return 出参：处理结果
+     */
     public Map<String, String> getChapterContentUploadUrl(Long projectId, Long chapterId) {
         getChapter(projectId, chapterId);
         String objectKey = "novels/" + projectId + "/chapters/" + chapterId + "/" + UUID.randomUUID() + ".md";
@@ -302,6 +503,16 @@ public class NovelApplicationService {
         );
     }
 
+    /**
+     * 提交业务变更。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelChapter commitChapterContent(Long projectId, Long chapterId, CommitChapterContentCommand command, Long operatorId, String traceId) {
         int affected = novelGateway.updateChapterContentMeta(
                 projectId,
@@ -319,16 +530,39 @@ public class NovelApplicationService {
         return getChapter(projectId, chapterId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @param versionNo 入参：versionNo
+     * @return 出参：处理结果
+     */
     public Map<String, String> getChapterVersionSnapshotUrl(Long projectId, Long chapterId, Integer versionNo) {
         NovelChapterVersion version = getChapterVersion(projectId, chapterId, versionNo);
         return Map.of("url", "https://object.local/read/" + version.getSnapshotObjectKey());
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<NovelOutlineNode> listOutlineTree(Long projectId) {
         getProject(projectId);
         return novelGateway.findOutlineNodesByProjectId(projectId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelOutlineNode createOutlineNode(Long projectId, CreateOutlineNodeCommand command, Long operatorId, String traceId) {
         getProject(projectId);
         NovelOutlineNode node = new NovelOutlineNode();
@@ -352,6 +586,16 @@ public class NovelApplicationService {
         return node;
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param nodeId 入参：nodeId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelOutlineNode updateOutlineNode(Long projectId, Long nodeId, UpdateOutlineNodeCommand command, Long operatorId, String traceId) {
         NovelOutlineNode existing = novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
         if (existing == null) {
@@ -370,6 +614,15 @@ public class NovelApplicationService {
         return novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param nodeId 入参：nodeId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void moveOutlineNode(Long projectId, Long nodeId, MoveOutlineNodeCommand command, Long operatorId, String traceId) {
         int affected = novelGateway.moveOutlineNode(projectId, nodeId, command.parentId(), command.sortOrder() == null ? 0 : command.sortOrder());
         if (affected != 1) {
@@ -378,6 +631,14 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "move-outline-node", "novel_outline_nodes", String.valueOf(nodeId), null, 200);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param nodeId 入参：nodeId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteOutlineNode(Long projectId, Long nodeId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteOutlineNode(projectId, nodeId);
         if (affected != 1) {
@@ -386,11 +647,24 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "delete-outline-node", "novel_outline_nodes", String.valueOf(nodeId), null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<NovelCard> listCards(Long projectId) {
         getProject(projectId);
         return novelGateway.findCardsByProjectId(projectId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param cardId 入参：cardId
+     * @return 出参：处理结果
+     */
     public NovelCard getCard(Long projectId, Long cardId) {
         NovelCard card = novelGateway.findCardByIdAndProjectId(projectId, cardId);
         if (card == null) {
@@ -399,6 +673,15 @@ public class NovelApplicationService {
         return card;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelCard createCard(Long projectId, CreateCardCommand command, Long operatorId, String traceId) {
         getProject(projectId);
         NovelCard card = new NovelCard();
@@ -415,6 +698,16 @@ public class NovelApplicationService {
         return card;
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param cardId 入参：cardId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelCard updateCard(Long projectId, Long cardId, UpdateCardCommand command, Long operatorId, String traceId) {
         NovelCard card = getCard(projectId, cardId);
         card.setCardType(command.cardType() == null ? card.getCardType() : command.cardType());
@@ -435,6 +728,14 @@ public class NovelApplicationService {
         return getCard(projectId, cardId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param cardId 入参：cardId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteCard(Long projectId, Long cardId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteCard(projectId, cardId);
         if (affected != 1) {
@@ -443,11 +744,26 @@ public class NovelApplicationService {
         writeAudit(traceId, operatorId, "novel", "delete-card", "novel_cards", String.valueOf(cardId), null, 200);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<NovelCardRelation> listCardRelations(Long projectId) {
         getProject(projectId);
         return novelGateway.findCardRelationsByProjectId(projectId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public NovelCardRelation createCardRelation(Long projectId, CreateCardRelationCommand command, Long operatorId, String traceId) {
         getCard(projectId, command.fromCardId());
         getCard(projectId, command.toCardId());
@@ -465,6 +781,14 @@ public class NovelApplicationService {
         return relation;
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param relationId 入参：relationId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteCardRelation(Long projectId, Long relationId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteCardRelation(projectId, relationId);
         if (affected != 1) {

@@ -7,6 +7,10 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
+/**
+ * IamMenuMapper。
+ * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ */
 @Mapper
 public interface IamMenuMapper {
 

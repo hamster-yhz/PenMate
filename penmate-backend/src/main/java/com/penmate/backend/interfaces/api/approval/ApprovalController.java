@@ -19,6 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * ApprovalController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/novels/{projectId}/approvals")
 public class ApprovalController {
@@ -29,6 +33,14 @@ public class ApprovalController {
         this.approvalApplicationService = approvalApplicationService;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping
     public ApiResponse<ApprovalRequest> create(@PathVariable Long projectId,
                                                @Valid @RequestBody CreateApprovalRequestDto dto,
@@ -45,6 +57,14 @@ public class ApprovalController {
         return ApiResponse.success(created, traceId);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param status 入参：status
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping
     public ApiResponse<List<ApprovalRequest>> list(@PathVariable Long projectId,
                                                    @RequestParam(value = "status", required = false) String status,
@@ -56,12 +76,27 @@ public class ApprovalController {
         return ApiResponse.success(items, traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param approvalId 入参：approvalId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/{approvalId}")
     public ApiResponse<ApprovalRequest> detail(@PathVariable Long approvalId,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(approvalApplicationService.detail(approvalId), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param approvalId 入参：approvalId
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/{approvalId}/approve")
     public ApiResponse<String> approve(@PathVariable Long approvalId,
                                        @Valid @RequestBody ReviewApprovalRequestDto dto,
@@ -71,6 +106,14 @@ public class ApprovalController {
         return ApiResponse.success("approved", traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param approvalId 入参：approvalId
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/{approvalId}/reject")
     public ApiResponse<String> reject(@PathVariable Long approvalId,
                                       @Valid @RequestBody ReviewApprovalRequestDto dto,

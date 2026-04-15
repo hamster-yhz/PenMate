@@ -13,6 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * RealtimeEventServiceImpl。
+ * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ */
 @Service
 public class RealtimeEventServiceImpl implements RealtimeEventService {
 
@@ -28,6 +32,13 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 发布业务状态。
+     *
+     * @param projectId 入参：projectId
+     * @param eventType 入参：eventType
+     * @param data 入参：data
+     */
     @Override
     public void publishProjectEvent(Long projectId, String eventType, Object data) {
         if (projectId == null || eventType == null || eventType.isBlank()) {
@@ -41,6 +52,14 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         broadcast(projectId, payload);
     }
 
+    /**
+     * 发布业务状态。
+     *
+     * @param projectId 入参：projectId
+     * @param taskId 入参：taskId
+     * @param token 入参：token
+     * @param done 入参：done
+     */
     @Override
     public void publishGenerationToken(Long projectId, Long taskId, String token, boolean done) {
         Map<String, Object> tokenPayload = new LinkedHashMap<>();
@@ -48,6 +67,7 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         tokenPayload.put("token", token);
         tokenPayload.put("done", done);
 
+        // 复杂流程解析：同一token事件同时投递到WebSocket与SSE，兼容不同客户端订阅通道。
         publishProjectEvent(projectId, "generation.token", tokenPayload);
         generationSseEmitterHub.publish(taskId, "generation.token", tokenPayload);
         if (done) {
@@ -57,6 +77,7 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
     }
 
     private void broadcast(Long projectId, Map<String, Object> payload) {
+        // 复杂流程解析：广播前先清理失效连接，避免发送异常影响正常会话。
         sessionRegistry.cleanupClosed(projectId);
         Set<WebSocketSession> sessions = sessionRegistry.sessions(projectId);
         if (sessions.isEmpty()) {

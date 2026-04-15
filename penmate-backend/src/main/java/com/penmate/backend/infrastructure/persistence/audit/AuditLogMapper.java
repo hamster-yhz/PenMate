@@ -4,6 +4,10 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+/**
+ * AuditLogMapper。
+ * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ */
 @Mapper
 public interface AuditLogMapper {
 

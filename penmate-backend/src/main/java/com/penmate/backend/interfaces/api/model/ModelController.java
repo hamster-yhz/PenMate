@@ -26,6 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * ModelController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class ModelController {
@@ -36,23 +40,52 @@ public class ModelController {
         this.modelApplicationService = modelApplicationService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/model/providers")
     public ApiResponse<List<ModelProvider>> listProviders(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listProviders(), traceId);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param providerCode 入参：providerCode
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/model/providers/{providerCode}/models")
     public ApiResponse<List<ModelProviderModel>> listProviderModels(@PathVariable String providerCode,
                                                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listProviderModels(providerCode), traceId);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param userId 入参：userId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/model/keys")
     public ApiResponse<List<ModelUserApiKey>> listKeys(@RequestParam("userId") Long userId,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listUserKeys(userId), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param dto 入参：dto
+     * @param userId 入参：userId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/model/keys")
     public ApiResponse<String> createKey(@Valid @RequestBody CreateModelKeyDto dto,
                                          @RequestParam("userId") Long userId,
@@ -73,6 +106,16 @@ public class ModelController {
         return ApiResponse.success("created", traceId);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param keyId 入参：keyId
+     * @param dto 入参：dto
+     * @param userId 入参：userId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PatchMapping("/model/keys/{keyId}")
     public ApiResponse<String> updateKey(@PathVariable Long keyId,
                                          @RequestBody UpdateModelKeyDto dto,
@@ -94,6 +137,15 @@ public class ModelController {
         return ApiResponse.success("updated", traceId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param keyId 入参：keyId
+     * @param userId 入参：userId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/model/keys/{keyId}")
     public ApiResponse<String> deleteKey(@PathVariable Long keyId,
                                          @RequestParam("userId") Long userId,
@@ -103,12 +155,28 @@ public class ModelController {
         return ApiResponse.success("deleted", traceId);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/novels/{projectId}/model-policies")
     public ApiResponse<List<ModelProjectPolicy>> listPolicies(@PathVariable Long projectId,
                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listPolicies(projectId), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/novels/{projectId}/model-policies")
     public ApiResponse<String> createPolicy(@PathVariable Long projectId,
                                             @Valid @RequestBody CreateModelPolicyDto dto,
@@ -133,6 +201,16 @@ public class ModelController {
         return ApiResponse.success("created", traceId);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param policyId 入参：policyId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PutMapping("/novels/{projectId}/model-policies/{policyId}")
     public ApiResponse<String> updatePolicy(@PathVariable Long projectId,
                                             @PathVariable Long policyId,
@@ -159,6 +237,15 @@ public class ModelController {
         return ApiResponse.success("updated", traceId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param policyId 入参：policyId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/novels/{projectId}/model-policies/{policyId}")
     public ApiResponse<String> deletePolicy(@PathVariable Long projectId,
                                             @PathVariable Long policyId,
@@ -168,6 +255,15 @@ public class ModelController {
         return ApiResponse.success("deleted", traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param policyId 入参：policyId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/novels/{projectId}/model-policies/{policyId}/set-default")
     public ApiResponse<String> setDefaultPolicy(@PathVariable Long projectId,
                                                 @PathVariable Long policyId,

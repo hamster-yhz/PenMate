@@ -15,6 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * StyleApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class StyleApplicationService {
 
@@ -30,10 +34,23 @@ public class StyleApplicationService {
         this.realtimeEventService = realtimeEventService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<StyleProfile> listStyles(Long projectId) {
         return styleRepository.findByProjectId(projectId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param styleId 入参：styleId
+     * @return 出参：处理结果
+     */
     public StyleProfile getStyle(Long projectId, Long styleId) {
         StyleProfile style = styleRepository.findById(projectId, styleId);
         if (style == null) {
@@ -42,6 +59,14 @@ public class StyleApplicationService {
         return style;
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public StyleProfile createStyle(Long projectId, CreateStyleCommand command, String traceId) {
         StyleProfile style = new StyleProfile();
         style.setProjectId(projectId);
@@ -66,6 +91,15 @@ public class StyleApplicationService {
         return style;
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param styleId 入参：styleId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public StyleProfile updateStyle(Long projectId, Long styleId, UpdateStyleCommand command, String traceId) {
         StyleProfile style = getStyle(projectId, styleId);
         style.setName(command.name());
@@ -84,6 +118,14 @@ public class StyleApplicationService {
         return getStyle(projectId, styleId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param styleId 入参：styleId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     */
     public void deleteStyle(Long projectId, Long styleId, Long operatorId, String traceId) {
         int affected = styleRepository.softDelete(projectId, styleId);
         if (affected != 1) {
@@ -92,6 +134,14 @@ public class StyleApplicationService {
         writeAudit(traceId, operatorId, "style", "delete-style", "style_profiles", String.valueOf(styleId), null, 200);
     }
 
+    /**
+     * 切换业务状态。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public StyleProfile switchStyle(Long projectId, SwitchStyleCommand command, String traceId) {
         StyleProfile toStyle = getStyle(projectId, command.toStyleId());
         StyleProfile fromStyle = styleRepository.findDefaultByProjectId(projectId);
@@ -122,6 +172,14 @@ public class StyleApplicationService {
         return getStyle(projectId, command.toStyleId());
     }
 
+    /**
+     * 分析输入内容。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public Map<String, Object> analyzeSample(Long projectId, AnalyzeStyleCommand command, String traceId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("projectId", projectId);

@@ -23,6 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * StyleController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/novels/{projectId}/styles")
 public class StyleController {
@@ -33,12 +37,28 @@ public class StyleController {
         this.styleApplicationService = styleApplicationService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping
     public ApiResponse<List<StyleProfile>> listStyles(@PathVariable Long projectId,
                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(styleApplicationService.listStyles(projectId), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping
     public ApiResponse<StyleProfile> createStyle(@PathVariable Long projectId,
                                                  @Valid @RequestBody CreateStyleDto dto,
@@ -60,6 +80,14 @@ public class StyleController {
         ), traceId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param styleId 入参：styleId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/{styleId}")
     public ApiResponse<StyleProfile> getStyle(@PathVariable Long projectId,
                                               @PathVariable Long styleId,
@@ -67,6 +95,16 @@ public class StyleController {
         return ApiResponse.success(styleApplicationService.getStyle(projectId, styleId), traceId);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param styleId 入参：styleId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PutMapping("/{styleId}")
     public ApiResponse<StyleProfile> updateStyle(@PathVariable Long projectId,
                                                  @PathVariable Long styleId,
@@ -89,6 +127,15 @@ public class StyleController {
         ), traceId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param styleId 入参：styleId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/{styleId}")
     public ApiResponse<String> deleteStyle(@PathVariable Long projectId,
                                            @PathVariable Long styleId,
@@ -98,6 +145,15 @@ public class StyleController {
         return ApiResponse.success("deleted", traceId);
     }
 
+    /**
+     * 切换业务状态。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/switch")
     public ApiResponse<StyleProfile> switchStyle(@PathVariable Long projectId,
                                                  @Valid @RequestBody SwitchStyleDto dto,
@@ -115,6 +171,15 @@ public class StyleController {
         ), traceId);
     }
 
+    /**
+     * 分析输入内容。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/analyze-sample")
     public ApiResponse<Map<String, Object>> analyzeSample(@PathVariable Long projectId,
                                                            @Valid @RequestBody AnalyzeStyleSampleDto dto,

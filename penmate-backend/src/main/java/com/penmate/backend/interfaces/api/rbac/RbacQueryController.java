@@ -26,6 +26,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * RbacQueryController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class RbacQueryController {
@@ -36,28 +40,60 @@ public class RbacQueryController {
         this.iamQueryApplicationService = iamQueryApplicationService;
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/users")
     public ApiResponse<List<Map<String, Object>>> users(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         List<Map<String, Object>> items = iamQueryApplicationService.listUsers().stream().map(this::toSafeUser).toList();
         return ApiResponse.success(items, traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param id 入参：id
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/users/{id}")
     public ApiResponse<Map<String, Object>> user(@PathVariable Long id,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(toSafeUser(iamQueryApplicationService.getUser(id)), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/roles")
     public ApiResponse<List<IamRole>> roles(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(iamQueryApplicationService.listRoles(), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/permissions")
     public ApiResponse<List<IamPermission>> permissions(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(iamQueryApplicationService.listPermissions(), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/users")
     public ApiResponse<Map<String, Object>> createUser(@Valid @RequestBody CreateUserDto dto,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -65,6 +101,14 @@ public class RbacQueryController {
         return ApiResponse.success(toSafeUser(user), traceId);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param id 入参：id
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PutMapping("/users/{id}")
     public ApiResponse<Map<String, Object>> updateUser(@PathVariable Long id,
                                                        @Valid @RequestBody UpdateUserDto dto,
@@ -73,6 +117,13 @@ public class RbacQueryController {
         return ApiResponse.success(toSafeUser(user), traceId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param id 入参：id
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/users/{id}")
     public ApiResponse<Map<String, Object>> deleteUser(@PathVariable Long id,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -82,6 +133,13 @@ public class RbacQueryController {
         return ApiResponse.success(data, traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/roles")
     public ApiResponse<IamRole> createRole(@Valid @RequestBody CreateRoleDto dto,
                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -89,6 +147,14 @@ public class RbacQueryController {
         return ApiResponse.success(role, traceId);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param id 入参：id
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PutMapping("/roles/{id}")
     public ApiResponse<IamRole> updateRole(@PathVariable Long id,
                                            @Valid @RequestBody UpdateRoleDto dto,
@@ -97,6 +163,13 @@ public class RbacQueryController {
         return ApiResponse.success(role, traceId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param id 入参：id
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/roles/{id}")
     public ApiResponse<Map<String, Object>> deleteRole(@PathVariable Long id,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -106,6 +179,14 @@ public class RbacQueryController {
         return ApiResponse.success(data, traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param id 入参：id
+     * @param roleId 入参：roleId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/users/{id}/roles")
     public ApiResponse<Map<String, Object>> assignRole(@PathVariable Long id,
                                                         @RequestParam("roleId") Long roleId,
@@ -116,6 +197,14 @@ public class RbacQueryController {
         return ApiResponse.success(data, traceId);
     }
 
+    /**
+     * 移除业务数据。
+     *
+     * @param userId 入参：userId
+     * @param roleId 入参：roleId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/users/{userId}/roles/{roleId}")
     public ApiResponse<Map<String, Object>> removeRole(@PathVariable Long userId,
                                                         @PathVariable Long roleId,
@@ -126,6 +215,14 @@ public class RbacQueryController {
         return ApiResponse.success(data, traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param id 入参：id
+     * @param permissionId 入参：permissionId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/roles/{id}/permissions")
     public ApiResponse<Map<String, Object>> assignPermission(@PathVariable Long id,
                                                               @RequestParam("permissionId") Long permissionId,
@@ -136,6 +233,14 @@ public class RbacQueryController {
         return ApiResponse.success(data, traceId);
     }
 
+    /**
+     * 移除业务数据。
+     *
+     * @param roleId 入参：roleId
+     * @param permissionId 入参：permissionId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/roles/{roleId}/permissions/{permissionId}")
     public ApiResponse<Map<String, Object>> removePermission(@PathVariable Long roleId,
                                                               @PathVariable Long permissionId,
@@ -146,11 +251,24 @@ public class RbacQueryController {
         return ApiResponse.success(data, traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/menus")
     public ApiResponse<List<IamMenu>> menus(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(iamQueryApplicationService.listMenus(), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param userId 入参：userId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/profile/menus")
     public ApiResponse<List<IamMenu>> profileMenus(@RequestParam("userId") Long userId,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {

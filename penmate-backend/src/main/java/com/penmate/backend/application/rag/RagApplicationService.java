@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * RagApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class RagApplicationService {
 
@@ -23,10 +27,24 @@ public class RagApplicationService {
         this.auditService = auditService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<RagDocument> listDocuments(Long projectId) {
         return ragDocumentRepository.findByProjectId(projectId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public RagDocument createDocument(Long projectId, CreateRagDocumentCommand command, String traceId) {
         RagDocument document = new RagDocument();
         document.setProjectId(projectId);
@@ -46,6 +64,13 @@ public class RagApplicationService {
         return document;
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param docId 入参：docId
+     * @return 出参：处理结果
+     */
     public RagDocument getDocument(Long projectId, Long docId) {
         RagDocument document = ragDocumentRepository.findById(projectId, docId);
         if (document == null) {
@@ -54,6 +79,14 @@ public class RagApplicationService {
         return document;
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param docId 入参：docId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     */
     public void deleteDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
         int affected = ragDocumentRepository.softDelete(projectId, docId);
         if (affected != 1) {
@@ -62,6 +95,12 @@ public class RagApplicationService {
         writeAudit(traceId, command.operatorId(), "rag", "delete-document", "rag_documents", String.valueOf(docId), null, 200);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public Map<String, String> getDocumentUploadUrl(Long projectId) {
         String objectKey = "novels/" + projectId + "/rag/" + UUID.randomUUID();
         return Map.of(
@@ -70,6 +109,15 @@ public class RagApplicationService {
         );
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param docId 入参：docId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public RagDocument parseDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
         getDocument(projectId, docId);
         int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "pending");
@@ -80,6 +128,15 @@ public class RagApplicationService {
         return getDocument(projectId, docId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param docId 入参：docId
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public RagDocument embedDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
         RagDocument current = getDocument(projectId, docId);
         String parseStatus = current.getParseStatus() == null ? "pending" : current.getParseStatus();
@@ -94,6 +151,13 @@ public class RagApplicationService {
         return getDocument(projectId, docId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param docId 入参：docId
+     * @return 出参：处理结果
+     */
     public Map<String, Object> getIndexStatus(Long projectId, Long docId) {
         RagDocument document = getDocument(projectId, docId);
         return Map.of(
@@ -103,6 +167,12 @@ public class RagApplicationService {
         );
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @return 出参：处理结果
+     */
     public List<Map<String, Object>> listRetrievalLogs(Long projectId) {
         return List.of(
                 Map.of("projectId", projectId, "message", "no retrieval logs yet")

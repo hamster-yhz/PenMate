@@ -1,5 +1,9 @@
 package com.penmate.backend.application.rag.command;
 
+/**
+ * OperateRagDocumentCommand。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 public record OperateRagDocumentCommand(
         Long operatorId
 ) {

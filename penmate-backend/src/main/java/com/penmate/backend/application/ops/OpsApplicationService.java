@@ -10,6 +10,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * OpsApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class OpsApplicationService {
 
@@ -22,6 +26,12 @@ public class OpsApplicationService {
         this.auditService = auditService;
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param jobId 入参：jobId
+     * @return 出参：处理结果
+     */
     public OpsAsyncJob getJob(Long jobId) {
         OpsAsyncJob job = opsRepository.findJobById(jobId);
         if (job == null) {
@@ -30,10 +40,25 @@ public class OpsApplicationService {
         return job;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param bizKey 入参：bizKey
+     * @param jobType 入参：jobType
+     * @return 出参：处理结果
+     */
     public List<OpsAsyncJob> listJobs(String bizKey, String jobType) {
         return opsRepository.listJobs(bizKey, jobType);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param jobId 入参：jobId
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public OpsAsyncJob retryJob(Long jobId, Long operatorId, String traceId) {
         OpsAsyncJob oldJob = getJob(jobId);
         OpsAsyncJob newJob = new OpsAsyncJob();
@@ -49,6 +74,13 @@ public class OpsApplicationService {
         return getJob(newJob.getId());
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public OpsMigrationTask startContentToObjectStorageMigration(Long operatorId, String traceId) {
         OpsMigrationTask task = new OpsMigrationTask();
         task.setMigrationType("content_to_object_storage");
@@ -66,6 +98,12 @@ public class OpsApplicationService {
         return getMigration(task.getId());
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param migrationId 入参：migrationId
+     * @return 出参：处理结果
+     */
     public OpsMigrationTask getMigration(Long migrationId) {
         OpsMigrationTask task = opsRepository.findMigrationById(migrationId);
         if (task == null) {

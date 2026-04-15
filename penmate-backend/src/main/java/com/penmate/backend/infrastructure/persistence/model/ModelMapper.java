@@ -13,6 +13,10 @@ import org.apache.ibatis.annotations.Update;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * ModelMapper。
+ * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ */
 @Mapper
 public interface ModelMapper {
 

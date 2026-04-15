@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * AuthController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -26,6 +30,13 @@ public class AuthController {
         this.authApplicationService = authApplicationService;
     }
 
+    /**
+     * 执行登录流程。
+     *
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@Valid @RequestBody LoginDto dto,
                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -33,6 +44,13 @@ public class AuthController {
         return ApiResponse.success(authApplicationService.login(command, traceId), traceId);
     }
 
+    /**
+     * 执行登出流程。
+     *
+     * @param authorization 入参：authorization
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/logout")
     public ApiResponse<String> logout(@RequestHeader("Authorization") String authorization,
                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -40,6 +58,13 @@ public class AuthController {
         return ApiResponse.success("ok", traceId);
     }
 
+    /**
+     * 刷新鉴权凭证。
+     *
+     * @param dto 入参：dto
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/refresh")
     public ApiResponse<Map<String, Object>> refresh(@Valid @RequestBody RefreshDto dto,
                                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -47,6 +72,13 @@ public class AuthController {
         return ApiResponse.success(authApplicationService.refresh(command, traceId), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param authorization 入参：authorization
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/me")
     public ApiResponse<Map<String, Object>> me(@RequestHeader("Authorization") String authorization,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {

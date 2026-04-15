@@ -7,6 +7,10 @@ public final class ModelCommands {
     private ModelCommands() {
     }
 
+    /**
+     * CreateModelKeyCommand。
+     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+     */
     public record CreateModelKeyCommand(Long providerId,
                                         String keyName,
                                         String apiKey,
@@ -15,6 +19,10 @@ public final class ModelCommands {
                                         Long operatorId) {
     }
 
+    /**
+     * UpdateModelKeyCommand。
+     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+     */
     public record UpdateModelKeyCommand(String keyName,
                                         String apiKey,
                                         Boolean isDefault,
@@ -22,6 +30,10 @@ public final class ModelCommands {
                                         Long operatorId) {
     }
 
+    /**
+     * CreatePolicyCommand。
+     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+     */
     public record CreatePolicyCommand(String policyName,
                                       String scene,
                                       Long providerModelId,
@@ -34,6 +46,10 @@ public final class ModelCommands {
                                       Long operatorId) {
     }
 
+    /**
+     * UpdatePolicyCommand。
+     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+     */
     public record UpdatePolicyCommand(String policyName,
                                       String scene,
                                       Long providerModelId,

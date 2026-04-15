@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * PluginController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class PluginController {
@@ -32,23 +36,52 @@ public class PluginController {
         this.pluginApplicationService = pluginApplicationService;
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/plugins/catalog")
     public ApiResponse<List<PluginCatalogItem>> catalog(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(pluginApplicationService.listCatalog(), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param pluginCode 入参：pluginCode
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/plugins/catalog/{pluginCode}")
     public ApiResponse<PluginCatalogItem> catalogItem(@PathVariable String pluginCode,
                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(pluginApplicationService.getCatalog(pluginCode), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/novels/{projectId}/plugins")
     public ApiResponse<List<PluginProjectInstall>> projectPlugins(@PathVariable Long projectId,
                                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(pluginApplicationService.listProjectInstalls(projectId), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/novels/{projectId}/plugins/install")
     public ApiResponse<String> install(@PathVariable Long projectId,
                                        @Valid @RequestBody InstallPluginDto dto,
@@ -62,6 +95,16 @@ public class PluginController {
         return ApiResponse.success("installed", traceId);
     }
 
+    /**
+     * 更新业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param pluginCode 入参：pluginCode
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PatchMapping("/novels/{projectId}/plugins/{pluginCode}")
     public ApiResponse<String> updateInstall(@PathVariable Long projectId,
                                              @PathVariable String pluginCode,
@@ -77,6 +120,15 @@ public class PluginController {
         return ApiResponse.success("updated", traceId);
     }
 
+    /**
+     * 删除业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param pluginCode 入参：pluginCode
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @DeleteMapping("/novels/{projectId}/plugins/{pluginCode}")
     public ApiResponse<String> deleteInstall(@PathVariable Long projectId,
                                              @PathVariable String pluginCode,
@@ -86,6 +138,13 @@ public class PluginController {
         return ApiResponse.success("deleted", traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/novels/{projectId}/plugins/call-logs")
     public ApiResponse<List<PluginCallLog>> callLogs(@PathVariable Long projectId,
                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {

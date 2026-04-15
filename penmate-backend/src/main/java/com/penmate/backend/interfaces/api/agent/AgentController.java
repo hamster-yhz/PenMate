@@ -26,6 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * AgentController。
+ * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/novels/{projectId}/agent")
 public class AgentController {
@@ -39,12 +43,28 @@ public class AgentController {
         this.generationStreamService = generationStreamService;
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/conversations")
     public ApiResponse<List<AgentConversation>> listConversations(@PathVariable Long projectId,
                                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(agentApplicationService.listConversations(projectId), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/conversations")
     public ApiResponse<AgentConversation> createConversation(@PathVariable Long projectId,
                                                              @Valid @RequestBody CreateAgentConversationDto dto,
@@ -63,6 +83,14 @@ public class AgentController {
         ), traceId);
     }
 
+    /**
+     * 查询列表数据。
+     *
+     * @param projectId 入参：projectId
+     * @param conversationId 入参：conversationId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/conversations/{conversationId}/messages")
     public ApiResponse<List<AgentMessage>> listMessages(@PathVariable Long projectId,
                                                         @PathVariable Long conversationId,
@@ -70,6 +98,16 @@ public class AgentController {
         return ApiResponse.success(agentApplicationService.listMessages(projectId, conversationId), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param conversationId 入参：conversationId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/conversations/{conversationId}/messages")
     public ApiResponse<AgentMessage> createMessage(@PathVariable Long projectId,
                                                    @PathVariable Long conversationId,
@@ -91,6 +129,15 @@ public class AgentController {
         ), traceId);
     }
 
+    /**
+     * 创建业务数据。
+     *
+     * @param projectId 入参：projectId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/generations")
     public ApiResponse<AgentGenerationTask> createGeneration(@PathVariable Long projectId,
                                                              @Valid @RequestBody CreateAgentGenerationDto dto,
@@ -111,6 +158,14 @@ public class AgentController {
         ), traceId);
     }
 
+    /**
+     * 查询详情数据。
+     *
+     * @param projectId 入参：projectId
+     * @param taskId 入参：taskId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping("/generations/{taskId}")
     public ApiResponse<AgentGenerationTask> getGeneration(@PathVariable Long projectId,
                                                            @PathVariable Long taskId,
@@ -118,6 +173,16 @@ public class AgentController {
         return ApiResponse.success(agentApplicationService.getGeneration(projectId, taskId), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param taskId 入参：taskId
+     * @param dto 入参：dto
+     * @param operatorId 入参：operatorId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @PostMapping("/generations/{taskId}/apply")
     public ApiResponse<AgentGenerationTask> applyGeneration(@PathVariable Long projectId,
                                                              @PathVariable Long taskId,
@@ -132,6 +197,14 @@ public class AgentController {
         ), traceId);
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param projectId 入参：projectId
+     * @param taskId 入参：taskId
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     @GetMapping(value = "/generations/{taskId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamGeneration(@PathVariable Long projectId,
                                        @PathVariable Long taskId,

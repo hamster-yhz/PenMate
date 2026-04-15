@@ -16,6 +16,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * AuthApplicationService。
+ * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ */
 @Service
 public class AuthApplicationService {
 
@@ -28,6 +32,13 @@ public class AuthApplicationService {
         this.auditService = auditService;
     }
 
+    /**
+     * 执行登录流程。
+     *
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public Map<String, Object> login(LoginCommand command, String traceId) {
         IamUser user = iamGateway.findUserByEmail(command.email());
         if (user == null || user.getStatus() == null || user.getStatus() != 1) {
@@ -58,6 +69,12 @@ public class AuthApplicationService {
         return result;
     }
 
+    /**
+     * 执行登出流程。
+     *
+     * @param accessToken 入参：accessToken
+     * @param traceId 入参：traceId
+     */
     public void logout(String accessToken, String traceId) {
         String token = extractBearer(accessToken);
         IamSession session = iamGateway.findSessionByAccessToken(token);
@@ -68,6 +85,13 @@ public class AuthApplicationService {
         writeAudit(traceId, session.getUserId(), "auth", "logout", "iam_user_sessions", String.valueOf(session.getId()), null, 200);
     }
 
+    /**
+     * 刷新鉴权凭证。
+     *
+     * @param command 入参：command
+     * @param traceId 入参：traceId
+     * @return 出参：处理结果
+     */
     public Map<String, Object> refresh(RefreshCommand command, String traceId) {
         IamSession session = iamGateway.findSessionByRefreshToken(command.refreshToken());
         if (session == null || session.getRefreshExpiresAt().isBefore(LocalDateTime.now())) {
@@ -90,6 +114,12 @@ public class AuthApplicationService {
         return result;
     }
 
+    /**
+     * 处理业务请求。
+     *
+     * @param authorization 入参：authorization
+     * @return 出参：处理结果
+     */
     public Map<String, Object> me(String authorization) {
         String token = extractBearer(authorization);
         IamSession session = iamGateway.findSessionByAccessToken(token);
