@@ -237,7 +237,7 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-const pStyle = (n: number) => ({
+const pStyle = (_n: number) => ({
   width: `${Math.random() * 3 + 1}px`,
   height: `${Math.random() * 3 + 1}px`,
   left: `${Math.random() * 100}%`,

@@ -141,11 +141,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import logoImg from '@/assets/images/logo.png'
+import { novelApi } from '@/api/modules/novel.api'
+import { getSession } from '@/stores/session'
 
 const router = useRouter()
+
+const session = getSession()
 
 const userInfo = reactive({
   name: '墨客',
@@ -172,41 +177,41 @@ const coverGradients = [
   'linear-gradient(135deg, #1a2a2e 0%, #0d2b3b 50%, #0a1a2e 100%)'
 ]
 
-const books = ref<Book[]>([
-  {
-    id: 'b1',
-    title: '苍穹剑仙传',
-    description: '少年林风身怀天问剑意，踏上修仙之路，经历尘世磨练与仙界风云。',
-    genre: '仙侠',
-    tags: ['修仙', '热血', '剑道'],
-    wordCount: 28470,
-    chapterCount: 15,
-    updatedAt: '2小时前',
-    coverGradient: coverGradients[0]
-  },
-  {
-    id: 'b2',
-    title: '长安夜未央',
-    description: '盛唐长安，一位年轻大理寺丞卷入一桩牵连朝堂的连环命案。',
-    genre: '古风悬疑',
-    tags: ['悬疑', '古风', '探案'],
-    wordCount: 12300,
-    chapterCount: 8,
-    updatedAt: '昨天',
-    coverGradient: coverGradients[1]
-  },
-  {
-    id: 'b3',
-    title: '星际拾荒者',
-    description: '23世纪，地球流浪者在废弃星域间拾荒求生，发现远古文明遗迹。',
-    genre: '科幻',
-    tags: ['科幻', '冒险', '遗迹'],
-    wordCount: 5600,
-    chapterCount: 4,
-    updatedAt: '3天前',
-    coverGradient: coverGradients[4]
+const books = ref<Book[]>([])
+
+const toBook = (item: Record<string, any>, idx: number): Book => {
+  const id = String(item.projectId ?? item.id ?? `book-${idx}`)
+  const title = String(item.title ?? item.name ?? `未命名作品-${idx + 1}`)
+  const description = String(item.description ?? item.summary ?? '')
+  const genre = String(item.genre ?? item.category ?? '其他')
+  const tagsRaw = item.tags
+  const tags = Array.isArray(tagsRaw)
+    ? tagsRaw.map((v: unknown) => String(v))
+    : String(tagsRaw || '')
+      .split(/[,，]/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+  return {
+    id,
+    title,
+    description,
+    genre,
+    tags,
+    wordCount: Number(item.wordCount ?? item.totalWords ?? 0),
+    chapterCount: Number(item.chapterCount ?? item.totalChapters ?? 0),
+    updatedAt: String(item.updatedAt ?? item.updateTime ?? '刚刚'),
+    coverGradient: coverGradients[idx % coverGradients.length]
   }
-])
+}
+
+const loadBooks = async () => {
+  try {
+    const list = await novelApi.listProjects()
+    books.value = (list || []).map((item, idx) => toBook(item as Record<string, any>, idx))
+  } catch (error: any) {
+    message.error(error?.message || '加载书架失败')
+  }
+}
 
 const totalWords = computed(() => books.value.reduce((s, b) => s + b.wordCount, 0))
 const totalChapters = computed(() => books.value.reduce((s, b) => s + b.chapterCount, 0))
@@ -238,30 +243,33 @@ const editBook = (book: Book) => {
   showCreateModal.value = true
 }
 
-const confirmBook = () => {
+const confirmBook = async () => {
   if (!bookForm.title.trim()) return
   const tags = bookForm.tagsStr.split(/[,，]/).map(t => t.trim()).filter(Boolean)
 
-  if (editingBook.value) {
-    const book = books.value.find(b => b.id === editingBook.value!.id)
-    if (book) {
-      book.title = bookForm.title
-      book.description = bookForm.description
-      book.genre = bookForm.genre
-      book.tags = tags
+  try {
+    if (editingBook.value) {
+      await novelApi.updateProject(editingBook.value.id, {
+        title: bookForm.title,
+        description: bookForm.description,
+        genre: bookForm.genre,
+        tags
+      })
+      message.success('作品已更新')
+    } else {
+      await novelApi.createProject({
+        title: bookForm.title,
+        description: bookForm.description,
+        genre: bookForm.genre,
+        tags,
+        ownerId: session.userId
+      })
+      message.success('作品已创建')
     }
-  } else {
-    books.value.push({
-      id: `b${Date.now()}`,
-      title: bookForm.title,
-      description: bookForm.description,
-      genre: bookForm.genre,
-      tags,
-      wordCount: 0,
-      chapterCount: 0,
-      updatedAt: '刚刚',
-      coverGradient: coverGradients[Math.floor(Math.random() * coverGradients.length)]
-    })
+    await loadBooks()
+  } catch (error: any) {
+    message.error(error?.message || '保存作品失败')
+    return
   }
 
   showCreateModal.value = false
@@ -277,15 +285,22 @@ const deleteBook = (book: Book) => {
   showDeleteConfirm.value = true
 }
 
-const confirmDelete = () => {
+const confirmDelete = async () => {
   if (deletingBook.value) {
-    books.value = books.value.filter(b => b.id !== deletingBook.value!.id)
+    try {
+      await novelApi.deleteProject(deletingBook.value.id, session.userId || 0)
+      message.success('作品已删除')
+      await loadBooks()
+    } catch (error: any) {
+      message.error(error?.message || '删除失败')
+      return
+    }
   }
   showDeleteConfirm.value = false
   deletingBook.value = null
 }
 
-const pStyle = (n: number) => ({
+const pStyle = (_n: number) => ({
   width: `${Math.random() * 3 + 1}px`,
   height: `${Math.random() * 3 + 1}px`,
   left: `${Math.random() * 100}%`,
@@ -293,6 +308,12 @@ const pStyle = (n: number) => ({
   animationDuration: `${Math.random() * 12 + 12}s`,
   animationDelay: `${Math.random() * 15}s`,
   opacity: Math.random() * 0.3 + 0.1
+})
+
+onMounted(() => {
+  if (session.userName) userInfo.name = session.userName
+  if (session.userEmail) userInfo.email = session.userEmail
+  loadBooks()
 })
 </script>
 

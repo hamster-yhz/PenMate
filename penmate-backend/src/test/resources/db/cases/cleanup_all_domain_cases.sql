@@ -1,0 +1,48 @@
+-- PenMate 数据库造数：统一清理脚本
+-- 清理范围：DBCASE_ALL_001 / 002 / 003（ID段 920001~922999）
+
+SET NAMES utf8mb4;
+
+DELETE FROM agent_approval_actions  WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM agent_approval_requests WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM agent_generation_tasks  WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM agent_messages          WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM agent_conversations     WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM rag_chunks              WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM rag_documents           WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM storage_objects         WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM plugin_call_logs        WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM plugin_project_installs WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM plugin_catalog          WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM model_project_policies  WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM model_user_api_keys     WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM model_provider_models   WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM model_providers         WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM style_switch_logs       WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM style_profiles          WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM novel_card_relations    WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM novel_cards             WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM novel_outline_nodes     WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM novel_chapter_versions  WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM novel_chapters          WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM novel_volumes           WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM novel_members           WHERE project_id BETWEEN 920001 AND 922999;
+DELETE FROM novel_projects          WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM iam_user_sessions       WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM iam_menus               WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM iam_role_permissions    WHERE role_id BETWEEN 920001 AND 922999;
+DELETE FROM iam_user_roles          WHERE user_id BETWEEN 920001 AND 922999;
+DELETE FROM iam_permissions         WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM iam_roles               WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM iam_users               WHERE id BETWEEN 920001 AND 922999;
+
+DELETE FROM ops_async_jobs          WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM ops_migrations          WHERE id BETWEEN 920001 AND 922999;
+DELETE FROM ops_audit_logs          WHERE id BETWEEN 920001 AND 922999;
+

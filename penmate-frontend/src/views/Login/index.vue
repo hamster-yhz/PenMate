@@ -170,6 +170,9 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
+import { authApi } from '@/api/modules/auth.api'
+import { setSession } from '@/stores/session'
 
 import loginBg from '@/assets/images/login-bg.png'
 import logoImg from '@/assets/images/logo.png'
@@ -193,15 +196,45 @@ const registerForm = reactive({
 })
 
 const handleSubmit = async () => {
+  if (mode.value !== 'login') {
+    message.info('当前版本暂未接入注册接口，请先使用已有账号登录')
+    return
+  }
+  if (!loginForm.username.trim() || !loginForm.password.trim()) {
+    message.warning('请输入账号与密码')
+    return
+  }
   isLoading.value = true
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  isLoading.value = false
-  // Navigate to book shelf
-  router.push('/mybooks')
+  try {
+    const tokenData = await authApi.login({
+      email: loginForm.username.trim(),
+      password: loginForm.password
+    })
+    setSession({
+      accessToken: String(tokenData?.accessToken || ''),
+      refreshToken: String(tokenData?.refreshToken || '')
+    })
+
+    const profile = await authApi.me()
+    const uid = Number(profile.userId ?? profile.id ?? profile.uid ?? 0)
+    const email = String(profile.email ?? profile.userEmail ?? loginForm.username.trim())
+    const name = String(profile.displayName ?? profile.username ?? profile.name ?? '创作者')
+    setSession({
+      userId: Number.isFinite(uid) && uid > 0 ? uid : undefined,
+      userEmail: email,
+      userName: name
+    })
+
+    message.success('登录成功')
+    router.push('/mybooks')
+  } catch (error: any) {
+    message.error(error?.message || '登录失败')
+  } finally {
+    isLoading.value = false
+  }
 }
 
-const pStyle = (n: number) => {
+const pStyle = (_n: number) => {
   const size = Math.random() * 3 + 1
   const left = Math.random() * 100
   const dur = Math.random() * 12 + 12

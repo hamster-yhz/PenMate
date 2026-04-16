@@ -349,7 +349,8 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 
 // Images
 import logoImg from '@/assets/images/logo.png'
@@ -366,8 +367,14 @@ import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
 import ModelSettings from '@/components/workbench/ModelSettings.vue'
 import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
 import type { ApprovalCardData } from '@/components/workbench/ApprovalCard.vue'
+import { novelApi } from '@/api/modules/novel.api'
+import { outlineApi } from '@/api/modules/outline.api'
+import { getSession, clearSession } from '@/stores/session'
+import { authApi } from '@/api/modules/auth.api'
 
 const router = useRouter()
+const route = useRoute()
+const session = getSession()
 
 // --- State ---
 const username = ref('墨客')
@@ -791,14 +798,82 @@ const handleReject = (id: string) => {
 // --- Auth ---
 const handleLogout = () => {
   userMenuOpen.value = false
-  router.push('/login')
+  authApi.logout().catch(() => undefined).finally(() => {
+    clearSession()
+    router.push('/login')
+  })
 }
 
 // --- Init ---
+const mapOutlineTree = (nodes: Array<Record<string, any>>) => {
+  const volumeMap = new Map<string, { title: string; key: string; expanded: boolean; children: Array<{ title: string; key: string }> }>()
+  nodes.forEach((node) => {
+    const key = String(node.id ?? node.nodeId ?? node.key ?? '')
+    const title = String(node.title ?? node.name ?? '未命名')
+    const parentId = node.parentId ?? node.parentNodeId ?? null
+    const nodeType = String(node.nodeType ?? node.type ?? '').toUpperCase()
+    if (!parentId || nodeType.includes('VOLUME')) {
+      volumeMap.set(key, { title, key, expanded: true, children: [] })
+    }
+  })
+
+  nodes.forEach((node) => {
+    const key = String(node.id ?? node.nodeId ?? node.key ?? '')
+    const title = String(node.title ?? node.name ?? '未命名章节')
+    const parentId = node.parentId ?? node.parentNodeId
+    if (parentId != null) {
+      const pKey = String(parentId)
+      const parent = volumeMap.get(pKey)
+      if (parent) {
+        parent.children.push({ title, key })
+      }
+    }
+  })
+
+  const values = Array.from(volumeMap.values())
+  return values.length ? values : outlineData.value
+}
+
+const loadWorkbenchData = async () => {
+  const projectId = Number(route.query.bookId || 0)
+  if (!projectId) return
+  try {
+    const [project, outlines, chapters] = await Promise.all([
+      novelApi.getProject(projectId),
+      outlineApi.listOutlineTree(projectId),
+      novelApi.listChapters(projectId)
+    ])
+
+    novelTitle.value = String((project as Record<string, any>)?.title ?? novelTitle.value)
+
+    const chapterList = (chapters || []) as Array<Record<string, any>>
+    chapterList.forEach((chapter) => {
+      const key = String(chapter.chapterId ?? chapter.id ?? chapter.key ?? '')
+      if (!key) return
+      chapterContents.value[key] = String(chapter.content ?? chapter.summary ?? '')
+    })
+
+    outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>)
+    const first = outlineData.value[0]?.children?.[0]
+    if (first) {
+      activeChapter.value = first.key
+      currentChapterTitle.value = first.title
+      editorContent.value = chapterContents.value[first.key] || ''
+      wordCount.value = editorContent.value.replace(/\s/g, '').length
+      lastSnapshot = editorContent.value
+    }
+  } catch (error: any) {
+    message.warning(error?.message || '工作台数据加载失败，已使用本地演示数据')
+  }
+}
+
 onMounted(() => {
+  if (session.userName) username.value = session.userName
+  if (session.userEmail) userEmail.value = session.userEmail
   editorContent.value = chapterContents.value[activeChapter.value] || ''
   wordCount.value = editorContent.value.replace(/\s/g, '').length
   lastSnapshot = editorContent.value
+  loadWorkbenchData()
 })
 </script>
 

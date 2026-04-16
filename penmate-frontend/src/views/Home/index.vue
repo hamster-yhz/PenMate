@@ -1,5 +1,5 @@
 <template>
-  <div class="home-page" ref="pageRef">
+  <div class="home-page">
     <!-- ======== Floating Particles ======== -->
     <div class="particles-layer" aria-hidden="true">
       <span
@@ -260,7 +260,6 @@ import featureStyle from '@/assets/images/feature-style.png'
 import featurePlugin from '@/assets/images/feature-plugin.png'
 
 const router = useRouter()
-const pageRef = ref<HTMLElement | null>(null)
 const isScrolled = ref(false)
 
 const goToWorkbench = () => {
@@ -348,7 +347,7 @@ const workflowSteps = ref([
 ])
 
 // Particle animation styles
-const particleStyle = (n: number) => {
+const particleStyle = (_n: number) => {
   const size = Math.random() * 4 + 1
   const left = Math.random() * 100
   const duration = Math.random() * 15 + 15
