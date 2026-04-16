@@ -12,11 +12,24 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Component
+/**
+ * TraceId 过滤器。
+ * <p>从请求头透传或生成链路追踪 ID，并写入 MDC/请求属性/响应头，保证上下游日志可关联。</p>
+ */
 public class TraceIdFilter extends OncePerRequestFilter {
 
     public static final String TRACE_ID_HEADER = "X-Trace-Id";
     public static final String TRACE_ID_KEY = "traceId";
 
+    /**
+     * 在每次请求中注入 TraceId。
+     *
+     * @param request HTTP 请求
+     * @param response HTTP 响应
+     * @param filterChain 过滤器链
+     * @throws ServletException Servlet 异常
+     * @throws IOException IO 异常
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -32,6 +45,13 @@ public class TraceIdFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * 解析最终使用的 TraceId。
+     * <p>优先使用请求头中的 traceId，缺失时自动生成 UUID。</p>
+     *
+     * @param headerTraceId 请求头传入的 TraceId
+     * @return 可用的 TraceId
+     */
     private String resolveTraceId(String headerTraceId) {
         return (headerTraceId == null || headerTraceId.isBlank()) ? UUID.randomUUID().toString() : headerTraceId;
     }

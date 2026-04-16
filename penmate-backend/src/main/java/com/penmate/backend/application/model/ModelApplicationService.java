@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * ModelApplicationService。
- * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ * 模型配置应用服务。
+ * <p>负责模型厂商/模型查询、用户 API Key 管理、项目模型策略管理与默认策略切换。</p>
  */
 @Service
 @Slf4j
@@ -30,7 +30,7 @@ public class ModelApplicationService {
     private final AuditService auditService;
 
     /**
-     * 查询列表数据。
+     * 查询可用模型厂商列表。
      *
      * @return 出参：处理结果
      */
@@ -40,7 +40,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 查询列表数据。
+     * 按厂商编码查询模型清单。
      *
      * @param providerCode 入参：providerCode
      * @return 出参：处理结果
@@ -51,7 +51,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 查询列表数据。
+     * 查询用户已配置的模型密钥列表。
      *
      * @param userId 入参：userId
      * @return 出参：处理结果
@@ -62,7 +62,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 创建业务数据。
+     * 新增用户模型密钥。
      *
      * @param userId 入参：userId
      * @param command 入参：command
@@ -92,7 +92,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 更新业务数据。
+     * 更新用户模型密钥。
      *
      * @param userId 入参：userId
      * @param keyId 入参：keyId
@@ -124,7 +124,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 删除业务数据。
+     * 软删除用户模型密钥。
      *
      * @param userId 入参：userId
      * @param keyId 入参：keyId
@@ -143,7 +143,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 查询列表数据。
+     * 查询项目模型策略列表。
      *
      * @param projectId 入参：projectId
      * @return 出参：处理结果
@@ -154,7 +154,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 创建业务数据。
+     * 新增项目模型策略。
      *
      * @param projectId 入参：projectId
      * @param command 入参：command
@@ -187,7 +187,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 更新业务数据。
+     * 更新项目模型策略。
      *
      * @param projectId 入参：projectId
      * @param policyId 入参：policyId
@@ -221,7 +221,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 删除业务数据。
+     * 软删除项目模型策略。
      *
      * @param projectId 入参：projectId
      * @param policyId 入参：policyId
@@ -240,7 +240,7 @@ public class ModelApplicationService {
     }
 
     /**
-     * 处理业务请求。
+     * 设置项目默认模型策略。
      *
      * @param projectId 入参：projectId
      * @param policyId 入参：policyId

@@ -19,8 +19,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * AuthApplicationService。
- * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ * 认证应用服务。
+ * <p>负责登录、登出、令牌刷新与当前登录用户信息查询，并在关键认证动作后记录审计日志。</p>
  */
 @Service
 @Slf4j
@@ -31,11 +31,12 @@ public class AuthApplicationService {
     private final AuditService auditService;
 
     /**
-     * 执行登录流程。
+     * 处理邮箱密码登录。
+     * <p>校验用户状态与密码后创建会话，签发 access/refresh token，并更新最后登录时间。</p>
      *
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * @param command 登录命令（邮箱、密码）
+     * @param traceId 请求链路追踪 ID
+     * @return 包含 accessToken、refreshToken 及过期时间的登录结果
      */
     public Map<String, Object> login(LoginCommand command, String traceId) {
         log.info("登录请求: email={}", command.email());
@@ -73,10 +74,11 @@ public class AuthApplicationService {
     }
 
     /**
-     * 执行登出流程。
+     * 处理登出。
+     * <p>根据 Bearer Token 定位会话并撤销访问令牌。</p>
      *
-     * @param accessToken 入参：accessToken
-     * @param traceId 入参：traceId
+     * @param accessToken Authorization 头中的 Bearer Token
+     * @param traceId 请求链路追踪 ID
      */
     public void logout(String accessToken, String traceId) {
         String token = extractBearer(accessToken);
@@ -91,11 +93,12 @@ public class AuthApplicationService {
     }
 
     /**
-     * 刷新鉴权凭证。
+     * 刷新会话令牌。
+     * <p>校验 refreshToken 未过期后轮换 access/refresh token 与过期时间。</p>
      *
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * @param command 刷新令牌命令
+     * @param traceId 请求链路追踪 ID
+     * @return 新的 accessToken、refreshToken 及过期时间
      */
     public Map<String, Object> refresh(RefreshCommand command, String traceId) {
         log.info("刷新令牌请求");
@@ -124,10 +127,11 @@ public class AuthApplicationService {
     }
 
     /**
-     * 处理业务请求。
+     * 查询当前登录用户信息。
+     * <p>根据 accessToken 获取会话、用户、角色与权限集合。</p>
      *
-     * @param authorization 入参：authorization
-     * @return 出参：处理结果
+     * @param authorization Authorization 头中的 Bearer Token
+     * @return 当前用户基础信息、角色列表与权限列表
      */
     public Map<String, Object> me(String authorization) {
         String token = extractBearer(authorization);

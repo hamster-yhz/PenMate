@@ -17,6 +17,10 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+/**
+ * Spring Security 基础配置。
+ * <p>当前以无状态模式运行，开放鉴权与文档端点，并接入 TraceId 过滤器用于全链路日志追踪。</p>
+ */
 public class SecurityConfig {
 
     private final TraceIdFilter traceIdFilter;
@@ -25,6 +29,14 @@ public class SecurityConfig {
         this.traceIdFilter = traceIdFilter;
     }
 
+    /**
+     * 构建 HTTP 安全过滤链。
+     * <p>禁用表单登录/Basic/CSRF，放行鉴权与 API 文档相关端点，并将 TraceId 过滤器前置。</p>
+     *
+     * @param http Spring Security HTTP 配置对象
+     * @return 可供 Spring Security 注册的过滤链
+     * @throws Exception 安全链构建过程中抛出的异常
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -47,6 +59,12 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * 配置全局 CORS 规则。
+     * <p>允许跨域访问并暴露 Authorization 响应头，满足前后端分离调试与联调需求。</p>
+     *
+     * @return CORS 配置源
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();

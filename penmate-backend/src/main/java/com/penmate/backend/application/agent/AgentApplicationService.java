@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * AgentApplicationService。
- * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ * 智能体应用服务。
+ * <p>负责会话、消息、生成任务的创建与查询，并在关键节点写入审计与实时事件。</p>
  */
 @Service
 @Slf4j
@@ -32,7 +32,7 @@ public class AgentApplicationService {
     private final RealtimeEventService realtimeEventService;
 
     /**
-     * 查询列表数据。
+     * 查询项目下会话列表。
      *
      * @param projectId 入参：projectId
      * @return 出参：处理结果
@@ -43,7 +43,7 @@ public class AgentApplicationService {
     }
 
     /**
-     * 创建业务数据。
+     * 在项目下创建会话。
      *
      * @param projectId 入参：projectId
      * @param command 入参：command
@@ -72,7 +72,7 @@ public class AgentApplicationService {
     }
 
     /**
-     * 查询列表数据。
+     * 查询指定会话的消息列表。
      *
      * @param projectId 入参：projectId
      * @param conversationId 入参：conversationId
@@ -85,7 +85,7 @@ public class AgentApplicationService {
     }
 
     /**
-     * 创建业务数据。
+     * 在指定会话下创建消息。
      *
      * @param projectId 入参：projectId
      * @param conversationId 入参：conversationId
@@ -120,7 +120,7 @@ public class AgentApplicationService {
     }
 
     /**
-     * 创建业务数据。
+     * 创建文本生成任务。
      *
      * @param projectId 入参：projectId
      * @param command 入参：command
@@ -157,7 +157,7 @@ public class AgentApplicationService {
     }
 
     /**
-     * 查询详情数据。
+     * 查询生成任务详情。
      *
      * @param projectId 入参：projectId
      * @param taskId 入参：taskId
@@ -174,7 +174,7 @@ public class AgentApplicationService {
     }
 
     /**
-     * 处理业务请求。
+     * 应用生成结果。
      *
      * @param projectId 入参：projectId
      * @param taskId 入参：taskId

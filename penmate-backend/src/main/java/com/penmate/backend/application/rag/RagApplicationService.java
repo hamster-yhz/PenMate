@@ -5,6 +5,7 @@ import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
 import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
 import com.penmate.backend.domain.rag.model.RagDocument;
 import com.penmate.backend.domain.shared.service.AuditService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,10 +13,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * RagApplicationService。
- * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
+ * RAG 文档应用服务。
+ * <p>负责项目知识文档的创建、删除、解析、向量化及索引状态查询。</p>
  */
 @Service
+@Slf4j
 public class RagApplicationService {
 
     private final RagDocumentRepository ragDocumentRepository;
@@ -28,17 +30,19 @@ public class RagApplicationService {
     }
 
     /**
-     * 查询列表数据。
+     * 查询项目下的 RAG 文档列表。
      *
      * @param projectId 入参：projectId
      * @return 出参：处理结果
      */
     public List<RagDocument> listDocuments(Long projectId) {
-        return ragDocumentRepository.findByProjectId(projectId);
+        List<RagDocument> documents = ragDocumentRepository.findByProjectId(projectId);
+        log.info("查询RAG文档列表: projectId={}, count={}", projectId, documents.size());
+        return documents;
     }
 
     /**
-     * 创建业务数据。
+     * 新建 RAG 文档记录。
      *
      * @param projectId 入参：projectId
      * @param command 入参：command
@@ -46,6 +50,8 @@ public class RagApplicationService {
      * @return 出参：处理结果
      */
     public RagDocument createDocument(Long projectId, CreateRagDocumentCommand command, String traceId) {
+        log.info("创建RAG文档: projectId={}, title={}, docType={}, operatorId={}",
+                projectId, command.title(), command.docType(), command.operatorId());
         RagDocument document = new RagDocument();
         document.setProjectId(projectId);
         document.setDocType(command.docType());
@@ -58,29 +64,35 @@ public class RagApplicationService {
         document.setIndexStatus("pending");
         int affected = ragDocumentRepository.insert(document);
         if (affected != 1) {
+            log.error("创建RAG文档失败: projectId={}, title={}, reason=insert_failed", projectId, command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create rag document");
         }
         writeAudit(traceId, command.operatorId(), "rag", "create-document", "rag_documents", String.valueOf(document.getId()), command.title(), 201);
+        log.info("创建RAG文档成功: projectId={}, docId={}, title={}", projectId, document.getId(), document.getTitle());
         return document;
     }
 
     /**
-     * 查询详情数据。
+     * 查询单个 RAG 文档详情。
      *
      * @param projectId 入参：projectId
      * @param docId 入参：docId
      * @return 出参：处理结果
      */
     public RagDocument getDocument(Long projectId, Long docId) {
+        log.info("查询RAG文档详情: projectId={}, docId={}", projectId, docId);
         RagDocument document = ragDocumentRepository.findById(projectId, docId);
         if (document == null) {
+            log.warn("查询RAG文档详情失败: projectId={}, docId={}, reason=not_found", projectId, docId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Rag document not found");
         }
+        log.info("查询RAG文档详情成功: projectId={}, docId={}, parseStatus={}, indexStatus={}",
+                projectId, docId, document.getParseStatus(), document.getIndexStatus());
         return document;
     }
 
     /**
-     * 删除业务数据。
+     * 删除指定 RAG 文档。
      *
      * @param projectId 入参：projectId
      * @param docId 入参：docId
@@ -88,21 +100,25 @@ public class RagApplicationService {
      * @param traceId 入参：traceId
      */
     public void deleteDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
+        log.info("删除RAG文档: projectId={}, docId={}, operatorId={}", projectId, docId, command.operatorId());
         int affected = ragDocumentRepository.softDelete(projectId, docId);
         if (affected != 1) {
+            log.warn("删除RAG文档失败: projectId={}, docId={}, reason=not_found", projectId, docId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Rag document not found");
         }
         writeAudit(traceId, command.operatorId(), "rag", "delete-document", "rag_documents", String.valueOf(docId), null, 200);
+        log.info("删除RAG文档成功: projectId={}, docId={}", projectId, docId);
     }
 
     /**
-     * 查询详情数据。
+     * 获取文档上传地址。
      *
      * @param projectId 入参：projectId
      * @return 出参：处理结果
      */
     public Map<String, String> getDocumentUploadUrl(Long projectId) {
         String objectKey = "novels/" + projectId + "/rag/" + UUID.randomUUID();
+        log.info("生成RAG文档上传地址: projectId={}, objectKey={}", projectId, objectKey);
         return Map.of(
                 "objectKey", objectKey,
                 "uploadUrl", "https://object.local/upload/" + objectKey + "?token=" + UUID.randomUUID()
@@ -110,7 +126,7 @@ public class RagApplicationService {
     }
 
     /**
-     * 处理业务请求。
+     * 触发文档解析流程。
      *
      * @param projectId 入参：projectId
      * @param docId 入参：docId
@@ -119,17 +135,20 @@ public class RagApplicationService {
      * @return 出参：处理结果
      */
     public RagDocument parseDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
+        log.info("触发RAG文档解析: projectId={}, docId={}, operatorId={}", projectId, docId, command.operatorId());
         getDocument(projectId, docId);
         int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "pending");
         if (affected != 1) {
+            log.error("触发RAG文档解析失败: projectId={}, docId={}, reason=update_failed", projectId, docId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to parse rag document");
         }
         writeAudit(traceId, command.operatorId(), "rag", "parse-document", "rag_documents", String.valueOf(docId), null, 200);
+        log.info("触发RAG文档解析成功: projectId={}, docId={}", projectId, docId);
         return getDocument(projectId, docId);
     }
 
     /**
-     * 处理业务请求。
+     * 触发文档向量化入库流程。
      *
      * @param projectId 入参：projectId
      * @param docId 入参：docId
@@ -138,21 +157,25 @@ public class RagApplicationService {
      * @return 出参：处理结果
      */
     public RagDocument embedDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
+        log.info("触发RAG文档向量化: projectId={}, docId={}, operatorId={}", projectId, docId, command.operatorId());
         RagDocument current = getDocument(projectId, docId);
         String parseStatus = current.getParseStatus() == null ? "pending" : current.getParseStatus();
         if (!"done".equalsIgnoreCase(parseStatus)) {
+            log.warn("触发RAG文档向量化失败: projectId={}, docId={}, parseStatus={}", projectId, docId, parseStatus);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Document parse not finished");
         }
         int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "done");
         if (affected != 1) {
+            log.error("触发RAG文档向量化失败: projectId={}, docId={}, reason=update_failed", projectId, docId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to embed rag document");
         }
         writeAudit(traceId, command.operatorId(), "rag", "embed-document", "rag_documents", String.valueOf(docId), null, 200);
+        log.info("触发RAG文档向量化成功: projectId={}, docId={}", projectId, docId);
         return getDocument(projectId, docId);
     }
 
     /**
-     * 查询详情数据。
+     * 查询文档解析/索引状态。
      *
      * @param projectId 入参：projectId
      * @param docId 入参：docId
@@ -160,6 +183,8 @@ public class RagApplicationService {
      */
     public Map<String, Object> getIndexStatus(Long projectId, Long docId) {
         RagDocument document = getDocument(projectId, docId);
+        log.info("查询RAG索引状态: projectId={}, docId={}, parseStatus={}, indexStatus={}",
+                projectId, docId, document.getParseStatus(), document.getIndexStatus());
         return Map.of(
                 "docId", document.getId(),
                 "parseStatus", document.getParseStatus(),
@@ -168,15 +193,17 @@ public class RagApplicationService {
     }
 
     /**
-     * 查询列表数据。
+     * 查询项目检索日志（当前为占位实现）。
      *
      * @param projectId 入参：projectId
      * @return 出参：处理结果
      */
     public List<Map<String, Object>> listRetrievalLogs(Long projectId) {
-        return List.of(
+        List<Map<String, Object>> logs = List.of(
                 Map.of("projectId", projectId, "message", "no retrieval logs yet")
         );
+        log.info("查询RAG检索日志: projectId={}, count={}", projectId, logs.size());
+        return logs;
     }
 
     private void writeAudit(String traceId,
