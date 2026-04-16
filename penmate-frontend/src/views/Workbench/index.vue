@@ -98,6 +98,8 @@
                   <div class="tree-item-actions" @click.stop>
                     <button class="tree-act-btn" @click="startEditNode(vol)" title="重命名">✏️</button>
                     <button class="tree-act-btn" @click="addChapter(vol)" title="添加章节">+</button>
+                    <button class="tree-act-btn" @click="moveVolume(vol, -1)" title="上移">↑</button>
+                    <button class="tree-act-btn" @click="moveVolume(vol, 1)" title="下移">↓</button>
                     <button class="tree-act-btn danger" @click="deleteVolume(vIdx)" title="删除">✕</button>
                   </div>
                 </div>
@@ -122,6 +124,8 @@
                     <span v-else class="tree-label">{{ ch.title }}</span>
                     <div class="tree-item-actions" @click.stop>
                       <button class="tree-act-btn" @click="startEditNode(ch)" title="重命名">✏️</button>
+                      <button class="tree-act-btn" @click="moveChapter(vol, cIdx, -1)" title="上移">↑</button>
+                      <button class="tree-act-btn" @click="moveChapter(vol, cIdx, 1)" title="下移">↓</button>
                       <button class="tree-act-btn danger" @click="deleteChapter(vol, cIdx)" title="删除">✕</button>
                     </div>
                   </div>
@@ -133,83 +137,114 @@
           <!-- ======== Character Library ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'characters'">
             <div class="tree-actions">
-              <button class="tree-btn" @click="addCharacter">+ 新角色</button>
+              <button class="tree-btn" @click="createCardQuick('CHARACTER')">+ 新角色卡</button>
             </div>
-            <div class="char-list">
+            <div class="char-list" v-if="projectCards.length">
               <div
-                v-for="(char, cIdx) in characters"
-                :key="char.id"
+                v-for="card in projectCards.filter((item) => String(item.cardType || '').toUpperCase() === 'CHARACTER')"
+                :key="String(card.id)"
                 class="char-card"
-                :class="{ expanded: char.expanded }"
+                :class="{ expanded: card.expanded }"
               >
-                <div class="char-header" @click="char.expanded = !char.expanded">
-                  <span class="char-avatar">{{ char.name.charAt(0) }}</span>
+                <div class="char-header" @click="card.expanded = !card.expanded">
+                  <span class="char-avatar">{{ String(card.name || '角').charAt(0) }}</span>
                   <div class="char-meta">
-                    <span class="char-name">{{ char.name }}</span>
-                    <span class="char-role">{{ char.role }}</span>
+                    <span class="char-name">{{ String(card.name || '未命名角色') }}</span>
+                    <span class="char-role">{{ String(card.summary || '角色卡') }}</span>
                   </div>
                   <div class="char-actions" @click.stop>
-                    <button class="tree-act-btn danger" @click="deleteCharacter(cIdx)" title="删除角色">✕</button>
+                    <button class="tree-act-btn" @click="saveCard(card)" title="保存">💾</button>
+                    <button class="tree-act-btn danger" @click="deleteCardById(card)" title="删除角色">✕</button>
                   </div>
-                  <span class="char-toggle">{{ char.expanded ? '▾' : '▸' }}</span>
+                  <span class="char-toggle">{{ card.expanded ? '▾' : '▸' }}</span>
                 </div>
-                <div class="char-details" v-if="char.expanded">
+                <div class="char-details" v-if="card.expanded">
                   <div class="char-field-edit">
                     <span class="cf-label">名字</span>
-                    <input v-model="char.name" class="cf-input" />
+                    <input v-model="card.name" class="cf-input" />
                   </div>
                   <div class="char-field-edit">
                     <span class="cf-label">身份</span>
-                    <input v-model="char.role" class="cf-input" />
+                    <input v-model="card.summary" class="cf-input" />
                   </div>
                   <div class="char-field-edit">
                     <span class="cf-label">性格</span>
-                    <input v-model="char.personality" class="cf-input" />
-                  </div>
-                  <div class="char-field-edit">
-                    <span class="cf-label">背景</span>
-                    <textarea v-model="char.background" class="cf-input cf-textarea" rows="2"></textarea>
-                  </div>
-                  <div class="char-field-edit">
-                    <span class="cf-label">能力</span>
-                    <input v-model="char.ability" class="cf-input" placeholder="可选" />
+                    <input v-model="card.detailJson" class="cf-input" placeholder="可填 JSON 或文本" />
                   </div>
                 </div>
               </div>
             </div>
+            <div v-else class="empty-hint">暂无角色卡，点击“+ 新角色卡”创建。</div>
           </div>
 
           <!-- ======== World Settings ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'world'">
             <div class="tree-actions">
-              <button class="tree-btn" @click="addWorldEntry">+ 新设定</button>
+              <button class="tree-btn" @click="createCardQuick('WORLD')">+ 新世界观卡</button>
             </div>
-            <div class="world-list">
-              <div v-for="(entry, wIdx) in worldSettings" :key="entry.id" class="world-card">
-                <div class="world-header" @click="entry.expanded = !entry.expanded">
-                  <span class="world-icon">{{ entry.icon }}</span>
-                  <span class="world-name">{{ entry.name }}</span>
+            <div class="world-list" v-if="projectCards.length">
+              <div
+                v-for="card in projectCards.filter((item) => String(item.cardType || '').toUpperCase() === 'WORLD')"
+                :key="`world-${String(card.id)}`"
+                class="world-card"
+              >
+                <div class="world-header" @click="card.expanded = !card.expanded">
+                  <span class="world-icon">🌍</span>
+                  <span class="world-name">{{ String(card.name || '未命名设定') }}</span>
                   <div class="world-actions" @click.stop>
-                    <button class="tree-act-btn danger" @click="deleteWorldEntry(wIdx)" title="删除">✕</button>
+                    <button class="tree-act-btn" @click="saveCard(card)" title="保存">💾</button>
+                    <button class="tree-act-btn danger" @click="deleteCardById(card)" title="删除">✕</button>
                   </div>
-                  <span class="world-toggle">{{ entry.expanded ? '▾' : '▸' }}</span>
+                  <span class="world-toggle">{{ card.expanded ? '▾' : '▸' }}</span>
                 </div>
-                <div class="world-body" v-if="entry.expanded">
+                <div class="world-body" v-if="card.expanded">
                   <div class="world-edit-field">
                     <label>名称</label>
-                    <input v-model="entry.name" class="cf-input" />
+                    <input v-model="card.name" class="cf-input" />
                   </div>
                   <div class="world-edit-field">
-                    <label>图标</label>
-                    <input v-model="entry.icon" class="cf-input cf-icon" />
+                    <label>摘要</label>
+                    <input v-model="card.summary" class="cf-input" />
                   </div>
                   <div class="world-edit-field">
-                    <label>详情</label>
-                    <textarea v-model="entry.description" class="cf-input cf-textarea" rows="3"></textarea>
+                    <label>详情(JSON)</label>
+                    <textarea v-model="card.detailJson" class="cf-input cf-textarea" rows="3"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="relation-panel">
+                <div class="relation-title">关系维护</div>
+                <div class="relation-create">
+                  <select v-model="relationFromId" class="relation-select">
+                    <option value="">来源卡片</option>
+                    <option v-for="card in projectCards" :key="`from-${String(card.id)}`" :value="String(card.id)">
+                      {{ String(card.name || `卡片#${String(card.id)}`) }}
+                    </option>
+                  </select>
+                  <select v-model="relationToId" class="relation-select">
+                    <option value="">目标卡片</option>
+                    <option v-for="card in projectCards" :key="`to-${String(card.id)}`" :value="String(card.id)">
+                      {{ String(card.name || `卡片#${String(card.id)}`) }}
+                    </option>
+                  </select>
+                  <input v-model="relationType" class="cf-input" placeholder="关系类型，如：敌对/师徒" />
+                  <button class="tree-btn" @click="createRelation">+ 新建关系</button>
+                </div>
+                <div class="relation-list">
+                  <div class="relation-item" v-for="relation in cardRelations" :key="String(relation.id)">
+                    <span>
+                      {{ cardNameById(String(relation.fromCardId || '')) }}
+                      →
+                      {{ cardNameById(String(relation.toCardId || '')) }}
+                      （{{ String(relation.relationType || '关联') }}）
+                    </span>
+                    <button class="tree-act-btn danger" @click="deleteRelationById(relation)">✕</button>
                   </div>
                 </div>
               </div>
             </div>
+            <div v-else class="empty-hint">暂无资料卡，先创建角色卡或世界观卡。</div>
           </div>
         </div>
       </aside>
@@ -228,6 +263,19 @@
           </div>
           <div class="toolbar-right">
             <span class="chapter-label">{{ currentChapterTitle }}</span>
+            <select v-model="selectedVersionNo" class="version-select" :disabled="versionBusy || !getCurrentChapterVersions().length">
+              <option value="">版本记录</option>
+              <option
+                v-for="version in getCurrentChapterVersions()"
+                :key="String(version.id ?? version.versionNo)"
+                :value="String(version.versionNo ?? '')"
+              >
+                v{{ version.versionNo ?? '-' }} · {{ String(version.changeReason ?? version.changeType ?? '无备注') }}
+              </option>
+            </select>
+            <button class="tb-btn" :disabled="versionBusy || !selectedVersionNo" @click="restoreSelectedVersion">恢复版本</button>
+            <button class="tb-btn" :disabled="versionBusy || !selectedVersionNo" @click="viewSelectedVersion">查看版本</button>
+            <button class="tb-btn" :disabled="versionBusy || !activeChapter" @click="publishCurrentChapter">发布章节</button>
           </div>
         </div>
 
@@ -250,7 +298,16 @@
 
         <div class="editor-statusbar">
           <span>{{ selectedText ? `已选 ${selectedText.length} 字` : '' }}</span>
+          <span v-if="versionDiffSummary" class="diff-summary">{{ versionDiffSummary }}</span>
           <span>行 {{ currentLine }} · 列 {{ currentCol }}</span>
+        </div>
+
+        <div class="version-preview" v-if="selectedVersionContent">
+          <div class="vp-title">版本对比预览（左：当前内容 / 右：所选版本）</div>
+          <div class="vp-grid">
+            <textarea class="vp-box" :value="editorContent" readonly></textarea>
+            <textarea class="vp-box" :value="selectedVersionContent" readonly></textarea>
+          </div>
         </div>
       </main>
 
@@ -369,6 +426,8 @@ import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
 import type { ApprovalCardData } from '@/components/workbench/ApprovalCard.vue'
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
+import { chapterApi } from '@/api/modules/chapter.api'
+import { cardApi } from '@/api/modules/card.api'
 import { getSession, clearSession } from '@/stores/session'
 import { authApi } from '@/api/modules/auth.api'
 
@@ -450,62 +509,6 @@ const outlineData = ref([
   }
 ])
 
-// Characters
-const characters = ref([
-  {
-    id: 'c1',
-    name: '林风',
-    role: '主角',
-    personality: '坚韧、机智、重情重义',
-    background: '出身寒门，自幼被师父收养于天问山，修习剑道十余年',
-    ability: '天问剑法·第三重',
-    expanded: true
-  },
-  {
-    id: 'c2',
-    name: '苏婉清',
-    role: '女主',
-    personality: '聪慧、独立、外冷内热',
-    background: '天机阁阁主之女，精通阵法与炼丹术',
-    ability: '天机推衍术',
-    expanded: false
-  },
-  {
-    id: 'c3',
-    name: '萧逸',
-    role: '亦敌亦友',
-    personality: '狂傲、不羁、有底线',
-    background: '魔道天才，被逐出正道宗门后自立门户',
-    ability: '噬魂魔功',
-    expanded: false
-  }
-])
-
-// World settings
-const worldSettings = ref([
-  {
-    id: 'w1',
-    icon: '⚔️',
-    name: '修炼体系',
-    description: '分为炼气、筑基、金丹、元婴、化神五大境界。每个境界分初期、中期、后期三层。突破需感悟天地法则。',
-    expanded: true
-  },
-  {
-    id: 'w2',
-    icon: '🏔️',
-    name: '天问山',
-    description: '正道首席宗门，坐落于东域最高峰。山中灵气充沛，有上古大能遗留的剑意结界。',
-    expanded: false
-  },
-  {
-    id: 'w3',
-    icon: '🌑',
-    name: '暗网',
-    description: '隐藏在修仙界暗处的神秘组织，专门贩卖禁忌功法与天材地宝。首领身份不明。',
-    expanded: false
-  }
-])
-
 // Active plugins
 const activePlugins = ref(['热网词', '起名助手'])
 
@@ -549,6 +552,296 @@ const messages = ref<ChatMessage[]>([
 const chatInput = ref('')
 const chatRef = ref<HTMLElement | null>(null)
 let msgIdCounter = 4
+const chapterVersions = ref<Record<string, Array<Record<string, unknown>>>>({})
+const selectedVersionNo = ref('')
+const versionBusy = ref(false)
+const selectedVersionContent = ref('')
+const versionDiffSummary = ref('')
+const projectCards = ref<Array<Record<string, any>>>([])
+const cardRelations = ref<Array<Record<string, any>>>([])
+const relationFromId = ref('')
+const relationToId = ref('')
+const relationType = ref('')
+
+const resolveOperatorId = () => {
+  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
+  const queryId = Number(route.query.operatorId || 0)
+  return queryId > 0 ? queryId : null
+}
+
+const getCurrentProjectId = () => Number(route.query.bookId || 0)
+
+const getContext = () => {
+  const projectId = getCurrentProjectId()
+  const operatorId = resolveOperatorId()
+  return { projectId, operatorId }
+}
+
+const cardNameById = (idLike: string) => {
+  const hit = projectCards.value.find((item) => String(item.id) === String(idLike))
+  return String(hit?.name || `卡片#${idLike}`)
+}
+
+const loadCardsAndRelations = async (projectId: number) => {
+  if (!projectId) return
+  try {
+    const [cards, relations] = await Promise.all([cardApi.listCards(projectId), cardApi.listCardRelations(projectId)])
+    projectCards.value = ((cards || []) as Array<Record<string, any>>).map((item) => ({ ...item, expanded: false }))
+    cardRelations.value = (relations || []) as Array<Record<string, any>>
+  } catch {
+    projectCards.value = []
+    cardRelations.value = []
+  }
+}
+
+const createCardQuick = async (cardType: 'CHARACTER' | 'WORLD') => {
+  const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法创建资料卡')
+    return
+  }
+  try {
+    await cardApi.createCard(projectId, operatorId, {
+      cardType,
+      name: cardType === 'CHARACTER' ? '新角色' : '新世界设定',
+      summary: '',
+      detailJson: ''
+    })
+    await loadCardsAndRelations(projectId)
+  } catch (error: any) {
+    message.warning(error?.message || '创建资料卡失败')
+  }
+}
+
+const saveCard = async (card: Record<string, any>) => {
+  const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId || !card?.id) return
+  try {
+    await cardApi.updateCard(projectId, Number(card.id), operatorId, {
+      cardType: card.cardType,
+      name: card.name,
+      summary: card.summary,
+      detailJson: card.detailJson
+    })
+    message.success('资料卡已保存')
+  } catch (error: any) {
+    message.warning(error?.message || '保存资料卡失败')
+  }
+}
+
+const deleteCardById = async (card: Record<string, any>) => {
+  const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId || !card?.id) return
+  try {
+    await cardApi.deleteCard(projectId, Number(card.id), operatorId)
+    await loadCardsAndRelations(projectId)
+  } catch (error: any) {
+    message.warning(error?.message || '删除资料卡失败')
+  }
+}
+
+const createRelation = async () => {
+  const { projectId, operatorId } = getContext()
+  const fromCardId = Number(relationFromId.value)
+  const toCardId = Number(relationToId.value)
+  const relationTypeValue = relationType.value.trim()
+  if (!projectId || !operatorId || !fromCardId || !toCardId || !relationTypeValue) {
+    message.warning('请补全来源/目标/关系类型')
+    return
+  }
+  try {
+    await cardApi.createCardRelation(projectId, operatorId, {
+      fromCardId,
+      toCardId,
+      relationType: relationTypeValue,
+      description: ''
+    })
+    relationType.value = ''
+    await loadCardsAndRelations(projectId)
+  } catch (error: any) {
+    message.warning(error?.message || '创建关系失败')
+  }
+}
+
+const deleteRelationById = async (relation: Record<string, any>) => {
+  const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId || !relation?.id) return
+  try {
+    await cardApi.deleteCardRelation(projectId, Number(relation.id), operatorId)
+    await loadCardsAndRelations(projectId)
+  } catch (error: any) {
+    message.warning(error?.message || '删除关系失败')
+  }
+}
+
+const toRecord = (value: unknown) => (value && typeof value === 'object' ? (value as Record<string, unknown>) : {})
+
+const pickString = (obj: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = obj[key]
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return ''
+}
+
+const loadChapterVersions = async (projectId: number, chapterId: string) => {
+  const numericChapterId = Number(chapterId)
+  if (!projectId || !numericChapterId) return
+  try {
+    const versions = await chapterApi.listVersions(projectId, numericChapterId)
+    const versionList = Array.isArray(versions) ? (versions as Array<Record<string, unknown>>) : []
+    chapterVersions.value[chapterId] = versionList
+    if (chapterId === activeChapter.value) {
+      const firstVersionNo = versionList[0]?.versionNo
+      selectedVersionNo.value = firstVersionNo != null ? String(firstVersionNo) : ''
+    }
+  } catch {
+    chapterVersions.value[chapterId] = []
+    if (chapterId === activeChapter.value) {
+      selectedVersionNo.value = ''
+    }
+  }
+}
+
+const getCurrentChapterVersions = () => chapterVersions.value[activeChapter.value] || []
+
+const viewSelectedVersion = async () => {
+  const projectId = getCurrentProjectId()
+  const chapterId = Number(activeChapter.value)
+  const versionNo = Number(selectedVersionNo.value)
+  if (!projectId || !chapterId || !versionNo) {
+    message.warning('请选择有效版本后再查看')
+    return
+  }
+  versionBusy.value = true
+  try {
+    const snapshotResp = toRecord(await chapterApi.getVersionSnapshotUrl(projectId, chapterId, versionNo))
+    const url = pickString(snapshotResp, ['downloadUrl', 'url', 'getUrl'])
+    if (!url) throw new Error('版本快照地址为空')
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('读取版本快照失败')
+    const text = await response.text()
+    selectedVersionContent.value = text
+    const currentLen = editorContent.value.length
+    const versionLen = text.length
+    const delta = versionLen - currentLen
+    versionDiffSummary.value = `当前 ${currentLen} 字 / 版本 ${versionLen} 字 / 差值 ${delta >= 0 ? '+' : ''}${delta}`
+  } catch (error: any) {
+    selectedVersionContent.value = ''
+    versionDiffSummary.value = ''
+    message.warning(error?.message || '查看版本失败')
+  } finally {
+    versionBusy.value = false
+  }
+}
+
+const refreshEditorFromRemote = async (projectId: number, chapterId: number) => {
+  const contentResp = toRecord(await chapterApi.getContentUrl(projectId, chapterId))
+  const downloadUrl = pickString(contentResp, ['downloadUrl', 'url', 'getUrl'])
+  if (!downloadUrl) return
+  const response = await fetch(downloadUrl)
+  if (!response.ok) return
+  const text = await response.text()
+  editorContent.value = text
+  chapterContents.value[activeChapter.value] = text
+  wordCount.value = text.replace(/\s/g, '').length
+  lastSnapshot = text
+}
+
+const restoreSelectedVersion = async () => {
+  const projectId = getCurrentProjectId()
+  const chapterId = Number(activeChapter.value)
+  const operatorId = resolveOperatorId()
+  const versionNo = Number(selectedVersionNo.value)
+  if (!projectId || !chapterId || !operatorId || !versionNo) {
+    message.warning('缺少 projectId/chapterId/operatorId/versionNo，无法恢复版本')
+    return
+  }
+  versionBusy.value = true
+  try {
+    await chapterApi.restoreVersion(projectId, chapterId, versionNo, operatorId)
+    await refreshEditorFromRemote(projectId, chapterId)
+    await loadChapterVersions(projectId, String(chapterId))
+    selectedVersionContent.value = ''
+    versionDiffSummary.value = ''
+    message.success(`已恢复到版本 v${versionNo}`)
+  } catch (error: any) {
+    message.warning(error?.message || '恢复版本失败')
+  } finally {
+    versionBusy.value = false
+  }
+}
+
+const publishCurrentChapter = async () => {
+  const projectId = getCurrentProjectId()
+  const chapterId = Number(activeChapter.value)
+  const operatorId = resolveOperatorId()
+  if (!projectId || !chapterId || !operatorId) {
+    message.warning('缺少 projectId/chapterId/operatorId，无法发布章节')
+    return
+  }
+  versionBusy.value = true
+  try {
+    await chapterApi.publishChapter(projectId, chapterId, operatorId)
+    message.success('章节已发布')
+  } catch (error: any) {
+    message.warning(error?.message || '发布章节失败')
+  } finally {
+    versionBusy.value = false
+  }
+}
+
+const uploadAndCommitContent = async (projectId: number, chapterId: number, content: string, operatorId: number) => {
+  const uploadResp = toRecord(await chapterApi.getContentUploadUrl(projectId, chapterId))
+  const uploadUrl = pickString(uploadResp, ['uploadUrl', 'url', 'putUrl'])
+  const objectKey = pickString(uploadResp, ['objectKey', 'key'])
+  const storageProvider = pickString(uploadResp, ['storageProvider', 'provider']) || 'oss'
+  if (!uploadUrl || !objectKey) {
+    throw new Error('上传地址响应缺少 uploadUrl/objectKey')
+  }
+
+  let etag = ''
+  let checksum = ''
+  const uploadHost = (() => {
+    try {
+      return new URL(uploadUrl).hostname
+    } catch {
+      return ''
+    }
+  })()
+
+  // 本地联调兜底：后端默认返回 object.local 示例地址，浏览器无法真实上传
+  if (uploadHost && uploadHost !== 'object.local') {
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8'
+      },
+      body: content
+    })
+    if (!uploadResponse.ok) {
+      throw new Error(`内容上传失败: ${uploadResponse.status}`)
+    }
+    etag = uploadResponse.headers.get('etag') || ''
+    checksum = uploadResponse.headers.get('x-amz-checksum-sha256') || ''
+  }
+
+  const size = new Blob([content]).size
+
+  await chapterApi.commitContent(projectId, chapterId, operatorId, {
+    objectKey,
+    etag,
+    size,
+    checksum,
+    storageProvider
+  })
+
+  await chapterApi.createVersion(projectId, chapterId, {
+    changeType: 'MANUAL_SAVE',
+    changeReason: '前端手动保存',
+    createdBy: operatorId
+  })
+}
 
 // ===================== METHODS =====================
 
@@ -645,37 +938,87 @@ const selectChapter = (ch: { key: string; title: string }) => {
   undoStack.value = []
   redoStack.value = []
   lastSnapshot = editorContent.value
+  loadChapterVersions(getCurrentProjectId(), ch.key)
   nextTick(() => editorRef.value?.focus())
 }
 
 // --- Outline CRUD ---
-const addVolume = () => {
+const addVolume = async () => {
+  const { projectId, operatorId } = getContext()
   const idx = outlineData.value.length
   const nums = ['一','二','三','四','五','六','七','八','九','十']
-  outlineData.value.push({
-    title: `第${nums[idx] || idx + 1}卷：新的篇章`,
-    key: `0-${idx}`,
-    expanded: true,
-    children: []
-  })
+  const title = `第${nums[idx] || idx + 1}卷：新的篇章`
+  if (projectId && operatorId) {
+    try {
+      await outlineApi.createNode(projectId, operatorId, {
+        parentId: null,
+        title,
+        nodeType: 'VOLUME',
+        sortOrder: idx + 1,
+        content: ''
+      })
+      await loadOutlineTree(projectId)
+      return
+    } catch (error: any) {
+      message.warning(error?.message || '新建分卷失败，已回退本地模式')
+    }
+  }
+  outlineData.value.push({ title, key: `0-${idx}`, expanded: true, children: [] })
 }
 
-const addChapter = (vol: any) => {
+const addChapter = async (vol: any) => {
+  const { projectId, operatorId } = getContext()
   const idx = vol.children.length
   const newKey = `${vol.key}-${idx}`
-  vol.children.push({ title: `第${idx + 1}章：未命名`, key: newKey })
+  const title = `第${idx + 1}章：未命名`
+  if (projectId && operatorId && Number(vol.key)) {
+    try {
+      await outlineApi.createNode(projectId, operatorId, {
+        parentId: Number(vol.key),
+        title,
+        nodeType: 'CHAPTER',
+        sortOrder: idx + 1,
+        content: ''
+      })
+      await loadOutlineTree(projectId)
+      return
+    } catch (error: any) {
+      message.warning(error?.message || '新建章节失败，已回退本地模式')
+    }
+  }
+  vol.children.push({ title, key: newKey })
   vol.expanded = true
   chapterContents.value[newKey] = ''
 }
 
-const deleteVolume = (vIdx: number) => {
+const deleteVolume = async (vIdx: number) => {
+  const { projectId, operatorId } = getContext()
   const vol = outlineData.value[vIdx]
+  if (projectId && operatorId && Number(vol?.key)) {
+    try {
+      await outlineApi.deleteNode(projectId, Number(vol.key), operatorId)
+      await loadOutlineTree(projectId)
+      return
+    } catch (error: any) {
+      message.warning(error?.message || '删除分卷失败，已回退本地模式')
+    }
+  }
   vol.children.forEach((ch: any) => delete chapterContents.value[ch.key])
   outlineData.value.splice(vIdx, 1)
 }
 
-const deleteChapter = (vol: any, cIdx: number) => {
+const deleteChapter = async (vol: any, cIdx: number) => {
+  const { projectId, operatorId } = getContext()
   const ch = vol.children[cIdx]
+  if (projectId && operatorId && Number(ch?.key)) {
+    try {
+      await outlineApi.deleteNode(projectId, Number(ch.key), operatorId)
+      await loadOutlineTree(projectId)
+      return
+    } catch (error: any) {
+      message.warning(error?.message || '删除章节失败，已回退本地模式')
+    }
+  }
   delete chapterContents.value[ch.key]
   if (activeChapter.value === ch.key) {
     editorContent.value = ''
@@ -692,52 +1035,75 @@ const startEditNode = (node: { key: string; title: string }) => {
 }
 
 const finishEditNode = (node: { key: string; title: string }) => {
-  if (editingNodeValue.value.trim()) {
-    node.title = editingNodeValue.value.trim()
+  const nextTitle = editingNodeValue.value.trim()
+  if (nextTitle) {
+    node.title = nextTitle
   }
   editingNodeKey.value = ''
   if (node.key === activeChapter.value) {
     currentChapterTitle.value = node.title
   }
+  const { projectId, operatorId } = getContext()
+  if (projectId && operatorId && Number(node.key) && nextTitle) {
+    outlineApi.updateNode(projectId, Number(node.key), operatorId, { title: nextTitle }).catch(() => undefined)
+  }
 }
 
-// --- Character CRUD ---
-const addCharacter = () => {
-  characters.value.push({
-    id: `c${Date.now()}`,
-    name: '新角色',
-    role: '配角',
-    personality: '',
-    background: '',
-    ability: '',
-    expanded: true
-  })
+const moveVolume = async (vol: any, direction: -1 | 1) => {
+  const currentIdx = outlineData.value.findIndex((item: any) => item.key === vol.key)
+  const targetIdx = currentIdx + direction
+  if (currentIdx < 0 || targetIdx < 0 || targetIdx >= outlineData.value.length) return
+  const { projectId, operatorId } = getContext()
+  if (projectId && operatorId && Number(vol.key)) {
+    await outlineApi.moveNode(projectId, Number(vol.key), operatorId, {
+      parentId: null,
+      sortOrder: targetIdx + 1
+    }).catch(() => undefined)
+  }
+  const [item] = outlineData.value.splice(currentIdx, 1)
+  outlineData.value.splice(targetIdx, 0, item)
 }
 
-const deleteCharacter = (idx: number) => {
-  characters.value.splice(idx, 1)
-}
-
-// --- World CRUD ---
-const addWorldEntry = () => {
-  worldSettings.value.push({
-    id: `w${Date.now()}`,
-    icon: '🔮',
-    name: '新设定',
-    description: '',
-    expanded: true
-  })
-}
-
-const deleteWorldEntry = (idx: number) => {
-  worldSettings.value.splice(idx, 1)
+const moveChapter = async (vol: any, cIdx: number, direction: -1 | 1) => {
+  const targetIdx = cIdx + direction
+  if (targetIdx < 0 || targetIdx >= vol.children.length) return
+  const ch = vol.children[cIdx]
+  const { projectId, operatorId } = getContext()
+  if (projectId && operatorId && Number(ch?.key)) {
+    await outlineApi.moveNode(projectId, Number(ch.key), operatorId, {
+      parentId: Number(vol.key) || null,
+      sortOrder: targetIdx + 1
+    }).catch(() => undefined)
+  }
+  const [item] = vol.children.splice(cIdx, 1)
+  vol.children.splice(targetIdx, 0, item)
 }
 
 // --- Save ---
-const saveContent = () => {
+const saveContent = async () => {
   chapterContents.value[activeChapter.value] = editorContent.value
-  saveHint.value = '✓ 已保存'
-  setTimeout(() => { saveHint.value = '' }, 2000)
+  saveHint.value = '⌛ 保存中...'
+
+  const projectId = getCurrentProjectId()
+  const chapterId = Number(activeChapter.value)
+  const operatorId = resolveOperatorId()
+
+  if (!projectId || !chapterId || !operatorId) {
+    saveHint.value = '✓ 已本地保存'
+    setTimeout(() => { saveHint.value = '' }, 2000)
+    return
+  }
+
+  try {
+    await uploadAndCommitContent(projectId, chapterId, editorContent.value, operatorId)
+    await loadChapterVersions(projectId, String(chapterId))
+    saveHint.value = '✓ 云端已保存'
+  } catch (error: any) {
+    saveHint.value = '⚠ 本地已保存'
+    message.warning(error?.message || '云端保存失败，已保留本地内容')
+  } finally {
+    setTimeout(() => { saveHint.value = '' }, 2000)
+  }
 }
 
 // --- Chat merge/replace ---
@@ -834,6 +1200,11 @@ const mapOutlineTree = (nodes: Array<Record<string, any>>) => {
   return values.length ? values : outlineData.value
 }
 
+const loadOutlineTree = async (projectId: number) => {
+  const outlines = await outlineApi.listOutlineTree(projectId)
+  outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>)
+}
+
 const loadWorkbenchData = async () => {
   const projectId = Number(route.query.bookId || 0)
   if (!projectId) return
@@ -854,6 +1225,7 @@ const loadWorkbenchData = async () => {
     })
 
     outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>)
+    await loadCardsAndRelations(projectId)
     const first = outlineData.value[0]?.children?.[0]
     if (first) {
       activeChapter.value = first.key
@@ -861,6 +1233,7 @@ const loadWorkbenchData = async () => {
       editorContent.value = chapterContents.value[first.key] || ''
       wordCount.value = editorContent.value.replace(/\s/g, '').length
       lastSnapshot = editorContent.value
+      await loadChapterVersions(projectId, first.key)
     }
   } catch (error: any) {
     message.warning(error?.message || '工作台数据加载失败，已使用本地演示数据')
@@ -1202,6 +1575,22 @@ onMounted(() => {
 .chapter-label {
   font-family: var(--font-heading); font-size: 0.82rem;
   color: var(--text-muted); letter-spacing: 0.1em;
+}
+
+.version-select {
+  min-width: 168px;
+  max-width: 240px;
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(11,17,32,0.6);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 0.74rem;
+  outline: none;
+  &:focus {
+    border-color: var(--border-gold);
+  }
 }
 
 .editor-area { flex: 1; overflow: hidden; padding: 0; }

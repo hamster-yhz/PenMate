@@ -7,8 +7,8 @@ export const outlineApi = {
   listOutlineTree(projectId: IdLike) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/outlines/tree`)
   },
-  createNode(projectId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes`, payload)
+  createNode(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes?operatorId=${operatorId}`, payload)
   },
   updateNode(projectId: IdLike, nodeId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`, payload)
