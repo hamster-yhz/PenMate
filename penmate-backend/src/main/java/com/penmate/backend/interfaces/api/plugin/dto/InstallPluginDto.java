@@ -1,6 +1,9 @@
 package com.penmate.backend.interfaces.api.plugin.dto;
 
+import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
+
+@Data
 
 public class InstallPluginDto {
 
@@ -9,28 +12,5 @@ public class InstallPluginDto {
     private String version;
     private String configJson;
 
-    public String getPluginCode() {
-        return pluginCode;
-    }
-
-    public void setPluginCode(String pluginCode) {
-        this.pluginCode = pluginCode;
-    }
-
-    public String getVersion() {
-        return version;
-    }
-
-    public void setVersion(String version) {
-        this.version = version;
-    }
-
-    public String getConfigJson() {
-        return configJson;
-    }
-
-    public void setConfigJson(String configJson) {
-        this.configJson = configJson;
-    }
 }
 

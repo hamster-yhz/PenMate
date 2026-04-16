@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.common;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,11 +12,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        String traceId = traceId(request);
+        log.warn("请求参数校验失败: traceId={}, path={}, errorCount={}", traceId, request.getRequestURI(), ex.getBindingResult().getErrorCount());
         List<Map<String, String>> details = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -28,38 +32,46 @@ public class GlobalExceptionHandler {
                         "VALIDATION_ERROR",
                         "Input validation failed.",
                         details,
-                        traceId(request)
+                        traceId
                 )
         );
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleBiz(IllegalArgumentException ex, HttpServletRequest request) {
+        String traceId = traceId(request);
+        log.warn("业务异常: traceId={}, path={}, message={}", traceId, request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
                 ErrorResponse.of(
                         422,
                         "BUSINESS_RULE_VIOLATION",
                         ex.getMessage(),
                         null,
-                        traceId(request)
+                        traceId
                 )
         );
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnknown(Exception ex, HttpServletRequest request) {
+        String traceId = traceId(request);
+        log.error("系统异常: traceId={}, path={}", traceId, request.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 ErrorResponse.of(
                         500,
                         "INTERNAL_SERVER_ERROR",
                         "Internal server error",
                         null,
-                        traceId(request)
+                        traceId
                 )
         );
     }
 
     private String traceId(HttpServletRequest request) {
+        Object traceIdAttr = request.getAttribute("traceId");
+        if (traceIdAttr instanceof String traceId && !traceId.isBlank()) {
+            return traceId;
+        }
         String traceId = request.getHeader("X-Trace-Id");
         return traceId == null || traceId.isBlank() ? UUID.randomUUID().toString() : traceId;
     }

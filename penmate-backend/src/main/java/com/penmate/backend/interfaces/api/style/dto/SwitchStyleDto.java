@@ -1,6 +1,9 @@
 package com.penmate.backend.interfaces.api.style.dto;
 
+import lombok.Data;
 import jakarta.validation.constraints.NotNull;
+
+@Data
 
 public class SwitchStyleDto {
 
@@ -9,28 +12,5 @@ public class SwitchStyleDto {
     private Boolean warningConfirmed;
     private String reason;
 
-    public Long getToStyleId() {
-        return toStyleId;
-    }
-
-    public void setToStyleId(Long toStyleId) {
-        this.toStyleId = toStyleId;
-    }
-
-    public Boolean getWarningConfirmed() {
-        return warningConfirmed;
-    }
-
-    public void setWarningConfirmed(Boolean warningConfirmed) {
-        this.warningConfirmed = warningConfirmed;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public void setReason(String reason) {
-        this.reason = reason;
-    }
 }
 

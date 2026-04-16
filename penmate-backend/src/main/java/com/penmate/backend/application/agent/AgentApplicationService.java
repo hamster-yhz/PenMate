@@ -10,6 +10,8 @@ import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.shared.service.AuditService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,19 +23,13 @@ import java.util.UUID;
  * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
  */
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class AgentApplicationService {
 
     private final AgentRepository agentRepository;
     private final AuditService auditService;
     private final RealtimeEventService realtimeEventService;
-
-    public AgentApplicationService(AgentRepository agentRepository,
-                                   AuditService auditService,
-                                   RealtimeEventService realtimeEventService) {
-        this.agentRepository = agentRepository;
-        this.auditService = auditService;
-        this.realtimeEventService = realtimeEventService;
-    }
 
     /**
      * 查询列表数据。
@@ -42,6 +38,7 @@ public class AgentApplicationService {
      * @return 出参：处理结果
      */
     public List<AgentConversation> listConversations(Long projectId) {
+        log.info("查询会话列表: projectId={}", projectId);
         return agentRepository.listConversations(projectId);
     }
 
@@ -56,6 +53,7 @@ public class AgentApplicationService {
     public AgentConversation createConversation(Long projectId,
                                                 CreateConversationCommand command,
                                                 String traceId) {
+        log.info("创建会话: projectId={}, userId={}, title={}", projectId, command.userId(), command.title());
         AgentConversation conversation = new AgentConversation();
         conversation.setProjectId(projectId);
         conversation.setUserId(command.userId());
@@ -64,10 +62,12 @@ public class AgentApplicationService {
         conversation.setStatus(command.status() == null || command.status().isBlank() ? "active" : command.status());
         int affected = agentRepository.insertConversation(conversation);
         if (affected != 1) {
+            log.error("创建会话失败: projectId={}, userId={}", projectId, command.userId());
             throw new IllegalArgumentException("Failed to create conversation");
         }
         writeAudit(traceId, command.operatorId(), "agent", "conversation:create", "agent_conversations",
                 String.valueOf(conversation.getId()), command.contextScopeJson(), 201);
+        log.info("创建会话成功: conversationId={}", conversation.getId());
         return conversation;
     }
 
@@ -79,6 +79,7 @@ public class AgentApplicationService {
      * @return 出参：处理结果
      */
     public List<AgentMessage> listMessages(Long projectId, Long conversationId) {
+        log.info("查询消息列表: projectId={}, conversationId={}", projectId, conversationId);
         ensureConversation(projectId, conversationId);
         return agentRepository.listMessages(conversationId);
     }
@@ -96,6 +97,7 @@ public class AgentApplicationService {
                                       Long conversationId,
                                       CreateMessageCommand command,
                                       String traceId) {
+        log.info("创建消息: projectId={}, conversationId={}, role={}", projectId, conversationId, command.role());
         ensureConversation(projectId, conversationId);
         AgentMessage message = new AgentMessage();
         message.setConversationId(conversationId);
@@ -107,11 +109,13 @@ public class AgentApplicationService {
         message.setSeqNo(agentRepository.nextMessageSeq(conversationId));
         int affected = agentRepository.insertMessage(message);
         if (affected != 1) {
+            log.error("创建消息失败: projectId={}, conversationId={}", projectId, conversationId);
             throw new IllegalArgumentException("Failed to create message");
         }
         agentRepository.touchConversationLastMessage(conversationId);
         writeAudit(traceId, command.operatorId(), "agent", "message:create", "agent_messages",
                 String.valueOf(message.getId()), command.contentMd(), 201);
+        log.info("创建消息成功: messageId={}, seqNo={}", message.getId(), message.getSeqNo());
         return message;
     }
 
@@ -126,6 +130,7 @@ public class AgentApplicationService {
     public AgentGenerationTask createGeneration(Long projectId,
                                                 CreateGenerationCommand command,
                                                 String traceId) {
+        log.info("创建生成任务: projectId={}, conversationId={}, taskType={}", projectId, command.conversationId(), command.taskType());
         ensureConversation(projectId, command.conversationId());
         AgentGenerationTask task = new AgentGenerationTask();
         task.setProjectId(projectId);
@@ -139,6 +144,7 @@ public class AgentApplicationService {
         task.setStartedAt(LocalDateTime.now());
         int affected = agentRepository.insertGenerationTask(task);
         if (affected != 1) {
+            log.error("创建生成任务失败: projectId={}, conversationId={}", projectId, command.conversationId());
             throw new IllegalArgumentException("Failed to create generation task");
         }
         realtimeEventService.publishGenerationToken(projectId, task.getId(), "开始生成", false);
@@ -146,6 +152,7 @@ public class AgentApplicationService {
         realtimeEventService.publishGenerationToken(projectId, task.getId(), "", true);
         writeAudit(traceId, command.operatorId(), "agent", "generation:create", "agent_generation_tasks",
                 String.valueOf(task.getId()), command.promptSnapshot(), 201);
+        log.info("创建生成任务成功: taskId={}", task.getId());
         return getGeneration(projectId, task.getId());
     }
 
@@ -159,8 +166,10 @@ public class AgentApplicationService {
     public AgentGenerationTask getGeneration(Long projectId, Long taskId) {
         AgentGenerationTask task = agentRepository.findGenerationTask(projectId, taskId);
         if (task == null) {
+            log.warn("查询生成任务失败: projectId={}, taskId={}, reason=not_found", projectId, taskId);
             throw new IllegalArgumentException("Generation task not found");
         }
+        log.info("查询生成任务成功: projectId={}, taskId={}, status={}", projectId, taskId, task.getStatus());
         return task;
     }
 
@@ -177,22 +186,27 @@ public class AgentApplicationService {
                                                Long taskId,
                                                ApplyGenerationCommand command,
                                                String traceId) {
+        log.info("应用生成任务: projectId={}, taskId={}", projectId, taskId);
         AgentGenerationTask task = getGeneration(projectId, taskId);
         if (!"done".equals(task.getStatus()) && !"applied".equals(task.getStatus())) {
+            log.warn("应用生成任务失败: projectId={}, taskId={}, status={}", projectId, taskId, task.getStatus());
             throw new IllegalArgumentException("Generation task is not ready for apply");
         }
         int affected = agentRepository.updateGenerationTaskStatus(projectId, taskId, "applied", null);
         if (affected != 1) {
+            log.error("应用生成任务失败: projectId={}, taskId={}, reason=update_failed", projectId, taskId);
             throw new IllegalArgumentException("Failed to apply generation result");
         }
         writeAudit(traceId, command.operatorId(), "agent", "generation:apply", "agent_generation_tasks",
                 String.valueOf(taskId), command.applyNote(), 200);
+        log.info("应用生成任务成功: projectId={}, taskId={}", projectId, taskId);
         return getGeneration(projectId, taskId);
     }
 
     private void ensureConversation(Long projectId, Long conversationId) {
         AgentConversation conversation = agentRepository.findConversation(projectId, conversationId);
         if (conversation == null) {
+            log.warn("会话不存在: projectId={}, conversationId={}", projectId, conversationId);
             throw new IllegalArgumentException("Conversation not found");
         }
     }

@@ -8,6 +8,8 @@ import com.penmate.backend.domain.iam.model.IamSession;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
 import com.penmate.backend.domain.shared.service.AuditService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,16 +23,12 @@ import java.util.UUID;
  * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
  */
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class AuthApplicationService {
 
     private final IamGateway iamGateway;
     private final AuditService auditService;
-
-    public AuthApplicationService(IamGateway iamGateway,
-                                  AuditService auditService) {
-        this.iamGateway = iamGateway;
-        this.auditService = auditService;
-    }
 
     /**
      * 执行登录流程。
@@ -40,11 +38,14 @@ public class AuthApplicationService {
      * @return 出参：处理结果
      */
     public Map<String, Object> login(LoginCommand command, String traceId) {
+        log.info("登录请求: email={}", command.email());
         IamUser user = iamGateway.findUserByEmail(command.email());
         if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+            log.warn("登录失败: email={}, reason=invalid_user_or_status", command.email());
             throw new IllegalArgumentException("Invalid credentials");
         }
         if (!command.password().equals(user.getPasswordHash())) {
+            log.warn("登录失败: userId={}, reason=invalid_password", user.getId());
             throw new IllegalArgumentException("Invalid credentials");
         }
 
@@ -55,6 +56,7 @@ public class AuthApplicationService {
         session.setAccessExpiresAt(LocalDateTime.now().plusHours(2));
         session.setRefreshExpiresAt(LocalDateTime.now().plusDays(7));
         if (iamGateway.insertSession(session) != 1) {
+            log.error("登录失败: userId={}, reason=create_session_failed", user.getId());
             throw new IllegalArgumentException("Failed to create session");
         }
         iamGateway.touchLastLogin(user.getId());
@@ -66,6 +68,7 @@ public class AuthApplicationService {
         result.put("refreshToken", session.getRefreshToken());
         result.put("accessExpiresAt", session.getAccessExpiresAt());
         result.put("refreshExpiresAt", session.getRefreshExpiresAt());
+        log.info("登录成功: userId={}, sessionId={}", user.getId(), session.getId());
         return result;
     }
 
@@ -79,10 +82,12 @@ public class AuthApplicationService {
         String token = extractBearer(accessToken);
         IamSession session = iamGateway.findSessionByAccessToken(token);
         if (session == null) {
+            log.info("登出请求忽略: reason=session_not_found");
             return;
         }
         iamGateway.revokeByAccessToken(token);
         writeAudit(traceId, session.getUserId(), "auth", "logout", "iam_user_sessions", String.valueOf(session.getId()), null, 200);
+        log.info("登出成功: userId={}, sessionId={}", session.getUserId(), session.getId());
     }
 
     /**
@@ -93,8 +98,10 @@ public class AuthApplicationService {
      * @return 出参：处理结果
      */
     public Map<String, Object> refresh(RefreshCommand command, String traceId) {
+        log.info("刷新令牌请求");
         IamSession session = iamGateway.findSessionByRefreshToken(command.refreshToken());
         if (session == null || session.getRefreshExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("刷新令牌失败: reason=invalid_or_expired");
             throw new IllegalArgumentException("Refresh token invalid or expired");
         }
         session.setAccessToken("atk_" + UUID.randomUUID());
@@ -102,6 +109,7 @@ public class AuthApplicationService {
         session.setAccessExpiresAt(LocalDateTime.now().plusHours(2));
         session.setRefreshExpiresAt(LocalDateTime.now().plusDays(7));
         if (iamGateway.rotateSession(session) != 1) {
+            log.error("刷新令牌失败: userId={}, sessionId={}, reason=rotate_failed", session.getUserId(), session.getId());
             throw new IllegalArgumentException("Failed to refresh token");
         }
         writeAudit(traceId, session.getUserId(), "auth", "refresh", "iam_user_sessions", String.valueOf(session.getId()), null, 200);
@@ -111,6 +119,7 @@ public class AuthApplicationService {
         result.put("refreshToken", session.getRefreshToken());
         result.put("accessExpiresAt", session.getAccessExpiresAt());
         result.put("refreshExpiresAt", session.getRefreshExpiresAt());
+        log.info("刷新令牌成功: userId={}, sessionId={}", session.getUserId(), session.getId());
         return result;
     }
 
@@ -124,10 +133,12 @@ public class AuthApplicationService {
         String token = extractBearer(authorization);
         IamSession session = iamGateway.findSessionByAccessToken(token);
         if (session == null || session.getAccessExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("查询当前用户失败: reason=login_required");
             throw new IllegalArgumentException("Login required");
         }
         IamUser user = iamGateway.findUserById(session.getUserId());
         if (user == null) {
+            log.warn("查询当前用户失败: userId={}, reason=user_not_found", session.getUserId());
             throw new IllegalArgumentException("User not found");
         }
         List<IamRole> roles = iamGateway.findRolesByUserId(user.getId());
@@ -139,6 +150,7 @@ public class AuthApplicationService {
         result.put("displayName", user.getDisplayName());
         result.put("roles", roles);
         result.put("permissions", permissions);
+        log.info("查询当前用户成功: userId={}, roleCount={}, permissionCount={}", user.getId(), roles.size(), permissions.size());
         return result;
     }
 

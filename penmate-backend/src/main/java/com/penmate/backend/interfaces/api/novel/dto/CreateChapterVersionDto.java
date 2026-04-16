@@ -1,7 +1,10 @@
 package com.penmate.backend.interfaces.api.novel.dto;
 
+import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
+@Data
 
 public class CreateChapterVersionDto {
 
@@ -12,11 +15,5 @@ public class CreateChapterVersionDto {
     @NotNull
     private Long createdBy;
 
-    public String getChangeType() { return changeType; }
-    public void setChangeType(String changeType) { this.changeType = changeType; }
-    public String getChangeReason() { return changeReason; }
-    public void setChangeReason(String changeReason) { this.changeReason = changeReason; }
-    public Long getCreatedBy() { return createdBy; }
-    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
 }
 

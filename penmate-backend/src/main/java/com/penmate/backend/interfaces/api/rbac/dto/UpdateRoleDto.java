@@ -1,6 +1,9 @@
 package com.penmate.backend.interfaces.api.rbac.dto;
 
+import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
+
+@Data
 
 public class UpdateRoleDto {
 
@@ -9,20 +12,5 @@ public class UpdateRoleDto {
 
     private String description;
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
 }
 
