@@ -103,22 +103,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { message } from 'ant-design-vue'
+import { modelApi } from '@/api/modules/model.api'
+import { getSession } from '@/stores/session'
 
-defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean }>()
 defineEmits(['close'])
+const route = useRoute()
+const session = getSession()
 
-const activeModel = ref('deepseek')
+type AnyRecord = Record<string, unknown>
+
+const activeModel = ref('')
 const showKey = ref(false)
 const testStatus = ref<'success' | 'error' | ''>('')
+const saving = ref(false)
+const testing = ref(false)
+const keyIdByModel = ref<Record<string, number>>({})
 
-const models = ref([
-  { id: 'deepseek', name: 'DeepSeek Chat', provider: 'DeepSeek', status: 'connected' },
-  { id: 'gpt4', name: 'GPT-4o', provider: 'OpenAI', status: 'none' },
-  { id: 'claude', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', status: 'none' },
-  { id: 'qwen', name: '通义千问Max', provider: '阿里云', status: 'none' },
-  { id: 'custom', name: '自定义模型', provider: '自行配置', status: 'none' }
-])
+const models = ref<Array<{ id: string; providerId: number; providerCode: string; name: string; provider: string; status: 'connected' | 'error' | 'none' }>>([])
 
 const apiConfig = reactive({
   baseUrl: '',
@@ -126,17 +131,133 @@ const apiConfig = reactive({
   modelName: ''
 })
 
-const testConnection = async () => {
-  testStatus.value = ''
-  await new Promise(r => setTimeout(r, 1200))
-  testStatus.value = apiConfig.apiKey.length > 5 ? 'success' : 'error'
+const getProjectId = () => Number(route.query.bookId || 0)
+const getUserId = () => {
+  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
+  const fromQuery = Number(route.query.userId || route.query.operatorId || 0)
+  return fromQuery > 0 ? fromQuery : null
+}
+const getOperatorId = () => getUserId()
+
+const loadModelData = async () => {
+  const userId = getUserId()
+  const projectId = getProjectId()
+  if (!userId) return
+  try {
+    const [providersResp, keysResp, policiesResp] = await Promise.all([
+      modelApi.listProviders(),
+      modelApi.listKeys(userId),
+      projectId ? modelApi.listPolicies(projectId) : Promise.resolve([])
+    ])
+    const providers = (providersResp || []) as AnyRecord[]
+    const keys = (keysResp || []) as AnyRecord[]
+    const policies = (policiesResp || []) as AnyRecord[]
+    const defaultPolicy = policies.find((item) => Boolean(item.isDefault)) || policies[0]
+    const defaultKeyId = Number(defaultPolicy?.userKeyId || 0)
+    const keyByProvider = new Map<number, AnyRecord>()
+    keys.forEach((key) => {
+      const providerId = Number(key.providerId || 0)
+      if (providerId > 0 && !keyByProvider.has(providerId)) keyByProvider.set(providerId, key)
+    })
+
+    models.value = providers.map((provider, idx) => {
+      const providerId = Number(provider.id || provider.providerId || 0)
+      const providerCode = String(provider.providerCode || provider.code || `provider-${idx}`)
+      const providerName = String(provider.displayName || provider.name || providerCode)
+      const key = keyByProvider.get(providerId)
+      const keyId = Number(key?.id || 0)
+      const status = key ? (String(key.status || '').toUpperCase() === 'DISABLED' ? 'error' : 'connected') : 'none'
+      const id = `provider-${providerId || idx}`
+      if (keyId > 0) keyIdByModel.value[id] = keyId
+      return {
+        id,
+        providerId,
+        providerCode,
+        name: providerName,
+        provider: providerName,
+        status
+      }
+    })
+
+    const preferred = models.value.find((item) => {
+      const keyId = keyIdByModel.value[item.id] || 0
+      return defaultKeyId > 0 && keyId === defaultKeyId
+    }) || models.value[0]
+
+    if (preferred) {
+      activeModel.value = preferred.id
+      apiConfig.modelName = preferred.providerCode
+    }
+  } catch (error: any) {
+    message.warning(error?.message || '模型配置加载失败')
+  }
 }
 
-const saveApi = () => {
-  // TODO: Save to backend
-  const model = models.value.find(m => m.id === activeModel.value)
-  if (model) model.status = 'connected'
+const testConnection = async () => {
+  testStatus.value = ''
+  if (!apiConfig.apiKey.trim()) {
+    testStatus.value = 'error'
+    return
+  }
+  testing.value = true
+  await new Promise(r => setTimeout(r, 600))
+  testStatus.value = apiConfig.apiKey.length > 8 ? 'success' : 'error'
+  testing.value = false
 }
+
+const saveApi = async () => {
+  const userId = getUserId()
+  const operatorId = getOperatorId()
+  const active = models.value.find((m) => m.id === activeModel.value)
+  if (!userId || !operatorId || !active) {
+    message.warning('缺少 userId/operatorId 或模型选择')
+    return
+  }
+  if (!apiConfig.apiKey.trim()) {
+    message.warning('请填写 API Key')
+    return
+  }
+
+  saving.value = true
+  try {
+    const keyId = keyIdByModel.value[active.id] || 0
+    if (keyId > 0) {
+      await modelApi.updateKey(keyId, userId, operatorId, {
+        keyName: apiConfig.modelName || active.name,
+        apiKey: apiConfig.apiKey,
+        isDefault: true,
+        status: 'ENABLED'
+      })
+    } else {
+      const created = (await modelApi.createKey(userId, operatorId, {
+        providerId: active.providerId,
+        keyName: apiConfig.modelName || active.name,
+        apiKey: apiConfig.apiKey,
+        isDefault: true,
+        status: 'ENABLED'
+      })) as AnyRecord
+      const createdId = Number(created.id || 0)
+      if (createdId > 0) keyIdByModel.value[active.id] = createdId
+    }
+
+    active.status = 'connected'
+    message.success('模型配置已保存')
+    await loadModelData()
+  } catch (error: any) {
+    message.warning(error?.message || '保存模型配置失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      void loadModelData()
+    }
+  }
+)
 </script>
 
 <style lang="less" scoped>

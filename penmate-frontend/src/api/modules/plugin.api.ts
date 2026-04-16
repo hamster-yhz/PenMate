@@ -13,8 +13,8 @@ export const pluginApi = {
   listProjectPlugins(projectId: IdLike) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/plugins`)
   },
-  installPlugin(projectId: IdLike, payload: AnyRecord) {
-    return request.post<string>(`/v1/novels/${projectId}/plugins/install`, payload)
+  installPlugin(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<string>(`/v1/novels/${projectId}/plugins/install?operatorId=${operatorId}`, payload)
   },
   updateInstall(projectId: IdLike, pluginCode: string, operatorId: IdLike, payload: AnyRecord) {
     return request.patch<string>(`/v1/novels/${projectId}/plugins/${pluginCode}?operatorId=${operatorId}`, payload)

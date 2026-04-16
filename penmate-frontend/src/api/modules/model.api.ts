@@ -13,8 +13,8 @@ export const modelApi = {
   listKeys(userId: IdLike) {
     return request.get<AnyRecord[]>(`/v1/model/keys?userId=${userId}`)
   },
-  createKey(payload: AnyRecord) {
-    return request.post<AnyRecord>('/v1/model/keys', payload)
+  createKey(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/model/keys?userId=${userId}&operatorId=${operatorId}`, payload)
   },
   updateKey(keyId: IdLike, userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.patch<string>(`/v1/model/keys/${keyId}?userId=${userId}&operatorId=${operatorId}`, payload)

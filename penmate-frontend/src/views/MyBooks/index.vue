@@ -12,6 +12,9 @@
         <span class="nav-brand">笔友 · 书架</span>
       </div>
       <div class="nav-right">
+        <button class="nav-btn" @click="$router.push('/domain-console')">
+          <span>🧪 三域控台</span>
+        </button>
         <button class="nav-btn" @click="$router.push('/profile')">
           <div class="avatar-sm">{{ userInfo.name.charAt(0) }}</div>
           <span>{{ userInfo.name }}</span>
@@ -231,7 +234,13 @@ const showDeleteConfirm = ref(false)
 const deletingBook = ref<Book | null>(null)
 
 const openBook = (book: Book) => {
-  router.push({ path: '/workbench', query: { bookId: book.id } })
+  router.push({
+    path: '/workbench',
+    query: {
+      bookId: book.id,
+      ...(session.userId ? { operatorId: String(session.userId) } : {})
+    }
+  })
 }
 
 const editBook = (book: Book) => {

@@ -35,9 +35,10 @@
               <button
                 class="btn-install"
                 :class="{ active: plugin.installed }"
+                :disabled="plugin.loading"
                 @click="togglePlugin(plugin)"
               >
-                {{ plugin.installed ? '已挂载' : '安装' }}
+                {{ plugin.loading ? '处理中...' : plugin.installed ? (plugin.enabled ? '已启用' : '已停用') : '安装' }}
               </button>
             </div>
           </div>
@@ -53,84 +54,133 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { message } from 'ant-design-vue'
 import iconPlugin from '@/assets/images/feature-plugin.png'
+import { pluginApi } from '@/api/modules/plugin.api'
+import { getSession } from '@/stores/session'
 
-defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean }>()
 defineEmits(['close'])
+const route = useRoute()
+const session = getSession()
 
 interface Plugin {
-  id: string
+  id: string | number
+  code: string
   emoji: string
   name: string
   author: string
   desc: string
   tags: string[]
   installed: boolean
+  enabled?: boolean
+  loading?: boolean
 }
 
-const plugins = ref<Plugin[]>([
-  {
-    id: 'hot-words',
-    emoji: '🔥',
-    name: '今日热网词获取',
-    author: 'PenMate官方',
-    desc: '使Agent可以搜索最近网络爆火语句、热梗词汇，让创作紧贴潮流。',
-    tags: ['联网', '热词', '趋势'],
-    installed: true
-  },
-  {
-    id: 'history-search',
-    emoji: '📚',
-    name: '历史事件与时间查询',
-    author: 'PenMate官方',
-    desc: '帮助考究党实时确认某朝代的细节常识，支持联网搜索历史事实。',
-    tags: ['联网', '历史', '考证'],
-    installed: false
-  },
-  {
-    id: 'name-gen',
-    emoji: '🏷️',
-    name: '网文起名助手',
-    author: 'PenMate官方',
-    desc: '挂接专业词典API，处理大量特殊名字需求。支持古风、现代、奇幻等多种风格命名。',
-    tags: ['起名', '词典', 'API'],
-    installed: true
-  },
-  {
-    id: 'world-build',
-    emoji: '🗺️',
-    name: '世界观构建器',
-    author: '社区贡献',
-    desc: '帮助构建系统化的世界设定，自动检测设定冲突与逻辑不一致。',
-    tags: ['世界观', '逻辑', '设定'],
-    installed: false
-  },
-  {
-    id: 'plot-twist',
-    emoji: '🎭',
-    name: '情节反转生成器',
-    author: '社区贡献',
-    desc: '基于当前剧情走向生成合理且出人意料的情节反转建议。',
-    tags: ['剧情', '反转', '创意'],
-    installed: false
-  },
-  {
-    id: 'poetry',
-    emoji: '🎋',
-    name: '古诗词引用库',
-    author: 'PenMate官方',
-    desc: '在适当场景自动引用或化用古典诗词，提升文学性与意境感。',
-    tags: ['诗词', '引用', '文学'],
-    installed: false
-  }
-])
+const plugins = ref<Plugin[]>([])
 
 const installedCount = computed(() => plugins.value.filter(p => p.installed).length)
 
-const togglePlugin = (plugin: Plugin) => {
-  plugin.installed = !plugin.installed
+const getProjectId = () => Number(route.query.bookId || 0)
+const getOperatorId = () => {
+  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
+  const fromQuery = Number(route.query.operatorId || 0)
+  return fromQuery > 0 ? fromQuery : null
 }
+
+const toTagList = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean)
+  }
+  const text = String(value || '')
+  return text
+    .split(/[，,\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const loadPlugins = async () => {
+  const projectId = getProjectId()
+  if (!projectId) return
+  try {
+    const [catalogResp, installsResp] = await Promise.all([
+      pluginApi.listCatalog(),
+      pluginApi.listProjectPlugins(projectId)
+    ])
+    const catalog = (catalogResp || []) as Array<Record<string, unknown>>
+    const installs = (installsResp || []) as Array<Record<string, unknown>>
+    const installMap = new Map<string, Record<string, unknown>>()
+    installs.forEach((item) => {
+      const code = String(item.pluginCode || '')
+      if (code) installMap.set(code, item)
+    })
+
+    plugins.value = catalog.map((item, idx) => {
+      const code = String(item.pluginCode || item.code || '')
+      const installed = installMap.get(code)
+      return {
+        id: String(item.id || code || idx),
+        code,
+        emoji: String(item.icon || '🧩'),
+        name: String(item.name || code || '未命名插件'),
+        author: String(item.vendor || item.author || 'PenMate'),
+        desc: String(item.description || item.desc || ''),
+        tags: toTagList(item.tags),
+        installed: Boolean(installed),
+        enabled: Boolean(installed?.enabled)
+      }
+    })
+  } catch (error: any) {
+    message.warning(error?.message || '加载插件列表失败')
+  }
+}
+
+const togglePlugin = async (plugin: Plugin) => {
+  const projectId = getProjectId()
+  const operatorId = getOperatorId()
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法操作插件')
+    return
+  }
+  plugin.loading = true
+  try {
+    if (!plugin.installed) {
+      await pluginApi.installPlugin(projectId, operatorId, {
+        pluginCode: plugin.code,
+        version: 'latest',
+        configJson: '{}'
+      })
+      plugin.installed = true
+      plugin.enabled = true
+      message.success('插件已安装')
+    } else {
+      if (plugin.enabled) {
+        await pluginApi.updateInstall(projectId, plugin.code, operatorId, { enabled: false })
+        plugin.enabled = false
+        message.success('插件已停用')
+      } else {
+        await pluginApi.updateInstall(projectId, plugin.code, operatorId, { enabled: true })
+        plugin.enabled = true
+        message.success('插件已启用')
+      }
+    }
+  } catch (error: any) {
+    message.warning(error?.message || '插件操作失败')
+  } finally {
+    plugin.loading = false
+  }
+}
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      void loadPlugins()
+    }
+  }
+)
 </script>
 
 <style lang="less" scoped>

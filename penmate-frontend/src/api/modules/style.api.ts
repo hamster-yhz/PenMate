@@ -10,8 +10,8 @@ export const styleApi = {
   getStyle(projectId: IdLike, styleId: IdLike) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/styles/${styleId}`)
   },
-  createStyle(projectId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/styles`, payload)
+  createStyle(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/styles?operatorId=${operatorId}`, payload)
   },
   updateStyle(projectId: IdLike, styleId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/styles/${styleId}?operatorId=${operatorId}`, payload)
@@ -19,11 +19,11 @@ export const styleApi = {
   deleteStyle(projectId: IdLike, styleId: IdLike, operatorId: IdLike) {
     return request.delete<string>(`/v1/novels/${projectId}/styles/${styleId}?operatorId=${operatorId}`)
   },
-  switchStyle(projectId: IdLike, payload: AnyRecord) {
-    return request.post<string>(`/v1/novels/${projectId}/styles/switch`, payload)
+  switchStyle(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<string>(`/v1/novels/${projectId}/styles/switch?operatorId=${operatorId}`, payload)
   },
-  analyzeSample(projectId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/styles/analyze-sample`, payload)
+  analyzeSample(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/styles/analyze-sample?operatorId=${operatorId}`, payload)
   }
 }
 

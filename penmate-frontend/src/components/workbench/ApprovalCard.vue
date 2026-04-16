@@ -15,11 +15,11 @@
       </div>
     </div>
     <div class="ac-actions" v-if="!card.resolved">
-      <button class="btn-approve" @click="$emit('approve', card.id)">
-        ✅ 确认归档
+      <button class="btn-approve" :disabled="busy" @click="$emit('approve', card.id)">
+        {{ busy ? '处理中...' : '✅ 确认归档' }}
       </button>
-      <button class="btn-reject" @click="$emit('reject', card.id)">
-        ❌ 拒绝
+      <button class="btn-reject" :disabled="busy" @click="$emit('reject', card.id)">
+        {{ busy ? '处理中...' : '❌ 拒绝' }}
       </button>
     </div>
     <div class="ac-resolved" v-else>
@@ -40,7 +40,9 @@ export interface ApprovalCardData {
   resolvedAction?: 'approved' | 'rejected'
 }
 
-defineProps<{ card: ApprovalCardData }>()
+withDefaults(defineProps<{ card: ApprovalCardData; busy?: boolean }>(), {
+  busy: false
+})
 defineEmits(['approve', 'reject'])
 </script>
 
@@ -142,6 +144,10 @@ defineEmits(['approve', 'reject'])
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.3s;
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .btn-approve {

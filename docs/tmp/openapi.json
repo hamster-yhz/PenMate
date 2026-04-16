@@ -11688,8 +11688,7 @@
           },
           "encryptedApiKey": {
             "type": "string",
-            "description": "字段：字段「encryptedApiKey」，用于通用业务查询用户密钥。",
-            "writeOnly": true
+            "description": "字段：字段「encryptedApiKey」，用于通用业务查询用户密钥。"
           },
           "maskedApiKey": {
             "type": "string",

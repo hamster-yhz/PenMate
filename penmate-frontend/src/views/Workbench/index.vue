@@ -42,6 +42,7 @@
             <button class="ud-item" @click="$router.push('/profile'); userMenuOpen = false">👤 个人中心</button>
             <button class="ud-item" @click="$router.push('/mybooks'); userMenuOpen = false">📚 我的书架</button>
             <div class="ud-sep"></div>
+            <button class="ud-item" @click="$router.push('/domain-console'); userMenuOpen = false">🧪 三域控台</button>
             <button class="ud-item danger" @click="handleLogout">🚪 退出登录</button>
           </div>
         </div>
@@ -108,7 +109,7 @@
                     v-for="(ch, cIdx) in vol.children"
                     :key="ch.key"
                     class="tree-item chapter"
-                    :class="{ active: activeChapter === ch.key }"
+                    :class="{ active: activeChapter === String(ch.chapterId || ch.key) }"
                     @click="selectChapter(ch)"
                   >
                     <span class="tree-dot">◇</span>
@@ -322,9 +323,9 @@
           <div class="agent-header">
             <img :src="iconAgent" alt="" class="agent-icon" />
             <span class="agent-title">AI会话</span>
-            <div class="agent-status">
+            <div class="agent-status" :class="{ busy: isGenerating, failed: generationPhase === 'failed' }">
               <span class="status-dot"></span>
-              <span>就绪</span>
+              <span>{{ generationStatusText }}</span>
             </div>
           </div>
 
@@ -352,6 +353,7 @@
               <ApprovalCard
                 v-if="msg.approval"
                 :card="msg.approval"
+                :busy="isApprovalBusy(msg.approval.id)"
                 @approve="handleApprove"
                 @reject="handleReject"
               />
@@ -405,7 +407,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
@@ -428,6 +430,9 @@ import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
 import { cardApi } from '@/api/modules/card.api'
+import { agentApi } from '@/api/modules/agent.api'
+import { approvalApi } from '@/api/modules/approval.api'
+import { pluginApi } from '@/api/modules/plugin.api'
 import { getSession, clearSession } from '@/stores/session'
 import { authApi } from '@/api/modules/auth.api'
 
@@ -439,7 +444,7 @@ const session = getSession()
 const username = ref('墨客')
 const userEmail = ref('moke@penmate.com')
 const userMenuOpen = ref(false)
-const novelTitle = ref('苍穹剑仙传')
+const novelTitle = ref('未命名小说')
 const wordCount = ref(0)
 const currentLine = ref(1)
 const currentCol = ref(1)
@@ -455,19 +460,13 @@ const showPluginWorkshop = ref(false)
 const showModelSettings = ref(false)
 
 // --- Per-chapter content storage ---
-const chapterContents = ref<Record<string, string>>({
-  '0-0-0': '夜色如墨，月华倾洒。\n\n林风立于山巅，长衫猎猎作响。远处传来一阵若有若无的箫声，仿佛在诉说着千年未了的故事。\n\n他抬眼望去，只见天际处有一柄长剑破空而来，剑身上萦绕着淡金色的灵气，如同一条游龙穿云而过。那是师门传承千年的"天问剑"——传说中唯有心怀大道之人，方能驾驭此剑。\n\n"你终于来了。"身后传来一道苍老却中气十足的声音。\n\n林风没有回头，嘴角微微上扬："师父，弟子等这一天，已经等了三年。"',
-  '0-0-1': '风起青山，云涌四方。\n\n自从林风踏入江湖以来，从未见过如此气势磅礴的场面。千人齐聚于凌霄殿前，各门各派的弟子皆身着门派法袍，剑气纵横间，空气中弥漫着一股肃杀之意。',
-  '0-0-2': '剑意初现，惊鸿一瞥。\n\n当林风第一次真正感受到天问剑意时，整个人仿佛被一道闪电贯穿——不是痛苦，而是一种前所未有的明悟。',
-  '0-1-0': '暗夜之中，一个神秘的组织悄然浮出水面。\n\n他们自称"暗网"，行事低调却触手遍及修仙界每一个角落。',
-  '0-1-1': '地下交易场，灯火幽暗。\n\n形形色色的修士聚集于此，有的遮掩面容，有的大大方方地展示自己的修为境界。'
-})
+const chapterContents = ref<Record<string, string>>({})
 
 // Editor
 const editorRef = ref<HTMLTextAreaElement | null>(null)
 const editorContent = ref('')
-const currentChapterTitle = ref('第一章：神秘黑影')
-const activeChapter = ref('0-0-0')
+const currentChapterTitle = ref('')
+const activeChapter = ref('')
 
 // Undo/Redo stacks
 const undoStack = ref<string[]>([])
@@ -487,30 +486,23 @@ const leftTabs = ref([
 ])
 
 // Outline data
-const outlineData = ref([
-  {
-    title: '第一卷：初入江湖',
-    key: '0-0',
-    expanded: true,
-    children: [
-      { title: '第一章：神秘黑影', key: '0-0-0' },
-      { title: '第二章：风起云涌', key: '0-0-1' },
-      { title: '第三章：剑意初现', key: '0-0-2' }
-    ]
-  },
-  {
-    title: '第二卷：暗流涌动',
-    key: '0-1',
-    expanded: false,
-    children: [
-      { title: '第一章：神秘组织', key: '0-1-0' },
-      { title: '第二章：地下交易', key: '0-1-1' }
-    ]
-  }
-])
+type OutlineChapterNode = { title: string; key: string; chapterId?: string }
+type OutlineVolumeNode = { title: string; key: string; expanded: boolean; children: OutlineChapterNode[] }
+
+const outlineData = ref<OutlineVolumeNode[]>([])
 
 // Active plugins
-const activePlugins = ref(['热网词', '起名助手'])
+const activePlugins = ref<string[]>([])
+const approvalBusyIds = ref<string[]>([])
+const generationPhase = ref<'idle' | 'preparing' | 'polling' | 'failed'>('idle')
+const generationTaskStatus = ref('')
+const generationStatusText = computed(() => {
+  if (isGenerating.value && generationTaskStatus.value) return `生成中 · ${generationTaskStatus.value}`
+  if (generationPhase.value === 'preparing') return '准备中'
+  if (generationPhase.value === 'polling') return '生成中'
+  if (generationPhase.value === 'failed') return '异常'
+  return '就绪'
+})
 
 // Chat messages
 interface ChatMessage {
@@ -520,38 +512,12 @@ interface ChatMessage {
   approval?: ApprovalCardData
 }
 
-const messages = ref<ChatMessage[]>([
-  {
-    id: 1,
-    role: 'assistant',
-    text: '你好，我是你的AI写作助手。当前小说<b>「苍穹剑仙传」</b>已载入，文风设定为<b>古风文言化 · 慢节奏</b>。请问需要我做什么？'
-  },
-  {
-    id: 2,
-    role: 'user',
-    text: '继续写第一章第五段，林风接过天问剑后的描写，加入些震撼的场景感。'
-  },
-  {
-    id: 3,
-    role: 'assistant',
-    text: '林风伸手接住天问剑，刹那间，一股浩荡无匹的剑意自剑身涌入体内经脉。天地为之变色，四周的云层仿佛被一只无形巨手撕裂，露出星河万里的壮阔景象。\n\n他的衣袍被剑气激得猎猎作响，脚下的山巅碎石纷纷悬浮而起，在月光下泛着幽蓝的冷光。\n\n"这便是……天问的力量吗？"林风感到一阵战栗，并非恐惧，而是一种从灵魂深处涌起的共鸣。',
-    approval: {
-      id: 'ap-1',
-      message: '检测到新设定：「天问剑意共鸣」。是否创建并归档至"修炼体系"？',
-      time: '刚才',
-      preview: {
-        '名称': '天问剑意共鸣',
-        '类型': '特殊能力',
-        '描述': '持剑者与天问剑产生灵魂共鸣，可激发星河异象'
-      },
-      resolved: false
-    }
-  }
-])
+const messages = ref<ChatMessage[]>([])
 
 const chatInput = ref('')
 const chatRef = ref<HTMLElement | null>(null)
-let msgIdCounter = 4
+let msgIdCounter = 1
+const currentConversationId = ref<number | null>(null)
 const chapterVersions = ref<Record<string, Array<Record<string, unknown>>>>({})
 const selectedVersionNo = ref('')
 const versionBusy = ref(false)
@@ -577,6 +543,45 @@ const getContext = () => {
   return { projectId, operatorId }
 }
 
+const toPluginName = (item: Record<string, unknown>) => {
+  const name = String(item.pluginName || item.name || item.pluginCode || '').trim()
+  return name || '未命名插件'
+}
+
+const loadActivePlugins = async () => {
+  const projectId = getCurrentProjectId()
+  if (!projectId) {
+    activePlugins.value = []
+    return
+  }
+  try {
+    const installs = (await pluginApi.listProjectPlugins(projectId)) as Array<Record<string, unknown>>
+    activePlugins.value = installs
+      .filter((item) => item.enabled !== false)
+      .map(toPluginName)
+  } catch {
+    activePlugins.value = []
+  }
+}
+
+const ensureConversationId = async (projectId: number, operatorId: number) => {
+  if (currentConversationId.value) return currentConversationId.value
+  const conversations = (await agentApi.listConversations(projectId)) as Array<Record<string, unknown>>
+  const existing = conversations[0]
+  if (existing?.id) {
+    currentConversationId.value = Number(existing.id)
+    return currentConversationId.value
+  }
+  const created = (await agentApi.createConversation(projectId, operatorId, {
+    userId: operatorId,
+    title: 'Workbench 会话',
+    contextScopeJson: '{}',
+    status: 'ACTIVE'
+  })) as Record<string, unknown>
+  currentConversationId.value = Number(created?.id || 0) || null
+  return currentConversationId.value
+}
+
 const cardNameById = (idLike: string) => {
   const hit = projectCards.value.find((item) => String(item.id) === String(idLike))
   return String(hit?.name || `卡片#${idLike}`)
@@ -594,18 +599,45 @@ const loadCardsAndRelations = async (projectId: number) => {
   }
 }
 
+const normalizeCardType = (value: unknown) => {
+  const normalized = String(value || '').trim().toUpperCase()
+  return normalized === 'CHARACTER' || normalized === 'WORLD' ? normalized : ''
+}
+
+const normalizeDetailJsonInput = (value: unknown) => {
+  const text = String(value ?? '').trim()
+  if (!text) return ''
+  try {
+    return JSON.stringify(JSON.parse(text))
+  } catch {
+    return null
+  }
+}
+
 const createCardQuick = async (cardType: 'CHARACTER' | 'WORLD') => {
   const { projectId, operatorId } = getContext()
   if (!projectId || !operatorId) {
     message.warning('缺少 projectId/operatorId，无法创建资料卡')
     return
   }
+  const normalizedType = normalizeCardType(cardType)
+  if (!normalizedType) {
+    message.warning('卡片类型非法，仅支持 CHARACTER/WORLD')
+    return
+  }
+  const defaultName = normalizedType === 'CHARACTER' ? '新角色' : '新世界设定'
+  const enteredName = window.prompt('请输入卡片名称（必填）', defaultName)
+  const trimmedName = String(enteredName ?? '').trim()
+  if (!trimmedName) {
+    message.warning('卡片名称不能为空')
+    return
+  }
   try {
     await cardApi.createCard(projectId, operatorId, {
-      cardType,
-      name: cardType === 'CHARACTER' ? '新角色' : '新世界设定',
+      cardType: normalizedType,
+      name: trimmedName,
       summary: '',
-      detailJson: ''
+      detailJson: '{}'
     })
     await loadCardsAndRelations(projectId)
   } catch (error: any) {
@@ -616,12 +648,27 @@ const createCardQuick = async (cardType: 'CHARACTER' | 'WORLD') => {
 const saveCard = async (card: Record<string, any>) => {
   const { projectId, operatorId } = getContext()
   if (!projectId || !operatorId || !card?.id) return
+  const cardType = normalizeCardType(card.cardType)
+  if (!cardType) {
+    message.warning('卡片类型非法，仅支持 CHARACTER/WORLD')
+    return
+  }
+  const cardName = String(card.name || '').trim()
+  if (!cardName) {
+    message.warning('卡片名称不能为空')
+    return
+  }
+  const detailJson = normalizeDetailJsonInput(card.detailJson)
+  if (detailJson === null) {
+    message.warning('详情(JSON)格式不合法，请输入合法 JSON')
+    return
+  }
   try {
     await cardApi.updateCard(projectId, Number(card.id), operatorId, {
-      cardType: card.cardType,
-      name: card.name,
+      cardType,
+      name: cardName,
       summary: card.summary,
-      detailJson: card.detailJson
+      detailJson
     })
     message.success('资料卡已保存')
   } catch (error: any) {
@@ -735,17 +782,63 @@ const viewSelectedVersion = async () => {
   }
 }
 
+const getDraftStorageKey = (projectId: number, chapterId: string | number) => `penmate.chapterDraft.${projectId}.${chapterId}`
+
+const saveChapterDraftLocal = (projectId: number, chapterId: string | number, content: string) => {
+  try {
+    localStorage.setItem(getDraftStorageKey(projectId, chapterId), content)
+  } catch {
+    // 忽略浏览器存储异常
+  }
+}
+
+const readChapterDraftLocal = (projectId: number, chapterId: string | number) => {
+  try {
+    return localStorage.getItem(getDraftStorageKey(projectId, chapterId)) || ''
+  } catch {
+    return ''
+  }
+}
+
 const refreshEditorFromRemote = async (projectId: number, chapterId: number) => {
   const contentResp = toRecord(await chapterApi.getContentUrl(projectId, chapterId))
   const downloadUrl = pickString(contentResp, ['downloadUrl', 'url', 'getUrl'])
-  if (!downloadUrl) return
+  if (!downloadUrl) return false
   const response = await fetch(downloadUrl)
-  if (!response.ok) return
+  if (!response.ok) return false
   const text = await response.text()
   editorContent.value = text
   chapterContents.value[activeChapter.value] = text
   wordCount.value = text.replace(/\s/g, '').length
   lastSnapshot = text
+  saveChapterDraftLocal(projectId, chapterId, text)
+  return true
+}
+
+const tryLoadChapterRemoteContent = async (chapterIdLike: string) => {
+  const projectId = getCurrentProjectId()
+  const chapterId = Number(chapterIdLike)
+  if (!projectId || !chapterId) return
+  try {
+    const loaded = await refreshEditorFromRemote(projectId, chapterId)
+    if (!loaded) {
+      const localDraft = readChapterDraftLocal(projectId, chapterId)
+      if (localDraft) {
+        editorContent.value = localDraft
+        chapterContents.value[String(chapterId)] = localDraft
+        wordCount.value = localDraft.replace(/\s/g, '').length
+        lastSnapshot = localDraft
+      }
+    }
+  } catch {
+    const localDraft = readChapterDraftLocal(projectId, chapterId)
+    if (localDraft) {
+      editorContent.value = localDraft
+      chapterContents.value[String(chapterId)] = localDraft
+      wordCount.value = localDraft.replace(/\s/g, '').length
+      lastSnapshot = localDraft
+    }
+  }
 }
 
 const restoreSelectedVersion = async () => {
@@ -854,6 +947,10 @@ const updateTitle = (e: Event) => {
 const onEditorInput = () => {
   chapterContents.value[activeChapter.value] = editorContent.value
   wordCount.value = editorContent.value.replace(/\s/g, '').length
+  const projectId = getCurrentProjectId()
+  if (projectId && activeChapter.value) {
+    saveChapterDraftLocal(projectId, activeChapter.value, editorContent.value)
+  }
   if (editorContent.value !== lastSnapshot) {
     undoStack.value.push(lastSnapshot)
     if (undoStack.value.length > 50) undoStack.value.shift()
@@ -929,66 +1026,88 @@ const insertPrefix = (prefix: string) => {
 }
 
 // --- Chapter switching ---
-const selectChapter = (ch: { key: string; title: string }) => {
+const selectChapter = async (ch: { key: string; title: string; chapterId?: string }) => {
+  const chapterKey = String(ch.chapterId || ch.key)
+  const prevProjectId = getCurrentProjectId()
+  if (prevProjectId && activeChapter.value) {
+    saveChapterDraftLocal(prevProjectId, activeChapter.value, editorContent.value)
+  }
   chapterContents.value[activeChapter.value] = editorContent.value
-  activeChapter.value = ch.key
+  activeChapter.value = chapterKey
   currentChapterTitle.value = ch.title
-  editorContent.value = chapterContents.value[ch.key] || ''
+  const localDraft = getCurrentProjectId() ? readChapterDraftLocal(getCurrentProjectId(), chapterKey) : ''
+  editorContent.value = chapterContents.value[chapterKey] || localDraft || ''
   wordCount.value = editorContent.value.replace(/\s/g, '').length
   undoStack.value = []
   redoStack.value = []
   lastSnapshot = editorContent.value
-  loadChapterVersions(getCurrentProjectId(), ch.key)
+  loadChapterVersions(getCurrentProjectId(), chapterKey)
+  await tryLoadChapterRemoteContent(chapterKey)
   nextTick(() => editorRef.value?.focus())
 }
 
 // --- Outline CRUD ---
 const addVolume = async () => {
   const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法新建分卷')
+    return
+  }
   const idx = outlineData.value.length
   const nums = ['一','二','三','四','五','六','七','八','九','十']
   const title = `第${nums[idx] || idx + 1}卷：新的篇章`
-  if (projectId && operatorId) {
-    try {
-      await outlineApi.createNode(projectId, operatorId, {
-        parentId: null,
-        title,
-        nodeType: 'VOLUME',
-        sortOrder: idx + 1,
-        content: ''
-      })
-      await loadOutlineTree(projectId)
-      return
-    } catch (error: any) {
-      message.warning(error?.message || '新建分卷失败，已回退本地模式')
-    }
+  try {
+    await outlineApi.createNode(projectId, operatorId, {
+      parentId: null,
+      title,
+      nodeType: 'VOLUME',
+      sortOrder: idx + 1,
+      content: ''
+    })
+    await loadWorkbenchData()
+  } catch (error: any) {
+    message.warning(error?.message || '新建分卷失败')
   }
-  outlineData.value.push({ title, key: `0-${idx}`, expanded: true, children: [] })
 }
 
 const addChapter = async (vol: any) => {
   const { projectId, operatorId } = getContext()
-  const idx = vol.children.length
-  const newKey = `${vol.key}-${idx}`
-  const title = `第${idx + 1}章：未命名`
-  if (projectId && operatorId && Number(vol.key)) {
-    try {
-      await outlineApi.createNode(projectId, operatorId, {
-        parentId: Number(vol.key),
-        title,
-        nodeType: 'CHAPTER',
-        sortOrder: idx + 1,
-        content: ''
-      })
-      await loadOutlineTree(projectId)
-      return
-    } catch (error: any) {
-      message.warning(error?.message || '新建章节失败，已回退本地模式')
-    }
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法新建章节')
+    return
   }
-  vol.children.push({ title, key: newKey })
-  vol.expanded = true
-  chapterContents.value[newKey] = ''
+  const volumeNodeId = Number(vol?.key)
+  if (!volumeNodeId) {
+    message.warning('分卷节点ID异常，无法创建章节')
+    return
+  }
+  const idx = vol.children.length
+  const title = `第${idx + 1}章：未命名`
+  try {
+    const chapterNo = idx + 1
+    const createdOutline = await outlineApi.createNode(projectId, operatorId, {
+      parentId: volumeNodeId,
+      title,
+      nodeType: 'CHAPTER',
+      sortOrder: idx + 1,
+      content: ''
+    }) as Record<string, any>
+
+    await novelApi.createChapter(projectId, operatorId, {
+      volumeId: null,
+      outlineNodeId: Number(createdOutline.id ?? createdOutline.nodeId ?? 0) || null,
+      title,
+      chapterNo,
+      status: 1,
+      wordCount: 0,
+      excerpt: ''
+    })
+
+    await loadWorkbenchData()
+    message.success('章节已创建')
+  } catch (error: any) {
+    message.warning(error?.message || '新建章节失败')
+  }
 }
 
 const deleteVolume = async (vIdx: number) => {
@@ -997,14 +1116,12 @@ const deleteVolume = async (vIdx: number) => {
   if (projectId && operatorId && Number(vol?.key)) {
     try {
       await outlineApi.deleteNode(projectId, Number(vol.key), operatorId)
-      await loadOutlineTree(projectId)
+      await loadWorkbenchData()
       return
     } catch (error: any) {
-      message.warning(error?.message || '删除分卷失败，已回退本地模式')
+      message.warning(error?.message || '删除分卷失败')
     }
   }
-  vol.children.forEach((ch: any) => delete chapterContents.value[ch.key])
-  outlineData.value.splice(vIdx, 1)
 }
 
 const deleteChapter = async (vol: any, cIdx: number) => {
@@ -1012,20 +1129,16 @@ const deleteChapter = async (vol: any, cIdx: number) => {
   const ch = vol.children[cIdx]
   if (projectId && operatorId && Number(ch?.key)) {
     try {
+      if (Number(ch?.chapterId)) {
+        await novelApi.deleteChapter(projectId, Number(ch.chapterId), operatorId)
+      }
       await outlineApi.deleteNode(projectId, Number(ch.key), operatorId)
-      await loadOutlineTree(projectId)
+      await loadWorkbenchData()
       return
     } catch (error: any) {
-      message.warning(error?.message || '删除章节失败，已回退本地模式')
+      message.warning(error?.message || '删除章节失败')
     }
   }
-  delete chapterContents.value[ch.key]
-  if (activeChapter.value === ch.key) {
-    editorContent.value = ''
-    currentChapterTitle.value = ''
-    activeChapter.value = ''
-  }
-  vol.children.splice(cIdx, 1)
 }
 
 // --- Inline node rename ---
@@ -1090,11 +1203,15 @@ const saveContent = async () => {
 
   if (!projectId || !chapterId || !operatorId) {
     saveHint.value = '✓ 已本地保存'
+    if (projectId && activeChapter.value) {
+      saveChapterDraftLocal(projectId, activeChapter.value, editorContent.value)
+    }
     setTimeout(() => { saveHint.value = '' }, 2000)
     return
   }
 
   try {
+    saveChapterDraftLocal(projectId, chapterId, editorContent.value)
     await uploadAndCommitContent(projectId, chapterId, editorContent.value, operatorId)
     await loadChapterVersions(projectId, String(chapterId))
     saveHint.value = '✓ 云端已保存'
@@ -1128,22 +1245,90 @@ const replaceSelected = (msg: ChatMessage) => {
 // --- Chat send ---
 const sendMessage = async () => {
   if (!chatInput.value.trim() || isGenerating.value) return
-  const userMsg: ChatMessage = { id: msgIdCounter++, role: 'user', text: chatInput.value }
+  const userText = chatInput.value.trim()
+  const userMsg: ChatMessage = { id: msgIdCounter++, role: 'user', text: userText }
   messages.value.push(userMsg)
   chatInput.value = ''
   isGenerating.value = true
+  generationPhase.value = 'preparing'
+  generationTaskStatus.value = ''
   await nextTick()
   scrollChat()
-  await new Promise(r => setTimeout(r, 2500))
-  const aiMsg: ChatMessage = {
-    id: msgIdCounter++,
-    role: 'assistant',
-    text: '（AI根据您的指令、当前大纲、文风参数与RAG记忆检索，正在生成内容...）\n\n此处为模拟响应。在实际环境中，AI会调用LangChain4j Agent框架，结合已挂载插件与向量库检索结果，流式生成符合文风设定的长文本。'
+  const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId) {
+    await new Promise(r => setTimeout(r, 800))
+    messages.value.push({
+      id: msgIdCounter++,
+      role: 'assistant',
+      text: '缺少 projectId/operatorId，当前仅可本地预览消息。'
+    })
+    isGenerating.value = false
+    generationPhase.value = 'idle'
+    generationTaskStatus.value = ''
+    await nextTick()
+    scrollChat()
+    return
   }
-  messages.value.push(aiMsg)
-  isGenerating.value = false
-  await nextTick()
-  scrollChat()
+
+  try {
+    const conversationId = await ensureConversationId(projectId, operatorId)
+    if (!conversationId) throw new Error('会话初始化失败')
+
+    await agentApi.createMessage(projectId, conversationId, operatorId, {
+      role: 'user',
+      userMessageType: 'COMMAND',
+      contentMd: userText,
+      attachmentsJson: '[]',
+      toolCallsJson: '[]'
+    })
+
+    const generation = (await agentApi.createGeneration(projectId, operatorId, {
+      conversationId,
+      chapterId: Number(activeChapter.value) || null,
+      taskType: 'WRITE',
+      promptSnapshot: userText,
+      styleProfileSnapshot: '',
+      pluginSnapshot: JSON.stringify(activePlugins.value || [])
+    })) as Record<string, unknown>
+
+    const taskId = Number(generation?.id || 0)
+    let taskStatus = String(generation?.status || '')
+    generationPhase.value = 'polling'
+    generationTaskStatus.value = taskStatus || 'PENDING'
+    let loop = 0
+    while (taskId && !['SUCCEEDED', 'FAILED', 'ERROR', 'CANCELLED'].includes(taskStatus.toUpperCase()) && loop < 12) {
+      await new Promise(r => setTimeout(r, 1000))
+      const latest = (await agentApi.getGeneration(projectId, taskId)) as Record<string, unknown>
+      taskStatus = String(latest?.status || taskStatus)
+      generationTaskStatus.value = taskStatus || generationTaskStatus.value
+      loop += 1
+    }
+
+    const messageList = (await agentApi.listMessages(projectId, conversationId)) as Array<Record<string, unknown>>
+    const assistantMsg = [...messageList].reverse().find((item) => String(item.role || '').toLowerCase() === 'assistant')
+    const assistantText = String(assistantMsg?.contentMd || '')
+    messages.value.push({
+      id: msgIdCounter++,
+      role: 'assistant',
+      text: assistantText || `生成任务已提交，当前状态：${taskStatus || 'PENDING'}`
+    })
+  } catch (error: any) {
+    generationPhase.value = 'failed'
+    generationTaskStatus.value = 'FAILED'
+    messages.value.push({
+      id: msgIdCounter++,
+      role: 'assistant',
+      text: `生成失败：${String(error?.message || '未知错误')}`
+    })
+  } finally {
+    isGenerating.value = false
+    if (generationPhase.value !== 'failed') {
+      generationPhase.value = 'idle'
+      generationTaskStatus.value = ''
+    }
+    await nextTick()
+    scrollChat()
+  }
 }
 
 const scrollChat = () => {
@@ -1151,14 +1336,50 @@ const scrollChat = () => {
 }
 
 // --- Approval ---
-const handleApprove = (id: string) => {
+const isApprovalBusy = (id: string) => approvalBusyIds.value.includes(id)
+
+const handleApprove = async (id: string) => {
+  if (isApprovalBusy(id)) return
   const msg = messages.value.find(m => m.approval?.id === id)
-  if (msg && msg.approval) { msg.approval.resolved = true; msg.approval.resolvedAction = 'approved' }
+  if (!msg?.approval) return
+  const { projectId, operatorId } = getContext()
+  const approvalId = Number(id)
+  if (!projectId || !operatorId || approvalId <= 0) {
+    message.warning('缺少审批上下文，无法完成操作')
+    return
+  }
+  approvalBusyIds.value.push(id)
+  try {
+    await approvalApi.approve(projectId, approvalId, { reviewedBy: operatorId, comment: '前端审批通过' })
+    msg.approval.resolved = true
+    msg.approval.resolvedAction = 'approved'
+  } catch (error: any) {
+    message.warning(error?.message || '审批通过失败')
+  } finally {
+    approvalBusyIds.value = approvalBusyIds.value.filter((item) => item !== id)
+  }
 }
 
-const handleReject = (id: string) => {
+const handleReject = async (id: string) => {
+  if (isApprovalBusy(id)) return
   const msg = messages.value.find(m => m.approval?.id === id)
-  if (msg && msg.approval) { msg.approval.resolved = true; msg.approval.resolvedAction = 'rejected' }
+  if (!msg?.approval) return
+  const { projectId, operatorId } = getContext()
+  const approvalId = Number(id)
+  if (!projectId || !operatorId || approvalId <= 0) {
+    message.warning('缺少审批上下文，无法完成操作')
+    return
+  }
+  approvalBusyIds.value.push(id)
+  try {
+    await approvalApi.reject(projectId, approvalId, { reviewedBy: operatorId, comment: '前端审批拒绝' })
+    msg.approval.resolved = true
+    msg.approval.resolvedAction = 'rejected'
+  } catch (error: any) {
+    message.warning(error?.message || '审批拒绝失败')
+  } finally {
+    approvalBusyIds.value = approvalBusyIds.value.filter((item) => item !== id)
+  }
 }
 
 // --- Auth ---
@@ -1171,8 +1392,16 @@ const handleLogout = () => {
 }
 
 // --- Init ---
-const mapOutlineTree = (nodes: Array<Record<string, any>>) => {
-  const volumeMap = new Map<string, { title: string; key: string; expanded: boolean; children: Array<{ title: string; key: string }> }>()
+const mapOutlineTree = (
+  nodes: Array<Record<string, any>>,
+  chapterByOutlineNodeId: Record<string, string> = {}
+) => {
+  const volumeMap = new Map<string, {
+    title: string
+    key: string
+    expanded: boolean
+    children: Array<{ title: string; key: string; chapterId?: string }>
+  }>()
   nodes.forEach((node) => {
     const key = String(node.id ?? node.nodeId ?? node.key ?? '')
     const title = String(node.title ?? node.name ?? '未命名')
@@ -1191,7 +1420,7 @@ const mapOutlineTree = (nodes: Array<Record<string, any>>) => {
       const pKey = String(parentId)
       const parent = volumeMap.get(pKey)
       if (parent) {
-        parent.children.push({ title, key })
+        parent.children.push({ title, key, chapterId: chapterByOutlineNodeId[key] })
       }
     }
   })
@@ -1200,15 +1429,16 @@ const mapOutlineTree = (nodes: Array<Record<string, any>>) => {
   return values.length ? values : outlineData.value
 }
 
-const loadOutlineTree = async (projectId: number) => {
-  const outlines = await outlineApi.listOutlineTree(projectId)
-  outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>)
-}
-
 const loadWorkbenchData = async () => {
   const projectId = Number(route.query.bookId || 0)
   if (!projectId) return
   try {
+    chapterContents.value = {}
+    outlineData.value = []
+    activeChapter.value = ''
+    currentChapterTitle.value = ''
+    editorContent.value = ''
+
     const [project, outlines, chapters] = await Promise.all([
       novelApi.getProject(projectId),
       outlineApi.listOutlineTree(projectId),
@@ -1218,25 +1448,33 @@ const loadWorkbenchData = async () => {
     novelTitle.value = String((project as Record<string, any>)?.title ?? novelTitle.value)
 
     const chapterList = (chapters || []) as Array<Record<string, any>>
+    const chapterByOutlineNodeId: Record<string, string> = {}
     chapterList.forEach((chapter) => {
       const key = String(chapter.chapterId ?? chapter.id ?? chapter.key ?? '')
       if (!key) return
-      chapterContents.value[key] = String(chapter.content ?? chapter.summary ?? '')
+      const chapterText = String(chapter.content ?? chapter.summary ?? '')
+      const localDraft = readChapterDraftLocal(projectId, key)
+      chapterContents.value[key] = chapterText || localDraft || ''
+      const outlineNodeId = String(chapter.outlineNodeId ?? chapter.nodeId ?? '')
+      if (outlineNodeId) {
+        chapterByOutlineNodeId[outlineNodeId] = key
+      }
     })
 
-    outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>)
+    outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>, chapterByOutlineNodeId)
     await loadCardsAndRelations(projectId)
     const first = outlineData.value[0]?.children?.[0]
     if (first) {
-      activeChapter.value = first.key
+      activeChapter.value = String(first.chapterId || first.key)
       currentChapterTitle.value = first.title
-      editorContent.value = chapterContents.value[first.key] || ''
+      editorContent.value = chapterContents.value[String(first.chapterId || first.key)] || ''
       wordCount.value = editorContent.value.replace(/\s/g, '').length
       lastSnapshot = editorContent.value
-      await loadChapterVersions(projectId, first.key)
+      await tryLoadChapterRemoteContent(String(first.chapterId || first.key))
+      await loadChapterVersions(projectId, String(first.chapterId || first.key))
     }
   } catch (error: any) {
-    message.warning(error?.message || '工作台数据加载失败，已使用本地演示数据')
+    message.warning(error?.message || '工作台数据加载失败')
   }
 }
 
@@ -1247,7 +1485,17 @@ onMounted(() => {
   wordCount.value = editorContent.value.replace(/\s/g, '').length
   lastSnapshot = editorContent.value
   loadWorkbenchData()
+  loadActivePlugins()
 })
+
+watch(
+  () => showPluginWorkshop.value,
+  (visible, prevVisible) => {
+    if (prevVisible && !visible) {
+      void loadActivePlugins()
+    }
+  }
+)
 </script>
 
 <style lang="less" scoped>
@@ -1379,7 +1627,7 @@ onMounted(() => {
 
 /* --- Left Panel --- */
 .panel-left {
-  width: 280px; min-width: 0;
+  width: clamp(248px, 20vw, 320px); min-width: 0;
   border-right: 1px solid var(--border-subtle);
   background: rgba(11,17,32,0.6);
   &.collapsed { width: 0; border-right: none;
@@ -1596,10 +1844,14 @@ onMounted(() => {
 .editor-area { flex: 1; overflow: hidden; padding: 0; }
 
 .main-editor {
-  width: 100%; height: 100%; padding: 24px 48px;
+  width: 100%;
+  max-width: 960px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 28px 56px;
   background: transparent; border: none; resize: none; outline: none;
   color: var(--text-primary); font-family: var(--font-body);
-  font-size: 1rem; line-height: 2; letter-spacing: 0.02em;
+  font-size: 1rem; line-height: 1.95; letter-spacing: 0.02em;
   &::placeholder {
     color: var(--text-muted); font-family: var(--font-heading); letter-spacing: 0.1em;
   }
@@ -1614,7 +1866,7 @@ onMounted(() => {
 
 /* --- Right Panel: Agent --- */
 .panel-right {
-  width: 340px; min-width: 0;
+  width: clamp(320px, 26vw, 420px); min-width: 0;
   border-left: 1px solid var(--border-subtle);
   background: rgba(11,17,32,0.5);
   &.collapsed { width: 0; border-left: none;
@@ -1642,6 +1894,24 @@ onMounted(() => {
 .agent-status {
   display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--jade-green);
   .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--jade-green); box-shadow: 0 0 6px var(--jade-green); }
+
+  &.busy {
+    color: var(--amber-gold);
+    .status-dot {
+      background: var(--amber-gold);
+      box-shadow: 0 0 8px rgba(201, 169, 110, 0.75);
+      animation: statusBlink 1.1s ease-in-out infinite;
+    }
+  }
+
+  &.failed {
+    color: #e8a87c;
+    .status-dot {
+      background: #e8a87c;
+      box-shadow: 0 0 8px rgba(232, 168, 124, 0.7);
+      animation: none;
+    }
+  }
 }
 
 /* Chat messages */
@@ -1691,6 +1961,11 @@ onMounted(() => {
   30% { opacity: 1; transform: scale(1.2); }
 }
 
+@keyframes statusBlink {
+  0%, 100% { opacity: 0.6; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
 .t-label { font-size: 0.75rem; }
 
 /* Chat Input */
@@ -1709,7 +1984,7 @@ onMounted(() => {
   flex: 1; padding: 8px 12px;
   background: rgba(11,17,32,0.5); border: 1px solid var(--border-subtle);
   border-radius: 8px; color: var(--text-primary);
-  font-family: var(--font-body); font-size: 0.85rem;
+  font-family: var(--font-body); font-size: 0.85rem; line-height: 1.65;
   resize: none; outline: none; transition: border-color 0.3s;
   &:focus { border-color: var(--border-gold); }
   &::placeholder { color: var(--text-muted); }
@@ -1727,4 +2002,14 @@ onMounted(() => {
 }
 
 .input-hint { padding: 0 12px 6px; font-size: 0.65rem; color: var(--text-muted); text-align: right; }
+
+@media (max-width: 1360px) {
+  .panel-left { width: 248px; }
+  .panel-right { width: 320px; }
+  .main-editor { padding: 20px 28px; }
+}
+
+@media (max-width: 1120px) {
+  .panel-right { width: 300px; }
+}
 </style>

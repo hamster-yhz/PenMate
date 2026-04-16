@@ -25,6 +25,11 @@ const routes = [
     path: '/workbench',
     name: 'Workbench',
     component: () => import('@/views/Workbench/index.vue')
+  },
+  {
+    path: '/domain-console',
+    name: 'DomainConsole',
+    component: () => import('@/views/DomainConsole/index.vue')
   }
 ]
 

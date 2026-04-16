@@ -14,6 +14,11 @@
         <!-- 当前文风显示 -->
         <div class="sm-section">
           <div class="sm-label">当前文风</div>
+          <select v-if="styleOptions.length" v-model="selectedStyleId" class="style-select" @change="handleStyleSelect">
+            <option v-for="item in styleOptions" :key="String(item.id)" :value="String(item.id)">
+              {{ String(item.name || `文风#${String(item.id)}`) }}
+            </option>
+          </select>
           <div class="style-badge">
             <span class="badge-glow"></span>
             {{ currentStyle }}
@@ -72,7 +77,7 @@
             placeholder="粘贴一段参考样文..."
             rows="5"
           ></textarea>
-          <button class="btn-analyze" @click="analyzeSample">
+          <button class="btn-analyze" @click="analyzeSample" :disabled="analyzing">
             <span>🔍</span> 解析文风
           </button>
         </div>
@@ -82,27 +87,36 @@
           <span>⚠️</span>
           <span>中途切换文风将导致前后风格脱节！确认更改？</span>
           <div class="warning-actions">
-            <button class="btn-warn-confirm" @click="confirmChange">确认</button>
+            <button class="btn-warn-confirm" @click="confirmChange(true)">确认</button>
             <button class="btn-warn-cancel" @click="showWarning = false">取消</button>
           </div>
         </div>
       </div>
 
       <div class="sm-footer">
-        <button class="btn-save" @click="saveStyle">保 存 文 风</button>
+        <button class="btn-save" @click="saveStyle" :disabled="saving">保 存 文 风</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { message } from 'ant-design-vue'
 import iconStyle from '@/assets/images/icon-style.png'
+import { styleApi } from '@/api/modules/style.api'
+import { getSession } from '@/stores/session'
 
-defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean }>()
 defineEmits(['close'])
+const route = useRoute()
+const session = getSession()
+
+type StyleItem = Record<string, unknown>
 
 const config = reactive({
+  name: '默认文风',
   tempo: '适中',
   tone: '古风文言化',
   descPreference: '心理多'
@@ -114,27 +128,148 @@ const descOptions = ['动作多', '心理多', '环境多', '对话多', '均衡
 
 const sampleText = ref('')
 const showWarning = ref(false)
+const saving = ref(false)
+const analyzing = ref(false)
+const styleOptions = ref<StyleItem[]>([])
+const selectedStyleId = ref('')
+const activeDefaultStyleId = ref('')
 
 const currentStyle = computed(() => {
   return `${config.tone} · ${config.tempo} · ${config.descPreference}`
 })
 
+const getProjectId = () => Number(route.query.bookId || 0)
+
+const getOperatorId = () => {
+  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
+  const fromQuery = Number(route.query.operatorId || 0)
+  return fromQuery > 0 ? fromQuery : null
+}
+
+const applyStyleToForm = (style: StyleItem | null | undefined) => {
+  if (!style) return
+  config.name = String(style.name || config.name || '默认文风')
+  config.tempo = String(style.pace || config.tempo || '适中')
+  config.tone = String(style.tone || config.tone || '古风文言化')
+  config.descPreference = String(style.narrativeFocus || config.descPreference || '心理多')
+  sampleText.value = String(style.sampleText || sampleText.value || '')
+}
+
+const loadStyles = async () => {
+  const projectId = getProjectId()
+  if (!projectId) return
+  try {
+    const list = (await styleApi.listStyles(projectId)) as StyleItem[]
+    styleOptions.value = Array.isArray(list) ? list : []
+    const defaultStyle = styleOptions.value.find((item) => Boolean(item.isDefault)) || styleOptions.value[0]
+    if (defaultStyle) {
+      const id = String(defaultStyle.id || '')
+      selectedStyleId.value = id
+      activeDefaultStyleId.value = String((styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle).id || '')
+      applyStyleToForm(defaultStyle)
+    }
+  } catch (error: any) {
+    message.warning(error?.message || '加载文风失败')
+  }
+}
+
+const handleStyleSelect = () => {
+  const target = styleOptions.value.find((item) => String(item.id || '') === selectedStyleId.value)
+  applyStyleToForm(target)
+}
+
 const analyzeSample = () => {
-  if (sampleText.value.length < 50) return
-  // Simulate analysis
-  config.tone = '古风文言化'
-  config.tempo = '慢节奏'
-  config.descPreference = '环境多'
+  if (sampleText.value.length < 50) {
+    message.warning('样文太短，至少 50 字')
+    return
+  }
+  const projectId = getProjectId()
+  const operatorId = getOperatorId()
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法解析文风')
+    return
+  }
+  analyzing.value = true
+  styleApi
+    .analyzeSample(projectId, operatorId, { sampleText: sampleText.value })
+    .then((resp) => {
+      const result = ((resp || {}) as Record<string, unknown>)
+      config.tempo = String(result.pace || result.tempo || config.tempo)
+      config.tone = String(result.tone || config.tone)
+      config.descPreference = String(result.narrativeFocus || result.descPreference || config.descPreference)
+      message.success('文风解析完成')
+    })
+    .catch((error: any) => {
+      message.warning(error?.message || '文风解析失败')
+    })
+    .finally(() => {
+      analyzing.value = false
+    })
 }
 
 const saveStyle = () => {
-  showWarning.value = true
+  if (activeDefaultStyleId.value && selectedStyleId.value && activeDefaultStyleId.value !== selectedStyleId.value) {
+    showWarning.value = true
+    return
+  }
+  void confirmChange(false)
 }
 
-const confirmChange = () => {
+const confirmChange = async (warningConfirmed = true) => {
+  const projectId = getProjectId()
+  const operatorId = getOperatorId()
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法保存文风')
+    return
+  }
+  saving.value = true
   showWarning.value = false
-  // TODO: Save to backend
+  try {
+    const payload = {
+      name: config.name || '默认文风',
+      pace: config.tempo,
+      tone: config.tone,
+      narrativeFocus: config.descPreference,
+      promptTemplate: '',
+      sampleText: sampleText.value
+    }
+
+    let styleId = Number(selectedStyleId.value || 0)
+    if (styleId > 0) {
+      await styleApi.updateStyle(projectId, styleId, operatorId, payload)
+    } else {
+      const created = (await styleApi.createStyle(projectId, operatorId, {
+        ...payload,
+        isDefault: true
+      })) as Record<string, unknown>
+      styleId = Number(created?.id || 0)
+    }
+
+    if (styleId > 0) {
+      await styleApi.switchStyle(projectId, operatorId, {
+        toStyleId: styleId,
+        warningConfirmed,
+        reason: 'Workbench 文风切换'
+      })
+    }
+
+    await loadStyles()
+    message.success('文风已保存')
+  } catch (error: any) {
+    message.warning(error?.message || '保存文风失败')
+  } finally {
+    saving.value = false
+  }
 }
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      void loadStyles()
+    }
+  }
+)
 </script>
 
 <style lang="less" scoped>
@@ -269,6 +404,20 @@ const confirmChange = () => {
   padding-left: 24px;
 }
 
+.style-select {
+  width: 100%;
+  max-width: 260px;
+  height: 32px;
+  padding: 0 10px;
+  background: rgba(11,17,32,0.6);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  outline: none;
+  &:focus { border-color: var(--border-gold); }
+}
+
 .option-group {
   display: flex;
   flex-wrap: wrap;
@@ -340,6 +489,11 @@ const confirmChange = () => {
     background: rgba(201,169,110,0.15);
     border-color: var(--border-gold);
   }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .sm-warning {
@@ -406,6 +560,11 @@ const confirmChange = () => {
     box-shadow: var(--shadow-gold);
     border-color: var(--border-glow);
     color: var(--xuan-paper);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 </style>
