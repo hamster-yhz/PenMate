@@ -54,7 +54,7 @@ public class StyleApplicationService {
     public StyleProfile getStyle(Long projectId, Long styleId) {
         StyleProfile style = styleRepository.findById(projectId, styleId);
         if (style == null) {
-            throw new IllegalArgumentException("Style not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Style not found");
         }
         return style;
     }
@@ -84,7 +84,7 @@ public class StyleApplicationService {
 
         int affected = styleRepository.insert(style);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create style");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create style");
         }
 
         writeAudit(traceId, command.operatorId(), "style", "create-style", "style_profiles", String.valueOf(style.getId()), command.name(), 201);
@@ -111,7 +111,7 @@ public class StyleApplicationService {
 
         int affected = styleRepository.update(style);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to update style");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update style");
         }
 
         writeAudit(traceId, command.operatorId(), "style", "update-style", "style_profiles", String.valueOf(styleId), command.name(), 200);
@@ -129,7 +129,7 @@ public class StyleApplicationService {
     public void deleteStyle(Long projectId, Long styleId, Long operatorId, String traceId) {
         int affected = styleRepository.softDelete(projectId, styleId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Style not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Style not found");
         }
         writeAudit(traceId, operatorId, "style", "delete-style", "style_profiles", String.valueOf(styleId), null, 200);
     }
@@ -149,7 +149,7 @@ public class StyleApplicationService {
         styleRepository.clearDefaultByProjectId(projectId);
         int setAffected = styleRepository.setDefault(projectId, command.toStyleId());
         if (setAffected != 1) {
-            throw new IllegalArgumentException("Failed to switch default style");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to switch default style");
         }
 
         styleRepository.insertSwitchLog(
@@ -204,4 +204,5 @@ public class StyleApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

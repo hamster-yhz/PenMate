@@ -42,11 +42,11 @@ public class AuthApplicationService {
         IamUser user = iamGateway.findUserByEmail(command.email());
         if (user == null || user.getStatus() == null || user.getStatus() != 1) {
             log.warn("登录失败: email={}, reason=invalid_user_or_status", command.email());
-            throw new IllegalArgumentException("Invalid credentials");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }
         if (!command.password().equals(user.getPasswordHash())) {
             log.warn("登录失败: userId={}, reason=invalid_password", user.getId());
-            throw new IllegalArgumentException("Invalid credentials");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }
 
         IamSession session = new IamSession();
@@ -57,7 +57,7 @@ public class AuthApplicationService {
         session.setRefreshExpiresAt(LocalDateTime.now().plusDays(7));
         if (iamGateway.insertSession(session) != 1) {
             log.error("登录失败: userId={}, reason=create_session_failed", user.getId());
-            throw new IllegalArgumentException("Failed to create session");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create session");
         }
         iamGateway.touchLastLogin(user.getId());
 
@@ -102,7 +102,7 @@ public class AuthApplicationService {
         IamSession session = iamGateway.findSessionByRefreshToken(command.refreshToken());
         if (session == null || session.getRefreshExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("刷新令牌失败: reason=invalid_or_expired");
-            throw new IllegalArgumentException("Refresh token invalid or expired");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Refresh token invalid or expired");
         }
         session.setAccessToken("atk_" + UUID.randomUUID());
         session.setRefreshToken("rtk_" + UUID.randomUUID());
@@ -110,7 +110,7 @@ public class AuthApplicationService {
         session.setRefreshExpiresAt(LocalDateTime.now().plusDays(7));
         if (iamGateway.rotateSession(session) != 1) {
             log.error("刷新令牌失败: userId={}, sessionId={}, reason=rotate_failed", session.getUserId(), session.getId());
-            throw new IllegalArgumentException("Failed to refresh token");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to refresh token");
         }
         writeAudit(traceId, session.getUserId(), "auth", "refresh", "iam_user_sessions", String.valueOf(session.getId()), null, 200);
 
@@ -134,12 +134,12 @@ public class AuthApplicationService {
         IamSession session = iamGateway.findSessionByAccessToken(token);
         if (session == null || session.getAccessExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("查询当前用户失败: reason=login_required");
-            throw new IllegalArgumentException("Login required");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Login required");
         }
         IamUser user = iamGateway.findUserById(session.getUserId());
         if (user == null) {
             log.warn("查询当前用户失败: userId={}, reason=user_not_found", session.getUserId());
-            throw new IllegalArgumentException("User not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
         List<IamRole> roles = iamGateway.findRolesByUserId(user.getId());
         List<IamPermission> permissions = iamGateway.findPermissionsByUserId(user.getId());
@@ -156,7 +156,7 @@ public class AuthApplicationService {
 
     private String extractBearer(String authorization) {
         if (authorization == null || authorization.isBlank() || !authorization.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("Authorization header missing Bearer token");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Authorization header missing Bearer token");
         }
         return authorization.substring("Bearer ".length()).trim();
     }

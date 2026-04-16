@@ -35,7 +35,7 @@ public class OpsApplicationService {
     public OpsAsyncJob getJob(Long jobId) {
         OpsAsyncJob job = opsRepository.findJobById(jobId);
         if (job == null) {
-            throw new IllegalArgumentException("Job not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Job not found");
         }
         return job;
     }
@@ -68,7 +68,7 @@ public class OpsApplicationService {
         newJob.setErrorMsg(null);
         int affected = opsRepository.insertJob(newJob);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create retry job");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create retry job");
         }
         writeAudit(traceId, operatorId, "ops", "job:retry", "ops_async_jobs", String.valueOf(newJob.getId()), "{\"sourceJobId\":" + jobId + "}", 201);
         return getJob(newJob.getId());
@@ -90,7 +90,7 @@ public class OpsApplicationService {
         task.setStartedAt(LocalDateTime.now());
         int affected = opsRepository.insertMigration(task);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to start migration");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to start migration");
         }
 
         opsRepository.updateMigration(task.getId(), "done", 100, "{\"migrated\":0,\"failed\":0}", null);
@@ -107,7 +107,7 @@ public class OpsApplicationService {
     public OpsMigrationTask getMigration(Long migrationId) {
         OpsMigrationTask task = opsRepository.findMigrationById(migrationId);
         if (task == null) {
-            throw new IllegalArgumentException("Migration task not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Migration task not found");
         }
         return task;
     }
@@ -124,4 +124,5 @@ public class OpsApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

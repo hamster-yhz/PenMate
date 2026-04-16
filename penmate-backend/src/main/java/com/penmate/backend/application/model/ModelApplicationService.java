@@ -85,7 +85,7 @@ public class ModelApplicationService {
         );
         if (affected < 1) {
             log.error("创建模型密钥失败: userId={}, providerId={}", userId, command.providerId());
-            throw new IllegalArgumentException("Failed to create model key");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create model key");
         }
         writeAudit(traceId, command.operatorId(), "model", "create-model-key", "model_user_api_keys", userId.toString(), null, 200);
         log.info("创建模型密钥成功: userId={}, keyName={}", userId, command.keyName());
@@ -117,7 +117,7 @@ public class ModelApplicationService {
         );
         if (affected != 1) {
             log.warn("更新模型密钥失败: userId={}, keyId={}, reason=not_found", userId, keyId);
-            throw new IllegalArgumentException("Model key not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Model key not found");
         }
         writeAudit(traceId, command.operatorId(), "model", "update-model-key", "model_user_api_keys", keyId.toString(), null, 200);
         log.info("更新模型密钥成功: userId={}, keyId={}", userId, keyId);
@@ -136,7 +136,7 @@ public class ModelApplicationService {
         int affected = modelRepository.softDeleteUserKey(userId, keyId);
         if (affected != 1) {
             log.warn("删除模型密钥失败: userId={}, keyId={}, reason=not_found", userId, keyId);
-            throw new IllegalArgumentException("Model key not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Model key not found");
         }
         writeAudit(traceId, operatorId, "model", "delete-model-key", "model_user_api_keys", keyId.toString(), null, 200);
         log.info("删除模型密钥成功: userId={}, keyId={}", userId, keyId);
@@ -180,7 +180,7 @@ public class ModelApplicationService {
         );
         if (affected < 1) {
             log.error("创建模型策略失败: projectId={}, policyName={}", projectId, command.policyName());
-            throw new IllegalArgumentException("Failed to create model policy");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create model policy");
         }
         writeAudit(traceId, command.operatorId(), "model", "create-model-policy", "model_project_policies", projectId.toString(), null, 200);
         log.info("创建模型策略成功: projectId={}, policyName={}", projectId, command.policyName());
@@ -214,7 +214,7 @@ public class ModelApplicationService {
         );
         if (affected != 1) {
             log.warn("更新模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw new IllegalArgumentException("Model policy not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
         }
         writeAudit(traceId, command.operatorId(), "model", "update-model-policy", "model_project_policies", policyId.toString(), null, 200);
         log.info("更新模型策略成功: projectId={}, policyId={}", projectId, policyId);
@@ -233,7 +233,7 @@ public class ModelApplicationService {
         int affected = modelRepository.softDeletePolicy(projectId, policyId);
         if (affected != 1) {
             log.warn("删除模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw new IllegalArgumentException("Model policy not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
         }
         writeAudit(traceId, operatorId, "model", "delete-model-policy", "model_project_policies", policyId.toString(), null, 200);
         log.info("删除模型策略成功: projectId={}, policyId={}", projectId, policyId);
@@ -253,7 +253,7 @@ public class ModelApplicationService {
         int affected = modelRepository.setDefaultPolicy(projectId, policyId);
         if (affected != 1) {
             log.warn("设置默认模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw new IllegalArgumentException("Model policy not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
         }
         writeAudit(traceId, operatorId, "model", "set-default-model-policy", "model_project_policies", policyId.toString(), null, 200);
         log.info("设置默认模型策略成功: projectId={}, policyId={}", projectId, policyId);
@@ -283,4 +283,5 @@ public class ModelApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

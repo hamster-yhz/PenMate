@@ -79,7 +79,7 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
         when(agentRepository.findConversation(1L, 999L)).thenReturn(null);
 
         assertThatThrownBy(() -> agentApplicationService.listMessages(1L, 999L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Conversation not found");
     }
 
@@ -158,7 +158,7 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
                 501L,
                 new ApplyGenerationCommand(1001L, "应用"),
                 "trace"
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Generation task is not ready for apply");
     }
 
@@ -192,3 +192,4 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
         verifyNoInteractions(realtimeEventService);
     }
 }
+

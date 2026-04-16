@@ -46,7 +46,7 @@ public class PluginApplicationService {
     public PluginCatalogItem getCatalog(String pluginCode) {
         PluginCatalogItem item = pluginRepository.getCatalogByCode(pluginCode);
         if (item == null) {
-            throw new IllegalArgumentException("Plugin not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Plugin not found");
         }
         return item;
     }
@@ -71,7 +71,7 @@ public class PluginApplicationService {
     public void install(Long projectId, InstallPluginCommand command, String traceId) {
         Long pluginId = pluginRepository.findCatalogIdByCode(command.pluginCode());
         if (pluginId == null) {
-            throw new IllegalArgumentException("Plugin not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Plugin not found");
         }
         int affected = pluginRepository.insertInstall(
                 projectId,
@@ -82,7 +82,7 @@ public class PluginApplicationService {
                 command.operatorId()
         );
         if (affected < 1) {
-            throw new IllegalArgumentException("Failed to install plugin");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to install plugin");
         }
         writeAudit(traceId, command.operatorId(), "plugin", "install-plugin", "plugin_project_installs", pluginId.toString(), command.configJson(), 200);
     }
@@ -98,7 +98,7 @@ public class PluginApplicationService {
     public void updateInstall(Long projectId, String pluginCode, UpdatePluginInstallCommand command, String traceId) {
         int affected = pluginRepository.updateInstall(projectId, pluginCode, command.enabled(), command.configJson());
         if (affected != 1) {
-            throw new IllegalArgumentException("Plugin install not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Plugin install not found");
         }
         writeAudit(traceId, command.operatorId(), "plugin", "update-plugin-install", "plugin_project_installs", pluginCode, command.configJson(), 200);
     }
@@ -114,7 +114,7 @@ public class PluginApplicationService {
     public void deleteInstall(Long projectId, String pluginCode, Long operatorId, String traceId) {
         int affected = pluginRepository.deleteInstall(projectId, pluginCode);
         if (affected != 1) {
-            throw new IllegalArgumentException("Plugin install not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Plugin install not found");
         }
         writeAudit(traceId, operatorId, "plugin", "delete-plugin-install", "plugin_project_installs", pluginCode, null, 200);
     }
@@ -141,4 +141,5 @@ public class PluginApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

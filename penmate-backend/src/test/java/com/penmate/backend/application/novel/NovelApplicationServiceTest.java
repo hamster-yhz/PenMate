@@ -41,8 +41,9 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         when(novelGateway.findProjectById(1L)).thenReturn(null);
 
         assertThatThrownBy(() -> novelApplicationService.getProject(1L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Project not found");
     }
 }
+
 

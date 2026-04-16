@@ -58,7 +58,7 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         when(iamGateway.findUserByEmail("x@x.com")).thenReturn(null);
 
         assertThatThrownBy(() -> authApplicationService.login(new LoginCommand("x@x.com", "bad"), "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Invalid credentials");
     }
 
@@ -80,7 +80,7 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         when(iamGateway.findSessionByRefreshToken("bad")).thenReturn(null);
 
         assertThatThrownBy(() -> authApplicationService.refresh(new RefreshCommand("bad"), "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Refresh token invalid or expired");
     }
 
@@ -103,3 +103,4 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(result).containsEntry("id", 1001L).containsEntry("email", "author@penmate.ai");
     }
 }
+

@@ -37,7 +37,7 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_IAM_GET_USER_NOT_FOUND() {
         when(iamGateway.findUserById(1L)).thenReturn(null);
         assertThatThrownBy(() -> iamQueryApplicationService.getUser(1L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("User not found");
     }
 
@@ -49,8 +49,9 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
         when(iamGateway.findRoleById(1L)).thenReturn(role);
 
         assertThatThrownBy(() -> iamQueryApplicationService.deleteRole(1L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("System role cannot be deleted");
     }
 }
+
 

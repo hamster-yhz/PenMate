@@ -70,7 +70,7 @@ public class NovelApplicationService {
     public NovelProject getProject(Long projectId) {
         NovelProject project = novelGateway.findProjectById(projectId);
         if (project == null) {
-            throw new IllegalArgumentException("Project not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Project not found");
         }
         return project;
     }
@@ -90,7 +90,7 @@ public class NovelApplicationService {
         project.setStatus(command.status() == null ? 1 : command.status());
         int affected = novelGateway.insertProject(project);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create project");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create project");
         }
         writeAudit(traceId, command.ownerUserId(), "novel", "create-project", "novel_projects", String.valueOf(project.getId()), command.title(), 201);
         return project;
@@ -111,7 +111,7 @@ public class NovelApplicationService {
         existing.setStatus(command.status() == null ? existing.getStatus() : command.status());
         int affected = novelGateway.updateProject(existing);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to update project");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update project");
         }
         writeAudit(traceId, existing.getOwnerUserId(), "novel", "update-project", "novel_projects", String.valueOf(projectId), command.title(), 200);
         return getProject(projectId);
@@ -127,7 +127,7 @@ public class NovelApplicationService {
     public void deleteProject(Long projectId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteProject(projectId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Project not found or already deleted");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Project not found or already deleted");
         }
         writeAudit(traceId, operatorId, "novel", "delete-project", "novel_projects", String.valueOf(projectId), null, 200);
     }
@@ -159,7 +159,7 @@ public class NovelApplicationService {
         volume.setDescription(command.description());
         int affected = novelGateway.insertVolume(volume);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create volume");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create volume");
         }
         writeAudit(traceId, operatorId, "novel", "create-volume", "novel_volumes", String.valueOf(volume.getId()), command.title(), 201);
         return volume;
@@ -184,7 +184,7 @@ public class NovelApplicationService {
         volume.setDescription(command.description());
         int affected = novelGateway.updateVolume(volume);
         if (affected != 1) {
-            throw new IllegalArgumentException("Volume not found or already deleted");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Volume not found or already deleted");
         }
         writeAudit(traceId, operatorId, "novel", "update-volume", "novel_volumes", String.valueOf(volumeId), command.title(), 200);
         return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getId())).findFirst().orElse(volume);
@@ -201,7 +201,7 @@ public class NovelApplicationService {
     public void deleteVolume(Long projectId, Long volumeId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteVolume(projectId, volumeId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Volume not found or already deleted");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Volume not found or already deleted");
         }
         writeAudit(traceId, operatorId, "novel", "delete-volume", "novel_volumes", String.valueOf(volumeId), null, 200);
     }
@@ -226,7 +226,7 @@ public class NovelApplicationService {
     public NovelChapter getChapter(Long projectId, Long chapterId) {
         NovelChapter chapter = novelGateway.findChapterByIdAndProjectId(projectId, chapterId);
         if (chapter == null) {
-            throw new IllegalArgumentException("Chapter not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found");
         }
         return chapter;
     }
@@ -257,7 +257,7 @@ public class NovelApplicationService {
         chapter.setStorageProvider(command.storageProvider() == null ? "s3" : command.storageProvider());
         int affected = novelGateway.insertChapter(chapter);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create chapter");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create chapter");
         }
         writeAudit(traceId, operatorId, "novel", "create-chapter", "novel_chapters", String.valueOf(chapter.getId()), command.title(), 201);
         return chapter;
@@ -289,7 +289,7 @@ public class NovelApplicationService {
         chapter.setStorageProvider(command.storageProvider() == null ? chapter.getStorageProvider() : command.storageProvider());
         int affected = novelGateway.updateChapter(chapter);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to update chapter");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update chapter");
         }
         writeAudit(traceId, operatorId, "novel", "update-chapter", "novel_chapters", String.valueOf(chapterId), command.title(), 200);
         return getChapter(projectId, chapterId);
@@ -306,7 +306,7 @@ public class NovelApplicationService {
     public void deleteChapter(Long projectId, Long chapterId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteChapter(projectId, chapterId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Chapter not found or already deleted");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
         }
         writeAudit(traceId, operatorId, "novel", "delete-chapter", "novel_chapters", String.valueOf(chapterId), null, 200);
     }
@@ -322,7 +322,7 @@ public class NovelApplicationService {
     public void publishChapter(Long projectId, Long chapterId, Long operatorId, String traceId) {
         int affected = novelGateway.publishChapter(projectId, chapterId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Chapter not found or already deleted");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
         }
         writeAudit(traceId, operatorId, "novel", "publish-chapter", "novel_chapters", String.valueOf(chapterId), null, 200);
     }
@@ -353,7 +353,7 @@ public class NovelApplicationService {
         member.setMemberRole(command.memberRole());
         int affected = novelGateway.insertMember(member);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to add member");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to add member");
         }
         writeAudit(traceId, operatorId, "novel", "add-member", "novel_members", projectId + ":" + command.userId(), command.memberRole(), 201);
         return listMembers(projectId).stream().filter(m -> command.userId().equals(m.getUserId())).findFirst().orElse(member);
@@ -372,7 +372,7 @@ public class NovelApplicationService {
     public NovelMember updateMember(Long projectId, Long userId, UpdateMemberCommand command, Long operatorId, String traceId) {
         int affected = novelGateway.updateMemberRole(projectId, userId, command.memberRole());
         if (affected != 1) {
-            throw new IllegalArgumentException("Member not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Member not found");
         }
         writeAudit(traceId, operatorId, "novel", "update-member", "novel_members", projectId + ":" + userId, command.memberRole(), 200);
         return listMembers(projectId).stream().filter(m -> userId.equals(m.getUserId())).findFirst().orElseThrow();
@@ -389,7 +389,7 @@ public class NovelApplicationService {
     public void removeMember(Long projectId, Long userId, Long operatorId, String traceId) {
         int affected = novelGateway.deleteMember(projectId, userId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Member not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Member not found");
         }
         writeAudit(traceId, operatorId, "novel", "remove-member", "novel_members", projectId + ":" + userId, null, 200);
     }
@@ -431,7 +431,7 @@ public class NovelApplicationService {
         version.setCreatedBy(command.createdBy());
         int affected = novelGateway.insertChapterVersion(version);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create chapter version");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create chapter version");
         }
         writeAudit(traceId, command.createdBy(), "novel", "create-chapter-version", "novel_chapter_versions", String.valueOf(version.getId()), command.changeType(), 201);
         return version;
@@ -449,7 +449,7 @@ public class NovelApplicationService {
         getChapter(projectId, chapterId);
         NovelChapterVersion version = novelGateway.findVersionByChapterAndVersion(chapterId, versionNo);
         if (version == null) {
-            throw new IllegalArgumentException("Chapter version not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter version not found");
         }
         return version;
     }
@@ -469,7 +469,7 @@ public class NovelApplicationService {
         // 复杂流程解析：恢复版本时仅回滚内容元数据，不覆盖章节业务字段，确保恢复行为可审计。
         int affected = novelGateway.updateChapterContentMeta(projectId, chapterId, version.getSnapshotObjectKey(), version.getSnapshotEtag(), version.getSnapshotSize(), version.getSnapshotChecksum(), "s3");
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to restore chapter version");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to restore chapter version");
         }
         writeAudit(traceId, operatorId, "novel", "restore-chapter-version", "novel_chapter_versions", version.getId().toString(), versionNo.toString(), 200);
         return getChapter(projectId, chapterId);
@@ -524,7 +524,7 @@ public class NovelApplicationService {
                 command.storageProvider() == null ? "s3" : command.storageProvider()
         );
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to commit chapter content");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to commit chapter content");
         }
         writeAudit(traceId, operatorId, "novel", "commit-chapter-content", "novel_chapters", String.valueOf(chapterId), command.objectKey(), 200);
         return getChapter(projectId, chapterId);
@@ -574,7 +574,7 @@ public class NovelApplicationService {
         node.setContent(command.content());
         int affected = novelGateway.insertOutlineNode(node);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create outline node");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create outline node");
         }
         realtimeEventService.publishProjectEvent(projectId, "outline.node.created", Map.of(
                 "nodeId", node.getId(),
@@ -599,7 +599,7 @@ public class NovelApplicationService {
     public NovelOutlineNode updateOutlineNode(Long projectId, Long nodeId, UpdateOutlineNodeCommand command, Long operatorId, String traceId) {
         NovelOutlineNode existing = novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
         if (existing == null) {
-            throw new IllegalArgumentException("Outline node not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
         }
         existing.setParentId(command.parentId());
         existing.setTitle(command.title());
@@ -608,7 +608,7 @@ public class NovelApplicationService {
         existing.setContent(command.content());
         int affected = novelGateway.updateOutlineNode(existing);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to update outline node");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update outline node");
         }
         writeAudit(traceId, operatorId, "novel", "update-outline-node", "novel_outline_nodes", String.valueOf(nodeId), command.title(), 200);
         return novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
@@ -626,7 +626,7 @@ public class NovelApplicationService {
     public void moveOutlineNode(Long projectId, Long nodeId, MoveOutlineNodeCommand command, Long operatorId, String traceId) {
         int affected = novelGateway.moveOutlineNode(projectId, nodeId, command.parentId(), command.sortOrder() == null ? 0 : command.sortOrder());
         if (affected != 1) {
-            throw new IllegalArgumentException("Outline node not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
         }
         writeAudit(traceId, operatorId, "novel", "move-outline-node", "novel_outline_nodes", String.valueOf(nodeId), null, 200);
     }
@@ -642,7 +642,7 @@ public class NovelApplicationService {
     public void deleteOutlineNode(Long projectId, Long nodeId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteOutlineNode(projectId, nodeId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Outline node not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
         }
         writeAudit(traceId, operatorId, "novel", "delete-outline-node", "novel_outline_nodes", String.valueOf(nodeId), null, 200);
     }
@@ -668,7 +668,7 @@ public class NovelApplicationService {
     public NovelCard getCard(Long projectId, Long cardId) {
         NovelCard card = novelGateway.findCardByIdAndProjectId(projectId, cardId);
         if (card == null) {
-            throw new IllegalArgumentException("Card not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Card not found");
         }
         return card;
     }
@@ -692,7 +692,7 @@ public class NovelApplicationService {
         card.setDetailJson(command.detailJson());
         int affected = novelGateway.insertCard(card);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create card");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create card");
         }
         writeAudit(traceId, operatorId, "novel", "create-card", "novel_cards", String.valueOf(card.getId()), command.name(), 201);
         return card;
@@ -716,7 +716,7 @@ public class NovelApplicationService {
         card.setDetailJson(command.detailJson());
         int affected = novelGateway.updateCard(card);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to update card");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update card");
         }
         realtimeEventService.publishProjectEvent(projectId, "card.updated", Map.of(
                 "cardId", cardId,
@@ -739,7 +739,7 @@ public class NovelApplicationService {
     public void deleteCard(Long projectId, Long cardId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteCard(projectId, cardId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Card not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Card not found");
         }
         writeAudit(traceId, operatorId, "novel", "delete-card", "novel_cards", String.valueOf(cardId), null, 200);
     }
@@ -775,7 +775,7 @@ public class NovelApplicationService {
         relation.setDescription(command.description());
         int affected = novelGateway.insertCardRelation(relation);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create card relation");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create card relation");
         }
         writeAudit(traceId, operatorId, "novel", "create-card-relation", "novel_card_relations", String.valueOf(relation.getId()), command.relationType(), 201);
         return relation;
@@ -792,7 +792,7 @@ public class NovelApplicationService {
     public void deleteCardRelation(Long projectId, Long relationId, Long operatorId, String traceId) {
         int affected = novelGateway.softDeleteCardRelation(projectId, relationId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Card relation not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Card relation not found");
         }
         writeAudit(traceId, operatorId, "novel", "delete-card-relation", "novel_card_relations", String.valueOf(relationId), null, 200);
     }
@@ -809,4 +809,5 @@ public class NovelApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

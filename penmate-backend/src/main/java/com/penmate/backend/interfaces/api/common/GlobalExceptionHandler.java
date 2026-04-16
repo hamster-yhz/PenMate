@@ -1,5 +1,6 @@
 package com.penmate.backend.interfaces.api.common;
 
+import com.penmate.backend.application.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -30,23 +31,46 @@ public class GlobalExceptionHandler {
                 ErrorResponse.of(
                         400,
                         "VALIDATION_ERROR",
-                        "Input validation failed.",
+                        "请求参数校验失败",
                         details,
+                        request.getRequestURI(),
+                        traceId
+                )
+        );
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex, HttpServletRequest request) {
+        String traceId = traceId(request);
+        int status = ex.getHttpStatus().value();
+        log.warn("业务异常: traceId={}, path={}, errorCode={}, message={}",
+                traceId,
+                request.getRequestURI(),
+                ex.getErrorCode(),
+                ex.getMessage());
+        return ResponseEntity.status(ex.getHttpStatus()).body(
+                ErrorResponse.of(
+                        status,
+                        ex.getErrorCode(),
+                        ex.getMessage(),
+                        ex.getDetails(),
+                        request.getRequestURI(),
                         traceId
                 )
         );
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleBiz(IllegalArgumentException ex, HttpServletRequest request) {
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         String traceId = traceId(request);
-        log.warn("业务异常: traceId={}, path={}, message={}", traceId, request.getRequestURI(), ex.getMessage());
+        log.warn("非法参数异常: traceId={}, path={}, message={}", traceId, request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
                 ErrorResponse.of(
                         422,
                         "BUSINESS_RULE_VIOLATION",
                         ex.getMessage(),
                         null,
+                        request.getRequestURI(),
                         traceId
                 )
         );
@@ -60,8 +84,9 @@ public class GlobalExceptionHandler {
                 ErrorResponse.of(
                         500,
                         "INTERNAL_SERVER_ERROR",
-                        "Internal server error",
+                        "系统开小差了，请稍后重试",
                         null,
+                        request.getRequestURI(),
                         traceId
                 )
         );

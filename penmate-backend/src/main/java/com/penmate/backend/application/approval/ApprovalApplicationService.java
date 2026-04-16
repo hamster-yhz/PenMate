@@ -48,7 +48,7 @@ public class ApprovalApplicationService {
         request.setRequestedBy(command.requestedBy());
         int affected = approvalRequestRepository.insert(request);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create approval request");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create approval request");
         }
         realtimeEventService.publishProjectEvent(command.projectId(), "approval.created", Map.of(
                 "approvalId", request.getId(),
@@ -80,7 +80,7 @@ public class ApprovalApplicationService {
     public ApprovalRequest detail(Long approvalId) {
         ApprovalRequest request = approvalRequestRepository.findById(approvalId);
         if (request == null) {
-            throw new IllegalArgumentException("Approval request not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Approval request not found");
         }
         return request;
     }
@@ -95,7 +95,7 @@ public class ApprovalApplicationService {
     public void approve(Long approvalId, ReviewApprovalCommand command, String traceId) {
         int affected = approvalRequestRepository.approve(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
-            throw new IllegalArgumentException("Approval is not in pending status or not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Approval is not in pending status or not found");
         }
         realtimeEventService.publishProjectEvent(detail(approvalId).getProjectId(), "approval.reviewed", Map.of(
                 "approvalId", approvalId,
@@ -116,7 +116,7 @@ public class ApprovalApplicationService {
     public void reject(Long approvalId, ReviewApprovalCommand command, String traceId) {
         int affected = approvalRequestRepository.reject(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
-            throw new IllegalArgumentException("Approval is not in pending status or not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Approval is not in pending status or not found");
         }
         realtimeEventService.publishProjectEvent(detail(approvalId).getProjectId(), "approval.reviewed", Map.of(
                 "approvalId", approvalId,
@@ -139,4 +139,5 @@ public class ApprovalApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

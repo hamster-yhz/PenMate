@@ -1,6 +1,8 @@
 package com.penmate.backend.infrastructure.persistence.audit;
 
 import com.penmate.backend.domain.shared.service.AuditService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 /**
@@ -11,9 +13,11 @@ import org.springframework.stereotype.Service;
 public class AuditServiceImpl implements AuditService {
 
     private final AuditLogMapper auditLogMapper;
+    private final ObjectMapper objectMapper;
 
-    public AuditServiceImpl(AuditLogMapper auditLogMapper) {
+    public AuditServiceImpl(AuditLogMapper auditLogMapper, ObjectMapper objectMapper) {
         this.auditLogMapper = auditLogMapper;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -37,7 +41,23 @@ public class AuditServiceImpl implements AuditService {
                       String resourceId,
                       String requestJson,
                       int responseCode) {
-        auditLogMapper.insert(traceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        auditLogMapper.insert(traceId, userId, module, action, resourceType, resourceId, normalizeToJson(requestJson), responseCode);
+    }
+
+    private String normalizeToJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "{}";
+        }
+        try {
+            objectMapper.readTree(raw);
+            return raw;
+        } catch (JsonProcessingException ignore) {
+            try {
+                return objectMapper.writeValueAsString(raw);
+            } catch (JsonProcessingException e) {
+                return "{}";
+            }
+        }
     }
 }
 

@@ -63,7 +63,7 @@ public class AgentApplicationService {
         int affected = agentRepository.insertConversation(conversation);
         if (affected != 1) {
             log.error("创建会话失败: projectId={}, userId={}", projectId, command.userId());
-            throw new IllegalArgumentException("Failed to create conversation");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create conversation");
         }
         writeAudit(traceId, command.operatorId(), "agent", "conversation:create", "agent_conversations",
                 String.valueOf(conversation.getId()), command.contextScopeJson(), 201);
@@ -110,7 +110,7 @@ public class AgentApplicationService {
         int affected = agentRepository.insertMessage(message);
         if (affected != 1) {
             log.error("创建消息失败: projectId={}, conversationId={}", projectId, conversationId);
-            throw new IllegalArgumentException("Failed to create message");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create message");
         }
         agentRepository.touchConversationLastMessage(conversationId);
         writeAudit(traceId, command.operatorId(), "agent", "message:create", "agent_messages",
@@ -145,7 +145,7 @@ public class AgentApplicationService {
         int affected = agentRepository.insertGenerationTask(task);
         if (affected != 1) {
             log.error("创建生成任务失败: projectId={}, conversationId={}", projectId, command.conversationId());
-            throw new IllegalArgumentException("Failed to create generation task");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create generation task");
         }
         realtimeEventService.publishGenerationToken(projectId, task.getId(), "开始生成", false);
         agentRepository.updateGenerationTaskStatus(projectId, task.getId(), "done", null);
@@ -167,7 +167,7 @@ public class AgentApplicationService {
         AgentGenerationTask task = agentRepository.findGenerationTask(projectId, taskId);
         if (task == null) {
             log.warn("查询生成任务失败: projectId={}, taskId={}, reason=not_found", projectId, taskId);
-            throw new IllegalArgumentException("Generation task not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Generation task not found");
         }
         log.info("查询生成任务成功: projectId={}, taskId={}, status={}", projectId, taskId, task.getStatus());
         return task;
@@ -190,12 +190,12 @@ public class AgentApplicationService {
         AgentGenerationTask task = getGeneration(projectId, taskId);
         if (!"done".equals(task.getStatus()) && !"applied".equals(task.getStatus())) {
             log.warn("应用生成任务失败: projectId={}, taskId={}, status={}", projectId, taskId, task.getStatus());
-            throw new IllegalArgumentException("Generation task is not ready for apply");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Generation task is not ready for apply");
         }
         int affected = agentRepository.updateGenerationTaskStatus(projectId, taskId, "applied", null);
         if (affected != 1) {
             log.error("应用生成任务失败: projectId={}, taskId={}, reason=update_failed", projectId, taskId);
-            throw new IllegalArgumentException("Failed to apply generation result");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to apply generation result");
         }
         writeAudit(traceId, command.operatorId(), "agent", "generation:apply", "agent_generation_tasks",
                 String.valueOf(taskId), command.applyNote(), 200);
@@ -207,7 +207,7 @@ public class AgentApplicationService {
         AgentConversation conversation = agentRepository.findConversation(projectId, conversationId);
         if (conversation == null) {
             log.warn("会话不存在: projectId={}, conversationId={}", projectId, conversationId);
-            throw new IllegalArgumentException("Conversation not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Conversation not found");
         }
     }
 
@@ -223,4 +223,5 @@ public class AgentApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

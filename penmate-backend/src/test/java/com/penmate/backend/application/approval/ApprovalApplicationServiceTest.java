@@ -54,7 +54,7 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         when(approvalRequestRepository.findById(1L)).thenReturn(null);
 
         assertThatThrownBy(() -> approvalApplicationService.detail(1L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Approval request not found");
     }
 
@@ -63,8 +63,9 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         when(approvalRequestRepository.approve(1L, 1001L, "ok")).thenReturn(0);
 
         assertThatThrownBy(() -> approvalApplicationService.approve(1L, new ReviewApprovalCommand(1001L, "ok"), "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Approval is not in pending status or not found");
     }
 }
+
 

@@ -103,7 +103,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 userId,
                 new CreateModelKeyCommand(1L, "我的Key", "sk-123456", false, "active", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Failed to create model key");
     }
 
@@ -119,7 +119,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 keyId,
                 new UpdateModelKeyCommand("更新Key", "sk-654321", false, "active", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Model key not found");
     }
 
@@ -128,7 +128,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.softDeleteUserKey(1001L, 9999L)).thenReturn(0);
 
         assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, 9999L, 1001L, "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Model key not found");
     }
 
@@ -219,7 +219,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                         1001L
                 ),
                 "trace"
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Model policy not found");
     }
 
@@ -228,7 +228,8 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.setDefaultPolicy(1L, 9999L)).thenReturn(0);
 
         assertThatThrownBy(() -> modelApplicationService.setDefaultPolicy(1L, 9999L, 1001L, "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Model policy not found");
     }
 }
+

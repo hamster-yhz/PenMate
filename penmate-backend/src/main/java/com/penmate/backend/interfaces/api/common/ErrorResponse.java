@@ -8,14 +8,21 @@ public class ErrorResponse {
     private String errorCode;
     private String message;
     private Object details;
+    private String path;
     private Meta meta;
 
-    public static ErrorResponse of(int status, String errorCode, String message, Object details, String traceId) {
+    public static ErrorResponse of(int status,
+                                   String errorCode,
+                                   String message,
+                                   Object details,
+                                   String path,
+                                   String traceId) {
         ErrorResponse response = new ErrorResponse();
         response.status = status;
         response.errorCode = errorCode;
         response.message = message;
         response.details = details;
+        response.path = path;
         response.meta = new Meta(traceId, Instant.now().toString());
         return response;
     }
@@ -34,6 +41,10 @@ public class ErrorResponse {
 
     public Object getDetails() {
         return details;
+    }
+
+    public String getPath() {
+        return path;
     }
 
     public Meta getMeta() {

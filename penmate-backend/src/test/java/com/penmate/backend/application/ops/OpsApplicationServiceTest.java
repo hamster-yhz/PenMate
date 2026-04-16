@@ -34,7 +34,7 @@ class OpsApplicationServiceTest extends BaseApplicationServiceTest {
         when(opsRepository.findJobById(9L)).thenReturn(null);
 
         assertThatThrownBy(() -> opsApplicationService.getJob(9L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Job not found");
     }
 
@@ -109,7 +109,8 @@ class OpsApplicationServiceTest extends BaseApplicationServiceTest {
         when(opsRepository.findMigrationById(99L)).thenReturn(null);
 
         assertThatThrownBy(() -> opsApplicationService.getMigration(99L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Migration task not found");
     }
 }
+

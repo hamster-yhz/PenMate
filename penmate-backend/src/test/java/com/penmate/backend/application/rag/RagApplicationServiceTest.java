@@ -69,7 +69,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         when(ragDocumentRepository.findById(1L, 99L)).thenReturn(null);
 
         assertThatThrownBy(() -> ragApplicationService.getDocument(1L, 99L))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Rag document not found");
     }
 
@@ -78,7 +78,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         when(ragDocumentRepository.softDelete(1L, 99L)).thenReturn(0);
 
         assertThatThrownBy(() -> ragApplicationService.deleteDocument(1L, 99L, new OperateRagDocumentCommand(1001L), "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Rag document not found");
     }
 
@@ -115,7 +115,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         when(ragDocumentRepository.findById(1L, 2L)).thenReturn(current);
 
         assertThatThrownBy(() -> ragApplicationService.embedDocument(1L, 2L, new OperateRagDocumentCommand(1001L), "trace"))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Document parse not finished");
     }
 
@@ -136,3 +136,4 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         verifyNoMoreInteractions(ragDocumentRepository);
     }
 }
+

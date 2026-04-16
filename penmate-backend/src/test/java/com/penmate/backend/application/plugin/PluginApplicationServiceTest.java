@@ -70,7 +70,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pluginApplicationService.getCatalog(pluginCode))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Plugin not found");
     }
 
@@ -132,7 +132,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
                 projectId,
                 new InstallPluginCommand(pluginCode, version, configJson, operatorId),
                 traceId
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Plugin not found");
     }
 
@@ -153,7 +153,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
                 projectId,
                 new InstallPluginCommand(pluginCode, version, configJson, operatorId),
                 traceId
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Failed to install plugin");
     }
 
@@ -198,7 +198,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
                 pluginCode,
                 new UpdatePluginInstallCommand(enabled, configJson, operatorId),
                 traceId
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Plugin install not found");
     }
 
@@ -230,7 +230,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
         // when & then
         assertThatThrownBy(() -> pluginApplicationService.deleteInstall(projectId, pluginCode, operatorId, traceId))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Plugin install not found");
     }
 
@@ -251,3 +251,4 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         assert result.size() == 2;
     }
 }
+

@@ -61,7 +61,7 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         when(styleRepository.findById(projectId, styleId)).thenReturn(null);
 
         assertThatThrownBy(() -> styleApplicationService.getStyle(projectId, styleId))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Style not found");
     }
 
@@ -127,7 +127,7 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         when(styleRepository.softDelete(projectId, styleId)).thenReturn(0);
 
         assertThatThrownBy(() -> styleApplicationService.deleteStyle(projectId, styleId, operatorId, traceId))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Style not found");
     }
 
@@ -175,7 +175,7 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
                 projectId,
                 new SwitchStyleCommand(toStyleId, false, "切换", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(IllegalArgumentException.class)
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Failed to switch default style");
     }
 
@@ -197,3 +197,4 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         verifyNoInteractions(realtimeEventService);
     }
 }
+

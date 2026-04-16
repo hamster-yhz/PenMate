@@ -58,7 +58,7 @@ public class RagApplicationService {
         document.setIndexStatus("pending");
         int affected = ragDocumentRepository.insert(document);
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to create rag document");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create rag document");
         }
         writeAudit(traceId, command.operatorId(), "rag", "create-document", "rag_documents", String.valueOf(document.getId()), command.title(), 201);
         return document;
@@ -74,7 +74,7 @@ public class RagApplicationService {
     public RagDocument getDocument(Long projectId, Long docId) {
         RagDocument document = ragDocumentRepository.findById(projectId, docId);
         if (document == null) {
-            throw new IllegalArgumentException("Rag document not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Rag document not found");
         }
         return document;
     }
@@ -90,7 +90,7 @@ public class RagApplicationService {
     public void deleteDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
         int affected = ragDocumentRepository.softDelete(projectId, docId);
         if (affected != 1) {
-            throw new IllegalArgumentException("Rag document not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Rag document not found");
         }
         writeAudit(traceId, command.operatorId(), "rag", "delete-document", "rag_documents", String.valueOf(docId), null, 200);
     }
@@ -122,7 +122,7 @@ public class RagApplicationService {
         getDocument(projectId, docId);
         int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "pending");
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to parse rag document");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to parse rag document");
         }
         writeAudit(traceId, command.operatorId(), "rag", "parse-document", "rag_documents", String.valueOf(docId), null, 200);
         return getDocument(projectId, docId);
@@ -141,11 +141,11 @@ public class RagApplicationService {
         RagDocument current = getDocument(projectId, docId);
         String parseStatus = current.getParseStatus() == null ? "pending" : current.getParseStatus();
         if (!"done".equalsIgnoreCase(parseStatus)) {
-            throw new IllegalArgumentException("Document parse not finished");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Document parse not finished");
         }
         int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "done");
         if (affected != 1) {
-            throw new IllegalArgumentException("Failed to embed rag document");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to embed rag document");
         }
         writeAudit(traceId, command.operatorId(), "rag", "embed-document", "rag_documents", String.valueOf(docId), null, 200);
         return getDocument(projectId, docId);
@@ -191,4 +191,5 @@ public class RagApplicationService {
         auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
     }
 }
+
 

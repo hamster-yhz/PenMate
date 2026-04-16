@@ -40,7 +40,7 @@ public class IamQueryApplicationService {
     public IamUser getUser(Long id) {
         IamUser user = iamGateway.findUserById(id);
         if (user == null) {
-            throw new IllegalArgumentException("User not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
         return user;
     }
@@ -97,7 +97,7 @@ public class IamQueryApplicationService {
         user.setStatus(status);
         int affected = iamGateway.updateUserBasic(user);
         if (affected <= 0) {
-            throw new IllegalArgumentException("User not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
         return getUser(id);
     }
@@ -110,7 +110,7 @@ public class IamQueryApplicationService {
     public void deleteUser(Long id) {
         int affected = iamGateway.softDeleteUser(id);
         if (affected <= 0) {
-            throw new IllegalArgumentException("User not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
     }
 
@@ -144,13 +144,13 @@ public class IamQueryApplicationService {
     public IamRole updateRole(Long id, String name, String description) {
         IamRole role = iamGateway.findRoleById(id);
         if (role == null) {
-            throw new IllegalArgumentException("Role not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         role.setName(name);
         role.setDescription(description);
         int affected = iamGateway.updateRoleBasic(role);
         if (affected <= 0) {
-            throw new IllegalArgumentException("Role not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         return iamGateway.findRoleById(id);
     }
@@ -163,14 +163,14 @@ public class IamQueryApplicationService {
     public void deleteRole(Long id) {
         IamRole role = iamGateway.findRoleById(id);
         if (role == null) {
-            throw new IllegalArgumentException("Role not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         if (Boolean.TRUE.equals(role.getIsSystem())) {
-            throw new IllegalArgumentException("System role cannot be deleted");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("System role cannot be deleted");
         }
         int affected = iamGateway.softDeleteRole(id);
         if (affected <= 0) {
-            throw new IllegalArgumentException("Role not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
     }
 
@@ -182,10 +182,10 @@ public class IamQueryApplicationService {
      */
     public void assignRoleToUser(Long userId, Long roleId) {
         if (iamGateway.findUserById(userId) == null) {
-            throw new IllegalArgumentException("User not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
         if (iamGateway.findRoleById(roleId) == null) {
-            throw new IllegalArgumentException("Role not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         iamGateway.assignRoleToUser(userId, roleId);
     }
@@ -199,7 +199,7 @@ public class IamQueryApplicationService {
     public void removeRoleFromUser(Long userId, Long roleId) {
         int affected = iamGateway.removeRoleFromUser(userId, roleId);
         if (affected <= 0) {
-            throw new IllegalArgumentException("User role binding not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User role binding not found");
         }
     }
 
@@ -211,10 +211,10 @@ public class IamQueryApplicationService {
      */
     public void assignPermissionToRole(Long roleId, Long permissionId) {
         if (iamGateway.findRoleById(roleId) == null) {
-            throw new IllegalArgumentException("Role not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         if (iamGateway.findPermissionById(permissionId) == null) {
-            throw new IllegalArgumentException("Permission not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Permission not found");
         }
         iamGateway.assignPermissionToRole(roleId, permissionId);
     }
@@ -228,7 +228,7 @@ public class IamQueryApplicationService {
     public void removePermissionFromRole(Long roleId, Long permissionId) {
         int affected = iamGateway.removePermissionFromRole(roleId, permissionId);
         if (affected <= 0) {
-            throw new IllegalArgumentException("Role permission binding not found");
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Role permission binding not found");
         }
     }
 
@@ -251,4 +251,5 @@ public class IamQueryApplicationService {
         return iamGateway.findVisibleMenusByUserId(userId);
     }
 }
+
 
