@@ -26,12 +26,12 @@ public class BusinessLogAspect {
     public Object aroundBusiness(ProceedingJoinPoint joinPoint) throws Throwable {
         String signature = joinPoint.getSignature().toShortString();
         long start = System.currentTimeMillis();
-        log.info("[ENTER] method={}", signature);
+//        log.info("[ENTER] method={}", signature);
         try {
             Object result = joinPoint.proceed();
             long cost = System.currentTimeMillis() - start;
             String resultType = result == null ? "null" : result.getClass().getSimpleName();
-            log.info("[EXIT] method={} costMs={} resultType={}", signature, cost, resultType);
+//            log.info("[EXIT] method={} costMs={} resultType={}", signature, cost, resultType);
             return result;
         } catch (Exception ex) {
             long cost = System.currentTimeMillis() - start;

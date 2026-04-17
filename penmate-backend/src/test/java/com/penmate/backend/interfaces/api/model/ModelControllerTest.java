@@ -114,8 +114,8 @@ class ModelControllerTest {
                                 "apiKey", ""
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.data.status").value(400)) 
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -147,7 +147,7 @@ class ModelControllerTest {
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test

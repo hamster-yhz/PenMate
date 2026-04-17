@@ -8,11 +8,16 @@ export interface ApiEnvelope<T> {
   meta?: ApiMeta
 }
 
-export interface ApiErrorPayload {
+export interface ApiErrorData {
   status?: number
   errorCode?: string
   message?: string
   details?: unknown
+  path?: string
+}
+
+export interface ApiErrorPayload {
+  data?: ApiErrorData
   meta?: ApiMeta
 }
 

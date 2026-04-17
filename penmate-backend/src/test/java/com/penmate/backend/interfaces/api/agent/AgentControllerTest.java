@@ -99,8 +99,8 @@ class AgentControllerTest {
                                 "contentMd", ""
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -136,8 +136,8 @@ class AgentControllerTest {
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of("applyNote", "accept"))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test

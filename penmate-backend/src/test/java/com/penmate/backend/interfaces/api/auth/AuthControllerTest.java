@@ -77,8 +77,8 @@ class AuthControllerTest {
                                 "password", "StrongPass!23"
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -93,9 +93,9 @@ class AuthControllerTest {
                         .header("Authorization", "invalid")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("Authorization header missing Bearer token"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("Authorization header missing Bearer token"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -133,9 +133,9 @@ class AuthControllerTest {
                                 "password", "Wrong!23"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("Bad credential"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("Bad credential"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -174,9 +174,9 @@ class AuthControllerTest {
                                 "refreshToken", "bad_rtk"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("Refresh token invalid"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("Refresh token invalid"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -205,8 +205,8 @@ class AuthControllerTest {
                         .header("Authorization", "invalid")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -225,9 +225,9 @@ class AuthControllerTest {
                                 "password", "StrongPass!23"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("User disabled"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("User disabled"));
     }
 
     @Test
@@ -258,9 +258,9 @@ class AuthControllerTest {
                                 "refreshToken", "expired_rtk"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("Refresh token expired"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("Refresh token expired"));
     }
 }
 

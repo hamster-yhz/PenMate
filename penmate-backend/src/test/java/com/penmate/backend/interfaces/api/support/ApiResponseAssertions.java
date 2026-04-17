@@ -20,9 +20,9 @@ public final class ApiResponseAssertions {
                                                     String errorCode,
                                                     String traceId) throws Exception {
         return actions
-                .andExpect(jsonPath("$.status").value(status))
-                .andExpect(jsonPath("$.errorCode").value(errorCode))
-                .andExpect(jsonPath("$.meta.traceId").value(traceId))
-                .andExpect(jsonPath("$.meta.timestamp").exists());
+                 .andExpect(jsonPath("$.data.status").value(status))
+                 .andExpect(jsonPath("$.data.errorCode").value(errorCode))
+                 .andExpect(jsonPath("$.meta.traceId").value(traceId))
+                 .andExpect(jsonPath("$.meta.timestamp").exists());
     }
 }

@@ -78,8 +78,8 @@ class RbacQueryControllerTest {
                                 "status", 1
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -101,8 +101,8 @@ class RbacQueryControllerTest {
                                 "authMethod", "local"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("Email already exists"))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("Email already exists"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -131,8 +131,8 @@ class RbacQueryControllerTest {
                         .param("roleId", "9999")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -202,8 +202,8 @@ class RbacQueryControllerTest {
                                 "isSystem", false
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test
@@ -221,8 +221,8 @@ class RbacQueryControllerTest {
                                 "description", "desc"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test
@@ -321,8 +321,8 @@ class RbacQueryControllerTest {
                                 "status", 1
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 }
 

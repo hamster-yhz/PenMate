@@ -76,6 +76,7 @@
           <div class="tab-content" v-if="activeLeftTab === 'outline'">
             <div class="tree-actions">
               <button class="tree-btn" @click="addVolume">+ 新卷</button>
+              <button class="tree-btn" @click="addMemberQuick">+ 成员</button>
             </div>
             <div class="tree-root">
               <div v-for="(vol, vIdx) in outlineData" :key="vol.key" class="tree-node">
@@ -132,6 +133,22 @@
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div class="member-panel">
+              <div class="member-title">项目成员</div>
+              <div v-if="projectMembers.length" class="member-list">
+                <div class="member-item" v-for="member in projectMembers" :key="String(member.userId || member.id)">
+                  <span>
+                    用户#{{ String(member.userId || '-') }} · 角色 {{ String(member.memberRole || '-') }}
+                  </span>
+                  <div class="member-actions">
+                    <button class="tree-act-btn" @click="updateMemberRole(member)">改角色</button>
+                    <button class="tree-act-btn danger" @click="removeMemberById(member)">移除</button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-hint">暂无成员，点击“+ 成员”添加。</div>
             </div>
           </div>
 
@@ -528,6 +545,7 @@ const cardRelations = ref<Array<Record<string, any>>>([])
 const relationFromId = ref('')
 const relationToId = ref('')
 const relationType = ref('')
+const projectMembers = ref<Array<Record<string, any>>>([])
 
 const resolveOperatorId = () => {
   if (typeof session.userId === 'number' && session.userId > 0) return session.userId
@@ -596,6 +614,80 @@ const loadCardsAndRelations = async (projectId: number) => {
   } catch {
     projectCards.value = []
     cardRelations.value = []
+  }
+}
+
+const loadProjectMembers = async (projectId: number) => {
+  if (!projectId) return
+  try {
+    const list = (await novelApi.listMembers(projectId)) as Array<Record<string, unknown>>
+    projectMembers.value = Array.isArray(list) ? (list as Array<Record<string, any>>) : []
+  } catch {
+    projectMembers.value = []
+  }
+}
+
+const addMemberQuick = async () => {
+  const { projectId, operatorId } = getContext()
+  if (!projectId || !operatorId) {
+    message.warning('缺少 projectId/operatorId，无法添加成员')
+    return
+  }
+  const userIdText = window.prompt('请输入成员 userId（数字）', '')
+  const userId = Number(userIdText || 0)
+  if (!userId) {
+    message.warning('userId 非法')
+    return
+  }
+  const memberRole = String(window.prompt('请输入成员角色（如 EDITOR/OWNER/VIEWER）', 'EDITOR') || '').trim()
+  if (!memberRole) {
+    message.warning('成员角色不能为空')
+    return
+  }
+  try {
+    await novelApi.addMember(projectId, operatorId, { userId, memberRole })
+    await loadProjectMembers(projectId)
+    message.success('成员已添加')
+  } catch (error: any) {
+    message.warning(error?.message || '添加成员失败')
+  }
+}
+
+const updateMemberRole = async (member: Record<string, any>) => {
+  const { projectId, operatorId } = getContext()
+  const userId = Number(member.userId || member.id || 0)
+  if (!projectId || !operatorId || !userId) {
+    message.warning('成员信息不完整，无法更新')
+    return
+  }
+  const nextRole = String(window.prompt('请输入新的成员角色', String(member.memberRole || 'EDITOR')) || '').trim()
+  if (!nextRole) {
+    message.warning('成员角色不能为空')
+    return
+  }
+  try {
+    await novelApi.updateMember(projectId, userId, operatorId, { memberRole: nextRole })
+    await loadProjectMembers(projectId)
+    message.success('成员角色已更新')
+  } catch (error: any) {
+    message.warning(error?.message || '更新成员失败')
+  }
+}
+
+const removeMemberById = async (member: Record<string, any>) => {
+  const { projectId, operatorId } = getContext()
+  const userId = Number(member.userId || member.id || 0)
+  if (!projectId || !operatorId || !userId) {
+    message.warning('成员信息不完整，无法移除')
+    return
+  }
+  if (!window.confirm(`确认移除成员 userId=${userId} 吗？`)) return
+  try {
+    await novelApi.removeMember(projectId, userId, operatorId)
+    await loadProjectMembers(projectId)
+    message.success('成员已移除')
+  } catch (error: any) {
+    message.warning(error?.message || '移除成员失败')
   }
 }
 
@@ -940,7 +1032,11 @@ const uploadAndCommitContent = async (projectId: number, chapterId: number, cont
 
 const updateTitle = (e: Event) => {
   const target = e.target as HTMLElement
-  novelTitle.value = target.textContent || '未命名小说'
+  const nextTitle = String(target.textContent || '').trim() || '未命名小说'
+  novelTitle.value = nextTitle
+  const projectId = getCurrentProjectId()
+  if (!projectId) return
+  void novelApi.updateProject(projectId, { title: nextTitle }).catch(() => undefined)
 }
 
 // --- Editor Input / Cursor ---
@@ -1463,6 +1559,7 @@ const loadWorkbenchData = async () => {
 
     outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>, chapterByOutlineNodeId)
     await loadCardsAndRelations(projectId)
+    await loadProjectMembers(projectId)
     const first = outlineData.value[0]?.children?.[0]
     if (first) {
       activeChapter.value = String(first.chapterId || first.key)
@@ -1656,6 +1753,37 @@ watch(
 .tab-content { flex: 1; overflow-y: auto; padding: 8px; }
 
 .tree-actions { padding: 4px 0 8px; }
+
+.member-panel {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(11,17,32,0.35);
+}
+
+.member-title {
+  font-size: 0.78rem;
+  color: var(--amber-gold);
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+}
+
+.member-list { display: flex; flex-direction: column; gap: 6px; }
+
+.member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.member-actions { display: flex; gap: 4px; }
 
 .tree-btn {
   padding: 4px 12px; font-size: 0.75rem;

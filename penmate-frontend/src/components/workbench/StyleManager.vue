@@ -14,14 +14,21 @@
         <!-- 当前文风显示 -->
         <div class="sm-section">
           <div class="sm-label">当前文风</div>
-          <select v-if="styleOptions.length" v-model="selectedStyleId" class="style-select" @change="handleStyleSelect">
-            <option v-for="item in styleOptions" :key="String(item.id)" :value="String(item.id)">
-              {{ String(item.name || `文风#${String(item.id)}`) }}
-            </option>
-          </select>
+          <div class="style-toolbar" v-if="styleOptions.length">
+            <select v-model="selectedStyleId" class="style-select" @change="handleStyleSelect">
+              <option v-for="item in styleOptions" :key="String(item.id)" :value="String(item.id)">
+                {{ String(item.name || `文风#${String(item.id)}`) }}
+              </option>
+            </select>
+            <button class="style-action" @click="setAsDefault" :disabled="saving">设为默认</button>
+            <button class="style-action danger" @click="deleteSelectedStyle" :disabled="saving">删除</button>
+          </div>
           <div class="style-badge">
             <span class="badge-glow"></span>
             {{ currentStyle }}
+          </div>
+          <div class="style-status" v-if="activeDefaultStyleId">
+            默认文风 ID：{{ activeDefaultStyleId }}
           </div>
         </div>
 
@@ -175,7 +182,66 @@ const loadStyles = async () => {
 
 const handleStyleSelect = () => {
   const target = styleOptions.value.find((item) => String(item.id || '') === selectedStyleId.value)
-  applyStyleToForm(target)
+  if (!target) return
+  const projectId = getProjectId()
+  const styleId = Number(target.id || 0)
+  if (!projectId || !styleId) {
+    applyStyleToForm(target)
+    return
+  }
+  styleApi
+    .getStyle(projectId, styleId)
+    .then((detail) => applyStyleToForm((detail || {}) as StyleItem))
+    .catch(() => applyStyleToForm(target))
+}
+
+const setAsDefault = async () => {
+  const projectId = getProjectId()
+  const operatorId = getOperatorId()
+  const toStyleId = Number(selectedStyleId.value || 0)
+  if (!projectId || !operatorId || !toStyleId) {
+    message.warning('缺少 projectId/operatorId/styleId，无法设为默认')
+    return
+  }
+  saving.value = true
+  try {
+    await styleApi.switchStyle(projectId, operatorId, {
+      toStyleId,
+      warningConfirmed: true,
+      reason: '手动设为默认文风'
+    })
+    await loadStyles()
+    message.success('默认文风已切换')
+  } catch (error: any) {
+    message.warning(error?.message || '默认文风切换失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+const deleteSelectedStyle = async () => {
+  const projectId = getProjectId()
+  const operatorId = getOperatorId()
+  const styleId = Number(selectedStyleId.value || 0)
+  if (!projectId || !operatorId || !styleId) {
+    message.warning('缺少 projectId/operatorId/styleId，无法删除文风')
+    return
+  }
+  if (String(styleId) === String(activeDefaultStyleId.value)) {
+    message.warning('默认文风不可直接删除，请先切换默认文风')
+    return
+  }
+  if (!window.confirm(`确认删除文风 #${styleId} 吗？`)) return
+  saving.value = true
+  try {
+    await styleApi.deleteStyle(projectId, styleId, operatorId)
+    await loadStyles()
+    message.success('文风已删除')
+  } catch (error: any) {
+    message.warning(error?.message || '删除文风失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 const analyzeSample = () => {

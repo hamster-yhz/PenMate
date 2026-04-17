@@ -4,11 +4,7 @@ import java.time.Instant;
 
 public class ErrorResponse {
 
-    private int status;
-    private String errorCode;
-    private String message;
-    private Object details;
-    private String path;
+    private ErrorData data;
     private Meta meta;
 
     public static ErrorResponse of(int status,
@@ -18,33 +14,13 @@ public class ErrorResponse {
                                    String path,
                                    String traceId) {
         ErrorResponse response = new ErrorResponse();
-        response.status = status;
-        response.errorCode = errorCode;
-        response.message = message;
-        response.details = details;
-        response.path = path;
+        response.data = new ErrorData(status, errorCode, message, details, path);
         response.meta = new Meta(traceId, Instant.now().toString());
         return response;
     }
 
-    public int getStatus() {
-        return status;
-    }
-
-    public String getErrorCode() {
-        return errorCode;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public Object getDetails() {
-        return details;
-    }
-
-    public String getPath() {
-        return path;
+    public ErrorData getData() {
+        return data;
     }
 
     public Meta getMeta() {
@@ -68,5 +44,40 @@ public class ErrorResponse {
             return timestamp;
         }
     }
-}
 
+    public static class ErrorData {
+        private final int status;
+        private final String errorCode;
+        private final String message;
+        private final Object details;
+        private final String path;
+
+        public ErrorData(int status, String errorCode, String message, Object details, String path) {
+            this.status = status;
+            this.errorCode = errorCode;
+            this.message = message;
+            this.details = details;
+            this.path = path;
+        }
+
+        public int getStatus() {
+            return status;
+        }
+
+        public String getErrorCode() {
+            return errorCode;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public Object getDetails() {
+            return details;
+        }
+
+        public String getPath() {
+            return path;
+        }
+    }
+}

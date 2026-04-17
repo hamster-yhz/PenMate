@@ -72,8 +72,8 @@ class PluginControllerTest {
         mockMvc().perform(get("/api/v1/plugins/catalog/missing-plugin")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -112,8 +112,8 @@ class PluginControllerTest {
                                 "pluginCode", "knowledge-rag"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -130,8 +130,8 @@ class PluginControllerTest {
                                 "pluginCode", ""
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 

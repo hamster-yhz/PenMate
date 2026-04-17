@@ -20,11 +20,12 @@ const createTraceId = () => {
 }
 
 const toAppError = (payload: ApiErrorPayload, fallbackStatus?: number): AppError => {
-  const error = new Error(payload.message || '请求失败') as AppError
-  error.status = payload.status || fallbackStatus
-  error.errorCode = payload.errorCode
+  const body = payload?.data || {}
+  const error = new Error(body.message || '请求失败') as AppError
+  error.status = body.status || fallbackStatus
+  error.errorCode = body.errorCode
   error.traceId = payload.meta?.traceId
-  error.details = payload.details
+  error.details = body.details
   return error
 }
 

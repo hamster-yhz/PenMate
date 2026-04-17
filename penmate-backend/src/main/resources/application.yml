@@ -7,7 +7,7 @@ spring:
   application:
     name: penmate-backend
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:penmate}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=${DB_USE_SSL:false}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:penmate}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=true
     username: ${DB_USER:root}
     password: ${DB_PASS:root}
     driver-class-name: com.mysql.cj.jdbc.Driver

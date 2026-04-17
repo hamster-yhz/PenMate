@@ -89,7 +89,7 @@ public class OpenApiConfig {
             operation.setDescription(description == null
                     ? "接口作用：用于" + module + "的" + action + "。\n"
                     + "调用方式：" + method.toUpperCase(Locale.ROOT) + " " + path + "。\n"
-                    + "返回约定：统一返回 code/message/traceId/data 结构。"
+                    + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。"
                     : description);
         }
     }
@@ -152,20 +152,18 @@ public class OpenApiConfig {
                 fillSchemaDescriptions(mediaType.getSchema(), path, method, new HashSet<>(), openApi);
             }
             if (mediaType.getExample() == null) {
-                Map<String, Object> example = new LinkedHashMap<>();
-                example.put("code", 0);
-                example.put("message", "ok");
-                example.put("traceId", "trace-example-001");
-                example.put("data", buildResponseDataExample(mediaType, openApi));
-                mediaType.setExample(example);
+                mediaType.setExample(buildResponseEnvelopeExample(mediaType, openApi));
             }
         });
     }
 
-    private Object buildResponseDataExample(MediaType mediaType, OpenAPI openApi) {
+    private Object buildResponseEnvelopeExample(MediaType mediaType, OpenAPI openApi) {
         Schema<?> schema = mediaType.getSchema();
         if (schema == null) {
-            return Map.of("field", "示例值");
+            return Map.of(
+                    "data", Map.of("field", "示例值"),
+                    "meta", Map.of("traceId", "trace-example-001", "timestamp", "2026-01-01T00:00:00Z")
+            );
         }
         return exampleBySchema(schema, openApi);
     }
@@ -568,53 +566,53 @@ public class OpenApiConfig {
         map.put("GET /api/v1/model/providers", "接口作用：返回系统内可接入的模型服务商配置（不含用户密钥）。\n"
                 + "典型场景：创建 API Key 前先拉取 provider 列表供前端下拉选择。\n"
                 + "返回说明：data 为 ModelProvider 数组。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         map.put("GET /api/v1/model/providers/{providerCode}/models", "接口作用：按服务商编码查询可用模型清单。\n"
                 + "典型场景：用户选择 provider 后，联动加载 model 列表。\n"
                 + "关键入参：providerCode（服务商唯一编码）。\n"
                 + "返回说明：data 为 ModelProviderModel 数组。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         map.put("POST /api/v1/model/keys", "接口作用：为指定用户新增模型 API Key。\n"
                 + "业务规则：可标记默认 key，供策略执行时优先使用。\n"
                 + "关键入参：userId（归属用户）、providerId（服务商）、apiKey（密钥明文）。\n"
                 + "返回说明：data 为 created。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         map.put("POST /api/v1/novels/{projectId}/model-policies", "接口作用：为项目新增模型调用策略。\n"
                 + "业务规则：策略按 scene 绑定模型、密钥与采样参数；可设置默认策略。\n"
                 + "关键入参：providerModelId、userKeyId、temperature、topP、maxTokens。\n"
                 + "返回说明：data 为 created。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         map.put("POST /api/v1/novels/{projectId}/model-policies/{policyId}/set-default", "接口作用：将指定策略设为当前项目默认策略。\n"
                 + "业务规则：同一项目仅允许一个默认策略。\n"
                 + "关键入参：projectId、policyId、operatorId。\n"
                 + "返回说明：data 为 updated。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         // rbac（按正式项目写法给出差异化说明）
         map.put("GET /api/v1/users", "接口作用：分页/列表查询 IAM 用户（当前实现为全量列表）。\n"
                 + "返回内容：脱敏后的用户信息，不返回密码等敏感字段。\n"
                 + "适用场景：用户管理页初始化列表。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("POST /api/v1/users", "接口作用：创建 IAM 用户账号。\n"
                 + "关键字段：email（唯一账号）、displayName（展示名）、status（启用状态）、authMethod（认证方式）。\n"
                 + "业务规则：创建后即可参与角色绑定。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("POST /api/v1/users/{id}/roles", "接口作用：为指定用户绑定角色。\n"
                 + "关键字段：id（用户 ID）、roleId（角色 ID）。\n"
                 + "业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("POST /api/v1/roles/{id}/permissions", "接口作用：为指定角色绑定权限。\n"
                 + "关键字段：id（角色 ID）、permissionId（权限 ID）。\n"
                 + "业务规则：绑定后所有拥有该角色的用户获得对应权限。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("GET /api/v1/profile/menus", "接口作用：按用户维度计算最终可见菜单。\n"
                 + "关键字段：userId（目标用户 ID）。\n"
                 + "业务规则：菜单由用户绑定角色后聚合出的权限结果决定。\n"
-                + "返回约定：统一返回 code/message/traceId/data 结构。");
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         return Collections.unmodifiableMap(map);
     }

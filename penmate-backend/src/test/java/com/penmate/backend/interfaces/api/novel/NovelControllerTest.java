@@ -84,8 +84,8 @@ class NovelControllerTest {
                                 "title", ""
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -104,8 +104,8 @@ class NovelControllerTest {
                                 "memberRole", "editor"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test
@@ -119,8 +119,8 @@ class NovelControllerTest {
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test
@@ -154,7 +154,7 @@ class NovelControllerTest {
                                 "etag", "bad-etag"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test
@@ -173,7 +173,7 @@ class NovelControllerTest {
                                 "sortOrder", 1
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422));
+                .andExpect(jsonPath("$.data.status").value(422));
     }
 
     @Test
@@ -192,7 +192,7 @@ class NovelControllerTest {
                                 "name", "设定A"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test
@@ -212,7 +212,7 @@ class NovelControllerTest {
                                 "relationType", "ally"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422));
+                .andExpect(jsonPath("$.data.status").value(422));
     }
 
     @Test
@@ -349,7 +349,7 @@ class NovelControllerTest {
                                 "description", "卷描述"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422));
+                .andExpect(jsonPath("$.data.status").value(422));
     }
 
     @Test
@@ -485,7 +485,7 @@ class NovelControllerTest {
                                 "createdBy", 1001
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422));
+                .andExpect(jsonPath("$.data.status").value(422));
     }
 }
 

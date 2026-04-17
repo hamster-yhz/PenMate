@@ -105,8 +105,8 @@ class StyleControllerTest {
                                 "reason", "测试"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -121,8 +121,8 @@ class StyleControllerTest {
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of("sampleText", ""))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -200,8 +200,8 @@ class StyleControllerTest {
                                 "reason", "测试"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 
     @Test

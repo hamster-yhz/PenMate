@@ -26,7 +26,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询用户详情",
-        "description": "接口作用：用于RBAC 权限的查询用户详情。\n调用方式：GET /api/v1/users/{id}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的查询用户详情。\n调用方式：GET /api/v1/users/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "user",
         "parameters": [
           {
@@ -60,15 +60,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -81,7 +76,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 更新用户",
-        "description": "接口作用：用于RBAC 权限的更新用户资料。\n调用方式：PUT /api/v1/users/{id}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的更新用户资料。\n调用方式：PUT /api/v1/users/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateUser",
         "parameters": [
           {
@@ -129,15 +124,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -150,7 +140,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 删除用户",
-        "description": "接口作用：用于RBAC 权限的删除用户。\n调用方式：DELETE /api/v1/users/{id}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的删除用户。\n调用方式：DELETE /api/v1/users/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteUser",
         "parameters": [
           {
@@ -184,15 +174,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -207,7 +192,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 更新角色",
-        "description": "接口作用：用于RBAC 权限的更新角色。\n调用方式：PUT /api/v1/roles/{id}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的更新角色。\n调用方式：PUT /api/v1/roles/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateRole",
         "parameters": [
           {
@@ -255,21 +240,16 @@
                   "$ref": "#/components/schemas/ApiResponseIamRole"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "name": "示例值",
-                      "code": "示例值",
-                      "description": "示例值",
-                      "isSystem": true
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "name": "示例值",
+                    "code": "示例值",
+                    "description": "示例值",
+                    "isSystem": true
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -282,7 +262,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 删除角色",
-        "description": "接口作用：用于RBAC 权限的删除角色。\n调用方式：DELETE /api/v1/roles/{id}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的删除角色。\n调用方式：DELETE /api/v1/roles/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteRole",
         "parameters": [
           {
@@ -316,15 +296,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -339,7 +314,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询小说项目",
-        "description": "接口作用：用于小说项目的查询小说项目。\n调用方式：GET /api/v1/novels/{projectId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询小说项目。\n调用方式：GET /api/v1/novels/{projectId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getProject",
         "parameters": [
           {
@@ -373,24 +348,19 @@
                   "$ref": "#/components/schemas/ApiResponseNovelProject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "ownerUserId": 1,
-                      "title": "示例值",
-                      "summary": "示例值",
-                      "status": 1,
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "ownerUserId": 1,
+                    "title": "示例值",
+                    "summary": "示例值",
+                    "status": 1,
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -403,7 +373,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 更新小说项目",
-        "description": "接口作用：用于小说项目的更新小说项目。\n调用方式：PUT /api/v1/novels/{projectId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新小说项目。\n调用方式：PUT /api/v1/novels/{projectId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateProject",
         "parameters": [
           {
@@ -452,24 +422,19 @@
                   "$ref": "#/components/schemas/ApiResponseNovelProject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "ownerUserId": 1,
-                      "title": "示例值",
-                      "summary": "示例值",
-                      "status": 1,
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "ownerUserId": 1,
+                    "title": "示例值",
+                    "summary": "示例值",
+                    "status": 1,
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -482,7 +447,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除小说项目",
-        "description": "接口作用：用于小说项目的删除小说项目。\n调用方式：DELETE /api/v1/novels/{projectId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除小说项目。\n调用方式：DELETE /api/v1/novels/{projectId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteProject",
         "parameters": [
           {
@@ -527,15 +492,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -550,7 +510,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 更新分卷",
-        "description": "接口作用：用于小说项目的更新分卷。\n调用方式：PUT /api/v1/novels/{projectId}/volumes/{volumeId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新分卷。\n调用方式：PUT /api/v1/novels/{projectId}/volumes/{volumeId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateVolume",
         "parameters": [
           {
@@ -621,24 +581,19 @@
                   "$ref": "#/components/schemas/ApiResponseNovelVolume"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "title": "示例值",
-                      "sortOrder": 1,
-                      "description": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "title": "示例值",
+                    "sortOrder": 1,
+                    "description": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -651,7 +606,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除分卷",
-        "description": "接口作用：用于小说项目的删除分卷。\n调用方式：DELETE /api/v1/novels/{projectId}/volumes/{volumeId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除分卷。\n调用方式：DELETE /api/v1/novels/{projectId}/volumes/{volumeId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteVolume",
         "parameters": [
           {
@@ -707,15 +662,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -730,7 +680,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 查询风格",
-        "description": "接口作用：用于风格管理的查询风格。\n调用方式：GET /api/v1/novels/{projectId}/styles/{styleId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的查询风格。\n调用方式：GET /api/v1/novels/{projectId}/styles/{styleId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getStyle",
         "parameters": [
           {
@@ -775,28 +725,23 @@
                   "$ref": "#/components/schemas/ApiResponseStyleProfile"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "name": "示例值",
-                      "isDefault": true,
-                      "pace": "示例值",
-                      "tone": "示例值",
-                      "narrativeFocus": "示例值",
-                      "promptTemplate": "示例值",
-                      "sampleText": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "name": "示例值",
+                    "isDefault": true,
+                    "pace": "示例值",
+                    "tone": "示例值",
+                    "narrativeFocus": "示例值",
+                    "promptTemplate": "示例值",
+                    "sampleText": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -809,7 +754,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 更新风格",
-        "description": "接口作用：用于风格管理的更新风格。\n调用方式：PUT /api/v1/novels/{projectId}/styles/{styleId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的更新风格。\n调用方式：PUT /api/v1/novels/{projectId}/styles/{styleId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateStyle",
         "parameters": [
           {
@@ -883,28 +828,23 @@
                   "$ref": "#/components/schemas/ApiResponseStyleProfile"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "name": "示例值",
-                      "isDefault": true,
-                      "pace": "示例值",
-                      "tone": "示例值",
-                      "narrativeFocus": "示例值",
-                      "promptTemplate": "示例值",
-                      "sampleText": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "name": "示例值",
+                    "isDefault": true,
+                    "pace": "示例值",
+                    "tone": "示例值",
+                    "narrativeFocus": "示例值",
+                    "promptTemplate": "示例值",
+                    "sampleText": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -917,7 +857,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 删除风格",
-        "description": "接口作用：用于风格管理的删除风格。\n调用方式：DELETE /api/v1/novels/{projectId}/styles/{styleId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的删除风格。\n调用方式：DELETE /api/v1/novels/{projectId}/styles/{styleId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteStyle",
         "parameters": [
           {
@@ -973,15 +913,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -996,7 +931,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 更新大纲节点",
-        "description": "接口作用：用于小说项目的更新大纲节点。\n调用方式：PUT /api/v1/novels/{projectId}/outlines/nodes/{nodeId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新大纲节点。\n调用方式：PUT /api/v1/novels/{projectId}/outlines/nodes/{nodeId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateOutlineNode",
         "parameters": [
           {
@@ -1069,23 +1004,18 @@
                   "$ref": "#/components/schemas/ApiResponseNovelOutlineNode"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "parentId": 1,
-                      "title": "示例值",
-                      "nodeType": "示例值",
-                      "sortOrder": 1,
-                      "content": "示例值"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "parentId": 1,
+                    "title": "示例值",
+                    "nodeType": "示例值",
+                    "sortOrder": 1,
+                    "content": "示例值"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1098,7 +1028,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除大纲节点",
-        "description": "接口作用：用于小说项目的删除大纲节点。\n调用方式：DELETE /api/v1/novels/{projectId}/outlines/nodes/{nodeId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除大纲节点。\n调用方式：DELETE /api/v1/novels/{projectId}/outlines/nodes/{nodeId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteOutlineNode",
         "parameters": [
           {
@@ -1154,15 +1084,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1177,7 +1102,7 @@
           "model-controller"
         ],
         "summary": "模型策略 - 更新项目策略",
-        "description": "接口作用：用于小说项目的更新模型策略。\n调用方式：PUT /api/v1/novels/{projectId}/model-policies/{policyId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新模型策略。\n调用方式：PUT /api/v1/novels/{projectId}/model-policies/{policyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updatePolicy",
         "parameters": [
           {
@@ -1254,15 +1179,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1275,7 +1195,7 @@
           "model-controller"
         ],
         "summary": "模型策略 - 删除项目策略",
-        "description": "接口作用：用于小说项目的删除模型策略。\n调用方式：DELETE /api/v1/novels/{projectId}/model-policies/{policyId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除模型策略。\n调用方式：DELETE /api/v1/novels/{projectId}/model-policies/{policyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deletePolicy",
         "parameters": [
           {
@@ -1331,15 +1251,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1354,7 +1269,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询章节",
-        "description": "接口作用：用于小说项目的查询章节。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询章节。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getChapter",
         "parameters": [
           {
@@ -1399,34 +1314,29 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "volumeId": 1,
-                      "outlineNodeId": 1,
-                      "title": "示例值",
-                      "chapterNo": 1,
-                      "status": 1,
-                      "wordCount": 1,
-                      "excerpt": "示例值",
-                      "contentObjectKey": "示例值",
-                      "contentEtag": "示例值",
-                      "contentSize": 1,
-                      "contentChecksum": "示例值",
-                      "storageProvider": "示例值",
-                      "lastGeneratedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "volumeId": 1,
+                    "outlineNodeId": 1,
+                    "title": "示例值",
+                    "chapterNo": 1,
+                    "status": 1,
+                    "wordCount": 1,
+                    "excerpt": "示例值",
+                    "contentObjectKey": "示例值",
+                    "contentEtag": "示例值",
+                    "contentSize": 1,
+                    "contentChecksum": "示例值",
+                    "storageProvider": "示例值",
+                    "lastGeneratedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1439,7 +1349,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 更新章节",
-        "description": "接口作用：用于小说项目的更新章节。\n调用方式：PUT /api/v1/novels/{projectId}/chapters/{chapterId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新章节。\n调用方式：PUT /api/v1/novels/{projectId}/chapters/{chapterId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateChapter",
         "parameters": [
           {
@@ -1519,34 +1429,29 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "volumeId": 1,
-                      "outlineNodeId": 1,
-                      "title": "示例值",
-                      "chapterNo": 1,
-                      "status": 1,
-                      "wordCount": 1,
-                      "excerpt": "示例值",
-                      "contentObjectKey": "示例值",
-                      "contentEtag": "示例值",
-                      "contentSize": 1,
-                      "contentChecksum": "示例值",
-                      "storageProvider": "示例值",
-                      "lastGeneratedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "volumeId": 1,
+                    "outlineNodeId": 1,
+                    "title": "示例值",
+                    "chapterNo": 1,
+                    "status": 1,
+                    "wordCount": 1,
+                    "excerpt": "示例值",
+                    "contentObjectKey": "示例值",
+                    "contentEtag": "示例值",
+                    "contentSize": 1,
+                    "contentChecksum": "示例值",
+                    "storageProvider": "示例值",
+                    "lastGeneratedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1559,7 +1464,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除章节",
-        "description": "接口作用：用于小说项目的删除章节。\n调用方式：DELETE /api/v1/novels/{projectId}/chapters/{chapterId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除章节。\n调用方式：DELETE /api/v1/novels/{projectId}/chapters/{chapterId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteChapter",
         "parameters": [
           {
@@ -1615,15 +1520,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1638,7 +1538,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询资料卡",
-        "description": "接口作用：用于小说项目的查询资料卡。\n调用方式：GET /api/v1/novels/{projectId}/cards/{cardId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询资料卡。\n调用方式：GET /api/v1/novels/{projectId}/cards/{cardId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getCard",
         "parameters": [
           {
@@ -1683,22 +1583,17 @@
                   "$ref": "#/components/schemas/ApiResponseNovelCard"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "cardType": "示例值",
-                      "name": "示例值",
-                      "summary": "示例值",
-                      "detailJson": "示例值"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "cardType": "示例值",
+                    "name": "示例值",
+                    "summary": "示例值",
+                    "detailJson": "示例值"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1711,7 +1606,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 更新资料卡",
-        "description": "接口作用：用于小说项目的更新资料卡。\n调用方式：PUT /api/v1/novels/{projectId}/cards/{cardId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新资料卡。\n调用方式：PUT /api/v1/novels/{projectId}/cards/{cardId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateCard",
         "parameters": [
           {
@@ -1783,22 +1678,17 @@
                   "$ref": "#/components/schemas/ApiResponseNovelCard"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "cardType": "示例值",
-                      "name": "示例值",
-                      "summary": "示例值",
-                      "detailJson": "示例值"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "cardType": "示例值",
+                    "name": "示例值",
+                    "summary": "示例值",
+                    "detailJson": "示例值"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1811,7 +1701,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除资料卡",
-        "description": "接口作用：用于小说项目的删除资料卡。\n调用方式：DELETE /api/v1/novels/{projectId}/cards/{cardId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除资料卡。\n调用方式：DELETE /api/v1/novels/{projectId}/cards/{cardId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteCard",
         "parameters": [
           {
@@ -1867,15 +1757,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1890,7 +1775,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询用户列表",
-        "description": "接口作用：分页/列表查询 IAM 用户（当前实现为全量列表）。\n返回内容：脱敏后的用户信息，不返回密码等敏感字段。\n适用场景：用户管理页初始化列表。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：分页/列表查询 IAM 用户（当前实现为全量列表）。\n返回内容：脱敏后的用户信息，不返回密码等敏感字段。\n适用场景：用户管理页初始化列表。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "users",
         "parameters": [
           {
@@ -1913,17 +1798,12 @@
                   "$ref": "#/components/schemas/ApiResponseListMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      "示例值"
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": [
+                    "示例值"
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1936,7 +1816,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 创建用户",
-        "description": "接口作用：创建 IAM 用户账号。\n关键字段：email（唯一账号）、displayName（展示名）、status（启用状态）、authMethod（认证方式）。\n业务规则：创建后即可参与角色绑定。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：创建 IAM 用户账号。\n关键字段：email（唯一账号）、displayName（展示名）、status（启用状态）、authMethod（认证方式）。\n业务规则：创建后即可参与角色绑定。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createUser",
         "parameters": [
           {
@@ -1975,15 +1855,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -1998,7 +1873,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 为用户绑定角色",
-        "description": "接口作用：为指定用户绑定角色。\n关键字段：id（用户 ID）、roleId（角色 ID）。\n业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：为指定用户绑定角色。\n关键字段：id（用户 ID）、roleId（角色 ID）。\n业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "assignRole",
         "parameters": [
           {
@@ -2043,15 +1918,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2066,7 +1936,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询角色列表",
-        "description": "接口作用：用于RBAC 权限的查询角色列表。\n调用方式：GET /api/v1/roles。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的查询角色列表。\n调用方式：GET /api/v1/roles。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "roles",
         "parameters": [
           {
@@ -2089,23 +1959,18 @@
                   "$ref": "#/components/schemas/ApiResponseListIamRole"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "name": "示例值",
-                        "code": "示例值",
-                        "description": "示例值",
-                        "isSystem": true
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "name": "示例值",
+                      "code": "示例值",
+                      "description": "示例值",
+                      "isSystem": true
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2118,7 +1983,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 创建角色",
-        "description": "接口作用：用于RBAC 权限的创建角色。\n调用方式：POST /api/v1/roles。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的创建角色。\n调用方式：POST /api/v1/roles。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createRole",
         "parameters": [
           {
@@ -2157,21 +2022,16 @@
                   "$ref": "#/components/schemas/ApiResponseIamRole"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "name": "示例值",
-                      "code": "示例值",
-                      "description": "示例值",
-                      "isSystem": true
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "name": "示例值",
+                    "code": "示例值",
+                    "description": "示例值",
+                    "isSystem": true
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2186,7 +2046,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 为角色绑定权限",
-        "description": "接口作用：为指定角色绑定权限。\n关键字段：id（角色 ID）、permissionId（权限 ID）。\n业务规则：绑定后所有拥有该角色的用户获得对应权限。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：为指定角色绑定权限。\n关键字段：id（角色 ID）、permissionId（权限 ID）。\n业务规则：绑定后所有拥有该角色的用户获得对应权限。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "assignPermission",
         "parameters": [
           {
@@ -2231,15 +2091,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2254,7 +2109,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询小说项目",
-        "description": "接口作用：用于小说项目的查询小说项目。\n调用方式：GET /api/v1/novels。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询小说项目。\n调用方式：GET /api/v1/novels。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listProjects",
         "parameters": [
           {
@@ -2277,26 +2132,21 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelProject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "ownerUserId": 1,
-                        "title": "示例值",
-                        "summary": "示例值",
-                        "status": 1,
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "ownerUserId": 1,
+                      "title": "示例值",
+                      "summary": "示例值",
+                      "status": 1,
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2309,7 +2159,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建小说项目",
-        "description": "接口作用：用于小说项目的创建小说项目。\n调用方式：POST /api/v1/novels。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建小说项目。\n调用方式：POST /api/v1/novels。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createProject",
         "parameters": [
           {
@@ -2348,24 +2198,19 @@
                   "$ref": "#/components/schemas/ApiResponseNovelProject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "ownerUserId": 1,
-                      "title": "示例值",
-                      "summary": "示例值",
-                      "status": 1,
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "ownerUserId": 1,
+                    "title": "示例值",
+                    "summary": "示例值",
+                    "status": 1,
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2380,7 +2225,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询分卷",
-        "description": "接口作用：用于小说项目的查询分卷。\n调用方式：GET /api/v1/novels/{projectId}/volumes。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询分卷。\n调用方式：GET /api/v1/novels/{projectId}/volumes。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listVolumes",
         "parameters": [
           {
@@ -2414,26 +2259,21 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelVolume"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "title": "示例值",
-                        "sortOrder": 1,
-                        "description": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "title": "示例值",
+                      "sortOrder": 1,
+                      "description": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2446,7 +2286,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建分卷",
-        "description": "接口作用：用于小说项目的创建分卷。\n调用方式：POST /api/v1/novels/{projectId}/volumes。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建分卷。\n调用方式：POST /api/v1/novels/{projectId}/volumes。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createVolume",
         "parameters": [
           {
@@ -2506,24 +2346,19 @@
                   "$ref": "#/components/schemas/ApiResponseNovelVolume"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "title": "示例值",
-                      "sortOrder": 1,
-                      "description": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "title": "示例值",
+                    "sortOrder": 1,
+                    "description": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2538,7 +2373,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 查询风格",
-        "description": "接口作用：用于风格管理的查询风格。\n调用方式：GET /api/v1/novels/{projectId}/styles。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的查询风格。\n调用方式：GET /api/v1/novels/{projectId}/styles。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listStyles",
         "parameters": [
           {
@@ -2572,30 +2407,25 @@
                   "$ref": "#/components/schemas/ApiResponseListStyleProfile"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "name": "示例值",
-                        "isDefault": true,
-                        "pace": "示例值",
-                        "tone": "示例值",
-                        "narrativeFocus": "示例值",
-                        "promptTemplate": "示例值",
-                        "sampleText": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "name": "示例值",
+                      "isDefault": true,
+                      "pace": "示例值",
+                      "tone": "示例值",
+                      "narrativeFocus": "示例值",
+                      "promptTemplate": "示例值",
+                      "sampleText": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2608,7 +2438,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 创建风格",
-        "description": "接口作用：用于风格管理的创建风格。\n调用方式：POST /api/v1/novels/{projectId}/styles。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的创建风格。\n调用方式：POST /api/v1/novels/{projectId}/styles。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createStyle",
         "parameters": [
           {
@@ -2672,28 +2502,23 @@
                   "$ref": "#/components/schemas/ApiResponseStyleProfile"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "name": "示例值",
-                      "isDefault": true,
-                      "pace": "示例值",
-                      "tone": "示例值",
-                      "narrativeFocus": "示例值",
-                      "promptTemplate": "示例值",
-                      "sampleText": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "name": "示例值",
+                    "isDefault": true,
+                    "pace": "示例值",
+                    "tone": "示例值",
+                    "narrativeFocus": "示例值",
+                    "promptTemplate": "示例值",
+                    "sampleText": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2708,7 +2533,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 创建数据",
-        "description": "接口作用：用于风格管理的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/styles/switch。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/styles/switch。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "switchStyle",
         "parameters": [
           {
@@ -2768,28 +2593,23 @@
                   "$ref": "#/components/schemas/ApiResponseStyleProfile"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "name": "示例值",
-                      "isDefault": true,
-                      "pace": "示例值",
-                      "tone": "示例值",
-                      "narrativeFocus": "示例值",
-                      "promptTemplate": "示例值",
-                      "sampleText": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "name": "示例值",
+                    "isDefault": true,
+                    "pace": "示例值",
+                    "tone": "示例值",
+                    "narrativeFocus": "示例值",
+                    "promptTemplate": "示例值",
+                    "sampleText": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2804,7 +2624,7 @@
           "style-controller"
         ],
         "summary": "风格管理 - 创建数据",
-        "description": "接口作用：用于风格管理的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/styles/analyze-sample。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于风格管理的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/styles/analyze-sample。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "analyzeSample",
         "parameters": [
           {
@@ -2862,15 +2682,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2885,7 +2700,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 查询RAG 文档",
-        "description": "接口作用：用于知识库（RAG）的查询RAG 文档。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的查询RAG 文档。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listDocuments",
         "parameters": [
           {
@@ -2919,30 +2734,25 @@
                   "$ref": "#/components/schemas/ApiResponseListRagDocument"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "docType": "示例值",
-                        "title": "示例值",
-                        "sourceRef": "示例值",
-                        "originObjectKey": "示例值",
-                        "originEtag": "示例值",
-                        "mimeType": "示例值",
-                        "parseStatus": "示例值",
-                        "indexStatus": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "docType": "示例值",
+                      "title": "示例值",
+                      "sourceRef": "示例值",
+                      "originObjectKey": "示例值",
+                      "originEtag": "示例值",
+                      "mimeType": "示例值",
+                      "parseStatus": "示例值",
+                      "indexStatus": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -2955,7 +2765,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 创建RAG 文档",
-        "description": "接口作用：用于知识库（RAG）的创建RAG 文档。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的创建RAG 文档。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createDocument",
         "parameters": [
           {
@@ -3018,28 +2828,23 @@
                   "$ref": "#/components/schemas/ApiResponseRagDocument"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "docType": "示例值",
-                      "title": "示例值",
-                      "sourceRef": "示例值",
-                      "originObjectKey": "示例值",
-                      "originEtag": "示例值",
-                      "mimeType": "示例值",
-                      "parseStatus": "示例值",
-                      "indexStatus": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "docType": "示例值",
+                    "title": "示例值",
+                    "sourceRef": "示例值",
+                    "originObjectKey": "示例值",
+                    "originEtag": "示例值",
+                    "mimeType": "示例值",
+                    "parseStatus": "示例值",
+                    "indexStatus": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3054,7 +2859,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 创建数据",
-        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{docId}/parse。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{docId}/parse。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "parseDocument",
         "parameters": [
           {
@@ -3110,28 +2915,23 @@
                   "$ref": "#/components/schemas/ApiResponseRagDocument"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "docType": "示例值",
-                      "title": "示例值",
-                      "sourceRef": "示例值",
-                      "originObjectKey": "示例值",
-                      "originEtag": "示例值",
-                      "mimeType": "示例值",
-                      "parseStatus": "示例值",
-                      "indexStatus": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "docType": "示例值",
+                    "title": "示例值",
+                    "sourceRef": "示例值",
+                    "originObjectKey": "示例值",
+                    "originEtag": "示例值",
+                    "mimeType": "示例值",
+                    "parseStatus": "示例值",
+                    "indexStatus": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3146,7 +2946,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 创建数据",
-        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{docId}/embed。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{docId}/embed。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "embedDocument",
         "parameters": [
           {
@@ -3202,28 +3002,23 @@
                   "$ref": "#/components/schemas/ApiResponseRagDocument"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "docType": "示例值",
-                      "title": "示例值",
-                      "sourceRef": "示例值",
-                      "originObjectKey": "示例值",
-                      "originEtag": "示例值",
-                      "mimeType": "示例值",
-                      "parseStatus": "示例值",
-                      "indexStatus": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "docType": "示例值",
+                    "title": "示例值",
+                    "sourceRef": "示例值",
+                    "originObjectKey": "示例值",
+                    "originEtag": "示例值",
+                    "mimeType": "示例值",
+                    "parseStatus": "示例值",
+                    "indexStatus": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3238,7 +3033,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 创建数据",
-        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/upload-url。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/upload-url。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getUploadUrl",
         "parameters": [
           {
@@ -3272,15 +3067,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3295,7 +3085,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 创建数据",
-        "description": "接口作用：用于插件管理的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/plugins/install。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/plugins/install。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "install",
         "parameters": [
           {
@@ -3355,15 +3145,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3378,7 +3163,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建大纲节点",
-        "description": "接口作用：用于小说项目的创建大纲节点。\n调用方式：POST /api/v1/novels/{projectId}/outlines/nodes。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建大纲节点。\n调用方式：POST /api/v1/novels/{projectId}/outlines/nodes。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createOutlineNode",
         "parameters": [
           {
@@ -3440,23 +3225,18 @@
                   "$ref": "#/components/schemas/ApiResponseNovelOutlineNode"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "parentId": 1,
-                      "title": "示例值",
-                      "nodeType": "示例值",
-                      "sortOrder": 1,
-                      "content": "示例值"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "parentId": 1,
+                    "title": "示例值",
+                    "nodeType": "示例值",
+                    "sortOrder": 1,
+                    "content": "示例值"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3471,7 +3251,7 @@
           "model-controller"
         ],
         "summary": "模型策略 - 查询项目策略列表",
-        "description": "接口作用：用于小说项目的查询模型策略。\n调用方式：GET /api/v1/novels/{projectId}/model-policies。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询模型策略。\n调用方式：GET /api/v1/novels/{projectId}/model-policies。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listPolicies",
         "parameters": [
           {
@@ -3505,32 +3285,27 @@
                   "$ref": "#/components/schemas/ApiResponseListModelProjectPolicy"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "policyName": "示例值",
-                        "scene": "示例值",
-                        "providerModelId": 1,
-                        "userKeyId": 1,
-                        "temperature": 1,
-                        "topP": 1,
-                        "maxTokens": 1,
-                        "fallbackPolicyJson": "示例值",
-                        "isDefault": true,
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "policyName": "示例值",
+                      "scene": "示例值",
+                      "providerModelId": 1,
+                      "userKeyId": 1,
+                      "temperature": 1,
+                      "topP": 1,
+                      "maxTokens": 1,
+                      "fallbackPolicyJson": "示例值",
+                      "isDefault": true,
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3543,7 +3318,7 @@
           "model-controller"
         ],
         "summary": "模型策略 - 新增项目策略",
-        "description": "接口作用：为项目新增模型调用策略。\n业务规则：策略按 scene 绑定模型、密钥与采样参数；可设置默认策略。\n关键入参：providerModelId、userKeyId、temperature、topP、maxTokens。\n返回说明：data 为 created。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：为项目新增模型调用策略。\n业务规则：策略按 scene 绑定模型、密钥与采样参数；可设置默认策略。\n关键入参：providerModelId、userKeyId、temperature、topP、maxTokens。\n返回说明：data 为 created。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createPolicy",
         "parameters": [
           {
@@ -3609,15 +3384,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3632,7 +3402,7 @@
           "model-controller"
         ],
         "summary": "模型策略 - 设置默认策略",
-        "description": "接口作用：将指定策略设为当前项目默认策略。\n业务规则：同一项目仅允许一个默认策略。\n关键入参：projectId、policyId、operatorId。\n返回说明：data 为 updated。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：将指定策略设为当前项目默认策略。\n业务规则：同一项目仅允许一个默认策略。\n关键入参：projectId、policyId、operatorId。\n返回说明：data 为 updated。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "setDefaultPolicy",
         "parameters": [
           {
@@ -3688,15 +3458,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3711,7 +3476,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询成员",
-        "description": "接口作用：用于小说项目的查询成员。\n调用方式：GET /api/v1/novels/{projectId}/members。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询成员。\n调用方式：GET /api/v1/novels/{projectId}/members。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listMembers",
         "parameters": [
           {
@@ -3745,22 +3510,17 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelMember"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "projectId": 1,
-                        "userId": 1,
-                        "memberRole": "示例值",
-                        "joinedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "projectId": 1,
+                      "userId": 1,
+                      "memberRole": "示例值",
+                      "joinedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3773,7 +3533,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建成员",
-        "description": "接口作用：用于小说项目的创建成员。\n调用方式：POST /api/v1/novels/{projectId}/members。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建成员。\n调用方式：POST /api/v1/novels/{projectId}/members。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "addMember",
         "parameters": [
           {
@@ -3832,20 +3592,15 @@
                   "$ref": "#/components/schemas/ApiResponseNovelMember"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "projectId": 1,
-                      "userId": 1,
-                      "memberRole": "示例值",
-                      "joinedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "projectId": 1,
+                    "userId": 1,
+                    "memberRole": "示例值",
+                    "joinedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3860,7 +3615,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询章节",
-        "description": "接口作用：用于小说项目的查询章节。\n调用方式：GET /api/v1/novels/{projectId}/chapters。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询章节。\n调用方式：GET /api/v1/novels/{projectId}/chapters。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listChapters",
         "parameters": [
           {
@@ -3894,36 +3649,31 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelChapter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "volumeId": 1,
-                        "outlineNodeId": 1,
-                        "title": "示例值",
-                        "chapterNo": 1,
-                        "status": 1,
-                        "wordCount": 1,
-                        "excerpt": "示例值",
-                        "contentObjectKey": "示例值",
-                        "contentEtag": "示例值",
-                        "contentSize": 1,
-                        "contentChecksum": "示例值",
-                        "storageProvider": "示例值",
-                        "lastGeneratedAt": "2026-01-01T08:00:00Z",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "volumeId": 1,
+                      "outlineNodeId": 1,
+                      "title": "示例值",
+                      "chapterNo": 1,
+                      "status": 1,
+                      "wordCount": 1,
+                      "excerpt": "示例值",
+                      "contentObjectKey": "示例值",
+                      "contentEtag": "示例值",
+                      "contentSize": 1,
+                      "contentChecksum": "示例值",
+                      "storageProvider": "示例值",
+                      "lastGeneratedAt": "2026-01-01T08:00:00Z",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -3936,7 +3686,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建章节",
-        "description": "接口作用：用于小说项目的创建章节。\n调用方式：POST /api/v1/novels/{projectId}/chapters。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建章节。\n调用方式：POST /api/v1/novels/{projectId}/chapters。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createChapter",
         "parameters": [
           {
@@ -4005,34 +3755,29 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "volumeId": 1,
-                      "outlineNodeId": 1,
-                      "title": "示例值",
-                      "chapterNo": 1,
-                      "status": 1,
-                      "wordCount": 1,
-                      "excerpt": "示例值",
-                      "contentObjectKey": "示例值",
-                      "contentEtag": "示例值",
-                      "contentSize": 1,
-                      "contentChecksum": "示例值",
-                      "storageProvider": "示例值",
-                      "lastGeneratedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "volumeId": 1,
+                    "outlineNodeId": 1,
+                    "title": "示例值",
+                    "chapterNo": 1,
+                    "status": 1,
+                    "wordCount": 1,
+                    "excerpt": "示例值",
+                    "contentObjectKey": "示例值",
+                    "contentEtag": "示例值",
+                    "contentSize": 1,
+                    "contentChecksum": "示例值",
+                    "storageProvider": "示例值",
+                    "lastGeneratedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4047,7 +3792,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询章节版本记录",
-        "description": "接口作用：用于小说项目的查询章节版本记录。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/versions。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询章节版本记录。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/versions。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listChapterVersions",
         "parameters": [
           {
@@ -4092,29 +3837,24 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelChapterVersion"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "chapterId": 1,
-                        "versionNo": 1,
-                        "changeType": "示例值",
-                        "changeReason": "示例值",
-                        "snapshotObjectKey": "示例值",
-                        "snapshotEtag": "示例值",
-                        "snapshotSize": 1,
-                        "snapshotChecksum": "示例值",
-                        "createdBy": 1,
-                        "createdAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "chapterId": 1,
+                      "versionNo": 1,
+                      "changeType": "示例值",
+                      "changeReason": "示例值",
+                      "snapshotObjectKey": "示例值",
+                      "snapshotEtag": "示例值",
+                      "snapshotSize": 1,
+                      "snapshotChecksum": "示例值",
+                      "createdBy": 1,
+                      "createdAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4127,7 +3867,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建章节版本快照",
-        "description": "接口作用：用于小说项目的创建章节版本快照。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/versions。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建章节版本快照。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/versions。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createChapterVersion",
         "parameters": [
           {
@@ -4187,27 +3927,22 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapterVersion"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "chapterId": 1,
-                      "versionNo": 1,
-                      "changeType": "示例值",
-                      "changeReason": "示例值",
-                      "snapshotObjectKey": "示例值",
-                      "snapshotEtag": "示例值",
-                      "snapshotSize": 1,
-                      "snapshotChecksum": "示例值",
-                      "createdBy": 1,
-                      "createdAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "chapterId": 1,
+                    "versionNo": 1,
+                    "changeType": "示例值",
+                    "changeReason": "示例值",
+                    "snapshotObjectKey": "示例值",
+                    "snapshotEtag": "示例值",
+                    "snapshotSize": 1,
+                    "snapshotChecksum": "示例值",
+                    "createdBy": 1,
+                    "createdAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4222,7 +3957,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 恢复历史版本",
-        "description": "接口作用：用于小说项目的恢复历史版本。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/versions/{versionNo}/restore。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的恢复历史版本。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/versions/{versionNo}/restore。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "restoreChapterVersion",
         "parameters": [
           {
@@ -4289,34 +4024,29 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "volumeId": 1,
-                      "outlineNodeId": 1,
-                      "title": "示例值",
-                      "chapterNo": 1,
-                      "status": 1,
-                      "wordCount": 1,
-                      "excerpt": "示例值",
-                      "contentObjectKey": "示例值",
-                      "contentEtag": "示例值",
-                      "contentSize": 1,
-                      "contentChecksum": "示例值",
-                      "storageProvider": "示例值",
-                      "lastGeneratedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "volumeId": 1,
+                    "outlineNodeId": 1,
+                    "title": "示例值",
+                    "chapterNo": 1,
+                    "status": 1,
+                    "wordCount": 1,
+                    "excerpt": "示例值",
+                    "contentObjectKey": "示例值",
+                    "contentEtag": "示例值",
+                    "contentSize": 1,
+                    "contentChecksum": "示例值",
+                    "storageProvider": "示例值",
+                    "lastGeneratedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4331,7 +4061,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 发布章节",
-        "description": "接口作用：用于小说项目的发布章节。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/publish。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的发布章节。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/publish。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "publishChapter",
         "parameters": [
           {
@@ -4387,15 +4117,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4410,7 +4135,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 获取章节内容上传地址",
-        "description": "接口作用：用于小说项目的获取章节内容上传地址。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/content-upload-url。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的获取章节内容上传地址。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/content-upload-url。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getChapterContentUploadUrl",
         "parameters": [
           {
@@ -4455,15 +4180,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4478,7 +4198,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 提交章节内容元数据",
-        "description": "接口作用：用于小说项目的提交章节内容元数据。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/content-commit。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的提交章节内容元数据。\n调用方式：POST /api/v1/novels/{projectId}/chapters/{chapterId}/content-commit。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "commitChapterContent",
         "parameters": [
           {
@@ -4551,34 +4271,29 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "volumeId": 1,
-                      "outlineNodeId": 1,
-                      "title": "示例值",
-                      "chapterNo": 1,
-                      "status": 1,
-                      "wordCount": 1,
-                      "excerpt": "示例值",
-                      "contentObjectKey": "示例值",
-                      "contentEtag": "示例值",
-                      "contentSize": 1,
-                      "contentChecksum": "示例值",
-                      "storageProvider": "示例值",
-                      "lastGeneratedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "volumeId": 1,
+                    "outlineNodeId": 1,
+                    "title": "示例值",
+                    "chapterNo": 1,
+                    "status": 1,
+                    "wordCount": 1,
+                    "excerpt": "示例值",
+                    "contentObjectKey": "示例值",
+                    "contentEtag": "示例值",
+                    "contentSize": 1,
+                    "contentChecksum": "示例值",
+                    "storageProvider": "示例值",
+                    "lastGeneratedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4593,7 +4308,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询资料卡",
-        "description": "接口作用：用于小说项目的查询资料卡。\n调用方式：GET /api/v1/novels/{projectId}/cards。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询资料卡。\n调用方式：GET /api/v1/novels/{projectId}/cards。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listCards",
         "parameters": [
           {
@@ -4627,24 +4342,19 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelCard"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "cardType": "示例值",
-                        "name": "示例值",
-                        "summary": "示例值",
-                        "detailJson": "示例值"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "cardType": "示例值",
+                      "name": "示例值",
+                      "summary": "示例值",
+                      "detailJson": "示例值"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4657,7 +4367,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建资料卡",
-        "description": "接口作用：用于小说项目的创建资料卡。\n调用方式：POST /api/v1/novels/{projectId}/cards。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建资料卡。\n调用方式：POST /api/v1/novels/{projectId}/cards。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createCard",
         "parameters": [
           {
@@ -4718,22 +4428,17 @@
                   "$ref": "#/components/schemas/ApiResponseNovelCard"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "cardType": "示例值",
-                      "name": "示例值",
-                      "summary": "示例值",
-                      "detailJson": "示例值"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "cardType": "示例值",
+                    "name": "示例值",
+                    "summary": "示例值",
+                    "detailJson": "示例值"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4748,7 +4453,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询资料卡关系",
-        "description": "接口作用：用于小说项目的查询资料卡关系。\n调用方式：GET /api/v1/novels/{projectId}/card-relations。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询资料卡关系。\n调用方式：GET /api/v1/novels/{projectId}/card-relations。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listCardRelations",
         "parameters": [
           {
@@ -4782,24 +4487,19 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelCardRelation"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "fromCardId": 1,
-                        "toCardId": 1,
-                        "relationType": "示例值",
-                        "description": "示例值"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "fromCardId": 1,
+                      "toCardId": 1,
+                      "relationType": "示例值",
+                      "description": "示例值"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4812,7 +4512,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 创建资料卡关系",
-        "description": "接口作用：用于小说项目的创建资料卡关系。\n调用方式：POST /api/v1/novels/{projectId}/card-relations。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的创建资料卡关系。\n调用方式：POST /api/v1/novels/{projectId}/card-relations。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createCardRelation",
         "parameters": [
           {
@@ -4873,22 +4573,17 @@
                   "$ref": "#/components/schemas/ApiResponseNovelCardRelation"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "fromCardId": 1,
-                      "toCardId": 1,
-                      "relationType": "示例值",
-                      "description": "示例值"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "fromCardId": 1,
+                    "toCardId": 1,
+                    "relationType": "示例值",
+                    "description": "示例值"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4903,7 +4598,7 @@
           "approval-controller"
         ],
         "summary": "审批流 - 查询审批单",
-        "description": "接口作用：用于审批流的查询审批单。\n调用方式：GET /api/v1/novels/{projectId}/approvals。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于审批流的查询审批单。\n调用方式：GET /api/v1/novels/{projectId}/approvals。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "list",
         "parameters": [
           {
@@ -4947,31 +4642,26 @@
                   "$ref": "#/components/schemas/ApiResponseListApprovalRequest"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "taskId": 1,
-                        "approvalType": "示例值",
-                        "payloadJson": "示例值",
-                        "riskLevel": 1,
-                        "status": "示例值",
-                        "requestedBy": 1,
-                        "reviewedBy": 1,
-                        "reviewedAt": "2026-01-01T08:00:00Z",
-                        "reviewComment": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "taskId": 1,
+                      "approvalType": "示例值",
+                      "payloadJson": "示例值",
+                      "riskLevel": 1,
+                      "status": "示例值",
+                      "requestedBy": 1,
+                      "reviewedBy": 1,
+                      "reviewedAt": "2026-01-01T08:00:00Z",
+                      "reviewComment": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -4984,7 +4674,7 @@
           "approval-controller"
         ],
         "summary": "审批流 - 创建审批单",
-        "description": "接口作用：用于审批流的创建审批单。\n调用方式：POST /api/v1/novels/{projectId}/approvals。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于审批流的创建审批单。\n调用方式：POST /api/v1/novels/{projectId}/approvals。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "create",
         "parameters": [
           {
@@ -5036,29 +4726,24 @@
                   "$ref": "#/components/schemas/ApiResponseApprovalRequest"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "taskId": 1,
-                      "approvalType": "示例值",
-                      "payloadJson": "示例值",
-                      "riskLevel": 1,
-                      "status": "示例值",
-                      "requestedBy": 1,
-                      "reviewedBy": 1,
-                      "reviewedAt": "2026-01-01T08:00:00Z",
-                      "reviewComment": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "taskId": 1,
+                    "approvalType": "示例值",
+                    "payloadJson": "示例值",
+                    "riskLevel": 1,
+                    "status": "示例值",
+                    "requestedBy": 1,
+                    "reviewedBy": 1,
+                    "reviewedAt": "2026-01-01T08:00:00Z",
+                    "reviewComment": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5073,7 +4758,7 @@
           "approval-controller"
         ],
         "summary": "审批流 - 创建数据",
-        "description": "接口作用：用于审批流的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/approvals/{approvalId}/reject。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于审批流的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/approvals/{approvalId}/reject。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "reject",
         "parameters": [
           {
@@ -5121,15 +4806,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5144,7 +4824,7 @@
           "approval-controller"
         ],
         "summary": "审批流 - 创建数据",
-        "description": "接口作用：用于审批流的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/approvals/{approvalId}/approve。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于审批流的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/approvals/{approvalId}/approve。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "approve",
         "parameters": [
           {
@@ -5192,15 +4872,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5215,7 +4890,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 创建生成任务",
-        "description": "接口作用：用于Agent 写作的创建生成任务。\n调用方式：POST /api/v1/novels/{projectId}/agent/generations。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的创建生成任务。\n调用方式：POST /api/v1/novels/{projectId}/agent/generations。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createGeneration",
         "parameters": [
           {
@@ -5278,29 +4953,24 @@
                   "$ref": "#/components/schemas/ApiResponseAgentGenerationTask"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "conversationId": 1,
-                      "chapterId": 1,
-                      "taskType": "示例值",
-                      "promptSnapshot": "示例值",
-                      "styleProfileSnapshot": "示例值",
-                      "pluginSnapshot": "示例值",
-                      "status": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "errorMsg": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "conversationId": 1,
+                    "chapterId": 1,
+                    "taskType": "示例值",
+                    "promptSnapshot": "示例值",
+                    "styleProfileSnapshot": "示例值",
+                    "pluginSnapshot": "示例值",
+                    "status": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "errorMsg": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5315,7 +4985,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 创建数据",
-        "description": "接口作用：用于Agent 写作的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/agent/generations/{taskId}/apply。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/agent/generations/{taskId}/apply。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "applyGeneration",
         "parameters": [
           {
@@ -5383,29 +5053,24 @@
                   "$ref": "#/components/schemas/ApiResponseAgentGenerationTask"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "conversationId": 1,
-                      "chapterId": 1,
-                      "taskType": "示例值",
-                      "promptSnapshot": "示例值",
-                      "styleProfileSnapshot": "示例值",
-                      "pluginSnapshot": "示例值",
-                      "status": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "errorMsg": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "conversationId": 1,
+                    "chapterId": 1,
+                    "taskType": "示例值",
+                    "promptSnapshot": "示例值",
+                    "styleProfileSnapshot": "示例值",
+                    "pluginSnapshot": "示例值",
+                    "status": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "errorMsg": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5420,7 +5085,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 查询会话",
-        "description": "接口作用：用于Agent 写作的查询会话。\n调用方式：GET /api/v1/novels/{projectId}/agent/conversations。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的查询会话。\n调用方式：GET /api/v1/novels/{projectId}/agent/conversations。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listConversations",
         "parameters": [
           {
@@ -5454,28 +5119,23 @@
                   "$ref": "#/components/schemas/ApiResponseListAgentConversation"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "userId": 1,
-                        "title": "示例值",
-                        "contextScopeJson": "示例值",
-                        "lastMessageAt": "2026-01-01T08:00:00Z",
-                        "status": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "userId": 1,
+                      "title": "示例值",
+                      "contextScopeJson": "示例值",
+                      "lastMessageAt": "2026-01-01T08:00:00Z",
+                      "status": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5488,7 +5148,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 创建会话",
-        "description": "接口作用：用于Agent 写作的创建会话。\n调用方式：POST /api/v1/novels/{projectId}/agent/conversations。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的创建会话。\n调用方式：POST /api/v1/novels/{projectId}/agent/conversations。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createConversation",
         "parameters": [
           {
@@ -5549,26 +5209,21 @@
                   "$ref": "#/components/schemas/ApiResponseAgentConversation"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "userId": 1,
-                      "title": "示例值",
-                      "contextScopeJson": "示例值",
-                      "lastMessageAt": "2026-01-01T08:00:00Z",
-                      "status": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z",
-                      "deletedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "userId": 1,
+                    "title": "示例值",
+                    "contextScopeJson": "示例值",
+                    "lastMessageAt": "2026-01-01T08:00:00Z",
+                    "status": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z",
+                    "deletedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5583,7 +5238,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 查询消息",
-        "description": "接口作用：用于Agent 写作的查询消息。\n调用方式：GET /api/v1/novels/{projectId}/agent/conversations/{conversationId}/messages。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的查询消息。\n调用方式：GET /api/v1/novels/{projectId}/agent/conversations/{conversationId}/messages。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listMessages",
         "parameters": [
           {
@@ -5628,27 +5283,22 @@
                   "$ref": "#/components/schemas/ApiResponseListAgentMessage"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "conversationId": 1,
-                        "role": "示例值",
-                        "userMessageType": "示例值",
-                        "contentMd": "示例值",
-                        "attachmentsJson": "示例值",
-                        "toolCallsJson": "示例值",
-                        "seqNo": 1,
-                        "createdAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "conversationId": 1,
+                      "role": "示例值",
+                      "userMessageType": "示例值",
+                      "contentMd": "示例值",
+                      "attachmentsJson": "示例值",
+                      "toolCallsJson": "示例值",
+                      "seqNo": 1,
+                      "createdAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5661,7 +5311,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 创建消息",
-        "description": "接口作用：用于Agent 写作的创建消息。\n调用方式：POST /api/v1/novels/{projectId}/agent/conversations/{conversationId}/messages。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的创建消息。\n调用方式：POST /api/v1/novels/{projectId}/agent/conversations/{conversationId}/messages。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createMessage",
         "parameters": [
           {
@@ -5734,25 +5384,20 @@
                   "$ref": "#/components/schemas/ApiResponseAgentMessage"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "conversationId": 1,
-                      "role": "示例值",
-                      "userMessageType": "示例值",
-                      "contentMd": "示例值",
-                      "attachmentsJson": "示例值",
-                      "toolCallsJson": "示例值",
-                      "seqNo": 1,
-                      "createdAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "conversationId": 1,
+                    "role": "示例值",
+                    "userMessageType": "示例值",
+                    "contentMd": "示例值",
+                    "attachmentsJson": "示例值",
+                    "toolCallsJson": "示例值",
+                    "seqNo": 1,
+                    "createdAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5767,7 +5412,7 @@
           "model-controller"
         ],
         "summary": "模型配置 - 查询用户 API Key 列表",
-        "description": "接口作用：用于通用业务的查询用户密钥。\n调用方式：GET /api/v1/model/keys。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的查询用户密钥。\n调用方式：GET /api/v1/model/keys。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listKeys",
         "parameters": [
           {
@@ -5801,30 +5446,25 @@
                   "$ref": "#/components/schemas/ApiResponseListModelUserApiKey"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "userId": 1,
-                        "providerId": 1,
-                        "keyName": "示例值",
-                        "encryptedApiKey": "示例值",
-                        "maskedApiKey": "示例值",
-                        "isDefault": true,
-                        "lastUsedAt": "2026-01-01T08:00:00Z",
-                        "status": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z",
-                        "deletedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "userId": 1,
+                      "providerId": 1,
+                      "keyName": "示例值",
+                      "encryptedApiKey": "示例值",
+                      "maskedApiKey": "示例值",
+                      "isDefault": true,
+                      "lastUsedAt": "2026-01-01T08:00:00Z",
+                      "status": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5837,7 +5477,7 @@
           "model-controller"
         ],
         "summary": "模型配置 - 新增用户 API Key",
-        "description": "接口作用：为指定用户新增模型 API Key。\n业务规则：可标记默认 key，供策略执行时优先使用。\n关键入参：userId（归属用户）、providerId（服务商）、apiKey（密钥明文）。\n返回说明：data 为 created。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：为指定用户新增模型 API Key。\n业务规则：可标记默认 key，供策略执行时优先使用。\n关键入参：userId（归属用户）、providerId（服务商）、apiKey（密钥明文）。\n返回说明：data 为 created。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "createKey",
         "parameters": [
           {
@@ -5899,15 +5539,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5922,7 +5557,7 @@
           "ops-controller"
         ],
         "summary": "通用业务 - 创建数据",
-        "description": "接口作用：用于通用业务的创建数据。\n调用方式：POST /api/v1/migrations/content-to-object-storage。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的创建数据。\n调用方式：POST /api/v1/migrations/content-to-object-storage。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "runContentMigration",
         "parameters": [
           {
@@ -5956,26 +5591,21 @@
                   "$ref": "#/components/schemas/ApiResponseOpsMigrationTask"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "migrationType": "示例值",
-                      "status": "示例值",
-                      "progressPct": 1,
-                      "summaryJson": "示例值",
-                      "errorMsg": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "migrationType": "示例值",
+                    "status": "示例值",
+                    "progressPct": 1,
+                    "summaryJson": "示例值",
+                    "errorMsg": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -5990,7 +5620,7 @@
           "ops-controller"
         ],
         "summary": "通用业务 - 创建数据",
-        "description": "接口作用：用于通用业务的创建数据。\n调用方式：POST /api/v1/jobs/{jobId}/retry。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的创建数据。\n调用方式：POST /api/v1/jobs/{jobId}/retry。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "retryJob",
         "parameters": [
           {
@@ -6035,25 +5665,20 @@
                   "$ref": "#/components/schemas/ApiResponseOpsAsyncJob"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "jobType": "示例值",
-                      "bizKey": "示例值",
-                      "status": "示例值",
-                      "errorMsg": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "jobType": "示例值",
+                    "bizKey": "示例值",
+                    "status": "示例值",
+                    "errorMsg": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6068,7 +5693,7 @@
           "auth-controller"
         ],
         "summary": "认证 - 刷新访问令牌",
-        "description": "接口作用：用于认证与会话的刷新令牌。\n调用方式：POST /api/v1/auth/refresh。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于认证与会话的刷新令牌。\n调用方式：POST /api/v1/auth/refresh。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "refresh",
         "parameters": [
           {
@@ -6104,15 +5729,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6127,7 +5747,7 @@
           "auth-controller"
         ],
         "summary": "认证 - 用户登出",
-        "description": "接口作用：用于认证与会话的用户登出。\n调用方式：POST /api/v1/auth/logout。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于认证与会话的用户登出。\n调用方式：POST /api/v1/auth/logout。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "logout",
         "parameters": [
           {
@@ -6160,15 +5780,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6183,7 +5798,7 @@
           "auth-controller"
         ],
         "summary": "认证 - 用户登录",
-        "description": "接口作用：用于认证与会话的用户登录。\n调用方式：POST /api/v1/auth/login。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于认证与会话的用户登录。\n调用方式：POST /api/v1/auth/login。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "login",
         "parameters": [
           {
@@ -6220,15 +5835,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6243,7 +5853,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 删除插件安装",
-        "description": "接口作用：用于插件管理的删除插件安装。\n调用方式：DELETE /api/v1/novels/{projectId}/plugins/{pluginCode}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的删除插件安装。\n调用方式：DELETE /api/v1/novels/{projectId}/plugins/{pluginCode}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteInstall",
         "parameters": [
           {
@@ -6298,15 +5908,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6319,7 +5924,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 更新插件安装",
-        "description": "接口作用：用于插件管理的更新插件安装。\n调用方式：PATCH /api/v1/novels/{projectId}/plugins/{pluginCode}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的更新插件安装。\n调用方式：PATCH /api/v1/novels/{projectId}/plugins/{pluginCode}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateInstall",
         "parameters": [
           {
@@ -6388,15 +5993,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6411,7 +6011,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 移动节点",
-        "description": "接口作用：用于小说项目的移动节点。\n调用方式：PATCH /api/v1/novels/{projectId}/outlines/nodes/{nodeId}/move。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的移动节点。\n调用方式：PATCH /api/v1/novels/{projectId}/outlines/nodes/{nodeId}/move。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "moveOutlineNode",
         "parameters": [
           {
@@ -6481,15 +6081,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6504,7 +6099,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除成员",
-        "description": "接口作用：用于小说项目的删除成员。\n调用方式：DELETE /api/v1/novels/{projectId}/members/{userId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除成员。\n调用方式：DELETE /api/v1/novels/{projectId}/members/{userId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "removeMember",
         "parameters": [
           {
@@ -6560,15 +6155,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6581,7 +6171,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 更新成员",
-        "description": "接口作用：用于小说项目的更新成员。\n调用方式：PATCH /api/v1/novels/{projectId}/members/{userId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的更新成员。\n调用方式：PATCH /api/v1/novels/{projectId}/members/{userId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateMember",
         "parameters": [
           {
@@ -6650,20 +6240,15 @@
                   "$ref": "#/components/schemas/ApiResponseNovelMember"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "projectId": 1,
-                      "userId": 1,
-                      "memberRole": "示例值",
-                      "joinedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "projectId": 1,
+                    "userId": 1,
+                    "memberRole": "示例值",
+                    "joinedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6678,7 +6263,7 @@
           "model-controller"
         ],
         "summary": "模型配置 - 删除用户 API Key",
-        "description": "接口作用：用于通用业务的删除用户密钥。\n调用方式：DELETE /api/v1/model/keys/{keyId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的删除用户密钥。\n调用方式：DELETE /api/v1/model/keys/{keyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteKey",
         "parameters": [
           {
@@ -6734,15 +6319,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6755,7 +6335,7 @@
           "model-controller"
         ],
         "summary": "模型配置 - 更新用户 API Key",
-        "description": "接口作用：用于通用业务的更新用户密钥。\n调用方式：PATCH /api/v1/model/keys/{keyId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的更新用户密钥。\n调用方式：PATCH /api/v1/model/keys/{keyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateKey",
         "parameters": [
           {
@@ -6827,15 +6407,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6850,7 +6425,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询用户可见菜单",
-        "description": "接口作用：按用户维度计算最终可见菜单。\n关键字段：userId（目标用户 ID）。\n业务规则：菜单由用户绑定角色后聚合出的权限结果决定。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：按用户维度计算最终可见菜单。\n关键字段：userId（目标用户 ID）。\n业务规则：菜单由用户绑定角色后聚合出的权限结果决定。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "profileMenus",
         "parameters": [
           {
@@ -6884,25 +6459,20 @@
                   "$ref": "#/components/schemas/ApiResponseListIamMenu"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "parentId": 1,
-                        "title": "示例值",
-                        "path": "示例值",
-                        "sortOrder": 1,
-                        "permissionCode": "示例值",
-                        "visible": true
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "parentId": 1,
+                      "title": "示例值",
+                      "path": "示例值",
+                      "sortOrder": 1,
+                      "permissionCode": "示例值",
+                      "visible": true
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6917,7 +6487,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 查询插件目录",
-        "description": "接口作用：用于插件管理的查询插件目录。\n调用方式：GET /api/v1/plugins/catalog。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的查询插件目录。\n调用方式：GET /api/v1/plugins/catalog。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "catalog",
         "parameters": [
           {
@@ -6940,27 +6510,22 @@
                   "$ref": "#/components/schemas/ApiResponseListPluginCatalogItem"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "code": "示例值",
-                        "name": "示例值",
-                        "category": "示例值",
-                        "provider": "示例值",
-                        "status": "示例值",
-                        "latestVersion": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "code": "示例值",
+                      "name": "示例值",
+                      "category": "示例值",
+                      "provider": "示例值",
+                      "status": "示例值",
+                      "latestVersion": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -6975,7 +6540,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 查询插件目录",
-        "description": "接口作用：用于插件管理的查询插件目录。\n调用方式：GET /api/v1/plugins/catalog/{pluginCode}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的查询插件目录。\n调用方式：GET /api/v1/plugins/catalog/{pluginCode}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "catalogItem",
         "parameters": [
           {
@@ -7008,25 +6573,20 @@
                   "$ref": "#/components/schemas/ApiResponsePluginCatalogItem"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "code": "示例值",
-                      "name": "示例值",
-                      "category": "示例值",
-                      "provider": "示例值",
-                      "status": "示例值",
-                      "latestVersion": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "code": "示例值",
+                    "name": "示例值",
+                    "category": "示例值",
+                    "provider": "示例值",
+                    "status": "示例值",
+                    "latestVersion": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7041,7 +6601,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询权限列表",
-        "description": "接口作用：用于通用业务的查询权限列表。\n调用方式：GET /api/v1/permissions。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的查询权限列表。\n调用方式：GET /api/v1/permissions。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "permissions",
         "parameters": [
           {
@@ -7064,23 +6624,18 @@
                   "$ref": "#/components/schemas/ApiResponseListIamPermission"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "name": "示例值",
-                        "code": "示例值",
-                        "module": "示例值",
-                        "description": "示例值"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "name": "示例值",
+                      "code": "示例值",
+                      "module": "示例值",
+                      "description": "示例值"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7095,7 +6650,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 查询检索日志",
-        "description": "接口作用：用于知识库（RAG）的查询检索日志。\n调用方式：GET /api/v1/novels/{projectId}/rag/retrieval-logs。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的查询检索日志。\n调用方式：GET /api/v1/novels/{projectId}/rag/retrieval-logs。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "retrievalLogs",
         "parameters": [
           {
@@ -7129,17 +6684,12 @@
                   "$ref": "#/components/schemas/ApiResponseListMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      "示例值"
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": [
+                    "示例值"
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7154,7 +6704,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 查询RAG 文档",
-        "description": "接口作用：用于知识库（RAG）的查询RAG 文档。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{docId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的查询RAG 文档。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{docId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getDocument",
         "parameters": [
           {
@@ -7199,28 +6749,23 @@
                   "$ref": "#/components/schemas/ApiResponseRagDocument"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "docType": "示例值",
-                      "title": "示例值",
-                      "sourceRef": "示例值",
-                      "originObjectKey": "示例值",
-                      "originEtag": "示例值",
-                      "mimeType": "示例值",
-                      "parseStatus": "示例值",
-                      "indexStatus": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "docType": "示例值",
+                    "title": "示例值",
+                    "sourceRef": "示例值",
+                    "originObjectKey": "示例值",
+                    "originEtag": "示例值",
+                    "mimeType": "示例值",
+                    "parseStatus": "示例值",
+                    "indexStatus": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7233,7 +6778,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 删除RAG 文档",
-        "description": "接口作用：用于知识库（RAG）的删除RAG 文档。\n调用方式：DELETE /api/v1/novels/{projectId}/rag/documents/{docId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的删除RAG 文档。\n调用方式：DELETE /api/v1/novels/{projectId}/rag/documents/{docId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteDocument",
         "parameters": [
           {
@@ -7289,15 +6834,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7312,7 +6852,7 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 查询数据",
-        "description": "接口作用：用于知识库（RAG）的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{docId}/index-status。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于知识库（RAG）的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{docId}/index-status。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "indexStatus",
         "parameters": [
           {
@@ -7357,15 +6897,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7380,7 +6915,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 查询插件安装",
-        "description": "接口作用：用于插件管理的查询插件安装。\n调用方式：GET /api/v1/novels/{projectId}/plugins。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的查询插件安装。\n调用方式：GET /api/v1/novels/{projectId}/plugins。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "projectPlugins",
         "parameters": [
           {
@@ -7414,29 +6949,24 @@
                   "$ref": "#/components/schemas/ApiResponseListPluginProjectInstall"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "pluginId": 1,
-                        "pluginCode": "示例值",
-                        "pluginName": "示例值",
-                        "version": "示例值",
-                        "configJson": "示例值",
-                        "enabled": true,
-                        "installedBy": 1,
-                        "installedAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "pluginId": 1,
+                      "pluginCode": "示例值",
+                      "pluginName": "示例值",
+                      "version": "示例值",
+                      "configJson": "示例值",
+                      "enabled": true,
+                      "installedBy": 1,
+                      "installedAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7451,7 +6981,7 @@
           "plugin-controller"
         ],
         "summary": "插件管理 - 查询插件调用日志",
-        "description": "接口作用：用于插件管理的查询插件调用日志。\n调用方式：GET /api/v1/novels/{projectId}/plugins/call-logs。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于插件管理的查询插件调用日志。\n调用方式：GET /api/v1/novels/{projectId}/plugins/call-logs。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "callLogs",
         "parameters": [
           {
@@ -7485,28 +7015,23 @@
                   "$ref": "#/components/schemas/ApiResponseListPluginCallLog"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "pluginCode": "示例值",
-                        "toolName": "示例值",
-                        "requestJson": "示例值",
-                        "responseJson": "示例值",
-                        "latencyMs": 1,
-                        "status": "示例值",
-                        "errorMsg": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "pluginCode": "示例值",
+                      "toolName": "示例值",
+                      "requestJson": "示例值",
+                      "responseJson": "示例值",
+                      "latencyMs": 1,
+                      "status": "示例值",
+                      "errorMsg": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7521,7 +7046,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询数据",
-        "description": "接口作用：用于小说项目的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/outlines/tree。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/outlines/tree。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listOutlineTree",
         "parameters": [
           {
@@ -7555,25 +7080,20 @@
                   "$ref": "#/components/schemas/ApiResponseListNovelOutlineNode"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "projectId": 1,
-                        "parentId": 1,
-                        "title": "示例值",
-                        "nodeType": "示例值",
-                        "sortOrder": 1,
-                        "content": "示例值"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectId": 1,
+                      "parentId": 1,
+                      "title": "示例值",
+                      "nodeType": "示例值",
+                      "sortOrder": 1,
+                      "content": "示例值"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7588,7 +7108,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询章节版本记录",
-        "description": "接口作用：用于小说项目的查询章节版本记录。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/versions/{versionNo}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询章节版本记录。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/versions/{versionNo}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getChapterVersion",
         "parameters": [
           {
@@ -7644,27 +7164,22 @@
                   "$ref": "#/components/schemas/ApiResponseNovelChapterVersion"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "chapterId": 1,
-                      "versionNo": 1,
-                      "changeType": "示例值",
-                      "changeReason": "示例值",
-                      "snapshotObjectKey": "示例值",
-                      "snapshotEtag": "示例值",
-                      "snapshotSize": 1,
-                      "snapshotChecksum": "示例值",
-                      "createdBy": 1,
-                      "createdAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "chapterId": 1,
+                    "versionNo": 1,
+                    "changeType": "示例值",
+                    "changeReason": "示例值",
+                    "snapshotObjectKey": "示例值",
+                    "snapshotEtag": "示例值",
+                    "snapshotSize": 1,
+                    "snapshotChecksum": "示例值",
+                    "createdBy": 1,
+                    "createdAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7679,7 +7194,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 查询章节版本记录",
-        "description": "接口作用：用于小说项目的查询章节版本记录。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/versions/{versionNo}/snapshot-url。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的查询章节版本记录。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/versions/{versionNo}/snapshot-url。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getChapterVersionSnapshotUrl",
         "parameters": [
           {
@@ -7735,15 +7250,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7758,7 +7268,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 获取章节内容下载地址",
-        "description": "接口作用：用于小说项目的获取章节内容下载地址。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/content-url。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的获取章节内容下载地址。\n调用方式：GET /api/v1/novels/{projectId}/chapters/{chapterId}/content-url。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getChapterContentUrl",
         "parameters": [
           {
@@ -7803,15 +7313,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7826,7 +7331,7 @@
           "approval-controller"
         ],
         "summary": "审批流 - 查询审批单",
-        "description": "接口作用：用于审批流的查询审批单。\n调用方式：GET /api/v1/novels/{projectId}/approvals/{approvalId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于审批流的查询审批单。\n调用方式：GET /api/v1/novels/{projectId}/approvals/{approvalId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "detail",
         "parameters": [
           {
@@ -7860,29 +7365,24 @@
                   "$ref": "#/components/schemas/ApiResponseApprovalRequest"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "taskId": 1,
-                      "approvalType": "示例值",
-                      "payloadJson": "示例值",
-                      "riskLevel": 1,
-                      "status": "示例值",
-                      "requestedBy": 1,
-                      "reviewedBy": 1,
-                      "reviewedAt": "2026-01-01T08:00:00Z",
-                      "reviewComment": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "taskId": 1,
+                    "approvalType": "示例值",
+                    "payloadJson": "示例值",
+                    "riskLevel": 1,
+                    "status": "示例值",
+                    "requestedBy": 1,
+                    "reviewedBy": 1,
+                    "reviewedAt": "2026-01-01T08:00:00Z",
+                    "reviewComment": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7897,7 +7397,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 查询生成任务",
-        "description": "接口作用：用于Agent 写作的查询生成任务。\n调用方式：GET /api/v1/novels/{projectId}/agent/generations/{taskId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的查询生成任务。\n调用方式：GET /api/v1/novels/{projectId}/agent/generations/{taskId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getGeneration",
         "parameters": [
           {
@@ -7942,29 +7442,24 @@
                   "$ref": "#/components/schemas/ApiResponseAgentGenerationTask"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "projectId": 1,
-                      "conversationId": 1,
-                      "chapterId": 1,
-                      "taskType": "示例值",
-                      "promptSnapshot": "示例值",
-                      "styleProfileSnapshot": "示例值",
-                      "pluginSnapshot": "示例值",
-                      "status": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "errorMsg": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "projectId": 1,
+                    "conversationId": 1,
+                    "chapterId": 1,
+                    "taskType": "示例值",
+                    "promptSnapshot": "示例值",
+                    "styleProfileSnapshot": "示例值",
+                    "pluginSnapshot": "示例值",
+                    "status": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "errorMsg": "示例值",
+                    "createdAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -7979,7 +7474,7 @@
           "agent-controller"
         ],
         "summary": "Agent 写作 - 查询数据",
-        "description": "接口作用：用于Agent 写作的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/agent/generations/{taskId}/stream。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于Agent 写作的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/agent/generations/{taskId}/stream。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "streamGeneration",
         "parameters": [
           {
@@ -8024,12 +7519,7 @@
                   "$ref": "#/components/schemas/SseEmitter"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "timeout": 1
-                  }
+                  "timeout": 1
                 }
               }
             }
@@ -8043,7 +7533,7 @@
           "model-controller"
         ],
         "summary": "模型配置 - 查询模型服务商列表",
-        "description": "接口作用：返回系统内可接入的模型服务商配置（不含用户密钥）。\n典型场景：创建 API Key 前先拉取 provider 列表供前端下拉选择。\n返回说明：data 为 ModelProvider 数组。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：返回系统内可接入的模型服务商配置（不含用户密钥）。\n典型场景：创建 API Key 前先拉取 provider 列表供前端下拉选择。\n返回说明：data 为 ModelProvider 数组。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listProviders",
         "parameters": [
           {
@@ -8066,26 +7556,21 @@
                   "$ref": "#/components/schemas/ApiResponseListModelProvider"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "code": "示例值",
-                        "name": "示例值",
-                        "baseUrl": "示例值",
-                        "authType": "示例值",
-                        "status": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "code": "示例值",
+                      "name": "示例值",
+                      "baseUrl": "示例值",
+                      "authType": "示例值",
+                      "status": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8100,7 +7585,7 @@
           "model-controller"
         ],
         "summary": "模型配置 - 查询服务商可用模型",
-        "description": "接口作用：按服务商编码查询可用模型清单。\n典型场景：用户选择 provider 后，联动加载 model 列表。\n关键入参：providerCode（服务商唯一编码）。\n返回说明：data 为 ModelProviderModel 数组。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：按服务商编码查询可用模型清单。\n典型场景：用户选择 provider 后，联动加载 model 列表。\n关键入参：providerCode（服务商唯一编码）。\n返回说明：data 为 ModelProviderModel 数组。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listProviderModels",
         "parameters": [
           {
@@ -8133,27 +7618,22 @@
                   "$ref": "#/components/schemas/ApiResponseListModelProviderModel"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "providerId": 1,
-                        "modelCode": "示例值",
-                        "modelName": "示例值",
-                        "contextWindow": 1,
-                        "maxOutput": 1,
-                        "pricingJson": "示例值",
-                        "status": "示例值",
-                        "createdAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "providerId": 1,
+                      "modelCode": "示例值",
+                      "modelName": "示例值",
+                      "contextWindow": 1,
+                      "maxOutput": 1,
+                      "pricingJson": "示例值",
+                      "status": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8168,7 +7648,7 @@
           "ops-controller"
         ],
         "summary": "通用业务 - 查询迁移任务",
-        "description": "接口作用：用于通用业务的查询迁移任务。\n调用方式：GET /api/v1/migrations/{migrationId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的查询迁移任务。\n调用方式：GET /api/v1/migrations/{migrationId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getMigration",
         "parameters": [
           {
@@ -8202,26 +7682,21 @@
                   "$ref": "#/components/schemas/ApiResponseOpsMigrationTask"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "migrationType": "示例值",
-                      "status": "示例值",
-                      "progressPct": 1,
-                      "summaryJson": "示例值",
-                      "errorMsg": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "migrationType": "示例值",
+                    "status": "示例值",
+                    "progressPct": 1,
+                    "summaryJson": "示例值",
+                    "errorMsg": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8236,7 +7711,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询菜单列表",
-        "description": "接口作用：用于通用业务的查询菜单列表。\n调用方式：GET /api/v1/menus。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的查询菜单列表。\n调用方式：GET /api/v1/menus。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "menus",
         "parameters": [
           {
@@ -8259,25 +7734,20 @@
                   "$ref": "#/components/schemas/ApiResponseListIamMenu"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "parentId": 1,
-                        "title": "示例值",
-                        "path": "示例值",
-                        "sortOrder": 1,
-                        "permissionCode": "示例值",
-                        "visible": true
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "parentId": 1,
+                      "title": "示例值",
+                      "path": "示例值",
+                      "sortOrder": 1,
+                      "permissionCode": "示例值",
+                      "visible": true
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8292,7 +7762,7 @@
           "ops-controller"
         ],
         "summary": "通用业务 - 查询异步任务",
-        "description": "接口作用：用于通用业务的查询异步任务。\n调用方式：GET /api/v1/jobs。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的查询异步任务。\n调用方式：GET /api/v1/jobs。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "listJobs",
         "parameters": [
           {
@@ -8335,27 +7805,22 @@
                   "$ref": "#/components/schemas/ApiResponseListOpsAsyncJob"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": [
-                      {
-                        "id": 1,
-                        "jobType": "示例值",
-                        "bizKey": "示例值",
-                        "status": "示例值",
-                        "errorMsg": "示例值",
-                        "startedAt": "2026-01-01T08:00:00Z",
-                        "finishedAt": "2026-01-01T08:00:00Z",
-                        "createdAt": "2026-01-01T08:00:00Z",
-                        "updatedAt": "2026-01-01T08:00:00Z"
-                      }
-                    ],
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
+                  "data": [
+                    {
+                      "id": 1,
+                      "jobType": "示例值",
+                      "bizKey": "示例值",
+                      "status": "示例值",
+                      "errorMsg": "示例值",
+                      "startedAt": "2026-01-01T08:00:00Z",
+                      "finishedAt": "2026-01-01T08:00:00Z",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z"
                     }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8370,7 +7835,7 @@
           "ops-controller"
         ],
         "summary": "通用业务 - 查询异步任务",
-        "description": "接口作用：用于通用业务的查询异步任务。\n调用方式：GET /api/v1/jobs/{jobId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于通用业务的查询异步任务。\n调用方式：GET /api/v1/jobs/{jobId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getJob",
         "parameters": [
           {
@@ -8404,25 +7869,20 @@
                   "$ref": "#/components/schemas/ApiResponseOpsAsyncJob"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
                   "data": {
-                    "data": {
-                      "id": 1,
-                      "jobType": "示例值",
-                      "bizKey": "示例值",
-                      "status": "示例值",
-                      "errorMsg": "示例值",
-                      "startedAt": "2026-01-01T08:00:00Z",
-                      "finishedAt": "2026-01-01T08:00:00Z",
-                      "createdAt": "2026-01-01T08:00:00Z",
-                      "updatedAt": "2026-01-01T08:00:00Z"
-                    },
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                    "id": 1,
+                    "jobType": "示例值",
+                    "bizKey": "示例值",
+                    "status": "示例值",
+                    "errorMsg": "示例值",
+                    "startedAt": "2026-01-01T08:00:00Z",
+                    "finishedAt": "2026-01-01T08:00:00Z",
+                    "createdAt": "2026-01-01T08:00:00Z",
+                    "updatedAt": "2026-01-01T08:00:00Z"
+                  },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8437,7 +7897,7 @@
           "auth-controller"
         ],
         "summary": "认证 - 获取当前登录态用户",
-        "description": "接口作用：用于认证与会话的获取当前登录用户信息。\n调用方式：GET /api/v1/auth/me。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于认证与会话的获取当前登录用户信息。\n调用方式：GET /api/v1/auth/me。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "me",
         "parameters": [
           {
@@ -8470,15 +7930,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8493,7 +7948,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 解除用户角色绑定",
-        "description": "接口作用：用于RBAC 权限的解除用户角色绑定。\n调用方式：DELETE /api/v1/users/{userId}/roles/{roleId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的解除用户角色绑定。\n调用方式：DELETE /api/v1/users/{userId}/roles/{roleId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "removeRole",
         "parameters": [
           {
@@ -8538,15 +7993,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8561,7 +8011,7 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 解除角色权限绑定",
-        "description": "接口作用：用于RBAC 权限的解除角色权限绑定。\n调用方式：DELETE /api/v1/roles/{roleId}/permissions/{permissionId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于RBAC 权限的解除角色权限绑定。\n调用方式：DELETE /api/v1/roles/{roleId}/permissions/{permissionId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "removePermission",
         "parameters": [
           {
@@ -8606,15 +8056,10 @@
                   "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }
@@ -8629,7 +8074,7 @@
           "novel-controller"
         ],
         "summary": "小说项目 - 删除资料卡关系",
-        "description": "接口作用：用于小说项目的删除资料卡关系。\n调用方式：DELETE /api/v1/novels/{projectId}/card-relations/{relationId}。\n返回约定：统一返回 code/message/traceId/data 结构。",
+        "description": "接口作用：用于小说项目的删除资料卡关系。\n调用方式：DELETE /api/v1/novels/{projectId}/card-relations/{relationId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteCardRelation",
         "parameters": [
           {
@@ -8685,15 +8130,10 @@
                   "$ref": "#/components/schemas/ApiResponseString"
                 },
                 "example": {
-                  "code": 0,
-                  "message": "ok",
-                  "traceId": "trace-example-001",
-                  "data": {
-                    "data": "示例值",
-                    "meta": {
-                      "traceId": "示例值",
-                      "timestamp": "示例值"
-                    }
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
                   }
                 }
               }

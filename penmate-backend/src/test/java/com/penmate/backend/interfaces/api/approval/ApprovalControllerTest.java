@@ -86,8 +86,8 @@ class ApprovalControllerTest {
                                 "requestedBy", 1001
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -130,8 +130,8 @@ class ApprovalControllerTest {
                                 "comment", "repeat review"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -145,9 +145,9 @@ class ApprovalControllerTest {
         mockMvc().perform(get("/api/v1/novels/10001/approvals/99999")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.status").value(422))
-                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"))
-                .andExpect(jsonPath("$.message").value("Approval not found"))
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.data.message").value("Approval not found"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
