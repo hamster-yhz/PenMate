@@ -18,11 +18,6 @@ DELETE FROM plugin_call_logs        WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM plugin_project_installs WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM plugin_catalog          WHERE id BETWEEN 920001 AND 920999;
 
-DELETE FROM model_project_policies  WHERE id BETWEEN 920001 AND 920999;
-DELETE FROM model_user_api_keys     WHERE id BETWEEN 920001 AND 920999;
-DELETE FROM model_provider_models   WHERE id BETWEEN 920001 AND 920999;
-DELETE FROM model_providers         WHERE id BETWEEN 920001 AND 920999;
-
 DELETE FROM style_switch_logs       WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM style_profiles          WHERE id BETWEEN 920001 AND 920999;
 
@@ -35,7 +30,6 @@ DELETE FROM novel_volumes           WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM novel_members           WHERE project_id BETWEEN 920001 AND 920999;
 DELETE FROM novel_projects          WHERE id BETWEEN 920001 AND 920999;
 
-DELETE FROM iam_user_sessions       WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM iam_menus               WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM iam_role_permissions    WHERE role_id BETWEEN 920001 AND 920999;
 DELETE FROM iam_user_roles          WHERE user_id BETWEEN 920001 AND 920999;
@@ -45,7 +39,6 @@ DELETE FROM iam_users               WHERE id BETWEEN 920001 AND 920999;
 
 DELETE FROM ops_async_jobs          WHERE id BETWEEN 920001 AND 920999;
 DELETE FROM ops_migrations          WHERE id BETWEEN 920001 AND 920999;
-DELETE FROM ops_audit_logs          WHERE id BETWEEN 920001 AND 920999;
 
 -- IAM
 INSERT INTO iam_users (id, email, password_hash, display_name, status, auth_method, last_login_at, created_at, updated_at, deleted_at) VALUES
@@ -80,12 +73,6 @@ INSERT INTO iam_menus (id, parent_id, title, path, sort_order, permission_code, 
 (920002, 920001, '小说管理', '/workbench/novel',           10, 'novel.project.manage',    1, NOW(3), NOW(3), NULL),
 (920003, 920001, '审批中心', '/workbench/approval',        20, 'approval.request.review', 1, NOW(3), NOW(3), NULL),
 (920004, 920002, '章节编辑', '/workbench/novel/chapters', 11, 'novel.project.manage',    1, NOW(3), NOW(3), NULL);
-
-INSERT INTO iam_user_sessions (id, user_id, access_token, refresh_token, access_expires_at, refresh_expires_at, revoked_at, created_at) VALUES
-(920001, 920001, 'dbcase-access-admin-001', 'dbcase-refresh-admin-001', DATE_ADD(NOW(3), INTERVAL 2 HOUR), DATE_ADD(NOW(3), INTERVAL 7 DAY), NULL, NOW(3)),
-(920002, 920002, 'dbcase-access-owner-001', 'dbcase-refresh-owner-001', DATE_ADD(NOW(3), INTERVAL 1 HOUR), DATE_ADD(NOW(3), INTERVAL 7 DAY), NULL, NOW(3)),
-(920003, 920003, 'dbcase-access-expired-1', 'dbcase-refresh-expired-1', DATE_SUB(NOW(3), INTERVAL 1 HOUR), DATE_SUB(NOW(3), INTERVAL 10 MINUTE), NULL, NOW(3)),
-(920004, 920004, 'dbcase-access-revoked-1', 'dbcase-refresh-revoked-1', DATE_ADD(NOW(3), INTERVAL 2 HOUR), DATE_ADD(NOW(3), INTERVAL 7 DAY), NOW(3), NOW(3));
 
 -- 小说核心
 INSERT INTO novel_projects (id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at) VALUES
@@ -152,23 +139,6 @@ INSERT INTO plugin_call_logs (id, project_id, plugin_code, tool_name, request_js
 (920001, 920001, 'plot-expander',      'expand_plot',      JSON_OBJECT('chapterId', 920001), JSON_OBJECT('ok', TRUE), 220, 'success', NULL, NOW(3)),
 (920002, 920001, 'character-polisher', 'polish_character', JSON_OBJECT('cardId', 920001),    NULL,                    560, 'failed',  'tool timeout', NOW(3));
 
--- 模型
-INSERT INTO model_providers (id, code, name, base_url, auth_type, status, created_at, updated_at) VALUES
-(920001, 'openai',   'OpenAI',   'https://api.openai.com/v1', 'bearer', 'active', NOW(3), NOW(3)),
-(920002, 'deepseek', 'DeepSeek', 'https://api.deepseek.com',  'bearer', 'active', NOW(3), NOW(3));
-
-INSERT INTO model_provider_models (id, provider_id, model_code, model_name, context_window, max_output, pricing_json, status, created_at) VALUES
-(920001, 920001, 'gpt-4o-mini',   'GPT-4o-mini',   128000, 4096, JSON_OBJECT('input', 0.15, 'output', 0.6), 'active', NOW(3)),
-(920002, 920002, 'deepseek-chat', 'DeepSeek Chat', 64000,  4096, JSON_OBJECT('input', 0.1,  'output', 0.2), 'active', NOW(3));
-
-INSERT INTO model_user_api_keys (id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at) VALUES
-(920001, 920002, 920001, 'openai-main',     'enc_openai_main_920001',    'sk-****-9201', 1, NOW(3), 'active',   NOW(3), NOW(3), NULL),
-(920002, 920002, 920002, 'deepseek-backup', 'enc_deepseek_backup_920002', 'sk-****-9202', 0, NULL,   'inactive', NOW(3), NOW(3), NULL);
-
-INSERT INTO model_project_policies (id, project_id, policy_name, scene, provider_model_id, user_key_id, temperature, top_p, max_tokens, fallback_policy_json, is_default, created_at, updated_at, deleted_at) VALUES
-(920001, 920001, '默认创作策略', 'draft',   920001, 920001, 0.70, 0.95, 2048, JSON_OBJECT('fallbackModel', 920002), 1, NOW(3), NOW(3), NULL),
-(920002, 920001, '重写策略',     'rewrite', 920002, 920002, 0.55, 0.90, 1536, JSON_OBJECT('fallbackModel', 920001), 0, NOW(3), NOW(3), NULL);
-
 -- Agent + 审批
 INSERT INTO agent_conversations (id, project_id, user_id, title, context_scope_json, last_message_at, status, created_at, updated_at, deleted_at) VALUES
 (920001, 920001, 920002, '第一卷创作会话', JSON_OBJECT('chapterIds', JSON_ARRAY(920001, 920002)), NOW(3), 'active',   NOW(3), NOW(3), NULL),
@@ -221,9 +191,4 @@ INSERT INTO ops_migrations (id, migration_type, status, progress_pct, summary_js
 (920001, 'content_to_object_storage', 'running', 45,  JSON_OBJECT('migrated', 12, 'failed', 1), NULL,              NOW(3), NULL,   NOW(3), NOW(3)),
 (920002, 'content_to_object_storage', 'done',    100, JSON_OBJECT('migrated', 23, 'failed', 0), NULL,              NOW(3), NOW(3), NOW(3), NOW(3)),
 (920003, 'vector_rebuild',            'failed',  73,  JSON_OBJECT('processed', 88),             'index corruption', NOW(3), NOW(3), NOW(3), NOW(3));
-
-INSERT INTO ops_audit_logs (id, trace_id, user_id, module, action, resource_type, resource_id, request_json, response_code, created_at) VALUES
-(920001, 'dbcase-trace-iam-1',    920001, 'iam',    'assign-role',            'iam_user_roles',         '920002:920002', JSON_OBJECT('userId', 920002, 'roleId', 920002), 200, NOW(3)),
-(920002, 'dbcase-trace-novel-1',  920002, 'novel',  'create-chapter-version', 'novel_chapter_versions', '920002',        JSON_OBJECT('chapterId', 920001, 'versionNo', 2), 201, NOW(3)),
-(920003, 'dbcase-trace-plugin-1', 920002, 'plugin', 'call-tool',              'plugin_call_logs',       '920002',        JSON_OBJECT('plugin', 'character-polisher'), 500, NOW(3));
 

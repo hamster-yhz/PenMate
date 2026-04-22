@@ -75,7 +75,7 @@
           <!-- ======== Outline Tree ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'outline'">
             <div class="tree-actions">
-              <button class="tree-btn" @click="addVolume">+ 新卷</button>
+              <button class="tree-btn" :disabled="outlineOpBusy" @click="addVolume">+ 新卷</button>
               <button class="tree-btn" @click="addMemberQuick">+ 成员</button>
             </div>
             <div class="tree-root">
@@ -340,6 +340,9 @@
           <div class="agent-header">
             <img :src="iconAgent" alt="" class="agent-icon" />
             <span class="agent-title">AI会话</span>
+            <div class="agent-model" :class="{ empty: !currentModelName }">
+              {{ currentModelName || '未选择模型' }}
+            </div>
             <div class="agent-status" :class="{ busy: isGenerating, failed: generationPhase === 'failed' }">
               <span class="status-dot"></span>
               <span>{{ generationStatusText }}</span>
@@ -352,10 +355,19 @@
               v-for="msg in messages"
               :key="msg.id"
               class="chat-msg"
-              :class="msg.role"
+              :class="[msg.role, { generating: msg.role === 'assistant' && msg.id === streamingAssistantMsgId && isGenerating }]"
             >
               <div class="msg-bubble">
                 <div class="msg-text" v-html="msg.text"></div>
+                <div
+                  class="msg-inline-typing"
+                  v-if="msg.role === 'assistant' && msg.id === streamingAssistantMsgId && isGenerating && !msg.text"
+                >
+                  <span class="t-dot"></span>
+                  <span class="t-dot"></span>
+                  <span class="t-dot"></span>
+                  <span class="t-label">AI正在创作中...</span>
+                </div>
                 <div class="msg-actions" v-if="msg.role === 'assistant' && msg.text">
                   <button class="msg-btn" @click="mergeToEditor(msg)" title="合并至编辑器">
                     📥 合并
@@ -375,23 +387,21 @@
                 @reject="handleReject"
               />
             </div>
-
-            <!-- Typing indicator -->
-            <div class="chat-msg assistant" v-if="isGenerating">
-              <div class="msg-bubble typing">
-                <span class="t-dot"></span>
-                <span class="t-dot"></span>
-                <span class="t-dot"></span>
-                <span class="t-label">AI正在创作中...</span>
-              </div>
-            </div>
           </div>
 
           <!-- Chat Input -->
           <div class="chat-input-area">
+            <div v-if="!currentModelName" class="model-warning-inline">
+              当前未选择模型，请先在模型设置中保存并切换一个可用模型。
+              <button class="model-warning-btn" @click="showModelSettings = true">去选择</button>
+            </div>
             <div class="input-plugins" v-if="activePlugins.length">
               <span class="ip-label">已挂载：</span>
               <span class="ip-tag" v-for="p in activePlugins" :key="p">{{ p }}</span>
+            </div>
+            <div class="input-model-line">
+              <span class="input-model-label">当前模型：</span>
+              <span :class="['input-model-value', { empty: !currentModelName }]">{{ currentModelName || '未选择模型' }}</span>
             </div>
             <div class="input-wrap">
               <textarea
@@ -419,12 +429,12 @@
     <!-- ===== Modals ===== -->
     <StyleManager :visible="showStyleManager" @close="showStyleManager = false" />
     <PluginWorkshop :visible="showPluginWorkshop" @close="showPluginWorkshop = false" />
-    <ModelSettings :visible="showModelSettings" @close="showModelSettings = false" />
+    <ModelSettings :visible="showModelSettings" @close="showModelSettings = false" @saved="onModelConfigSaved" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, computed, watch } from 'vue'
+import { ref, nextTick, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
@@ -450,6 +460,7 @@ import { cardApi } from '@/api/modules/card.api'
 import { agentApi } from '@/api/modules/agent.api'
 import { approvalApi } from '@/api/modules/approval.api'
 import { pluginApi } from '@/api/modules/plugin.api'
+import { modelApi } from '@/api/modules/model.api'
 import { getSession, clearSession } from '@/stores/session'
 import { authApi } from '@/api/modules/auth.api'
 
@@ -507,16 +518,26 @@ type OutlineChapterNode = { title: string; key: string; chapterId?: string }
 type OutlineVolumeNode = { title: string; key: string; expanded: boolean; children: OutlineChapterNode[] }
 
 const outlineData = ref<OutlineVolumeNode[]>([])
+const outlineOpBusy = ref(false)
 
 // Active plugins
 const activePlugins = ref<string[]>([])
+const activeModelConfigId = ref<number | null>(null)
+const currentModelName = ref('')
 const approvalBusyIds = ref<string[]>([])
-const generationPhase = ref<'idle' | 'preparing' | 'polling' | 'failed'>('idle')
-const generationTaskStatus = ref('')
+type GenerationTaskStatus = 'pending' | 'running' | 'waiting_approval' | 'done' | 'applied' | 'failed' | 'cancelled'
+const TERMINAL_GENERATION_STATUSES: GenerationTaskStatus[] = ['done', 'applied', 'failed', 'cancelled']
+const ENABLE_POLLING_FALLBACK = String(import.meta.env.VITE_AGENT_POLLING_FALLBACK || 'false').toLowerCase() === 'true'
+const LAST_PROJECT_ID_KEY = 'penmate.lastProjectId'
+const LAST_OPERATOR_ID_KEY = 'penmate.lastOperatorId'
+const generationPhase = ref<'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'>('idle')
+const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
+let generationStream: EventSource | null = null
 const generationStatusText = computed(() => {
   if (isGenerating.value && generationTaskStatus.value) return `生成中 · ${generationTaskStatus.value}`
   if (generationPhase.value === 'preparing') return '准备中'
-  if (generationPhase.value === 'polling') return '生成中'
+  if (generationPhase.value === 'streaming') return '流式生成中'
+  if (generationPhase.value === 'waiting_approval') return '等待审批'
   if (generationPhase.value === 'failed') return '异常'
   return '就绪'
 })
@@ -534,6 +555,7 @@ const messages = ref<ChatMessage[]>([])
 const chatInput = ref('')
 const chatRef = ref<HTMLElement | null>(null)
 let msgIdCounter = 1
+const streamingAssistantMsgId = ref<number | null>(null)
 const currentConversationId = ref<number | null>(null)
 const chapterVersions = ref<Record<string, Array<Record<string, unknown>>>>({})
 const selectedVersionNo = ref('')
@@ -547,17 +569,226 @@ const relationToId = ref('')
 const relationType = ref('')
 const projectMembers = ref<Array<Record<string, any>>>([])
 
-const resolveOperatorId = () => {
-  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
-  const queryId = Number(route.query.operatorId || 0)
-  return queryId > 0 ? queryId : null
+const normalizeGenerationStatus = (raw: unknown): GenerationTaskStatus | '' => {
+  const status = String(raw || '').trim().toLowerCase()
+  return (['pending', 'running', 'waiting_approval', 'done', 'applied', 'failed', 'cancelled'] as const).includes(status as GenerationTaskStatus)
+    ? (status as GenerationTaskStatus)
+    : ''
 }
 
-const getCurrentProjectId = () => Number(route.query.bookId || 0)
+const parseSseData = (event: MessageEvent<string>) => {
+  try {
+    return JSON.parse(event.data || '{}') as Record<string, unknown>
+  } catch {
+    return {} as Record<string, unknown>
+  }
+}
+
+const escapeHtml = (value: string) => value
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+  .replaceAll('\n', '<br/>')
+
+const closeGenerationStream = () => {
+  if (generationStream) {
+    generationStream.close()
+    generationStream = null
+  }
+}
+
+const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
+  console.info('[agent-ui] chat-state', {
+    stage,
+    isGenerating: isGenerating.value,
+    generationPhase: generationPhase.value,
+    generationTaskStatus: generationTaskStatus.value,
+    messageCount: messages.value.length,
+    lastMessageRole: messages.value[messages.value.length - 1]?.role || '',
+    lastMessageLength: messages.value[messages.value.length - 1]?.text?.length || 0,
+    ...extra
+  })
+}
+
+const pollGenerationAsFallback = async (projectId: number, taskId: number) => {
+  let status: GenerationTaskStatus | '' = ''
+  for (let i = 0; i < 12; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const latest = (await agentApi.getGeneration(projectId, taskId)) as Record<string, unknown>
+    status = normalizeGenerationStatus(latest?.status)
+    if (status) generationTaskStatus.value = status
+    if (status && TERMINAL_GENERATION_STATUSES.includes(status)) break
+  }
+  return status
+}
+
+const consumeGenerationStream = (projectId: number, taskId: number, assistantMsg: ChatMessage) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
+  closeGenerationStream()
+  console.info('[agent] opening SSE stream', { projectId, taskId })
+  generationStream = agentApi.openGenerationStream(projectId, taskId)
+  let reconnectCount = 0
+  let settled = false
+  let firstTokenAt = 0
+  const streamOpenAt = Date.now()
+
+  const settleResolve = (status: GenerationTaskStatus | '') => {
+    if (settled) return
+    settled = true
+    closeGenerationStream()
+    resolve(status)
+  }
+
+  const settleReject = (error: Error) => {
+    if (settled) return
+    settled = true
+    closeGenerationStream()
+    reject(error)
+  }
+
+  const startStatusCatchup = () => {
+    let attempts = 0
+    const timer = window.setInterval(async () => {
+      if (settled) {
+        window.clearInterval(timer)
+        return
+      }
+      attempts += 1
+      try {
+        const latest = (await agentApi.getGeneration(projectId, taskId)) as Record<string, unknown>
+        const latestStatus = normalizeGenerationStatus(latest?.status)
+        if (latestStatus) generationTaskStatus.value = latestStatus
+        if (latestStatus && TERMINAL_GENERATION_STATUSES.includes(latestStatus)) {
+          console.info('[agent] catch-up status reached terminal', { projectId, taskId, latestStatus, attempts })
+          if (latestStatus === 'failed' || latestStatus === 'cancelled') {
+            settleReject(new Error(`生成任务结束：${latestStatus}`))
+          } else {
+            settleResolve(latestStatus)
+          }
+        }
+      } catch {
+        // 状态补拉失败时不中断主流程。
+      }
+      if (attempts >= 15) {
+        window.clearInterval(timer)
+      }
+    }, 1000)
+  }
+
+  const bindListeners = () => {
+    if (!generationStream) return
+    agentApi.addStreamListener(generationStream, 'generation.started', () => {
+      generationPhase.value = 'streaming'
+      generationTaskStatus.value = 'running'
+    })
+    agentApi.addStreamListener(generationStream, 'generation.token', (event) => {
+      const payload = parseSseData(event)
+      const token = String(payload.token || '')
+      if (token) {
+        if (!firstTokenAt) {
+          firstTokenAt = Date.now()
+          console.info('[agent-ui] first-token-received', {
+            projectId,
+            taskId,
+            firstTokenDelayMs: firstTokenAt - streamOpenAt,
+            tokenLength: token.length
+          })
+        }
+        assistantMsg.text += escapeHtml(token)
+        debugChatState('append-token', { taskId, appendedTokenLength: token.length, assistantLength: assistantMsg.text.length })
+        scrollChat()
+      }
+    })
+    agentApi.addStreamListener(generationStream, 'generation.tool_call', (event) => {
+      const payload = parseSseData(event)
+      const pluginCode = String(payload.pluginCode || '')
+      const toolName = String(payload.toolName || '')
+      const status = String(payload.status || '')
+      const output = String(payload.output || '')
+      const errorMsg = String(payload.errorMsg || '')
+      const toolMsg = status === 'failed'
+        ? `工具调用失败：${pluginCode}/${toolName} - ${errorMsg || 'unknown error'}`
+        : `工具调用完成：${pluginCode}/${toolName}${output ? ` -> ${output}` : ''}`
+      messages.value.push({
+        id: msgIdCounter++,
+        role: 'system',
+        text: escapeHtml(toolMsg)
+      })
+      scrollChat()
+    })
+    agentApi.addStreamListener(generationStream, 'generation.waiting_approval', (event) => {
+      const payload = parseSseData(event)
+      const approvalId = String(payload.approvalId || '')
+      if (approvalId) {
+        assistantMsg.approval = {
+          id: approvalId,
+          message: '检测到高风险结构化写入，需你确认后继续生成。',
+          time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+          preview: {
+            taskId: String(payload.taskId || taskId),
+            type: String(payload.approvalType || 'WORLD_SETTING_CREATE')
+          },
+          resolved: false
+        }
+      }
+      generationPhase.value = 'waiting_approval'
+      generationTaskStatus.value = 'waiting_approval'
+      scrollChat()
+    })
+    agentApi.addStreamListener(generationStream, 'generation.done', (event) => {
+      const payload = parseSseData(event)
+      const status = normalizeGenerationStatus(payload.status) || 'done'
+      console.info('[agent] generation.done received', { projectId, taskId, status })
+      generationTaskStatus.value = status
+      settleResolve(status)
+    })
+    agentApi.addStreamListener(generationStream, 'generation.failed', (event) => {
+      const payload = parseSseData(event)
+      console.error('[agent] generation.failed received', { projectId, taskId, payload })
+      generationTaskStatus.value = 'failed'
+      settleReject(new Error(String(payload.errorMsg || payload.errorCode || '生成失败')))
+    })
+  }
+
+  bindListeners()
+  startStatusCatchup()
+
+  generationStream.onerror = () => {
+    if (settled) return
+    console.warn('[agent] SSE onerror', { projectId, taskId, reconnectCount })
+    if (reconnectCount < 1) {
+      reconnectCount += 1
+      closeGenerationStream()
+      console.info('[agent] reopening SSE stream', { projectId, taskId, reconnectCount })
+      generationStream = agentApi.openGenerationStream(projectId, taskId)
+      bindListeners()
+      return
+    }
+    settleReject(new Error('SSE 连接失败'))
+  }
+})
+
+const resolveOperatorId = () => {
+  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
+  const queryId = Number(route.query.operatorId || route.query.userId || 0)
+  if (queryId > 0) return queryId
+  const cachedId = Number(localStorage.getItem(LAST_OPERATOR_ID_KEY) || 0)
+  return cachedId > 0 ? cachedId : null
+}
+
+const getCurrentProjectId = () => {
+  const queryId = Number(route.query.bookId || route.query.projectId || 0)
+  if (queryId > 0) return queryId
+  const cachedId = Number(localStorage.getItem(LAST_PROJECT_ID_KEY) || 0)
+  return cachedId > 0 ? cachedId : 0
+}
 
 const getContext = () => {
   const projectId = getCurrentProjectId()
   const operatorId = resolveOperatorId()
+  if (projectId > 0) localStorage.setItem(LAST_PROJECT_ID_KEY, String(projectId))
+  if (operatorId && operatorId > 0) localStorage.setItem(LAST_OPERATOR_ID_KEY, String(operatorId))
   return { projectId, operatorId }
 }
 
@@ -598,6 +829,36 @@ const ensureConversationId = async (projectId: number, operatorId: number) => {
   })) as Record<string, unknown>
   currentConversationId.value = Number(created?.id || 0) || null
   return currentConversationId.value
+}
+
+const refreshActiveModelInfo = async (projectId: number) => {
+  if (!projectId) {
+    activeModelConfigId.value = null
+    currentModelName.value = ''
+    return null
+  }
+  try {
+    const configs = (await modelApi.listConfigs(projectId)) as Array<Record<string, unknown>>
+    const preferred = configs.find((item) => Boolean(item.isDefault)) || configs[0]
+    const modelConfigId = Number(preferred?.id || 0)
+    activeModelConfigId.value = modelConfigId > 0 ? modelConfigId : null
+    currentModelName.value = String(preferred?.modelName || '').trim()
+    return activeModelConfigId.value
+  } catch {
+    activeModelConfigId.value = null
+    currentModelName.value = ''
+    return null
+  }
+}
+
+const ensureModelConfigId = async (projectId: number) => {
+  // 完全显式模式：每次生成都携带模型配置ID；这里负责读取当前可用配置供发送时显式传参。
+  return refreshActiveModelInfo(projectId)
+}
+
+const onModelConfigSaved = () => {
+  // 模型设置变更后刷新当前生效模型信息。
+  void refreshActiveModelInfo(Number(route.query.bookId || 0))
 }
 
 const cardNameById = (idLike: string) => {
@@ -823,6 +1084,34 @@ const pickString = (obj: Record<string, unknown>, keys: string[]) => {
   return ''
 }
 
+const normalizeObjectStorageUrl = (rawUrl: string) => {
+  const url = String(rawUrl || '').trim()
+  if (!url) return ''
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(url)) return url
+  if (url.startsWith('//')) return `${window.location.protocol}${url}`
+  if (url.startsWith('/')) return url
+  const defaultProtocol = String(import.meta.env.VITE_STORAGE_URL_PROTOCOL || 'https').replace(/:$/, '')
+  if (/^(localhost|127\.0\.0\.1|\[::1\]|[\w.-]+)(:\d+)?(\/|$)/i.test(url)) {
+    return `${defaultProtocol}://${url}`
+  }
+  return url
+}
+
+const hasObjectKeyInStorageUrl = (rawUrl: string, marker: '/read/' | '/upload/') => {
+  const url = String(rawUrl || '').trim()
+  if (!url) return false
+  try {
+    const parsed = new URL(url, window.location.origin)
+    const path = parsed.pathname || ''
+    const idx = path.indexOf(marker)
+    if (idx < 0) return true
+    return path.slice(idx + marker.length).trim().length > 0
+  } catch {
+    if (url.endsWith(marker)) return false
+    return true
+  }
+}
+
 const loadChapterVersions = async (projectId: number, chapterId: string) => {
   const numericChapterId = Number(chapterId)
   if (!projectId || !numericChapterId) return
@@ -855,8 +1144,8 @@ const viewSelectedVersion = async () => {
   versionBusy.value = true
   try {
     const snapshotResp = toRecord(await chapterApi.getVersionSnapshotUrl(projectId, chapterId, versionNo))
-    const url = pickString(snapshotResp, ['downloadUrl', 'url', 'getUrl'])
-    if (!url) throw new Error('版本快照地址为空')
+    const url = normalizeObjectStorageUrl(pickString(snapshotResp, ['downloadUrl', 'url', 'getUrl']))
+    if (!url || !hasObjectKeyInStorageUrl(url, '/read/')) throw new Error('版本快照地址为空')
     const response = await fetch(url)
     if (!response.ok) throw new Error('读取版本快照失败')
     const text = await response.text()
@@ -894,8 +1183,8 @@ const readChapterDraftLocal = (projectId: number, chapterId: string | number) =>
 
 const refreshEditorFromRemote = async (projectId: number, chapterId: number) => {
   const contentResp = toRecord(await chapterApi.getContentUrl(projectId, chapterId))
-  const downloadUrl = pickString(contentResp, ['downloadUrl', 'url', 'getUrl'])
-  if (!downloadUrl) return false
+  const downloadUrl = normalizeObjectStorageUrl(pickString(contentResp, ['downloadUrl', 'url', 'getUrl']))
+  if (!downloadUrl || !hasObjectKeyInStorageUrl(downloadUrl, '/read/')) return false
   const response = await fetch(downloadUrl)
   if (!response.ok) return false
   const text = await response.text()
@@ -967,6 +1256,9 @@ const publishCurrentChapter = async () => {
   }
   versionBusy.value = true
   try {
+    // 发布前先执行一次“原保存接口流程”：上传正文并提交对象元数据。
+    await uploadAndCommitContent(projectId, chapterId, editorContent.value, operatorId)
+    await loadChapterVersions(projectId, String(chapterId))
     await chapterApi.publishChapter(projectId, chapterId, operatorId)
     message.success('章节已发布')
   } catch (error: any) {
@@ -978,40 +1270,40 @@ const publishCurrentChapter = async () => {
 
 const uploadAndCommitContent = async (projectId: number, chapterId: number, content: string, operatorId: number) => {
   const uploadResp = toRecord(await chapterApi.getContentUploadUrl(projectId, chapterId))
-  const uploadUrl = pickString(uploadResp, ['uploadUrl', 'url', 'putUrl'])
+  const uploadUrl = normalizeObjectStorageUrl(pickString(uploadResp, ['uploadUrl', 'url', 'putUrl']))
   const objectKey = pickString(uploadResp, ['objectKey', 'key'])
-  const storageProvider = pickString(uploadResp, ['storageProvider', 'provider']) || 'oss'
-  if (!uploadUrl || !objectKey) {
-    throw new Error('上传地址响应缺少 uploadUrl/objectKey')
+  const storageProvider = pickString(uploadResp, ['storageProvider', 'provider']) || 's3'
+  // 仅走前端直传：必须同时具备 objectKey + uploadUrl。
+  if (!objectKey) {
+    throw new Error('上传地址响应缺少 objectKey')
+  }
+  if (!uploadUrl) {
+    throw new Error('上传地址响应缺少 uploadUrl')
   }
 
+  const size = new Blob([content]).size
   let etag = ''
   let checksum = ''
-  const uploadHost = (() => {
-    try {
-      return new URL(uploadUrl).hostname
-    } catch {
-      return ''
-    }
-  })()
 
-  // 本地联调兜底：后端默认返回 object.local 示例地址，浏览器无法真实上传
-  if (uploadHost && uploadHost !== 'object.local') {
-    const uploadResponse = await fetch(uploadUrl, {
+  let uploadResponse: Response
+  try {
+    uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': 'text/plain; charset=utf-8'
       },
       body: content
     })
-    if (!uploadResponse.ok) {
-      throw new Error(`内容上传失败: ${uploadResponse.status}`)
-    }
-    etag = uploadResponse.headers.get('etag') || ''
-    checksum = uploadResponse.headers.get('x-amz-checksum-sha256') || ''
+  } catch {
+    throw new Error('直传 OSS 请求失败，请检查网络/CORS/预检配置')
   }
 
-  const size = new Blob([content]).size
+  if (!uploadResponse.ok) {
+    throw new Error(`直传 OSS 失败(${uploadResponse.status})`)
+  }
+
+  etag = (uploadResponse.headers.get('etag') || '').replace(/"/g, '').trim()
+  checksum = (uploadResponse.headers.get('x-amz-checksum-crc32') || '').trim()
 
   await chapterApi.commitContent(projectId, chapterId, operatorId, {
     objectKey,
@@ -1144,6 +1436,7 @@ const selectChapter = async (ch: { key: string; title: string; chapterId?: strin
 
 // --- Outline CRUD ---
 const addVolume = async () => {
+  if (outlineOpBusy.value) return
   const { projectId, operatorId } = getContext()
   if (!projectId || !operatorId) {
     message.warning('缺少 projectId/operatorId，无法新建分卷')
@@ -1152,6 +1445,7 @@ const addVolume = async () => {
   const idx = outlineData.value.length
   const nums = ['一','二','三','四','五','六','七','八','九','十']
   const title = `第${nums[idx] || idx + 1}卷：新的篇章`
+  outlineOpBusy.value = true
   try {
     await outlineApi.createNode(projectId, operatorId, {
       parentId: null,
@@ -1163,6 +1457,8 @@ const addVolume = async () => {
     await loadWorkbenchData()
   } catch (error: any) {
     message.warning(error?.message || '新建分卷失败')
+  } finally {
+    outlineOpBusy.value = false
   }
 }
 
@@ -1295,28 +1591,15 @@ const saveContent = async () => {
 
   const projectId = getCurrentProjectId()
   const chapterId = Number(activeChapter.value)
-  const operatorId = resolveOperatorId()
 
-  if (!projectId || !chapterId || !operatorId) {
-    saveHint.value = '✓ 已本地保存'
-    if (projectId && activeChapter.value) {
-      saveChapterDraftLocal(projectId, activeChapter.value, editorContent.value)
-    }
-    setTimeout(() => { saveHint.value = '' }, 2000)
-    return
-  }
-
-  try {
+  // 需求调整：保存仅落本地草稿，不触发服务端上传/提交。
+  if (projectId && chapterId) {
     saveChapterDraftLocal(projectId, chapterId, editorContent.value)
-    await uploadAndCommitContent(projectId, chapterId, editorContent.value, operatorId)
-    await loadChapterVersions(projectId, String(chapterId))
-    saveHint.value = '✓ 云端已保存'
-  } catch (error: any) {
-    saveHint.value = '⚠ 本地已保存'
-    message.warning(error?.message || '云端保存失败，已保留本地内容')
-  } finally {
-    setTimeout(() => { saveHint.value = '' }, 2000)
+  } else if (projectId && activeChapter.value) {
+    saveChapterDraftLocal(projectId, activeChapter.value, editorContent.value)
   }
+  saveHint.value = '✓ 已本地保存'
+  setTimeout(() => { saveHint.value = '' }, 2000)
 }
 
 // --- Chat merge/replace ---
@@ -1339,6 +1622,22 @@ const replaceSelected = (msg: ChatMessage) => {
 }
 
 // --- Chat send ---
+const revealAssistantText = async (assistantMsg: ChatMessage, rawText: string) => {
+  const text = String(rawText || '')
+  if (!text) {
+    assistantMsg.text = ''
+    return
+  }
+  assistantMsg.text = ''
+  const chunkSize = Math.max(10, Math.floor(text.length / 120))
+  for (let i = 0; i < text.length; i += chunkSize) {
+    assistantMsg.text = escapeHtml(text.slice(0, i + chunkSize))
+    await nextTick()
+    scrollChat()
+    await new Promise((resolve) => setTimeout(resolve, 16))
+  }
+}
+
 const sendMessage = async () => {
   if (!chatInput.value.trim() || isGenerating.value) return
   const userText = chatInput.value.trim()
@@ -1348,10 +1647,12 @@ const sendMessage = async () => {
   isGenerating.value = true
   generationPhase.value = 'preparing'
   generationTaskStatus.value = ''
+  debugChatState('user-send-start', { userTextLength: userText.length })
   await nextTick()
   scrollChat()
   const { projectId, operatorId } = getContext()
   if (!projectId || !operatorId) {
+    console.warn('[agent] missing context, skip backend calls', { projectId, operatorId, routeQuery: { ...route.query } })
     await new Promise(r => setTimeout(r, 800))
     messages.value.push({
       id: msgIdCounter++,
@@ -1367,8 +1668,14 @@ const sendMessage = async () => {
   }
 
   try {
+    console.info('[agent] start send flow', { projectId, operatorId })
     const conversationId = await ensureConversationId(projectId, operatorId)
     if (!conversationId) throw new Error('会话初始化失败')
+    const modelConfigId = await ensureModelConfigId(projectId)
+    if (!modelConfigId) {
+      showModelSettings.value = true
+      throw new Error('未选择可用模型，请先在模型设置中保存并切换模型')
+    }
 
     await agentApi.createMessage(projectId, conversationId, operatorId, {
       role: 'user',
@@ -1381,6 +1688,7 @@ const sendMessage = async () => {
     const generation = (await agentApi.createGeneration(projectId, operatorId, {
       conversationId,
       chapterId: Number(activeChapter.value) || null,
+      modelConfigId,
       taskType: 'WRITE',
       promptSnapshot: userText,
       styleProfileSnapshot: '',
@@ -1388,40 +1696,80 @@ const sendMessage = async () => {
     })) as Record<string, unknown>
 
     const taskId = Number(generation?.id || 0)
-    let taskStatus = String(generation?.status || '')
-    generationPhase.value = 'polling'
-    generationTaskStatus.value = taskStatus || 'PENDING'
-    let loop = 0
-    while (taskId && !['SUCCEEDED', 'FAILED', 'ERROR', 'CANCELLED'].includes(taskStatus.toUpperCase()) && loop < 12) {
-      await new Promise(r => setTimeout(r, 1000))
-      const latest = (await agentApi.getGeneration(projectId, taskId)) as Record<string, unknown>
-      taskStatus = String(latest?.status || taskStatus)
-      generationTaskStatus.value = taskStatus || generationTaskStatus.value
-      loop += 1
+    if (!taskId) throw new Error('任务创建失败，缺少 taskId')
+    console.info('[agent] generation created', { projectId, conversationId, taskId, status: generation?.status })
+
+    generationTaskStatus.value = normalizeGenerationStatus(generation?.status) || 'pending'
+    generationPhase.value = 'streaming'
+
+    const assistantMsg: ChatMessage = { id: msgIdCounter++, role: 'assistant', text: '' }
+    messages.value.push(assistantMsg)
+    streamingAssistantMsgId.value = assistantMsg.id
+    debugChatState('assistant-placeholder-created', { assistantMsgId: assistantMsg.id })
+    await nextTick()
+    scrollChat()
+
+    let finalStatus: GenerationTaskStatus | ''
+    let streamedTokenReceived = false
+    try {
+      finalStatus = await consumeGenerationStream(projectId, taskId, assistantMsg)
+      streamedTokenReceived = Boolean(assistantMsg.text)
+    } catch (streamError: any) {
+      if (!ENABLE_POLLING_FALLBACK) {
+        throw streamError
+      }
+      finalStatus = await pollGenerationAsFallback(projectId, taskId)
+      if (!assistantMsg.text) {
+        const messageList = (await agentApi.listMessages(projectId, conversationId)) as Array<Record<string, unknown>>
+        const latestAssistant = [...messageList].reverse().find((item) => String(item.role || '').toLowerCase() === 'assistant')
+        const latestText = String(latestAssistant?.contentMd || '')
+        if (latestText) {
+          await revealAssistantText(assistantMsg, latestText)
+        }
+      }
     }
 
-    const messageList = (await agentApi.listMessages(projectId, conversationId)) as Array<Record<string, unknown>>
-    const assistantMsg = [...messageList].reverse().find((item) => String(item.role || '').toLowerCase() === 'assistant')
-    const assistantText = String(assistantMsg?.contentMd || '')
-    messages.value.push({
-      id: msgIdCounter++,
-      role: 'assistant',
-      text: assistantText || `生成任务已提交，当前状态：${taskStatus || 'PENDING'}`
-    })
+    if (!assistantMsg.text) {
+      try {
+        const messageList = (await agentApi.listMessages(projectId, conversationId)) as Array<Record<string, unknown>>
+        const latestAssistant = [...messageList].reverse().find((item) => String(item.role || '').toLowerCase() === 'assistant')
+        const latestText = String(latestAssistant?.contentMd || '')
+        if (latestText) {
+          if (streamedTokenReceived) {
+            assistantMsg.text = escapeHtml(latestText)
+          } else {
+            await revealAssistantText(assistantMsg, latestText)
+          }
+        }
+      } catch {
+        // 消息补拉失败时使用后续兜底文案。
+      }
+    }
+
+    if (!assistantMsg.text) {
+      assistantMsg.text = `生成任务已完成，状态：${finalStatus || generationTaskStatus.value || 'unknown'}`
+    }
+
+    if (finalStatus === 'failed' || finalStatus === 'cancelled') {
+      throw new Error(`生成任务结束：${finalStatus}`)
+    }
   } catch (error: any) {
     generationPhase.value = 'failed'
-    generationTaskStatus.value = 'FAILED'
+    generationTaskStatus.value = 'failed'
     messages.value.push({
       id: msgIdCounter++,
       role: 'assistant',
       text: `生成失败：${String(error?.message || '未知错误')}`
     })
   } finally {
+    closeGenerationStream()
     isGenerating.value = false
+    streamingAssistantMsgId.value = null
     if (generationPhase.value !== 'failed') {
       generationPhase.value = 'idle'
       generationTaskStatus.value = ''
     }
+    debugChatState('send-flow-finished')
     await nextTick()
     scrollChat()
   }
@@ -1501,9 +1849,9 @@ const mapOutlineTree = (
   nodes.forEach((node) => {
     const key = String(node.id ?? node.nodeId ?? node.key ?? '')
     const title = String(node.title ?? node.name ?? '未命名')
-    const parentId = node.parentId ?? node.parentNodeId ?? null
     const nodeType = String(node.nodeType ?? node.type ?? '').toUpperCase()
-    if (!parentId || nodeType.includes('VOLUME')) {
+    // 仅按明确的 VOLUME 节点构建卷，避免 parentId=0/null 边界导致章节被误判为卷。
+    if (nodeType.includes('VOLUME')) {
       volumeMap.set(key, { title, key, expanded: true, children: [] })
     }
   })
@@ -1548,7 +1896,8 @@ const loadWorkbenchData = async () => {
     chapterList.forEach((chapter) => {
       const key = String(chapter.chapterId ?? chapter.id ?? chapter.key ?? '')
       if (!key) return
-      const chapterText = String(chapter.content ?? chapter.summary ?? '')
+      // 正文应走 OSS content-url 获取；这里不再回填 chapter.content，避免把后端 HTML 占位内容灌进编辑器。
+      const chapterText = ''
       const localDraft = readChapterDraftLocal(projectId, key)
       chapterContents.value[key] = chapterText || localDraft || ''
       const outlineNodeId = String(chapter.outlineNodeId ?? chapter.nodeId ?? '')
@@ -1576,6 +1925,7 @@ const loadWorkbenchData = async () => {
 }
 
 onMounted(() => {
+  void refreshActiveModelInfo(Number(route.query.bookId || 0))
   if (session.userName) username.value = session.userName
   if (session.userEmail) userEmail.value = session.userEmail
   editorContent.value = chapterContents.value[activeChapter.value] || ''
@@ -1583,6 +1933,10 @@ onMounted(() => {
   lastSnapshot = editorContent.value
   loadWorkbenchData()
   loadActivePlugins()
+})
+
+onBeforeUnmount(() => {
+  closeGenerationStream()
 })
 
 watch(
@@ -2062,6 +2416,14 @@ watch(
   padding: 10px 14px; border: 1px solid; border-radius: 10px;
   font-size: 0.85rem; color: var(--text-primary); line-height: 1.7; white-space: pre-wrap;
   &.typing { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.78rem; }
+}
+
+.msg-inline-typing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 
 .msg-actions {

@@ -113,7 +113,6 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         // then
         verify(pluginRepository).findCatalogIdByCode(pluginCode);
         verify(pluginRepository).insertInstall(eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("plugin"), eq("install-plugin"), eq("plugin_project_installs"), eq("1"), eq(configJson), eq(200));
     }
 
     @Test
@@ -178,7 +177,6 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
         // then
         verify(pluginRepository).updateInstall(projectId, pluginCode, enabled, configJson);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("plugin"), eq("update-plugin-install"), eq("plugin_project_installs"), eq(pluginCode), eq(configJson), eq(200));
     }
 
     @Test
@@ -216,7 +214,6 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
         // then
         verify(pluginRepository).deleteInstall(projectId, pluginCode);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("plugin"), eq("delete-plugin-install"), eq("plugin_project_installs"), eq(pluginCode), isNull(), eq(200));
     }
 
     @Test
@@ -249,6 +246,21 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         verify(pluginRepository).listCallLogs(projectId);
         verifyNoInteractions(auditService);
         assert result.size() == 2;
+    }
+
+    @Test
+    void UT_APP_PLUGIN_RECORD_TOOL_CALL_SUCCESS() {
+        PluginCallLog callLog = new PluginCallLog();
+        callLog.setProjectId(1L);
+        callLog.setTaskId(2L);
+        callLog.setPluginCode("search-tool");
+        callLog.setToolName("context_enhancer");
+        when(pluginRepository.insertCallLog(callLog)).thenReturn(1);
+
+        pluginApplicationService.recordToolCall(callLog);
+
+        verify(pluginRepository).insertCallLog(callLog);
+        verifyNoInteractions(auditService);
     }
 }
 

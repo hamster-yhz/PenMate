@@ -76,7 +76,6 @@ class OpsApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getId()).isEqualTo(12L);
         verify(opsRepository).insertJob(any(OpsAsyncJob.class));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("ops"), eq("job:retry"), eq("ops_async_jobs"), eq("12"), eq("{\"sourceJobId\":11}"), eq(201));
     }
 
     @Test
@@ -101,7 +100,6 @@ class OpsApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getId()).isEqualTo(31L);
         verify(opsRepository).updateMigration(31L, "done", 100, "{\"migrated\":0,\"failed\":0}", null);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("ops"), eq("migration:run"), eq("ops_migrations"), eq("31"), eq("{\"migrationType\":\"content_to_object_storage\"}"), eq(201));
     }
 
     @Test

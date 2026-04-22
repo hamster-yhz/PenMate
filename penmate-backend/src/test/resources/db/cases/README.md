@@ -22,14 +22,13 @@
 
 | 领域 | 表 | 覆盖脚本 |
 |---|---|---|
-| IAM | iam_users / iam_roles / iam_permissions / iam_user_roles / iam_role_permissions / iam_menus / iam_user_sessions | base + conflict_boundary |
+| IAM | iam_users / iam_roles / iam_permissions / iam_user_roles / iam_role_permissions / iam_menus | base + conflict_boundary |
 | 小说 | novel_projects / novel_members / novel_volumes / novel_chapters / novel_chapter_versions / novel_outline_nodes / novel_cards / novel_card_relations | base + conflict_boundary + concurrency_rollback |
 | 文风 | style_profiles / style_switch_logs | base + conflict_boundary |
 | 插件 | plugin_catalog / plugin_project_installs / plugin_call_logs | base + conflict_boundary |
-| 模型 | model_providers / model_provider_models / model_user_api_keys / model_project_policies | base + conflict_boundary |
 | Agent审批 | agent_conversations / agent_messages / agent_generation_tasks / agent_approval_requests / agent_approval_actions | base + conflict_boundary + concurrency_rollback |
 | RAG/存储 | rag_documents / rag_chunks / storage_objects | base + conflict_boundary |
-| 运维 | ops_async_jobs / ops_migrations / ops_audit_logs | base + conflict_boundary + concurrency_rollback |
+| 运维 | ops_async_jobs / ops_migrations | base + conflict_boundary + concurrency_rollback |
 
 ## 4. 约束与异常覆盖说明
 
@@ -37,6 +36,7 @@
   - 如 `iam_users.email`、`novel_chapter_versions(chapter_id,version_no)`、`plugin_project_installs(project_id,plugin_id)`、`novel_members(project_id,user_id)`、`rag_chunks(vector_id,vector_store)`
 - 并发/乐观锁模板：见 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
 - 事务回滚模板：见 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
+- 按约定不包含模型与密钥造数：`model_providers` / `model_provider_models` / `model_user_api_keys` / `model_project_policies`
 
 ## 5. 注意事项
 

@@ -11,4 +11,3 @@ public interface AuditService {
                String requestJson,
                int responseCode);
 }
-

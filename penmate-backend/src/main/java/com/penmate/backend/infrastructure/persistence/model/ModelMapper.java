@@ -1,8 +1,8 @@
 package com.penmate.backend.infrastructure.persistence.model;
 
 import com.penmate.backend.domain.model.model.ModelProjectPolicy;
+import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelProviderModel;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -21,23 +21,6 @@ import java.util.List;
 public interface ModelMapper {
 
     @Select("""
-            SELECT id, code, name, base_url, auth_type, status, created_at, updated_at
-            FROM model_providers
-            ORDER BY id DESC
-            """)
-    List<ModelProvider> listProviders();
-
-    @Select("""
-            SELECT m.id, m.provider_id, m.model_code, m.model_name, m.context_window,
-                   m.max_output, CAST(m.pricing_json AS CHAR) AS pricing_json, m.status, m.created_at
-            FROM model_provider_models m
-            JOIN model_providers p ON p.id = m.provider_id
-            WHERE p.code = #{providerCode}
-            ORDER BY m.id DESC
-            """)
-    List<ModelProviderModel> listProviderModels(@Param("providerCode") String providerCode);
-
-    @Select("""
             SELECT id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key,
                    is_default, last_used_at, status, created_at, updated_at, deleted_at
             FROM model_user_api_keys
@@ -45,6 +28,15 @@ public interface ModelMapper {
             ORDER BY is_default DESC, id DESC
             """)
     List<ModelUserApiKey> listUserKeys(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT id, provider_id, key_name, encrypted_api_key, masked_api_key,
+                   is_default, last_used_at, status, created_at, updated_at, deleted_at
+            FROM model_official_api_keys
+            WHERE deleted_at IS NULL
+            ORDER BY provider_id ASC, is_default DESC, id DESC
+            """)
+    List<ModelOfficialApiKey> listOfficialKeys();
 
     @Insert("""
             INSERT INTO model_user_api_keys(user_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, status)
@@ -58,12 +50,31 @@ public interface ModelMapper {
                       @Param("isDefault") boolean isDefault,
                       @Param("status") String status);
 
+    @Insert("""
+            INSERT INTO model_official_api_keys(provider_id, key_name, encrypted_api_key, masked_api_key, is_default, status)
+            VALUES (#{providerId}, #{keyName}, #{encryptedApiKey}, #{maskedApiKey}, #{isDefault}, #{status})
+            """)
+    int insertOfficialKey(@Param("providerId") Long providerId,
+                          @Param("keyName") String keyName,
+                          @Param("encryptedApiKey") String encryptedApiKey,
+                          @Param("maskedApiKey") String maskedApiKey,
+                          @Param("isDefault") boolean isDefault,
+                          @Param("status") String status);
+
     @Update("""
             UPDATE model_user_api_keys
             SET is_default = 0
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
     int clearDefaultUserKey(@Param("userId") Long userId);
+
+    @Update("""
+            UPDATE model_official_api_keys
+            SET is_default = 0,
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE provider_id = #{providerId} AND deleted_at IS NULL
+            """)
+    int clearDefaultOfficialKey(@Param("providerId") Long providerId);
 
     @Update("""
             UPDATE model_user_api_keys
@@ -84,6 +95,23 @@ public interface ModelMapper {
                       @Param("status") String status);
 
     @Update("""
+            UPDATE model_official_api_keys
+            SET key_name = COALESCE(#{keyName}, key_name),
+                encrypted_api_key = COALESCE(#{encryptedApiKey}, encrypted_api_key),
+                masked_api_key = COALESCE(#{maskedApiKey}, masked_api_key),
+                is_default = COALESCE(#{isDefault}, is_default),
+                status = COALESCE(#{status}, status),
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE id = #{keyId} AND deleted_at IS NULL
+            """)
+    int updateOfficialKey(@Param("keyId") Long keyId,
+                          @Param("keyName") String keyName,
+                          @Param("encryptedApiKey") String encryptedApiKey,
+                          @Param("maskedApiKey") String maskedApiKey,
+                          @Param("isDefault") Boolean isDefault,
+                          @Param("status") String status);
+
+    @Update("""
             UPDATE model_user_api_keys
             SET deleted_at = CURRENT_TIMESTAMP(3),
                 is_default = 0,
@@ -92,8 +120,18 @@ public interface ModelMapper {
             """)
     int softDeleteUserKey(@Param("userId") Long userId, @Param("keyId") Long keyId);
 
+    @Update("""
+            UPDATE model_official_api_keys
+            SET deleted_at = CURRENT_TIMESTAMP(3),
+                is_default = 0,
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE id = #{keyId} AND deleted_at IS NULL
+            """)
+    int softDeleteOfficialKey(@Param("keyId") Long keyId);
+
     @Select("""
-            SELECT id, project_id, policy_name, scene, provider_model_id, user_key_id,
+            SELECT id, project_id, policy_name, scene, provider_model_id, model_name, user_key_id,
+                   base_url, official_key_id,
                    temperature, top_p, max_tokens,
                    CAST(fallback_policy_json AS CHAR) AS fallback_policy_json,
                    is_default, created_at, updated_at, deleted_at
@@ -103,17 +141,82 @@ public interface ModelMapper {
             """)
     List<ModelProjectPolicy> listProjectPolicies(@Param("projectId") Long projectId);
 
+    @Select("""
+            SELECT id, project_id, policy_name, scene, provider_model_id, model_name, user_key_id,
+                   base_url, official_key_id,
+                   temperature, top_p, max_tokens,
+                   CAST(fallback_policy_json AS CHAR) AS fallback_policy_json,
+                   is_default, created_at, updated_at, deleted_at
+            FROM model_project_policies
+            WHERE project_id = #{projectId} AND id = #{policyId} AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    ModelProjectPolicy findProjectPolicy(@Param("projectId") Long projectId,
+                                         @Param("policyId") Long policyId);
+
+    @Select("""
+            SELECT id, project_id, policy_name, scene, provider_model_id, model_name, user_key_id,
+                   base_url, official_key_id,
+                   temperature, top_p, max_tokens,
+                   CAST(fallback_policy_json AS CHAR) AS fallback_policy_json,
+                   is_default, created_at, updated_at, deleted_at
+            FROM model_project_policies
+            WHERE project_id = #{projectId} AND deleted_at IS NULL
+            ORDER BY is_default DESC, id DESC
+            LIMIT 1
+            """)
+    ModelProjectPolicy findDefaultProjectPolicy(@Param("projectId") Long projectId);
+
+    @Select("""
+            SELECT id, code, name, base_url, auth_type, status, created_at, updated_at
+            FROM model_providers
+            WHERE id = #{providerId}
+            LIMIT 1
+            """)
+    ModelProvider findProvider(@Param("providerId") Long providerId);
+
+    @Select("""
+            SELECT id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key,
+                   is_default, last_used_at, status, created_at, updated_at, deleted_at
+            FROM model_user_api_keys
+            WHERE id = #{userKeyId} AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    ModelUserApiKey findUserKey(@Param("userKeyId") Long userKeyId);
+
+    @Select("""
+            SELECT id, provider_id, key_name, encrypted_api_key, masked_api_key,
+                   is_default, last_used_at, status, created_at, updated_at, deleted_at
+            FROM model_official_api_keys
+            WHERE id = #{officialKeyId} AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    ModelOfficialApiKey findOfficialKey(@Param("officialKeyId") Long officialKeyId);
+
+    @Select("""
+            SELECT id, provider_id, key_name, encrypted_api_key, masked_api_key,
+                   is_default, last_used_at, status, created_at, updated_at, deleted_at
+            FROM model_official_api_keys
+            WHERE provider_id = #{providerId} AND is_default = 1 AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+            """)
+    ModelOfficialApiKey findDefaultOfficialKey(@Param("providerId") Long providerId);
+
     @Insert("""
-            INSERT INTO model_project_policies(project_id, policy_name, scene, provider_model_id, user_key_id,
+            INSERT INTO model_project_policies(project_id, policy_name, scene, provider_model_id, model_name, base_url, user_key_id, official_key_id,
                                                temperature, top_p, max_tokens, fallback_policy_json, is_default)
-            VALUES (#{projectId}, #{policyName}, #{scene}, #{providerModelId}, #{userKeyId},
+            VALUES (#{projectId}, #{policyName}, #{scene}, #{providerModelId}, #{modelName}, #{baseUrl}, #{userKeyId}, #{officialKeyId},
                     #{temperature}, #{topP}, #{maxTokens}, #{fallbackPolicyJson}, #{isDefault})
             """)
     int insertPolicy(@Param("projectId") Long projectId,
                      @Param("policyName") String policyName,
                      @Param("scene") String scene,
                      @Param("providerModelId") Long providerModelId,
+                     @Param("modelName") String modelName,
+                     @Param("baseUrl") String baseUrl,
                      @Param("userKeyId") Long userKeyId,
+                     @Param("officialKeyId") Long officialKeyId,
                      @Param("temperature") BigDecimal temperature,
                      @Param("topP") BigDecimal topP,
                      @Param("maxTokens") Integer maxTokens,
@@ -125,7 +228,10 @@ public interface ModelMapper {
             SET policy_name = COALESCE(#{policyName}, policy_name),
                 scene = COALESCE(#{scene}, scene),
                 provider_model_id = COALESCE(#{providerModelId}, provider_model_id),
+                model_name = COALESCE(#{modelName}, model_name),
+                base_url = COALESCE(#{baseUrl}, base_url),
                 user_key_id = COALESCE(#{userKeyId}, user_key_id),
+                official_key_id = COALESCE(#{officialKeyId}, official_key_id),
                 temperature = COALESCE(#{temperature}, temperature),
                 top_p = COALESCE(#{topP}, top_p),
                 max_tokens = COALESCE(#{maxTokens}, max_tokens),
@@ -139,7 +245,10 @@ public interface ModelMapper {
                      @Param("policyName") String policyName,
                      @Param("scene") String scene,
                      @Param("providerModelId") Long providerModelId,
+                     @Param("modelName") String modelName,
+                     @Param("baseUrl") String baseUrl,
                      @Param("userKeyId") Long userKeyId,
+                     @Param("officialKeyId") Long officialKeyId,
                      @Param("temperature") BigDecimal temperature,
                      @Param("topP") BigDecimal topP,
                      @Param("maxTokens") Integer maxTokens,

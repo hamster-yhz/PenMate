@@ -30,16 +30,21 @@ CREATE TABLE IF NOT EXISTS agent_generation_tasks (
     project_id BIGINT UNSIGNED NOT NULL,
     conversation_id BIGINT UNSIGNED NOT NULL,
     chapter_id BIGINT UNSIGNED NULL,
+    model_policy_id BIGINT UNSIGNED NULL,
     task_type VARCHAR(40) NOT NULL,
     prompt_snapshot JSON NULL,
     style_profile_snapshot JSON NULL,
     plugin_snapshot JSON NULL,
+    token_usage_json JSON NULL,
+    cost_json JSON NULL,
+    trace_id VARCHAR(64) NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'running',
     started_at DATETIME(3) NULL,
     finished_at DATETIME(3) NULL,
     error_msg VARCHAR(500) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    KEY idx_agent_generation_project_status (project_id, status)
+    KEY idx_agent_generation_project_status (project_id, status),
+    KEY idx_agent_generation_trace (trace_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS ops_async_jobs (

@@ -2,21 +2,23 @@ package com.penmate.backend.application.auth;
 
 import com.penmate.backend.application.auth.command.LoginCommand;
 import com.penmate.backend.application.auth.command.RefreshCommand;
+import com.penmate.backend.application.auth.support.AuthSessionCache;
+import com.penmate.backend.application.auth.support.AuthTokenBundle;
+import com.penmate.backend.application.auth.support.AuthTokenService;
+import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
+import com.penmate.backend.application.auth.support.ParsedToken;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
-import com.penmate.backend.domain.iam.model.IamSession;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
-import com.penmate.backend.domain.shared.service.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 认证应用服务。
@@ -28,7 +30,8 @@ import java.util.UUID;
 public class AuthApplicationService {
 
     private final IamGateway iamGateway;
-    private final AuditService auditService;
+    private final AuthTokenService authTokenService;
+    private final AuthSessionCache authSessionCache;
 
     /**
      * 处理邮箱密码登录。
@@ -50,26 +53,30 @@ public class AuthApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }
 
-        IamSession session = new IamSession();
-        session.setUserId(user.getId());
-        session.setAccessToken("atk_" + UUID.randomUUID());
-        session.setRefreshToken("rtk_" + UUID.randomUUID());
-        session.setAccessExpiresAt(LocalDateTime.now().plusHours(2));
-        session.setRefreshExpiresAt(LocalDateTime.now().plusDays(7));
-        if (iamGateway.insertSession(session) != 1) {
-            log.error("登录失败: userId={}, reason=create_session_failed", user.getId());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create session");
-        }
+        List<IamRole> roles = iamGateway.findRolesByUserId(user.getId());
+        List<IamPermission> permissions = iamGateway.findPermissionsByUserId(user.getId());
+
+        AuthUserSessionPayload payload = new AuthUserSessionPayload();
+        payload.setUserId(user.getId());
+        payload.setEmail(user.getEmail());
+        payload.setDisplayName(user.getDisplayName());
+        payload.setStatus(user.getStatus());
+        payload.setRoles(toRoleMaps(roles));
+        payload.setPermissions(toPermissionMaps(permissions));
+
+        AuthTokenBundle bundle = authTokenService.issueTokens(payload);
+        payload.setRefreshJti(bundle.refreshJti());
+        authSessionCache.saveSession(payload, bundle);
         iamGateway.touchLastLogin(user.getId());
 
-        writeAudit(traceId, user.getId(), "auth", "login", "iam_user_sessions", String.valueOf(session.getId()), command.email(), 200);
+        writeAudit(traceId, user.getId(), "auth", "login", "redis_auth_tokens", bundle.accessJti(), command.email(), 200);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("accessToken", session.getAccessToken());
-        result.put("refreshToken", session.getRefreshToken());
-        result.put("accessExpiresAt", session.getAccessExpiresAt());
-        result.put("refreshExpiresAt", session.getRefreshExpiresAt());
-        log.info("登录成功: userId={}, sessionId={}", user.getId(), session.getId());
+        result.put("accessToken", bundle.accessToken());
+        result.put("refreshToken", bundle.refreshToken());
+        result.put("accessExpiresAt", bundle.accessExpiresAt());
+        result.put("refreshExpiresAt", bundle.refreshExpiresAt());
+        log.info("登录成功: userId={}, accessJti={}", user.getId(), bundle.accessJti());
         return result;
     }
 
@@ -82,14 +89,18 @@ public class AuthApplicationService {
      */
     public void logout(String accessToken, String traceId) {
         String token = extractBearer(accessToken);
-        IamSession session = iamGateway.findSessionByAccessToken(token);
-        if (session == null) {
+        ParsedToken parsed = authTokenService.parseAccessToken(token);
+        AuthUserSessionPayload payload = authSessionCache.getByAccessJti(parsed.tokenId());
+        if (payload == null) {
             log.info("登出请求忽略: reason=session_not_found");
             return;
         }
-        iamGateway.revokeByAccessToken(token);
-        writeAudit(traceId, session.getUserId(), "auth", "logout", "iam_user_sessions", String.valueOf(session.getId()), null, 200);
-        log.info("登出成功: userId={}, sessionId={}", session.getUserId(), session.getId());
+        authSessionCache.revokeAccess(parsed.tokenId());
+        if (payload.getRefreshJti() != null && !payload.getRefreshJti().isBlank()) {
+            authSessionCache.revokeRefresh(payload.getRefreshJti());
+        }
+        writeAudit(traceId, parsed.userId(), "auth", "logout", "redis_auth_tokens", parsed.tokenId(), null, 200);
+        log.info("登出成功: userId={}, accessJti={}", parsed.userId(), parsed.tokenId());
     }
 
     /**
@@ -102,27 +113,25 @@ public class AuthApplicationService {
      */
     public Map<String, Object> refresh(RefreshCommand command, String traceId) {
         log.info("刷新令牌请求");
-        IamSession session = iamGateway.findSessionByRefreshToken(command.refreshToken());
-        if (session == null || session.getRefreshExpiresAt().isBefore(LocalDateTime.now())) {
+        ParsedToken parsed = authTokenService.parseRefreshToken(command.refreshToken());
+        AuthUserSessionPayload payload = authSessionCache.getByRefreshJti(parsed.tokenId());
+        if (payload == null) {
             log.warn("刷新令牌失败: reason=invalid_or_expired");
             throw com.penmate.backend.application.common.exception.BusinessException.of("Refresh token invalid or expired");
         }
-        session.setAccessToken("atk_" + UUID.randomUUID());
-        session.setRefreshToken("rtk_" + UUID.randomUUID());
-        session.setAccessExpiresAt(LocalDateTime.now().plusHours(2));
-        session.setRefreshExpiresAt(LocalDateTime.now().plusDays(7));
-        if (iamGateway.rotateSession(session) != 1) {
-            log.error("刷新令牌失败: userId={}, sessionId={}, reason=rotate_failed", session.getUserId(), session.getId());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to refresh token");
-        }
-        writeAudit(traceId, session.getUserId(), "auth", "refresh", "iam_user_sessions", String.valueOf(session.getId()), null, 200);
+        authSessionCache.revokeRefresh(parsed.tokenId());
+        AuthTokenBundle bundle = authTokenService.issueTokens(payload);
+        payload.setRefreshJti(bundle.refreshJti());
+        authSessionCache.saveSession(payload, bundle);
+
+        writeAudit(traceId, payload.getUserId(), "auth", "refresh", "redis_auth_tokens", bundle.refreshJti(), null, 200);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("accessToken", session.getAccessToken());
-        result.put("refreshToken", session.getRefreshToken());
-        result.put("accessExpiresAt", session.getAccessExpiresAt());
-        result.put("refreshExpiresAt", session.getRefreshExpiresAt());
-        log.info("刷新令牌成功: userId={}, sessionId={}", session.getUserId(), session.getId());
+        result.put("accessToken", bundle.accessToken());
+        result.put("refreshToken", bundle.refreshToken());
+        result.put("accessExpiresAt", bundle.accessExpiresAt());
+        result.put("refreshExpiresAt", bundle.refreshExpiresAt());
+        log.info("刷新令牌成功: userId={}, refreshJti={}", payload.getUserId(), bundle.refreshJti());
         return result;
     }
 
@@ -135,26 +144,23 @@ public class AuthApplicationService {
      */
     public Map<String, Object> me(String authorization) {
         String token = extractBearer(authorization);
-        IamSession session = iamGateway.findSessionByAccessToken(token);
-        if (session == null || session.getAccessExpiresAt().isBefore(LocalDateTime.now())) {
+        ParsedToken parsed = authTokenService.parseAccessToken(token);
+        AuthUserSessionPayload payload = authSessionCache.getByAccessJti(parsed.tokenId());
+        if (payload == null) {
             log.warn("查询当前用户失败: reason=login_required");
             throw com.penmate.backend.application.common.exception.BusinessException.of("Login required");
         }
-        IamUser user = iamGateway.findUserById(session.getUserId());
-        if (user == null) {
-            log.warn("查询当前用户失败: userId={}, reason=user_not_found", session.getUserId());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
-        }
-        List<IamRole> roles = iamGateway.findRolesByUserId(user.getId());
-        List<IamPermission> permissions = iamGateway.findPermissionsByUserId(user.getId());
 
         Map<String, Object> result = new HashMap<>();
-        result.put("id", user.getId());
-        result.put("email", user.getEmail());
-        result.put("displayName", user.getDisplayName());
-        result.put("roles", roles);
-        result.put("permissions", permissions);
-        log.info("查询当前用户成功: userId={}, roleCount={}, permissionCount={}", user.getId(), roles.size(), permissions.size());
+        result.put("id", payload.getUserId());
+        result.put("email", payload.getEmail());
+        result.put("displayName", payload.getDisplayName());
+        result.put("roles", payload.getRoles());
+        result.put("permissions", payload.getPermissions());
+        log.info("查询当前用户成功: userId={}, roleCount={}, permissionCount={}",
+                payload.getUserId(),
+                payload.getRoles() == null ? 0 : payload.getRoles().size(),
+                payload.getPermissions() == null ? 0 : payload.getPermissions().size());
         return result;
     }
 
@@ -165,6 +171,31 @@ public class AuthApplicationService {
         return authorization.substring("Bearer ".length()).trim();
     }
 
+    private List<Map<String, Object>> toRoleMaps(List<IamRole> roles) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (IamRole role : roles) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", role.getId());
+            item.put("name", role.getName());
+            item.put("code", role.getCode());
+            result.add(item);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> toPermissionMaps(List<IamPermission> permissions) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (IamPermission permission : permissions) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", permission.getId());
+            item.put("name", permission.getName());
+            item.put("code", permission.getCode());
+            item.put("module", permission.getModule());
+            result.add(item);
+        }
+        return result;
+    }
+
     private void writeAudit(String traceId,
                             Long userId,
                             String module,
@@ -173,8 +204,7 @@ public class AuthApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
 

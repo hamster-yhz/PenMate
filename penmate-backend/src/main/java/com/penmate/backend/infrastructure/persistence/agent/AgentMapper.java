@@ -82,12 +82,14 @@ public interface AgentMapper {
 
     @Insert("""
             INSERT INTO agent_generation_tasks(
-                project_id, conversation_id, chapter_id, task_type,
+                project_id, conversation_id, chapter_id, model_policy_id, task_type,
                 prompt_snapshot, style_profile_snapshot, plugin_snapshot,
+                token_usage_json, cost_json, trace_id,
                 status, started_at, finished_at, error_msg
             ) VALUES (
-                #{projectId}, #{conversationId}, #{chapterId}, #{taskType},
+                #{projectId}, #{conversationId}, #{chapterId}, #{modelConfigId}, #{taskType},
                 #{promptSnapshot}, #{styleProfileSnapshot}, #{pluginSnapshot},
+                #{tokenUsageJson}, #{costJson}, #{traceId},
                 #{status}, #{startedAt}, #{finishedAt}, #{errorMsg}
             )
             """)
@@ -95,10 +97,14 @@ public interface AgentMapper {
     int insertGenerationTask(AgentGenerationTask task);
 
     @Select("""
-            SELECT id, project_id, conversation_id, chapter_id, task_type,
+            SELECT id, project_id, conversation_id, chapter_id,
+                   model_policy_id AS model_config_id, task_type,
                    CAST(prompt_snapshot AS CHAR) AS prompt_snapshot,
                    CAST(style_profile_snapshot AS CHAR) AS style_profile_snapshot,
                    CAST(plugin_snapshot AS CHAR) AS plugin_snapshot,
+                   CAST(token_usage_json AS CHAR) AS token_usage_json,
+                   CAST(cost_json AS CHAR) AS cost_json,
+                   trace_id,
                    status, started_at, finished_at, error_msg, created_at
             FROM agent_generation_tasks
             WHERE project_id = #{projectId} AND id = #{taskId}
@@ -111,12 +117,25 @@ public interface AgentMapper {
             UPDATE agent_generation_tasks
             SET status = #{status},
                 error_msg = #{errorMsg},
-                finished_at = CASE WHEN #{status} IN ('done', 'applied', 'failed') THEN CURRENT_TIMESTAMP(3) ELSE finished_at END
+                finished_at = CASE WHEN #{status} IN ('done', 'applied', 'failed', 'cancelled') THEN CURRENT_TIMESTAMP(3) ELSE finished_at END
             WHERE project_id = #{projectId} AND id = #{taskId}
             """)
     int updateGenerationTaskStatus(@Param("projectId") Long projectId,
                                    @Param("taskId") Long taskId,
                                    @Param("status") String status,
                                    @Param("errorMsg") String errorMsg);
+
+    @Update("""
+            UPDATE agent_generation_tasks
+            SET token_usage_json = COALESCE(#{tokenUsageJson}, token_usage_json),
+                cost_json = COALESCE(#{costJson}, cost_json),
+                trace_id = COALESCE(#{traceId}, trace_id)
+            WHERE project_id = #{projectId} AND id = #{taskId}
+            """)
+    int updateGenerationTaskRuntime(@Param("projectId") Long projectId,
+                                    @Param("taskId") Long taskId,
+                                    @Param("tokenUsageJson") String tokenUsageJson,
+                                    @Param("costJson") String costJson,
+                                    @Param("traceId") String traceId);
 }
 

@@ -27,5 +27,7 @@ public interface AgentRepository {
     AgentGenerationTask findGenerationTask(Long projectId, Long taskId);
 
     int updateGenerationTaskStatus(Long projectId, Long taskId, String status, String errorMsg);
+
+    int updateGenerationTaskRuntime(Long projectId, Long taskId, String tokenUsageJson, String costJson, String traceId);
 }
 

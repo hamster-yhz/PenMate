@@ -3,7 +3,6 @@
 import com.penmate.backend.domain.iam.model.IamMenu;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
-import com.penmate.backend.domain.iam.model.IamSession;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
 import org.springframework.stereotype.Repository;
@@ -18,18 +17,15 @@ import java.util.List;
 public class IamGatewayImpl implements IamGateway {
 
     private final IamUserMapper iamUserMapper;
-    private final IamSessionMapper iamSessionMapper;
     private final IamRoleMapper iamRoleMapper;
     private final IamPermissionMapper iamPermissionMapper;
     private final IamMenuMapper iamMenuMapper;
 
     public IamGatewayImpl(IamUserMapper iamUserMapper,
-                          IamSessionMapper iamSessionMapper,
                           IamRoleMapper iamRoleMapper,
                           IamPermissionMapper iamPermissionMapper,
                           IamMenuMapper iamMenuMapper) {
         this.iamUserMapper = iamUserMapper;
-        this.iamSessionMapper = iamSessionMapper;
         this.iamRoleMapper = iamRoleMapper;
         this.iamPermissionMapper = iamPermissionMapper;
         this.iamMenuMapper = iamMenuMapper;
@@ -88,61 +84,6 @@ public class IamGatewayImpl implements IamGateway {
     @Override
     public List<IamPermission> findPermissionsByUserId(Long userId) {
         return iamUserMapper.findPermissionsByUserId(userId);
-    }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param session 入参：session
-     * @return 出参：处理结果
-     */
-    @Override
-    public int insertSession(IamSession session) {
-        return iamSessionMapper.insert(session);
-    }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param accessToken 入参：accessToken
-     * @return 出参：处理结果
-     */
-    @Override
-    public IamSession findSessionByAccessToken(String accessToken) {
-        return iamSessionMapper.findByAccessToken(accessToken);
-    }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param refreshToken 入参：refreshToken
-     * @return 出参：处理结果
-     */
-    @Override
-    public IamSession findSessionByRefreshToken(String refreshToken) {
-        return iamSessionMapper.findByRefreshToken(refreshToken);
-    }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param accessToken 入参：accessToken
-     * @return 出参：处理结果
-     */
-    @Override
-    public int revokeByAccessToken(String accessToken) {
-        return iamSessionMapper.revokeByAccessToken(accessToken);
-    }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param session 入参：session
-     * @return 出参：处理结果
-     */
-    @Override
-    public int rotateSession(IamSession session) {
-        return iamSessionMapper.rotate(session);
     }
 
     /**

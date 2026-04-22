@@ -13,6 +13,7 @@ public class CommitChapterContentDto {
     private Long size;
     private String checksum;
     private String storageProvider;
+    private String content;
 
 }
 

@@ -31,5 +31,7 @@ public interface PluginRepository {
     int deleteInstall(Long projectId, String pluginCode);
 
     List<PluginCallLog> listCallLogs(Long projectId);
+
+    int insertCallLog(PluginCallLog callLog);
 }
 

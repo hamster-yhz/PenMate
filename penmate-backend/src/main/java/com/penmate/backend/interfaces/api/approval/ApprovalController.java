@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * ApprovalController。
- * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ * 审批请求控制器。
+ * <p>负责审批单创建、列表查询、详情查询与审核动作（通过/拒绝）的 HTTP 接入，并将请求转换为审批应用层命令。</p>
  */
 @RestController
 @RequestMapping("/api/v1/novels/{projectId}/approvals")
@@ -34,7 +34,12 @@ public class ApprovalController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建审批请求。
+     * <p><b>业务目的：</b>将高风险或需人工确认的业务变更提交为审批单，进入后续审核流程。</p>
+     * <p><b>流程主线：</b>校验请求体 -> 组装 {@link CreateApprovalCommand} -> 调用应用服务创建审批单 -> 返回新审批对象。</p>
+     * <p><b>关键调用：</b>{@code approvalApplicationService.create(command, traceId)} 负责审批单落库与状态初始化。</p>
+     * <p><b>异常与分支：</b>任务不存在、审批类型非法或请求人无权限时返回业务异常。</p>
+     * <p><b>副作用：</b>新增审批请求记录。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -58,7 +63,12 @@ public class ApprovalController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询项目审批列表。
+     * <p><b>业务目的：</b>返回项目下审批请求集合，并支持按状态筛选，供审批中心展示。</p>
+     * <p><b>流程主线：</b>查询项目审批列表 -> 按可选状态参数过滤 -> 统一封装响应。</p>
+     * <p><b>关键调用：</b>{@code approvalApplicationService.listByProject(projectId)} 获取基础集合。</p>
+     * <p><b>异常与分支：</b>状态参数为空时返回全量；非空时执行大小写无关过滤。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      *
      * @param projectId 入参：projectId
      * @param status 入参：status
@@ -77,7 +87,12 @@ public class ApprovalController {
     }
 
     /**
-     * 处理业务请求。
+     * 查询审批详情。
+     * <p><b>业务目的：</b>返回单个审批请求的完整信息，支持审批页展示上下文与历史状态。</p>
+     * <p><b>流程主线：</b>接收审批ID -> 调用应用服务查询详情 -> 封装统一响应。</p>
+     * <p><b>关键调用：</b>{@code approvalApplicationService.detail(approvalId)}。</p>
+     * <p><b>异常与分支：</b>审批单不存在时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      *
      * @param approvalId 入参：approvalId
      * @param traceId 入参：traceId
@@ -90,7 +105,12 @@ public class ApprovalController {
     }
 
     /**
-     * 处理业务请求。
+     * 审批通过。
+     * <p><b>业务目的：</b>将审批单状态推进为通过，并触发后续业务落地链路。</p>
+     * <p><b>流程主线：</b>校验审核入参 -> 组装 {@link ReviewApprovalCommand} -> 调用应用服务执行通过动作 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code approvalApplicationService.approve(approvalId, command, traceId)}。</p>
+     * <p><b>异常与分支：</b>审批单状态不可变更、审核人无权限时返回业务异常。</p>
+     * <p><b>副作用：</b>更新审批状态并记录审核意见。</p>
      *
      * @param approvalId 入参：approvalId
      * @param dto 入参：dto
@@ -107,7 +127,12 @@ public class ApprovalController {
     }
 
     /**
-     * 处理业务请求。
+     * 审批拒绝。
+     * <p><b>业务目的：</b>拒绝当前审批请求并阻断后续业务执行。</p>
+     * <p><b>流程主线：</b>校验审核入参 -> 组装 {@link ReviewApprovalCommand} -> 调用应用服务执行拒绝动作 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code approvalApplicationService.reject(approvalId, command, traceId)}。</p>
+     * <p><b>异常与分支：</b>审批状态不允许拒绝或审核人权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>更新审批状态并记录拒绝意见。</p>
      *
      * @param approvalId 入参：approvalId
      * @param dto 入参：dto

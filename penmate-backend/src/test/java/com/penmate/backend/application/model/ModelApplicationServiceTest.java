@@ -5,11 +5,12 @@ import com.penmate.backend.application.model.command.ModelCommands.CreatePolicyC
 import com.penmate.backend.application.model.command.ModelCommands.UpdateModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdatePolicyCommand;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
+import com.penmate.backend.application.model.BuiltinModelProviders;
 import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelProviderModel;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.domain.model.repository.ModelRepository;
+import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,29 +35,18 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     @Mock
     private ModelRepository modelRepository;
 
+    @Mock
+    private SecretCryptoService secretCryptoService;
+
     @InjectMocks
     private ModelApplicationService modelApplicationService;
 
     @Test
     void UT_APP_MODEL_LIST_PROVIDERS_SUCCESS() {
-        when(modelRepository.listProviders()).thenReturn(List.of(new ModelProvider(), new ModelProvider()));
-
         List<ModelProvider> result = modelApplicationService.listProviders();
 
-        assertThat(result).hasSize(2);
-        verify(modelRepository).listProviders();
-        verifyNoInteractions(auditService);
-    }
-
-    @Test
-    void UT_APP_MODEL_LIST_PROVIDER_MODELS_SUCCESS() {
-        String providerCode = "openai";
-        when(modelRepository.listProviderModels(providerCode)).thenReturn(List.of(new ModelProviderModel(), new ModelProviderModel()));
-
-        List<ModelProviderModel> result = modelApplicationService.listProviderModels(providerCode);
-
-        assertThat(result).hasSize(2);
-        verify(modelRepository).listProviderModels(providerCode);
+        assertThat(result).hasSize(BuiltinModelProviders.list().size());
+        assertThat(result).extracting(ModelProvider::getCode).contains("openai", "xai", "deepseek");
         verifyNoInteractions(auditService);
     }
 
@@ -79,6 +69,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         String traceId = "UT-TRACE-MODEL-CREATE-KEY";
 
         when(modelRepository.clearDefaultUserKey(userId)).thenReturn(1);
+        when(secretCryptoService.encrypt("sk-123456")).thenReturn("cipher-123");
         when(modelRepository.insertUserKey(eq(userId), eq(1L), eq("我的Key"), anyString(), anyString(), eq(true), eq("active")))
                 .thenReturn(1);
 
@@ -90,7 +81,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
 
         verify(modelRepository).clearDefaultUserKey(userId);
         verify(modelRepository).insertUserKey(eq(userId), eq(1L), eq("我的Key"), anyString(), anyString(), eq(true), eq("active"));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("model"), eq("create-model-key"), eq("model_user_api_keys"), eq("1001"), isNull(), eq(200));
     }
 
     @Test
@@ -98,6 +88,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         Long userId = 1001L;
         when(modelRepository.insertUserKey(eq(userId), eq(1L), eq("我的Key"), anyString(), anyString(), eq(false), eq("active")))
                 .thenReturn(0);
+        when(secretCryptoService.encrypt("sk-123456")).thenReturn("cipher-123");
 
         assertThatThrownBy(() -> modelApplicationService.createKey(
                 userId,
@@ -111,6 +102,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_MODEL_UPDATE_KEY_NOT_FOUND() {
         Long userId = 1001L;
         Long keyId = 9999L;
+        when(secretCryptoService.encrypt("sk-654321")).thenReturn("cipher-654");
         when(modelRepository.updateUserKey(eq(userId), eq(keyId), eq("更新Key"), anyString(), anyString(), eq(false), eq("active")))
                 .thenReturn(0);
 
@@ -156,7 +148,10 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 eq("默认策略"),
                 eq("chat"),
                 eq(1L),
+                eq("gpt-4o-mini"),
+                isNull(),
                 eq(1L),
+                isNull(),
                 eq(new BigDecimal("0.7")),
                 eq(new BigDecimal("0.9")),
                 eq(2048),
@@ -170,7 +165,10 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                         "默认策略",
                         "chat",
                         1L,
+                        "gpt-4o-mini",
+                        null,
                         1L,
+                        null,
                         new BigDecimal("0.7"),
                         new BigDecimal("0.9"),
                         2048,
@@ -182,7 +180,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         );
 
         verify(modelRepository).clearDefaultPolicy(projectId);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("model"), eq("create-model-policy"), eq("model_project_policies"), eq("1"), isNull(), eq(200));
     }
 
     @Test
@@ -195,7 +192,10 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 eq("更新策略"),
                 eq("chat"),
                 eq(2L),
+                eq("gpt-4o"),
+                isNull(),
                 eq(2L),
+                isNull(),
                 eq(new BigDecimal("0.8")),
                 eq(new BigDecimal("0.95")),
                 eq(4096),
@@ -210,7 +210,10 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                         "更新策略",
                         "chat",
                         2L,
+                        "gpt-4o",
+                        null,
                         2L,
+                        null,
                         new BigDecimal("0.8"),
                         new BigDecimal("0.95"),
                         4096,

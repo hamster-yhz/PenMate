@@ -87,7 +87,6 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(result.getName()).isEqualTo("古风");
         verify(styleRepository).clearDefaultByProjectId(projectId);
         verify(styleRepository).insert(any(StyleProfile.class));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("style"), eq("create-style"), eq("style_profiles"), eq("11"), eq("古风"), eq(201));
         verifyNoInteractions(realtimeEventService);
     }
 
@@ -114,7 +113,6 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(result.getName()).isEqualTo("新风格");
         verify(styleRepository, times(2)).findById(projectId, styleId);
         verify(styleRepository).update(any(StyleProfile.class));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("style"), eq("update-style"), eq("style_profiles"), eq("2"), eq("新风格"), eq(200));
         verifyNoInteractions(realtimeEventService);
     }
 
@@ -158,7 +156,6 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         verify(styleRepository).setDefault(projectId, toStyleId);
         verify(styleRepository).insertSwitchLog(projectId, 3L, toStyleId, operatorId, true, "切换文风");
         verify(realtimeEventService).publishProjectEvent(eq(projectId), eq("style.switched"), anyMap());
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("style"), eq("switch-style"), eq("style_profiles"), eq("9"), eq("切换文风"), eq(200));
     }
 
     @Test
@@ -193,7 +190,6 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         );
 
         assertThat(result).containsKeys("projectId", "suggestedTone", "suggestedPace", "keywords", "sampleLength");
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("style"), eq("analyze-sample"), eq("style_profiles"), eq("1"), eq(sampleText), eq(200));
         verifyNoInteractions(realtimeEventService);
     }
 }

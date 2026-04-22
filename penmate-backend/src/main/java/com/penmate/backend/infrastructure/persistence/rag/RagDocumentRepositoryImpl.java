@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * RagDocumentRepositoryImpl。
- * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ * RAG 文档仓储 MyBatis 实现。
+ * <p>负责知识文档元数据的查询、新增、软删除与状态更新持久化操作。</p>
  */
 @Repository
 public class RagDocumentRepositoryImpl implements RagDocumentRepository {
@@ -20,10 +20,8 @@ public class RagDocumentRepositoryImpl implements RagDocumentRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
+     * 查询项目文档列表。
+     * <p>流程：按项目ID读取文档元数据集合。</p>
      */
     @Override
     public List<RagDocument> findByProjectId(Long projectId) {
@@ -31,11 +29,8 @@ public class RagDocumentRepositoryImpl implements RagDocumentRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @return 出参：处理结果
+     * 查询单个文档。
+     * <p>流程：按项目与文档ID双键定位文档。</p>
      */
     @Override
     public RagDocument findById(Long projectId, Long docId) {
@@ -43,10 +38,8 @@ public class RagDocumentRepositoryImpl implements RagDocumentRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param document 入参：document
-     * @return 出参：处理结果
+     * 新增文档记录。
+     * <p>流程：将文档实体写入数据库。</p>
      */
     @Override
     public int insert(RagDocument document) {
@@ -54,11 +47,8 @@ public class RagDocumentRepositoryImpl implements RagDocumentRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @return 出参：处理结果
+     * 软删除文档。
+     * <p>流程：按项目与文档ID标记删除状态，不执行物理删除。</p>
      */
     @Override
     public int softDelete(Long projectId, Long docId) {
@@ -66,13 +56,8 @@ public class RagDocumentRepositoryImpl implements RagDocumentRepository {
     }
 
     /**
-     * 更新业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @param parseStatus 入参：parseStatus
-     * @param indexStatus 入参：indexStatus
-     * @return 出参：处理结果
+     * 更新文档解析/索引状态。
+     * <p>流程：写入 parseStatus 与 indexStatus，供前端展示处理进度。</p>
      */
     @Override
     public int updateStatuses(Long projectId, Long docId, String parseStatus, String indexStatus) {

@@ -18,11 +18,7 @@ ON DUPLICATE KEY UPDATE
   updated_at = VALUES(updated_at),
   version = VALUES(version);
 
--- A2. 幂等重放样本：同业务键记录在审计日志（应用层应只创建一次业务实体）
-INSERT INTO ops_audit_logs (id, trace_id, user_id, module, action, resource_type, resource_id, request_json, response_code, created_at) VALUES
-  (922001, 'dbcase-idem-001', 920002, 'agent', 'create-generation', 'agent_generation_tasks', '922001', JSON_OBJECT('idempotencyKey', 'idem-922001', 'taskType', 'draft'), 201, NOW(3)),
-  (922002, 'dbcase-idem-001-replay', 920002, 'agent', 'create-generation-replay', 'agent_generation_tasks', '922001', JSON_OBJECT('idempotencyKey', 'idem-922001', 'replayed', true), 200, NOW(3))
-ON DUPLICATE KEY UPDATE created_at = VALUES(created_at);
+-- A2. 幂等重放样本：审计模块已移除，保留业务实体侧场景。
 
 -- A3. 审批重复审核防重样本：同 request 已有终态 + 再次动作日志
 INSERT INTO agent_approval_requests (id, project_id, task_id, approval_type, payload_json, risk_level, status, requested_by, reviewed_by, reviewed_at, review_comment, created_at, updated_at) VALUES
@@ -52,7 +48,7 @@ ON DUPLICATE KEY UPDATE
 -- B. 回滚模板（默认注释，需在事务中手工启用）
 -- =========================================================
 
--- CASE-ROLLBACK-001：跨表写失败回滚（novel_chapter_versions + ops_audit_logs 一致性）
+-- CASE-ROLLBACK-001：跨表写失败回滚（novel_chapter_versions 一致性）
 -- START TRANSACTION;
 -- INSERT INTO novel_chapter_versions (
 --   id, chapter_id, version_no, change_type, change_reason, snapshot_object_key, snapshot_etag, snapshot_size, snapshot_checksum, created_by, created_at
@@ -67,11 +63,7 @@ ON DUPLICATE KEY UPDATE
 --   922102, 920001, 2, 'rewrite', 'duplicate-for-rollback', 'dbcase/rollback/v2.json', 'etag-rb2', 1024, 'sha-rb2', 920002, NOW(3)
 -- );
 --
--- INSERT INTO ops_audit_logs (
---   id, trace_id, user_id, module, action, resource_type, resource_id, request_json, response_code, created_at
--- ) VALUES (
---   922101, 'dbcase-rollback-001', 920002, 'novel', 'create-version', 'novel_chapter_versions', '922101', JSON_OBJECT('versionNo', 99), 201, NOW(3)
--- );
+-- 审计表已移除：该段不再适用。
 -- COMMIT;
 --
 -- -- 预期：上面事务应失败回滚，922101/922102 与审计日志均不应落库

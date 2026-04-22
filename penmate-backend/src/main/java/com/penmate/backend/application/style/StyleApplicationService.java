@@ -4,7 +4,6 @@ import com.penmate.backend.application.style.command.StyleCommands.AnalyzeStyleC
 import com.penmate.backend.application.style.command.StyleCommands.CreateStyleCommand;
 import com.penmate.backend.application.style.command.StyleCommands.SwitchStyleCommand;
 import com.penmate.backend.application.style.command.StyleCommands.UpdateStyleCommand;
-import com.penmate.backend.domain.shared.service.AuditService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.domain.style.model.StyleProfile;
 import com.penmate.backend.domain.style.repository.StyleRepository;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 风格应用服务。
@@ -25,14 +23,11 @@ import java.util.UUID;
 public class StyleApplicationService {
 
     private final StyleRepository styleRepository;
-    private final AuditService auditService;
     private final RealtimeEventService realtimeEventService;
 
     public StyleApplicationService(StyleRepository styleRepository,
-                                   AuditService auditService,
                                    RealtimeEventService realtimeEventService) {
         this.styleRepository = styleRepository;
-        this.auditService = auditService;
         this.realtimeEventService = realtimeEventService;
     }
 
@@ -225,8 +220,7 @@ public class StyleApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
 

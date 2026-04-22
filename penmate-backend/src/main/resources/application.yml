@@ -44,6 +44,8 @@ security:
     refresh-token-expire-days: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:7}
 
 penmate:
+  security:
+    model-key-encryption-key-base64: ${MODEL_KEY_ENCRYPTION_KEY_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
   idempotency:
     key-prefix: ${IDEMPOTENCY_KEY_PREFIX:idempotency:}
     ttl-seconds: ${IDEMPOTENCY_TTL_SECONDS:86400}
@@ -64,6 +66,8 @@ penmate:
     provider: ${LLM_PROVIDER:openai}
     base-url: ${LLM_BASE_URL:https://api.openai.com}
     api-key: ${LLM_API_KEY:}
+    model-name: ${LLM_MODEL_NAME:gpt-4o-mini}
+    mock-enabled: ${LLM_MOCK_ENABLED:true}
 
 mybatis:
   configuration:

@@ -30,6 +30,21 @@ public final class ModelCommands {
                                         Long operatorId) {
     }
 
+    public record CreateOfficialModelKeyCommand(Long providerId,
+                                                String keyName,
+                                                String apiKey,
+                                                Boolean isDefault,
+                                                String status,
+                                                Long operatorId) {
+    }
+
+    public record UpdateOfficialModelKeyCommand(String keyName,
+                                                String apiKey,
+                                                Boolean isDefault,
+                                                String status,
+                                                Long operatorId) {
+    }
+
     /**
      * CreatePolicyCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
@@ -37,7 +52,10 @@ public final class ModelCommands {
     public record CreatePolicyCommand(String policyName,
                                       String scene,
                                       Long providerModelId,
+                                      String modelName,
+                                      String baseUrl,
                                       Long userKeyId,
+                                      Long officialKeyId,
                                       BigDecimal temperature,
                                       BigDecimal topP,
                                       Integer maxTokens,
@@ -53,7 +71,10 @@ public final class ModelCommands {
     public record UpdatePolicyCommand(String policyName,
                                       String scene,
                                       Long providerModelId,
+                                      String modelName,
+                                      String baseUrl,
                                       Long userKeyId,
+                                      Long officialKeyId,
                                       BigDecimal temperature,
                                       BigDecimal topP,
                                       Integer maxTokens,

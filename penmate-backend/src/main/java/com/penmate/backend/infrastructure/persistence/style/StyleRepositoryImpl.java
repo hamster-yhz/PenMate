@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * StyleRepositoryImpl。
- * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ * 风格仓储 MyBatis 实现。
+ * <p>负责风格档案、默认风格与风格切换日志的持久化读写。</p>
  */
 @Repository
 public class StyleRepositoryImpl implements StyleRepository {
@@ -20,10 +20,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
+     * 查询项目风格列表。
+     * <p>流程：按项目ID读取风格档案集合。</p>
      */
     @Override
     public List<StyleProfile> findByProjectId(Long projectId) {
@@ -31,11 +29,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param styleId 入参：styleId
-     * @return 出参：处理结果
+     * 查询单个风格档案。
+     * <p>流程：按项目与风格ID双键读取风格详情。</p>
      */
     @Override
     public StyleProfile findById(Long projectId, Long styleId) {
@@ -43,10 +38,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
+     * 查询项目默认风格。
+     * <p>流程：按项目读取默认标记为 true 的风格记录。</p>
      */
     @Override
     public StyleProfile findDefaultByProjectId(Long projectId) {
@@ -54,10 +47,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param styleProfile 入参：styleProfile
-     * @return 出参：处理结果
+     * 新增风格档案。
+     * <p>流程：将风格领域对象写入数据库。</p>
      */
     @Override
     public int insert(StyleProfile styleProfile) {
@@ -65,10 +56,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 更新业务数据。
-     *
-     * @param styleProfile 入参：styleProfile
-     * @return 出参：处理结果
+     * 更新风格档案。
+     * <p>流程：按主键更新风格配置字段。</p>
      */
     @Override
     public int update(StyleProfile styleProfile) {
@@ -76,11 +65,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param styleId 入参：styleId
-     * @return 出参：处理结果
+     * 软删除风格。
+     * <p>流程：标记风格为删除态而非物理删除。</p>
      */
     @Override
     public int softDelete(Long projectId, Long styleId) {
@@ -88,10 +74,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
+     * 清空项目默认风格标记。
+     * <p>流程：将项目下当前默认标记批量置空，为新默认值设置做准备。</p>
      */
     @Override
     public int clearDefaultByProjectId(Long projectId) {
@@ -99,11 +83,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param styleId 入参：styleId
-     * @return 出参：处理结果
+     * 设置项目默认风格。
+     * <p>流程：将目标风格置为默认。</p>
      */
     @Override
     public int setDefault(Long projectId, Long styleId) {
@@ -111,15 +92,8 @@ public class StyleRepositoryImpl implements StyleRepository {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param fromStyleId 入参：fromStyleId
-     * @param toStyleId 入参：toStyleId
-     * @param switchedBy 入参：switchedBy
-     * @param warningConfirmed 入参：warningConfirmed
-     * @param reason 入参：reason
-     * @return 出参：处理结果
+     * 写入风格切换日志。
+     * <p>流程：记录切换前后风格、操作者及风险确认信息，支持审计追踪。</p>
      */
     @Override
     public int insertSwitchLog(Long projectId,

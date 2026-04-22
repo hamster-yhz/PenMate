@@ -5,8 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * GenerationStreamServiceImpl。
- * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ * 生成任务流式输出服务实现。
+ * <p>封装 SSE 连接创建逻辑，为生成任务提供统一的流式通道入口。</p>
  */
 @Service
 public class GenerationStreamServiceImpl implements GenerationStreamService {
@@ -18,10 +18,8 @@ public class GenerationStreamServiceImpl implements GenerationStreamService {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param taskId 入参：taskId
-     * @return 出参：处理结果
+     * 打开指定任务的 SSE 通道。
+     * <p>流程：委托 {@link GenerationSseEmitterHub} 创建并注册 emitter，供后续事件推送。</p>
      */
     @Override
     public SseEmitter openStream(Long taskId) {

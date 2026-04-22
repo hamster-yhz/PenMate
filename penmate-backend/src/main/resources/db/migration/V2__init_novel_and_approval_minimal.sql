@@ -38,18 +38,3 @@ CREATE TABLE IF NOT EXISTS agent_approval_actions (
     KEY idx_approval_actions_request (request_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS ops_audit_logs (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    trace_id VARCHAR(64) NOT NULL,
-    user_id BIGINT UNSIGNED NULL,
-    module VARCHAR(64) NOT NULL,
-    action VARCHAR(64) NOT NULL,
-    resource_type VARCHAR(64) NOT NULL,
-    resource_id VARCHAR(64) NULL,
-    request_json JSON NULL,
-    response_code INT NOT NULL,
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    KEY idx_audit_user_created (user_id, created_at),
-    KEY idx_audit_module_created (module, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-

@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.AgentApplicationService;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -138,6 +140,26 @@ class AgentControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.status").value(422))
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
+    // 非法状态流转错误码透传。
+    void UT_AGENT_GENERATION_APPLY_STATE_TRANSITION_INVALID() throws Exception {
+        String traceId = "UT-TRACE-AGENT-GEN-STATE-INVALID";
+        doThrow(BusinessException.of(HttpStatus.UNPROCESSABLE_ENTITY,
+                "AGENT_STATE_TRANSITION_INVALID",
+                "Invalid generation task state transition",
+                null))
+                .when(agentApplicationService).applyGeneration(eq(10001L), eq(8001L), any(), eq(traceId));
+
+        mockMvc().perform(post("/api/v1/novels/10001/agent/generations/8001/apply")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of("applyNote", "accept"))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.errorCode").value("AGENT_STATE_TRANSITION_INVALID"));
     }
 
     @Test

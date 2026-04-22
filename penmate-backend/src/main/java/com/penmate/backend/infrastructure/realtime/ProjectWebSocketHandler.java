@@ -6,8 +6,8 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
- * ProjectWebSocketHandler。
- * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ * 项目实时事件 WebSocket 处理器。
+ * <p>负责连接建立时的项目路由解析、会话注册，以及连接关闭/异常时的会话回收。</p>
  */
 @Component
 public class ProjectWebSocketHandler extends TextWebSocketHandler {
@@ -21,9 +21,8 @@ public class ProjectWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param session 入参：session
+     * 处理连接建立。
+     * <p>流程：从 URL 解析 projectId -> 写入会话属性 -> 注册到项目会话中心。</p>
      */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -36,10 +35,8 @@ public class ProjectWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param session 入参：session
-     * @param status 入参：status
+     * 处理连接关闭。
+     * <p>流程：从会话属性读取 projectId 并反注册会话，避免无效连接残留。</p>
      */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
@@ -50,10 +47,8 @@ public class ProjectWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param session 入参：session
-     * @param exception 入参：exception
+     * 处理传输异常。
+     * <p>流程：异常发生时立即从注册中心移除该会话，防止后续广播失败放大。</p>
      */
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
@@ -63,6 +58,10 @@ public class ProjectWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /**
+     * 从连接 URL 解析项目ID。
+     * <p>约定路径形态：`/ws/projects/{projectId}`。</p>
+     */
     private Long parseProjectId(WebSocketSession session) {
         if (session.getUri() == null) {
             return null;

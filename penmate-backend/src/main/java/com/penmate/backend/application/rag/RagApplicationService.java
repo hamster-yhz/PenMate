@@ -2,10 +2,11 @@ package com.penmate.backend.application.rag;
 
 import com.penmate.backend.application.rag.command.CreateRagDocumentCommand;
 import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
+import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
 import com.penmate.backend.domain.rag.model.RagDocument;
-import com.penmate.backend.domain.shared.service.AuditService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,12 +22,15 @@ import java.util.UUID;
 public class RagApplicationService {
 
     private final RagDocumentRepository ragDocumentRepository;
-    private final AuditService auditService;
+    private final RagRetrievalService ragRetrievalService;
+    private final String storageEndpoint;
 
     public RagApplicationService(RagDocumentRepository ragDocumentRepository,
-                                 AuditService auditService) {
+                                 RagRetrievalService ragRetrievalService,
+                                 @Value("${penmate.storage.endpoint:http://localhost:9000}") String storageEndpoint) {
         this.ragDocumentRepository = ragDocumentRepository;
-        this.auditService = auditService;
+        this.ragRetrievalService = ragRetrievalService;
+        this.storageEndpoint = storageEndpoint;
     }
 
     /**
@@ -121,8 +125,19 @@ public class RagApplicationService {
         log.info("生成RAG文档上传地址: projectId={}, objectKey={}", projectId, objectKey);
         return Map.of(
                 "objectKey", objectKey,
-                "uploadUrl", "https://object.local/upload/" + objectKey + "?token=" + UUID.randomUUID()
+                "uploadUrl", buildObjectUploadUrl(objectKey)
         );
+    }
+
+    private String buildObjectUploadUrl(String objectKey) {
+        return normalizedStorageEndpoint() + "/upload/" + objectKey + "?token=" + UUID.randomUUID();
+    }
+
+    private String normalizedStorageEndpoint() {
+        if (storageEndpoint.endsWith("/")) {
+            return storageEndpoint.substring(0, storageEndpoint.length() - 1);
+        }
+        return storageEndpoint;
     }
 
     /**
@@ -199,11 +214,27 @@ public class RagApplicationService {
      * @return 出参：处理结果
      */
     public List<Map<String, Object>> listRetrievalLogs(Long projectId) {
-        List<Map<String, Object>> logs = List.of(
-                Map.of("projectId", projectId, "message", "no retrieval logs yet")
-        );
+        List<Map<String, Object>> logs = ragRetrievalService.listRetrievalLogs(projectId)
+                .stream()
+                .map(this::toRetrievalLogView)
+                .toList();
         log.info("查询RAG检索日志: projectId={}, count={}", projectId, logs.size());
         return logs;
+    }
+
+    private Map<String, Object> toRetrievalLogView(RagRetrievalLog log) {
+        return Map.of(
+                "id", log.getId(),
+                "projectId", log.getProjectId(),
+                "taskId", log.getTaskId(),
+                "queryText", log.getQueryText() == null ? "" : log.getQueryText(),
+                "hitCount", log.getHitCount() == null ? 0 : log.getHitCount(),
+                "sourcesJson", log.getSourcesJson() == null ? "[]" : log.getSourcesJson(),
+                "latencyMs", log.getLatencyMs() == null ? 0 : log.getLatencyMs(),
+                "adopted", log.getAdopted() != null && log.getAdopted(),
+                "traceId", log.getTraceId() == null ? "" : log.getTraceId(),
+                "createdAt", log.getCreatedAt() == null ? "" : log.getCreatedAt().toString()
+        );
     }
 
     private void writeAudit(String traceId,
@@ -214,8 +245,7 @@ public class RagApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
 

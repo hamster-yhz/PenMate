@@ -4,6 +4,7 @@ import com.penmate.backend.application.rag.command.CreateRagDocumentCommand;
 import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.domain.rag.model.RagDocument;
+import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,9 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private RagDocumentRepository ragDocumentRepository;
+
+    @Mock
+    private RagRetrievalService ragRetrievalService;
 
     @InjectMocks
     private RagApplicationService ragApplicationService;
@@ -61,7 +65,6 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getId()).isEqualTo(7L);
         verify(ragDocumentRepository).insert(any(RagDocument.class));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("rag"), eq("create-document"), eq("rag_documents"), eq("7"), eq("知识文档"), eq(201));
     }
 
     @Test
@@ -104,7 +107,6 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getParseStatus()).isEqualTo("done");
         verify(ragDocumentRepository).updateStatuses(projectId, docId, "done", "pending");
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("rag"), eq("parse-document"), eq("rag_documents"), eq("2"), isNull(), eq(200));
     }
 
     @Test
@@ -134,6 +136,25 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
                 .containsEntry("indexStatus", "done");
         verify(ragDocumentRepository).findById(1L, 2L);
         verifyNoMoreInteractions(ragDocumentRepository);
+    }
+
+    @Test
+    void UT_APP_RAG_LIST_RETRIEVAL_LOGS_SUCCESS() {
+        RagRetrievalLog log = new RagRetrievalLog();
+        log.setId(1L);
+        log.setProjectId(1L);
+        log.setTaskId(2L);
+        log.setHitCount(3);
+        log.setSourcesJson("[]");
+        log.setAdopted(true);
+        when(ragRetrievalService.listRetrievalLogs(1L)).thenReturn(List.of(log));
+
+        List<Map<String, Object>> result = ragApplicationService.listRetrievalLogs(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).containsEntry("projectId", 1L)
+                .containsEntry("taskId", 2L)
+                .containsEntry("hitCount", 3);
     }
 }
 

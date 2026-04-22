@@ -3,8 +3,8 @@ package com.penmate.backend.interfaces.api.model;
 import com.penmate.backend.application.model.ModelApplicationService;
 import com.penmate.backend.application.model.command.ModelCommands;
 import com.penmate.backend.domain.model.model.ModelProjectPolicy;
+import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelProviderModel;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.model.dto.CreateModelKeyDto;
@@ -27,8 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * ModelController。
- * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ * 模型供应商、密钥与项目模型配置控制器。
+ * <p>负责内置供应商目录查询、用户 API Key 管理、项目模型配置管理与默认配置切换。</p>
+ * <p>说明：底层存储仍复用历史 policy 表结构，接口语义已切换为 config。</p>
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -41,10 +42,12 @@ public class ModelController {
     }
 
     /**
-     * 查询列表数据。
-     *
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 查询模型供应商列表。
+     * <p><b>业务目的：</b>返回系统支持的模型厂商，用于前端创建密钥与策略时选择供应商。</p>
+     * <p><b>流程主线：</b>接收请求 -> 调用应用服务查询供应商 -> 封装统一响应。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.listProviders()}。</p>
+     * <p><b>异常与分支：</b>无供应商数据时返回空列表。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      */
     @GetMapping("/model/providers")
     public ApiResponse<List<ModelProvider>> listProviders(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -52,39 +55,31 @@ public class ModelController {
     }
 
     /**
-     * 查询列表数据。
-     *
-     * @param providerCode 入参：providerCode
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/model/providers/{providerCode}/models")
-    public ApiResponse<List<ModelProviderModel>> listProviderModels(@PathVariable String providerCode,
-                                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(modelApplicationService.listProviderModels(providerCode), traceId);
-    }
-
-    /**
-     * 查询列表数据。
-     *
-     * @param userId 入参：userId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 查询用户模型密钥列表。
+     * <p><b>业务目的：</b>返回用户已维护的 API Key 元数据，供前端密钥管理页展示。</p>
+     * <p><b>流程主线：</b>读取用户ID -> 调用应用服务查询密钥列表 -> 封装响应。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.listUserKeys(userId)}。</p>
+     * <p><b>异常与分支：</b>用户不存在时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      */
     @GetMapping("/model/keys")
     public ApiResponse<List<ModelUserApiKey>> listKeys(@RequestParam("userId") Long userId,
-                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listUserKeys(userId), traceId);
     }
 
+    @GetMapping("/model/official-keys")
+    public ApiResponse<List<ModelOfficialApiKey>> listOfficialKeys(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(modelApplicationService.listOfficialKeys(), traceId);
+    }
+
     /**
-     * 创建业务数据。
-     *
-     * @param dto 入参：dto
-     * @param userId 入参：userId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 创建用户模型密钥。
+     * <p><b>业务目的：</b>为用户新增一条可用于模型调用的 API Key 配置。</p>
+     * <p><b>流程主线：</b>校验请求体 -> 组装 {@link ModelCommands.CreateModelKeyCommand} -> 调用应用服务创建 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.createKey(...)} 负责密钥加密存储与默认项处理。</p>
+     * <p><b>异常与分支：</b>供应商无效、密钥重复或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>新增密钥记录，可能变更默认密钥。</p>
      */
     @PostMapping("/model/keys")
     public ApiResponse<String> createKey(@Valid @RequestBody CreateModelKeyDto dto,
@@ -107,14 +102,12 @@ public class ModelController {
     }
 
     /**
-     * 更新业务数据。
-     *
-     * @param keyId 入参：keyId
-     * @param dto 入参：dto
-     * @param userId 入参：userId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 更新用户模型密钥。
+     * <p><b>业务目的：</b>修改密钥名称、值、启用状态或默认标记。</p>
+     * <p><b>流程主线：</b>读取密钥标识 -> 组装 {@link ModelCommands.UpdateModelKeyCommand} -> 调用应用服务更新 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.updateKey(...)}。</p>
+     * <p><b>异常与分支：</b>密钥不存在、权限不足或状态非法时返回业务异常。</p>
+     * <p><b>副作用：</b>更新密钥元数据与加密值。</p>
      */
     @PatchMapping("/model/keys/{keyId}")
     public ApiResponse<String> updateKey(@PathVariable Long keyId,
@@ -138,13 +131,12 @@ public class ModelController {
     }
 
     /**
-     * 删除业务数据。
-     *
-     * @param keyId 入参：keyId
-     * @param userId 入参：userId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 删除用户模型密钥。
+     * <p><b>业务目的：</b>移除不再使用或存在风险的 API Key。</p>
+     * <p><b>流程主线：</b>接收 keyId 与操作者 -> 调用应用服务删除密钥 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.deleteKey(userId, keyId, operatorId, traceId)}。</p>
+     * <p><b>异常与分支：</b>密钥不存在、被策略引用或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>删除密钥记录，可能影响策略可用性。</p>
      */
     @DeleteMapping("/model/keys/{keyId}")
     public ApiResponse<String> deleteKey(@PathVariable Long keyId,
@@ -155,30 +147,75 @@ public class ModelController {
         return ApiResponse.success("deleted", traceId);
     }
 
+    @PostMapping("/model/official-keys")
+    public ApiResponse<String> createOfficialKey(@Valid @RequestBody CreateModelKeyDto dto,
+                                                 @RequestParam("operatorId") Long operatorId,
+                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        modelApplicationService.createOfficialKey(
+                new ModelCommands.CreateOfficialModelKeyCommand(
+                        dto.getProviderId(),
+                        dto.getKeyName(),
+                        dto.getApiKey(),
+                        dto.getIsDefault(),
+                        dto.getStatus(),
+                        operatorId
+                ),
+                traceId
+        );
+        return ApiResponse.success("created", traceId);
+    }
+
+    @PatchMapping("/model/official-keys/{keyId}")
+    public ApiResponse<String> updateOfficialKey(@PathVariable Long keyId,
+                                                 @RequestBody UpdateModelKeyDto dto,
+                                                 @RequestParam("operatorId") Long operatorId,
+                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        modelApplicationService.updateOfficialKey(
+                keyId,
+                new ModelCommands.UpdateOfficialModelKeyCommand(
+                        dto.getKeyName(),
+                        dto.getApiKey(),
+                        dto.getIsDefault(),
+                        dto.getStatus(),
+                        operatorId
+                ),
+                traceId
+        );
+        return ApiResponse.success("updated", traceId);
+    }
+
+    @DeleteMapping("/model/official-keys/{keyId}")
+    public ApiResponse<String> deleteOfficialKey(@PathVariable Long keyId,
+                                                 @RequestParam("operatorId") Long operatorId,
+                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        modelApplicationService.deleteOfficialKey(keyId, operatorId, traceId);
+        return ApiResponse.success("deleted", traceId);
+    }
+
     /**
-     * 查询列表数据。
-     *
-     * @param projectId 入参：projectId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 查询项目模型配置列表。
+     * <p><b>业务目的：</b>返回项目下全部模型配置，供写作/Agent 场景显式选择调用配置。</p>
+     * <p><b>流程主线：</b>读取项目ID -> 调用应用服务查询配置 -> 返回列表。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.listPolicies(projectId)}（底层复用历史策略实现）。</p>
+     * <p><b>异常与分支：</b>项目不存在时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      */
-    @GetMapping("/novels/{projectId}/model-policies")
-    public ApiResponse<List<ModelProjectPolicy>> listPolicies(@PathVariable Long projectId,
+    @GetMapping({"/novels/{projectId}/model-configs", "/novels/{projectId}/model-policies"})
+    public ApiResponse<List<ModelProjectPolicy>> listConfigs(@PathVariable Long projectId,
                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listPolicies(projectId), traceId);
     }
 
     /**
-     * 创建业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 创建项目模型配置。
+     * <p><b>业务目的：</b>为项目新增可复用的模型调用配置（模型、密钥、采样参数等）。</p>
+     * <p><b>流程主线：</b>校验入参 -> 组装 {@link ModelCommands.CreatePolicyCommand} -> 调用应用服务创建配置 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.createPolicy(...)}。</p>
+     * <p><b>异常与分支：</b>模型不可用、密钥无效或参数越界时返回业务异常。</p>
+     * <p><b>副作用：</b>新增配置记录，可能影响默认配置。</p>
      */
-    @PostMapping("/novels/{projectId}/model-policies")
-    public ApiResponse<String> createPolicy(@PathVariable Long projectId,
+    @PostMapping({"/novels/{projectId}/model-configs", "/novels/{projectId}/model-policies"})
+    public ApiResponse<String> createConfig(@PathVariable Long projectId,
                                             @Valid @RequestBody CreateModelPolicyDto dto,
                                             @RequestParam("operatorId") Long operatorId,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
@@ -188,7 +225,10 @@ public class ModelController {
                         dto.getPolicyName(),
                         dto.getScene(),
                         dto.getProviderModelId(),
+                        dto.getModelName(),
+                        dto.getBaseUrl(),
                         dto.getUserKeyId(),
+                        dto.getOfficialKeyId(),
                         dto.getTemperature(),
                         dto.getTopP(),
                         dto.getMaxTokens(),
@@ -202,29 +242,30 @@ public class ModelController {
     }
 
     /**
-     * 更新业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param policyId 入参：policyId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 更新项目模型配置。
+     * <p><b>业务目的：</b>调整既有配置的模型选择、参数配置与兜底策略。</p>
+     * <p><b>流程主线：</b>读取配置标识 -> 组装 {@link ModelCommands.UpdatePolicyCommand} -> 调用应用服务更新 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.updatePolicy(...)}。</p>
+     * <p><b>异常与分支：</b>配置不存在、默认配置约束冲突或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>更新配置，影响后续模型路由结果。</p>
      */
-    @PutMapping("/novels/{projectId}/model-policies/{policyId}")
-    public ApiResponse<String> updatePolicy(@PathVariable Long projectId,
-                                            @PathVariable Long policyId,
+    @PutMapping({"/novels/{projectId}/model-configs/{configId}", "/novels/{projectId}/model-policies/{configId}"})
+    public ApiResponse<String> updateConfig(@PathVariable Long projectId,
+                                            @PathVariable Long configId,
                                             @RequestBody UpdateModelPolicyDto dto,
                                             @RequestParam("operatorId") Long operatorId,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.updatePolicy(
                 projectId,
-                policyId,
+                configId,
                 new ModelCommands.UpdatePolicyCommand(
                         dto.getPolicyName(),
                         dto.getScene(),
                         dto.getProviderModelId(),
+                        dto.getModelName(),
+                        dto.getBaseUrl(),
                         dto.getUserKeyId(),
+                        dto.getOfficialKeyId(),
                         dto.getTemperature(),
                         dto.getTopP(),
                         dto.getMaxTokens(),
@@ -238,38 +279,36 @@ public class ModelController {
     }
 
     /**
-     * 删除业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param policyId 入参：policyId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 删除项目模型配置。
+     * <p><b>业务目的：</b>移除不再使用的配置，减少错误配置对生成链路的影响。</p>
+     * <p><b>流程主线：</b>接收配置标识与操作者 -> 调用应用服务删除配置 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.deletePolicy(projectId, configId, operatorId, traceId)}。</p>
+     * <p><b>异常与分支：</b>配置不存在、被强依赖或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>删除配置记录。</p>
      */
-    @DeleteMapping("/novels/{projectId}/model-policies/{policyId}")
-    public ApiResponse<String> deletePolicy(@PathVariable Long projectId,
-                                            @PathVariable Long policyId,
+    @DeleteMapping({"/novels/{projectId}/model-configs/{configId}", "/novels/{projectId}/model-policies/{configId}"})
+    public ApiResponse<String> deleteConfig(@PathVariable Long projectId,
+                                            @PathVariable Long configId,
                                             @RequestParam("operatorId") Long operatorId,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.deletePolicy(projectId, policyId, operatorId, traceId);
+        modelApplicationService.deletePolicy(projectId, configId, operatorId, traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
     /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param policyId 入参：policyId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 将指定配置设为项目默认配置。
+     * <p><b>业务目的：</b>明确未指定配置时的统一模型路由默认项。</p>
+     * <p><b>流程主线：</b>接收项目与配置标识 -> 调用应用服务设置默认配置 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.setDefaultPolicy(projectId, configId, operatorId, traceId)}。</p>
+     * <p><b>异常与分支：</b>配置不属于项目、不可用或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>更新项目默认策略指向。</p>
      */
-    @PostMapping("/novels/{projectId}/model-policies/{policyId}/set-default")
-    public ApiResponse<String> setDefaultPolicy(@PathVariable Long projectId,
-                                                @PathVariable Long policyId,
+    @PostMapping({"/novels/{projectId}/model-configs/{configId}/set-default", "/novels/{projectId}/model-policies/{configId}/set-default"})
+    public ApiResponse<String> setDefaultConfig(@PathVariable Long projectId,
+                                                @PathVariable Long configId,
                                                 @RequestParam("operatorId") Long operatorId,
                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.setDefaultPolicy(projectId, policyId, operatorId, traceId);
+        modelApplicationService.setDefaultPolicy(projectId, configId, operatorId, traceId);
         return ApiResponse.success("updated", traceId);
     }
 }

@@ -91,7 +91,7 @@ public interface PluginMapper {
     int deleteInstall(@Param("projectId") Long projectId, @Param("pluginCode") String pluginCode);
 
     @Select("""
-            SELECT id, project_id, plugin_code, tool_name,
+            SELECT id, project_id, task_id, plugin_code, tool_name,
                    CAST(request_json AS CHAR) AS request_json,
                    CAST(response_json AS CHAR) AS response_json,
                    latency_ms, status, error_msg, created_at
@@ -101,5 +101,11 @@ public interface PluginMapper {
             LIMIT 100
             """)
     List<PluginCallLog> listCallLogs(@Param("projectId") Long projectId);
+
+    @Insert("""
+            INSERT INTO plugin_call_logs(project_id, task_id, plugin_code, tool_name, request_json, response_json, latency_ms, status, error_msg)
+            VALUES(#{projectId}, #{taskId}, #{pluginCode}, #{toolName}, #{requestJson}, #{responseJson}, #{latencyMs}, #{status}, #{errorMsg})
+            """)
+    int insertCallLog(PluginCallLog callLog);
 }
 

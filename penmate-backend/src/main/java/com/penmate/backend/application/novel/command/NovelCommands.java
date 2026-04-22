@@ -89,7 +89,8 @@ public final class NovelCommands {
                                               String etag,
                                               Long size,
                                               String checksum,
-                                              String storageProvider) {}
+                                              String storageProvider,
+                                              String content) {}
 
     /**
      * CreateOutlineNodeCommand。

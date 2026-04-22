@@ -3,7 +3,6 @@ package com.penmate.backend.interfaces.api.model;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.model.ModelApplicationService;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelProviderModel;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -60,21 +59,6 @@ class ModelControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].code").value("openai-compatible"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
-    }
-
-    @Test
-    // 供应商模型列表查询成功。
-    void UT_MODEL_PROVIDER_MODELS_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-MODEL-PROVIDER-MODELS";
-        ModelProviderModel model = new ModelProviderModel();
-        model.setId(11L);
-        model.setModelCode("gpt-4o-mini");
-        when(modelApplicationService.listProviderModels("openai-compatible")).thenReturn(List.of(model));
-
-        mockMvc().perform(get("/api/v1/model/providers/openai-compatible/models")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].modelCode").value("gpt-4o-mini"));
     }
 
     @Test
@@ -199,6 +183,7 @@ class ModelControllerTest {
                                 "policyName", "默认策略",
                                 "scene", "draft",
                                 "providerModelId", 11,
+                                "modelName", "gpt-4o-mini",
                                 "userKeyId", 8,
                                 "temperature", 0.7,
                                 "topP", 0.9,

@@ -4,17 +4,31 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-
+/**
+ * 插件调用日志实体。
+ */
 public class PluginCallLog {
+    /** 日志主键 ID。 */
     private Long id;
+    /** 所属项目 ID。 */
     private Long projectId;
+    /** 关联生成任务 ID。 */
+    private Long taskId;
+    /** 插件编码。 */
     private String pluginCode;
+    /** 调用的工具名称。 */
     private String toolName;
+    /** 调用请求报文（JSON）。 */
     private String requestJson;
+    /** 调用响应报文（JSON）。 */
     private String responseJson;
+    /** 调用耗时（毫秒）。 */
     private Integer latencyMs;
+    /** 调用状态。 */
     private String status;
+    /** 失败错误信息。 */
     private String errorMsg;
+    /** 日志创建时间。 */
     private LocalDateTime createdAt;
 
 }

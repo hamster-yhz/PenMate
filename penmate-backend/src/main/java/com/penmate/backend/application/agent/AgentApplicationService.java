@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.command.AgentCommands.ApplyGenerationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateGenerationCommand;
@@ -7,16 +9,13 @@ import com.penmate.backend.application.agent.command.AgentCommands.CreateMessage
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
+import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.shared.service.AuditService;
-import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 智能体应用服务。
@@ -27,9 +26,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AgentApplicationService {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final AgentRepository agentRepository;
-    private final AuditService auditService;
-    private final RealtimeEventService realtimeEventService;
+    private final AgentTaskStateMachine taskStateMachine;
+    private final AgentOrchestrationDispatcher orchestrationDispatcher;
 
     /**
      * 查询项目下会话列表。
@@ -131,28 +132,31 @@ public class AgentApplicationService {
                                                 CreateGenerationCommand command,
                                                 String traceId) {
         log.info("创建生成任务: projectId={}, conversationId={}, taskType={}", projectId, command.conversationId(), command.taskType());
+        // 编排前置校验：任务必须绑定到已存在会话，避免后续异步链路找不到上下文。
         ensureConversation(projectId, command.conversationId());
         AgentGenerationTask task = new AgentGenerationTask();
         task.setProjectId(projectId);
         task.setConversationId(command.conversationId());
         task.setChapterId(command.chapterId());
+        // 完全显式模式：模型配置必须由前端显式传入，不再读取项目默认策略。
+        task.setModelConfigId(command.modelConfigId());
         task.setTaskType(command.taskType());
-        task.setPromptSnapshot(command.promptSnapshot());
-        task.setStyleProfileSnapshot(command.styleProfileSnapshot());
-        task.setPluginSnapshot(command.pluginSnapshot());
-        task.setStatus("running");
-        task.setStartedAt(LocalDateTime.now());
+        task.setPromptSnapshot(normalizeJsonField(command.promptSnapshot()));
+        task.setStyleProfileSnapshot(normalizeJsonField(command.styleProfileSnapshot()));
+        task.setPluginSnapshot(normalizeJsonField(command.pluginSnapshot()));
+        task.setTraceId(traceId);
+        task.setStatus(AgentTaskStatus.PENDING.value());
         int affected = agentRepository.insertGenerationTask(task);
         if (affected != 1) {
             log.error("创建生成任务失败: projectId={}, conversationId={}", projectId, command.conversationId());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create generation task");
         }
-        realtimeEventService.publishGenerationToken(projectId, task.getId(), "开始生成", false);
-        agentRepository.updateGenerationTaskStatus(projectId, task.getId(), "done", null);
-        realtimeEventService.publishGenerationToken(projectId, task.getId(), "", true);
         writeAudit(traceId, command.operatorId(), "agent", "generation:create", "agent_generation_tasks",
                 String.valueOf(task.getId()), command.promptSnapshot(), 201);
+        // 异步分发执行，创建接口快速返回，避免同步阻塞模型调用。
+        orchestrationDispatcher.dispatch(projectId, task.getId(), traceId);
         log.info("创建生成任务成功: taskId={}", task.getId());
+        // 返回最新任务快照，前端可立刻感知 pending/running 等状态。
         return getGeneration(projectId, task.getId());
     }
 
@@ -188,11 +192,14 @@ public class AgentApplicationService {
                                                String traceId) {
         log.info("应用生成任务: projectId={}, taskId={}", projectId, taskId);
         AgentGenerationTask task = getGeneration(projectId, taskId);
-        if (!"done".equals(task.getStatus()) && !"applied".equals(task.getStatus())) {
-            log.warn("应用生成任务失败: projectId={}, taskId={}, status={}", projectId, taskId, task.getStatus());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Generation task is not ready for apply");
+        AgentTaskStatus currentStatus = taskStateMachine.parseStatus(task.getStatus());
+        // 幂等保护：重复应用已落地任务直接返回，不重复写库。
+        if (currentStatus == AgentTaskStatus.APPLIED) {
+            return task;
         }
-        int affected = agentRepository.updateGenerationTaskStatus(projectId, taskId, "applied", null);
+        // 只允许 done -> applied，其他状态会被状态机拒绝。
+        taskStateMachine.assertTransition(currentStatus.value(), AgentTaskStatus.APPLIED);
+        int affected = agentRepository.updateGenerationTaskStatus(projectId, taskId, AgentTaskStatus.APPLIED.value(), null);
         if (affected != 1) {
             log.error("应用生成任务失败: projectId={}, taskId={}, reason=update_failed", projectId, taskId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to apply generation result");
@@ -211,6 +218,29 @@ public class AgentApplicationService {
         }
     }
 
+    /**
+     * Normalize user input to a value MySQL JSON columns can accept.
+     * - blank => null
+     * - valid JSON => keep as-is
+     * - plain text => encode as JSON string
+     */
+    private String normalizeJsonField(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        String trimmed = rawValue.trim();
+        try {
+            OBJECT_MAPPER.readTree(trimmed);
+            return trimmed;
+        } catch (JsonProcessingException ignored) {
+            try {
+                return OBJECT_MAPPER.writeValueAsString(rawValue);
+            } catch (JsonProcessingException e) {
+                throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid JSON payload");
+            }
+        }
+    }
+
     private void writeAudit(String traceId,
                             Long userId,
                             String module,
@@ -219,9 +249,7 @@ public class AgentApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
-
 

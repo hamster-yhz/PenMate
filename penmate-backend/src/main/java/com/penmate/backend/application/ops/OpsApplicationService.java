@@ -3,13 +3,11 @@
 import com.penmate.backend.domain.ops.model.OpsAsyncJob;
 import com.penmate.backend.domain.ops.model.OpsMigrationTask;
 import com.penmate.backend.domain.ops.repository.OpsRepository;
-import com.penmate.backend.domain.shared.service.AuditService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 运维应用服务。
@@ -20,12 +18,9 @@ import java.util.UUID;
 public class OpsApplicationService {
 
     private final OpsRepository opsRepository;
-    private final AuditService auditService;
 
-    public OpsApplicationService(OpsRepository opsRepository,
-                                 AuditService auditService) {
+    public OpsApplicationService(OpsRepository opsRepository) {
         this.opsRepository = opsRepository;
-        this.auditService = auditService;
     }
 
     /**
@@ -137,8 +132,7 @@ public class OpsApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
 

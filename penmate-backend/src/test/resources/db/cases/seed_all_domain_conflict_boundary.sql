@@ -44,23 +44,6 @@ INSERT INTO plugin_call_logs (id, project_id, plugin_code, tool_name, request_js
 (921001, 921001, 'boundary-plugin', 'dry_run', JSON_OBJECT('input', 'x'), NULL, 9999, 'failed', RPAD('timeout', 120, 'x'), NOW(3))
 ON DUPLICATE KEY UPDATE created_at = VALUES(created_at);
 
--- Model：非默认key与策略切换样本
-INSERT INTO model_providers (id, code, name, base_url, auth_type, status, created_at, updated_at) VALUES
-(921001, 'boundary-provider', 'Boundary Provider', 'https://api.boundary.local', 'bearer', 'inactive', NOW(3), NOW(3))
-ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at);
-
-INSERT INTO model_provider_models (id, provider_id, model_code, model_name, context_window, max_output, pricing_json, status, created_at) VALUES
-(921001, 921001, 'boundary-model', 'Boundary Model', 2048, 128, JSON_OBJECT('input', 1, 'output', 1), 'inactive', NOW(3))
-ON DUPLICATE KEY UPDATE created_at = VALUES(created_at);
-
-INSERT INTO model_user_api_keys (id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at) VALUES
-(921001, 920002, 921001, 'boundary-key', 'enc_boundary_key', 'bk-****-0001', 0, NULL, 'inactive', NOW(3), NOW(3), NULL)
-ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at);
-
-INSERT INTO model_project_policies (id, project_id, policy_name, scene, provider_model_id, user_key_id, temperature, top_p, max_tokens, fallback_policy_json, is_default, created_at, updated_at, deleted_at) VALUES
-(921001, 921001, '边界策略', 'draft', 921001, 921001, 0.00, 1.00, 1, JSON_OBJECT('fallbackModel', 920001), 0, NOW(3), NOW(3), NULL)
-ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at);
-
 -- Agent/Approval：pending + 重复动作候选
 INSERT INTO agent_conversations (id, project_id, user_id, title, context_scope_json, last_message_at, status, created_at, updated_at, deleted_at) VALUES
 (921001, 921001, 920002, '边界会话', JSON_OBJECT('scope', 'minimal'), NOW(3), 'active', NOW(3), NOW(3), NULL)

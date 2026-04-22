@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * StyleController。
- * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ * 写作风格配置控制器。
+ * <p>负责项目风格档案的增删改查、默认风格切换与样本文本风格分析。</p>
  */
 @RestController
 @RequestMapping("/api/v1/novels/{projectId}/styles")
@@ -38,11 +38,12 @@ public class StyleController {
     }
 
     /**
-     * 查询列表数据。
-     *
-     * @param projectId 入参：projectId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 查询项目风格列表。
+     * <p><b>业务目的：</b>返回项目下全部风格档案，供前端展示并选择当前写作风格。</p>
+     * <p><b>流程主线：</b>读取项目ID -> 调用应用服务查询风格列表 -> 封装统一响应。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.listStyles(projectId)}。</p>
+     * <p><b>异常与分支：</b>项目不存在时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      */
     @GetMapping
     public ApiResponse<List<StyleProfile>> listStyles(@PathVariable Long projectId,
@@ -51,13 +52,12 @@ public class StyleController {
     }
 
     /**
-     * 创建业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 创建风格档案。
+     * <p><b>业务目的：</b>新增一套可复用写作风格配置（节奏、语气、叙事焦点、提示模板等）。</p>
+     * <p><b>流程主线：</b>校验请求体 -> 组装 {@link StyleCommands.CreateStyleCommand} -> 调用应用服务创建 -> 返回新风格档案。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.createStyle(...)}。</p>
+     * <p><b>异常与分支：</b>风格名冲突、参数非法或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>新增风格记录，可能变更默认风格。</p>
      */
     @PostMapping
     public ApiResponse<StyleProfile> createStyle(@PathVariable Long projectId,
@@ -81,12 +81,12 @@ public class StyleController {
     }
 
     /**
-     * 查询详情数据。
-     *
-     * @param projectId 入参：projectId
-     * @param styleId 入参：styleId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 查询风格详情。
+     * <p><b>业务目的：</b>返回指定风格完整配置，供编辑面板回填。</p>
+     * <p><b>流程主线：</b>接收风格ID -> 调用应用服务查询详情 -> 返回风格对象。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.getStyle(projectId, styleId)}。</p>
+     * <p><b>异常与分支：</b>风格不存在或不属于项目时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      */
     @GetMapping("/{styleId}")
     public ApiResponse<StyleProfile> getStyle(@PathVariable Long projectId,
@@ -96,14 +96,12 @@ public class StyleController {
     }
 
     /**
-     * 更新业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param styleId 入参：styleId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 更新风格档案。
+     * <p><b>业务目的：</b>修改已有风格配置，使写作风格约束随业务需求演进。</p>
+     * <p><b>流程主线：</b>读取风格标识 -> 组装 {@link StyleCommands.UpdateStyleCommand} -> 调用应用服务更新 -> 返回最新风格。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.updateStyle(...)}。</p>
+     * <p><b>异常与分支：</b>风格不存在、参数越界或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>更新风格配置。</p>
      */
     @PutMapping("/{styleId}")
     public ApiResponse<StyleProfile> updateStyle(@PathVariable Long projectId,
@@ -128,13 +126,12 @@ public class StyleController {
     }
 
     /**
-     * 删除业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param styleId 入参：styleId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 删除风格档案。
+     * <p><b>业务目的：</b>移除无效或废弃风格，避免继续被章节或任务使用。</p>
+     * <p><b>流程主线：</b>接收风格ID与操作者 -> 调用应用服务删除风格 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.deleteStyle(projectId, styleId, operatorId, traceId)}。</p>
+     * <p><b>异常与分支：</b>风格被引用、默认风格约束冲突或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>删除风格记录或标记失效。</p>
      */
     @DeleteMapping("/{styleId}")
     public ApiResponse<String> deleteStyle(@PathVariable Long projectId,
@@ -146,13 +143,12 @@ public class StyleController {
     }
 
     /**
-     * 切换业务状态。
-     *
-     * @param projectId 入参：projectId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 切换项目当前默认风格。
+     * <p><b>业务目的：</b>将写作默认风格切换到目标风格，影响后续生成任务的风格约束。</p>
+     * <p><b>流程主线：</b>校验切换参数 -> 组装 {@link StyleCommands.SwitchStyleCommand} -> 调用应用服务切换 -> 返回新默认风格。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.switchStyle(...)}。</p>
+     * <p><b>异常与分支：</b>目标风格不可用、风险确认缺失或权限不足时返回业务异常。</p>
+     * <p><b>副作用：</b>更新默认风格指向。</p>
      */
     @PostMapping("/switch")
     public ApiResponse<StyleProfile> switchStyle(@PathVariable Long projectId,
@@ -172,13 +168,12 @@ public class StyleController {
     }
 
     /**
-     * 分析输入内容。
-     *
-     * @param projectId 入参：projectId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * 分析样本文本风格特征。
+     * <p><b>业务目的：</b>从样本文本提取风格特征，辅助用户快速构建风格配置。</p>
+     * <p><b>流程主线：</b>接收样本文本 -> 组装 {@link StyleCommands.AnalyzeStyleCommand} -> 调用应用服务分析 -> 返回分析结果。</p>
+     * <p><b>关键调用：</b>{@code styleApplicationService.analyzeSample(...)}。</p>
+     * <p><b>异常与分支：</b>样本为空、文本过短或分析服务异常时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
      */
     @PostMapping("/analyze-sample")
     public ApiResponse<Map<String, Object>> analyzeSample(@PathVariable Long projectId,

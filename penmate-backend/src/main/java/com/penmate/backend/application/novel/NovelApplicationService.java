@@ -9,7 +9,7 @@ import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
-import com.penmate.backend.domain.shared.service.AuditService;
+import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.application.novel.command.NovelCommands.AddMemberCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
@@ -30,6 +30,7 @@ import com.penmate.backend.application.novel.command.NovelCommands.UpdateVolumeC
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,15 +44,15 @@ import java.util.UUID;
 public class NovelApplicationService {
 
     private final NovelGateway novelGateway;
-    private final AuditService auditService;
     private final RealtimeEventService realtimeEventService;
+    private final ObjectStorageService objectStorageService;
 
     public NovelApplicationService(NovelGateway novelGateway,
-                                   AuditService auditService,
-                                   RealtimeEventService realtimeEventService) {
+                                   RealtimeEventService realtimeEventService,
+                                   ObjectStorageService objectStorageService) {
         this.novelGateway = novelGateway;
-        this.auditService = auditService;
         this.realtimeEventService = realtimeEventService;
+        this.objectStorageService = objectStorageService;
     }
 
     /**
@@ -101,7 +102,7 @@ public class NovelApplicationService {
             log.error("创建小说项目失败: ownerUserId={}, title={}", command.ownerUserId(), command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create project");
         }
-        writeAudit(traceId, command.ownerUserId(), "novel", "create-project", "novel_projects", String.valueOf(project.getId()), command.title(), 201);
+         
         log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getId(), command.ownerUserId());
         return project;
     }
@@ -125,7 +126,7 @@ public class NovelApplicationService {
             log.error("更新小说项目失败: projectId={}", projectId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update project");
         }
-        writeAudit(traceId, existing.getOwnerUserId(), "novel", "update-project", "novel_projects", String.valueOf(projectId), command.title(), 200);
+         
         log.info("更新小说项目成功: projectId={}", projectId);
         return getProject(projectId);
     }
@@ -144,7 +145,7 @@ public class NovelApplicationService {
             log.warn("删除小说项目失败: projectId={}, reason=not_found_or_deleted", projectId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Project not found or already deleted");
         }
-        writeAudit(traceId, operatorId, "novel", "delete-project", "novel_projects", String.valueOf(projectId), null, 200);
+         
         log.info("删除小说项目成功: projectId={}", projectId);
     }
 
@@ -181,7 +182,7 @@ public class NovelApplicationService {
             log.error("创建分卷失败: projectId={}, title={}", projectId, command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create volume");
         }
-        writeAudit(traceId, operatorId, "novel", "create-volume", "novel_volumes", String.valueOf(volume.getId()), command.title(), 201);
+         
         log.info("创建分卷成功: projectId={}, volumeId={}", projectId, volume.getId());
         return volume;
     }
@@ -209,7 +210,7 @@ public class NovelApplicationService {
             log.warn("更新分卷失败: projectId={}, volumeId={}, reason=not_found_or_deleted", projectId, volumeId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Volume not found or already deleted");
         }
-        writeAudit(traceId, operatorId, "novel", "update-volume", "novel_volumes", String.valueOf(volumeId), command.title(), 200);
+         
         log.info("更新分卷成功: projectId={}, volumeId={}", projectId, volumeId);
         return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getId())).findFirst().orElse(volume);
     }
@@ -229,7 +230,7 @@ public class NovelApplicationService {
             log.warn("删除分卷失败: projectId={}, volumeId={}, reason=not_found_or_deleted", projectId, volumeId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Volume not found or already deleted");
         }
-        writeAudit(traceId, operatorId, "novel", "delete-volume", "novel_volumes", String.valueOf(volumeId), null, 200);
+         
         log.info("删除分卷成功: projectId={}, volumeId={}", projectId, volumeId);
     }
 
@@ -293,7 +294,7 @@ public class NovelApplicationService {
             log.error("创建章节失败: projectId={}, title={}", projectId, command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create chapter");
         }
-        writeAudit(traceId, operatorId, "novel", "create-chapter", "novel_chapters", String.valueOf(chapter.getId()), command.title(), 201);
+         
         log.info("创建章节成功: projectId={}, chapterId={}", projectId, chapter.getId());
         return chapter;
     }
@@ -328,7 +329,7 @@ public class NovelApplicationService {
             log.error("更新章节失败: projectId={}, chapterId={}", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update chapter");
         }
-        writeAudit(traceId, operatorId, "novel", "update-chapter", "novel_chapters", String.valueOf(chapterId), command.title(), 200);
+         
         log.info("更新章节成功: projectId={}, chapterId={}", projectId, chapterId);
         return getChapter(projectId, chapterId);
     }
@@ -348,7 +349,7 @@ public class NovelApplicationService {
             log.warn("删除章节失败: projectId={}, chapterId={}, reason=not_found_or_deleted", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
         }
-        writeAudit(traceId, operatorId, "novel", "delete-chapter", "novel_chapters", String.valueOf(chapterId), null, 200);
+         
         log.info("删除章节成功: projectId={}, chapterId={}", projectId, chapterId);
     }
 
@@ -367,7 +368,7 @@ public class NovelApplicationService {
             log.warn("发布章节失败: projectId={}, chapterId={}, reason=not_found_or_deleted", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
         }
-        writeAudit(traceId, operatorId, "novel", "publish-chapter", "novel_chapters", String.valueOf(chapterId), null, 200);
+         
         log.info("发布章节成功: projectId={}, chapterId={}", projectId, chapterId);
     }
 
@@ -403,7 +404,7 @@ public class NovelApplicationService {
             log.error("新增项目成员失败: projectId={}, userId={}", projectId, command.userId());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to add member");
         }
-        writeAudit(traceId, operatorId, "novel", "add-member", "novel_members", projectId + ":" + command.userId(), command.memberRole(), 201);
+         
         log.info("新增项目成员成功: projectId={}, userId={}", projectId, command.userId());
         return listMembers(projectId).stream().filter(m -> command.userId().equals(m.getUserId())).findFirst().orElse(member);
     }
@@ -425,7 +426,7 @@ public class NovelApplicationService {
             log.warn("更新项目成员角色失败: projectId={}, userId={}, reason=not_found", projectId, userId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Member not found");
         }
-        writeAudit(traceId, operatorId, "novel", "update-member", "novel_members", projectId + ":" + userId, command.memberRole(), 200);
+         
         log.info("更新项目成员角色成功: projectId={}, userId={}", projectId, userId);
         return listMembers(projectId).stream().filter(m -> userId.equals(m.getUserId())).findFirst().orElseThrow();
     }
@@ -445,7 +446,7 @@ public class NovelApplicationService {
             log.warn("移除项目成员失败: projectId={}, userId={}, reason=not_found", projectId, userId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Member not found");
         }
-        writeAudit(traceId, operatorId, "novel", "remove-member", "novel_members", projectId + ":" + userId, null, 200);
+         
         log.info("移除项目成员成功: projectId={}, userId={}", projectId, userId);
     }
 
@@ -492,7 +493,7 @@ public class NovelApplicationService {
             log.error("创建章节版本失败: projectId={}, chapterId={}", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create chapter version");
         }
-        writeAudit(traceId, command.createdBy(), "novel", "create-chapter-version", "novel_chapter_versions", String.valueOf(version.getId()), command.changeType(), 201);
+         
         log.info("创建章节版本成功: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, version.getVersionNo());
         return version;
     }
@@ -536,7 +537,7 @@ public class NovelApplicationService {
             log.error("恢复章节版本失败: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to restore chapter version");
         }
-        writeAudit(traceId, operatorId, "novel", "restore-chapter-version", "novel_chapter_versions", version.getId().toString(), versionNo.toString(), 200);
+         
         log.info("恢复章节版本成功: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
         return getChapter(projectId, chapterId);
     }
@@ -550,8 +551,12 @@ public class NovelApplicationService {
      */
     public Map<String, String> getChapterContentUrl(Long projectId, Long chapterId) {
         NovelChapter chapter = getChapter(projectId, chapterId);
+        if (chapter.getContentObjectKey() == null || chapter.getContentObjectKey().isBlank()) {
+            log.warn("章节正文对象键为空: projectId={}, chapterId={}", projectId, chapterId);
+            return Map.of("url", "");
+        }
         log.info("获取章节正文读取地址: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, chapter.getContentObjectKey());
-        return Map.of("url", "https://object.local/read/" + chapter.getContentObjectKey());
+        return Map.of("url", objectStorageService.buildReadUrl(chapter.getContentObjectKey()));
     }
 
     /**
@@ -567,7 +572,7 @@ public class NovelApplicationService {
         log.info("获取章节正文上传地址: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, objectKey);
         return Map.of(
                 "objectKey", objectKey,
-                "uploadUrl", "https://object.local/upload/" + objectKey + "?token=" + UUID.randomUUID()
+                "uploadUrl", objectStorageService.buildUploadUrl(objectKey, "text/plain; charset=utf-8")
         );
     }
 
@@ -583,6 +588,9 @@ public class NovelApplicationService {
      */
     public NovelChapter commitChapterContent(Long projectId, Long chapterId, CommitChapterContentCommand command, Long operatorId, String traceId) {
         log.info("提交章节正文元数据: projectId={}, chapterId={}, objectKey={}, operatorId={}", projectId, chapterId, command.objectKey(), operatorId);
+        if (command.content() != null && !command.content().isBlank()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Direct upload mode does not accept content in commit payload");
+        }
         int affected = novelGateway.updateChapterContentMeta(
                 projectId,
                 chapterId,
@@ -596,7 +604,7 @@ public class NovelApplicationService {
             log.error("提交章节正文元数据失败: projectId={}, chapterId={}", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to commit chapter content");
         }
-        writeAudit(traceId, operatorId, "novel", "commit-chapter-content", "novel_chapters", String.valueOf(chapterId), command.objectKey(), 200);
+         
         log.info("提交章节正文元数据成功: projectId={}, chapterId={}", projectId, chapterId);
         return getChapter(projectId, chapterId);
     }
@@ -611,8 +619,12 @@ public class NovelApplicationService {
      */
     public Map<String, String> getChapterVersionSnapshotUrl(Long projectId, Long chapterId, Integer versionNo) {
         NovelChapterVersion version = getChapterVersion(projectId, chapterId, versionNo);
+        if (version.getSnapshotObjectKey() == null || version.getSnapshotObjectKey().isBlank()) {
+            log.warn("章节版本快照对象键为空: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
+            return Map.of("url", "");
+        }
         log.info("获取章节版本快照地址: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-        return Map.of("url", "https://object.local/read/" + version.getSnapshotObjectKey());
+        return Map.of("url", objectStorageService.buildReadUrl(version.getSnapshotObjectKey()));
     }
 
     /**
@@ -652,13 +664,13 @@ public class NovelApplicationService {
             log.error("创建大纲节点失败: projectId={}, title={}", projectId, command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create outline node");
         }
-        realtimeEventService.publishProjectEvent(projectId, "outline.node.created", Map.of(
-                "nodeId", node.getId(),
-                "parentId", node.getParentId(),
-                "title", node.getTitle(),
-                "nodeType", node.getNodeType()
-        ));
-        writeAudit(traceId, operatorId, "novel", "create-outline-node", "novel_outline_nodes", String.valueOf(node.getId()), command.title(), 201);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("nodeId", node.getId());
+        payload.put("parentId", node.getParentId());
+        payload.put("title", node.getTitle());
+        payload.put("nodeType", node.getNodeType());
+        realtimeEventService.publishProjectEvent(projectId, "outline.node.created", payload);
+         
         log.info("创建大纲节点成功: projectId={}, nodeId={}", projectId, node.getId());
         return node;
     }
@@ -690,7 +702,7 @@ public class NovelApplicationService {
             log.error("更新大纲节点失败: projectId={}, nodeId={}, reason=update_failed", projectId, nodeId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update outline node");
         }
-        writeAudit(traceId, operatorId, "novel", "update-outline-node", "novel_outline_nodes", String.valueOf(nodeId), command.title(), 200);
+         
         log.info("更新大纲节点成功: projectId={}, nodeId={}", projectId, nodeId);
         return novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
     }
@@ -712,7 +724,7 @@ public class NovelApplicationService {
             log.warn("移动大纲节点失败: projectId={}, nodeId={}, reason=not_found", projectId, nodeId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
         }
-        writeAudit(traceId, operatorId, "novel", "move-outline-node", "novel_outline_nodes", String.valueOf(nodeId), null, 200);
+         
         log.info("移动大纲节点成功: projectId={}, nodeId={}", projectId, nodeId);
     }
 
@@ -731,7 +743,7 @@ public class NovelApplicationService {
             log.warn("删除大纲节点失败: projectId={}, nodeId={}, reason=not_found", projectId, nodeId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
         }
-        writeAudit(traceId, operatorId, "novel", "delete-outline-node", "novel_outline_nodes", String.valueOf(nodeId), null, 200);
+
         log.info("删除大纲节点成功: projectId={}, nodeId={}", projectId, nodeId);
     }
 
@@ -789,7 +801,6 @@ public class NovelApplicationService {
             log.error("创建卡片失败: projectId={}, name={}", projectId, command.name());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create card");
         }
-        writeAudit(traceId, operatorId, "novel", "create-card", "novel_cards", String.valueOf(card.getId()), command.name(), 201);
         log.info("创建卡片成功: projectId={}, cardId={}", projectId, card.getId());
         return card;
     }
@@ -822,7 +833,6 @@ public class NovelApplicationService {
                 "name", card.getName(),
                 "summary", card.getSummary()
         ));
-        writeAudit(traceId, operatorId, "novel", "update-card", "novel_cards", String.valueOf(cardId), command.name(), 200);
         log.info("更新卡片成功: projectId={}, cardId={}", projectId, cardId);
         return getCard(projectId, cardId);
     }
@@ -842,7 +852,6 @@ public class NovelApplicationService {
             log.warn("删除卡片失败: projectId={}, cardId={}, reason=not_found", projectId, cardId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Card not found");
         }
-        writeAudit(traceId, operatorId, "novel", "delete-card", "novel_cards", String.valueOf(cardId), null, 200);
         log.info("删除卡片成功: projectId={}, cardId={}", projectId, cardId);
     }
 
@@ -884,7 +893,6 @@ public class NovelApplicationService {
             log.error("创建卡片关系失败: projectId={}, fromCardId={}, toCardId={}", projectId, command.fromCardId(), command.toCardId());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create card relation");
         }
-        writeAudit(traceId, operatorId, "novel", "create-card-relation", "novel_card_relations", String.valueOf(relation.getId()), command.relationType(), 201);
         log.info("创建卡片关系成功: projectId={}, relationId={}", projectId, relation.getId());
         return relation;
     }
@@ -904,21 +912,9 @@ public class NovelApplicationService {
             log.warn("删除卡片关系失败: projectId={}, relationId={}, reason=not_found", projectId, relationId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Card relation not found");
         }
-        writeAudit(traceId, operatorId, "novel", "delete-card-relation", "novel_card_relations", String.valueOf(relationId), null, 200);
         log.info("删除卡片关系成功: projectId={}, relationId={}", projectId, relationId);
     }
-
-    private void writeAudit(String traceId,
-                            Long userId,
-                            String module,
-                            String action,
-                            String resourceType,
-                            String resourceId,
-                            String requestJson,
-                            int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
-    }
+    
 }
 
 

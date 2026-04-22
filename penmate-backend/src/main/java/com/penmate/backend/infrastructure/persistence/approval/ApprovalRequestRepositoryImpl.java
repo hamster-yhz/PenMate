@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * ApprovalRequestRepositoryImpl。
- * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
+ * 审批请求仓储实现。
+ * <p>负责将审批单的创建、查询与审核状态变更委托给 {@link ApprovalRequestMapper}。</p>
  */
 @Repository
 public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository {
@@ -20,10 +20,10 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     }
 
     /**
-     * 处理业务请求。
+     * 新增审批请求。
      *
-     * @param approvalRequest 入参：approvalRequest
-     * @return 出参：处理结果
+     * @param approvalRequest 审批请求聚合
+     * @return 受影响行数
      */
     @Override
     public int insert(ApprovalRequest approvalRequest) {
@@ -31,10 +31,10 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     }
 
     /**
-     * 处理业务请求。
+     * 按项目查询审批请求列表。
      *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
+     * @param projectId 项目 ID
+     * @return 审批请求集合
      */
     @Override
     public List<ApprovalRequest> findByProjectId(Long projectId) {
@@ -42,10 +42,10 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     }
 
     /**
-     * 处理业务请求。
+     * 按审批单 ID 查询详情。
      *
-     * @param id 入参：id
-     * @return 出参：处理结果
+     * @param id 审批单 ID
+     * @return 审批请求；不存在时返回 {@code null}
      */
     @Override
     public ApprovalRequest findById(Long id) {
@@ -53,12 +53,12 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     }
 
     /**
-     * 处理业务请求。
+     * 将审批请求标记为通过。
      *
-     * @param id 入参：id
-     * @param reviewedBy 入参：reviewedBy
-     * @param comment 入参：comment
-     * @return 出参：处理结果
+     * @param id 审批单 ID
+     * @param reviewedBy 审核人 ID
+     * @param comment 审核意见
+     * @return 受影响行数
      */
     @Override
     public int approve(Long id, Long reviewedBy, String comment) {
@@ -66,12 +66,12 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     }
 
     /**
-     * 处理业务请求。
+     * 将审批请求标记为拒绝。
      *
-     * @param id 入参：id
-     * @param reviewedBy 入参：reviewedBy
-     * @param comment 入参：comment
-     * @return 出参：处理结果
+     * @param id 审批单 ID
+     * @param reviewedBy 审核人 ID
+     * @param comment 审核意见
+     * @return 受影响行数
      */
     @Override
     public int reject(Long id, Long reviewedBy, String comment) {

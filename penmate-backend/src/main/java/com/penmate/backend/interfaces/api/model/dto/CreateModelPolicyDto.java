@@ -2,7 +2,6 @@ package com.penmate.backend.interfaces.api.model.dto;
 
 import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
@@ -16,10 +15,14 @@ public class CreateModelPolicyDto {
     @NotBlank
     private String scene;
 
-    @NotNull
     private Long providerModelId;
 
+    @NotBlank
+    private String modelName;
+
+    private String baseUrl;
     private Long userKeyId;
+    private Long officialKeyId;
     private BigDecimal temperature;
     private BigDecimal topP;
     private Integer maxTokens;

@@ -9,7 +9,6 @@ import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,7 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -34,7 +34,10 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
     private AgentRepository agentRepository;
 
     @Mock
-    private RealtimeEventService realtimeEventService;
+    private AgentTaskStateMachine taskStateMachine;
+
+    @Mock
+    private AgentOrchestrationDispatcher orchestrationDispatcher;
 
     @InjectMocks
     private AgentApplicationService agentApplicationService;
@@ -47,7 +50,7 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result).hasSize(2);
         verify(agentRepository).listConversations(1L);
-        verifyNoInteractions(auditService, realtimeEventService);
+        verifyNoInteractions(auditService, taskStateMachine, orchestrationDispatcher);
     }
 
     @Test
@@ -70,8 +73,7 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getId()).isEqualTo(77L);
         verify(agentRepository).insertConversation(any(AgentConversation.class));
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("agent"), eq("conversation:create"), eq("agent_conversations"), eq("77"), eq("{}"), eq(201));
-        verifyNoInteractions(realtimeEventService);
+        verifyNoInteractions(taskStateMachine, orchestrationDispatcher);
     }
 
     @Test
@@ -109,8 +111,7 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getId()).isEqualTo(88L);
         verify(agentRepository).touchConversationLastMessage(conversationId);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("agent"), eq("message:create"), eq("agent_messages"), eq("88"), eq("hello"), eq(201));
-        verifyNoInteractions(realtimeEventService);
+        verifyNoInteractions(taskStateMachine, orchestrationDispatcher);
     }
 
     @Test
@@ -128,22 +129,19 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
             task.setId(501L);
             return 1;
         });
-        AgentGenerationTask doneTask = new AgentGenerationTask();
-        doneTask.setId(501L);
-        doneTask.setStatus("done");
-        when(agentRepository.findGenerationTask(projectId, 501L)).thenReturn(doneTask);
+        AgentGenerationTask pendingTask = new AgentGenerationTask();
+        pendingTask.setId(501L);
+        pendingTask.setStatus("pending");
+        when(agentRepository.findGenerationTask(projectId, 501L)).thenReturn(pendingTask);
 
         AgentGenerationTask result = agentApplicationService.createGeneration(
                 projectId,
-                new CreateGenerationCommand(conversationId, 20L, "rewrite", "prompt", "style", "plugins", operatorId),
+                new CreateGenerationCommand(conversationId, 20L, 9001L, "rewrite", "prompt", "style", "plugins", operatorId),
                 traceId
         );
 
         assertThat(result.getId()).isEqualTo(501L);
-        verify(realtimeEventService).publishGenerationToken(projectId, 501L, "开始生成", false);
-        verify(realtimeEventService).publishGenerationToken(projectId, 501L, "", true);
-        verify(agentRepository).updateGenerationTaskStatus(projectId, 501L, "done", null);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("agent"), eq("generation:create"), eq("agent_generation_tasks"), eq("501"), eq("prompt"), eq(201));
+        verify(orchestrationDispatcher).dispatch(projectId, 501L, traceId);
     }
 
     @Test
@@ -152,6 +150,9 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
         task.setId(501L);
         task.setStatus("running");
         when(agentRepository.findGenerationTask(1L, 501L)).thenReturn(task);
+        when(taskStateMachine.parseStatus("running")).thenReturn(com.penmate.backend.domain.agent.model.AgentTaskStatus.RUNNING);
+        doThrow(com.penmate.backend.application.common.exception.BusinessException.of("Invalid generation task state transition"))
+                .when(taskStateMachine).assertTransition("running", com.penmate.backend.domain.agent.model.AgentTaskStatus.APPLIED);
 
         assertThatThrownBy(() -> agentApplicationService.applyGeneration(
                 1L,
@@ -159,7 +160,7 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
                 new ApplyGenerationCommand(1001L, "应用"),
                 "trace"
         )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Generation task is not ready for apply");
+                .hasMessage("Invalid generation task state transition");
     }
 
     @Test
@@ -178,6 +179,8 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
 
         when(agentRepository.findGenerationTask(projectId, taskId)).thenReturn(readyTask, appliedTask);
         when(agentRepository.updateGenerationTaskStatus(projectId, taskId, "applied", null)).thenReturn(1);
+        when(taskStateMachine.parseStatus("done")).thenReturn(com.penmate.backend.domain.agent.model.AgentTaskStatus.DONE);
+        doNothing().when(taskStateMachine).assertTransition("done", com.penmate.backend.domain.agent.model.AgentTaskStatus.APPLIED);
 
         AgentGenerationTask result = agentApplicationService.applyGeneration(
                 projectId,
@@ -188,8 +191,8 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result.getStatus()).isEqualTo("applied");
         verify(agentRepository).updateGenerationTaskStatus(projectId, taskId, "applied", null);
-        verify(auditService).write(eq(traceId), eq(operatorId), eq("agent"), eq("generation:apply"), eq("agent_generation_tasks"), eq("501"), eq("确认应用"), eq(200));
-        verifyNoInteractions(realtimeEventService);
+        verify(taskStateMachine).assertTransition("done", com.penmate.backend.domain.agent.model.AgentTaskStatus.APPLIED);
+        verifyNoInteractions(orchestrationDispatcher);
     }
 }
 

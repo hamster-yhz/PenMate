@@ -1,21 +1,22 @@
 package com.penmate.backend.application.model;
 
 import com.penmate.backend.application.model.command.ModelCommands.CreateModelKeyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.CreateOfficialModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.CreatePolicyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdateModelKeyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.UpdateOfficialModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdatePolicyCommand;
+import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelProviderModel;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.domain.model.repository.ModelRepository;
-import com.penmate.backend.domain.shared.service.AuditService;
+import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 模型配置应用服务。
@@ -27,7 +28,7 @@ import java.util.UUID;
 public class ModelApplicationService {
 
     private final ModelRepository modelRepository;
-    private final AuditService auditService;
+    private final SecretCryptoService secretCryptoService;
 
     /**
      * 查询可用模型厂商列表。
@@ -36,18 +37,7 @@ public class ModelApplicationService {
      */
     public List<ModelProvider> listProviders() {
         log.info("查询模型厂商列表");
-        return modelRepository.listProviders();
-    }
-
-    /**
-     * 按厂商编码查询模型清单。
-     *
-     * @param providerCode 入参：providerCode
-     * @return 出参：处理结果
-     */
-    public List<ModelProviderModel> listProviderModels(String providerCode) {
-        log.info("查询厂商模型列表: providerCode={}", providerCode);
-        return modelRepository.listProviderModels(providerCode);
+        return BuiltinModelProviders.list();
     }
 
     /**
@@ -59,6 +49,11 @@ public class ModelApplicationService {
     public List<ModelUserApiKey> listUserKeys(Long userId) {
         log.info("查询用户模型密钥列表: userId={}", userId);
         return modelRepository.listUserKeys(userId);
+    }
+
+    public List<ModelOfficialApiKey> listOfficialKeys() {
+        log.info("查询官方模型密钥列表");
+        return modelRepository.listOfficialKeys();
     }
 
     /**
@@ -78,7 +73,7 @@ public class ModelApplicationService {
                 userId,
                 command.providerId(),
                 command.keyName(),
-                encrypt(command.apiKey()),
+                secretCryptoService.encrypt(command.apiKey()),
                 mask(command.apiKey()),
                 toDefault,
                 command.status() == null ? "active" : command.status()
@@ -104,7 +99,7 @@ public class ModelApplicationService {
         if (Boolean.TRUE.equals(command.isDefault())) {
             modelRepository.clearDefaultUserKey(userId);
         }
-        String encrypted = command.apiKey() == null || command.apiKey().isBlank() ? null : encrypt(command.apiKey());
+        String encrypted = command.apiKey() == null || command.apiKey().isBlank() ? null : secretCryptoService.encrypt(command.apiKey());
         String masked = command.apiKey() == null || command.apiKey().isBlank() ? null : mask(command.apiKey());
         int affected = modelRepository.updateUserKey(
                 userId,
@@ -142,6 +137,67 @@ public class ModelApplicationService {
         log.info("删除模型密钥成功: userId={}, keyId={}", userId, keyId);
     }
 
+    public void createOfficialKey(CreateOfficialModelKeyCommand command, String traceId) {
+        log.info("创建官方模型密钥: providerId={}, keyName={}", command.providerId(), command.keyName());
+        boolean toDefault = Boolean.TRUE.equals(command.isDefault());
+        if (toDefault) {
+            modelRepository.clearDefaultOfficialKey(command.providerId());
+        }
+        int affected = modelRepository.insertOfficialKey(
+                command.providerId(),
+                command.keyName(),
+                secretCryptoService.encrypt(command.apiKey()),
+                mask(command.apiKey()),
+                toDefault,
+                command.status() == null ? "active" : command.status()
+        );
+        if (affected < 1) {
+            log.error("创建官方模型密钥失败: providerId={}", command.providerId());
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create official model key");
+        }
+        writeAudit(traceId, command.operatorId(), "model", "create-official-model-key", "model_official_api_keys", command.providerId().toString(), null, 200);
+        log.info("创建官方模型密钥成功: providerId={}, keyName={}", command.providerId(), command.keyName());
+    }
+
+    public void updateOfficialKey(Long keyId, UpdateOfficialModelKeyCommand command, String traceId) {
+        log.info("更新官方模型密钥: keyId={}", keyId);
+        ModelOfficialApiKey existing = modelRepository.findOfficialKey(keyId);
+        if (existing == null) {
+            log.warn("更新官方模型密钥失败: keyId={}, reason=not_found", keyId);
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Official model key not found");
+        }
+        if (Boolean.TRUE.equals(command.isDefault())) {
+            modelRepository.clearDefaultOfficialKey(existing.getProviderId());
+        }
+        String encrypted = command.apiKey() == null || command.apiKey().isBlank() ? null : secretCryptoService.encrypt(command.apiKey());
+        String masked = command.apiKey() == null || command.apiKey().isBlank() ? null : mask(command.apiKey());
+        int affected = modelRepository.updateOfficialKey(
+                keyId,
+                command.keyName(),
+                encrypted,
+                masked,
+                command.isDefault(),
+                command.status()
+        );
+        if (affected != 1) {
+            log.warn("更新官方模型密钥失败: keyId={}, reason=not_found", keyId);
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Official model key not found");
+        }
+        writeAudit(traceId, command.operatorId(), "model", "update-official-model-key", "model_official_api_keys", keyId.toString(), null, 200);
+        log.info("更新官方模型密钥成功: keyId={}", keyId);
+    }
+
+    public void deleteOfficialKey(Long keyId, Long operatorId, String traceId) {
+        log.info("删除官方模型密钥: keyId={}", keyId);
+        int affected = modelRepository.softDeleteOfficialKey(keyId);
+        if (affected != 1) {
+            log.warn("删除官方模型密钥失败: keyId={}, reason=not_found", keyId);
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Official model key not found");
+        }
+        writeAudit(traceId, operatorId, "model", "delete-official-model-key", "model_official_api_keys", keyId.toString(), null, 200);
+        log.info("删除官方模型密钥成功: keyId={}", keyId);
+    }
+
     /**
      * 查询项目模型策略列表。
      *
@@ -171,7 +227,10 @@ public class ModelApplicationService {
                 command.policyName(),
                 command.scene(),
                 command.providerModelId(),
+                command.modelName(),
+                command.baseUrl(),
                 command.userKeyId(),
+                command.officialKeyId(),
                 command.temperature(),
                 command.topP(),
                 command.maxTokens(),
@@ -205,7 +264,10 @@ public class ModelApplicationService {
                 command.policyName(),
                 command.scene(),
                 command.providerModelId(),
+                command.modelName(),
+                command.baseUrl(),
                 command.userKeyId(),
+                command.officialKeyId(),
                 command.temperature(),
                 command.topP(),
                 command.maxTokens(),
@@ -259,9 +321,6 @@ public class ModelApplicationService {
         log.info("设置默认模型策略成功: projectId={}, policyId={}", projectId, policyId);
     }
 
-    private String encrypt(String plain) {
-        return plain == null ? null : "ENC(" + plain + ")";
-    }
 
     private String mask(String key) {
         if (key == null || key.isBlank()) {
@@ -279,8 +338,7 @@ public class ModelApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
 

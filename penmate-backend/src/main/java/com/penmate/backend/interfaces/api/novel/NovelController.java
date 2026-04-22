@@ -43,8 +43,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * NovelController。
- * <p>控制层：负责HTTP请求接入、参数校验与统一响应封装。</p>
+ * 小说项目聚合控制器。
+ * <p>统一提供项目、卷、章节、成员、版本、大纲、卡片与关系等写作域接口，并将 HTTP 参数映射为应用层命令对象。</p>
  */
 @RestController
 @RequestMapping("/api/v1/novels")
@@ -57,7 +57,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询小说项目列表。
+     * <p>流程：调用应用服务读取项目清单并返回统一响应。</p>
      *
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -68,7 +69,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建小说项目。
+     * <p>流程：校验入参 -> 组装创建命令 -> 调用应用服务落库。</p>
      *
      * @param dto 入参：dto
      * @param traceId 入参：traceId
@@ -89,7 +91,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 查询项目详情。
+     * <p>流程：按项目ID查询项目实体并返回。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -102,7 +105,8 @@ public class NovelController {
     }
 
     /**
-     * 更新业务数据。
+     * 更新项目基础信息。
+     * <p>流程：组装更新命令 -> 应用服务校验并保存。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -121,7 +125,8 @@ public class NovelController {
     }
 
     /**
-     * 删除业务数据。
+     * 删除项目。
+     * <p>流程：校验操作者权限 -> 执行项目删除。</p>
      *
      * @param projectId 入参：projectId
      * @param operatorId 入参：operatorId
@@ -137,7 +142,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询项目卷列表。
+     * <p>流程：按项目ID读取卷集合。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -150,7 +156,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建卷。
+     * <p>流程：组装卷创建命令 -> 写入卷记录。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -172,7 +179,8 @@ public class NovelController {
     }
 
     /**
-     * 更新业务数据。
+     * 更新卷信息。
+     * <p>流程：按卷ID执行更新并返回新状态。</p>
      *
      * @param projectId 入参：projectId
      * @param volumeId 入参：volumeId
@@ -197,7 +205,8 @@ public class NovelController {
     }
 
     /**
-     * 删除业务数据。
+     * 删除卷。
+     * <p>流程：校验卷归属与权限后执行删除。</p>
      *
      * @param projectId 入参：projectId
      * @param volumeId 入参：volumeId
@@ -215,7 +224,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询章节列表。
+     * <p>流程：按项目聚合章节并返回。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -228,7 +238,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建章节。
+     * <p>流程：组装章节创建命令 -> 持久化章节元数据。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -263,7 +274,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 查询章节详情。
+     * <p>流程：按章节ID查询并返回章节对象。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -278,7 +290,8 @@ public class NovelController {
     }
 
     /**
-     * 更新业务数据。
+     * 更新章节元数据。
+     * <p>流程：校验章节归属 -> 执行章节更新。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -316,7 +329,8 @@ public class NovelController {
     }
 
     /**
-     * 删除业务数据。
+     * 删除章节。
+     * <p>流程：按章节ID执行删除并返回确认结果。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -334,7 +348,8 @@ public class NovelController {
     }
 
     /**
-     * 发布业务状态。
+     * 发布章节。
+     * <p>流程：触发章节发布状态流转并返回 published。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -352,7 +367,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询项目成员列表。
+     * <p>流程：读取项目成员关系并返回。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -365,7 +381,8 @@ public class NovelController {
     }
 
     /**
-     * 新增业务数据。
+     * 新增项目成员。
+     * <p>流程：组装成员命令 -> 应用服务写入成员关系。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -387,7 +404,8 @@ public class NovelController {
     }
 
     /**
-     * 更新业务数据。
+     * 更新成员角色。
+     * <p>流程：按用户ID更新成员角色与权限范围。</p>
      *
      * @param projectId 入参：projectId
      * @param userId 入参：userId
@@ -412,7 +430,8 @@ public class NovelController {
     }
 
     /**
-     * 移除业务数据。
+     * 移除项目成员。
+     * <p>流程：校验操作者权限 -> 解除成员关系。</p>
      *
      * @param projectId 入参：projectId
      * @param userId 入参：userId
@@ -430,7 +449,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询章节版本列表。
+     * <p>流程：读取章节历史版本并返回。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -445,7 +465,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建章节版本快照。
+     * <p>流程：根据变更原因创建新版本记录。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -467,7 +488,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 查询单个章节版本。
+     * <p>流程：按 versionNo 查询指定版本快照。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -484,7 +506,8 @@ public class NovelController {
     }
 
     /**
-     * 恢复历史数据。
+     * 恢复到历史章节版本。
+     * <p>流程：校验版本存在 -> 执行版本回滚并返回章节。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -503,7 +526,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 获取章节正文下载地址。
+     * <p>流程：生成或读取正文对象访问地址。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -518,7 +542,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 获取章节正文上传地址。
+     * <p>流程：申请上传URL用于前端直传正文文件。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -533,7 +558,8 @@ public class NovelController {
     }
 
     /**
-     * 提交业务变更。
+     * 提交章节正文对象变更。
+     * <p>流程：提交对象存储元信息 -> 应用服务更新章节正文引用。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -556,7 +582,8 @@ public class NovelController {
                         dto.getEtag(),
                         dto.getSize(),
                         dto.getChecksum(),
-                        dto.getStorageProvider()
+                        dto.getStorageProvider(),
+                        dto.getContent()
                 ),
                 operatorId,
                 traceId
@@ -564,7 +591,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 获取章节版本快照下载地址。
+     * <p>流程：按版本号返回快照对象访问地址。</p>
      *
      * @param projectId 入参：projectId
      * @param chapterId 入参：chapterId
@@ -581,7 +609,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询大纲树。
+     * <p>流程：按项目读取树形大纲节点。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -594,7 +623,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建大纲节点。
+     * <p>流程：组装节点创建命令 -> 写入并返回节点。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -622,7 +652,8 @@ public class NovelController {
     }
 
     /**
-     * 更新业务数据。
+     * 更新大纲节点。
+     * <p>流程：按节点ID更新标题/类型/排序与内容。</p>
      *
      * @param projectId 入参：projectId
      * @param nodeId 入参：nodeId
@@ -653,7 +684,8 @@ public class NovelController {
     }
 
     /**
-     * 处理业务请求。
+     * 移动大纲节点。
+     * <p>流程：更新父节点与排序号，完成树结构重排。</p>
      *
      * @param projectId 入参：projectId
      * @param nodeId 入参：nodeId
@@ -679,7 +711,8 @@ public class NovelController {
     }
 
     /**
-     * 删除业务数据。
+     * 删除大纲节点。
+     * <p>流程：校验节点可删后执行删除。</p>
      *
      * @param projectId 入参：projectId
      * @param nodeId 入参：nodeId
@@ -697,7 +730,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询卡片列表。
+     * <p>流程：读取项目卡片并返回。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -710,7 +744,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建卡片。
+     * <p>流程：按卡片类型与内容创建角色/世界观等卡片。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -732,7 +767,8 @@ public class NovelController {
     }
 
     /**
-     * 查询详情数据。
+     * 查询卡片详情。
+     * <p>流程：按卡片ID查询并返回。</p>
      *
      * @param projectId 入参：projectId
      * @param cardId 入参：cardId
@@ -747,7 +783,8 @@ public class NovelController {
     }
 
     /**
-     * 更新业务数据。
+     * 更新卡片。
+     * <p>流程：提交更新命令并保存卡片内容。</p>
      *
      * @param projectId 入参：projectId
      * @param cardId 入参：cardId
@@ -772,7 +809,8 @@ public class NovelController {
     }
 
     /**
-     * 删除业务数据。
+     * 删除卡片。
+     * <p>流程：按卡片ID删除并返回确认结果。</p>
      *
      * @param projectId 入参：projectId
      * @param cardId 入参：cardId
@@ -790,7 +828,8 @@ public class NovelController {
     }
 
     /**
-     * 查询列表数据。
+     * 查询卡片关系列表。
+     * <p>流程：读取项目内卡片关系边集合。</p>
      *
      * @param projectId 入参：projectId
      * @param traceId 入参：traceId
@@ -803,7 +842,8 @@ public class NovelController {
     }
 
     /**
-     * 创建业务数据。
+     * 创建卡片关系。
+     * <p>流程：提交关联关系命令并持久化。</p>
      *
      * @param projectId 入参：projectId
      * @param dto 入参：dto
@@ -830,7 +870,8 @@ public class NovelController {
     }
 
     /**
-     * 删除业务数据。
+     * 删除卡片关系。
+     * <p>流程：按关系ID删除关联边。</p>
      *
      * @param projectId 入参：projectId
      * @param relationId 入参：relationId

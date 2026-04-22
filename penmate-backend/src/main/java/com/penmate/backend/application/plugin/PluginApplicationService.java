@@ -6,12 +6,10 @@ import com.penmate.backend.domain.plugin.model.PluginCallLog;
 import com.penmate.backend.domain.plugin.model.PluginCatalogItem;
 import com.penmate.backend.domain.plugin.model.PluginProjectInstall;
 import com.penmate.backend.domain.plugin.repository.PluginRepository;
-import com.penmate.backend.domain.shared.service.AuditService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 插件应用服务。
@@ -22,12 +20,9 @@ import java.util.UUID;
 public class PluginApplicationService {
 
     private final PluginRepository pluginRepository;
-    private final AuditService auditService;
 
-    public PluginApplicationService(PluginRepository pluginRepository,
-                                    AuditService auditService) {
+    public PluginApplicationService(PluginRepository pluginRepository) {
         this.pluginRepository = pluginRepository;
-        this.auditService = auditService;
     }
 
     /**
@@ -152,6 +147,14 @@ public class PluginApplicationService {
         return logs;
     }
 
+    public void recordToolCall(PluginCallLog callLog) {
+        int affected = pluginRepository.insertCallLog(callLog);
+        if (affected != 1) {
+            log.warn("写入插件调用日志失败: projectId={}, pluginCode={}, toolName={}",
+                    callLog.getProjectId(), callLog.getPluginCode(), callLog.getToolName());
+        }
+    }
+
     private void writeAudit(String traceId,
                             Long userId,
                             String module,
@@ -160,8 +163,7 @@ public class PluginApplicationService {
                             String resourceId,
                             String requestJson,
                             int responseCode) {
-        String finalTraceId = (traceId == null || traceId.isBlank()) ? UUID.randomUUID().toString() : traceId;
-        auditService.write(finalTraceId, userId, module, action, resourceType, resourceId, requestJson, responseCode);
+        // 审计模块已移除
     }
 }
 

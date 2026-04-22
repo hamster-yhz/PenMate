@@ -3,7 +3,6 @@ package com.penmate.backend.domain.iam.repository;
 import com.penmate.backend.domain.iam.model.IamMenu;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
-import com.penmate.backend.domain.iam.model.IamSession;
 import com.penmate.backend.domain.iam.model.IamUser;
 
 import java.util.List;
@@ -19,16 +18,6 @@ public interface IamGateway {
     List<IamRole> findRolesByUserId(Long userId);
 
     List<IamPermission> findPermissionsByUserId(Long userId);
-
-    int insertSession(IamSession session);
-
-    IamSession findSessionByAccessToken(String accessToken);
-
-    IamSession findSessionByRefreshToken(String refreshToken);
-
-    int revokeByAccessToken(String accessToken);
-
-    int rotateSession(IamSession session);
 
     List<IamUser> findAllUsers();
 
