@@ -3,18 +3,34 @@ import type { IdLike } from '@/api/types'
 
 export type AnyRecord = Record<string, unknown>
 
+const normalizeProjectPayload = (payload: AnyRecord) => {
+  const next: AnyRecord = { ...payload }
+
+  if (next.ownerUserId == null && next.ownerId != null) {
+    next.ownerUserId = next.ownerId
+  }
+  delete next.ownerId
+
+  if ((next.summary == null || next.summary === '') && typeof next.description === 'string') {
+    next.summary = next.description
+  }
+  delete next.description
+
+  return next
+}
+
 export const novelApi = {
   listProjects() {
     return request.get<AnyRecord[]>('/v1/novels')
   },
   createProject(payload: AnyRecord) {
-    return request.post<AnyRecord>('/v1/novels', payload)
+    return request.post<AnyRecord>('/v1/novels', normalizeProjectPayload(payload))
   },
   getProject(projectId: IdLike) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}`)
   },
   updateProject(projectId: IdLike, payload: AnyRecord) {
-    return request.put<AnyRecord>(`/v1/novels/${projectId}`, payload)
+    return request.put<AnyRecord>(`/v1/novels/${projectId}`, normalizeProjectPayload(payload))
   },
   deleteProject(projectId: IdLike, operatorId: IdLike) {
     return request.delete<string>(`/v1/novels/${projectId}?operatorId=${operatorId}`)
