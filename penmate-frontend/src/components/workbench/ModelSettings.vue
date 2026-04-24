@@ -17,18 +17,27 @@
             <div
               v-for="item in officialCards"
               :key="`official-${item.id}`"
-              class="ms-card"
+              class="ms-card official-card"
               :class="{ active: item.isActive, unavailable: !item.canSwitch }"
+              @click="handleOfficialCardClick(item.id)"
             >
+              <button
+                v-if="item.configId || item.officialKeyId"
+                type="button"
+                class="card-icon-btn card-delete-btn"
+                title="删除"
+                @click.stop="deleteOfficialCard(item.id)"
+              >
+                <span aria-hidden="true">🗑</span>
+              </button>
               <div class="name">{{ item.name }}</div>
               <div class="meta">{{ item.providerName }} · {{ item.billingType === 'FREE' ? '免费' : '收费' }}</div>
               <div class="tag">{{ item.statusText }}</div>
               <div class="card-model-name">{{ item.modelName || '未配置模型名' }}</div>
               <div class="card-actions">
-                <button class="card-btn switch" :disabled="!item.canSwitch" @click="switchOfficial(item.id)">
-                  {{ item.isActive ? '当前使用中' : '切换使用' }}
+                <button class="card-icon-btn edit" type="button" title="编辑" @click.stop="selectOfficial(item.id)">
+                  <span aria-hidden="true">✎</span>
                 </button>
-                <button class="card-btn edit" @click="selectOfficial(item.id)">编辑</button>
               </div>
             </div>
           </div>
@@ -40,21 +49,29 @@
             <div
               v-for="item in userCards"
               :key="`user-${item.userKeyId}`"
-              class="ms-card"
+              class="ms-card user-card"
               :class="{ active: item.isActive, unavailable: !item.canSwitch }"
+              @click="handleUserCardClick(item.userKeyId)"
             >
+              <button
+                type="button"
+                class="card-icon-btn card-delete-btn"
+                title="删除"
+                @click.stop="deleteUserCard(item.userKeyId)"
+              >
+                <span aria-hidden="true">🗑</span>
+              </button>
               <div class="name">{{ item.keyName }}</div>
               <div class="meta">{{ item.providerName }} · {{ item.modelName }}</div>
               <div class="tag">{{ item.statusText }}</div>
               <div class="card-actions">
-                <button class="card-btn switch" :disabled="!item.canSwitch" @click="switchUser(item.userKeyId)">
-                  {{ item.isActive ? '当前使用中' : '切换使用' }}
+                <button class="card-icon-btn edit" type="button" title="编辑" @click.stop="selectUser(item.userKeyId)">
+                  <span aria-hidden="true">✎</span>
                 </button>
-                <button class="card-btn edit" @click="selectUser(item.userKeyId)">编辑</button>
               </div>
             </div>
 
-            <button class="ms-card add-card" @click="startCreate">
+            <button class="ms-card add-card" type="button" @click="startCreate">
               <div class="plus">＋</div>
               <div class="meta">新增我的模型</div>
             </button>
@@ -108,7 +125,6 @@
 
           <div class="api-actions">
             <button type="button" class="btn-test" @click="testConnection">🔗 测试连接</button>
-            <button v-if="editingConfigId" type="button" class="btn-delete-api" @click="deleteCurrentConfig">🗑 删除配置</button>
             <button type="button" class="btn-save-api" @click="saveApi">💾 保存配置</button>
           </div>
 
@@ -207,18 +223,6 @@ const getUserId = () => {
 }
 const getOperatorId = () => getUserId()
 
-const detectBillingType = (pricing: unknown): BillingType => {
-  if (!pricing) return 'PAID'
-  try {
-    const parsed = typeof pricing === 'string' ? JSON.parse(pricing) : pricing
-    const json = JSON.stringify(parsed).toLowerCase()
-    if (json.includes('free') || json.includes('"input":0') || json.includes('"output":0')) return 'FREE'
-  } catch {
-    // ignore
-  }
-  return 'PAID'
-}
-
 const modelById = computed<Record<string, ModelItem>>(() => {
   const dict: Record<string, ModelItem> = {}
   models.value.forEach((m) => {
@@ -278,6 +282,16 @@ const selectOfficial = (modelId: string) => {
   editingConfigId.value = m.configId
 }
 
+const handleOfficialCardClick = async (modelId: string) => {
+  const card = officialCards.value.find((item) => item.id === modelId)
+  if (!card) return
+  if (card.canSwitch && !card.isActive) {
+    await switchOfficial(modelId)
+    return
+  }
+  selectOfficial(modelId)
+}
+
 const selectUser = (userKeyId: number) => {
   const card = userCards.value.find((u) => u.userKeyId === userKeyId)
   if (!card) return
@@ -289,6 +303,16 @@ const selectUser = (userKeyId: number) => {
   form.value.apiKey = ''
   form.value.keyName = card.keyName
   editingConfigId.value = card.configId
+}
+
+const handleUserCardClick = async (userKeyId: number) => {
+  const card = userCards.value.find((item) => item.userKeyId === userKeyId)
+  if (!card) return
+  if (card.canSwitch && !card.isActive) {
+    await switchUser(userKeyId)
+    return
+  }
+  selectUser(userKeyId)
 }
 
 const startCreate = () => {
@@ -560,13 +584,50 @@ const saveApi = async () => {
   emit('saved')
 }
 
-const deleteCurrentConfig = async () => {
+const clearFormAfterDelete = () => {
+  form.value.mode = 'official'
+  form.value.selectedModelId = models.value[0]?.id || ''
+  form.value.modelInput = ''
+  form.value.baseUrl = ''
+  form.value.apiKey = ''
+  form.value.keyName = ''
+  form.value.selectedUserKeyId = null
+  editingConfigId.value = null
+}
+
+const deleteUserCard = async (userKeyId: number) => {
   const projectId = getProjectId()
   const operatorId = getOperatorId()
-  if (!projectId || !operatorId || !editingConfigId.value) return
-  await modelApi.deleteConfig(projectId, editingConfigId.value, operatorId)
-  message.success('模型配置已删除')
-  editingConfigId.value = null
+  const userId = getUserId()
+  const card = userCards.value.find((item) => item.userKeyId === userKeyId)
+  if (!projectId || !operatorId || !userId || !card) return
+
+  if (card.configId) {
+    await modelApi.deleteConfig(projectId, card.configId, operatorId)
+  }
+  await modelApi.deleteKey(card.userKeyId, userId, operatorId)
+
+  clearFormAfterDelete()
+  message.success('我的模型已删除')
+  await loadData()
+  emit('saved')
+}
+
+const deleteOfficialCard = async (modelId: string) => {
+  const projectId = getProjectId()
+  const operatorId = getOperatorId()
+  const card = officialCards.value.find((item) => item.id === modelId)
+  if (!projectId || !operatorId || !card) return
+
+  if (card.configId) {
+    await modelApi.deleteConfig(projectId, card.configId, operatorId)
+  }
+  if (card.officialKeyId) {
+    await modelApi.deleteOfficialKey(card.officialKeyId, operatorId)
+  }
+
+  clearFormAfterDelete()
+  message.success('官方模型配置已删除')
   await loadData()
   emit('saved')
 }
@@ -594,30 +655,32 @@ watch(
 .ms-section { display: flex; flex-direction: column; gap: 8px; }
 .ms-section h4 { margin: 0; color: var(--amber-gold); font-size: 0.92rem; }
 .ms-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
-.ms-card { text-align: left; background: rgba(11,17,32,0.4); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px; color: var(--text-primary); display: flex; flex-direction: column; gap: 8px; }
-.ms-card.active, .ms-card:hover { border-color: var(--border-gold); }
+.ms-card { position: relative; text-align: left; background: linear-gradient(180deg, rgba(11,17,32,0.62), rgba(11,17,32,0.42)); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 18px; color: var(--text-primary); display: flex; flex-direction: column; gap: 12px; min-height: 162px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.02); transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease, background .2s ease; cursor: pointer; }
+.ms-card.active, .ms-card:hover { border-color: var(--border-gold); box-shadow: 0 10px 24px rgba(0,0,0,0.18); transform: translateY(-1px); }
 .ms-card.unavailable { opacity: 0.7; }
-.name { font-size: 0.9rem; }
-.meta { font-size: 0.75rem; color: var(--text-muted); }
-.tag { font-size: 0.7rem; color: var(--amber-gold); }
-.card-model-name { font-size: 0.76rem; color: var(--text-secondary); }
-.card-actions { display: flex; gap: 8px; }
-.card-btn { flex: 1; border-radius: 6px; border: 1px solid var(--border-subtle); padding: 6px 8px; cursor: pointer; }
-.card-btn.switch { color: var(--amber-gold); background: rgba(201,169,110,0.08); }
-.card-btn.edit { color: var(--sky-cyan); background: rgba(110,197,212,0.08); }
-.card-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.add-card { align-items: center; justify-content: center; border-style: dashed; }
+.ms-card.unavailable:not(.active) { cursor: default; }
+.name { font-size: 0.9rem; font-weight: 600; color: var(--xuan-paper); padding-right: 34px; }
+.meta { font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; }
+.tag { font-size: 0.78rem; color: var(--amber-gold); min-height: 22px; }
+.card-model-name { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; }
+.card-actions { display: flex; justify-content: flex-end; margin-top: auto; }
+.card-icon-btn { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--border-subtle); background: rgba(255,255,255,0.02); color: var(--sky-cyan); cursor: pointer; transition: all .2s ease; }
+.card-icon-btn span { font-size: 0.95rem; line-height: 1; }
+.card-icon-btn:hover { border-color: rgba(110,197,212,0.42); background: rgba(110,197,212,0.08); }
+.card-delete-btn { position: absolute; right: 12px; top: 12px; color: #e8a87c; }
+.card-delete-btn:hover { border-color: rgba(232,168,124,0.42); background: rgba(232,168,124,0.08); }
+.add-card { align-items: center; justify-content: center; border-style: dashed; background: rgba(11,17,32,0.32); }
 .plus { font-size: 1.8rem; color: var(--amber-gold); line-height: 1; }
-.api-form { padding: 14px; border: 1px solid var(--border-subtle); border-radius: 10px; display: flex; flex-direction: column; gap: 10px; }
+.api-form { padding: 18px; border: 1px solid var(--border-subtle); border-radius: 14px; display: flex; flex-direction: column; gap: 12px; background: rgba(11,17,32,0.32); }
 .form-title { margin: 0; color: var(--amber-gold); }
 .form-row { display: flex; flex-direction: column; gap: 4px; }
 .form-row label { font-size: 0.8rem; color: var(--text-secondary); }
-.f-input { width: 100%; box-sizing: border-box; padding: 10px 12px; background: rgba(11,17,32,0.6); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-primary); }
+.f-input { width: 100%; box-sizing: border-box; padding: 12px 14px; background: rgba(11,17,32,0.6); border: 1px solid var(--border-subtle); border-radius: 10px; color: var(--text-primary); }
 .key-input-wrap { position: relative; }
 .key-input-wrap .f-input { padding-right: 42px; }
 .btn-toggle-key { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; }
 .api-actions { display: flex; gap: 10px; }
-.btn-test, .btn-save-api, .btn-delete-api { border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+.btn-test, .btn-save-api, .btn-delete-api { border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 14px; cursor: pointer; }
 .btn-test { color: var(--sky-cyan); background: rgba(110,197,212,0.08); }
 .btn-save-api { color: var(--amber-gold); background: rgba(201,169,110,0.08); }
 .btn-delete-api { color: #e8a87c; background: rgba(232,168,124,0.08); }
