@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * 写作风格档案实体。
  */
 public class StyleProfile {
-    /** 风格档案主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 风格业务 ID。 */
+    private Long styleId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
     /** 风格名称。 */
     private String name;

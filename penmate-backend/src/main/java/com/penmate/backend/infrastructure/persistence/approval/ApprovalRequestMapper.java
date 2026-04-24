@@ -19,15 +19,15 @@ public interface ApprovalRequestMapper {
 
     @Insert("""
             INSERT INTO agent_approval_requests
-            (project_id, task_id, approval_type, payload_json, risk_level, status, requested_by)
+            (approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status, requested_by)
             VALUES
-            (#{projectId}, #{taskId}, #{approvalType}, #{payloadJson}, #{riskLevel}, 'pending', #{requestedBy})
+            (#{approvalRequestId}, #{projectId}, #{taskId}, #{approvalType}, #{payloadJson}, #{riskLevel}, 'pending', #{requestedBy})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(ApprovalRequest approvalRequest);
 
     @Select("""
-            SELECT id, project_id, task_id, approval_type, payload_json, risk_level, status,
+            SELECT id, approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status,
                    requested_by, reviewed_by, reviewed_at, review_comment, created_at, updated_at
             FROM agent_approval_requests
             WHERE project_id = #{projectId}
@@ -36,24 +36,24 @@ public interface ApprovalRequestMapper {
     List<ApprovalRequest> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, project_id, task_id, approval_type, payload_json, risk_level, status,
+            SELECT id, approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status,
                    requested_by, reviewed_by, reviewed_at, review_comment, created_at, updated_at
             FROM agent_approval_requests
-            WHERE id = #{id}
+            WHERE approval_request_id = #{id}
             """)
     ApprovalRequest findById(@Param("id") Long id);
 
     @Update("""
             UPDATE agent_approval_requests
             SET status = 'approved', reviewed_by = #{reviewedBy}, reviewed_at = CURRENT_TIMESTAMP(3), review_comment = #{comment}
-            WHERE id = #{id} AND status = 'pending'
+            WHERE approval_request_id = #{id} AND status = 'pending'
             """)
     int approve(@Param("id") Long id, @Param("reviewedBy") Long reviewedBy, @Param("comment") String comment);
 
     @Update("""
             UPDATE agent_approval_requests
             SET status = 'rejected', reviewed_by = #{reviewedBy}, reviewed_at = CURRENT_TIMESTAMP(3), review_comment = #{comment}
-            WHERE id = #{id} AND status = 'pending'
+            WHERE approval_request_id = #{id} AND status = 'pending'
             """)
     int reject(@Param("id") Long id, @Param("reviewedBy") Long reviewedBy, @Param("comment") String comment);
 }

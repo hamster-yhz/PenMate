@@ -19,14 +19,14 @@ import java.util.List;
 public interface PluginMapper {
 
     @Select("""
-            SELECT id, code, name, category, provider, status, latest_version, created_at, updated_at
+            SELECT id, plugin_id, code, name, category, provider, status, latest_version, created_at, updated_at
             FROM plugin_catalog
             ORDER BY id DESC
             """)
     List<PluginCatalogItem> listCatalog();
 
     @Select("""
-            SELECT id, code, name, category, provider, status, latest_version, created_at, updated_at
+            SELECT id, plugin_id, code, name, category, provider, status, latest_version, created_at, updated_at
             FROM plugin_catalog
             WHERE code = #{pluginCode}
             LIMIT 1
@@ -34,7 +34,7 @@ public interface PluginMapper {
     PluginCatalogItem getCatalogByCode(@Param("pluginCode") String pluginCode);
 
     @Select("""
-            SELECT id
+            SELECT plugin_id
             FROM plugin_catalog
             WHERE code = #{pluginCode}
             LIMIT 1
@@ -42,26 +42,27 @@ public interface PluginMapper {
     Long findCatalogIdByCode(@Param("pluginCode") String pluginCode);
 
     @Select("""
-            SELECT i.id, i.project_id, i.plugin_id, c.code AS plugin_code, c.name AS plugin_name,
+            SELECT i.id, i.plugin_install_id, i.project_id, i.plugin_id, c.code AS plugin_code, c.name AS plugin_name,
                    i.version, CAST(i.config_json AS CHAR) AS config_json,
                    i.enabled, i.installed_by, i.installed_at, i.updated_at
             FROM plugin_project_installs i
-            JOIN plugin_catalog c ON c.id = i.plugin_id
+            JOIN plugin_catalog c ON c.plugin_id = i.plugin_id
             WHERE i.project_id = #{projectId}
             ORDER BY i.id DESC
             """)
     List<PluginProjectInstall> listProjectInstalls(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO plugin_project_installs(project_id, plugin_id, version, config_json, enabled, installed_by)
-            VALUES (#{projectId}, #{pluginId}, #{version}, #{configJson}, #{enabled}, #{installedBy})
+            INSERT INTO plugin_project_installs(plugin_install_id, project_id, plugin_id, version, config_json, enabled, installed_by)
+            VALUES (#{pluginInstallId}, #{projectId}, #{pluginId}, #{version}, #{configJson}, #{enabled}, #{installedBy})
             ON DUPLICATE KEY UPDATE
                 version = VALUES(version),
                 config_json = VALUES(config_json),
                 enabled = VALUES(enabled),
                 updated_at = CURRENT_TIMESTAMP(3)
             """)
-    int insertInstall(@Param("projectId") Long projectId,
+    int insertInstall(@Param("pluginInstallId") Long pluginInstallId,
+                      @Param("projectId") Long projectId,
                       @Param("pluginId") Long pluginId,
                       @Param("version") String version,
                       @Param("configJson") String configJson,
@@ -70,7 +71,7 @@ public interface PluginMapper {
 
     @Update("""
             UPDATE plugin_project_installs i
-            JOIN plugin_catalog c ON c.id = i.plugin_id
+            JOIN plugin_catalog c ON c.plugin_id = i.plugin_id
             SET i.enabled = COALESCE(#{enabled}, i.enabled),
                 i.config_json = COALESCE(#{configJson}, i.config_json),
                 i.updated_at = CURRENT_TIMESTAMP(3)
@@ -83,7 +84,7 @@ public interface PluginMapper {
 
     @Update("""
             UPDATE plugin_project_installs i
-            JOIN plugin_catalog c ON c.id = i.plugin_id
+            JOIN plugin_catalog c ON c.plugin_id = i.plugin_id
             SET i.enabled = 0,
                 i.updated_at = CURRENT_TIMESTAMP(3)
             WHERE i.project_id = #{projectId} AND c.code = #{pluginCode}
@@ -91,7 +92,7 @@ public interface PluginMapper {
     int deleteInstall(@Param("projectId") Long projectId, @Param("pluginCode") String pluginCode);
 
     @Select("""
-            SELECT id, project_id, task_id, plugin_code, tool_name,
+            SELECT id, plugin_call_log_id, project_id, task_id, plugin_code, tool_name,
                    CAST(request_json AS CHAR) AS request_json,
                    CAST(response_json AS CHAR) AS response_json,
                    latency_ms, status, error_msg, created_at
@@ -103,8 +104,8 @@ public interface PluginMapper {
     List<PluginCallLog> listCallLogs(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO plugin_call_logs(project_id, task_id, plugin_code, tool_name, request_json, response_json, latency_ms, status, error_msg)
-            VALUES(#{projectId}, #{taskId}, #{pluginCode}, #{toolName}, #{requestJson}, #{responseJson}, #{latencyMs}, #{status}, #{errorMsg})
+            INSERT INTO plugin_call_logs(plugin_call_log_id, project_id, task_id, plugin_code, tool_name, request_json, response_json, latency_ms, status, error_msg)
+            VALUES(#{pluginCallLogId}, #{projectId}, #{taskId}, #{pluginCode}, #{toolName}, #{requestJson}, #{responseJson}, #{latencyMs}, #{status}, #{errorMsg})
             """)
     int insertCallLog(PluginCallLog callLog);
 }

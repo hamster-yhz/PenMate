@@ -19,15 +19,15 @@ import java.util.List;
 public interface OpsMapper {
 
     @Select("""
-            SELECT id, job_type, biz_key, status, error_msg, started_at, finished_at, created_at, updated_at
+            SELECT id, job_id, job_type, biz_key, status, error_msg, started_at, finished_at, created_at, updated_at
             FROM ops_async_jobs
-            WHERE id = #{jobId}
+            WHERE job_id = #{jobId}
             LIMIT 1
             """)
     OpsAsyncJob findJobById(@Param("jobId") Long jobId);
 
     @Select("""
-            SELECT id, job_type, biz_key, status, error_msg, started_at, finished_at, created_at, updated_at
+            SELECT id, job_id, job_type, biz_key, status, error_msg, started_at, finished_at, created_at, updated_at
             FROM ops_async_jobs
             WHERE (#{bizKey} IS NULL OR #{bizKey} = '' OR biz_key = #{bizKey})
               AND (#{jobType} IS NULL OR #{jobType} = '' OR job_type = #{jobType})
@@ -38,8 +38,8 @@ public interface OpsMapper {
                                @Param("jobType") String jobType);
 
     @Insert("""
-            INSERT INTO ops_async_jobs(job_type, biz_key, status, error_msg, started_at, finished_at)
-            VALUES (#{jobType}, #{bizKey}, #{status}, #{errorMsg}, #{startedAt}, #{finishedAt})
+            INSERT INTO ops_async_jobs(job_id, job_type, biz_key, status, error_msg, started_at, finished_at)
+            VALUES (#{jobId}, #{jobType}, #{bizKey}, #{status}, #{errorMsg}, #{startedAt}, #{finishedAt})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertJob(OpsAsyncJob job);
@@ -51,23 +51,23 @@ public interface OpsMapper {
                 started_at = CASE WHEN #{status} = 'running' THEN COALESCE(started_at, CURRENT_TIMESTAMP(3)) ELSE started_at END,
                 finished_at = CASE WHEN #{status} IN ('done', 'failed') THEN CURRENT_TIMESTAMP(3) ELSE finished_at END,
                 updated_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{jobId}
+            WHERE job_id = #{jobId}
             """)
     int updateJobStatus(@Param("jobId") Long jobId,
                         @Param("status") String status,
                         @Param("errorMsg") String errorMsg);
 
     @Insert("""
-            INSERT INTO ops_migrations(migration_type, status, progress_pct, summary_json, error_msg, started_at, finished_at)
-            VALUES (#{migrationType}, #{status}, #{progressPct}, #{summaryJson}, #{errorMsg}, #{startedAt}, #{finishedAt})
+            INSERT INTO ops_migrations(migration_id, migration_type, status, progress_pct, summary_json, error_msg, started_at, finished_at)
+            VALUES (#{migrationId}, #{migrationType}, #{status}, #{progressPct}, #{summaryJson}, #{errorMsg}, #{startedAt}, #{finishedAt})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertMigration(OpsMigrationTask task);
 
     @Select("""
-            SELECT id, migration_type, status, progress_pct, summary_json, error_msg, started_at, finished_at, created_at, updated_at
+            SELECT id, migration_id, migration_type, status, progress_pct, summary_json, error_msg, started_at, finished_at, created_at, updated_at
             FROM ops_migrations
-            WHERE id = #{migrationId}
+            WHERE migration_id = #{migrationId}
             LIMIT 1
             """)
     OpsMigrationTask findMigrationById(@Param("migrationId") Long migrationId);
@@ -80,7 +80,7 @@ public interface OpsMapper {
                 error_msg = #{errorMsg},
                 finished_at = CASE WHEN #{status} IN ('done', 'failed') THEN CURRENT_TIMESTAMP(3) ELSE finished_at END,
                 updated_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{migrationId}
+            WHERE migration_id = #{migrationId}
             """)
     int updateMigration(@Param("migrationId") Long migrationId,
                         @Param("status") String status,

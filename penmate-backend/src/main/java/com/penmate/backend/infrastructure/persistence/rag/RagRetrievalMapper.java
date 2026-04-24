@@ -16,7 +16,7 @@ public interface RagRetrievalMapper {
     @Select("""
             SELECT rc.document_id, d.title AS document_title, rc.chunk_no, rc.content_text
             FROM rag_chunks rc
-            JOIN rag_documents d ON d.id = rc.document_id
+            JOIN rag_documents d ON d.document_id = rc.document_id
             WHERE rc.project_id = #{projectId}
               AND d.deleted_at IS NULL
               AND (
@@ -32,14 +32,14 @@ public interface RagRetrievalMapper {
                                          @Param("limit") int limit);
 
     @Insert("""
-            INSERT INTO rag_retrieval_logs(project_id, task_id, query_text, hit_count, sources_json, latency_ms, adopted, trace_id)
-            VALUES(#{projectId}, #{taskId}, #{queryText}, #{hitCount}, #{sourcesJson}, #{latencyMs}, #{adopted}, #{traceId})
+            INSERT INTO rag_retrieval_logs(retrieval_log_id, project_id, task_id, query_text, hit_count, sources_json, latency_ms, adopted, trace_id)
+            VALUES(#{retrievalLogId}, #{projectId}, #{taskId}, #{queryText}, #{hitCount}, #{sourcesJson}, #{latencyMs}, #{adopted}, #{traceId})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertRetrievalLog(RagRetrievalLog retrievalLog);
 
     @Select("""
-            SELECT id, project_id, task_id, query_text, hit_count,
+            SELECT id, retrieval_log_id, project_id, task_id, query_text, hit_count,
                    CAST(sources_json AS CHAR) AS sources_json,
                    latency_ms, adopted, trace_id, created_at
             FROM rag_retrieval_logs

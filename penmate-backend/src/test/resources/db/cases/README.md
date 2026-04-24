@@ -41,6 +41,7 @@
 ## 5. 注意事项
 
 - 以上脚本对齐当前 Flyway 表结构（V1~V11），优先保证可执行。
+- 造数与清理已按“物理主键 `id` + 业务语义 ID 列”执行，涉及删除与幂等定位时优先使用 `*_id` 语义列（如 `project_id`、`conversation_id`、`approval_request_id`）。
 - 文档 v1.1 中新增但尚未落地迁移的表（如 `plugin_versions`、`model_invocation_logs`、`rag_retrieval_logs` 等）未写入可执行 SQL。
 - 若后续迁移补齐这些表，请在对应脚本中新增样本并同步更新本说明。
 

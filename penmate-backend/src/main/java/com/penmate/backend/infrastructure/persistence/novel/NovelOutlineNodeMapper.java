@@ -18,7 +18,7 @@ import java.util.List;
 public interface NovelOutlineNodeMapper {
 
     @Select("""
-            SELECT id, project_id, parent_id, title, node_type, sort_order, content,
+            SELECT id, outline_node_id, project_id, parent_id, title, node_type, sort_order, content,
                    created_at, updated_at, deleted_at
             FROM novel_outline_nodes
             WHERE project_id = #{projectId} AND deleted_at IS NULL
@@ -27,16 +27,16 @@ public interface NovelOutlineNodeMapper {
     List<NovelOutlineNode> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, project_id, parent_id, title, node_type, sort_order, content,
+            SELECT id, outline_node_id, project_id, parent_id, title, node_type, sort_order, content,
                    created_at, updated_at, deleted_at
             FROM novel_outline_nodes
-            WHERE id = #{nodeId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE outline_node_id = #{nodeId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     NovelOutlineNode findByIdAndProjectId(@Param("projectId") Long projectId, @Param("nodeId") Long nodeId);
 
     @Insert("""
-            INSERT INTO novel_outline_nodes(project_id, parent_id, title, node_type, sort_order, content)
-            VALUES (#{projectId}, #{parentId}, #{title}, #{nodeType}, #{sortOrder}, #{content})
+            INSERT INTO novel_outline_nodes(outline_node_id, project_id, parent_id, title, node_type, sort_order, content)
+            VALUES (#{outlineNodeId}, #{projectId}, #{parentId}, #{title}, #{nodeType}, #{sortOrder}, #{content})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NovelOutlineNode node);
@@ -48,7 +48,7 @@ public interface NovelOutlineNodeMapper {
                 node_type = #{nodeType},
                 sort_order = #{sortOrder},
                 content = #{content}
-            WHERE id = #{id} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE outline_node_id = #{outlineNodeId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelOutlineNode node);
 
@@ -56,7 +56,7 @@ public interface NovelOutlineNodeMapper {
             UPDATE novel_outline_nodes
             SET parent_id = #{parentId},
                 sort_order = #{sortOrder}
-            WHERE id = #{nodeId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE outline_node_id = #{nodeId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int move(@Param("projectId") Long projectId,
              @Param("nodeId") Long nodeId,
@@ -66,7 +66,7 @@ public interface NovelOutlineNodeMapper {
     @Update("""
             UPDATE novel_outline_nodes
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{nodeId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE outline_node_id = #{nodeId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("nodeId") Long nodeId);
 }

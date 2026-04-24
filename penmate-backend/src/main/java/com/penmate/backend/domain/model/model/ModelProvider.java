@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
  * 模型服务提供商实体。
  */
 public class ModelProvider {
-    /** 提供商主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 提供商业务 ID。 */
+    private Long providerId;
     /** 提供商编码。 */
     private String code;
     /** 提供商名称。 */

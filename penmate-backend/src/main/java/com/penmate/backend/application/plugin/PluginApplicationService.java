@@ -6,6 +6,7 @@ import com.penmate.backend.domain.plugin.model.PluginCallLog;
 import com.penmate.backend.domain.plugin.model.PluginCatalogItem;
 import com.penmate.backend.domain.plugin.model.PluginProjectInstall;
 import com.penmate.backend.domain.plugin.repository.PluginRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,9 +21,12 @@ import java.util.List;
 public class PluginApplicationService {
 
     private final PluginRepository pluginRepository;
+    private final BusinessIdGenerator businessIdGenerator;
 
-    public PluginApplicationService(PluginRepository pluginRepository) {
+    public PluginApplicationService(PluginRepository pluginRepository,
+                                    BusinessIdGenerator businessIdGenerator) {
         this.pluginRepository = pluginRepository;
+        this.businessIdGenerator = businessIdGenerator;
     }
 
     /**
@@ -81,6 +85,7 @@ public class PluginApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Plugin not found");
         }
         int affected = pluginRepository.insertInstall(
+                businessIdGenerator.nextId(),
                 projectId,
                 pluginId,
                 command.version(),

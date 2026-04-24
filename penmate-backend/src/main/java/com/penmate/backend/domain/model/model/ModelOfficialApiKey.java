@@ -9,9 +9,11 @@ import java.time.LocalDateTime;
  * 官方模型密钥实体。
  */
 public class ModelOfficialApiKey {
-    /** 密钥主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 提供商 ID。 */
+    /** 官方 API Key 业务 ID。 */
+    private Long officialApiKeyId;
+    /** 提供商业务 ID。 */
     private Long providerId;
     /** 密钥展示名称。 */
     private String keyName;

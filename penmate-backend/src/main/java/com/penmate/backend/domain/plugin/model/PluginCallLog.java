@@ -8,11 +8,13 @@ import java.time.LocalDateTime;
  * 插件调用日志实体。
  */
 public class PluginCallLog {
-    /** 日志主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 插件调用日志业务 ID。 */
+    private Long pluginCallLogId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 关联生成任务 ID。 */
+    /** 关联生成任务业务 ID。 */
     private Long taskId;
     /** 插件编码。 */
     private String pluginCode;

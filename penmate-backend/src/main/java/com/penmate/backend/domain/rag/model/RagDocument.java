@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * RAG 文档实体。
  */
 public class RagDocument {
-    /** 文档主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 文档业务 ID。 */
+    private Long documentId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
     /** 文档类型。 */
     private String docType;

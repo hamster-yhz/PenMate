@@ -22,7 +22,8 @@ public interface StyleRepository {
 
     int setDefault(Long projectId, Long styleId);
 
-    int insertSwitchLog(Long projectId,
+    int insertSwitchLog(Long switchLogId,
+                        Long projectId,
                         Long fromStyleId,
                         Long toStyleId,
                         Long switchedBy,

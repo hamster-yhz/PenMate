@@ -6,9 +6,11 @@ import lombok.Data;
  * RBAC 菜单实体。
  */
 public class IamMenu {
-    /** 菜单主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 父级菜单 ID，根节点可为空。 */
+    /** 菜单业务 ID。 */
+    private Long menuId;
+    /** 父级菜单业务 ID，根节点可为空。 */
     private Long parentId;
     /** 菜单标题。 */
     private String title;

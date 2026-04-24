@@ -31,8 +31,9 @@ public class OpsController {
     /**
      * 查询异步作业详情。
      * <p><b>业务目的：</b>返回指定作业的执行状态、错误信息与重试信息，供运维面板展示。</p>
-     * <p><b>流程主线：</b>接收作业ID -> 调用应用服务查询 -> 统一封装响应。</p>
+     * <p><b>流程主线：</b>接收作业业务 ID -> 调用应用服务查询 -> 统一封装响应。</p>
      * <p><b>关键调用：</b>{@code opsApplicationService.getJob(jobId)}。</p>
+     * <p><b>ID 语义：</b>jobId 为异步作业业务 ID。</p>
      * <p><b>异常与分支：</b>作业不存在时返回业务异常。</p>
      * <p><b>副作用：</b>无持久化写入。</p>
      *
@@ -71,6 +72,7 @@ public class OpsController {
      * <p><b>业务目的：</b>对可重试作业发起重新执行，缩短人工修复链路。</p>
      * <p><b>流程主线：</b>接收作业与操作者参数 -> 调用应用服务执行重试 -> 返回更新后的作业状态。</p>
      * <p><b>关键调用：</b>{@code opsApplicationService.retryJob(jobId, operatorId, traceId)}。</p>
+     * <p><b>ID 语义：</b>jobId、operatorId 均为业务语义 ID。</p>
      * <p><b>异常与分支：</b>作业状态不允许重试或操作者无权限时返回业务异常。</p>
      * <p><b>副作用：</b>更新作业执行状态，可能触发新的异步执行。</p>
      *
@@ -91,6 +93,7 @@ public class OpsController {
      * <p><b>业务目的：</b>发起历史内容从原存储形态到对象存储的迁移流程。</p>
      * <p><b>流程主线：</b>接收操作者参数 -> 调用应用服务创建迁移任务 -> 返回迁移任务快照。</p>
      * <p><b>关键调用：</b>{@code opsApplicationService.startContentToObjectStorageMigration(operatorId, traceId)}。</p>
+     * <p><b>ID 语义：</b>operatorId 为操作者业务 ID。</p>
      * <p><b>异常与分支：</b>已有同类迁移在执行或权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>创建迁移任务并触发后台迁移执行。</p>
      *
@@ -107,8 +110,9 @@ public class OpsController {
     /**
      * 查询迁移任务详情。
      * <p><b>业务目的：</b>返回迁移任务进度、统计与失败信息，支持迁移过程监控。</p>
-     * <p><b>流程主线：</b>接收迁移任务ID -> 调用应用服务查询 -> 封装响应。</p>
+     * <p><b>流程主线：</b>接收迁移任务业务 ID -> 调用应用服务查询 -> 封装响应。</p>
      * <p><b>关键调用：</b>{@code opsApplicationService.getMigration(migrationId)}。</p>
+     * <p><b>ID 语义：</b>migrationId 为迁移任务业务 ID。</p>
      * <p><b>异常与分支：</b>迁移任务不存在时返回业务异常。</p>
      * <p><b>副作用：</b>无持久化写入。</p>
      *

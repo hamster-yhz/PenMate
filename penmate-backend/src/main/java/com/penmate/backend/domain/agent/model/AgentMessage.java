@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * 智能体会话消息实体。
  */
 public class AgentMessage {
-    /** 消息主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属会话 ID。 */
+    /** 消息业务 ID。 */
+    private Long messageId;
+    /** 所属会话业务 ID。 */
     private Long conversationId;
     /** 消息角色（user/assistant/system）。 */
     private String role;

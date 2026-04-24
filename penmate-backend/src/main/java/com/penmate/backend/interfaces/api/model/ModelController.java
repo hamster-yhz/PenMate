@@ -57,7 +57,7 @@ public class ModelController {
     /**
      * 查询用户模型密钥列表。
      * <p><b>业务目的：</b>返回用户已维护的 API Key 元数据，供前端密钥管理页展示。</p>
-     * <p><b>流程主线：</b>读取用户ID -> 调用应用服务查询密钥列表 -> 封装响应。</p>
+     * <p><b>流程主线：</b>读取用户业务ID -> 调用应用服务查询密钥列表 -> 封装响应。</p>
      * <p><b>关键调用：</b>{@code modelApplicationService.listUserKeys(userId)}。</p>
      * <p><b>异常与分支：</b>用户不存在时返回业务异常。</p>
      * <p><b>副作用：</b>无持久化写入。</p>
@@ -80,6 +80,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.createKey(...)} 负责密钥加密存储与默认项处理。</p>
      * <p><b>异常与分支：</b>供应商无效、密钥重复或权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>新增密钥记录，可能变更默认密钥。</p>
+     * <p><b>ID 语义：</b>所有 userId/providerId/keyId 均为业务语义 ID。</p>
      */
     @PostMapping("/model/keys")
     public ApiResponse<String> createKey(@Valid @RequestBody CreateModelKeyDto dto,
@@ -108,6 +109,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.updateKey(...)}。</p>
      * <p><b>异常与分支：</b>密钥不存在、权限不足或状态非法时返回业务异常。</p>
      * <p><b>副作用：</b>更新密钥元数据与加密值。</p>
+     * <p><b>ID 语义：</b>所有 userId/keyId 均为业务语义 ID。</p>
      */
     @PatchMapping("/model/keys/{keyId}")
     public ApiResponse<String> updateKey(@PathVariable Long keyId,
@@ -137,6 +139,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.deleteKey(userId, keyId, operatorId, traceId)}。</p>
      * <p><b>异常与分支：</b>密钥不存在、被策略引用或权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>删除密钥记录，可能影响策略可用性。</p>
+     * <p><b>ID 语义：</b>所有 userId/keyId 均为业务语义 ID。</p>
      */
     @DeleteMapping("/model/keys/{keyId}")
     public ApiResponse<String> deleteKey(@PathVariable Long keyId,
@@ -195,7 +198,7 @@ public class ModelController {
     /**
      * 查询项目模型配置列表。
      * <p><b>业务目的：</b>返回项目下全部模型配置，供写作/Agent 场景显式选择调用配置。</p>
-     * <p><b>流程主线：</b>读取项目ID -> 调用应用服务查询配置 -> 返回列表。</p>
+     * <p><b>流程主线：</b>读取项目业务ID -> 调用应用服务查询配置 -> 返回列表。</p>
      * <p><b>关键调用：</b>{@code modelApplicationService.listPolicies(projectId)}（底层复用历史策略实现）。</p>
      * <p><b>异常与分支：</b>项目不存在时返回业务异常。</p>
      * <p><b>副作用：</b>无持久化写入。</p>
@@ -213,6 +216,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.createPolicy(...)}。</p>
      * <p><b>异常与分支：</b>模型不可用、密钥无效或参数越界时返回业务异常。</p>
      * <p><b>副作用：</b>新增配置记录，可能影响默认配置。</p>
+     * <p><b>ID 语义：</b>projectId/providerModelId/userKeyId/officialKeyId 均为业务语义 ID。</p>
      */
     @PostMapping({"/novels/{projectId}/model-configs", "/novels/{projectId}/model-policies"})
     public ApiResponse<String> createConfig(@PathVariable Long projectId,
@@ -248,6 +252,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.updatePolicy(...)}。</p>
      * <p><b>异常与分支：</b>配置不存在、默认配置约束冲突或权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>更新配置，影响后续模型路由结果。</p>
+     * <p><b>ID 语义：</b>projectId/configId/providerModelId/userKeyId/officialKeyId 均为业务语义 ID。</p>
      */
     @PutMapping({"/novels/{projectId}/model-configs/{configId}", "/novels/{projectId}/model-policies/{configId}"})
     public ApiResponse<String> updateConfig(@PathVariable Long projectId,
@@ -285,6 +290,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.deletePolicy(projectId, configId, operatorId, traceId)}。</p>
      * <p><b>异常与分支：</b>配置不存在、被强依赖或权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>删除配置记录。</p>
+     * <p><b>ID 语义：</b>projectId/configId 均为业务语义 ID。</p>
      */
     @DeleteMapping({"/novels/{projectId}/model-configs/{configId}", "/novels/{projectId}/model-policies/{configId}"})
     public ApiResponse<String> deleteConfig(@PathVariable Long projectId,
@@ -302,6 +308,7 @@ public class ModelController {
      * <p><b>关键调用：</b>{@code modelApplicationService.setDefaultPolicy(projectId, configId, operatorId, traceId)}。</p>
      * <p><b>异常与分支：</b>配置不属于项目、不可用或权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>更新项目默认策略指向。</p>
+     * <p><b>ID 语义：</b>projectId/configId 均为业务语义 ID。</p>
      */
     @PostMapping({"/novels/{projectId}/model-configs/{configId}/set-default", "/novels/{projectId}/model-policies/{configId}/set-default"})
     public ApiResponse<String> setDefaultConfig(@PathVariable Long projectId,

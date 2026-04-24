@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * 提供商模型定义实体。
  */
 public class ModelProviderModel {
-    /** 模型定义主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属提供商 ID。 */
+    /** 模型定义业务 ID。 */
+    private Long providerModelId;
+    /** 所属提供商业务 ID。 */
     private Long providerId;
     /** 提供商侧模型编码。 */
     private String modelCode;

@@ -15,16 +15,16 @@ import java.util.List;
 public interface IamPermissionMapper {
 
     @Select("""
-            SELECT id, name, code, module, description
+            SELECT id, permission_id, name, code, module, description
             FROM iam_permissions
             ORDER BY id DESC
             """)
     List<IamPermission> findAll();
 
     @Select("""
-            SELECT id, name, code, module, description
+            SELECT id, permission_id, name, code, module, description
             FROM iam_permissions
-            WHERE id = #{id}
+            WHERE permission_id = #{id}
             """)
     IamPermission findById(@Param("id") Long id);
 }

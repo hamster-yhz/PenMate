@@ -208,19 +208,19 @@ public class OpenApiConfig {
         if ("GET".equals(httpMethod) && "/api/v1/users".equals(path)) {
             return "查询用户列表";
         }
-        if ("GET".equals(httpMethod) && "/api/v1/users/{id}".equals(path)) {
+        if ("GET".equals(httpMethod) && "/api/v1/users/{userId}".equals(path)) {
             return "查询用户详情";
         }
         if ("POST".equals(httpMethod) && "/api/v1/users".equals(path)) {
             return "创建用户";
         }
-        if ("PUT".equals(httpMethod) && "/api/v1/users/{id}".equals(path)) {
+        if ("PUT".equals(httpMethod) && "/api/v1/users/{userId}".equals(path)) {
             return "更新用户资料";
         }
-        if ("DELETE".equals(httpMethod) && "/api/v1/users/{id}".equals(path)) {
+        if ("DELETE".equals(httpMethod) && "/api/v1/users/{userId}".equals(path)) {
             return "删除用户";
         }
-        if ("POST".equals(httpMethod) && "/api/v1/users/{id}/roles".equals(path)) {
+        if ("POST".equals(httpMethod) && "/api/v1/users/{userId}/roles".equals(path)) {
             return "为用户绑定角色";
         }
         if ("DELETE".equals(httpMethod) && "/api/v1/users/{userId}/roles/{roleId}".equals(path)) {
@@ -232,16 +232,16 @@ public class OpenApiConfig {
         if ("POST".equals(httpMethod) && "/api/v1/roles".equals(path)) {
             return "创建角色";
         }
-        if ("PUT".equals(httpMethod) && "/api/v1/roles/{id}".equals(path)) {
+        if ("PUT".equals(httpMethod) && "/api/v1/roles/{roleId}".equals(path)) {
             return "更新角色";
         }
-        if ("DELETE".equals(httpMethod) && "/api/v1/roles/{id}".equals(path)) {
+        if ("DELETE".equals(httpMethod) && "/api/v1/roles/{roleId}".equals(path)) {
             return "删除角色";
         }
         if ("GET".equals(httpMethod) && "/api/v1/permissions".equals(path)) {
             return "查询权限列表";
         }
-        if ("POST".equals(httpMethod) && "/api/v1/roles/{id}/permissions".equals(path)) {
+        if ("POST".equals(httpMethod) && "/api/v1/roles/{roleId}/permissions".equals(path)) {
             return "为角色绑定权限";
         }
         if ("DELETE".equals(httpMethod) && "/api/v1/roles/{roleId}/permissions/{permissionId}".equals(path)) {
@@ -360,19 +360,19 @@ public class OpenApiConfig {
 
         // RBAC 语义优先
         if ("id".equals(n) && path.contains("/users/")) {
-            return place + "：用户 ID，用于定位目标用户。";
+            return place + "：用户业务 ID，用于定位目标用户。";
         }
         if ("id".equals(n) && path.contains("/roles/")) {
-            return place + "：角色 ID，用于定位目标角色。";
+            return place + "：角色业务 ID，用于定位目标角色。";
         }
         if ("roleid".equals(n)) {
-            return place + "：角色 ID，用于绑定/解绑用户角色。";
+            return place + "：角色业务 ID，用于绑定/解绑用户角色。";
         }
         if ("permissionid".equals(n)) {
             return place + "：权限 ID，用于绑定/解绑角色权限。";
         }
         if ("userid".equals(n) && path.contains("/profile/menus")) {
-            return place + "：用户 ID，用于查询该用户最终可见菜单（含角色聚合后权限）。";
+            return place + "：用户业务 ID，用于查询该用户最终可见菜单（含角色聚合后权限）。";
         }
         if ("email".equals(n) && path.contains("/users")) {
             return place + "：用户邮箱，作为登录账号标识，通常要求唯一。";
@@ -394,7 +394,7 @@ public class OpenApiConfig {
         if (path.contains("/model/")) {
             switch (n) {
                 case "providerid":
-                    return place + "：模型服务商主键 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。";
+                    return place + "：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。";
                 case "providercode":
                     return place + "：模型服务商编码（唯一标识），用于查询该服务商支持的模型列表。";
                 case "providername":
@@ -427,19 +427,28 @@ public class OpenApiConfig {
         }
 
         if ("projectid".equals(n)) {
-            return place + "：小说项目 ID，用于定位具体项目。";
+            return place + "：小说项目业务 ID，用于定位具体项目。";
         }
         if ("chapterid".equals(n)) {
-            return place + "：章节 ID，用于定位具体章节。";
+            return place + "：章节业务 ID，用于定位具体章节。";
         }
         if ("volumeid".equals(n)) {
-            return place + "：分卷 ID，用于定位章节所在分卷。";
+            return place + "：分卷业务 ID，用于定位章节所在分卷。";
         }
         if ("userid".equals(n)) {
-            return place + "：用户 ID，用于标识操作用户或目标用户。";
+            return place + "：用户业务 ID，用于标识操作用户或目标用户。";
         }
         if ("operatorid".equals(n)) {
-            return place + "：操作人 ID，用于审计与权限判断。";
+            return place + "：操作人业务 ID，用于审计与权限判断。";
+        }
+        if ("approvalid".equals(n)) {
+            return place + "：审批单业务 ID，用于定位审批请求。";
+        }
+        if ("keyid".equals(n)) {
+            return place + "：密钥业务 ID，用于定位用户密钥或官方密钥记录。";
+        }
+        if ("configid".equals(n)) {
+            return place + "：模型配置业务 ID，用于定位项目模型配置。";
         }
         if ("traceid".equals(n)) {
             return place + "：链路追踪 ID，用于日志追踪与问题定位。";
@@ -508,7 +517,7 @@ public class OpenApiConfig {
             return place + "：版本号字段，用于历史追踪与回滚。";
         }
         if (n.contains("id")) {
-            return place + "：主键标识，用于唯一定位业务对象。";
+            return place + "：业务语义 ID，用于唯一定位业务对象。";
         }
         return place + "：字段「" + name + "」，用于" + inferModule(path) + inferAction(path, method) + "。";
     }
@@ -533,26 +542,35 @@ public class OpenApiConfig {
         map.put("POST /api/v1/model/keys", "模型配置 - 新增用户 API Key");
         map.put("PATCH /api/v1/model/keys/{keyId}", "模型配置 - 更新用户 API Key");
         map.put("DELETE /api/v1/model/keys/{keyId}", "模型配置 - 删除用户 API Key");
-        map.put("GET /api/v1/novels/{projectId}/model-policies", "模型策略 - 查询项目策略列表");
-        map.put("POST /api/v1/novels/{projectId}/model-policies", "模型策略 - 新增项目策略");
-        map.put("PUT /api/v1/novels/{projectId}/model-policies/{policyId}", "模型策略 - 更新项目策略");
-        map.put("DELETE /api/v1/novels/{projectId}/model-policies/{policyId}", "模型策略 - 删除项目策略");
-        map.put("POST /api/v1/novels/{projectId}/model-policies/{policyId}/set-default", "模型策略 - 设置默认策略");
+        map.put("GET /api/v1/model/official-keys", "模型配置 - 查询官方 API Key 列表");
+        map.put("POST /api/v1/model/official-keys", "模型配置 - 新增官方 API Key");
+        map.put("PATCH /api/v1/model/official-keys/{keyId}", "模型配置 - 更新官方 API Key");
+        map.put("DELETE /api/v1/model/official-keys/{keyId}", "模型配置 - 删除官方 API Key");
+        map.put("GET /api/v1/novels/{projectId}/model-configs", "模型配置 - 查询项目模型配置列表");
+        map.put("POST /api/v1/novels/{projectId}/model-configs", "模型配置 - 新增项目模型配置");
+        map.put("PUT /api/v1/novels/{projectId}/model-configs/{configId}", "模型配置 - 更新项目模型配置");
+        map.put("DELETE /api/v1/novels/{projectId}/model-configs/{configId}", "模型配置 - 删除项目模型配置");
+        map.put("POST /api/v1/novels/{projectId}/model-configs/{configId}/set-default", "模型配置 - 设置项目默认模型配置");
+        map.put("GET /api/v1/novels/{projectId}/model-policies", "模型策略(兼容) - 查询项目策略列表");
+        map.put("POST /api/v1/novels/{projectId}/model-policies", "模型策略(兼容) - 新增项目策略");
+        map.put("PUT /api/v1/novels/{projectId}/model-policies/{configId}", "模型策略(兼容) - 更新项目策略");
+        map.put("DELETE /api/v1/novels/{projectId}/model-policies/{configId}", "模型策略(兼容) - 删除项目策略");
+        map.put("POST /api/v1/novels/{projectId}/model-policies/{configId}/set-default", "模型策略(兼容) - 设置默认策略");
 
         // rbac
         map.put("GET /api/v1/users", "RBAC - 查询用户列表");
-        map.put("GET /api/v1/users/{id}", "RBAC - 查询用户详情");
+        map.put("GET /api/v1/users/{userId}", "RBAC - 查询用户详情");
         map.put("POST /api/v1/users", "RBAC - 创建用户");
-        map.put("PUT /api/v1/users/{id}", "RBAC - 更新用户");
-        map.put("DELETE /api/v1/users/{id}", "RBAC - 删除用户");
-        map.put("POST /api/v1/users/{id}/roles", "RBAC - 为用户绑定角色");
+        map.put("PUT /api/v1/users/{userId}", "RBAC - 更新用户");
+        map.put("DELETE /api/v1/users/{userId}", "RBAC - 删除用户");
+        map.put("POST /api/v1/users/{userId}/roles", "RBAC - 为用户绑定角色");
         map.put("DELETE /api/v1/users/{userId}/roles/{roleId}", "RBAC - 解除用户角色绑定");
         map.put("GET /api/v1/roles", "RBAC - 查询角色列表");
         map.put("POST /api/v1/roles", "RBAC - 创建角色");
-        map.put("PUT /api/v1/roles/{id}", "RBAC - 更新角色");
-        map.put("DELETE /api/v1/roles/{id}", "RBAC - 删除角色");
+        map.put("PUT /api/v1/roles/{roleId}", "RBAC - 更新角色");
+        map.put("DELETE /api/v1/roles/{roleId}", "RBAC - 删除角色");
         map.put("GET /api/v1/permissions", "RBAC - 查询权限列表");
-        map.put("POST /api/v1/roles/{id}/permissions", "RBAC - 为角色绑定权限");
+        map.put("POST /api/v1/roles/{roleId}/permissions", "RBAC - 为角色绑定权限");
         map.put("DELETE /api/v1/roles/{roleId}/permissions/{permissionId}", "RBAC - 解除角色权限绑定");
         map.put("GET /api/v1/menus", "RBAC - 查询菜单列表");
         map.put("GET /api/v1/profile/menus", "RBAC - 查询用户可见菜单");
@@ -586,9 +604,9 @@ public class OpenApiConfig {
                 + "返回说明：data 为 created。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
-        map.put("POST /api/v1/novels/{projectId}/model-policies/{policyId}/set-default", "接口作用：将指定策略设为当前项目默认策略。\n"
+        map.put("POST /api/v1/novels/{projectId}/model-policies/{configId}/set-default", "接口作用：将指定策略设为当前项目默认策略。\n"
                 + "业务规则：同一项目仅允许一个默认策略。\n"
-                + "关键入参：projectId、policyId、operatorId。\n"
+                + "关键入参：projectId、configId、operatorId（均为业务语义 ID）。\n"
                 + "返回说明：data 为 updated。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
@@ -601,16 +619,16 @@ public class OpenApiConfig {
                 + "关键字段：email（唯一账号）、displayName（展示名）、status（启用状态）、authMethod（认证方式）。\n"
                 + "业务规则：创建后即可参与角色绑定。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
-        map.put("POST /api/v1/users/{id}/roles", "接口作用：为指定用户绑定角色。\n"
-                + "关键字段：id（用户 ID）、roleId（角色 ID）。\n"
+        map.put("POST /api/v1/users/{userId}/roles", "接口作用：为指定用户绑定角色。\n"
+                + "关键字段：userId（用户业务 ID）、roleId（角色业务 ID）。\n"
                 + "业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
-        map.put("POST /api/v1/roles/{id}/permissions", "接口作用：为指定角色绑定权限。\n"
-                + "关键字段：id（角色 ID）、permissionId（权限 ID）。\n"
+        map.put("POST /api/v1/roles/{roleId}/permissions", "接口作用：为指定角色绑定权限。\n"
+                + "关键字段：roleId（角色业务 ID）、permissionId（权限业务 ID）。\n"
                 + "业务规则：绑定后所有拥有该角色的用户获得对应权限。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("GET /api/v1/profile/menus", "接口作用：按用户维度计算最终可见菜单。\n"
-                + "关键字段：userId（目标用户 ID）。\n"
+                + "关键字段：userId（目标用户业务 ID）。\n"
                 + "业务规则：菜单由用户绑定角色后聚合出的权限结果决定。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 

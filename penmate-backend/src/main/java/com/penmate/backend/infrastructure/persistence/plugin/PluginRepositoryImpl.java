@@ -62,13 +62,14 @@ public class PluginRepositoryImpl implements PluginRepository {
      * <p>流程：写入项目与插件绑定关系、版本、配置与启用状态。</p>
      */
     @Override
-    public int insertInstall(Long projectId,
+    public int insertInstall(Long pluginInstallId,
+                             Long projectId,
                              Long pluginId,
                              String version,
                              String configJson,
                              boolean enabled,
                              Long installedBy) {
-        return pluginMapper.insertInstall(projectId, pluginId, version, configJson, enabled, installedBy);
+        return pluginMapper.insertInstall(pluginInstallId, projectId, pluginId, version, configJson, enabled, installedBy);
     }
 
     /**

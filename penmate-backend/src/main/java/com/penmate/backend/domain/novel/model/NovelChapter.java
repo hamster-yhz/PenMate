@@ -8,13 +8,15 @@ import java.time.LocalDateTime;
  * 小说章节实体。
  */
 public class NovelChapter {
-    /** 章节主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 章节业务 ID。 */
+    private Long chapterId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 所属卷册 ID。 */
+    /** 所属卷册业务 ID。 */
     private Long volumeId;
-    /** 关联大纲节点 ID。 */
+    /** 关联大纲节点业务 ID。 */
     private Long outlineNodeId;
     /** 章节标题。 */
     private String title;

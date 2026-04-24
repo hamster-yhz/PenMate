@@ -8,11 +8,13 @@ import java.time.LocalDateTime;
  * 项目插件安装记录实体。
  */
 public class PluginProjectInstall {
-    /** 安装记录主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 安装记录业务 ID。 */
+    private Long pluginInstallId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 插件目录项 ID。 */
+    /** 插件业务 ID。 */
     private Long pluginId;
     /** 插件编码。 */
     private String pluginCode;
@@ -24,7 +26,7 @@ public class PluginProjectInstall {
     private String configJson;
     /** 是否启用。 */
     private Boolean enabled;
-    /** 安装人用户 ID。 */
+    /** 安装人用户业务 ID。 */
     private Long installedBy;
     /** 安装时间。 */
     private LocalDateTime installedAt;

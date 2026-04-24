@@ -9,6 +9,7 @@ import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.application.novel.command.NovelCommands.AddMemberCommand;
@@ -44,13 +45,16 @@ import java.util.UUID;
 public class NovelApplicationService {
 
     private final NovelGateway novelGateway;
+    private final BusinessIdGenerator businessIdGenerator;
     private final RealtimeEventService realtimeEventService;
     private final ObjectStorageService objectStorageService;
 
     public NovelApplicationService(NovelGateway novelGateway,
+                                   BusinessIdGenerator businessIdGenerator,
                                    RealtimeEventService realtimeEventService,
                                    ObjectStorageService objectStorageService) {
         this.novelGateway = novelGateway;
+        this.businessIdGenerator = businessIdGenerator;
         this.realtimeEventService = realtimeEventService;
         this.objectStorageService = objectStorageService;
     }
@@ -93,6 +97,7 @@ public class NovelApplicationService {
     public NovelProject createProject(CreateProjectCommand command, String traceId) {
         log.info("创建小说项目: ownerUserId={}, title={}", command.ownerUserId(), command.title());
         NovelProject project = new NovelProject();
+        project.setProjectId(businessIdGenerator.nextId());
         project.setOwnerUserId(command.ownerUserId());
         project.setTitle(command.title());
         project.setSummary(command.summary());
@@ -103,7 +108,7 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create project");
         }
          
-        log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getId(), command.ownerUserId());
+        log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getProjectId(), command.ownerUserId());
         return project;
     }
 
@@ -173,6 +178,7 @@ public class NovelApplicationService {
     public NovelVolume createVolume(Long projectId, CreateVolumeCommand command, Long operatorId, String traceId) {
         log.info("创建分卷: projectId={}, title={}, operatorId={}", projectId, command.title(), operatorId);
         NovelVolume volume = new NovelVolume();
+        volume.setVolumeId(businessIdGenerator.nextId());
         volume.setProjectId(projectId);
         volume.setTitle(command.title());
         volume.setSortOrder(command.sortOrder() == null ? 0 : command.sortOrder());
@@ -183,7 +189,7 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create volume");
         }
          
-        log.info("创建分卷成功: projectId={}, volumeId={}", projectId, volume.getId());
+        log.info("创建分卷成功: projectId={}, volumeId={}", projectId, volume.getVolumeId());
         return volume;
     }
 
@@ -200,7 +206,7 @@ public class NovelApplicationService {
     public NovelVolume updateVolume(Long projectId, Long volumeId, UpdateVolumeCommand command, Long operatorId, String traceId) {
         log.info("更新分卷: projectId={}, volumeId={}, operatorId={}", projectId, volumeId, operatorId);
         NovelVolume volume = new NovelVolume();
-        volume.setId(volumeId);
+        volume.setVolumeId(volumeId);
         volume.setProjectId(projectId);
         volume.setTitle(command.title());
         volume.setSortOrder(command.sortOrder() == null ? 0 : command.sortOrder());
@@ -212,7 +218,7 @@ public class NovelApplicationService {
         }
          
         log.info("更新分卷成功: projectId={}, volumeId={}", projectId, volumeId);
-        return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getId())).findFirst().orElse(volume);
+        return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getVolumeId())).findFirst().orElse(volume);
     }
 
     /**
@@ -276,6 +282,7 @@ public class NovelApplicationService {
     public NovelChapter createChapter(Long projectId, CreateChapterCommand command, Long operatorId, String traceId) {
         log.info("创建章节: projectId={}, title={}, chapterNo={}, operatorId={}", projectId, command.title(), command.chapterNo(), operatorId);
         NovelChapter chapter = new NovelChapter();
+        chapter.setChapterId(businessIdGenerator.nextId());
         chapter.setProjectId(projectId);
         chapter.setVolumeId(command.volumeId());
         chapter.setOutlineNodeId(command.outlineNodeId());
@@ -295,7 +302,7 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create chapter");
         }
          
-        log.info("创建章节成功: projectId={}, chapterId={}", projectId, chapter.getId());
+        log.info("创建章节成功: projectId={}, chapterId={}", projectId, chapter.getChapterId());
         return chapter;
     }
 

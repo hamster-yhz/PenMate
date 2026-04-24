@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
  * 运维迁移任务实体。
  */
 public class OpsMigrationTask {
-    /** 迁移任务主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 迁移任务业务 ID。 */
+    private Long migrationId;
     /** 迁移任务类型。 */
     private String migrationType;
     /** 迁移任务状态。 */

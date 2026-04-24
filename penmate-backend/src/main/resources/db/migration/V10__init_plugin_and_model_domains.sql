@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS plugin_catalog (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    plugin_id BIGINT UNSIGNED NOT NULL,
     code VARCHAR(100) NOT NULL,
     name VARCHAR(120) NOT NULL,
     category VARCHAR(60) NULL,
@@ -8,11 +9,13 @@ CREATE TABLE IF NOT EXISTS plugin_catalog (
     latest_version VARCHAR(40) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_plugin_catalog_plugin_id (plugin_id),
     UNIQUE KEY uk_plugin_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS plugin_project_installs (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    plugin_install_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     plugin_id BIGINT UNSIGNED NOT NULL,
     version VARCHAR(40) NULL,
@@ -21,12 +24,14 @@ CREATE TABLE IF NOT EXISTS plugin_project_installs (
     installed_by BIGINT UNSIGNED NOT NULL,
     installed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_plugin_project_installs_install_id (plugin_install_id),
     UNIQUE KEY uk_project_plugin (project_id, plugin_id),
     KEY idx_plugin_install_project (project_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS plugin_call_logs (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    plugin_call_log_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     task_id BIGINT UNSIGNED NULL,
     plugin_code VARCHAR(100) NOT NULL,
@@ -37,12 +42,14 @@ CREATE TABLE IF NOT EXISTS plugin_call_logs (
     status VARCHAR(20) NOT NULL DEFAULT 'success',
     error_msg VARCHAR(255) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_plugin_call_logs_log_id (plugin_call_log_id),
     KEY idx_plugin_call_project_time (project_id, created_at),
     KEY idx_plugin_call_task (task_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS model_user_api_keys (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    user_api_key_id BIGINT UNSIGNED NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL,
     provider_id BIGINT UNSIGNED NOT NULL,
     key_name VARCHAR(120) NOT NULL,
@@ -54,11 +61,13 @@ CREATE TABLE IF NOT EXISTS model_user_api_keys (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
+    UNIQUE KEY uk_model_user_api_keys_key_id (user_api_key_id),
     KEY idx_model_key_user_deleted (user_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS model_official_api_keys (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    official_api_key_id BIGINT UNSIGNED NOT NULL,
     provider_id BIGINT UNSIGNED NOT NULL,
     key_name VARCHAR(120) NOT NULL,
     encrypted_api_key TEXT NOT NULL,
@@ -69,11 +78,13 @@ CREATE TABLE IF NOT EXISTS model_official_api_keys (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
+    UNIQUE KEY uk_model_official_api_keys_key_id (official_api_key_id),
     KEY idx_model_official_key_provider_deleted (provider_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS model_project_policies (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    project_policy_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     policy_name VARCHAR(120) NOT NULL,
     scene VARCHAR(60) NULL,
@@ -90,6 +101,7 @@ CREATE TABLE IF NOT EXISTS model_project_policies (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
+    UNIQUE KEY uk_model_project_policies_policy_id (project_policy_id),
     KEY idx_model_policy_project_deleted (project_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

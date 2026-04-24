@@ -55,12 +55,12 @@ public class RbacQueryController {
 
     /**
      * 查询单个用户详情（脱敏视图）。
-     * <p><b>流程主线：</b>按ID查询用户 -> 转换安全视图 -> 返回。</p>
+     * <p><b>流程主线：</b>按用户业务ID查询用户 -> 转换安全视图 -> 返回。</p>
      */
-    @GetMapping("/users/{id}")
-    public ApiResponse<Map<String, Object>> user(@PathVariable Long id,
-                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(toSafeUser(iamQueryApplicationService.getUser(id)), traceId);
+    @GetMapping("/users/{userId}")
+    public ApiResponse<Map<String, Object>> user(@PathVariable Long userId,
+                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(toSafeUser(iamQueryApplicationService.getUser(userId)), traceId);
     }
 
     /**
@@ -96,25 +96,26 @@ public class RbacQueryController {
     /**
      * 更新用户基础信息。
      * <p><b>业务目的：</b>维护用户显示名与状态。</p>
+     * <p><b>ID 语义：</b>路径中的 userId 为用户业务 ID。</p>
      * <p><b>副作用：</b>更新用户记录。</p>
      */
-    @PutMapping("/users/{id}")
-    public ApiResponse<Map<String, Object>> updateUser(@PathVariable Long id,
-                                                       @Valid @RequestBody UpdateUserDto dto,
-                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        IamUser user = iamQueryApplicationService.updateUser(id, dto.getDisplayName(), dto.getStatus());
+    @PutMapping("/users/{userId}")
+    public ApiResponse<Map<String, Object>> updateUser(@PathVariable Long userId,
+                                                        @Valid @RequestBody UpdateUserDto dto,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        IamUser user = iamQueryApplicationService.updateUser(userId, dto.getDisplayName(), dto.getStatus());
         return ApiResponse.success(toSafeUser(user), traceId);
     }
 
     /**
      * 删除用户。
-     * <p><b>流程主线：</b>按ID删除 -> 返回删除结果标记。</p>
+     * <p><b>流程主线：</b>按用户业务ID删除 -> 返回删除结果标记。</p>
      * <p><b>副作用：</b>删除用户及关联关系（按应用层策略）。</p>
      */
-    @DeleteMapping("/users/{id}")
-    public ApiResponse<Map<String, Object>> deleteUser(@PathVariable Long id,
-                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.deleteUser(id);
+    @DeleteMapping("/users/{userId}")
+    public ApiResponse<Map<String, Object>> deleteUser(@PathVariable Long userId,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        iamQueryApplicationService.deleteUser(userId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deleted", true);
         return ApiResponse.success(data, traceId);
@@ -135,25 +136,27 @@ public class RbacQueryController {
     /**
      * 更新角色信息。
      * <p><b>业务目的：</b>调整角色名称与描述，不变更角色编码。</p>
+     * <p><b>ID 语义：</b>路径中的 roleId 为角色业务 ID。</p>
      * <p><b>副作用：</b>更新角色记录。</p>
      */
-    @PutMapping("/roles/{id}")
-    public ApiResponse<IamRole> updateRole(@PathVariable Long id,
-                                           @Valid @RequestBody UpdateRoleDto dto,
-                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        IamRole role = iamQueryApplicationService.updateRole(id, dto.getName(), dto.getDescription());
+    @PutMapping("/roles/{roleId}")
+    public ApiResponse<IamRole> updateRole(@PathVariable Long roleId,
+                                            @Valid @RequestBody UpdateRoleDto dto,
+                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        IamRole role = iamQueryApplicationService.updateRole(roleId, dto.getName(), dto.getDescription());
         return ApiResponse.success(role, traceId);
     }
 
     /**
      * 删除角色。
      * <p><b>业务目的：</b>移除不再使用的角色。</p>
+     * <p><b>ID 语义：</b>路径中的 roleId 为角色业务 ID。</p>
      * <p><b>副作用：</b>删除角色及关联关系（按应用层策略）。</p>
      */
-    @DeleteMapping("/roles/{id}")
-    public ApiResponse<Map<String, Object>> deleteRole(@PathVariable Long id,
-                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.deleteRole(id);
+    @DeleteMapping("/roles/{roleId}")
+    public ApiResponse<Map<String, Object>> deleteRole(@PathVariable Long roleId,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        iamQueryApplicationService.deleteRole(roleId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deleted", true);
         return ApiResponse.success(data, traceId);
@@ -161,14 +164,14 @@ public class RbacQueryController {
 
     /**
      * 给用户绑定角色。
-     * <p><b>流程主线：</b>读取用户与角色ID -> 调用绑定服务 -> 返回绑定结果。</p>
+     * <p><b>流程主线：</b>读取用户业务ID与角色业务ID -> 调用绑定服务 -> 返回绑定结果。</p>
      * <p><b>副作用：</b>新增用户-角色关系。</p>
      */
-    @PostMapping("/users/{id}/roles")
-    public ApiResponse<Map<String, Object>> assignRole(@PathVariable Long id,
-                                                        @RequestParam("roleId") Long roleId,
-                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.assignRoleToUser(id, roleId);
+    @PostMapping("/users/{userId}/roles")
+    public ApiResponse<Map<String, Object>> assignRole(@PathVariable Long userId,
+                                                         @RequestParam("roleId") Long roleId,
+                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        iamQueryApplicationService.assignRoleToUser(userId, roleId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("bound", true);
         return ApiResponse.success(data, traceId);
@@ -177,6 +180,7 @@ public class RbacQueryController {
     /**
      * 解除用户角色绑定。
      * <p><b>副作用：</b>删除用户-角色关系。</p>
+     * <p><b>ID 语义：</b>userId、roleId 均为业务语义 ID。</p>
      */
     @DeleteMapping("/users/{userId}/roles/{roleId}")
     public ApiResponse<Map<String, Object>> removeRole(@PathVariable Long userId,
@@ -191,13 +195,14 @@ public class RbacQueryController {
     /**
      * 给角色绑定权限。
      * <p><b>业务目的：</b>扩展角色可执行能力。</p>
+     * <p><b>ID 语义：</b>路径中的 roleId 为角色业务 ID，permissionId 为权限业务 ID。</p>
      * <p><b>副作用：</b>新增角色-权限关系。</p>
      */
-    @PostMapping("/roles/{id}/permissions")
-    public ApiResponse<Map<String, Object>> assignPermission(@PathVariable Long id,
-                                                              @RequestParam("permissionId") Long permissionId,
-                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.assignPermissionToRole(id, permissionId);
+    @PostMapping("/roles/{roleId}/permissions")
+    public ApiResponse<Map<String, Object>> assignPermission(@PathVariable Long roleId,
+                                                               @RequestParam("permissionId") Long permissionId,
+                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        iamQueryApplicationService.assignPermissionToRole(roleId, permissionId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("bound", true);
         return ApiResponse.success(data, traceId);
@@ -206,6 +211,7 @@ public class RbacQueryController {
     /**
      * 解除角色权限绑定。
      * <p><b>副作用：</b>删除角色-权限关系。</p>
+     * <p><b>ID 语义：</b>roleId、permissionId 均为业务语义 ID。</p>
      */
     @DeleteMapping("/roles/{roleId}/permissions/{permissionId}")
     public ApiResponse<Map<String, Object>> removePermission(@PathVariable Long roleId,
@@ -229,6 +235,7 @@ public class RbacQueryController {
     /**
      * 查询当前用户可见菜单。
      * <p><b>业务目的：</b>按用户角色权限过滤菜单，用于前端动态路由渲染。</p>
+     * <p><b>ID 语义：</b>userId 为用户业务ID。</p>
      */
     @GetMapping("/profile/menus")
     public ApiResponse<List<IamMenu>> profileMenus(@RequestParam("userId") Long userId,
@@ -242,7 +249,7 @@ public class RbacQueryController {
      */
     private Map<String, Object> toSafeUser(IamUser user) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", user.getId());
+        data.put("userId", user.getUserId());
         data.put("email", user.getEmail());
         data.put("displayName", user.getDisplayName());
         data.put("status", user.getStatus());

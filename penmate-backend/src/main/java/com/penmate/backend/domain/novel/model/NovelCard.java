@@ -6,9 +6,11 @@ import lombok.Data;
  * 小说卡片实体。
  */
 public class NovelCard {
-    /** 卡片主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 卡片业务 ID。 */
+    private Long cardId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
     /** 卡片类型（角色、地点、物品等）。 */
     private String cardType;

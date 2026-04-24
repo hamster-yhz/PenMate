@@ -96,13 +96,14 @@ public class StyleRepositoryImpl implements StyleRepository {
      * <p>流程：记录切换前后风格、操作者及风险确认信息，支持审计追踪。</p>
      */
     @Override
-    public int insertSwitchLog(Long projectId,
+    public int insertSwitchLog(Long switchLogId,
+                               Long projectId,
                                Long fromStyleId,
                                Long toStyleId,
                                Long switchedBy,
                                boolean warningConfirmed,
                                String reason) {
-        return styleProfileMapper.insertSwitchLog(projectId, fromStyleId, toStyleId, switchedBy, warningConfirmed, reason);
+        return styleProfileMapper.insertSwitchLog(switchLogId, projectId, fromStyleId, toStyleId, switchedBy, warningConfirmed, reason);
     }
 }
 

@@ -17,7 +17,7 @@ import java.util.List;
 public interface NovelChapterVersionMapper {
 
     @Select("""
-            SELECT id, chapter_id, version_no, change_type, change_reason,
+            SELECT id, chapter_version_id, chapter_id, version_no, change_type, change_reason,
                    snapshot_object_key, snapshot_etag, snapshot_size, snapshot_checksum,
                    created_by, created_at
             FROM novel_chapter_versions
@@ -27,7 +27,7 @@ public interface NovelChapterVersionMapper {
     List<NovelChapterVersion> findByChapterId(@Param("chapterId") Long chapterId);
 
     @Select("""
-            SELECT id, chapter_id, version_no, change_type, change_reason,
+            SELECT id, chapter_version_id, chapter_id, version_no, change_type, change_reason,
                    snapshot_object_key, snapshot_etag, snapshot_size, snapshot_checksum,
                    created_by, created_at
             FROM novel_chapter_versions
@@ -44,10 +44,10 @@ public interface NovelChapterVersionMapper {
 
     @Insert("""
             INSERT INTO novel_chapter_versions(
-                chapter_id, version_no, change_type, change_reason,
+                chapter_version_id, chapter_id, version_no, change_type, change_reason,
                 snapshot_object_key, snapshot_etag, snapshot_size, snapshot_checksum, created_by
             ) VALUES (
-                #{chapterId}, #{versionNo}, #{changeType}, #{changeReason},
+                #{chapterVersionId}, #{chapterId}, #{versionNo}, #{changeType}, #{changeReason},
                 #{snapshotObjectKey}, #{snapshotEtag}, #{snapshotSize}, #{snapshotChecksum}, #{createdBy}
             )
             """)

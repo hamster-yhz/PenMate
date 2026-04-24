@@ -18,7 +18,7 @@ import java.util.List;
 public interface NovelCardMapper {
 
     @Select("""
-            SELECT id, project_id, card_type, name, summary, detail_json,
+            SELECT id, card_id, project_id, card_type, name, summary, detail_json,
                    created_at, updated_at, deleted_at
             FROM novel_cards
             WHERE project_id = #{projectId} AND deleted_at IS NULL
@@ -27,16 +27,16 @@ public interface NovelCardMapper {
     List<NovelCard> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, project_id, card_type, name, summary, detail_json,
+            SELECT id, card_id, project_id, card_type, name, summary, detail_json,
                    created_at, updated_at, deleted_at
             FROM novel_cards
-            WHERE id = #{cardId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE card_id = #{cardId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     NovelCard findByIdAndProjectId(@Param("projectId") Long projectId, @Param("cardId") Long cardId);
 
     @Insert("""
-            INSERT INTO novel_cards(project_id, card_type, name, summary, detail_json)
-            VALUES (#{projectId}, #{cardType}, #{name}, #{summary}, #{detailJson})
+            INSERT INTO novel_cards(card_id, project_id, card_type, name, summary, detail_json)
+            VALUES (#{cardId}, #{projectId}, #{cardType}, #{name}, #{summary}, #{detailJson})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NovelCard card);
@@ -47,14 +47,14 @@ public interface NovelCardMapper {
                 name = #{name},
                 summary = #{summary},
                 detail_json = #{detailJson}
-            WHERE id = #{id} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE card_id = #{cardId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelCard card);
 
     @Update("""
             UPDATE novel_cards
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{cardId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE card_id = #{cardId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("cardId") Long cardId);
 }

@@ -11,6 +11,7 @@ import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.domain.model.repository.ModelRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ import java.util.List;
 public class ModelApplicationService {
 
     private final ModelRepository modelRepository;
+    private final BusinessIdGenerator businessIdGenerator;
     private final SecretCryptoService secretCryptoService;
 
     /**
@@ -70,6 +72,7 @@ public class ModelApplicationService {
             modelRepository.clearDefaultUserKey(userId);
         }
         int affected = modelRepository.insertUserKey(
+                businessIdGenerator.nextId(),
                 userId,
                 command.providerId(),
                 command.keyName(),
@@ -144,6 +147,7 @@ public class ModelApplicationService {
             modelRepository.clearDefaultOfficialKey(command.providerId());
         }
         int affected = modelRepository.insertOfficialKey(
+                businessIdGenerator.nextId(),
                 command.providerId(),
                 command.keyName(),
                 secretCryptoService.encrypt(command.apiKey()),
@@ -223,6 +227,7 @@ public class ModelApplicationService {
             modelRepository.clearDefaultPolicy(projectId);
         }
         int affected = modelRepository.insertPolicy(
+                businessIdGenerator.nextId(),
                 projectId,
                 command.policyName(),
                 command.scene(),

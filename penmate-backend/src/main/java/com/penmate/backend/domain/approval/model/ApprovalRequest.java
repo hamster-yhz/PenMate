@@ -8,11 +8,13 @@ import java.time.LocalDateTime;
  * 审批请求实体。
  */
 public class ApprovalRequest {
-    /** 审批单主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 关联项目 ID。 */
+    /** 审批请求业务 ID。 */
+    private Long approvalRequestId;
+    /** 关联项目业务 ID。 */
     private Long projectId;
-    /** 关联任务 ID。 */
+    /** 关联任务业务 ID。 */
     private Long taskId;
     /** 审批类型（发布审批、高风险操作审批等）。 */
     private String approvalType;
@@ -22,9 +24,9 @@ public class ApprovalRequest {
     private Integer riskLevel;
     /** 审批状态。 */
     private String status;
-    /** 发起人用户 ID。 */
+    /** 发起人用户业务 ID。 */
     private Long requestedBy;
-    /** 审核人用户 ID。 */
+    /** 审核人用户业务 ID。 */
     private Long reviewedBy;
     /** 审核完成时间。 */
     private LocalDateTime reviewedAt;

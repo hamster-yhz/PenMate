@@ -8,9 +8,9 @@ import java.time.LocalDateTime;
  * 小说项目成员实体。
  */
 public class NovelMember {
-    /** 所属项目 ID。 */
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 成员用户 ID。 */
+    /** 成员用户业务 ID。 */
     private Long userId;
     /** 成员角色。 */
     private String memberRole;

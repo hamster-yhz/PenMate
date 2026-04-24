@@ -6,8 +6,10 @@ import lombok.Data;
  * RBAC 角色实体。
  */
 public class IamRole {
-    /** 角色主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 角色业务 ID。 */
+    private Long roleId;
     /** 角色名称。 */
     private String name;
     /** 角色唯一编码。 */

@@ -18,7 +18,7 @@ import java.util.List;
 public interface NovelCardRelationMapper {
 
     @Select("""
-            SELECT id, project_id, from_card_id, to_card_id, relation_type, description,
+            SELECT id, card_relation_id, project_id, from_card_id, to_card_id, relation_type, description,
                    created_at, deleted_at
             FROM novel_card_relations
             WHERE project_id = #{projectId} AND deleted_at IS NULL
@@ -27,8 +27,8 @@ public interface NovelCardRelationMapper {
     List<NovelCardRelation> findByProjectId(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO novel_card_relations(project_id, from_card_id, to_card_id, relation_type, description)
-            VALUES (#{projectId}, #{fromCardId}, #{toCardId}, #{relationType}, #{description})
+            INSERT INTO novel_card_relations(card_relation_id, project_id, from_card_id, to_card_id, relation_type, description)
+            VALUES (#{cardRelationId}, #{projectId}, #{fromCardId}, #{toCardId}, #{relationType}, #{description})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NovelCardRelation relation);
@@ -36,7 +36,7 @@ public interface NovelCardRelationMapper {
     @Update("""
             UPDATE novel_card_relations
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{relationId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE card_relation_id = #{relationId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("relationId") Long relationId);
 }

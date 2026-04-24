@@ -8,16 +8,18 @@ import java.time.LocalDateTime;
  * 智能体生成任务实体。
  */
 public class AgentGenerationTask {
-    /** 任务主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 任务业务 ID。 */
+    private Long taskId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 关联会话 ID。 */
+    /** 关联会话业务 ID。 */
     private Long conversationId;
-    /** 关联章节 ID。 */
+    /** 关联章节业务 ID。 */
     private Long chapterId;
     /**
-     * 显式模型配置 ID。
+     * 显式模型配置业务 ID。
      * <p>完全显式模式下由前端每次请求传入，不再走项目默认策略兜底。</p>
      */
     private Long modelConfigId;

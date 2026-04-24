@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
  * 插件目录项实体。
  */
 public class PluginCatalogItem {
-    /** 插件目录主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 插件业务 ID。 */
+    private Long pluginId;
     /** 插件编码。 */
     private String code;
     /** 插件名称。 */

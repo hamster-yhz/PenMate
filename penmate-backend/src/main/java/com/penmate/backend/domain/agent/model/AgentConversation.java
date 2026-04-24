@@ -8,11 +8,13 @@ import java.time.LocalDateTime;
  * 智能体会话实体。
  */
 public class AgentConversation {
-    /** 会话主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 关联的小说项目 ID。 */
+    /** 会话业务 ID。 */
+    private Long conversationId;
+    /** 关联的小说项目业务 ID。 */
     private Long projectId;
-    /** 发起会话的用户 ID。 */
+    /** 发起会话的用户业务 ID。 */
     private Long userId;
     /** 会话标题。 */
     private String title;

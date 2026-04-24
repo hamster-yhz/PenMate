@@ -8,11 +8,13 @@ import java.time.LocalDateTime;
  * 用户模型密钥实体。
  */
 public class ModelUserApiKey {
-    /** 密钥主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 用户 ID。 */
+    /** 用户 API Key 业务 ID。 */
+    private Long userApiKeyId;
+    /** 用户业务 ID。 */
     private Long userId;
-    /** 提供商 ID。 */
+    /** 提供商业务 ID。 */
     private Long providerId;
     /** 密钥展示名称。 */
     private String keyName;

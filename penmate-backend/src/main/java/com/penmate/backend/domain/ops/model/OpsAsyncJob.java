@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
  * 异步运维任务实体。
  */
 public class OpsAsyncJob {
-    /** 异步任务主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 异步任务业务 ID。 */
+    private Long jobId;
     /** 任务类型。 */
     private String jobType;
     /** 业务键，用于关联业务对象。 */

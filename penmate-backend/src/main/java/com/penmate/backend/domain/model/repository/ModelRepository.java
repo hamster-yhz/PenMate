@@ -14,7 +14,8 @@ public interface ModelRepository {
 
     List<ModelOfficialApiKey> listOfficialKeys();
 
-    int insertUserKey(Long userId,
+    int insertUserKey(Long userApiKeyId,
+                      Long userId,
                       Long providerId,
                       String keyName,
                       String encryptedApiKey,
@@ -22,7 +23,8 @@ public interface ModelRepository {
                       boolean isDefault,
                       String status);
 
-    int insertOfficialKey(Long providerId,
+    int insertOfficialKey(Long officialApiKeyId,
+                          Long providerId,
                           String keyName,
                           String encryptedApiKey,
                           String maskedApiKey,
@@ -66,7 +68,8 @@ public interface ModelRepository {
 
     ModelOfficialApiKey findDefaultOfficialKey(Long providerId);
 
-    int insertPolicy(Long projectId,
+    int insertPolicy(Long projectPolicyId,
+                     Long projectId,
                      String policyName,
                      String scene,
                      Long providerModelId,

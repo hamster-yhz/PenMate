@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * 章节历史版本实体。
  */
 public class NovelChapterVersion {
-    /** 版本主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属章节 ID。 */
+    /** 章节版本业务 ID。 */
+    private Long chapterVersionId;
+    /** 所属章节业务 ID。 */
     private Long chapterId;
     /** 版本号。 */
     private Integer versionNo;
@@ -26,7 +28,7 @@ public class NovelChapterVersion {
     private Long snapshotSize;
     /** 快照校验和。 */
     private String snapshotChecksum;
-    /** 创建该版本的用户 ID。 */
+    /** 创建该版本的用户业务 ID。 */
     private Long createdBy;
     /** 版本创建时间。 */
     private LocalDateTime createdAt;

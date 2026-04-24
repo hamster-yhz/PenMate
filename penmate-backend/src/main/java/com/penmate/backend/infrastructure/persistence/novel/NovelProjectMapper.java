@@ -18,7 +18,7 @@ import java.util.List;
 public interface NovelProjectMapper {
 
     @Select("""
-            SELECT id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
+            SELECT id, project_id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
             FROM novel_projects
             WHERE deleted_at IS NULL
             ORDER BY updated_at DESC
@@ -26,15 +26,15 @@ public interface NovelProjectMapper {
     List<NovelProject> findAll();
 
     @Select("""
-            SELECT id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
+            SELECT id, project_id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
             FROM novel_projects
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND deleted_at IS NULL
             """)
-    NovelProject findById(@Param("id") Long id);
+    NovelProject findByProjectId(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO novel_projects(owner_user_id, title, summary, status)
-            VALUES(#{ownerUserId}, #{title}, #{summary}, #{status})
+            INSERT INTO novel_projects(project_id, owner_user_id, title, summary, status)
+            VALUES(#{projectId}, #{ownerUserId}, #{title}, #{summary}, #{status})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NovelProject project);
@@ -42,15 +42,15 @@ public interface NovelProjectMapper {
     @Update("""
             UPDATE novel_projects
             SET title = #{title}, summary = #{summary}, status = #{status}
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelProject project);
 
     @Update("""
             UPDATE novel_projects
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND deleted_at IS NULL
             """)
-    int softDelete(@Param("id") Long id);
+    int softDelete(@Param("projectId") Long projectId);
 }
 

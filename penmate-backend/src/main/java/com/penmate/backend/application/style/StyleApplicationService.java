@@ -4,6 +4,7 @@ import com.penmate.backend.application.style.command.StyleCommands.AnalyzeStyleC
 import com.penmate.backend.application.style.command.StyleCommands.CreateStyleCommand;
 import com.penmate.backend.application.style.command.StyleCommands.SwitchStyleCommand;
 import com.penmate.backend.application.style.command.StyleCommands.UpdateStyleCommand;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.domain.style.model.StyleProfile;
 import com.penmate.backend.domain.style.repository.StyleRepository;
@@ -23,11 +24,14 @@ import java.util.Map;
 public class StyleApplicationService {
 
     private final StyleRepository styleRepository;
+    private final BusinessIdGenerator businessIdGenerator;
     private final RealtimeEventService realtimeEventService;
 
     public StyleApplicationService(StyleRepository styleRepository,
-                                   RealtimeEventService realtimeEventService) {
+                                   BusinessIdGenerator businessIdGenerator,
+                                    RealtimeEventService realtimeEventService) {
         this.styleRepository = styleRepository;
+        this.businessIdGenerator = businessIdGenerator;
         this.realtimeEventService = realtimeEventService;
     }
 
@@ -167,24 +171,25 @@ public class StyleApplicationService {
         }
 
         styleRepository.insertSwitchLog(
+                businessIdGenerator.nextId(),
                 projectId,
-                fromStyle == null ? null : fromStyle.getId(),
-                toStyle.getId(),
+                fromStyle == null ? null : fromStyle.getStyleId(),
+                toStyle.getStyleId(),
                 command.operatorId(),
                 Boolean.TRUE.equals(command.warningConfirmed()),
                 command.reason()
         );
 
         realtimeEventService.publishProjectEvent(projectId, "style.switched", Map.of(
-                "fromStyleId", fromStyle == null ? null : fromStyle.getId(),
-                "toStyleId", toStyle.getId(),
+                "fromStyleId", fromStyle == null ? null : fromStyle.getStyleId(),
+                "toStyleId", toStyle.getStyleId(),
                 "operatorId", command.operatorId(),
                 "reason", command.reason()
         ));
 
-        writeAudit(traceId, command.operatorId(), "style", "switch-style", "style_profiles", String.valueOf(toStyle.getId()), command.reason(), 200);
+        writeAudit(traceId, command.operatorId(), "style", "switch-style", "style_profiles", String.valueOf(toStyle.getStyleId()), command.reason(), 200);
         log.info("切换默认风格成功: projectId={}, fromStyleId={}, toStyleId={}",
-                projectId, fromStyle == null ? null : fromStyle.getId(), toStyle.getId());
+                projectId, fromStyle == null ? null : fromStyle.getStyleId(), toStyle.getStyleId());
         return getStyle(projectId, command.toStyleId());
     }
 

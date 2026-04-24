@@ -18,7 +18,7 @@ import java.util.List;
 public interface NovelVolumeMapper {
 
     @Select("""
-            SELECT id, project_id, title, sort_order, description, created_at, updated_at, deleted_at
+            SELECT id, volume_id, project_id, title, sort_order, description, created_at, updated_at, deleted_at
             FROM novel_volumes
             WHERE project_id = #{projectId} AND deleted_at IS NULL
             ORDER BY sort_order ASC, id ASC
@@ -26,8 +26,8 @@ public interface NovelVolumeMapper {
     List<NovelVolume> findByProjectId(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO novel_volumes(project_id, title, sort_order, description)
-            VALUES(#{projectId}, #{title}, #{sortOrder}, #{description})
+            INSERT INTO novel_volumes(volume_id, project_id, title, sort_order, description)
+            VALUES(#{volumeId}, #{projectId}, #{title}, #{sortOrder}, #{description})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NovelVolume volume);
@@ -35,14 +35,14 @@ public interface NovelVolumeMapper {
     @Update("""
             UPDATE novel_volumes
             SET title = #{title}, sort_order = #{sortOrder}, description = #{description}
-            WHERE id = #{id} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE volume_id = #{volumeId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelVolume volume);
 
     @Update("""
             UPDATE novel_volumes
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{volumeId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE volume_id = #{volumeId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("volumeId") Long volumeId);
 }

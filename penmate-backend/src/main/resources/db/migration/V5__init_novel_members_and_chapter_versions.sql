@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS novel_members (
 
 CREATE TABLE IF NOT EXISTS novel_chapter_versions (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    chapter_version_id BIGINT UNSIGNED NOT NULL,
     chapter_id BIGINT UNSIGNED NOT NULL,
     version_no INT UNSIGNED NOT NULL,
     change_type VARCHAR(32) NOT NULL,
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS novel_chapter_versions (
     snapshot_checksum VARCHAR(128) NULL,
     created_by BIGINT UNSIGNED NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_novel_chapter_versions_version_id (chapter_version_id),
     UNIQUE KEY uk_chapter_version_no (chapter_id, version_no),
     KEY idx_chapter_versions_chapter_created (chapter_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

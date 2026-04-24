@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS agent_conversations (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    conversation_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL,
     title VARCHAR(200) NULL,
@@ -9,11 +10,13 @@ CREATE TABLE IF NOT EXISTS agent_conversations (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
+    UNIQUE KEY uk_agent_conversations_conversation_id (conversation_id),
     KEY idx_agent_conversation_project_deleted (project_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS agent_messages (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    message_id BIGINT UNSIGNED NOT NULL,
     conversation_id BIGINT UNSIGNED NOT NULL,
     role VARCHAR(20) NOT NULL,
     user_message_type VARCHAR(40) NULL,
@@ -22,11 +25,13 @@ CREATE TABLE IF NOT EXISTS agent_messages (
     tool_calls_json JSON NULL,
     seq_no INT NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_agent_messages_message_id (message_id),
     KEY idx_agent_messages_conversation_seq (conversation_id, seq_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS agent_generation_tasks (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     conversation_id BIGINT UNSIGNED NOT NULL,
     chapter_id BIGINT UNSIGNED NULL,
@@ -43,12 +48,14 @@ CREATE TABLE IF NOT EXISTS agent_generation_tasks (
     finished_at DATETIME(3) NULL,
     error_msg VARCHAR(500) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_agent_generation_tasks_task_id (task_id),
     KEY idx_agent_generation_project_status (project_id, status),
     KEY idx_agent_generation_trace (trace_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS ops_async_jobs (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    job_id BIGINT UNSIGNED NOT NULL,
     job_type VARCHAR(60) NOT NULL,
     biz_key VARCHAR(120) NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -57,12 +64,14 @@ CREATE TABLE IF NOT EXISTS ops_async_jobs (
     finished_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_ops_async_jobs_job_id (job_id),
     KEY idx_ops_job_type_status (job_type, status),
     KEY idx_ops_job_biz_key (biz_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS ops_migrations (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    migration_id BIGINT UNSIGNED NOT NULL,
     migration_type VARCHAR(80) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'running',
     progress_pct INT NOT NULL DEFAULT 0,
@@ -71,6 +80,7 @@ CREATE TABLE IF NOT EXISTS ops_migrations (
     started_at DATETIME(3) NULL,
     finished_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_ops_migrations_migration_id (migration_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

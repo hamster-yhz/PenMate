@@ -63,7 +63,7 @@ public class NovelGatewayImpl implements NovelGateway {
      * @return 出参：处理结果
      */
     @Override
-    public NovelProject findProjectById(Long projectId) { return novelProjectMapper.findById(projectId); }
+    public NovelProject findProjectById(Long projectId) { return novelProjectMapper.findByProjectId(projectId); }
 
     /**
      * 处理业务请求。

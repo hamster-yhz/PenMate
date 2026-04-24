@@ -18,7 +18,7 @@ import java.util.List;
 public interface NovelChapterMapper {
 
     @Select("""
-            SELECT id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count,
+            SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count,
                    excerpt, content_object_key, content_etag, content_size, content_checksum,
                    storage_provider, last_generated_at, created_at, updated_at, deleted_at
             FROM novel_chapters
@@ -28,20 +28,20 @@ public interface NovelChapterMapper {
     List<NovelChapter> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count,
+            SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count,
                    excerpt, content_object_key, content_etag, content_size, content_checksum,
                    storage_provider, last_generated_at, created_at, updated_at, deleted_at
             FROM novel_chapters
-            WHERE id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     NovelChapter findByIdAndProjectId(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId);
 
     @Insert("""
             INSERT INTO novel_chapters(
-                project_id, volume_id, outline_node_id, title, chapter_no, status, word_count, excerpt,
+                chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count, excerpt,
                 content_object_key, content_etag, content_size, content_checksum, storage_provider
             ) VALUES (
-                #{projectId}, #{volumeId}, #{outlineNodeId}, #{title}, #{chapterNo}, #{status}, #{wordCount}, #{excerpt},
+                #{chapterId}, #{projectId}, #{volumeId}, #{outlineNodeId}, #{title}, #{chapterNo}, #{status}, #{wordCount}, #{excerpt},
                 #{contentObjectKey}, #{contentEtag}, #{contentSize}, #{contentChecksum}, #{storageProvider}
             )
             """)
@@ -62,21 +62,21 @@ public interface NovelChapterMapper {
                 content_size = #{contentSize},
                 content_checksum = #{contentChecksum},
                 storage_provider = #{storageProvider}
-            WHERE id = #{id} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelChapter chapter);
 
     @Update("""
             UPDATE novel_chapters
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId);
 
     @Update("""
             UPDATE novel_chapters
             SET status = 2, last_generated_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int publish(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId);
 
@@ -87,7 +87,7 @@ public interface NovelChapterMapper {
                 content_size = #{size},
                 content_checksum = #{checksum},
                 storage_provider = #{storageProvider}
-            WHERE id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int updateContentMeta(@Param("projectId") Long projectId,
                           @Param("chapterId") Long chapterId,

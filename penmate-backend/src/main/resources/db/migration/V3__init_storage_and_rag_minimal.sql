@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS storage_objects (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    storage_object_id BIGINT UNSIGNED NOT NULL,
     object_key VARCHAR(500) NOT NULL,
     bucket VARCHAR(100) NOT NULL,
     provider VARCHAR(32) NOT NULL,
@@ -10,12 +11,14 @@ CREATE TABLE IF NOT EXISTS storage_objects (
     ref_type VARCHAR(50) NOT NULL,
     ref_id BIGINT UNSIGNED NOT NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_storage_objects_storage_object_id (storage_object_id),
     UNIQUE KEY uk_storage_object_key (object_key),
     KEY idx_storage_ref (ref_type, ref_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS rag_documents (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    document_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     doc_type VARCHAR(32) NOT NULL,
     title VARCHAR(200) NOT NULL,
@@ -28,11 +31,13 @@ CREATE TABLE IF NOT EXISTS rag_documents (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
+    UNIQUE KEY uk_rag_documents_document_id (document_id),
     KEY idx_rag_project_status (project_id, parse_status, index_status, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS rag_chunks (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    chunk_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     document_id BIGINT UNSIGNED NOT NULL,
     chunk_no INT UNSIGNED NOT NULL,
@@ -46,6 +51,7 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
     embedding_version VARCHAR(32) NOT NULL,
     metadata_json JSON NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_rag_chunks_chunk_id (chunk_id),
     UNIQUE KEY uk_chunks_vector (vector_id, vector_store),
     KEY idx_chunks_doc_no (document_id, chunk_no),
     KEY idx_chunks_project_doc (project_id, document_id)
@@ -53,6 +59,7 @@ CREATE TABLE IF NOT EXISTS rag_chunks (
 
 CREATE TABLE IF NOT EXISTS rag_retrieval_logs (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    retrieval_log_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
     task_id BIGINT UNSIGNED NULL,
     query_text VARCHAR(500) NULL,
@@ -62,6 +69,7 @@ CREATE TABLE IF NOT EXISTS rag_retrieval_logs (
     adopted TINYINT(1) NOT NULL DEFAULT 0,
     trace_id VARCHAR(64) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_rag_retrieval_logs_retrieval_log_id (retrieval_log_id),
     KEY idx_rag_retrieval_project_created (project_id, created_at),
     KEY idx_rag_retrieval_task_created (task_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

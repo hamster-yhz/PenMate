@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
  * IAM 用户实体。
  */
 public class IamUser {
-    /** 用户主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 用户业务 ID。 */
+    private Long userId;
     /** 登录邮箱。 */
     private String email;
     /** 密码哈希值。 */

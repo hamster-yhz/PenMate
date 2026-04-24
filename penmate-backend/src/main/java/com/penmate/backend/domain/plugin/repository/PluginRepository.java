@@ -16,7 +16,8 @@ public interface PluginRepository {
 
     List<PluginProjectInstall> listProjectInstalls(Long projectId);
 
-    int insertInstall(Long projectId,
+    int insertInstall(Long pluginInstallId,
+                      Long projectId,
                       Long pluginId,
                       String version,
                       String configJson,

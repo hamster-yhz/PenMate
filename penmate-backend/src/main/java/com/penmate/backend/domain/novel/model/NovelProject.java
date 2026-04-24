@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * 小说项目实体。
  */
 public class NovelProject {
-    /** 项目主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 项目拥有者用户 ID。 */
+    /** 项目业务 ID。 */
+    private Long projectId;
+    /** 项目拥有者用户业务 ID。 */
     private Long ownerUserId;
     /** 小说项目标题。 */
     private String title;

@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
  * 小说卷册实体。
  */
 public class NovelVolume {
-    /** 卷册主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 卷册业务 ID。 */
+    private Long volumeId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
     /** 卷册标题。 */
     private String title;

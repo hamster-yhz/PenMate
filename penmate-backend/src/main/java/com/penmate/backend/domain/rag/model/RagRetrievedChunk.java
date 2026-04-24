@@ -7,7 +7,7 @@ import lombok.Data;
  * RAG 检索命中片段实体。
  */
 public class RagRetrievedChunk {
-    /** 来源文档 ID。 */
+    /** 来源文档业务 ID。 */
     private Long documentId;
     /** 来源文档标题。 */
     private String documentTitle;

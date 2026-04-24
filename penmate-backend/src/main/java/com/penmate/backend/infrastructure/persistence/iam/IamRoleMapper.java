@@ -18,7 +18,7 @@ import java.util.List;
 public interface IamRoleMapper {
 
     @Select("""
-            SELECT id, name, code, description, is_system
+            SELECT id, role_id, name, code, description, is_system
             FROM iam_roles
             WHERE deleted_at IS NULL
             ORDER BY id DESC
@@ -26,15 +26,15 @@ public interface IamRoleMapper {
     List<IamRole> findAll();
 
     @Select("""
-            SELECT id, name, code, description, is_system
+            SELECT id, role_id, name, code, description, is_system
             FROM iam_roles
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE role_id = #{id} AND deleted_at IS NULL
             """)
     IamRole findById(@Param("id") Long id);
 
     @Insert("""
-            INSERT INTO iam_roles(name, code, description, is_system)
-            VALUES(#{name}, #{code}, #{description}, #{isSystem})
+            INSERT INTO iam_roles(role_id, name, code, description, is_system)
+            VALUES(#{roleId}, #{name}, #{code}, #{description}, #{isSystem})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(IamRole role);
@@ -42,14 +42,14 @@ public interface IamRoleMapper {
     @Update("""
             UPDATE iam_roles
             SET name = #{name}, description = #{description}
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE role_id = #{roleId} AND deleted_at IS NULL
             """)
     int updateBasic(IamRole role);
 
     @Update("""
             UPDATE iam_roles
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE role_id = #{id} AND deleted_at IS NULL
             """)
     int softDelete(@Param("id") Long id);
 

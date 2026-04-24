@@ -92,9 +92,9 @@ public class NovelController {
 
     /**
      * 查询项目详情。
-     * <p>流程：按项目ID查询项目实体并返回。</p>
+     * <p>流程：按项目业务ID查询项目实体并返回。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
@@ -106,9 +106,9 @@ public class NovelController {
 
     /**
      * 更新项目基础信息。
-     * <p>流程：组装更新命令 -> 应用服务校验并保存。</p>
+     * <p>流程：组装更新命令 -> 应用服务按项目业务ID校验并保存。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param dto 入参：dto
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -126,9 +126,9 @@ public class NovelController {
 
     /**
      * 删除项目。
-     * <p>流程：校验操作者权限 -> 执行项目删除。</p>
+     * <p>流程：校验操作者权限 -> 按项目业务ID执行项目删除。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param operatorId 入参：operatorId
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -143,9 +143,9 @@ public class NovelController {
 
     /**
      * 查询项目卷列表。
-     * <p>流程：按项目ID读取卷集合。</p>
+     * <p>流程：按项目业务ID读取卷集合。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
@@ -157,9 +157,9 @@ public class NovelController {
 
     /**
      * 创建卷。
-     * <p>流程：组装卷创建命令 -> 写入卷记录。</p>
+     * <p>流程：组装卷创建命令 -> 以项目业务ID写入卷记录。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param dto 入参：dto
      * @param operatorId 入参：operatorId
      * @param traceId 入参：traceId
@@ -180,10 +180,10 @@ public class NovelController {
 
     /**
      * 更新卷信息。
-     * <p>流程：按卷ID执行更新并返回新状态。</p>
+     * <p>流程：按卷业务ID执行更新并返回新状态。</p>
      *
-     * @param projectId 入参：projectId
-     * @param volumeId 入参：volumeId
+     * @param projectId 入参：projectId（项目业务ID）
+     * @param volumeId 入参：volumeId（卷业务ID）
      * @param dto 入参：dto
      * @param operatorId 入参：operatorId
      * @param traceId 入参：traceId
@@ -206,10 +206,10 @@ public class NovelController {
 
     /**
      * 删除卷。
-     * <p>流程：校验卷归属与权限后执行删除。</p>
+     * <p>流程：校验卷业务ID归属与权限后执行删除。</p>
      *
-     * @param projectId 入参：projectId
-     * @param volumeId 入参：volumeId
+     * @param projectId 入参：projectId（项目业务ID）
+     * @param volumeId 入参：volumeId（卷业务ID）
      * @param operatorId 入参：operatorId
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -225,9 +225,9 @@ public class NovelController {
 
     /**
      * 查询章节列表。
-     * <p>流程：按项目聚合章节并返回。</p>
+     * <p>流程：按项目业务ID聚合章节并返回。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
@@ -239,9 +239,9 @@ public class NovelController {
 
     /**
      * 创建章节。
-     * <p>流程：组装章节创建命令 -> 持久化章节元数据。</p>
+     * <p>流程：组装章节创建命令 -> 持久化章节业务元数据。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param dto 入参：dto
      * @param operatorId 入参：operatorId
      * @param traceId 入参：traceId

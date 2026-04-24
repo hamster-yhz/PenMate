@@ -18,7 +18,7 @@ import java.util.List;
 public interface RagDocumentMapper {
 
     @Select("""
-            SELECT id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
+            SELECT id, document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
                    mime_type, parse_status, index_status, created_at, updated_at
             FROM rag_documents
             WHERE project_id = #{projectId} AND deleted_at IS NULL
@@ -27,17 +27,17 @@ public interface RagDocumentMapper {
     List<RagDocument> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
+            SELECT id, document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
                    mime_type, parse_status, index_status, created_at, updated_at
             FROM rag_documents
-            WHERE project_id = #{projectId} AND id = #{docId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND document_id = #{docId} AND deleted_at IS NULL
             """)
     RagDocument findById(@Param("projectId") Long projectId, @Param("docId") Long docId);
 
     @Insert("""
-            INSERT INTO rag_documents(project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
+            INSERT INTO rag_documents(document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
                                       mime_type, parse_status, index_status)
-            VALUES(#{projectId}, #{docType}, #{title}, #{sourceRef}, #{originObjectKey}, #{originEtag},
+            VALUES(#{documentId}, #{projectId}, #{docType}, #{title}, #{sourceRef}, #{originObjectKey}, #{originEtag},
                    #{mimeType}, #{parseStatus}, #{indexStatus})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -46,14 +46,14 @@ public interface RagDocumentMapper {
     @Update("""
             UPDATE rag_documents
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND id = #{docId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND document_id = #{docId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("docId") Long docId);
 
     @Update("""
             UPDATE rag_documents
             SET parse_status = #{parseStatus}, index_status = #{indexStatus}
-            WHERE project_id = #{projectId} AND id = #{docId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND document_id = #{docId} AND deleted_at IS NULL
             """)
     int updateStatuses(@Param("projectId") Long projectId,
                        @Param("docId") Long docId,

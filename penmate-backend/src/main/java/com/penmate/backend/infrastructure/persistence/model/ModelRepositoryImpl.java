@@ -52,24 +52,26 @@ public class ModelRepositoryImpl implements ModelRepository {
      * @return 受影响行数
      */
     @Override
-    public int insertUserKey(Long userId,
+    public int insertUserKey(Long userApiKeyId,
+                             Long userId,
                              Long providerId,
                              String keyName,
                              String encryptedApiKey,
                              String maskedApiKey,
                              boolean isDefault,
                              String status) {
-        return modelMapper.insertUserKey(userId, providerId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
+        return modelMapper.insertUserKey(userApiKeyId, userId, providerId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
     }
 
     @Override
-    public int insertOfficialKey(Long providerId,
+    public int insertOfficialKey(Long officialApiKeyId,
+                                 Long providerId,
                                  String keyName,
                                  String encryptedApiKey,
                                  String maskedApiKey,
                                  boolean isDefault,
                                  String status) {
-        return modelMapper.insertOfficialKey(providerId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
+        return modelMapper.insertOfficialKey(officialApiKeyId, providerId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
     }
 
     /**
@@ -195,7 +197,8 @@ public class ModelRepositoryImpl implements ModelRepository {
      * @return 受影响行数
      */
     @Override
-    public int insertPolicy(Long projectId,
+    public int insertPolicy(Long projectPolicyId,
+                            Long projectId,
                             String policyName,
                             String scene,
                             Long providerModelId,
@@ -208,7 +211,7 @@ public class ModelRepositoryImpl implements ModelRepository {
                             Integer maxTokens,
                             String fallbackPolicyJson,
                             boolean isDefault) {
-        return modelMapper.insertPolicy(projectId, policyName, scene, providerModelId, modelName, baseUrl, userKeyId, officialKeyId, temperature, topP, maxTokens, fallbackPolicyJson, isDefault);
+        return modelMapper.insertPolicy(projectPolicyId, projectId, policyName, scene, providerModelId, modelName, baseUrl, userKeyId, officialKeyId, temperature, topP, maxTokens, fallbackPolicyJson, isDefault);
     }
 
     /**

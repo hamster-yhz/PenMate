@@ -20,28 +20,28 @@ import java.util.List;
 public interface IamUserMapper {
 
     @Select("""
-            SELECT id, email, password_hash, display_name, status, auth_method, last_login_at
+            SELECT id, user_id, email, password_hash, display_name, status, auth_method, last_login_at
             FROM iam_users
             WHERE email = #{email} AND deleted_at IS NULL
             """)
     IamUser findByEmail(@Param("email") String email);
 
     @Select("""
-            SELECT id, email, password_hash, display_name, status, auth_method, last_login_at
+            SELECT id, user_id, email, password_hash, display_name, status, auth_method, last_login_at
             FROM iam_users
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE user_id = #{id} AND deleted_at IS NULL
             """)
     IamUser findById(@Param("id") Long id);
 
     @Update("""
             UPDATE iam_users
             SET last_login_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{id}
+            WHERE user_id = #{id}
             """)
     int touchLastLogin(@Param("id") Long id);
 
     @Select("""
-            SELECT id, email, password_hash, display_name, status, auth_method, last_login_at
+            SELECT id, user_id, email, password_hash, display_name, status, auth_method, last_login_at
             FROM iam_users
             WHERE deleted_at IS NULL
             ORDER BY id DESC
@@ -49,18 +49,18 @@ public interface IamUserMapper {
     List<IamUser> findAll();
 
     @Select("""
-            SELECT r.id, r.name, r.code, r.description
+            SELECT r.id, r.role_id, r.name, r.code, r.description
             FROM iam_roles r
-            JOIN iam_user_roles ur ON ur.role_id = r.id
+            JOIN iam_user_roles ur ON ur.role_id = r.role_id
             WHERE ur.user_id = #{userId} AND r.deleted_at IS NULL
             ORDER BY r.id DESC
             """)
     List<IamRole> findRolesByUserId(@Param("userId") Long userId);
 
     @Select("""
-            SELECT DISTINCT p.id, p.name, p.code, p.module, p.description
+            SELECT DISTINCT p.id, p.permission_id, p.name, p.code, p.module, p.description
             FROM iam_permissions p
-            JOIN iam_role_permissions rp ON rp.permission_id = p.id
+            JOIN iam_role_permissions rp ON rp.permission_id = p.permission_id
             JOIN iam_user_roles ur ON ur.role_id = rp.role_id
             WHERE ur.user_id = #{userId}
             ORDER BY p.id DESC
@@ -68,8 +68,8 @@ public interface IamUserMapper {
     List<IamPermission> findPermissionsByUserId(@Param("userId") Long userId);
 
     @Insert("""
-            INSERT INTO iam_users(email, password_hash, display_name, status, auth_method)
-            VALUES(#{email}, #{passwordHash}, #{displayName}, #{status}, #{authMethod})
+            INSERT INTO iam_users(user_id, email, password_hash, display_name, status, auth_method)
+            VALUES(#{userId}, #{email}, #{passwordHash}, #{displayName}, #{status}, #{authMethod})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(IamUser user);
@@ -77,14 +77,14 @@ public interface IamUserMapper {
     @Update("""
             UPDATE iam_users
             SET display_name = #{displayName}, status = #{status}
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
     int updateBasic(IamUser user);
 
     @Update("""
             UPDATE iam_users
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE id = #{id} AND deleted_at IS NULL
+            WHERE user_id = #{id} AND deleted_at IS NULL
             """)
     int softDelete(@Param("id") Long id);
 

@@ -5,6 +5,7 @@ import com.penmate.backend.domain.iam.model.IamMenu;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +20,12 @@ import java.util.List;
 public class IamQueryApplicationService {
 
     private final IamGateway iamGateway;
+    private final BusinessIdGenerator businessIdGenerator;
 
-    public IamQueryApplicationService(IamGateway iamGateway) {
+    public IamQueryApplicationService(IamGateway iamGateway,
+                                      BusinessIdGenerator businessIdGenerator) {
         this.iamGateway = iamGateway;
+        this.businessIdGenerator = businessIdGenerator;
     }
 
     /**
@@ -86,13 +90,14 @@ public class IamQueryApplicationService {
     public IamUser createUser(String email, String displayName, Integer status, String authMethod) {
         log.info("创建用户: email={}, displayName={}, status={}, authMethod={}", email, displayName, status, authMethod);
         IamUser user = new IamUser();
+        user.setUserId(businessIdGenerator.nextId());
         user.setEmail(email);
         user.setDisplayName(displayName);
         user.setStatus(status);
         user.setAuthMethod(authMethod == null || authMethod.isBlank() ? "local" : authMethod);
         user.setPasswordHash("{noop}changeme");
         iamGateway.insertUser(user);
-        log.info("创建用户成功: userId={}, email={}", user.getId(), user.getEmail());
+        log.info("创建用户成功: userId={}, email={}", user.getUserId(), user.getEmail());
         return user;
     }
 
@@ -145,12 +150,13 @@ public class IamQueryApplicationService {
     public IamRole createRole(String name, String code, String description, Boolean isSystem) {
         log.info("创建角色: code={}, name={}, isSystem={}", code, name, isSystem);
         IamRole role = new IamRole();
+        role.setRoleId(businessIdGenerator.nextId());
         role.setName(name);
         role.setCode(code);
         role.setDescription(description);
         role.setIsSystem(Boolean.TRUE.equals(isSystem));
         iamGateway.insertRole(role);
-        log.info("创建角色成功: roleId={}, code={}", role.getId(), role.getCode());
+        log.info("创建角色成功: roleId={}, code={}", role.getRoleId(), role.getCode());
         return role;
     }
 

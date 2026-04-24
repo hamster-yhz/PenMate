@@ -6,8 +6,10 @@ import lombok.Data;
  * RBAC 权限点实体。
  */
 public class IamPermission {
-    /** 权限主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
+    /** 权限业务 ID。 */
+    private Long permissionId;
     /** 权限名称。 */
     private String name;
     /** 权限唯一编码。 */

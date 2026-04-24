@@ -40,8 +40,9 @@ public class ApprovalController {
      * <p><b>关键调用：</b>{@code approvalApplicationService.create(command, traceId)} 负责审批单落库与状态初始化。</p>
      * <p><b>异常与分支：</b>任务不存在、审批类型非法或请求人无权限时返回业务异常。</p>
      * <p><b>副作用：</b>新增审批请求记录。</p>
+     * <p><b>ID 语义：</b>projectId / taskId / requestedBy 均为业务语义 ID。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param dto 入参：dto
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -69,8 +70,9 @@ public class ApprovalController {
      * <p><b>关键调用：</b>{@code approvalApplicationService.listByProject(projectId)} 获取基础集合。</p>
      * <p><b>异常与分支：</b>状态参数为空时返回全量；非空时执行大小写无关过滤。</p>
      * <p><b>副作用：</b>无持久化写入。</p>
+     * <p><b>ID 语义：</b>projectId 为项目业务 ID。</p>
      *
-     * @param projectId 入参：projectId
+     * @param projectId 入参：projectId（项目业务ID）
      * @param status 入参：status
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -89,12 +91,13 @@ public class ApprovalController {
     /**
      * 查询审批详情。
      * <p><b>业务目的：</b>返回单个审批请求的完整信息，支持审批页展示上下文与历史状态。</p>
-     * <p><b>流程主线：</b>接收审批ID -> 调用应用服务查询详情 -> 封装统一响应。</p>
+     * <p><b>流程主线：</b>接收审批业务ID -> 调用应用服务查询详情 -> 封装统一响应。</p>
      * <p><b>关键调用：</b>{@code approvalApplicationService.detail(approvalId)}。</p>
      * <p><b>异常与分支：</b>审批单不存在时返回业务异常。</p>
      * <p><b>副作用：</b>无持久化写入。</p>
+     * <p><b>ID 语义：</b>approvalId 为审批单业务 ID。</p>
      *
-     * @param approvalId 入参：approvalId
+     * @param approvalId 入参：approvalId（审批单业务ID）
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
@@ -111,8 +114,9 @@ public class ApprovalController {
      * <p><b>关键调用：</b>{@code approvalApplicationService.approve(approvalId, command, traceId)}。</p>
      * <p><b>异常与分支：</b>审批单状态不可变更、审核人无权限时返回业务异常。</p>
      * <p><b>副作用：</b>更新审批状态并记录审核意见。</p>
+     * <p><b>ID 语义：</b>approvalId / reviewedBy 均为业务语义 ID。</p>
      *
-     * @param approvalId 入参：approvalId
+     * @param approvalId 入参：approvalId（审批单业务ID）
      * @param dto 入参：dto
      * @param traceId 入参：traceId
      * @return 出参：处理结果
@@ -133,8 +137,9 @@ public class ApprovalController {
      * <p><b>关键调用：</b>{@code approvalApplicationService.reject(approvalId, command, traceId)}。</p>
      * <p><b>异常与分支：</b>审批状态不允许拒绝或审核人权限不足时返回业务异常。</p>
      * <p><b>副作用：</b>更新审批状态并记录拒绝意见。</p>
+     * <p><b>ID 语义：</b>approvalId / reviewedBy 均为业务语义 ID。</p>
      *
-     * @param approvalId 入参：approvalId
+     * @param approvalId 入参：approvalId（审批单业务ID）
      * @param dto 入参：dto
      * @param traceId 入参：traceId
      * @return 出参：处理结果

@@ -9,11 +9,13 @@ import java.time.LocalDateTime;
  * RAG 检索日志实体。
  */
 public class RagRetrievalLog {
-    /** 日志主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 检索日志业务 ID。 */
+    private Long retrievalLogId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 关联生成任务 ID。 */
+    /** 关联生成任务业务 ID。 */
     private Long taskId;
     /** 检索查询文本。 */
     private String queryText;

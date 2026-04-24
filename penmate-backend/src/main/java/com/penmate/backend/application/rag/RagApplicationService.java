@@ -5,6 +5,7 @@ import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
 import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
 import com.penmate.backend.domain.rag.model.RagDocument;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,13 +23,16 @@ import java.util.UUID;
 public class RagApplicationService {
 
     private final RagDocumentRepository ragDocumentRepository;
+    private final BusinessIdGenerator businessIdGenerator;
     private final RagRetrievalService ragRetrievalService;
     private final String storageEndpoint;
 
     public RagApplicationService(RagDocumentRepository ragDocumentRepository,
+                                 BusinessIdGenerator businessIdGenerator,
                                  RagRetrievalService ragRetrievalService,
                                  @Value("${penmate.storage.endpoint:http://localhost:9000}") String storageEndpoint) {
         this.ragDocumentRepository = ragDocumentRepository;
+        this.businessIdGenerator = businessIdGenerator;
         this.ragRetrievalService = ragRetrievalService;
         this.storageEndpoint = storageEndpoint;
     }
@@ -57,6 +61,7 @@ public class RagApplicationService {
         log.info("创建RAG文档: projectId={}, title={}, docType={}, operatorId={}",
                 projectId, command.title(), command.docType(), command.operatorId());
         RagDocument document = new RagDocument();
+        document.setDocumentId(businessIdGenerator.nextId());
         document.setProjectId(projectId);
         document.setDocType(command.docType());
         document.setTitle(command.title());
@@ -71,8 +76,8 @@ public class RagApplicationService {
             log.error("创建RAG文档失败: projectId={}, title={}, reason=insert_failed", projectId, command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create rag document");
         }
-        writeAudit(traceId, command.operatorId(), "rag", "create-document", "rag_documents", String.valueOf(document.getId()), command.title(), 201);
-        log.info("创建RAG文档成功: projectId={}, docId={}, title={}", projectId, document.getId(), document.getTitle());
+        writeAudit(traceId, command.operatorId(), "rag", "create-document", "rag_documents", String.valueOf(document.getDocumentId()), command.title(), 201);
+        log.info("创建RAG文档成功: projectId={}, docId={}, title={}", projectId, document.getDocumentId(), document.getTitle());
         return document;
     }
 
@@ -201,7 +206,7 @@ public class RagApplicationService {
         log.info("查询RAG索引状态: projectId={}, docId={}, parseStatus={}, indexStatus={}",
                 projectId, docId, document.getParseStatus(), document.getIndexStatus());
         return Map.of(
-                "docId", document.getId(),
+                "docId", document.getDocumentId(),
                 "parseStatus", document.getParseStatus(),
                 "indexStatus", document.getIndexStatus()
         );
@@ -224,7 +229,7 @@ public class RagApplicationService {
 
     private Map<String, Object> toRetrievalLogView(RagRetrievalLog log) {
         return Map.of(
-                "id", log.getId(),
+                "id", log.getRetrievalLogId(),
                 "projectId", log.getProjectId(),
                 "taskId", log.getTaskId(),
                 "queryText", log.getQueryText() == null ? "" : log.getQueryText(),

@@ -18,7 +18,7 @@ import java.util.List;
 public interface StyleProfileMapper {
 
     @Select("""
-            SELECT id, project_id, name, is_default, pace, tone, narrative_focus,
+            SELECT id, style_id, project_id, name, is_default, pace, tone, narrative_focus,
                    prompt_template, sample_text, created_at, updated_at, deleted_at
             FROM style_profiles
             WHERE project_id = #{projectId} AND deleted_at IS NULL
@@ -27,15 +27,15 @@ public interface StyleProfileMapper {
     List<StyleProfile> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, project_id, name, is_default, pace, tone, narrative_focus,
+            SELECT id, style_id, project_id, name, is_default, pace, tone, narrative_focus,
                    prompt_template, sample_text, created_at, updated_at, deleted_at
             FROM style_profiles
-            WHERE project_id = #{projectId} AND id = #{styleId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND style_id = #{styleId} AND deleted_at IS NULL
             """)
     StyleProfile findById(@Param("projectId") Long projectId, @Param("styleId") Long styleId);
 
     @Select("""
-            SELECT id, project_id, name, is_default, pace, tone, narrative_focus,
+            SELECT id, style_id, project_id, name, is_default, pace, tone, narrative_focus,
                    prompt_template, sample_text, created_at, updated_at, deleted_at
             FROM style_profiles
             WHERE project_id = #{projectId} AND is_default = 1 AND deleted_at IS NULL
@@ -44,8 +44,8 @@ public interface StyleProfileMapper {
     StyleProfile findDefaultByProjectId(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO style_profiles(project_id, name, is_default, pace, tone, narrative_focus, prompt_template, sample_text)
-            VALUES (#{projectId}, #{name}, #{isDefault}, #{pace}, #{tone}, #{narrativeFocus}, #{promptTemplate}, #{sampleText})
+            INSERT INTO style_profiles(style_id, project_id, name, is_default, pace, tone, narrative_focus, prompt_template, sample_text)
+            VALUES (#{styleId}, #{projectId}, #{name}, #{isDefault}, #{pace}, #{tone}, #{narrativeFocus}, #{promptTemplate}, #{sampleText})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(StyleProfile styleProfile);
@@ -58,7 +58,7 @@ public interface StyleProfileMapper {
                 narrative_focus = #{narrativeFocus},
                 prompt_template = #{promptTemplate},
                 sample_text = #{sampleText}
-            WHERE project_id = #{projectId} AND id = #{id} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND style_id = #{styleId} AND deleted_at IS NULL
             """)
     int update(StyleProfile styleProfile);
 
@@ -66,7 +66,7 @@ public interface StyleProfileMapper {
             UPDATE style_profiles
             SET deleted_at = CURRENT_TIMESTAMP(3),
                 is_default = 0
-            WHERE project_id = #{projectId} AND id = #{styleId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND style_id = #{styleId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("styleId") Long styleId);
 
@@ -80,15 +80,16 @@ public interface StyleProfileMapper {
     @Update("""
             UPDATE style_profiles
             SET is_default = 1
-            WHERE project_id = #{projectId} AND id = #{styleId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND style_id = #{styleId} AND deleted_at IS NULL
             """)
     int setDefault(@Param("projectId") Long projectId, @Param("styleId") Long styleId);
 
     @Insert("""
-            INSERT INTO style_switch_logs(project_id, from_style_id, to_style_id, switched_by, warning_confirmed, reason)
-            VALUES (#{projectId}, #{fromStyleId}, #{toStyleId}, #{switchedBy}, #{warningConfirmed}, #{reason})
+            INSERT INTO style_switch_logs(style_switch_log_id, project_id, from_style_id, to_style_id, switched_by, warning_confirmed, reason)
+            VALUES (#{switchLogId}, #{projectId}, #{fromStyleId}, #{toStyleId}, #{switchedBy}, #{warningConfirmed}, #{reason})
             """)
-    int insertSwitchLog(@Param("projectId") Long projectId,
+    int insertSwitchLog(@Param("switchLogId") Long switchLogId,
+                        @Param("projectId") Long projectId,
                         @Param("fromStyleId") Long fromStyleId,
                         @Param("toStyleId") Long toStyleId,
                         @Param("switchedBy") Long switchedBy,

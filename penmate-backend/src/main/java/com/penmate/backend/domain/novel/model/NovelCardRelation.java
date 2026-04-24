@@ -6,13 +6,15 @@ import lombok.Data;
  * 小说卡片关系实体。
  */
 public class NovelCardRelation {
-    /** 关系主键 ID。 */
+    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 所属项目 ID。 */
+    /** 关系业务 ID。 */
+    private Long cardRelationId;
+    /** 所属项目业务 ID。 */
     private Long projectId;
-    /** 起始卡片 ID。 */
+    /** 起始卡片业务 ID。 */
     private Long fromCardId;
-    /** 目标卡片 ID。 */
+    /** 目标卡片业务 ID。 */
     private Long toCardId;
     /** 关系类型。 */
     private String relationType;
