@@ -20,19 +20,19 @@
     }
   ],
   "paths": {
-    "/api/v1/users/{id}": {
+    "/api/v1/users/{userId}": {
       "get": {
         "tags": [
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询用户详情",
-        "description": "接口作用：用于RBAC 权限的查询用户详情。\n调用方式：GET /api/v1/users/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于RBAC 权限的查询用户详情。\n调用方式：GET /api/v1/users/{userId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "user",
         "parameters": [
           {
-            "name": "id",
+            "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于定位目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -43,7 +43,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -76,13 +76,13 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 更新用户",
-        "description": "接口作用：用于RBAC 权限的更新用户资料。\n调用方式：PUT /api/v1/users/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于RBAC 权限的更新用户资料。\n调用方式：PUT /api/v1/users/{userId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateUser",
         "parameters": [
           {
-            "name": "id",
+            "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于定位目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -93,7 +93,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -140,13 +140,13 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 删除用户",
-        "description": "接口作用：用于RBAC 权限的删除用户。\n调用方式：DELETE /api/v1/users/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于RBAC 权限的删除用户。\n调用方式：DELETE /api/v1/users/{userId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteUser",
         "parameters": [
           {
-            "name": "id",
+            "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于定位目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -157,7 +157,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -186,19 +186,19 @@
         }
       }
     },
-    "/api/v1/roles/{id}": {
+    "/api/v1/roles/{roleId}": {
       "put": {
         "tags": [
           "rbac-query-controller"
         ],
         "summary": "RBAC - 更新角色",
-        "description": "接口作用：用于RBAC 权限的更新角色。\n调用方式：PUT /api/v1/roles/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于RBAC 权限的更新角色。\n调用方式：PUT /api/v1/roles/{roleId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "updateRole",
         "parameters": [
           {
-            "name": "id",
+            "name": "roleId",
             "in": "path",
-            "description": "path参数：角色 ID，用于定位目标角色。",
+            "description": "path参数：角色业务 ID，用于绑定/解绑用户角色。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -209,7 +209,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -242,6 +242,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "roleId": 1,
                     "name": "示例值",
                     "code": "示例值",
                     "description": "示例值",
@@ -262,13 +263,13 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 删除角色",
-        "description": "接口作用：用于RBAC 权限的删除角色。\n调用方式：DELETE /api/v1/roles/{id}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于RBAC 权限的删除角色。\n调用方式：DELETE /api/v1/roles/{roleId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteRole",
         "parameters": [
           {
-            "name": "id",
+            "name": "roleId",
             "in": "path",
-            "description": "path参数：角色 ID，用于定位目标角色。",
+            "description": "path参数：角色业务 ID，用于绑定/解绑用户角色。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -279,7 +280,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -320,7 +321,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -331,7 +332,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -350,6 +351,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "projectId": 1,
                     "ownerUserId": 1,
                     "title": "示例值",
                     "summary": "示例值",
@@ -379,7 +381,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -390,7 +392,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -424,6 +426,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "projectId": 1,
                     "ownerUserId": 1,
                     "title": "示例值",
                     "summary": "示例值",
@@ -453,7 +456,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -464,7 +467,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -475,7 +478,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -516,7 +519,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -527,7 +530,7 @@
           {
             "name": "volumeId",
             "in": "path",
-            "description": "path参数：分卷 ID，用于定位章节所在分卷。",
+            "description": "path参数：分卷业务 ID，用于定位章节所在分卷。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -538,7 +541,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -549,7 +552,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -583,6 +586,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "volumeId": 1,
                     "projectId": 1,
                     "title": "示例值",
                     "sortOrder": 1,
@@ -612,7 +616,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -623,7 +627,7 @@
           {
             "name": "volumeId",
             "in": "path",
-            "description": "path参数：分卷 ID，用于定位章节所在分卷。",
+            "description": "path参数：分卷业务 ID，用于定位章节所在分卷。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -634,7 +638,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -645,7 +649,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -686,7 +690,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -697,7 +701,7 @@
           {
             "name": "styleId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -708,7 +712,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -727,6 +731,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "styleId": 1,
                     "projectId": 1,
                     "name": "示例值",
                     "isDefault": true,
@@ -760,7 +765,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -771,7 +776,7 @@
           {
             "name": "styleId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -782,7 +787,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -793,7 +798,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -830,6 +835,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "styleId": 1,
                     "projectId": 1,
                     "name": "示例值",
                     "isDefault": true,
@@ -863,7 +869,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -874,7 +880,7 @@
           {
             "name": "styleId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -885,7 +891,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -896,7 +902,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -937,7 +943,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -948,7 +954,7 @@
           {
             "name": "nodeId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -959,7 +965,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -970,7 +976,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1006,6 +1012,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "outlineNodeId": 1,
                     "projectId": 1,
                     "parentId": 1,
                     "title": "示例值",
@@ -1034,7 +1041,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1045,7 +1052,7 @@
           {
             "name": "nodeId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1056,7 +1063,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1067,7 +1074,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1096,19 +1103,19 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/model-policies/{policyId}": {
+    "/api/v1/novels/{projectId}/model-policies/{configId}": {
       "put": {
         "tags": [
           "model-controller"
         ],
-        "summary": "模型策略 - 更新项目策略",
-        "description": "接口作用：用于小说项目的更新模型策略。\n调用方式：PUT /api/v1/novels/{projectId}/model-policies/{policyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
-        "operationId": "updatePolicy",
+        "summary": "模型策略(兼容) - 更新项目策略",
+        "description": "接口作用：用于小说项目的更新模型策略。\n调用方式：PUT /api/v1/novels/{projectId}/model-policies/{configId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "updateConfig",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1117,9 +1124,9 @@
             }
           },
           {
-            "name": "policyId",
+            "name": "configId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：模型配置业务 ID，用于定位项目模型配置。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1130,7 +1137,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1141,7 +1148,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1159,7 +1166,10 @@
                 "policyName": "示例值",
                 "scene": "示例值",
                 "providerModelId": 1,
+                "modelName": "示例值",
+                "baseUrl": "示例值",
                 "userKeyId": 1,
+                "officialKeyId": 1,
                 "temperature": 1,
                 "topP": 1,
                 "maxTokens": 1,
@@ -1194,14 +1204,14 @@
         "tags": [
           "model-controller"
         ],
-        "summary": "模型策略 - 删除项目策略",
-        "description": "接口作用：用于小说项目的删除模型策略。\n调用方式：DELETE /api/v1/novels/{projectId}/model-policies/{policyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
-        "operationId": "deletePolicy",
+        "summary": "模型策略(兼容) - 删除项目策略",
+        "description": "接口作用：用于小说项目的删除模型策略。\n调用方式：DELETE /api/v1/novels/{projectId}/model-policies/{configId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "deleteConfig",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1210,9 +1220,9 @@
             }
           },
           {
-            "name": "policyId",
+            "name": "configId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：模型配置业务 ID，用于定位项目模型配置。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1223,7 +1233,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1234,7 +1244,177 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{projectId}/model-configs/{configId}": {
+      "put": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 更新项目模型配置",
+        "description": "接口作用：用于小说项目的更新数据。\n调用方式：PUT /api/v1/novels/{projectId}/model-configs/{configId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "updateConfig_1",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "configId",
+            "in": "path",
+            "description": "path参数：模型配置业务 ID，用于定位项目模型配置。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModelPolicyDto"
+              },
+              "example": {
+                "policyName": "示例值",
+                "scene": "示例值",
+                "providerModelId": 1,
+                "modelName": "示例值",
+                "baseUrl": "示例值",
+                "userKeyId": 1,
+                "officialKeyId": 1,
+                "temperature": 1,
+                "topP": 1,
+                "maxTokens": 1,
+                "fallbackPolicyJson": "示例值",
+                "isDefault": true
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 删除项目模型配置",
+        "description": "接口作用：用于小说项目的删除数据。\n调用方式：DELETE /api/v1/novels/{projectId}/model-configs/{configId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "deleteConfig_1",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "configId",
+            "in": "path",
+            "description": "path参数：模型配置业务 ID，用于定位项目模型配置。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1275,7 +1455,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1286,7 +1466,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1297,7 +1477,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1316,6 +1496,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterId": 1,
                     "projectId": 1,
                     "volumeId": 1,
                     "outlineNodeId": 1,
@@ -1355,7 +1536,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1366,7 +1547,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1377,7 +1558,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1388,7 +1569,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1431,6 +1612,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterId": 1,
                     "projectId": 1,
                     "volumeId": 1,
                     "outlineNodeId": 1,
@@ -1470,7 +1652,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1481,7 +1663,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1492,7 +1674,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1503,7 +1685,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1544,7 +1726,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1555,7 +1737,7 @@
           {
             "name": "cardId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1566,7 +1748,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1585,6 +1767,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "cardId": 1,
                     "projectId": 1,
                     "cardType": "示例值",
                     "name": "示例值",
@@ -1612,7 +1795,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1623,7 +1806,7 @@
           {
             "name": "cardId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1634,7 +1817,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1645,7 +1828,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1680,6 +1863,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "cardId": 1,
                     "projectId": 1,
                     "cardType": "示例值",
                     "name": "示例值",
@@ -1707,7 +1891,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1718,7 +1902,7 @@
           {
             "name": "cardId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1729,7 +1913,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1740,7 +1924,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1781,7 +1965,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1822,7 +2006,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1867,19 +2051,19 @@
         }
       }
     },
-    "/api/v1/users/{id}/roles": {
+    "/api/v1/users/{userId}/roles": {
       "post": {
         "tags": [
           "rbac-query-controller"
         ],
         "summary": "RBAC - 为用户绑定角色",
-        "description": "接口作用：为指定用户绑定角色。\n关键字段：id（用户 ID）、roleId（角色 ID）。\n业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：为指定用户绑定角色。\n关键字段：userId（用户业务 ID）、roleId（角色业务 ID）。\n业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "assignRole",
         "parameters": [
           {
-            "name": "id",
+            "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于定位目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1890,7 +2074,7 @@
           {
             "name": "roleId",
             "in": "query",
-            "description": "query参数：角色 ID，用于绑定/解绑用户角色。",
+            "description": "query参数：角色业务 ID，用于绑定/解绑用户角色。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -1901,7 +2085,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1942,7 +2126,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -1962,6 +2146,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "roleId": 1,
                       "name": "示例值",
                       "code": "示例值",
                       "description": "示例值",
@@ -1989,7 +2174,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2024,6 +2209,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "roleId": 1,
                     "name": "示例值",
                     "code": "示例值",
                     "description": "示例值",
@@ -2040,19 +2226,19 @@
         }
       }
     },
-    "/api/v1/roles/{id}/permissions": {
+    "/api/v1/roles/{roleId}/permissions": {
       "post": {
         "tags": [
           "rbac-query-controller"
         ],
         "summary": "RBAC - 为角色绑定权限",
-        "description": "接口作用：为指定角色绑定权限。\n关键字段：id（角色 ID）、permissionId（权限 ID）。\n业务规则：绑定后所有拥有该角色的用户获得对应权限。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：为指定角色绑定权限。\n关键字段：roleId（角色业务 ID）、permissionId（权限业务 ID）。\n业务规则：绑定后所有拥有该角色的用户获得对应权限。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "assignPermission",
         "parameters": [
           {
-            "name": "id",
+            "name": "roleId",
             "in": "path",
-            "description": "path参数：角色 ID，用于定位目标角色。",
+            "description": "path参数：角色业务 ID，用于绑定/解绑用户角色。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2074,7 +2260,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2115,7 +2301,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2135,6 +2321,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "projectId": 1,
                       "ownerUserId": 1,
                       "title": "示例值",
                       "summary": "示例值",
@@ -2165,7 +2352,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2200,6 +2387,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "projectId": 1,
                     "ownerUserId": 1,
                     "title": "示例值",
                     "summary": "示例值",
@@ -2231,7 +2419,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2242,7 +2430,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2262,6 +2450,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "volumeId": 1,
                       "projectId": 1,
                       "title": "示例值",
                       "sortOrder": 1,
@@ -2292,7 +2481,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2303,7 +2492,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2314,7 +2503,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2348,6 +2537,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "volumeId": 1,
                     "projectId": 1,
                     "title": "示例值",
                     "sortOrder": 1,
@@ -2379,7 +2569,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2390,7 +2580,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2410,6 +2600,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "styleId": 1,
                       "projectId": 1,
                       "name": "示例值",
                       "isDefault": true,
@@ -2444,7 +2635,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2455,7 +2646,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2466,7 +2657,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2504,6 +2695,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "styleId": 1,
                     "projectId": 1,
                     "name": "示例值",
                     "isDefault": true,
@@ -2539,7 +2731,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2550,7 +2742,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2561,7 +2753,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2595,6 +2787,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "styleId": 1,
                     "projectId": 1,
                     "name": "示例值",
                     "isDefault": true,
@@ -2630,7 +2823,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2641,7 +2834,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2652,7 +2845,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2706,7 +2899,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2717,7 +2910,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2737,6 +2930,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "documentId": 1,
                       "projectId": 1,
                       "docType": "示例值",
                       "title": "示例值",
@@ -2771,7 +2965,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2782,7 +2976,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2793,7 +2987,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2830,6 +3024,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "documentId": 1,
                     "projectId": 1,
                     "docType": "示例值",
                     "title": "示例值",
@@ -2853,19 +3048,19 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/rag/documents/{docId}/parse": {
+    "/api/v1/novels/{projectId}/rag/documents/{documentId}/parse": {
       "post": {
         "tags": [
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 创建数据",
-        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{docId}/parse。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{documentId}/parse。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "parseDocument",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2874,9 +3069,9 @@
             }
           },
           {
-            "name": "docId",
+            "name": "documentId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2887,7 +3082,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2898,7 +3093,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -2917,6 +3112,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "documentId": 1,
                     "projectId": 1,
                     "docType": "示例值",
                     "title": "示例值",
@@ -2940,19 +3136,19 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/rag/documents/{docId}/embed": {
+    "/api/v1/novels/{projectId}/rag/documents/{documentId}/embed": {
       "post": {
         "tags": [
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 创建数据",
-        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{docId}/embed。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于知识库（RAG）的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/rag/documents/{documentId}/embed。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "embedDocument",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2961,9 +3157,9 @@
             }
           },
           {
-            "name": "docId",
+            "name": "documentId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2974,7 +3170,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2985,7 +3181,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3004,6 +3200,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "documentId": 1,
                     "projectId": 1,
                     "docType": "示例值",
                     "title": "示例值",
@@ -3039,7 +3236,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3050,7 +3247,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3091,7 +3288,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3102,7 +3299,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3113,7 +3310,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3169,7 +3366,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3180,7 +3377,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3191,7 +3388,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3227,6 +3424,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "outlineNodeId": 1,
                     "projectId": 1,
                     "parentId": 1,
                     "title": "示例值",
@@ -3245,19 +3443,41 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/model-policies": {
-      "get": {
+    "/api/v1/novels/{projectId}/model-policies/{configId}/set-default": {
+      "post": {
         "tags": [
           "model-controller"
         ],
-        "summary": "模型策略 - 查询项目策略列表",
-        "description": "接口作用：用于小说项目的查询模型策略。\n调用方式：GET /api/v1/novels/{projectId}/model-policies。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
-        "operationId": "listPolicies",
+        "summary": "模型策略(兼容) - 设置默认策略",
+        "description": "接口作用：将指定策略设为当前项目默认策略。\n业务规则：同一项目仅允许一个默认策略。\n关键入参：projectId、configId、operatorId（均为业务语义 ID）。\n返回说明：data 为 updated。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "setDefaultConfig",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "configId",
+            "in": "path",
+            "description": "path参数：模型配置业务 ID，用于定位项目模型配置。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3268,7 +3488,133 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{projectId}/model-configs/{configId}/set-default": {
+      "post": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 设置项目默认模型配置",
+        "description": "接口作用：用于小说项目的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/model-configs/{configId}/set-default。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "setDefaultConfig_1",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "configId",
+            "in": "path",
+            "description": "path参数：模型配置业务 ID，用于定位项目模型配置。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{projectId}/model-configs": {
+      "get": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 查询项目模型配置列表",
+        "description": "接口作用：用于小说项目的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/model-configs。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "listConfigs",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3288,11 +3634,15 @@
                   "data": [
                     {
                       "id": 1,
+                      "projectPolicyId": 1,
                       "projectId": 1,
                       "policyName": "示例值",
                       "scene": "示例值",
                       "providerModelId": 1,
+                      "modelName": "示例值",
+                      "baseUrl": "示例值",
                       "userKeyId": 1,
+                      "officialKeyId": 1,
                       "temperature": 1,
                       "topP": 1,
                       "maxTokens": 1,
@@ -3317,14 +3667,14 @@
         "tags": [
           "model-controller"
         ],
-        "summary": "模型策略 - 新增项目策略",
-        "description": "接口作用：为项目新增模型调用策略。\n业务规则：策略按 scene 绑定模型、密钥与采样参数；可设置默认策略。\n关键入参：providerModelId、userKeyId、temperature、topP、maxTokens。\n返回说明：data 为 created。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
-        "operationId": "createPolicy",
+        "summary": "模型配置 - 新增项目模型配置",
+        "description": "接口作用：用于小说项目的创建数据。\n调用方式：POST /api/v1/novels/{projectId}/model-configs。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "createConfig",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3335,7 +3685,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3346,7 +3696,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3364,7 +3714,10 @@
                 "policyName": "示例值",
                 "scene": "示例值",
                 "providerModelId": 1,
+                "modelName": "示例值",
+                "baseUrl": "示例值",
                 "userKeyId": 1,
+                "officialKeyId": 1,
                 "temperature": 1,
                 "topP": 1,
                 "maxTokens": 1,
@@ -3396,41 +3749,19 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/model-policies/{policyId}/set-default": {
-      "post": {
+    "/api/v1/novels/{projectId}/model-policies": {
+      "get": {
         "tags": [
           "model-controller"
         ],
-        "summary": "模型策略 - 设置默认策略",
-        "description": "接口作用：将指定策略设为当前项目默认策略。\n业务规则：同一项目仅允许一个默认策略。\n关键入参：projectId、policyId、operatorId。\n返回说明：data 为 updated。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
-        "operationId": "setDefaultPolicy",
+        "summary": "模型策略(兼容) - 查询项目策略列表",
+        "description": "接口作用：用于小说项目的查询模型策略。\n调用方式：GET /api/v1/novels/{projectId}/model-policies。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "listConfigs_1",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "example": 1
-            }
-          },
-          {
-            "name": "policyId",
-            "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "example": 1
-            }
-          },
-          {
-            "name": "operatorId",
-            "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3441,7 +3772,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3449,6 +3780,112 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListModelProjectPolicy"
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": 1,
+                      "projectPolicyId": 1,
+                      "projectId": 1,
+                      "policyName": "示例值",
+                      "scene": "示例值",
+                      "providerModelId": 1,
+                      "modelName": "示例值",
+                      "baseUrl": "示例值",
+                      "userKeyId": 1,
+                      "officialKeyId": 1,
+                      "temperature": 1,
+                      "topP": 1,
+                      "maxTokens": 1,
+                      "fallbackPolicyJson": "示例值",
+                      "isDefault": true,
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
+                    }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型策略(兼容) - 新增项目策略",
+        "description": "接口作用：为项目新增模型调用策略。\n业务规则：策略按 scene 绑定模型、密钥与采样参数；可设置默认策略。\n关键入参：providerModelId、userKeyId、temperature、topP、maxTokens。\n返回说明：data 为 created。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "createConfig_1",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModelPolicyDto"
+              },
+              "example": {
+                "policyName": "示例值",
+                "scene": "示例值",
+                "providerModelId": 1,
+                "modelName": "示例值",
+                "baseUrl": "示例值",
+                "userKeyId": 1,
+                "officialKeyId": 1,
+                "temperature": 1,
+                "topP": 1,
+                "maxTokens": 1,
+                "fallbackPolicyJson": "示例值",
+                "isDefault": true
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -3482,7 +3919,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3493,7 +3930,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3539,7 +3976,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3550,7 +3987,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3561,7 +3998,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3621,7 +4058,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3632,7 +4069,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3652,6 +4089,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "chapterId": 1,
                       "projectId": 1,
                       "volumeId": 1,
                       "outlineNodeId": 1,
@@ -3692,7 +4130,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3703,7 +4141,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3714,7 +4152,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3757,6 +4195,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterId": 1,
                     "projectId": 1,
                     "volumeId": 1,
                     "outlineNodeId": 1,
@@ -3798,7 +4237,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3809,7 +4248,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3820,7 +4259,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3840,6 +4279,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "chapterVersionId": 1,
                       "chapterId": 1,
                       "versionNo": 1,
                       "changeType": "示例值",
@@ -3873,7 +4313,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3884,7 +4324,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3895,7 +4335,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -3929,6 +4369,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterVersionId": 1,
                     "chapterId": 1,
                     "versionNo": 1,
                     "changeType": "示例值",
@@ -3963,7 +4404,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3974,7 +4415,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -3996,7 +4437,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4007,7 +4448,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4026,6 +4467,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterId": 1,
                     "projectId": 1,
                     "volumeId": 1,
                     "outlineNodeId": 1,
@@ -4067,7 +4509,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4078,7 +4520,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4089,7 +4531,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4100,7 +4542,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4141,7 +4583,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4152,7 +4594,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4163,7 +4605,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4204,7 +4646,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4215,7 +4657,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4226,7 +4668,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4237,7 +4679,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4256,7 +4698,8 @@
                 "etag": "示例值",
                 "size": 1,
                 "checksum": "示例值",
-                "storageProvider": "示例值"
+                "storageProvider": "示例值",
+                "content": "示例值"
               }
             }
           },
@@ -4273,6 +4716,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterId": 1,
                     "projectId": 1,
                     "volumeId": 1,
                     "outlineNodeId": 1,
@@ -4314,7 +4758,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4325,7 +4769,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4345,6 +4789,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "cardId": 1,
                       "projectId": 1,
                       "cardType": "示例值",
                       "name": "示例值",
@@ -4373,7 +4818,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4384,7 +4829,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4395,7 +4840,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4430,6 +4875,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "cardId": 1,
                     "projectId": 1,
                     "cardType": "示例值",
                     "name": "示例值",
@@ -4459,7 +4905,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4470,7 +4916,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4490,6 +4936,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "cardRelationId": 1,
                       "projectId": 1,
                       "fromCardId": 1,
                       "toCardId": 1,
@@ -4518,7 +4965,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4529,7 +4976,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4540,7 +4987,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4575,6 +5022,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "cardRelationId": 1,
                     "projectId": 1,
                     "fromCardId": 1,
                     "toCardId": 1,
@@ -4604,7 +5052,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4625,7 +5073,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4645,6 +5093,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "approvalRequestId": 1,
                       "projectId": 1,
                       "taskId": 1,
                       "approvalType": "示例值",
@@ -4680,7 +5129,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4691,7 +5140,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4728,6 +5177,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "approvalRequestId": 1,
                     "projectId": 1,
                     "taskId": 1,
                     "approvalType": "示例值",
@@ -4764,7 +5214,7 @@
           {
             "name": "approvalId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：审批单业务 ID，用于定位审批请求。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4775,7 +5225,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4830,7 +5280,7 @@
           {
             "name": "approvalId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：审批单业务 ID，用于定位审批请求。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4841,7 +5291,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4896,7 +5346,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4907,7 +5357,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -4918,7 +5368,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -4935,6 +5385,7 @@
               "example": {
                 "conversationId": 1,
                 "chapterId": 1,
+                "modelConfigId": 1,
                 "taskType": "示例值",
                 "promptSnapshot": "示例值",
                 "styleProfileSnapshot": "示例值",
@@ -4955,13 +5406,18 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "taskId": 1,
                     "projectId": 1,
                     "conversationId": 1,
                     "chapterId": 1,
+                    "modelConfigId": 1,
                     "taskType": "示例值",
                     "promptSnapshot": "示例值",
                     "styleProfileSnapshot": "示例值",
                     "pluginSnapshot": "示例值",
+                    "tokenUsageJson": "示例值",
+                    "costJson": "示例值",
+                    "traceId": "示例值",
                     "status": "示例值",
                     "startedAt": "2026-01-01T08:00:00Z",
                     "finishedAt": "2026-01-01T08:00:00Z",
@@ -4991,7 +5447,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5002,7 +5458,7 @@
           {
             "name": "taskId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5013,7 +5469,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5024,7 +5480,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5055,13 +5511,18 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "taskId": 1,
                     "projectId": 1,
                     "conversationId": 1,
                     "chapterId": 1,
+                    "modelConfigId": 1,
                     "taskType": "示例值",
                     "promptSnapshot": "示例值",
                     "styleProfileSnapshot": "示例值",
                     "pluginSnapshot": "示例值",
+                    "tokenUsageJson": "示例值",
+                    "costJson": "示例值",
+                    "traceId": "示例值",
                     "status": "示例值",
                     "startedAt": "2026-01-01T08:00:00Z",
                     "finishedAt": "2026-01-01T08:00:00Z",
@@ -5091,7 +5552,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5102,7 +5563,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5122,6 +5583,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "conversationId": 1,
                       "projectId": 1,
                       "userId": 1,
                       "title": "示例值",
@@ -5154,7 +5616,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5165,7 +5627,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5176,7 +5638,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5211,6 +5673,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "conversationId": 1,
                     "projectId": 1,
                     "userId": 1,
                     "title": "示例值",
@@ -5244,7 +5707,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5255,7 +5718,7 @@
           {
             "name": "conversationId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5266,7 +5729,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5286,6 +5749,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "messageId": 1,
                       "conversationId": 1,
                       "role": "示例值",
                       "userMessageType": "示例值",
@@ -5317,7 +5781,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5328,7 +5792,7 @@
           {
             "name": "conversationId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5339,7 +5803,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5350,7 +5814,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5386,6 +5850,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "messageId": 1,
                     "conversationId": 1,
                     "role": "示例值",
                     "userMessageType": "示例值",
@@ -5395,6 +5860,129 @@
                     "seqNo": 1,
                     "createdAt": "2026-01-01T08:00:00Z"
                   },
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model/official-keys": {
+      "get": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 查询官方 API Key 列表",
+        "description": "接口作用：用于通用业务的查询数据。\n调用方式：GET /api/v1/model/official-keys。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "listOfficialKeys",
+        "parameters": [
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListModelOfficialApiKey"
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": 1,
+                      "officialApiKeyId": 1,
+                      "providerId": 1,
+                      "keyName": "示例值",
+                      "encryptedApiKey": "示例值",
+                      "maskedApiKey": "示例值",
+                      "isDefault": true,
+                      "lastUsedAt": "2026-01-01T08:00:00Z",
+                      "status": "示例值",
+                      "createdAt": "2026-01-01T08:00:00Z",
+                      "updatedAt": "2026-01-01T08:00:00Z",
+                      "deletedAt": "2026-01-01T08:00:00Z"
+                    }
+                  ],
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 新增官方 API Key",
+        "description": "接口作用：用于通用业务的创建数据。\n调用方式：POST /api/v1/model/official-keys。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "createOfficialKey",
+        "parameters": [
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateModelKeyDto"
+              },
+              "example": {
+                "providerId": 1,
+                "keyName": "示例值",
+                "apiKey": "示例值",
+                "isDefault": true,
+                "status": "示例值"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
                   "meta": {
                     "traceId": "示例值",
                     "timestamp": "示例值"
@@ -5418,7 +6006,7 @@
           {
             "name": "userId",
             "in": "query",
-            "description": "query参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "query参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5429,7 +6017,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5449,6 +6037,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "userApiKeyId": 1,
                       "userId": 1,
                       "providerId": 1,
                       "keyName": "示例值",
@@ -5483,7 +6072,7 @@
           {
             "name": "userId",
             "in": "query",
-            "description": "query参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "query参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5494,7 +6083,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5505,7 +6094,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5563,7 +6152,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5574,7 +6163,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5593,6 +6182,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "migrationId": 1,
                     "migrationType": "示例值",
                     "status": "示例值",
                     "progressPct": 1,
@@ -5626,7 +6216,7 @@
           {
             "name": "jobId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5637,7 +6227,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5648,7 +6238,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5667,6 +6257,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "jobId": 1,
                     "jobType": "示例值",
                     "bizKey": "示例值",
                     "status": "示例值",
@@ -5699,7 +6290,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5763,7 +6354,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5804,7 +6395,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5859,7 +6450,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5880,7 +6471,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5891,7 +6482,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -5930,7 +6521,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5951,7 +6542,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -5962,7 +6553,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6017,7 +6608,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6028,7 +6619,7 @@
           {
             "name": "nodeId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6039,7 +6630,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6050,7 +6641,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6105,7 +6696,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6116,7 +6707,7 @@
           {
             "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6127,7 +6718,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6138,7 +6729,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6177,7 +6768,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6188,7 +6779,7 @@
           {
             "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6199,7 +6790,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6210,7 +6801,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6257,6 +6848,146 @@
         }
       }
     },
+    "/api/v1/model/official-keys/{keyId}": {
+      "delete": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 删除官方 API Key",
+        "description": "接口作用：用于通用业务的删除数据。\n调用方式：DELETE /api/v1/model/official-keys/{keyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "deleteOfficialKey",
+        "parameters": [
+          {
+            "name": "keyId",
+            "in": "path",
+            "description": "path参数：密钥业务 ID，用于定位用户密钥或官方密钥记录。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "model-controller"
+        ],
+        "summary": "模型配置 - 更新官方 API Key",
+        "description": "接口作用：用于通用业务的更新数据。\n调用方式：PATCH /api/v1/model/official-keys/{keyId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "operationId": "updateOfficialKey",
+        "parameters": [
+          {
+            "name": "keyId",
+            "in": "path",
+            "description": "path参数：密钥业务 ID，用于定位用户密钥或官方密钥记录。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "operatorId",
+            "in": "query",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "example": 1
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "示例值"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateModelKeyDto"
+              },
+              "example": {
+                "keyName": "示例值",
+                "apiKey": "示例值",
+                "isDefault": true,
+                "status": "示例值"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                },
+                "example": {
+                  "data": "示例值",
+                  "meta": {
+                    "traceId": "示例值",
+                    "timestamp": "示例值"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/model/keys/{keyId}": {
       "delete": {
         "tags": [
@@ -6269,7 +7000,7 @@
           {
             "name": "keyId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：密钥业务 ID，用于定位用户密钥或官方密钥记录。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6280,7 +7011,7 @@
           {
             "name": "userId",
             "in": "query",
-            "description": "query参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "query参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6291,7 +7022,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6302,7 +7033,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6341,7 +7072,7 @@
           {
             "name": "keyId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：密钥业务 ID，用于定位用户密钥或官方密钥记录。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6352,7 +7083,7 @@
           {
             "name": "userId",
             "in": "query",
-            "description": "query参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "query参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6363,7 +7094,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6374,7 +7105,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6425,13 +7156,13 @@
           "rbac-query-controller"
         ],
         "summary": "RBAC - 查询用户可见菜单",
-        "description": "接口作用：按用户维度计算最终可见菜单。\n关键字段：userId（目标用户 ID）。\n业务规则：菜单由用户绑定角色后聚合出的权限结果决定。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：按用户维度计算最终可见菜单。\n关键字段：userId（目标用户业务 ID）。\n业务规则：菜单由用户绑定角色后聚合出的权限结果决定。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "profileMenus",
         "parameters": [
           {
             "name": "userId",
             "in": "query",
-            "description": "query参数：用户 ID，用于查询该用户最终可见菜单（含角色聚合后权限）。",
+            "description": "query参数：用户业务 ID，用于查询该用户最终可见菜单（含角色聚合后权限）。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6442,7 +7173,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6462,6 +7193,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "menuId": 1,
                       "parentId": 1,
                       "title": "示例值",
                       "path": "示例值",
@@ -6493,7 +7225,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6513,6 +7245,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "pluginId": 1,
                       "code": "示例值",
                       "name": "示例值",
                       "category": "示例值",
@@ -6556,7 +7289,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6575,6 +7308,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "pluginId": 1,
                     "code": "示例值",
                     "name": "示例值",
                     "category": "示例值",
@@ -6607,7 +7341,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6627,6 +7361,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "permissionId": 1,
                       "name": "示例值",
                       "code": "示例值",
                       "module": "示例值",
@@ -6656,7 +7391,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6667,7 +7402,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6698,19 +7433,19 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/rag/documents/{docId}": {
+    "/api/v1/novels/{projectId}/rag/documents/{documentId}": {
       "get": {
         "tags": [
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 查询RAG 文档",
-        "description": "接口作用：用于知识库（RAG）的查询RAG 文档。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{docId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于知识库（RAG）的查询RAG 文档。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{documentId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "getDocument",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6719,9 +7454,9 @@
             }
           },
           {
-            "name": "docId",
+            "name": "documentId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6732,7 +7467,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6751,6 +7486,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "documentId": 1,
                     "projectId": 1,
                     "docType": "示例值",
                     "title": "示例值",
@@ -6778,13 +7514,13 @@
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 删除RAG 文档",
-        "description": "接口作用：用于知识库（RAG）的删除RAG 文档。\n调用方式：DELETE /api/v1/novels/{projectId}/rag/documents/{docId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于知识库（RAG）的删除RAG 文档。\n调用方式：DELETE /api/v1/novels/{projectId}/rag/documents/{documentId}。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "deleteDocument",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6793,9 +7529,9 @@
             }
           },
           {
-            "name": "docId",
+            "name": "documentId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6806,7 +7542,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6817,7 +7553,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6846,19 +7582,19 @@
         }
       }
     },
-    "/api/v1/novels/{projectId}/rag/documents/{docId}/index-status": {
+    "/api/v1/novels/{projectId}/rag/documents/{documentId}/index-status": {
       "get": {
         "tags": [
           "rag-controller"
         ],
         "summary": "知识库（RAG） - 查询数据",
-        "description": "接口作用：用于知识库（RAG）的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{docId}/index-status。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
+        "description": "接口作用：用于知识库（RAG）的查询数据。\n调用方式：GET /api/v1/novels/{projectId}/rag/documents/{documentId}/index-status。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
         "operationId": "indexStatus",
         "parameters": [
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6867,9 +7603,9 @@
             }
           },
           {
-            "name": "docId",
+            "name": "documentId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6880,7 +7616,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6921,7 +7657,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6932,7 +7668,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -6952,6 +7688,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "pluginInstallId": 1,
                       "projectId": 1,
                       "pluginId": 1,
                       "pluginCode": "示例值",
@@ -6987,7 +7724,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -6998,7 +7735,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7018,7 +7755,9 @@
                   "data": [
                     {
                       "id": 1,
+                      "pluginCallLogId": 1,
                       "projectId": 1,
+                      "taskId": 1,
                       "pluginCode": "示例值",
                       "toolName": "示例值",
                       "requestJson": "示例值",
@@ -7052,7 +7791,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7063,7 +7802,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7083,6 +7822,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "outlineNodeId": 1,
                       "projectId": 1,
                       "parentId": 1,
                       "title": "示例值",
@@ -7114,7 +7854,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7125,7 +7865,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7147,7 +7887,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7166,6 +7906,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "chapterVersionId": 1,
                     "chapterId": 1,
                     "versionNo": 1,
                     "changeType": "示例值",
@@ -7200,7 +7941,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7211,7 +7952,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7233,7 +7974,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7274,7 +8015,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7285,7 +8026,7 @@
           {
             "name": "chapterId",
             "in": "path",
-            "description": "path参数：章节 ID，用于定位具体章节。",
+            "description": "path参数：章节业务 ID，用于定位具体章节。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7296,7 +8037,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7337,7 +8078,7 @@
           {
             "name": "approvalId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：审批单业务 ID，用于定位审批请求。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7348,7 +8089,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7367,6 +8108,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "approvalRequestId": 1,
                     "projectId": 1,
                     "taskId": 1,
                     "approvalType": "示例值",
@@ -7403,7 +8145,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7414,7 +8156,7 @@
           {
             "name": "taskId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7425,7 +8167,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7444,13 +8186,18 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "taskId": 1,
                     "projectId": 1,
                     "conversationId": 1,
                     "chapterId": 1,
+                    "modelConfigId": 1,
                     "taskType": "示例值",
                     "promptSnapshot": "示例值",
                     "styleProfileSnapshot": "示例值",
                     "pluginSnapshot": "示例值",
+                    "tokenUsageJson": "示例值",
+                    "costJson": "示例值",
+                    "traceId": "示例值",
                     "status": "示例值",
                     "startedAt": "2026-01-01T08:00:00Z",
                     "finishedAt": "2026-01-01T08:00:00Z",
@@ -7480,7 +8227,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7491,7 +8238,7 @@
           {
             "name": "taskId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7502,7 +8249,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7539,7 +8286,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7559,6 +8306,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "providerId": 1,
                       "code": "示例值",
                       "name": "示例值",
                       "baseUrl": "示例值",
@@ -7566,69 +8314,6 @@
                       "status": "示例值",
                       "createdAt": "2026-01-01T08:00:00Z",
                       "updatedAt": "2026-01-01T08:00:00Z"
-                    }
-                  ],
-                  "meta": {
-                    "traceId": "示例值",
-                    "timestamp": "示例值"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/model/providers/{providerCode}/models": {
-      "get": {
-        "tags": [
-          "model-controller"
-        ],
-        "summary": "模型配置 - 查询服务商可用模型",
-        "description": "接口作用：按服务商编码查询可用模型清单。\n典型场景：用户选择 provider 后，联动加载 model 列表。\n关键入参：providerCode（服务商唯一编码）。\n返回说明：data 为 ModelProviderModel 数组。\n返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。",
-        "operationId": "listProviderModels",
-        "parameters": [
-          {
-            "name": "providerCode",
-            "in": "path",
-            "description": "path参数：模型服务商编码（唯一标识），用于查询该服务商支持的模型列表。",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "example": "示例值"
-            }
-          },
-          {
-            "name": "X-Trace-Id",
-            "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "example": "示例值"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListModelProviderModel"
-                },
-                "example": {
-                  "data": [
-                    {
-                      "id": 1,
-                      "providerId": 1,
-                      "modelCode": "示例值",
-                      "modelName": "示例值",
-                      "contextWindow": 1,
-                      "maxOutput": 1,
-                      "pricingJson": "示例值",
-                      "status": "示例值",
-                      "createdAt": "2026-01-01T08:00:00Z"
                     }
                   ],
                   "meta": {
@@ -7654,7 +8339,7 @@
           {
             "name": "migrationId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7665,7 +8350,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7684,6 +8369,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "migrationId": 1,
                     "migrationType": "示例值",
                     "status": "示例值",
                     "progressPct": 1,
@@ -7717,7 +8403,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7737,6 +8423,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "menuId": 1,
                       "parentId": 1,
                       "title": "示例值",
                       "path": "示例值",
@@ -7788,7 +8475,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7808,6 +8495,7 @@
                   "data": [
                     {
                       "id": 1,
+                      "jobId": 1,
                       "jobType": "示例值",
                       "bizKey": "示例值",
                       "status": "示例值",
@@ -7841,7 +8529,7 @@
           {
             "name": "jobId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7852,7 +8540,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7871,6 +8559,7 @@
                 "example": {
                   "data": {
                     "id": 1,
+                    "jobId": 1,
                     "jobType": "示例值",
                     "bizKey": "示例值",
                     "status": "示例值",
@@ -7913,7 +8602,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -7954,7 +8643,7 @@
           {
             "name": "userId",
             "in": "path",
-            "description": "path参数：用户 ID，用于标识操作用户或目标用户。",
+            "description": "path参数：用户业务 ID，用于标识操作用户或目标用户。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7965,7 +8654,7 @@
           {
             "name": "roleId",
             "in": "path",
-            "description": "path参数：角色 ID，用于绑定/解绑用户角色。",
+            "description": "path参数：角色业务 ID，用于绑定/解绑用户角色。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -7976,7 +8665,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -8017,7 +8706,7 @@
           {
             "name": "roleId",
             "in": "path",
-            "description": "path参数：角色 ID，用于绑定/解绑用户角色。",
+            "description": "path参数：角色业务 ID，用于绑定/解绑用户角色。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -8039,7 +8728,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -8080,7 +8769,7 @@
           {
             "name": "projectId",
             "in": "path",
-            "description": "path参数：小说项目 ID，用于定位具体项目。",
+            "description": "path参数：小说项目业务 ID，用于定位具体项目。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -8091,7 +8780,7 @@
           {
             "name": "relationId",
             "in": "path",
-            "description": "path参数：主键标识，用于唯一定位业务对象。",
+            "description": "path参数：业务语义 ID，用于唯一定位业务对象。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -8102,7 +8791,7 @@
           {
             "name": "operatorId",
             "in": "query",
-            "description": "query参数：操作人 ID，用于审计与权限判断。",
+            "description": "query参数：操作人业务 ID，用于审计与权限判断。",
             "required": true,
             "schema": {
               "type": "integer",
@@ -8113,7 +8802,7 @@
           {
             "name": "X-Trace-Id",
             "in": "header",
-            "description": "header参数：主键标识，用于唯一定位业务对象。",
+            "description": "header参数：业务语义 ID，用于唯一定位业务对象。",
             "required": false,
             "schema": {
               "type": "string",
@@ -8228,7 +8917,12 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：角色 ID，用于定位目标角色。",
+            "description": "字段：角色业务 ID，用于定位目标角色。",
+            "format": "int64"
+          },
+          "roleId": {
+            "type": "integer",
+            "description": "字段：角色业务 ID，用于绑定/解绑用户角色。",
             "format": "int64"
           },
           "name": {
@@ -8289,12 +8983,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "projectId": {
+            "type": "integer",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "ownerUserId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -8367,12 +9066,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "volumeId": {
+            "type": "integer",
+            "description": "字段：分卷业务 ID，用于定位章节所在分卷。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "title": {
@@ -8456,12 +9160,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "styleId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "name": {
@@ -8518,7 +9227,7 @@
         "properties": {
           "parentId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -8558,17 +9267,22 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "outlineNodeId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "parentId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -8607,9 +9321,22 @@
             "description": "字段：服务提供方标识，例如模型商或存储服务商。",
             "format": "int64"
           },
+          "modelName": {
+            "type": "string",
+            "description": "字段：名称字段，用于展示或唯一识别。"
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "字段：字段「baseUrl」，用于小说项目更新模型策略。"
+          },
           "userKeyId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "officialKeyId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "temperature": {
@@ -8658,12 +9385,12 @@
         "properties": {
           "volumeId": {
             "type": "integer",
-            "description": "字段：分卷 ID，用于定位章节所在分卷。",
+            "description": "字段：分卷业务 ID，用于定位章节所在分卷。",
             "format": "int64"
           },
           "outlineNodeId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -8730,22 +9457,27 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "chapterId": {
+            "type": "integer",
+            "description": "字段：章节业务 ID，用于定位具体章节。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "volumeId": {
             "type": "integer",
-            "description": "字段：分卷 ID，用于定位章节所在分卷。",
+            "description": "字段：分卷业务 ID，用于定位章节所在分卷。",
             "format": "int64"
           },
           "outlineNodeId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -8857,12 +9589,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "cardId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "cardType": {
@@ -8947,7 +9684,7 @@
         "properties": {
           "ownerUserId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -9033,7 +9770,7 @@
         "properties": {
           "toStyleId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "warningConfirmed": {
@@ -9112,12 +9849,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "documentId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "docType": {
@@ -9210,7 +9952,7 @@
         "properties": {
           "parentId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -9235,8 +9977,8 @@
       },
       "CreateModelPolicyDto": {
         "required": [
+          "modelName",
           "policyName",
-          "providerModelId",
           "scene"
         ],
         "type": "object",
@@ -9247,25 +9989,38 @@
           },
           "scene": {
             "type": "string",
-            "description": "字段：字段「scene」，用于小说项目创建模型策略。"
+            "description": "字段：字段「scene」，用于小说项目创建数据。"
           },
           "providerModelId": {
             "type": "integer",
             "description": "字段：服务提供方标识，例如模型商或存储服务商。",
             "format": "int64"
           },
+          "modelName": {
+            "type": "string",
+            "description": "字段：名称字段，用于展示或唯一识别。"
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "字段：字段「baseUrl」，用于小说项目创建数据。"
+          },
           "userKeyId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "officialKeyId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "temperature": {
             "type": "number",
-            "description": "字段：字段「temperature」，用于小说项目创建模型策略。"
+            "description": "字段：字段「temperature」，用于小说项目创建数据。"
           },
           "topP": {
             "type": "number",
-            "description": "字段：字段「topP」，用于小说项目创建模型策略。"
+            "description": "字段：字段「topP」，用于小说项目创建数据。"
           },
           "maxTokens": {
             "type": "integer",
@@ -9274,11 +10029,11 @@
           },
           "fallbackPolicyJson": {
             "type": "string",
-            "description": "字段：字段「fallbackPolicyJson」，用于小说项目创建模型策略。"
+            "description": "字段：字段「fallbackPolicyJson」，用于小说项目创建数据。"
           },
           "isDefault": {
             "type": "boolean",
-            "description": "字段：字段「isDefault」，用于小说项目创建模型策略。"
+            "description": "字段：字段「isDefault」，用于小说项目创建数据。"
           }
         },
         "description": "字段「CreateModelPolicyDto」定义。"
@@ -9292,7 +10047,7 @@
         "properties": {
           "userId": {
             "type": "integer",
-            "description": "字段：用户 ID，用于标识操作用户或目标用户。",
+            "description": "字段：用户业务 ID，用于标识操作用户或目标用户。",
             "format": "int64"
           },
           "memberRole": {
@@ -9319,12 +10074,12 @@
         "properties": {
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "userId": {
             "type": "integer",
-            "description": "字段：用户 ID，用于标识操作用户或目标用户。",
+            "description": "字段：用户业务 ID，用于标识操作用户或目标用户。",
             "format": "int64"
           },
           "memberRole": {
@@ -9348,12 +10103,12 @@
         "properties": {
           "volumeId": {
             "type": "integer",
-            "description": "字段：分卷 ID，用于定位章节所在分卷。",
+            "description": "字段：分卷业务 ID，用于定位章节所在分卷。",
             "format": "int64"
           },
           "outlineNodeId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -9443,12 +10198,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "chapterVersionId": {
+            "type": "integer",
+            "description": "字段：版本号字段，用于历史追踪与回滚。",
             "format": "int64"
           },
           "chapterId": {
             "type": "integer",
-            "description": "字段：章节 ID，用于定位具体章节。",
+            "description": "字段：章节业务 ID，用于定位具体章节。",
             "format": "int64"
           },
           "versionNo": {
@@ -9520,6 +10280,10 @@
           "storageProvider": {
             "type": "string",
             "description": "字段：服务提供方标识，例如模型商或存储服务商。"
+          },
+          "content": {
+            "type": "string",
+            "description": "字段：正文或内容元数据字段。"
           }
         },
         "description": "字段「CommitChapterContentDto」定义。"
@@ -9560,12 +10324,12 @@
         "properties": {
           "fromCardId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "toCardId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "relationType": {
@@ -9596,22 +10360,27 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "cardRelationId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "fromCardId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "toCardId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "relationType": {
@@ -9637,12 +10406,12 @@
         "properties": {
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "taskId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "approvalType": {
@@ -9683,17 +10452,22 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "approvalRequestId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "taskId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "approvalType": {
@@ -9766,18 +10540,24 @@
       "CreateAgentGenerationDto": {
         "required": [
           "conversationId",
+          "modelConfigId",
           "taskType"
         ],
         "type": "object",
         "properties": {
           "conversationId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "chapterId": {
             "type": "integer",
-            "description": "字段：章节 ID，用于定位具体章节。",
+            "description": "字段：章节业务 ID，用于定位具体章节。",
+            "format": "int64"
+          },
+          "modelConfigId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "taskType": {
@@ -9804,22 +10584,32 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "taskId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "conversationId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "chapterId": {
             "type": "integer",
-            "description": "字段：章节 ID，用于定位具体章节。",
+            "description": "字段：章节业务 ID，用于定位具体章节。",
+            "format": "int64"
+          },
+          "modelConfigId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "taskType": {
@@ -9837,6 +10627,18 @@
           "pluginSnapshot": {
             "type": "string",
             "description": "字段：字段「pluginSnapshot」，用于Agent 写作创建生成任务。"
+          },
+          "tokenUsageJson": {
+            "type": "string",
+            "description": "字段：令牌字段，用于认证或续期。"
+          },
+          "costJson": {
+            "type": "string",
+            "description": "字段：字段「costJson」，用于Agent 写作创建生成任务。"
+          },
+          "traceId": {
+            "type": "string",
+            "description": "字段：链路追踪 ID，用于日志追踪与问题定位。"
           },
           "status": {
             "type": "string",
@@ -9894,7 +10696,7 @@
         "properties": {
           "userId": {
             "type": "integer",
-            "description": "字段：用户 ID，用于标识操作用户或目标用户。",
+            "description": "字段：用户业务 ID，用于标识操作用户或目标用户。",
             "format": "int64"
           },
           "title": {
@@ -9917,17 +10719,22 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "conversationId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "userId": {
             "type": "integer",
-            "description": "字段：用户 ID，用于标识操作用户或目标用户。",
+            "description": "字段：用户业务 ID，用于标识操作用户或目标用户。",
             "format": "int64"
           },
           "title": {
@@ -10012,12 +10819,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "messageId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "conversationId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "role": {
@@ -10075,7 +10887,7 @@
         "properties": {
           "providerId": {
             "type": "integer",
-            "description": "字段：模型服务商主键 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
+            "description": "字段：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
             "format": "int64"
           },
           "keyName": {
@@ -10114,7 +10926,12 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "migrationId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "migrationType": {
@@ -10178,7 +10995,12 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "jobId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "jobType": {
@@ -10275,7 +11097,7 @@
         "properties": {
           "parentId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "sortOrder": {
@@ -10377,12 +11199,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "menuId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "parentId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "title": {
@@ -10430,7 +11257,12 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "pluginId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "code": {
@@ -10503,7 +11335,12 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "permissionId": {
+            "type": "integer",
+            "description": "字段：权限 ID，用于绑定/解绑角色权限。",
             "format": "int64"
           },
           "name": {
@@ -10610,17 +11447,22 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "pluginInstallId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "pluginId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "pluginCode": {
@@ -10682,12 +11524,22 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "pluginCallLogId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
+            "format": "int64"
+          },
+          "taskId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "pluginCode": {
@@ -10748,7 +11600,7 @@
         "properties": {
           "data": {
             "type": "array",
-            "description": "字段：字段「data」，用于小说项目查询模型策略。",
+            "description": "字段：字段「data」，用于小说项目查询数据。",
             "items": {
               "$ref": "#/components/schemas/ModelProjectPolicy"
             }
@@ -10764,12 +11616,17 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "projectPolicyId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "projectId": {
             "type": "integer",
-            "description": "字段：小说项目 ID，用于定位具体项目。",
+            "description": "字段：小说项目业务 ID，用于定位具体项目。",
             "format": "int64"
           },
           "policyName": {
@@ -10778,25 +11635,38 @@
           },
           "scene": {
             "type": "string",
-            "description": "字段：字段「scene」，用于小说项目查询模型策略。"
+            "description": "字段：字段「scene」，用于小说项目查询数据。"
           },
           "providerModelId": {
             "type": "integer",
             "description": "字段：服务提供方标识，例如模型商或存储服务商。",
             "format": "int64"
           },
+          "modelName": {
+            "type": "string",
+            "description": "字段：名称字段，用于展示或唯一识别。"
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "字段：字段「baseUrl」，用于小说项目查询数据。"
+          },
           "userKeyId": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "officialKeyId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "temperature": {
             "type": "number",
-            "description": "字段：字段「temperature」，用于小说项目查询模型策略。"
+            "description": "字段：字段「temperature」，用于小说项目查询数据。"
           },
           "topP": {
             "type": "number",
-            "description": "字段：字段「topP」，用于小说项目查询模型策略。"
+            "description": "字段：字段「topP」，用于小说项目查询数据。"
           },
           "maxTokens": {
             "type": "integer",
@@ -10805,25 +11675,25 @@
           },
           "fallbackPolicyJson": {
             "type": "string",
-            "description": "字段：字段「fallbackPolicyJson」，用于小说项目查询模型策略。"
+            "description": "字段：字段「fallbackPolicyJson」，用于小说项目查询数据。"
           },
           "isDefault": {
             "type": "boolean",
-            "description": "字段：字段「isDefault」，用于小说项目查询模型策略。"
+            "description": "字段：字段「isDefault」，用于小说项目查询数据。"
           },
           "createdAt": {
             "type": "string",
-            "description": "字段：字段「createdAt」，用于小说项目查询模型策略。",
+            "description": "字段：字段「createdAt」，用于小说项目查询数据。",
             "format": "date-time"
           },
           "updatedAt": {
             "type": "string",
-            "description": "字段：字段「updatedAt」，用于小说项目查询模型策略。",
+            "description": "字段：字段「updatedAt」，用于小说项目查询数据。",
             "format": "date-time"
           },
           "deletedAt": {
             "type": "string",
-            "description": "字段：字段「deletedAt」，用于小说项目查询模型策略。",
+            "description": "字段：字段「deletedAt」，用于小说项目查询数据。",
             "format": "date-time"
           }
         },
@@ -10989,7 +11859,12 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "providerId": {
+            "type": "integer",
+            "description": "字段：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
             "format": "int64"
           },
           "code": {
@@ -11025,56 +11900,60 @@
         },
         "description": "字段「ModelProvider」定义。"
       },
-      "ApiResponseListModelProviderModel": {
+      "ApiResponseListModelOfficialApiKey": {
         "type": "object",
         "properties": {
           "data": {
             "type": "array",
-            "description": "字段：字段「data」，用于模型配置查询模型。",
+            "description": "字段：字段「data」，用于通用业务查询数据。",
             "items": {
-              "$ref": "#/components/schemas/ModelProviderModel"
+              "$ref": "#/components/schemas/ModelOfficialApiKey"
             }
           },
           "meta": {
             "$ref": "#/components/schemas/Meta"
           }
         },
-        "description": "字段「ApiResponseListModelProviderModel」定义。"
+        "description": "字段「ApiResponseListModelOfficialApiKey」定义。"
       },
-      "ModelProviderModel": {
+      "ModelOfficialApiKey": {
         "type": "object",
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "officialApiKeyId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "providerId": {
             "type": "integer",
-            "description": "字段：模型服务商主键 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
+            "description": "字段：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
             "format": "int64"
           },
-          "modelCode": {
+          "keyName": {
             "type": "string",
-            "description": "字段：字段「modelCode」，用于模型配置查询模型。"
+            "description": "字段：用户自定义密钥名称，便于在多个 API Key 间区分。"
           },
-          "modelName": {
+          "encryptedApiKey": {
             "type": "string",
-            "description": "字段：名称字段，用于展示或唯一识别。"
+            "description": "字段：字段「encryptedApiKey」，用于通用业务查询数据。"
           },
-          "contextWindow": {
-            "type": "integer",
-            "description": "字段：字段「contextWindow」，用于模型配置查询模型。",
-            "format": "int32"
-          },
-          "maxOutput": {
-            "type": "integer",
-            "description": "字段：字段「maxOutput」，用于模型配置查询模型。",
-            "format": "int32"
-          },
-          "pricingJson": {
+          "maskedApiKey": {
             "type": "string",
-            "description": "字段：字段「pricingJson」，用于模型配置查询模型。"
+            "description": "字段：字段「maskedApiKey」，用于通用业务查询数据。"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "字段：是否默认配置（1=默认，0=非默认）。"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "description": "字段：字段「lastUsedAt」，用于通用业务查询数据。",
+            "format": "date-time"
           },
           "status": {
             "type": "string",
@@ -11082,11 +11961,21 @@
           },
           "createdAt": {
             "type": "string",
-            "description": "字段：字段「createdAt」，用于模型配置查询模型。",
+            "description": "字段：字段「createdAt」，用于通用业务查询数据。",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "字段：字段「updatedAt」，用于通用业务查询数据。",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "description": "字段：字段「deletedAt」，用于通用业务查询数据。",
             "format": "date-time"
           }
         },
-        "description": "字段「ModelProviderModel」定义。"
+        "description": "字段「ModelOfficialApiKey」定义。"
       },
       "ApiResponseListModelUserApiKey": {
         "type": "object",
@@ -11109,17 +11998,22 @@
         "properties": {
           "id": {
             "type": "integer",
-            "description": "字段：主键标识，用于唯一定位业务对象。",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
+            "format": "int64"
+          },
+          "userApiKeyId": {
+            "type": "integer",
+            "description": "字段：业务语义 ID，用于唯一定位业务对象。",
             "format": "int64"
           },
           "userId": {
             "type": "integer",
-            "description": "字段：用户 ID，用于标识操作用户或目标用户。",
+            "description": "字段：用户业务 ID，用于标识操作用户或目标用户。",
             "format": "int64"
           },
           "providerId": {
             "type": "integer",
-            "description": "字段：模型服务商主键 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
+            "description": "字段：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。",
             "format": "int64"
           },
           "keyName": {

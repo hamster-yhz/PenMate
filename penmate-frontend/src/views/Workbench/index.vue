@@ -76,7 +76,6 @@
           <div class="tab-content" v-if="activeLeftTab === 'outline'">
             <div class="tree-actions">
               <button class="tree-btn" :disabled="outlineOpBusy" @click="addVolume">+ 新卷</button>
-              <button class="tree-btn" @click="addMemberQuick">+ 成员</button>
             </div>
             <div class="tree-root">
               <div v-for="(vol, vIdx) in outlineData" :key="vol.key" class="tree-node">
@@ -135,21 +134,6 @@
               </div>
             </div>
 
-            <div class="member-panel">
-              <div class="member-title">项目成员</div>
-              <div v-if="projectMembers.length" class="member-list">
-                <div class="member-item" v-for="member in projectMembers" :key="String(member.userId || member.id)">
-                  <span>
-                    用户#{{ String(member.userId || '-') }} · 角色 {{ String(member.memberRole || '-') }}
-                  </span>
-                  <div class="member-actions">
-                    <button class="tree-act-btn" @click="updateMemberRole(member)">改角色</button>
-                    <button class="tree-act-btn danger" @click="removeMemberById(member)">移除</button>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="empty-hint">暂无成员，点击“+ 成员”添加。</div>
-            </div>
           </div>
 
           <!-- ======== Character Library ======== -->
@@ -160,7 +144,7 @@
             <div class="char-list" v-if="projectCards.length">
               <div
                 v-for="card in projectCards.filter((item) => String(item.cardType || '').toUpperCase() === 'CHARACTER')"
-                :key="String(card.id)"
+                :key="String(card.cardId)"
                 class="char-card"
                 :class="{ expanded: card.expanded }"
               >
@@ -203,7 +187,7 @@
             <div class="world-list" v-if="projectCards.length">
               <div
                 v-for="card in projectCards.filter((item) => String(item.cardType || '').toUpperCase() === 'WORLD')"
-                :key="`world-${String(card.id)}`"
+                :key="`world-${String(card.cardId)}`"
                 class="world-card"
               >
                 <div class="world-header" @click="card.expanded = !card.expanded">
@@ -236,21 +220,21 @@
                 <div class="relation-create">
                   <select v-model="relationFromId" class="relation-select">
                     <option value="">来源卡片</option>
-                    <option v-for="card in projectCards" :key="`from-${String(card.id)}`" :value="String(card.id)">
-                      {{ String(card.name || `卡片#${String(card.id)}`) }}
+                    <option v-for="card in projectCards" :key="`from-${String(card.cardId)}`" :value="String(card.cardId)">
+                      {{ String(card.name || `卡片#${String(card.cardId)}`) }}
                     </option>
                   </select>
                   <select v-model="relationToId" class="relation-select">
                     <option value="">目标卡片</option>
-                    <option v-for="card in projectCards" :key="`to-${String(card.id)}`" :value="String(card.id)">
-                      {{ String(card.name || `卡片#${String(card.id)}`) }}
+                    <option v-for="card in projectCards" :key="`to-${String(card.cardId)}`" :value="String(card.cardId)">
+                      {{ String(card.name || `卡片#${String(card.cardId)}`) }}
                     </option>
                   </select>
                   <input v-model="relationType" class="cf-input" placeholder="关系类型，如：敌对/师徒" />
                   <button class="tree-btn" @click="createRelation">+ 新建关系</button>
                 </div>
                 <div class="relation-list">
-                  <div class="relation-item" v-for="relation in cardRelations" :key="String(relation.id)">
+                  <div class="relation-item" v-for="relation in cardRelations" :key="String(relation.cardRelationId)">
                     <span>
                       {{ cardNameById(String(relation.fromCardId || '')) }}
                       →
@@ -285,7 +269,7 @@
               <option value="">版本记录</option>
               <option
                 v-for="version in getCurrentChapterVersions()"
-                :key="String(version.id ?? version.versionNo)"
+                :key="String(version.chapterVersionId ?? version.versionNo)"
                 :value="String(version.versionNo ?? '')"
               >
                 v{{ version.versionNo ?? '-' }} · {{ String(version.changeReason ?? version.changeType ?? '无备注') }}
@@ -340,6 +324,7 @@
           <div class="agent-header">
             <img :src="iconAgent" alt="" class="agent-icon" />
             <span class="agent-title">AI会话</span>
+            <button class="agent-history-btn" @click="toggleConversationPanel">历史会话</button>
             <div class="agent-model" :class="{ empty: !currentModelName }">
               {{ currentModelName || '未选择模型' }}
             </div>
@@ -350,6 +335,23 @@
           </div>
 
           <!-- Chat Messages -->
+          <div class="conversation-panel" v-if="showConversationPanel">
+            <div class="conversation-panel-title">会话历史</div>
+            <div class="conversation-empty" v-if="conversationLoading">加载中...</div>
+            <div class="conversation-empty" v-else-if="!conversationList.length">暂无历史会话</div>
+            <button
+              v-else
+              v-for="conversation in conversationList"
+              :key="String(conversation.conversationId)"
+              class="conversation-item"
+              :class="{ active: currentConversationId === conversation.conversationId }"
+              @click="selectConversation(conversation.conversationId)"
+            >
+              <div class="conversation-name">{{ conversation.title || `会话#${conversation.conversationId}` }}</div>
+              <div class="conversation-meta">{{ conversation.updatedAt }}</div>
+            </button>
+          </div>
+
           <div class="chat-messages" ref="chatRef">
             <div
               v-for="msg in messages"
@@ -550,7 +552,16 @@ interface ChatMessage {
   approval?: ApprovalCardData
 }
 
+interface ConversationItem {
+  conversationId: number
+  title: string
+  updatedAt: string
+}
+
 const messages = ref<ChatMessage[]>([])
+const showConversationPanel = ref(false)
+const conversationLoading = ref(false)
+const conversationList = ref<ConversationItem[]>([])
 
 const chatInput = ref('')
 const chatRef = ref<HTMLElement | null>(null)
@@ -567,7 +578,12 @@ const cardRelations = ref<Array<Record<string, any>>>([])
 const relationFromId = ref('')
 const relationToId = ref('')
 const relationType = ref('')
-const projectMembers = ref<Array<Record<string, any>>>([])
+
+const pickModelConfigId = (item: Record<string, unknown>) => Number(item.projectPolicyId ?? 0)
+const pickConversationId = (item: Record<string, unknown>) => Number(item.conversationId ?? 0)
+const pickCardId = (item: Record<string, unknown>) => Number(item.cardId ?? 0)
+const pickRelationId = (item: Record<string, unknown>) => Number(item.cardRelationId ?? 0)
+const pickOutlineNodeId = (item: Record<string, unknown>) => Number(item.outlineNodeId ?? 0)
 
 const normalizeGenerationStatus = (raw: unknown): GenerationTaskStatus | '' => {
   const status = String(raw || '').trim().toLowerCase()
@@ -610,6 +626,87 @@ const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
     lastMessageLength: messages.value[messages.value.length - 1]?.text?.length || 0,
     ...extra
   })
+}
+
+const toChatRole = (raw: unknown): ChatMessage['role'] => {
+  const role = String(raw || '').trim().toLowerCase()
+  if (role === 'assistant') return 'assistant'
+  if (role === 'system' || role === 'tool') return 'system'
+  return 'user'
+}
+
+const mapApiMessage = (item: Record<string, unknown>) => {
+  const role = toChatRole(item.role)
+  const content = String(item.contentMd || item.content || item.text || '')
+  return {
+    id: Number(item.messageId ?? msgIdCounter++),
+    role,
+    text: escapeHtml(content)
+  } as ChatMessage
+}
+
+const loadConversationMessages = async (projectId: number, conversationId: number) => {
+  const list = (await agentApi.listMessages(projectId, conversationId)) as Array<Record<string, unknown>>
+  messages.value = (Array.isArray(list) ? list : []).map(mapApiMessage)
+  const maxId = messages.value.reduce((max, item) => (item.id > max ? item.id : max), 0)
+  if (maxId >= msgIdCounter) msgIdCounter = maxId + 1
+  await nextTick()
+  scrollChat()
+}
+
+const loadConversationList = async (projectId: number) => {
+  if (!projectId) {
+    conversationList.value = []
+    return
+  }
+  conversationLoading.value = true
+  try {
+    const conversations = (await agentApi.listConversations(projectId)) as Array<Record<string, unknown>>
+    conversationList.value = (Array.isArray(conversations) ? conversations : [])
+      .map((item) => ({
+        conversationId: pickConversationId(item),
+        title: String(item.title || ''),
+        updatedAt: String(item.updatedAt || item.createdAt || '')
+      }))
+      .filter((item) => item.conversationId > 0)
+  } finally {
+    conversationLoading.value = false
+  }
+}
+
+const selectConversation = async (conversationId: number) => {
+  const projectId = getCurrentProjectId()
+  if (!projectId || !conversationId) return
+  currentConversationId.value = conversationId
+  await loadConversationMessages(projectId, conversationId)
+}
+
+const toggleConversationPanel = async () => {
+  showConversationPanel.value = !showConversationPanel.value
+  if (!showConversationPanel.value) return
+  const projectId = getCurrentProjectId()
+  if (!projectId) return
+  await loadConversationList(projectId)
+}
+
+const loadConversationHistory = async (projectId: number, operatorId: number) => {
+  if (!projectId || !operatorId) {
+    messages.value = []
+    currentConversationId.value = null
+    return
+  }
+  try {
+    const conversationId = await ensureConversationId(projectId, operatorId)
+    if (!conversationId) {
+      messages.value = []
+      return
+    }
+    await loadConversationMessages(projectId, conversationId)
+    await loadConversationList(projectId)
+  } catch {
+    messages.value = []
+    currentConversationId.value = null
+  }
 }
 
 const pollGenerationAsFallback = async (projectId: number, taskId: number) => {
@@ -778,7 +875,7 @@ const resolveOperatorId = () => {
 }
 
 const getCurrentProjectId = () => {
-  const queryId = Number(route.query.bookId || route.query.projectId || 0)
+  const queryId = Number(route.query.projectId || 0)
   if (queryId > 0) return queryId
   const cachedId = Number(localStorage.getItem(LAST_PROJECT_ID_KEY) || 0)
   return cachedId > 0 ? cachedId : 0
@@ -817,8 +914,9 @@ const ensureConversationId = async (projectId: number, operatorId: number) => {
   if (currentConversationId.value) return currentConversationId.value
   const conversations = (await agentApi.listConversations(projectId)) as Array<Record<string, unknown>>
   const existing = conversations[0]
-  if (existing?.id) {
-    currentConversationId.value = Number(existing.id)
+  const existingConversationId = existing ? pickConversationId(existing) : 0
+  if (existingConversationId > 0) {
+    currentConversationId.value = existingConversationId
     return currentConversationId.value
   }
   const created = (await agentApi.createConversation(projectId, operatorId, {
@@ -827,7 +925,7 @@ const ensureConversationId = async (projectId: number, operatorId: number) => {
     contextScopeJson: '{}',
     status: 'ACTIVE'
   })) as Record<string, unknown>
-  currentConversationId.value = Number(created?.id || 0) || null
+  currentConversationId.value = pickConversationId(created) || null
   return currentConversationId.value
 }
 
@@ -840,7 +938,7 @@ const refreshActiveModelInfo = async (projectId: number) => {
   try {
     const configs = (await modelApi.listConfigs(projectId)) as Array<Record<string, unknown>>
     const preferred = configs.find((item) => Boolean(item.isDefault)) || configs[0]
-    const modelConfigId = Number(preferred?.id || 0)
+    const modelConfigId = preferred ? pickModelConfigId(preferred) : 0
     activeModelConfigId.value = modelConfigId > 0 ? modelConfigId : null
     currentModelName.value = String(preferred?.modelName || '').trim()
     return activeModelConfigId.value
@@ -858,11 +956,11 @@ const ensureModelConfigId = async (projectId: number) => {
 
 const onModelConfigSaved = () => {
   // 模型设置变更后刷新当前生效模型信息。
-  void refreshActiveModelInfo(Number(route.query.bookId || 0))
+  void refreshActiveModelInfo(getCurrentProjectId())
 }
 
 const cardNameById = (idLike: string) => {
-  const hit = projectCards.value.find((item) => String(item.id) === String(idLike))
+  const hit = projectCards.value.find((item) => String(pickCardId(item)) === String(idLike))
   return String(hit?.name || `卡片#${idLike}`)
 }
 
@@ -875,80 +973,6 @@ const loadCardsAndRelations = async (projectId: number) => {
   } catch {
     projectCards.value = []
     cardRelations.value = []
-  }
-}
-
-const loadProjectMembers = async (projectId: number) => {
-  if (!projectId) return
-  try {
-    const list = (await novelApi.listMembers(projectId)) as Array<Record<string, unknown>>
-    projectMembers.value = Array.isArray(list) ? (list as Array<Record<string, any>>) : []
-  } catch {
-    projectMembers.value = []
-  }
-}
-
-const addMemberQuick = async () => {
-  const { projectId, operatorId } = getContext()
-  if (!projectId || !operatorId) {
-    message.warning('缺少 projectId/operatorId，无法添加成员')
-    return
-  }
-  const userIdText = window.prompt('请输入成员 userId（数字）', '')
-  const userId = Number(userIdText || 0)
-  if (!userId) {
-    message.warning('userId 非法')
-    return
-  }
-  const memberRole = String(window.prompt('请输入成员角色（如 EDITOR/OWNER/VIEWER）', 'EDITOR') || '').trim()
-  if (!memberRole) {
-    message.warning('成员角色不能为空')
-    return
-  }
-  try {
-    await novelApi.addMember(projectId, operatorId, { userId, memberRole })
-    await loadProjectMembers(projectId)
-    message.success('成员已添加')
-  } catch (error: any) {
-    message.warning(error?.message || '添加成员失败')
-  }
-}
-
-const updateMemberRole = async (member: Record<string, any>) => {
-  const { projectId, operatorId } = getContext()
-  const userId = Number(member.userId || member.id || 0)
-  if (!projectId || !operatorId || !userId) {
-    message.warning('成员信息不完整，无法更新')
-    return
-  }
-  const nextRole = String(window.prompt('请输入新的成员角色', String(member.memberRole || 'EDITOR')) || '').trim()
-  if (!nextRole) {
-    message.warning('成员角色不能为空')
-    return
-  }
-  try {
-    await novelApi.updateMember(projectId, userId, operatorId, { memberRole: nextRole })
-    await loadProjectMembers(projectId)
-    message.success('成员角色已更新')
-  } catch (error: any) {
-    message.warning(error?.message || '更新成员失败')
-  }
-}
-
-const removeMemberById = async (member: Record<string, any>) => {
-  const { projectId, operatorId } = getContext()
-  const userId = Number(member.userId || member.id || 0)
-  if (!projectId || !operatorId || !userId) {
-    message.warning('成员信息不完整，无法移除')
-    return
-  }
-  if (!window.confirm(`确认移除成员 userId=${userId} 吗？`)) return
-  try {
-    await novelApi.removeMember(projectId, userId, operatorId)
-    await loadProjectMembers(projectId)
-    message.success('成员已移除')
-  } catch (error: any) {
-    message.warning(error?.message || '移除成员失败')
   }
 }
 
@@ -1000,7 +1024,8 @@ const createCardQuick = async (cardType: 'CHARACTER' | 'WORLD') => {
 
 const saveCard = async (card: Record<string, any>) => {
   const { projectId, operatorId } = getContext()
-  if (!projectId || !operatorId || !card?.id) return
+  const cardId = pickCardId(card)
+  if (!projectId || !operatorId || !cardId) return
   const cardType = normalizeCardType(card.cardType)
   if (!cardType) {
     message.warning('卡片类型非法，仅支持 CHARACTER/WORLD')
@@ -1017,7 +1042,7 @@ const saveCard = async (card: Record<string, any>) => {
     return
   }
   try {
-    await cardApi.updateCard(projectId, Number(card.id), operatorId, {
+    await cardApi.updateCard(projectId, cardId, operatorId, {
       cardType,
       name: cardName,
       summary: card.summary,
@@ -1031,9 +1056,10 @@ const saveCard = async (card: Record<string, any>) => {
 
 const deleteCardById = async (card: Record<string, any>) => {
   const { projectId, operatorId } = getContext()
-  if (!projectId || !operatorId || !card?.id) return
+  const cardId = pickCardId(card)
+  if (!projectId || !operatorId || !cardId) return
   try {
-    await cardApi.deleteCard(projectId, Number(card.id), operatorId)
+    await cardApi.deleteCard(projectId, cardId, operatorId)
     await loadCardsAndRelations(projectId)
   } catch (error: any) {
     message.warning(error?.message || '删除资料卡失败')
@@ -1065,9 +1091,10 @@ const createRelation = async () => {
 
 const deleteRelationById = async (relation: Record<string, any>) => {
   const { projectId, operatorId } = getContext()
-  if (!projectId || !operatorId || !relation?.id) return
+  const relationId = pickRelationId(relation)
+  if (!projectId || !operatorId || !relationId) return
   try {
-    await cardApi.deleteCardRelation(projectId, Number(relation.id), operatorId)
+    await cardApi.deleteCardRelation(projectId, relationId, operatorId)
     await loadCardsAndRelations(projectId)
   } catch (error: any) {
     message.warning(error?.message || '删除关系失败')
@@ -1487,7 +1514,7 @@ const addChapter = async (vol: any) => {
 
     await novelApi.createChapter(projectId, operatorId, {
       volumeId: null,
-      outlineNodeId: Number(createdOutline.id ?? createdOutline.nodeId ?? 0) || null,
+      outlineNodeId: pickOutlineNodeId(createdOutline) || null,
       title,
       chapterNo,
       status: 1,
@@ -1695,7 +1722,7 @@ const sendMessage = async () => {
       pluginSnapshot: JSON.stringify(activePlugins.value || [])
     })) as Record<string, unknown>
 
-    const taskId = Number(generation?.id || 0)
+    const taskId = Number(generation?.taskId ?? 0)
     if (!taskId) throw new Error('任务创建失败，缺少 taskId')
     console.info('[agent] generation created', { projectId, conversationId, taskId, status: generation?.status })
 
@@ -1847,7 +1874,8 @@ const mapOutlineTree = (
     children: Array<{ title: string; key: string; chapterId?: string }>
   }>()
   nodes.forEach((node) => {
-    const key = String(node.id ?? node.nodeId ?? node.key ?? '')
+    const key = String(node.outlineNodeId ?? '')
+    if (!key) return
     const title = String(node.title ?? node.name ?? '未命名')
     const nodeType = String(node.nodeType ?? node.type ?? '').toUpperCase()
     // 仅按明确的 VOLUME 节点构建卷，避免 parentId=0/null 边界导致章节被误判为卷。
@@ -1857,9 +1885,10 @@ const mapOutlineTree = (
   })
 
   nodes.forEach((node) => {
-    const key = String(node.id ?? node.nodeId ?? node.key ?? '')
+    const key = String(node.outlineNodeId ?? '')
+    if (!key) return
     const title = String(node.title ?? node.name ?? '未命名章节')
-    const parentId = node.parentId ?? node.parentNodeId
+    const parentId = node.parentId
     if (parentId != null) {
       const pKey = String(parentId)
       const parent = volumeMap.get(pKey)
@@ -1874,7 +1903,7 @@ const mapOutlineTree = (
 }
 
 const loadWorkbenchData = async () => {
-  const projectId = Number(route.query.bookId || 0)
+  const projectId = getCurrentProjectId()
   if (!projectId) return
   try {
     chapterContents.value = {}
@@ -1894,13 +1923,13 @@ const loadWorkbenchData = async () => {
     const chapterList = (chapters || []) as Array<Record<string, any>>
     const chapterByOutlineNodeId: Record<string, string> = {}
     chapterList.forEach((chapter) => {
-      const key = String(chapter.chapterId ?? chapter.id ?? chapter.key ?? '')
+      const key = String(chapter.chapterId ?? '')
       if (!key) return
       // 正文应走 OSS content-url 获取；这里不再回填 chapter.content，避免把后端 HTML 占位内容灌进编辑器。
       const chapterText = ''
       const localDraft = readChapterDraftLocal(projectId, key)
       chapterContents.value[key] = chapterText || localDraft || ''
-      const outlineNodeId = String(chapter.outlineNodeId ?? chapter.nodeId ?? '')
+      const outlineNodeId = String(chapter.outlineNodeId ?? '')
       if (outlineNodeId) {
         chapterByOutlineNodeId[outlineNodeId] = key
       }
@@ -1908,7 +1937,6 @@ const loadWorkbenchData = async () => {
 
     outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>, chapterByOutlineNodeId)
     await loadCardsAndRelations(projectId)
-    await loadProjectMembers(projectId)
     const first = outlineData.value[0]?.children?.[0]
     if (first) {
       activeChapter.value = String(first.chapterId || first.key)
@@ -1925,7 +1953,7 @@ const loadWorkbenchData = async () => {
 }
 
 onMounted(() => {
-  void refreshActiveModelInfo(Number(route.query.bookId || 0))
+  void refreshActiveModelInfo(getCurrentProjectId())
   if (session.userName) username.value = session.userName
   if (session.userEmail) userEmail.value = session.userEmail
   editorContent.value = chapterContents.value[activeChapter.value] || ''
@@ -1933,6 +1961,10 @@ onMounted(() => {
   lastSnapshot = editorContent.value
   loadWorkbenchData()
   loadActivePlugins()
+  const { projectId, operatorId } = getContext()
+  if (projectId && operatorId) {
+    void loadConversationHistory(projectId, operatorId)
+  }
 })
 
 onBeforeUnmount(() => {

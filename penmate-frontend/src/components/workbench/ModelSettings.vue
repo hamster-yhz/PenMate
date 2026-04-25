@@ -215,7 +215,7 @@ const form = ref({
   apiKey: ''
 })
 
-const getProjectId = () => Number(route.query.bookId || 0)
+const getProjectId = () => Number(route.query.projectId || 0)
 const getUserId = () => {
   if (typeof session.userId === 'number' && session.userId > 0) return session.userId
   const fromQuery = Number(route.query.userId || route.query.operatorId || 0)
@@ -234,12 +234,17 @@ const modelById = computed<Record<string, ModelItem>>(() => {
 const configByOfficialKeyId = ref<Record<number, AnyRecord>>({})
 const configByUserKeyId = ref<Record<number, AnyRecord>>({})
 
+const pickProviderId = (item: AnyRecord, fallback = 0) => Number(item.providerId ?? fallback)
+const pickConfigId = (item: AnyRecord | null | undefined) => Number(item?.projectPolicyId ?? 0)
+const pickOfficialKeyId = (item: AnyRecord | null | undefined) => Number(item?.officialApiKeyId ?? 0)
+const pickUserKeyId = (item: AnyRecord | null | undefined) => Number(item?.userApiKeyId ?? 0)
+
 const officialCards = computed<OfficialCard[]>(() =>
   models.value.map((m) => {
     const officialKey = officialKeyByProvider.value[m.providerId]
-    const officialKeyId = Number(officialKey?.id || 0) || null
+    const officialKeyId = pickOfficialKeyId(officialKey) || null
     const config = officialKeyId ? configByOfficialKeyId.value[officialKeyId] : null
-    const configId = Number(config?.id || 0) || null
+    const configId = pickConfigId(config) || null
     const modelName = String(config?.modelName || '')
     const hasOfficialKey = Boolean(officialKey)
     const available = hasOfficialKey && !!configId && !!modelName
@@ -336,9 +341,9 @@ const saveProjectConfig = async (projectId: number, operatorId: number, payload:
   await modelApi.createConfig(projectId, operatorId, payload)
   const latestConfigs = (await modelApi.listConfigs(projectId)) as AnyRecord[]
   const created = findDefaultConfig(latestConfigs)
-    || latestConfigs.find((item) => Number(item.userKeyId || 0) === Number(payload.userKeyId || 0) && Number(item.officialKeyId || 0) === Number(payload.officialKeyId || 0))
+    || latestConfigs.find((item) => Number(item.userApiKeyId || 0) === Number(payload.userKeyId || 0) && Number(item.officialApiKeyId || 0) === Number(payload.officialKeyId || 0))
     || latestConfigs[latestConfigs.length - 1]
-  const createdId = Number(created?.id || 0) || null
+  const createdId = pickConfigId(created) || null
   if (createdId) {
     await modelApi.setDefaultConfig(projectId, createdId, operatorId)
   }
@@ -384,11 +389,11 @@ const loadData = async () => {
   const officialKeys = (officialKeysResp || []) as AnyRecord[]
   const configs = (configsResp || []) as AnyRecord[]
   const defaultConfig = findDefaultConfig(configs)
-  currentConfigId.value = Number(defaultConfig?.id || 0) || null
+  currentConfigId.value = pickConfigId(defaultConfig) || null
 
   models.value = providers.map((provider, idx) => {
     const p = provider as AnyRecord
-    const providerId = Number(p.id || p.providerId || idx + 1)
+    const providerId = pickProviderId(p, idx + 1)
     const providerName = String(p.displayName || p.name || p.providerCode || p.code || `provider-${idx + 1}`)
     return {
       id: `provider-${providerId}`,
@@ -403,7 +408,7 @@ const loadData = async () => {
 
   const officialDict: Record<number, AnyRecord> = {}
   officialKeys.forEach((k) => {
-    const pid = Number(k.providerId || 0)
+    const pid = pickProviderId(k)
     if (pid > 0 && !officialDict[pid]) officialDict[pid] = k
   })
   officialKeyByProvider.value = officialDict
@@ -411,8 +416,8 @@ const loadData = async () => {
   const officialConfigDict: Record<number, AnyRecord> = {}
   const userConfigDict: Record<number, AnyRecord> = {}
   configs.forEach((config) => {
-    const officialKeyId = Number(config.officialKeyId || 0)
-    const userKeyId = Number(config.userKeyId || 0)
+    const officialKeyId = pickOfficialKeyId(config)
+    const userKeyId = pickUserKeyId(config)
     if (officialKeyId > 0) officialConfigDict[officialKeyId] = config
     if (userKeyId > 0) userConfigDict[userKeyId] = config
   })
@@ -421,10 +426,10 @@ const loadData = async () => {
 
   userCards.value = userKeys
     .map((k) => {
-      const providerId = Number(k.providerId || 0)
-      const keyId = Number(k.id || 0)
+      const providerId = pickProviderId(k)
+      const keyId = pickUserKeyId(k)
       const linkedConfig = userConfigDict[keyId]
-      const configId = Number(linkedConfig?.id || 0) || null
+      const configId = pickConfigId(linkedConfig) || null
       const modelId = models.value.find((m) => m.providerId === providerId)?.id || ''
       const status = String(k.status || '').toLowerCase()
       const modelName = String(linkedConfig?.modelName || '') || '未填写模型名'
@@ -496,8 +501,9 @@ const saveApi = async () => {
       message.warning('首次配置官方Key必须填写 API Key')
       return
     }
-    if (exist?.id) {
-      await modelApi.updateOfficialKey(Number(exist.id), operatorId, {
+    const existOfficialKeyId = pickOfficialKeyId(exist)
+    if (existOfficialKeyId) {
+      await modelApi.updateOfficialKey(existOfficialKeyId, operatorId, {
         keyName,
         apiKey: apiKey || undefined,
         isDefault: true,
@@ -513,7 +519,7 @@ const saveApi = async () => {
       })
     }
     const latest = (await modelApi.listOfficialKeys()) as AnyRecord[]
-    officialKeyId = Number(latest.find((i) => Number(i.providerId || 0) === model.providerId)?.id || 0) || null
+    officialKeyId = pickOfficialKeyId(latest.find((i) => pickProviderId(i) === model.providerId)) || null
   } else {
     if (!userId) {
       message.warning('缺少 userId')
@@ -541,9 +547,16 @@ const saveApi = async () => {
         const latest = (await modelApi.listKeys(userId)) as AnyRecord[]
         userKeyId = Number(
           latest
-            .filter((i) => Number(i.providerId || 0) === model.providerId)
-            .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0]?.id || 0
+            .filter((i) => pickProviderId(i) === model.providerId)
+            .sort((a, b) => pickUserKeyId(b) - pickUserKeyId(a))[0]?.userApiKeyId
         ) || null
+        if (!userKeyId) {
+          userKeyId = pickUserKeyId(
+            latest
+              .filter((i) => pickProviderId(i) === model.providerId)
+              .sort((a, b) => pickUserKeyId(b) - pickUserKeyId(a))[0]
+          ) || null
+        }
       } else {
         await modelApi.updateKey(form.value.selectedUserKeyId, userId, operatorId, {
           keyName,
@@ -562,7 +575,7 @@ const saveApi = async () => {
         status: 'active'
       })
       const latest = (await modelApi.listKeys(userId)) as AnyRecord[]
-      userKeyId = Number(latest.find((i) => Number(i.providerId || 0) === model.providerId)?.id || 0) || null
+      userKeyId = pickUserKeyId(latest.find((i) => pickProviderId(i) === model.providerId)) || null
     }
   }
 

@@ -183,7 +183,7 @@ const coverGradients = [
 const books = ref<Book[]>([])
 
 const toBook = (item: Record<string, any>, idx: number): Book => {
-  const id = String(item.projectId ?? item.id ?? `book-${idx}`)
+  const id = String(item.projectId ?? '')
   const title = String(item.title ?? item.name ?? `未命名作品-${idx + 1}`)
   const description = String(item.description ?? item.summary ?? '')
   const genre = String(item.genre ?? item.category ?? '其他')
@@ -210,7 +210,9 @@ const toBook = (item: Record<string, any>, idx: number): Book => {
 const loadBooks = async () => {
   try {
     const list = await novelApi.listProjects()
-    books.value = (list || []).map((item, idx) => toBook(item as Record<string, any>, idx))
+    books.value = (list || [])
+      .map((item, idx) => toBook(item as Record<string, any>, idx))
+      .filter((item) => Number(item.id) > 0)
   } catch (error: any) {
     message.error(error?.message || '加载书架失败')
   }
@@ -237,7 +239,7 @@ const openBook = (book: Book) => {
   router.push({
     path: '/workbench',
     query: {
-      bookId: book.id,
+      projectId: book.id,
       ...(session.userId ? { operatorId: String(session.userId) } : {})
     }
   })

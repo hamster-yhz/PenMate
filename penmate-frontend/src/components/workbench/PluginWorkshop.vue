@@ -83,7 +83,8 @@ const plugins = ref<Plugin[]>([])
 
 const installedCount = computed(() => plugins.value.filter(p => p.installed).length)
 
-const getProjectId = () => Number(route.query.bookId || 0)
+const getProjectId = () => Number(route.query.projectId || 0)
+const pickCatalogPluginId = (item: Record<string, unknown>, fallback: string) => String(item.pluginId ?? fallback)
 const getOperatorId = () => {
   if (typeof session.userId === 'number' && session.userId > 0) return session.userId
   const fromQuery = Number(route.query.operatorId || 0)
@@ -121,7 +122,7 @@ const loadPlugins = async () => {
       const code = String(item.pluginCode || item.code || '')
       const installed = installMap.get(code)
       return {
-        id: String(item.id || code || idx),
+        id: pickCatalogPluginId(item, code || String(idx)),
         code,
         emoji: String(item.icon || '🧩'),
         name: String(item.name || code || '未命名插件'),

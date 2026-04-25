@@ -47,18 +47,6 @@ export const novelApi = {
   deleteVolume(projectId: IdLike, volumeId: IdLike, operatorId: IdLike) {
     return request.delete<string>(`/v1/novels/${projectId}/volumes/${volumeId}?operatorId=${operatorId}`)
   },
-  listMembers(projectId: IdLike) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/members`)
-  },
-  addMember(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/members?operatorId=${operatorId}`, payload)
-  },
-  updateMember(projectId: IdLike, userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.patch<AnyRecord>(`/v1/novels/${projectId}/members/${userId}?operatorId=${operatorId}`, payload)
-  },
-  removeMember(projectId: IdLike, userId: IdLike, operatorId: IdLike) {
-    return request.delete<string>(`/v1/novels/${projectId}/members/${userId}?operatorId=${operatorId}`)
-  },
   listChapters(projectId: IdLike) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/chapters`)
   },

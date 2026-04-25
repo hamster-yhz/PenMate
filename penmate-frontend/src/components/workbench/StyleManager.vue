@@ -16,8 +16,8 @@
           <div class="sm-label">当前文风</div>
           <div class="style-toolbar" v-if="styleOptions.length">
             <select v-model="selectedStyleId" class="style-select" @change="handleStyleSelect">
-              <option v-for="item in styleOptions" :key="String(item.id)" :value="String(item.id)">
-                {{ String(item.name || `文风#${String(item.id)}`) }}
+              <option v-for="item in styleOptions" :key="String(pickStyleId(item))" :value="String(pickStyleId(item))">
+                {{ String(item.name || `文风#${String(pickStyleId(item))}`) }}
               </option>
             </select>
             <button class="style-action" @click="setAsDefault" :disabled="saving">设为默认</button>
@@ -145,7 +145,8 @@ const currentStyle = computed(() => {
   return `${config.tone} · ${config.tempo} · ${config.descPreference}`
 })
 
-const getProjectId = () => Number(route.query.bookId || 0)
+const getProjectId = () => Number(route.query.projectId || 0)
+const pickStyleId = (item: StyleItem | null | undefined) => Number(item?.styleId ?? 0)
 
 const getOperatorId = () => {
   if (typeof session.userId === 'number' && session.userId > 0) return session.userId
@@ -170,9 +171,9 @@ const loadStyles = async () => {
     styleOptions.value = Array.isArray(list) ? list : []
     const defaultStyle = styleOptions.value.find((item) => Boolean(item.isDefault)) || styleOptions.value[0]
     if (defaultStyle) {
-      const id = String(defaultStyle.id || '')
+      const id = String(pickStyleId(defaultStyle) || '')
       selectedStyleId.value = id
-      activeDefaultStyleId.value = String((styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle).id || '')
+      activeDefaultStyleId.value = String(pickStyleId(styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle) || '')
       applyStyleToForm(defaultStyle)
     }
   } catch (error: any) {
@@ -181,10 +182,10 @@ const loadStyles = async () => {
 }
 
 const handleStyleSelect = () => {
-  const target = styleOptions.value.find((item) => String(item.id || '') === selectedStyleId.value)
+  const target = styleOptions.value.find((item) => String(pickStyleId(item) || '') === selectedStyleId.value)
   if (!target) return
   const projectId = getProjectId()
-  const styleId = Number(target.id || 0)
+  const styleId = pickStyleId(target)
   if (!projectId || !styleId) {
     applyStyleToForm(target)
     return
@@ -308,7 +309,7 @@ const confirmChange = async (warningConfirmed = true) => {
         ...payload,
         isDefault: true
       })) as Record<string, unknown>
-      styleId = Number(created?.id || 0)
+      styleId = Number(created?.styleId ?? 0)
     }
 
     if (styleId > 0) {

@@ -18,7 +18,6 @@
         <h3>请求参数</h3>
         <div class="form-grid">
           <label>volumeId <input v-model.number="volumeId" type="number" class="ipt" /></label>
-          <label>memberUserId <input v-model.number="memberUserId" type="number" class="ipt" /></label>
           <label>chapterId <input v-model.number="chapterId" type="number" class="ipt" /></label>
           <label>versionNo <input v-model.number="versionNo" type="number" class="ipt" /></label>
           <label>nodeId <input v-model.number="nodeId" type="number" class="ipt" /></label>
@@ -44,11 +43,6 @@
           <button class="btn" @click="run(() => novelApi.createVolume(projectId, operatorId, parseJson(volumePayload)))">createVolume</button>
           <button class="btn" @click="run(() => novelApi.updateVolume(projectId, volumeId, operatorId, parseJson(volumePayload)))">updateVolume</button>
           <button class="btn danger" @click="run(() => novelApi.deleteVolume(projectId, volumeId, operatorId))">deleteVolume</button>
-
-          <button class="btn" @click="run(() => novelApi.listMembers(projectId))">listMembers</button>
-          <button class="btn" @click="run(() => novelApi.addMember(projectId, operatorId, parseJson(memberPayload)))">addMember</button>
-          <button class="btn" @click="run(() => novelApi.updateMember(projectId, memberUserId, operatorId, parseJson(memberPatchPayload)))">updateMember</button>
-          <button class="btn danger" @click="run(() => novelApi.removeMember(projectId, memberUserId, operatorId))">removeMember</button>
 
           <button class="btn" @click="run(() => novelApi.listChapters(projectId))">listChapters</button>
           <button class="btn" @click="run(() => novelApi.createChapter(projectId, operatorId, parseJson(chapterPayload)))">createChapter</button>
@@ -125,8 +119,6 @@
         <div class="payload-grid">
           <label>novelProjectPayload <textarea v-model="novelProjectPayload" class="txt" rows="3" /></label>
           <label>volumePayload <textarea v-model="volumePayload" class="txt" rows="3" /></label>
-          <label>memberPayload <textarea v-model="memberPayload" class="txt" rows="3" /></label>
-          <label>memberPatchPayload <textarea v-model="memberPatchPayload" class="txt" rows="3" /></label>
           <label>chapterPayload <textarea v-model="chapterPayload" class="txt" rows="3" /></label>
           <label>versionPayload <textarea v-model="versionPayload" class="txt" rows="3" /></label>
           <label>contentCommitPayload <textarea v-model="contentCommitPayload" class="txt" rows="3" /></label>
@@ -168,7 +160,6 @@ const projectId = ref(1)
 const operatorId = ref(Number(session.userId || 1))
 
 const volumeId = ref(1)
-const memberUserId = ref(1)
 const chapterId = ref(1)
 const versionNo = ref(1)
 const nodeId = ref(1)
@@ -181,8 +172,6 @@ const permissionId = ref(1)
 
 const novelProjectPayload = ref('{"ownerUserId":1,"title":"新小说","summary":"简介","status":1}')
 const volumePayload = ref('{"title":"第一卷","sortOrder":1,"description":"卷简介"}')
-const memberPayload = ref('{"userId":1,"memberRole":"EDITOR"}')
-const memberPatchPayload = ref('{"memberRole":"OWNER"}')
 const chapterPayload = ref('{"volumeId":1,"outlineNodeId":null,"title":"第一章","chapterNo":1,"status":1,"wordCount":0,"excerpt":""}')
 const versionPayload = ref('{"changeType":"MANUAL_SAVE","changeReason":"保存","createdBy":1}')
 const contentCommitPayload = ref('{"objectKey":"demo/ch1.txt","etag":"","size":128,"checksum":"","storageProvider":"oss"}')
