@@ -1,0 +1,123 @@
+import { afterEach, describe, expect, it } from 'vitest'
+
+import {
+  LAST_OPERATOR_ID_KEY,
+  LAST_PROJECT_ID_KEY,
+  useWorkbenchContext,
+} from '../useWorkbenchContext'
+
+describe('useWorkbenchContext', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('should_prioritize_query_over_session_and_local_storage_when_resolving_context', () => {
+    window.localStorage.setItem(LAST_PROJECT_ID_KEY, '701')
+    window.localStorage.setItem(LAST_OPERATOR_ID_KEY, '801')
+
+    const { projectId, operatorId } = useWorkbenchContext({
+      query: {
+        projectId: '101',
+        operatorId: '201',
+      },
+      session: {
+        userId: 301,
+      },
+    })
+
+    expect(projectId).toBe(101)
+    expect(operatorId).toBe(201)
+  })
+
+  it('should_fallback_to_session_before_local_storage_for_operator_id', () => {
+    window.localStorage.setItem(LAST_PROJECT_ID_KEY, '702')
+    window.localStorage.setItem(LAST_OPERATOR_ID_KEY, '802')
+
+    const { projectId, operatorId } = useWorkbenchContext({
+      query: {
+        projectId: '102',
+      },
+      session: {
+        userId: 302,
+      },
+    })
+
+    expect(projectId).toBe(102)
+    expect(operatorId).toBe(302)
+  })
+
+  it('should_fallback_to_local_storage_when_query_and_session_are_missing', () => {
+    window.localStorage.setItem(LAST_PROJECT_ID_KEY, '703')
+    window.localStorage.setItem(LAST_OPERATOR_ID_KEY, '803')
+
+    const { projectId, operatorId } = useWorkbenchContext({
+      query: {},
+      session: {},
+    })
+
+    expect(projectId).toBe(703)
+    expect(operatorId).toBe(803)
+  })
+
+  it('should_persist_resolved_context_to_local_storage', () => {
+    const { ensureContext } = useWorkbenchContext({
+      query: {
+        projectId: '104',
+      },
+      session: {
+        userId: 304,
+      },
+    })
+
+    ensureContext()
+
+    expect(window.localStorage.getItem(LAST_PROJECT_ID_KEY)).toBe('104')
+    expect(window.localStorage.getItem(LAST_OPERATOR_ID_KEY)).toBe('304')
+  })
+
+  it('should_expose_context_profile_and_ensure_context', () => {
+    const { projectId, operatorId, username, userEmail, ensureContext } = useWorkbenchContext({
+      query: {
+        projectId: '105',
+      },
+      session: {
+        userId: 305,
+        userName: '墨客',
+        userEmail: 'moke@penmate.com',
+      },
+    })
+
+    expect(projectId).toBe(105)
+    expect(operatorId).toBe(305)
+    expect(username).toBe('墨客')
+    expect(userEmail).toBe('moke@penmate.com')
+    expect(ensureContext()).toEqual({
+      projectId: 105,
+      operatorId: 305,
+      username: '墨客',
+      userEmail: 'moke@penmate.com',
+    })
+  })
+
+  it('should_only_expose_plan_defined_public_contract', () => {
+    const context = useWorkbenchContext({
+      query: {
+        projectId: '106',
+        operatorId: '206',
+      },
+      session: {
+        userId: 306,
+        userName: '执笔人',
+        userEmail: 'writer@penmate.com',
+      },
+    })
+
+    expect(Object.keys(context).sort()).toEqual([
+      'ensureContext',
+      'operatorId',
+      'projectId',
+      'userEmail',
+      'username',
+    ])
+  })
+})

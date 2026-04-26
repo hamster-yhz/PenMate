@@ -119,6 +119,7 @@ class AgentControllerTest {
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "conversationId", 7001,
+                                "modelConfigId", 9001,
                                 "taskType", "draft"
                         ))))
                 .andExpect(status().isOk())

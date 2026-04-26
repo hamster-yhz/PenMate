@@ -1,10 +1,17 @@
 package com.penmate.backend.application.novel;
 
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
+import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateOutlineNodeCommand;
+import com.penmate.backend.domain.novel.model.NovelChapter;
+import com.penmate.backend.domain.novel.model.NovelChapterVersion;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.domain.novel.model.NovelProject;
+import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +26,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +39,12 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private RealtimeEventService realtimeEventService;
+
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
+
+    @Mock
+    private ObjectStorageService objectStorageService;
 
     @InjectMocks
     private NovelApplicationService novelApplicationService;
@@ -73,6 +88,572 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(created.getId()).isEqualTo(123L);
         assertThat(created.getParentId()).isNull();
         verify(realtimeEventService).publishProjectEvent(eq(920002L), eq("outline.node.created"), any());
+    }
+
+    @Test
+    void UT_APP_NOVEL_CREATE_PROJECT_DEFAULT_STATUS_AND_GENERATED_ID() {
+        when(businessIdGenerator.nextId()).thenReturn(900001L);
+        when(novelGateway.insertProject(any(NovelProject.class))).thenReturn(1);
+
+        NovelProject created = novelApplicationService.createProject(
+                new CreateProjectCommand(920001L, "新建项目", "摘要", null),
+                "trace-create-project"
+        );
+
+        assertThat(created.getProjectId()).isEqualTo(900001L);
+        assertThat(created.getStatus()).isEqualTo(1);
+        verify(novelGateway).insertProject(any(NovelProject.class));
+    }
+
+    @Test
+    void UT_APP_NOVEL_CREATE_PROJECT_INSERT_FAILED() {
+        when(businessIdGenerator.nextId()).thenReturn(900002L);
+        when(novelGateway.insertProject(any(NovelProject.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> novelApplicationService.createProject(
+                new CreateProjectCommand(920001L, "新建项目", "摘要", 2),
+                "trace-create-project-failed"
+        ))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Failed to create project");
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_REJECTS_INLINE_CONTENT() {
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                920002L,
+                920101L,
+                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, "inline-content"),
+                920001L,
+                "trace-commit-inline"
+        ))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Direct upload mode does not accept content in commit payload");
+
+        verify(novelGateway, never()).updateChapterContentMeta(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_COMMAND_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                920002L,
+                920101L,
+                null,
+                920001L,
+                "trace-commit-null-command"
+        ))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("command must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                null,
+                920101L,
+                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, null),
+                920001L,
+                "trace-commit-null-project"
+        ))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("projectId must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                920002L,
+                null,
+                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, null),
+                920001L,
+                "trace-commit-null-chapter"
+        ))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("chapterId must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_OBJECT_KEY_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                920002L,
+                920101L,
+                new CommitChapterContentCommand(null, "etag", 12L, "sha256", null, null),
+                920001L,
+                "trace-commit-null-object-key"
+        ))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("objectKey must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_OPERATOR_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                920002L,
+                920101L,
+                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, null),
+                null,
+                "trace-commit-null-operator"
+        ))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("operatorId must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_RETURNS_EMPTY_WHEN_OBJECT_KEY_BLANK() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        chapter.setContentObjectKey("  ");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+
+        assertThat(novelApplicationService.getChapterContentUrl(920002L, 920101L))
+                .containsEntry("url", "");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_SUCCESS() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        chapter.setContentObjectKey("novels/920002/chapters/920101/content.md");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(objectStorageService.buildReadUrl("novels/920002/chapters/920101/content.md"))
+                .thenReturn("https://cdn.local/read-url");
+
+        assertThat(novelApplicationService.getChapterContentUrl(920002L, 920101L))
+                .containsEntry("url", "https://cdn.local/read-url");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_SHOULD_THROW_WHEN_CHAPTER_NOT_FOUND() {
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(null);
+
+        assertThatThrownBy(() -> novelApplicationService.getChapterContentUrl(920002L, 920101L))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Chapter not found");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterContentUrl(null, 920101L))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("projectId must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterContentUrl(920002L, null))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("chapterId must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_SUCCESS() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(objectStorageService.buildUploadUrl(any(), eq("text/plain; charset=utf-8")))
+                .thenReturn("https://oss.local/upload-url");
+
+        java.util.Map<String, String> result = novelApplicationService.getChapterContentUploadUrl(920002L, 920101L);
+
+        assertThat(result)
+                .containsEntry("uploadUrl", "https://oss.local/upload-url")
+                .containsKey("objectKey");
+        assertThat(result.get("objectKey"))
+                .startsWith("novels/920002/chapters/920101/")
+                .endsWith(".md");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterContentUploadUrl(null, 920101L))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("projectId must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterContentUploadUrl(920002L, null))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("chapterId must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NOT_FOUND() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(null);
+
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, 920101L, 3))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Chapter version not found");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(null, 920101L, 3))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("projectId must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, null, 3))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("chapterId must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NULL_VERSION_NO_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, 920101L, null))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("versionNo must not be null");
+
+        verifyNoInteractions(novelGateway);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(null, 920101L, 3))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("projectId must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(920002L, null, 3))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("chapterId must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_NULL_VERSION_NO_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, null))
+                .isExactlyInstanceOf(NullPointerException.class)
+                .hasMessage("versionNo must not be null");
+
+        verifyNoInteractions(novelGateway, objectStorageService);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_RETURNS_EMPTY_WHEN_OBJECT_KEY_BLANK() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        NovelChapterVersion version = new NovelChapterVersion();
+        version.setVersionNo(3);
+        version.setSnapshotObjectKey("   ");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(version);
+
+        assertThat(novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, 3))
+                .containsEntry("url", "");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_SUCCESS() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        NovelChapterVersion version = new NovelChapterVersion();
+        version.setVersionNo(3);
+        version.setSnapshotObjectKey("novels/920002/chapters/920101/versions/3/snapshot.md");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(version);
+        when(objectStorageService.buildReadUrl("novels/920002/chapters/920101/versions/3/snapshot.md"))
+                .thenReturn("https://cdn.local/snapshot-url");
+
+        assertThat(novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, 3))
+                .containsEntry("url", "https://cdn.local/snapshot-url");
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_SHOULD_THROW_WHEN_VERSION_NOT_FOUND() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(null);
+
+        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, 3))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Chapter version not found");
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_SHOULD_FAIL_WHEN_UPDATE_COUNT_IS_NOT_ONE() {
+        when(novelGateway.updateChapterContentMeta(
+                eq(920002L),
+                eq(920101L),
+                eq("novels/920002/chapters/920101/content.md"),
+                eq("etag-1"),
+                eq(128L),
+                eq("sha-256"),
+                eq("s3")
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
+                920002L,
+                920101L,
+                new CommitChapterContentCommand("novels/920002/chapters/920101/content.md", "etag-1", 128L, "sha-256", null, null),
+                920001L,
+                "trace-commit-failed"
+        ))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Failed to commit chapter content");
+    }
+
+    @Test
+    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_DEFAULT_STORAGE_PROVIDER() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        when(novelGateway.updateChapterContentMeta(
+                eq(920002L),
+                eq(920101L),
+                eq("novels/920002/chapters/920101/content.md"),
+                eq("etag-1"),
+                eq(128L),
+                eq("sha-256"),
+                eq("s3")
+        )).thenReturn(1);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+
+        NovelChapter result = novelApplicationService.commitChapterContent(
+                920002L,
+                920101L,
+                new CommitChapterContentCommand("novels/920002/chapters/920101/content.md", "etag-1", 128L, "sha-256", null, null),
+                920001L,
+                "trace-commit"
+        );
+
+        assertThat(result).isSameAs(chapter);
+        verify(novelGateway).updateChapterContentMeta(
+                920002L,
+                920101L,
+                "novels/920002/chapters/920101/content.md",
+                "etag-1",
+                128L,
+                "sha-256",
+                "s3"
+        );
+    }
+
+    @Test
+    void UT_APP_NOVEL_CREATE_CHAPTER_VERSION_SHOULD_INCREMENT_FROM_MAX_VERSION() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        chapter.setContentObjectKey("novels/920002/chapters/920101/content.md");
+        chapter.setContentEtag("etag-latest");
+        chapter.setContentSize(1024L);
+        chapter.setContentChecksum("sha-latest");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.maxVersionNo(920101L)).thenReturn(7);
+        when(novelGateway.insertChapterVersion(any(NovelChapterVersion.class))).thenReturn(1);
+
+        NovelChapterVersion created = novelApplicationService.createChapterVersion(
+                920002L,
+                920101L,
+                new com.penmate.backend.application.novel.command.NovelCommands.CreateChapterVersionCommand("manual-save", "保存草稿", 920001L),
+                "trace-version-create"
+        );
+
+        assertThat(created.getVersionNo()).isEqualTo(8);
+        assertThat(created.getSnapshotObjectKey()).isEqualTo("novels/920002/chapters/920101/content.md");
+        assertThat(created.getSnapshotEtag()).isEqualTo("etag-latest");
+        verify(novelGateway).insertChapterVersion(any(NovelChapterVersion.class));
+    }
+
+    @Test
+    void UT_APP_NOVEL_RESTORE_CHAPTER_VERSION_SHOULD_FAIL_WHEN_UPDATE_COUNT_IS_NOT_ONE() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        NovelChapterVersion version = new NovelChapterVersion();
+        version.setVersionNo(3);
+        version.setSnapshotObjectKey("novels/920002/chapters/920101/versions/3/snapshot.md");
+        version.setSnapshotEtag("etag-v3");
+        version.setSnapshotSize(256L);
+        version.setSnapshotChecksum("sha-v3");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(version);
+        when(novelGateway.updateChapterContentMeta(
+                eq(920002L),
+                eq(920101L),
+                eq("novels/920002/chapters/920101/versions/3/snapshot.md"),
+                eq("etag-v3"),
+                eq(256L),
+                eq("sha-v3"),
+                eq("s3")
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> novelApplicationService.restoreChapterVersion(920002L, 920101L, 3, 920001L, "trace-restore-failed"))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Failed to restore chapter version");
+    }
+
+    @Test
+    void UT_APP_NOVEL_UPDATE_PROJECT_SUCCESS_RETURNS_REFRESHED_PROJECT() {
+        NovelProject existing = new NovelProject();
+        existing.setId(11L);
+        existing.setProjectId(920002L);
+        existing.setTitle("旧标题");
+        existing.setSummary("旧摘要");
+        existing.setStatus(2);
+
+        NovelProject refreshed = new NovelProject();
+        refreshed.setId(11L);
+        refreshed.setProjectId(920002L);
+        refreshed.setTitle("新标题");
+        refreshed.setSummary("新摘要");
+        refreshed.setStatus(2);
+
+        when(novelGateway.findProjectById(920002L)).thenReturn(existing, refreshed);
+        when(novelGateway.updateProject(existing)).thenReturn(1);
+
+        NovelProject result = novelApplicationService.updateProject(
+                920002L,
+                new com.penmate.backend.application.novel.command.NovelCommands.UpdateProjectCommand("新标题", "新摘要", null),
+                "trace-update-project"
+        );
+
+        assertThat(result).isSameAs(refreshed);
+        assertThat(existing.getTitle()).isEqualTo("新标题");
+        assertThat(existing.getSummary()).isEqualTo("新摘要");
+        assertThat(existing.getStatus()).isEqualTo(2);
+        verify(novelGateway).updateProject(existing);
+    }
+
+    @Test
+    void UT_APP_NOVEL_CREATE_VOLUME_DEFAULT_SORT_ORDER_SUCCESS() {
+        when(businessIdGenerator.nextId()).thenReturn(930001L);
+        when(novelGateway.insertVolume(any())).thenReturn(1);
+
+        NovelVolume volume = novelApplicationService.createVolume(
+                920002L,
+                new com.penmate.backend.application.novel.command.NovelCommands.CreateVolumeCommand("第一卷", null, "卷描述"),
+                920001L,
+                "trace-create-volume"
+        );
+
+        assertThat(volume.getVolumeId()).isEqualTo(930001L);
+        assertThat(volume.getProjectId()).isEqualTo(920002L);
+        assertThat(volume.getSortOrder()).isEqualTo(0);
+        assertThat(volume.getTitle()).isEqualTo("第一卷");
+    }
+
+    @Test
+    void UT_APP_NOVEL_UPDATE_VOLUME_SUCCESS_RETURNS_MATCHED_VOLUME_FROM_LIST() {
+        NovelVolume updated = new NovelVolume();
+        updated.setVolumeId(930101L);
+        updated.setProjectId(920002L);
+        updated.setTitle("第一卷-修订");
+        updated.setSortOrder(0);
+
+        when(novelGateway.updateVolume(any())).thenReturn(1);
+        when(novelGateway.findVolumesByProjectId(920002L)).thenReturn(List.of(updated));
+
+        NovelVolume result = novelApplicationService.updateVolume(
+                920002L,
+                930101L,
+                new com.penmate.backend.application.novel.command.NovelCommands.UpdateVolumeCommand("第一卷-修订", null, "新描述"),
+                920001L,
+                "trace-update-volume"
+        );
+
+        assertThat(result).isSameAs(updated);
+        assertThat(result.getSortOrder()).isEqualTo(0);
+    }
+
+    @Test
+    void UT_APP_NOVEL_DELETE_VOLUME_NOT_FOUND() {
+        when(novelGateway.softDeleteVolume(920002L, 930101L)).thenReturn(0);
+
+        assertThatThrownBy(() -> novelApplicationService.deleteVolume(920002L, 930101L, 920001L, "trace-delete-volume"))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Volume not found or already deleted");
+    }
+
+    @Test
+    void UT_APP_NOVEL_REMOVE_MEMBER_NOT_FOUND() {
+        when(novelGateway.deleteMember(920002L, 920005L)).thenReturn(0);
+
+        assertThatThrownBy(() -> novelApplicationService.removeMember(920002L, 920005L, 920001L, "trace-remove-member"))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Member not found");
+    }
+
+    @Test
+    void UT_APP_NOVEL_LIST_CHAPTER_VERSIONS_SUCCESS() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        NovelChapterVersion version = new NovelChapterVersion();
+        version.setVersionNo(1);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findVersionsByChapterId(920101L)).thenReturn(List.of(version));
+
+        List<NovelChapterVersion> result = novelApplicationService.listChapterVersions(920002L, 920101L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getVersionNo()).isEqualTo(1);
+    }
+
+    @Test
+    void UT_APP_NOVEL_LIST_OUTLINE_TREE_SUCCESS() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setTitle("长夜行");
+        NovelOutlineNode node = new NovelOutlineNode();
+        node.setId(9001L);
+        node.setProjectId(920002L);
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.findOutlineNodesByProjectId(920002L)).thenReturn(List.of(node));
+
+        List<NovelOutlineNode> result = novelApplicationService.listOutlineTree(920002L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(9001L);
+    }
+
+    @Test
+    void UT_APP_NOVEL_GET_CARD_NOT_FOUND() {
+        when(novelGateway.findCardByIdAndProjectId(920002L, 950001L)).thenReturn(null);
+
+        assertThatThrownBy(() -> novelApplicationService.getCard(920002L, 950001L))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Card not found");
     }
 }
 

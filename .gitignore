@@ -41,6 +41,9 @@ build/
 ### Local env ###
 penmate-backend/.env
 
+### Temporary test/debug logs ###
+penmate-backend/*.log
+
 ### roo ###
 .roo
 .roomodes

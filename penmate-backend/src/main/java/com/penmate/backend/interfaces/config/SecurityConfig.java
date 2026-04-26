@@ -14,6 +14,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.Objects;
 
 @Configuration
 @EnableWebSecurity
@@ -26,7 +27,7 @@ public class SecurityConfig {
     private final TraceIdFilter traceIdFilter;
 
     public SecurityConfig(TraceIdFilter traceIdFilter) {
-        this.traceIdFilter = traceIdFilter;
+        this.traceIdFilter = Objects.requireNonNull(traceIdFilter, "traceIdFilter");
     }
 
     /**
@@ -39,6 +40,7 @@ public class SecurityConfig {
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        Objects.requireNonNull(http, "http must not be null");
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
@@ -71,7 +73,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(List.of("Authorization", TraceIdFilter.TRACE_ID_HEADER));
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);
 

@@ -103,6 +103,28 @@ class ModelControllerTest {
     }
 
     @Test
+    // 创建用户密钥缺少 operatorId 参数：应返回参数校验错误。
+    void UT_MODEL_KEY_CREATE_MISSING_OPERATOR_ID_BAD_REQUEST() throws Exception {
+        String traceId = "UT-TRACE-MODEL-KEY-CREATE-MISSING-OPERATOR-ID";
+
+        mockMvc().perform(post("/api/v1/model/keys")
+                        .param("userId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "providerId", 1,
+                                "keyName", "my-key",
+                                "apiKey", "sk-xxx",
+                                "isDefault", true
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.details[0].field").value("operatorId"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
     // 列表密钥掩码字段断言。
     void UT_MODEL_KEY_MASKED_FIELD_ASSERT() throws Exception {
         String traceId = "UT-TRACE-MODEL-KEY-MASKED";

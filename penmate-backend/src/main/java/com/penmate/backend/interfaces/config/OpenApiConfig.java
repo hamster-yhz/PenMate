@@ -187,13 +187,13 @@ public class OpenApiConfig {
         if (path.contains("/plugins")) {
             return "插件管理";
         }
-        if (path.contains("/models")) {
+        if (path.contains("/models") || path.contains("/model/") || path.endsWith("/model")) {
             return "模型配置";
         }
         if (path.contains("/novels")) {
             return "小说项目";
         }
-        if (path.contains("/iam") || path.contains("/rbac") || path.contains("/roles") || path.contains("/users")) {
+        if (path.contains("/iam") || path.contains("/rbac") || path.contains("/roles") || path.contains("/users") || path.contains("/profile/menus")) {
             return "RBAC 权限";
         }
         if (path.contains("/ops")) {

@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -514,6 +515,9 @@ public class NovelApplicationService {
      * @return 出参：处理结果
      */
     public NovelChapterVersion getChapterVersion(Long projectId, Long chapterId, Integer versionNo) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(chapterId, "chapterId must not be null");
+        Objects.requireNonNull(versionNo, "versionNo must not be null");
         log.info("查询章节版本详情: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
         getChapter(projectId, chapterId);
         NovelChapterVersion version = novelGateway.findVersionByChapterAndVersion(chapterId, versionNo);
@@ -557,6 +561,8 @@ public class NovelApplicationService {
      * @return 出参：处理结果
      */
     public Map<String, String> getChapterContentUrl(Long projectId, Long chapterId) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(chapterId, "chapterId must not be null");
         NovelChapter chapter = getChapter(projectId, chapterId);
         if (chapter.getContentObjectKey() == null || chapter.getContentObjectKey().isBlank()) {
             log.warn("章节正文对象键为空: projectId={}, chapterId={}", projectId, chapterId);
@@ -574,6 +580,8 @@ public class NovelApplicationService {
      * @return 出参：处理结果
      */
     public Map<String, String> getChapterContentUploadUrl(Long projectId, Long chapterId) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(chapterId, "chapterId must not be null");
         getChapter(projectId, chapterId);
         String objectKey = "novels/" + projectId + "/chapters/" + chapterId + "/" + UUID.randomUUID() + ".md";
         log.info("获取章节正文上传地址: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, objectKey);
@@ -594,6 +602,11 @@ public class NovelApplicationService {
      * @return 出参：处理结果
      */
     public NovelChapter commitChapterContent(Long projectId, Long chapterId, CommitChapterContentCommand command, Long operatorId, String traceId) {
+        Objects.requireNonNull(command, "command must not be null");
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(chapterId, "chapterId must not be null");
+        Objects.requireNonNull(command.objectKey(), "objectKey must not be null");
+        Objects.requireNonNull(operatorId, "operatorId must not be null");
         log.info("提交章节正文元数据: projectId={}, chapterId={}, objectKey={}, operatorId={}", projectId, chapterId, command.objectKey(), operatorId);
         if (command.content() != null && !command.content().isBlank()) {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Direct upload mode does not accept content in commit payload");
@@ -625,6 +638,9 @@ public class NovelApplicationService {
      * @return 出参：处理结果
      */
     public Map<String, String> getChapterVersionSnapshotUrl(Long projectId, Long chapterId, Integer versionNo) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(chapterId, "chapterId must not be null");
+        Objects.requireNonNull(versionNo, "versionNo must not be null");
         NovelChapterVersion version = getChapterVersion(projectId, chapterId, versionNo);
         if (version.getSnapshotObjectKey() == null || version.getSnapshotObjectKey().isBlank()) {
             log.warn("章节版本快照对象键为空: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);

@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,6 +27,30 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(err -> Map.of("field", err.getField(), "message", err.getDefaultMessage()))
                 .toList();
+
+        return ResponseEntity.badRequest().body(
+                ErrorResponse.of(
+                        400,
+                        "VALIDATION_ERROR",
+                        "请求参数校验失败",
+                        details,
+                        request.getRequestURI(),
+                        traceId
+                )
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestParameter(MissingServletRequestParameterException ex,
+                                                                       HttpServletRequest request) {
+        String traceId = traceId(request);
+        log.warn("请求参数缺失: traceId={}, path={}, parameter={}", traceId, request.getRequestURI(), ex.getParameterName());
+        List<Map<String, String>> details = List.of(
+                Map.of(
+                        "field", ex.getParameterName(),
+                        "message", "required request parameter is missing"
+                )
+        );
 
         return ResponseEntity.badRequest().body(
                 ErrorResponse.of(
@@ -98,7 +123,10 @@ public class GlobalExceptionHandler {
             return traceId;
         }
         String traceId = request.getHeader("X-Trace-Id");
-        return traceId == null || traceId.isBlank() ? UUID.randomUUID().toString() : traceId;
+        if (traceId == null || traceId.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+        return traceId.trim();
     }
 }
 

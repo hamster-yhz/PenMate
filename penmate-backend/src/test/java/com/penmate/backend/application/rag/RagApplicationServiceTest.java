@@ -6,6 +6,7 @@ import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.domain.rag.model.RagDocument;
 import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,6 +34,9 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
     @Mock
     private RagRetrievalService ragRetrievalService;
 
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
+
     @InjectMocks
     private RagApplicationService ragApplicationService;
 
@@ -51,6 +55,8 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         Long operatorId = 1001L;
         String traceId = "UT-TRACE-RAG-CREATE";
 
+        when(businessIdGenerator.nextId()).thenReturn(7001L);
+
         when(ragDocumentRepository.insert(any(RagDocument.class))).thenAnswer(invocation -> {
             RagDocument doc = invocation.getArgument(0);
             doc.setId(7L);
@@ -64,6 +70,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         );
 
         assertThat(result.getId()).isEqualTo(7L);
+        assertThat(result.getDocumentId()).isEqualTo(7001L);
         verify(ragDocumentRepository).insert(any(RagDocument.class));
     }
 
@@ -125,6 +132,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_RAG_GET_INDEX_STATUS_SUCCESS() {
         RagDocument document = new RagDocument();
         document.setId(2L);
+        document.setDocumentId(2L);
         document.setParseStatus("done");
         document.setIndexStatus("done");
         when(ragDocumentRepository.findById(1L, 2L)).thenReturn(document);
@@ -142,6 +150,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_RAG_LIST_RETRIEVAL_LOGS_SUCCESS() {
         RagRetrievalLog log = new RagRetrievalLog();
         log.setId(1L);
+        log.setRetrievalLogId(1L);
         log.setProjectId(1L);
         log.setTaskId(2L);
         log.setHitCount(3);
@@ -152,7 +161,8 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         List<Map<String, Object>> result = ragApplicationService.listRetrievalLogs(1L);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0)).containsEntry("projectId", 1L)
+        assertThat(result.get(0)).containsEntry("id", 1L)
+                .containsEntry("projectId", 1L)
                 .containsEntry("taskId", 2L)
                 .containsEntry("hitCount", 3);
     }

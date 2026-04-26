@@ -139,6 +139,26 @@ class NovelControllerTest {
     }
 
     @Test
+    // 正文 commit 缺少 objectKey 应在接口层返回参数校验错误，而不是 500。
+    void UT_NOVEL_CONTENT_COMMIT_NULL_OBJECT_KEY_BAD_REQUEST() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CONTENT-COMMIT-NULL-OBJECT-KEY";
+
+        mockMvc().perform(post("/api/v1/novels/10001/chapters/3001/content-commit")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content("{" +
+                                "\"objectKey\":null," +
+                                "\"etag\":\"etag-1\"" +
+                                "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.details[0].field").value("objectKey"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
     // 正文 commit etag 校验失败。
     void UT_NOVEL_CONTENT_COMMIT_ETAG_MISMATCH() throws Exception {
         String traceId = "UT-TRACE-NOVEL-CONTENT-COMMIT-ETAG";
@@ -155,6 +175,28 @@ class NovelControllerTest {
                         ))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
+    // 正文 commit 空值空指针不应伪装成 422 业务异常。
+    void UT_NOVEL_CONTENT_COMMIT_NULL_POINTER_SHOULD_RETURN_INTERNAL_SERVER_ERROR() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CONTENT-COMMIT-NULL-POINTER";
+        doThrow(new NullPointerException("projectId must not be null"))
+                .when(novelApplicationService).commitChapterContent(eq(10001L), eq(3001L), any(), eq(1001L), eq(traceId));
+
+        mockMvc().perform(post("/api/v1/novels/10001/chapters/3001/content-commit")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "objectKey", "novels/10001/chapters/3001.md",
+                                "etag", "etag-1"
+                        ))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.data.status").value(500))
+                .andExpect(jsonPath("$.data.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.data.message").value("系统开小差了，请稍后重试"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
     @Test
@@ -267,6 +309,20 @@ class NovelControllerTest {
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value("deleted"));
+    }
+
+    @Test
+    // 删除项目缺少 operatorId 参数：应返回参数校验错误。
+    void UT_NOVEL_PROJECT_DELETE_MISSING_OPERATOR_ID_BAD_REQUEST() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-PROJECT-DELETE-MISSING-OPERATOR-ID";
+
+        mockMvc().perform(delete("/api/v1/novels/10001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.details[0].field").value("operatorId"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
     @Test
@@ -486,6 +542,192 @@ class NovelControllerTest {
                         ))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.status").value(422));
+    }
+
+    @Test
+    // 项目列表查询成功。
+    void UT_NOVEL_PROJECT_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-PROJECT-LIST";
+        NovelProject project = new NovelProject();
+        project.setId(10001L);
+        project.setTitle("第七星环");
+        when(novelApplicationService.listProjects()).thenReturn(java.util.List.of(project));
+
+        mockMvc().perform(get("/api/v1/novels")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(10001))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 项目详情查询成功。
+    void UT_NOVEL_PROJECT_GET_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-PROJECT-GET";
+        NovelProject project = new NovelProject();
+        project.setId(10001L);
+        project.setTitle("第七星环");
+        when(novelApplicationService.getProject(10001L)).thenReturn(project);
+
+        mockMvc().perform(get("/api/v1/novels/10001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(10001))
+                .andExpect(jsonPath("$.data.title").value("第七星环"));
+    }
+
+    @Test
+    // 成员移除成功。
+    void UT_NOVEL_MEMBER_REMOVE_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-MEMBER-REMOVE";
+        doNothing().when(novelApplicationService).removeMember(10001L, 2001L, 1001L, traceId);
+
+        mockMvc().perform(delete("/api/v1/novels/10001/members/2001")
+                        .param("operatorId", "1001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("removed"));
+    }
+
+    @Test
+    // 章节版本列表查询成功。
+    void UT_NOVEL_VERSION_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-VERSION-LIST";
+        NovelChapterVersion version = new NovelChapterVersion();
+        version.setVersionNo(3);
+        when(novelApplicationService.listChapterVersions(10001L, 3001L)).thenReturn(java.util.List.of(version));
+
+        mockMvc().perform(get("/api/v1/novels/10001/chapters/3001/versions")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].versionNo").value(3));
+    }
+
+    @Test
+    // 单个章节版本查询成功。
+    void UT_NOVEL_VERSION_GET_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-VERSION-GET";
+        NovelChapterVersion version = new NovelChapterVersion();
+        version.setVersionNo(3);
+        when(novelApplicationService.getChapterVersion(10001L, 3001L, 3)).thenReturn(version);
+
+        mockMvc().perform(get("/api/v1/novels/10001/chapters/3001/versions/3")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.versionNo").value(3));
+    }
+
+    @Test
+    // 正文读取URL获取成功。
+    void UT_NOVEL_CONTENT_URL_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CONTENT-URL";
+        when(novelApplicationService.getChapterContentUrl(10001L, 3001L)).thenReturn(Map.of(
+                "url", "https://oss/read"
+        ));
+
+        mockMvc().perform(get("/api/v1/novels/10001/chapters/3001/content-url")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.url").value("https://oss/read"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 大纲树查询成功。
+    void UT_NOVEL_OUTLINE_TREE_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-OUTLINE-TREE-LIST";
+        NovelOutlineNode node = new NovelOutlineNode();
+        node.setId(9001L);
+        node.setTitle("第一幕");
+        when(novelApplicationService.listOutlineTree(10001L)).thenReturn(java.util.List.of(node));
+
+        mockMvc().perform(get("/api/v1/novels/10001/outlines/tree")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(9001))
+                .andExpect(jsonPath("$.data[0].title").value("第一幕"));
+    }
+
+    @Test
+    // 卡片列表查询成功。
+    void UT_NOVEL_CARD_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CARD-LIST";
+        NovelCard card = new NovelCard();
+        card.setId(5001L);
+        card.setName("主角");
+        when(novelApplicationService.listCards(10001L)).thenReturn(java.util.List.of(card));
+
+        mockMvc().perform(get("/api/v1/novels/10001/cards")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(5001))
+                .andExpect(jsonPath("$.data[0].name").value("主角"));
+    }
+
+    @Test
+    // 卡片详情查询成功。
+    void UT_NOVEL_CARD_GET_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CARD-GET";
+        NovelCard card = new NovelCard();
+        card.setId(5001L);
+        card.setName("主角");
+        when(novelApplicationService.getCard(10001L, 5001L)).thenReturn(card);
+
+        mockMvc().perform(get("/api/v1/novels/10001/cards/5001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(5001))
+                .andExpect(jsonPath("$.data.name").value("主角"));
+    }
+
+    @Test
+    // 卡片更新成功。
+    void UT_NOVEL_CARD_UPDATE_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CARD-UPDATE";
+        NovelCard card = new NovelCard();
+        card.setId(5001L);
+        card.setName("主角-修订");
+        when(novelApplicationService.updateCard(eq(10001L), eq(5001L), any(), eq(1001L), eq(traceId))).thenReturn(card);
+
+        mockMvc().perform(put("/api/v1/novels/10001/cards/5001")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "cardType", "character",
+                                "name", "主角-修订",
+                                "summary", "新简介"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(5001))
+                .andExpect(jsonPath("$.data.name").value("主角-修订"));
+    }
+
+    @Test
+    // 卡片删除成功。
+    void UT_NOVEL_CARD_DELETE_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-CARD-DELETE";
+        doNothing().when(novelApplicationService).deleteCard(10001L, 5001L, 1001L, traceId);
+
+        mockMvc().perform(delete("/api/v1/novels/10001/cards/5001")
+                        .param("operatorId", "1001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("deleted"));
+    }
+
+    @Test
+    // 关系图谱列表查询成功。
+    void UT_NOVEL_RELATION_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-NOVEL-RELATION-LIST";
+        com.penmate.backend.domain.novel.model.NovelCardRelation relation = new com.penmate.backend.domain.novel.model.NovelCardRelation();
+        relation.setId(6001L);
+        when(novelApplicationService.listCardRelations(10001L)).thenReturn(java.util.List.of(relation));
+
+        mockMvc().perform(get("/api/v1/novels/10001/card-relations")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(6001));
     }
 }
 

@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.Signature;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,15 @@ public class BusinessLogAspect {
      */
     @Around("execution(* com.penmate.backend.interfaces.api..*.*(..)) || execution(* com.penmate.backend.application..*ApplicationService.*(..))")
     public Object aroundBusiness(ProceedingJoinPoint joinPoint) throws Throwable {
-        String signature = joinPoint.getSignature().toShortString();
+        String signature = "unknown";
+        try {
+            Signature rawSignature = joinPoint.getSignature();
+            if (rawSignature != null) {
+                signature = rawSignature.toShortString();
+            }
+        } catch (Exception ignore) {
+            // fallback to default signature
+        }
         long start = System.currentTimeMillis();
 //        log.info("[ENTER] method={}", signature);
         try {

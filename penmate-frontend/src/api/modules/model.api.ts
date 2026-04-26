@@ -78,16 +78,22 @@ export const modelApi = {
     return request.post<string>(`/v1/novels/${projectId}/model-configs/${configId}/set-default?operatorId=${operatorId}`)
   },
   listPolicies(projectId: IdLike) {
-    return this.listConfigs(projectId)
+    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/model-policies`)
   },
   createPolicy(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return this.createConfig(projectId, operatorId, payload)
+    return request.post<string>(
+      `/v1/novels/${projectId}/model-policies?operatorId=${operatorId}`,
+      normalizeConfigPayload(payload)
+    )
   },
   updatePolicy(projectId: IdLike, policyId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return this.updateConfig(projectId, policyId, operatorId, payload)
+    return request.put<string>(
+      `/v1/novels/${projectId}/model-policies/${policyId}?operatorId=${operatorId}`,
+      normalizeConfigPayload(payload)
+    )
   },
   setDefaultPolicy(projectId: IdLike, policyId: IdLike, operatorId: IdLike) {
-    return this.setDefaultConfig(projectId, policyId, operatorId)
+    return request.post<string>(`/v1/novels/${projectId}/model-policies/${policyId}/set-default?operatorId=${operatorId}`)
   }
 }
 

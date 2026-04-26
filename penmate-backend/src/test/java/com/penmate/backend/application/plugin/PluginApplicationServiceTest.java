@@ -6,6 +6,7 @@ import com.penmate.backend.domain.plugin.model.PluginCallLog;
 import com.penmate.backend.domain.plugin.model.PluginCatalogItem;
 import com.penmate.backend.domain.plugin.model.PluginProjectInstall;
 import com.penmate.backend.domain.plugin.repository.PluginRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +26,9 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private PluginRepository pluginRepository;
+
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
 
     @InjectMocks
     private PluginApplicationService pluginApplicationService;
@@ -100,8 +104,9 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         String version = "1.0.0";
         String configJson = "{\"apiKey\":\"xxx\"}";
         String traceId = "UT-TRACE-PLUGIN-INSTALL";
+        when(businessIdGenerator.nextId()).thenReturn(30001L);
         when(pluginRepository.findCatalogIdByCode(pluginCode)).thenReturn(1L);
-        when(pluginRepository.insertInstall(eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId))).thenReturn(1);
+        when(pluginRepository.insertInstall(eq(30001L), eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId))).thenReturn(1);
 
         // when
         pluginApplicationService.install(
@@ -112,7 +117,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
         // then
         verify(pluginRepository).findCatalogIdByCode(pluginCode);
-        verify(pluginRepository).insertInstall(eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId));
+        verify(pluginRepository).insertInstall(eq(30001L), eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId));
     }
 
     @Test
@@ -144,8 +149,9 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         String version = "1.0.0";
         String configJson = "{\"apiKey\":\"xxx\"}";
         String traceId = "UT-TRACE-PLUGIN-INSTALL-FAIL";
+        when(businessIdGenerator.nextId()).thenReturn(30002L);
         when(pluginRepository.findCatalogIdByCode(pluginCode)).thenReturn(1L);
-        when(pluginRepository.insertInstall(eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId))).thenReturn(0);
+        when(pluginRepository.insertInstall(eq(30002L), eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId))).thenReturn(0);
 
         // when & then
         assertThatThrownBy(() -> pluginApplicationService.install(
@@ -154,6 +160,9 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
                 traceId
         )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Failed to install plugin");
+
+        verify(businessIdGenerator).nextId();
+        verify(pluginRepository).insertInstall(eq(30002L), eq(projectId), eq(1L), eq(version), eq(configJson), eq(true), eq(operatorId));
     }
 
     @Test

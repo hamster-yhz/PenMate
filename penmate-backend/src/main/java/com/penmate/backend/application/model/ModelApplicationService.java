@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 模型配置应用服务。
@@ -66,6 +67,8 @@ public class ModelApplicationService {
      * @param traceId 入参：traceId
      */
     public void createKey(Long userId, CreateModelKeyCommand command, String traceId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        Objects.requireNonNull(command, "command must not be null");
         log.info("创建模型密钥: userId={}, providerId={}, keyName={}", userId, command.providerId(), command.keyName());
         boolean toDefault = Boolean.TRUE.equals(command.isDefault());
         if (toDefault) {
@@ -98,6 +101,9 @@ public class ModelApplicationService {
      * @param traceId 入参：traceId
      */
     public void updateKey(Long userId, Long keyId, UpdateModelKeyCommand command, String traceId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        Objects.requireNonNull(keyId, "keyId must not be null");
+        Objects.requireNonNull(command, "command must not be null");
         log.info("更新模型密钥: userId={}, keyId={}", userId, keyId);
         if (Boolean.TRUE.equals(command.isDefault())) {
             modelRepository.clearDefaultUserKey(userId);
@@ -130,6 +136,9 @@ public class ModelApplicationService {
      * @param traceId 入参：traceId
      */
     public void deleteKey(Long userId, Long keyId, Long operatorId, String traceId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        Objects.requireNonNull(keyId, "keyId must not be null");
+        Objects.requireNonNull(operatorId, "operatorId must not be null");
         log.info("删除模型密钥: userId={}, keyId={}", userId, keyId);
         int affected = modelRepository.softDeleteUserKey(userId, keyId);
         if (affected != 1) {
@@ -141,6 +150,7 @@ public class ModelApplicationService {
     }
 
     public void createOfficialKey(CreateOfficialModelKeyCommand command, String traceId) {
+        Objects.requireNonNull(command, "command must not be null");
         log.info("创建官方模型密钥: providerId={}, keyName={}", command.providerId(), command.keyName());
         boolean toDefault = Boolean.TRUE.equals(command.isDefault());
         if (toDefault) {
@@ -164,6 +174,7 @@ public class ModelApplicationService {
     }
 
     public void updateOfficialKey(Long keyId, UpdateOfficialModelKeyCommand command, String traceId) {
+        Objects.requireNonNull(command, "command must not be null");
         log.info("更新官方模型密钥: keyId={}", keyId);
         ModelOfficialApiKey existing = modelRepository.findOfficialKey(keyId);
         if (existing == null) {
@@ -221,6 +232,8 @@ public class ModelApplicationService {
      * @param traceId 入参：traceId
      */
     public void createPolicy(Long projectId, CreatePolicyCommand command, String traceId) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(command, "command must not be null");
         log.info("创建模型策略: projectId={}, policyName={}, scene={}", projectId, command.policyName(), command.scene());
         boolean toDefault = Boolean.TRUE.equals(command.isDefault());
         if (toDefault) {
@@ -259,6 +272,8 @@ public class ModelApplicationService {
      * @param traceId 入参：traceId
      */
     public void updatePolicy(Long projectId, Long policyId, UpdatePolicyCommand command, String traceId) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(command, "command must not be null");
         log.info("更新模型策略: projectId={}, policyId={}", projectId, policyId);
         if (Boolean.TRUE.equals(command.isDefault())) {
             modelRepository.clearDefaultPolicy(projectId);
@@ -315,7 +330,17 @@ public class ModelApplicationService {
      * @param traceId 入参：traceId
      */
     public void setDefaultPolicy(Long projectId, Long policyId, Long operatorId, String traceId) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(policyId, "policyId must not be null");
+        Objects.requireNonNull(operatorId, "operatorId must not be null");
         log.info("设置默认模型策略: projectId={}, policyId={}", projectId, policyId);
+
+        ModelProjectPolicy existing = modelRepository.findProjectPolicy(projectId, policyId);
+        if (existing == null) {
+            log.warn("设置默认模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
+        }
+
         modelRepository.clearDefaultPolicy(projectId);
         int affected = modelRepository.setDefaultPolicy(projectId, policyId);
         if (affected != 1) {

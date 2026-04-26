@@ -74,179 +74,59 @@
 
           <!-- ======== Outline Tree ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'outline'">
-            <div class="tree-actions">
-              <button class="tree-btn" :disabled="outlineOpBusy" @click="addVolume">+ 新卷</button>
-            </div>
-            <div class="tree-root">
-              <div v-for="(vol, vIdx) in outlineData" :key="vol.key" class="tree-node">
-                <div
-                  class="tree-item volume"
-                  :class="{ expanded: vol.expanded }"
-                  @click="vol.expanded = !vol.expanded"
-                >
-                  <span class="tree-arrow">{{ vol.expanded ? '▾' : '▸' }}</span>
-                  <!-- Inline edit for volume title -->
-                  <input
-                    v-if="editingNodeKey === vol.key"
-                    v-model="editingNodeValue"
-                    class="tree-edit-input"
-                    @blur="finishEditNode(vol)"
-                    @keydown.enter="finishEditNode(vol)"
-                    @keydown.escape="editingNodeKey = ''"
-                    @click.stop
-                  />
-                  <span v-else class="tree-label">{{ vol.title }}</span>
-                  <div class="tree-item-actions" @click.stop>
-                    <button class="tree-act-btn" @click="startEditNode(vol)" title="重命名">✏️</button>
-                    <button class="tree-act-btn" @click="addChapter(vol)" title="添加章节">+</button>
-                    <button class="tree-act-btn" @click="moveVolume(vol, -1)" title="上移">↑</button>
-                    <button class="tree-act-btn" @click="moveVolume(vol, 1)" title="下移">↓</button>
-                    <button class="tree-act-btn danger" @click="deleteVolume(vIdx)" title="删除">✕</button>
-                  </div>
-                </div>
-                <div v-if="vol.expanded" class="tree-children">
-                  <div
-                    v-for="(ch, cIdx) in vol.children"
-                    :key="ch.key"
-                    class="tree-item chapter"
-                    :class="{ active: activeChapter === String(ch.chapterId || ch.key) }"
-                    @click="selectChapter(ch)"
-                  >
-                    <span class="tree-dot">◇</span>
-                    <input
-                      v-if="editingNodeKey === ch.key"
-                      v-model="editingNodeValue"
-                      class="tree-edit-input"
-                      @blur="finishEditNode(ch)"
-                      @keydown.enter="finishEditNode(ch)"
-                      @keydown.escape="editingNodeKey = ''"
-                      @click.stop
-                    />
-                    <span v-else class="tree-label">{{ ch.title }}</span>
-                    <div class="tree-item-actions" @click.stop>
-                      <button class="tree-act-btn" @click="startEditNode(ch)" title="重命名">✏️</button>
-                      <button class="tree-act-btn" @click="moveChapter(vol, cIdx, -1)" title="上移">↑</button>
-                      <button class="tree-act-btn" @click="moveChapter(vol, cIdx, 1)" title="下移">↓</button>
-                      <button class="tree-act-btn danger" @click="deleteChapter(vol, cIdx)" title="删除">✕</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+            <OutlineTree
+              :volumes="outlineData"
+              :active-chapter-key="activeChapter"
+              :busy="outlineOpBusy"
+              @select-chapter="handleOutlineSelectChapter"
+              @rename-node="renameNode"
+              @move-node="moveNode"
+              @add-volume="addVolume"
+              @add-chapter="addChapter"
+              @delete-volume="deleteVolume"
+              @delete-chapter="deleteChapter"
+            />
           </div>
 
           <!-- ======== Character Library ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'characters'">
-            <div class="tree-actions">
-              <button class="tree-btn" @click="createCardQuick('CHARACTER')">+ 新角色卡</button>
-            </div>
-            <div class="char-list" v-if="projectCards.length">
-              <div
-                v-for="card in projectCards.filter((item) => String(item.cardType || '').toUpperCase() === 'CHARACTER')"
-                :key="String(card.cardId)"
-                class="char-card"
-                :class="{ expanded: card.expanded }"
-              >
-                <div class="char-header" @click="card.expanded = !card.expanded">
-                  <span class="char-avatar">{{ String(card.name || '角').charAt(0) }}</span>
-                  <div class="char-meta">
-                    <span class="char-name">{{ String(card.name || '未命名角色') }}</span>
-                    <span class="char-role">{{ String(card.summary || '角色卡') }}</span>
-                  </div>
-                  <div class="char-actions" @click.stop>
-                    <button class="tree-act-btn" @click="saveCard(card)" title="保存">💾</button>
-                    <button class="tree-act-btn danger" @click="deleteCardById(card)" title="删除角色">✕</button>
-                  </div>
-                  <span class="char-toggle">{{ card.expanded ? '▾' : '▸' }}</span>
-                </div>
-                <div class="char-details" v-if="card.expanded">
-                  <div class="char-field-edit">
-                    <span class="cf-label">名字</span>
-                    <input v-model="card.name" class="cf-input" />
-                  </div>
-                  <div class="char-field-edit">
-                    <span class="cf-label">身份</span>
-                    <input v-model="card.summary" class="cf-input" />
-                  </div>
-                  <div class="char-field-edit">
-                    <span class="cf-label">性格</span>
-                    <input v-model="card.detailJson" class="cf-input" placeholder="可填 JSON 或文本" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-hint">暂无角色卡，点击“+ 新角色卡”创建。</div>
+            <CharacterCardList
+              :cards="characterCards"
+              :show-empty-hint="!projectCards.length"
+              @create-card="createCardQuick('CHARACTER')"
+              @toggle-expand="toggleCardExpanded"
+              @update:card="updateCardDraft"
+              @save="saveCard"
+              @delete="deleteCardById"
+            />
           </div>
 
           <!-- ======== World Settings ======== -->
           <div class="tab-content" v-if="activeLeftTab === 'world'">
-            <div class="tree-actions">
-              <button class="tree-btn" @click="createCardQuick('WORLD')">+ 新世界观卡</button>
-            </div>
-            <div class="world-list" v-if="projectCards.length">
-              <div
-                v-for="card in projectCards.filter((item) => String(item.cardType || '').toUpperCase() === 'WORLD')"
-                :key="`world-${String(card.cardId)}`"
-                class="world-card"
-              >
-                <div class="world-header" @click="card.expanded = !card.expanded">
-                  <span class="world-icon">🌍</span>
-                  <span class="world-name">{{ String(card.name || '未命名设定') }}</span>
-                  <div class="world-actions" @click.stop>
-                    <button class="tree-act-btn" @click="saveCard(card)" title="保存">💾</button>
-                    <button class="tree-act-btn danger" @click="deleteCardById(card)" title="删除">✕</button>
-                  </div>
-                  <span class="world-toggle">{{ card.expanded ? '▾' : '▸' }}</span>
-                </div>
-                <div class="world-body" v-if="card.expanded">
-                  <div class="world-edit-field">
-                    <label>名称</label>
-                    <input v-model="card.name" class="cf-input" />
-                  </div>
-                  <div class="world-edit-field">
-                    <label>摘要</label>
-                    <input v-model="card.summary" class="cf-input" />
-                  </div>
-                  <div class="world-edit-field">
-                    <label>详情(JSON)</label>
-                    <textarea v-model="card.detailJson" class="cf-input cf-textarea" rows="3"></textarea>
-                  </div>
-                </div>
-              </div>
+            <WorldCardList
+              :cards="worldCards"
+              :show-empty-hint="!projectCards.length"
+              @create-card="createCardQuick('WORLD')"
+              @toggle-expand="toggleCardExpanded"
+              @update:card="updateCardDraft"
+              @save="saveCard"
+              @delete="deleteCardById"
+            />
 
-              <div class="relation-panel">
-                <div class="relation-title">关系维护</div>
-                <div class="relation-create">
-                  <select v-model="relationFromId" class="relation-select">
-                    <option value="">来源卡片</option>
-                    <option v-for="card in projectCards" :key="`from-${String(card.cardId)}`" :value="String(card.cardId)">
-                      {{ String(card.name || `卡片#${String(card.cardId)}`) }}
-                    </option>
-                  </select>
-                  <select v-model="relationToId" class="relation-select">
-                    <option value="">目标卡片</option>
-                    <option v-for="card in projectCards" :key="`to-${String(card.cardId)}`" :value="String(card.cardId)">
-                      {{ String(card.name || `卡片#${String(card.cardId)}`) }}
-                    </option>
-                  </select>
-                  <input v-model="relationType" class="cf-input" placeholder="关系类型，如：敌对/师徒" />
-                  <button class="tree-btn" @click="createRelation">+ 新建关系</button>
-                </div>
-                <div class="relation-list">
-                  <div class="relation-item" v-for="relation in cardRelations" :key="String(relation.cardRelationId)">
-                    <span>
-                      {{ cardNameById(String(relation.fromCardId || '')) }}
-                      →
-                      {{ cardNameById(String(relation.toCardId || '')) }}
-                      （{{ String(relation.relationType || '关联') }}）
-                    </span>
-                    <button class="tree-act-btn danger" @click="deleteRelationById(relation)">✕</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-hint">暂无资料卡，先创建角色卡或世界观卡。</div>
+            <CardRelationPanel
+              v-if="projectCards.length"
+              :cards="projectCards"
+              :relations="cardRelations"
+              :relation-from-id="relationFromId"
+              :relation-to-id="relationToId"
+              :relation-type="relationType"
+              :card-name-by-id="cardNameById"
+              @update:relation-from-id="relationFromId = $event"
+              @update:relation-to-id="relationToId = $event"
+              @update:relation-type="relationType = $event"
+              @create-relation="createRelation"
+              @delete-relation="deleteRelationById"
+            />
           </div>
         </div>
       </aside>
@@ -454,6 +334,10 @@ import StyleManager from '@/components/workbench/StyleManager.vue'
 import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
 import ModelSettings from '@/components/workbench/ModelSettings.vue'
 import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
+import OutlineTree from '@/components/workbench/outline/OutlineTree.vue'
+import CharacterCardList from '@/components/workbench/cards/CharacterCardList.vue'
+import WorldCardList from '@/components/workbench/cards/WorldCardList.vue'
+import CardRelationPanel from '@/components/workbench/cards/CardRelationPanel.vue'
 import type { ApprovalCardData } from '@/components/workbench/ApprovalCard.vue'
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
@@ -465,10 +349,35 @@ import { pluginApi } from '@/api/modules/plugin.api'
 import { modelApi } from '@/api/modules/model.api'
 import { getSession, clearSession } from '@/stores/session'
 import { authApi } from '@/api/modules/auth.api'
+import { useWorkbenchContext } from '@/composables/workbench/useWorkbenchContext'
+import { createChapterLoadGuard, useWorkbenchDraft } from '@/composables/workbench/useWorkbenchDraft'
+import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
+import { useWorkbenchOutline } from '@/composables/workbench/useWorkbenchOutline'
+import { useWorkbenchCards } from '@/composables/workbench/useWorkbenchCards'
+import {
+  hasObjectKeyInStorageUrl,
+  normalizeObjectStorageUrl,
+  resolveDirectUploadTarget,
+} from '@/composables/workbench/workbenchStorage'
 
 const router = useRouter()
 const route = useRoute()
 const session = getSession()
+const { projectId: initialProjectId, operatorId: initialOperatorId, ensureContext, username: sessionUsername, userEmail: sessionUserEmail } = useWorkbenchContext({
+  query: route.query,
+  session,
+})
+const { saveDraft, resolveStoredDraft, resolveEditorSeedContent, resolveChapterContent } = useWorkbenchDraft()
+const chapterLoadGuard = createChapterLoadGuard()
+const getCurrentProjectId = () => ensureContext().projectId || initialProjectId
+const resolveOperatorId = () => ensureContext().operatorId || initialOperatorId
+const getContext = () => {
+  const { projectId, operatorId } = ensureContext()
+  return {
+    projectId,
+    operatorId,
+  }
+}
 
 // --- State ---
 const username = ref('墨客')
@@ -495,17 +404,11 @@ const chapterContents = ref<Record<string, string>>({})
 // Editor
 const editorRef = ref<HTMLTextAreaElement | null>(null)
 const editorContent = ref('')
-const currentChapterTitle = ref('')
-const activeChapter = ref('')
 
 // Undo/Redo stacks
 const undoStack = ref<string[]>([])
 const redoStack = ref<string[]>([])
 let lastSnapshot = ''
-
-// Inline editing for tree nodes
-const editingNodeKey = ref('')
-const editingNodeValue = ref('')
 
 // Left panel tabs
 const activeLeftTab = ref('outline')
@@ -515,12 +418,73 @@ const leftTabs = ref([
   { key: 'world', label: '世界', icon: iconWorld }
 ])
 
-// Outline data
-type OutlineChapterNode = { title: string; key: string; chapterId?: string }
-type OutlineVolumeNode = { title: string; key: string; expanded: boolean; children: OutlineChapterNode[] }
+const {
+  outlineData,
+  activeChapter,
+  currentChapterTitle,
+  outlineOpBusy,
+  loadOutline,
+  selectChapter: selectOutlineChapter,
+  addVolume,
+  addChapter,
+  deleteVolume,
+  deleteChapter,
+  renameNode,
+  moveNode,
+} = useWorkbenchOutline({
+  getContext,
+  reloadOutline: async () => {
+    await loadWorkbenchData()
+  },
+  createOutlineNode: outlineApi.createNode,
+  createChapter: novelApi.createChapter,
+  deleteOutlineNode: outlineApi.deleteNode,
+  deleteChapter: novelApi.deleteChapter,
+  updateOutlineNode: outlineApi.updateNode,
+  moveOutlineNode: outlineApi.moveNode,
+  notify: (warningMessage) => {
+    message.warning(warningMessage)
+  },
+  notifySuccess: (successMessage) => {
+    message.success(successMessage)
+  },
+})
 
-const outlineData = ref<OutlineVolumeNode[]>([])
-const outlineOpBusy = ref(false)
+const {
+  projectCards,
+  cardRelations,
+  relationFromId,
+  relationToId,
+  relationType,
+  loadCardsAndRelations,
+  createCardQuick,
+  saveCard,
+  deleteCardById,
+  createRelation,
+  deleteRelationById,
+  cardNameById,
+  updateCardDraft,
+  toggleCardExpanded,
+} = useWorkbenchCards({
+  getContext,
+  listCards: cardApi.listCards,
+  listCardRelations: cardApi.listCardRelations,
+  createCard: cardApi.createCard,
+  updateCard: cardApi.updateCard,
+  deleteCard: cardApi.deleteCard,
+  createCardRelation: cardApi.createCardRelation,
+  deleteCardRelation: cardApi.deleteCardRelation,
+  promptCardName: (defaultName) => window.prompt('请输入卡片名称（必填）', defaultName),
+  notify: (warningMessage) => {
+    message.warning(warningMessage)
+  },
+  notifySuccess: (successMessage) => {
+    message.success(successMessage)
+  },
+})
+
+const characterCards = computed(() => projectCards.value.filter((item) => String(item.cardType || '').toUpperCase() === 'CHARACTER'))
+const worldCards = computed(() => projectCards.value.filter((item) => String(item.cardType || '').toUpperCase() === 'WORLD'))
 
 // Active plugins
 const activePlugins = ref<string[]>([])
@@ -530,8 +494,6 @@ const approvalBusyIds = ref<string[]>([])
 type GenerationTaskStatus = 'pending' | 'running' | 'waiting_approval' | 'done' | 'applied' | 'failed' | 'cancelled'
 const TERMINAL_GENERATION_STATUSES: GenerationTaskStatus[] = ['done', 'applied', 'failed', 'cancelled']
 const ENABLE_POLLING_FALLBACK = String(import.meta.env.VITE_AGENT_POLLING_FALLBACK || 'false').toLowerCase() === 'true'
-const LAST_PROJECT_ID_KEY = 'penmate.lastProjectId'
-const LAST_OPERATOR_ID_KEY = 'penmate.lastOperatorId'
 const generationPhase = ref<'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'>('idle')
 const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
 let generationStream: EventSource | null = null
@@ -573,17 +535,10 @@ const selectedVersionNo = ref('')
 const versionBusy = ref(false)
 const selectedVersionContent = ref('')
 const versionDiffSummary = ref('')
-const projectCards = ref<Array<Record<string, any>>>([])
-const cardRelations = ref<Array<Record<string, any>>>([])
-const relationFromId = ref('')
-const relationToId = ref('')
-const relationType = ref('')
 
 const pickModelConfigId = (item: Record<string, unknown>) => Number(item.projectPolicyId ?? 0)
 const pickConversationId = (item: Record<string, unknown>) => Number(item.conversationId ?? 0)
 const pickCardId = (item: Record<string, unknown>) => Number(item.cardId ?? 0)
-const pickRelationId = (item: Record<string, unknown>) => Number(item.cardRelationId ?? 0)
-const pickOutlineNodeId = (item: Record<string, unknown>) => Number(item.outlineNodeId ?? 0)
 
 const normalizeGenerationStatus = (raw: unknown): GenerationTaskStatus | '' => {
   const status = String(raw || '').trim().toLowerCase()
@@ -866,29 +821,6 @@ const consumeGenerationStream = (projectId: number, taskId: number, assistantMsg
   }
 })
 
-const resolveOperatorId = () => {
-  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
-  const queryId = Number(route.query.operatorId || route.query.userId || 0)
-  if (queryId > 0) return queryId
-  const cachedId = Number(localStorage.getItem(LAST_OPERATOR_ID_KEY) || 0)
-  return cachedId > 0 ? cachedId : null
-}
-
-const getCurrentProjectId = () => {
-  const queryId = Number(route.query.projectId || 0)
-  if (queryId > 0) return queryId
-  const cachedId = Number(localStorage.getItem(LAST_PROJECT_ID_KEY) || 0)
-  return cachedId > 0 ? cachedId : 0
-}
-
-const getContext = () => {
-  const projectId = getCurrentProjectId()
-  const operatorId = resolveOperatorId()
-  if (projectId > 0) localStorage.setItem(LAST_PROJECT_ID_KEY, String(projectId))
-  if (operatorId && operatorId > 0) localStorage.setItem(LAST_OPERATOR_ID_KEY, String(operatorId))
-  return { projectId, operatorId }
-}
-
 const toPluginName = (item: Record<string, unknown>) => {
   const name = String(item.pluginName || item.name || item.pluginCode || '').trim()
   return name || '未命名插件'
@@ -1111,33 +1043,6 @@ const pickString = (obj: Record<string, unknown>, keys: string[]) => {
   return ''
 }
 
-const normalizeObjectStorageUrl = (rawUrl: string) => {
-  const url = String(rawUrl || '').trim()
-  if (!url) return ''
-  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(url)) return url
-  if (url.startsWith('//')) return `${window.location.protocol}${url}`
-  if (url.startsWith('/')) return url
-  const defaultProtocol = String(import.meta.env.VITE_STORAGE_URL_PROTOCOL || 'https').replace(/:$/, '')
-  if (/^(localhost|127\.0\.0\.1|\[::1\]|[\w.-]+)(:\d+)?(\/|$)/i.test(url)) {
-    return `${defaultProtocol}://${url}`
-  }
-  return url
-}
-
-const hasObjectKeyInStorageUrl = (rawUrl: string, marker: '/read/' | '/upload/') => {
-  const url = String(rawUrl || '').trim()
-  if (!url) return false
-  try {
-    const parsed = new URL(url, window.location.origin)
-    const path = parsed.pathname || ''
-    const idx = path.indexOf(marker)
-    if (idx < 0) return true
-    return path.slice(idx + marker.length).trim().length > 0
-  } catch {
-    if (url.endsWith(marker)) return false
-    return true
-  }
-}
 
 const loadChapterVersions = async (projectId: number, chapterId: string) => {
   const numericChapterId = Number(chapterId)
@@ -1190,48 +1095,38 @@ const viewSelectedVersion = async () => {
   }
 }
 
-const getDraftStorageKey = (projectId: number, chapterId: string | number) => `penmate.chapterDraft.${projectId}.${chapterId}`
 
-const saveChapterDraftLocal = (projectId: number, chapterId: string | number, content: string) => {
-  try {
-    localStorage.setItem(getDraftStorageKey(projectId, chapterId), content)
-  } catch {
-    // 忽略浏览器存储异常
-  }
-}
-
-const readChapterDraftLocal = (projectId: number, chapterId: string | number) => {
-  try {
-    return localStorage.getItem(getDraftStorageKey(projectId, chapterId)) || ''
-  } catch {
-    return ''
-  }
-}
-
-const refreshEditorFromRemote = async (projectId: number, chapterId: number) => {
+const refreshEditorFromRemote = async (
+  projectId: number,
+  chapterId: number,
+  requestId: number,
+  options?: { preferRemote?: boolean },
+) => {
   const contentResp = toRecord(await chapterApi.getContentUrl(projectId, chapterId))
   const downloadUrl = normalizeObjectStorageUrl(pickString(contentResp, ['downloadUrl', 'url', 'getUrl']))
   if (!downloadUrl || !hasObjectKeyInStorageUrl(downloadUrl, '/read/')) return false
   const response = await fetch(downloadUrl)
   if (!response.ok) return false
   const text = await response.text()
-  editorContent.value = text
-  chapterContents.value[activeChapter.value] = text
-  wordCount.value = text.replace(/\s/g, '').length
-  lastSnapshot = text
-  saveChapterDraftLocal(projectId, chapterId, text)
+  if (!chapterLoadGuard.isCurrent(String(chapterId), requestId)) return false
+  const resolvedContent = resolveChapterContent(projectId, chapterId, text, options)
+  editorContent.value = resolvedContent
+  chapterContents.value[String(chapterId)] = resolvedContent
+  wordCount.value = resolvedContent.replace(/\s/g, '').length
+  lastSnapshot = resolvedContent
   return true
 }
 
-const tryLoadChapterRemoteContent = async (chapterIdLike: string) => {
+const tryLoadChapterRemoteContent = async (chapterIdLike: string, requestId: number) => {
   const projectId = getCurrentProjectId()
   const chapterId = Number(chapterIdLike)
   if (!projectId || !chapterId) return
   try {
-    const loaded = await refreshEditorFromRemote(projectId, chapterId)
+    const loaded = await refreshEditorFromRemote(projectId, chapterId, requestId)
     if (!loaded) {
-      const localDraft = readChapterDraftLocal(projectId, chapterId)
-      if (localDraft) {
+      if (!chapterLoadGuard.isCurrent(String(chapterId), requestId)) return
+      const localDraft = resolveStoredDraft(projectId, chapterId)
+      if (localDraft !== null) {
         editorContent.value = localDraft
         chapterContents.value[String(chapterId)] = localDraft
         wordCount.value = localDraft.replace(/\s/g, '').length
@@ -1239,8 +1134,9 @@ const tryLoadChapterRemoteContent = async (chapterIdLike: string) => {
       }
     }
   } catch {
-    const localDraft = readChapterDraftLocal(projectId, chapterId)
-    if (localDraft) {
+    if (!chapterLoadGuard.isCurrent(String(chapterId), requestId)) return
+    const localDraft = resolveStoredDraft(projectId, chapterId)
+    if (localDraft !== null) {
       editorContent.value = localDraft
       chapterContents.value[String(chapterId)] = localDraft
       wordCount.value = localDraft.replace(/\s/g, '').length
@@ -1261,7 +1157,8 @@ const restoreSelectedVersion = async () => {
   versionBusy.value = true
   try {
     await chapterApi.restoreVersion(projectId, chapterId, versionNo, operatorId)
-    await refreshEditorFromRemote(projectId, chapterId)
+    const requestId = chapterLoadGuard.begin(String(chapterId))
+    await refreshEditorFromRemote(projectId, chapterId, requestId, { preferRemote: true })
     await loadChapterVersions(projectId, String(chapterId))
     selectedVersionContent.value = ''
     versionDiffSummary.value = ''
@@ -1297,16 +1194,11 @@ const publishCurrentChapter = async () => {
 
 const uploadAndCommitContent = async (projectId: number, chapterId: number, content: string, operatorId: number) => {
   const uploadResp = toRecord(await chapterApi.getContentUploadUrl(projectId, chapterId))
-  const uploadUrl = normalizeObjectStorageUrl(pickString(uploadResp, ['uploadUrl', 'url', 'putUrl']))
-  const objectKey = pickString(uploadResp, ['objectKey', 'key'])
-  const storageProvider = pickString(uploadResp, ['storageProvider', 'provider']) || 's3'
-  // 仅走前端直传：必须同时具备 objectKey + uploadUrl。
-  if (!objectKey) {
-    throw new Error('上传地址响应缺少 objectKey')
-  }
-  if (!uploadUrl) {
-    throw new Error('上传地址响应缺少 uploadUrl')
-  }
+  const {
+    uploadUrl,
+    objectKey,
+    storageProvider,
+  } = resolveDirectUploadTarget(uploadResp)
 
   const size = new Blob([content]).size
   let etag = ''
@@ -1364,7 +1256,7 @@ const onEditorInput = () => {
   wordCount.value = editorContent.value.replace(/\s/g, '').length
   const projectId = getCurrentProjectId()
   if (projectId && activeChapter.value) {
-    saveChapterDraftLocal(projectId, activeChapter.value, editorContent.value)
+    saveDraft(projectId, activeChapter.value, editorContent.value)
   }
   if (editorContent.value !== lastSnapshot) {
     undoStack.value.push(lastSnapshot)
@@ -1441,174 +1333,26 @@ const insertPrefix = (prefix: string) => {
 }
 
 // --- Chapter switching ---
-const selectChapter = async (ch: { key: string; title: string; chapterId?: string }) => {
+const handleOutlineSelectChapter = async (ch: OutlineChapterNode) => {
   const chapterKey = String(ch.chapterId || ch.key)
   const prevProjectId = getCurrentProjectId()
   if (prevProjectId && activeChapter.value) {
-    saveChapterDraftLocal(prevProjectId, activeChapter.value, editorContent.value)
+    saveDraft(prevProjectId, activeChapter.value, editorContent.value)
   }
   chapterContents.value[activeChapter.value] = editorContent.value
-  activeChapter.value = chapterKey
-  currentChapterTitle.value = ch.title
-  const localDraft = getCurrentProjectId() ? readChapterDraftLocal(getCurrentProjectId(), chapterKey) : ''
-  editorContent.value = chapterContents.value[chapterKey] || localDraft || ''
+  selectOutlineChapter(ch)
+  const requestId = chapterLoadGuard.begin(chapterKey)
+  const currentProjectId = getCurrentProjectId()
+  const localDraft = currentProjectId ? resolveStoredDraft(currentProjectId, chapterKey) : null
+  const chapterContent = chapterContents.value[chapterKey]
+  editorContent.value = resolveEditorSeedContent(chapterContent, localDraft)
   wordCount.value = editorContent.value.replace(/\s/g, '').length
   undoStack.value = []
   redoStack.value = []
   lastSnapshot = editorContent.value
   loadChapterVersions(getCurrentProjectId(), chapterKey)
-  await tryLoadChapterRemoteContent(chapterKey)
+  await tryLoadChapterRemoteContent(chapterKey, requestId)
   nextTick(() => editorRef.value?.focus())
-}
-
-// --- Outline CRUD ---
-const addVolume = async () => {
-  if (outlineOpBusy.value) return
-  const { projectId, operatorId } = getContext()
-  if (!projectId || !operatorId) {
-    message.warning('缺少 projectId/operatorId，无法新建分卷')
-    return
-  }
-  const idx = outlineData.value.length
-  const nums = ['一','二','三','四','五','六','七','八','九','十']
-  const title = `第${nums[idx] || idx + 1}卷：新的篇章`
-  outlineOpBusy.value = true
-  try {
-    await outlineApi.createNode(projectId, operatorId, {
-      parentId: null,
-      title,
-      nodeType: 'VOLUME',
-      sortOrder: idx + 1,
-      content: ''
-    })
-    await loadWorkbenchData()
-  } catch (error: any) {
-    message.warning(error?.message || '新建分卷失败')
-  } finally {
-    outlineOpBusy.value = false
-  }
-}
-
-const addChapter = async (vol: any) => {
-  const { projectId, operatorId } = getContext()
-  if (!projectId || !operatorId) {
-    message.warning('缺少 projectId/operatorId，无法新建章节')
-    return
-  }
-  const volumeNodeId = Number(vol?.key)
-  if (!volumeNodeId) {
-    message.warning('分卷节点ID异常，无法创建章节')
-    return
-  }
-  const idx = vol.children.length
-  const title = `第${idx + 1}章：未命名`
-  try {
-    const chapterNo = idx + 1
-    const createdOutline = await outlineApi.createNode(projectId, operatorId, {
-      parentId: volumeNodeId,
-      title,
-      nodeType: 'CHAPTER',
-      sortOrder: idx + 1,
-      content: ''
-    }) as Record<string, any>
-
-    await novelApi.createChapter(projectId, operatorId, {
-      volumeId: null,
-      outlineNodeId: pickOutlineNodeId(createdOutline) || null,
-      title,
-      chapterNo,
-      status: 1,
-      wordCount: 0,
-      excerpt: ''
-    })
-
-    await loadWorkbenchData()
-    message.success('章节已创建')
-  } catch (error: any) {
-    message.warning(error?.message || '新建章节失败')
-  }
-}
-
-const deleteVolume = async (vIdx: number) => {
-  const { projectId, operatorId } = getContext()
-  const vol = outlineData.value[vIdx]
-  if (projectId && operatorId && Number(vol?.key)) {
-    try {
-      await outlineApi.deleteNode(projectId, Number(vol.key), operatorId)
-      await loadWorkbenchData()
-      return
-    } catch (error: any) {
-      message.warning(error?.message || '删除分卷失败')
-    }
-  }
-}
-
-const deleteChapter = async (vol: any, cIdx: number) => {
-  const { projectId, operatorId } = getContext()
-  const ch = vol.children[cIdx]
-  if (projectId && operatorId && Number(ch?.key)) {
-    try {
-      if (Number(ch?.chapterId)) {
-        await novelApi.deleteChapter(projectId, Number(ch.chapterId), operatorId)
-      }
-      await outlineApi.deleteNode(projectId, Number(ch.key), operatorId)
-      await loadWorkbenchData()
-      return
-    } catch (error: any) {
-      message.warning(error?.message || '删除章节失败')
-    }
-  }
-}
-
-// --- Inline node rename ---
-const startEditNode = (node: { key: string; title: string }) => {
-  editingNodeKey.value = node.key
-  editingNodeValue.value = node.title
-}
-
-const finishEditNode = (node: { key: string; title: string }) => {
-  const nextTitle = editingNodeValue.value.trim()
-  if (nextTitle) {
-    node.title = nextTitle
-  }
-  editingNodeKey.value = ''
-  if (node.key === activeChapter.value) {
-    currentChapterTitle.value = node.title
-  }
-  const { projectId, operatorId } = getContext()
-  if (projectId && operatorId && Number(node.key) && nextTitle) {
-    outlineApi.updateNode(projectId, Number(node.key), operatorId, { title: nextTitle }).catch(() => undefined)
-  }
-}
-
-const moveVolume = async (vol: any, direction: -1 | 1) => {
-  const currentIdx = outlineData.value.findIndex((item: any) => item.key === vol.key)
-  const targetIdx = currentIdx + direction
-  if (currentIdx < 0 || targetIdx < 0 || targetIdx >= outlineData.value.length) return
-  const { projectId, operatorId } = getContext()
-  if (projectId && operatorId && Number(vol.key)) {
-    await outlineApi.moveNode(projectId, Number(vol.key), operatorId, {
-      parentId: null,
-      sortOrder: targetIdx + 1
-    }).catch(() => undefined)
-  }
-  const [item] = outlineData.value.splice(currentIdx, 1)
-  outlineData.value.splice(targetIdx, 0, item)
-}
-
-const moveChapter = async (vol: any, cIdx: number, direction: -1 | 1) => {
-  const targetIdx = cIdx + direction
-  if (targetIdx < 0 || targetIdx >= vol.children.length) return
-  const ch = vol.children[cIdx]
-  const { projectId, operatorId } = getContext()
-  if (projectId && operatorId && Number(ch?.key)) {
-    await outlineApi.moveNode(projectId, Number(ch.key), operatorId, {
-      parentId: Number(vol.key) || null,
-      sortOrder: targetIdx + 1
-    }).catch(() => undefined)
-  }
-  const [item] = vol.children.splice(cIdx, 1)
-  vol.children.splice(targetIdx, 0, item)
 }
 
 // --- Save ---
@@ -1621,9 +1365,9 @@ const saveContent = async () => {
 
   // 需求调整：保存仅落本地草稿，不触发服务端上传/提交。
   if (projectId && chapterId) {
-    saveChapterDraftLocal(projectId, chapterId, editorContent.value)
+    saveDraft(projectId, chapterId, editorContent.value)
   } else if (projectId && activeChapter.value) {
-    saveChapterDraftLocal(projectId, activeChapter.value, editorContent.value)
+    saveDraft(projectId, activeChapter.value, editorContent.value)
   }
   saveHint.value = '✓ 已本地保存'
   setTimeout(() => { saveHint.value = '' }, 2000)
@@ -1863,44 +1607,6 @@ const handleLogout = () => {
 }
 
 // --- Init ---
-const mapOutlineTree = (
-  nodes: Array<Record<string, any>>,
-  chapterByOutlineNodeId: Record<string, string> = {}
-) => {
-  const volumeMap = new Map<string, {
-    title: string
-    key: string
-    expanded: boolean
-    children: Array<{ title: string; key: string; chapterId?: string }>
-  }>()
-  nodes.forEach((node) => {
-    const key = String(node.outlineNodeId ?? '')
-    if (!key) return
-    const title = String(node.title ?? node.name ?? '未命名')
-    const nodeType = String(node.nodeType ?? node.type ?? '').toUpperCase()
-    // 仅按明确的 VOLUME 节点构建卷，避免 parentId=0/null 边界导致章节被误判为卷。
-    if (nodeType.includes('VOLUME')) {
-      volumeMap.set(key, { title, key, expanded: true, children: [] })
-    }
-  })
-
-  nodes.forEach((node) => {
-    const key = String(node.outlineNodeId ?? '')
-    if (!key) return
-    const title = String(node.title ?? node.name ?? '未命名章节')
-    const parentId = node.parentId
-    if (parentId != null) {
-      const pKey = String(parentId)
-      const parent = volumeMap.get(pKey)
-      if (parent) {
-        parent.children.push({ title, key, chapterId: chapterByOutlineNodeId[key] })
-      }
-    }
-  })
-
-  const values = Array.from(volumeMap.values())
-  return values.length ? values : outlineData.value
-}
 
 const loadWorkbenchData = async () => {
   const projectId = getCurrentProjectId()
@@ -1926,26 +1632,26 @@ const loadWorkbenchData = async () => {
       const key = String(chapter.chapterId ?? '')
       if (!key) return
       // 正文应走 OSS content-url 获取；这里不再回填 chapter.content，避免把后端 HTML 占位内容灌进编辑器。
-      const chapterText = ''
-      const localDraft = readChapterDraftLocal(projectId, key)
-      chapterContents.value[key] = chapterText || localDraft || ''
+      const localDraft = resolveStoredDraft(projectId, key)
+      chapterContents.value[key] = resolveEditorSeedContent(undefined, localDraft)
       const outlineNodeId = String(chapter.outlineNodeId ?? '')
       if (outlineNodeId) {
         chapterByOutlineNodeId[outlineNodeId] = key
       }
     })
 
-    outlineData.value = mapOutlineTree((outlines || []) as Array<Record<string, any>>, chapterByOutlineNodeId)
+    const mappedOutline = loadOutline((outlines || []) as Array<Record<string, unknown>>, chapterByOutlineNodeId)
     await loadCardsAndRelations(projectId)
-    const first = outlineData.value[0]?.children?.[0]
+    const first = mappedOutline[0]?.children?.[0]
     if (first) {
-      activeChapter.value = String(first.chapterId || first.key)
-      currentChapterTitle.value = first.title
-      editorContent.value = chapterContents.value[String(first.chapterId || first.key)] || ''
+      selectOutlineChapter(first)
+      const firstChapterKey = activeChapter.value
+      editorContent.value = resolveEditorSeedContent(chapterContents.value[firstChapterKey], null)
       wordCount.value = editorContent.value.replace(/\s/g, '').length
       lastSnapshot = editorContent.value
-      await tryLoadChapterRemoteContent(String(first.chapterId || first.key))
-      await loadChapterVersions(projectId, String(first.chapterId || first.key))
+      const requestId = chapterLoadGuard.begin(firstChapterKey)
+      await tryLoadChapterRemoteContent(firstChapterKey, requestId)
+      await loadChapterVersions(projectId, firstChapterKey)
     }
   } catch (error: any) {
     message.warning(error?.message || '工作台数据加载失败')
@@ -1954,9 +1660,9 @@ const loadWorkbenchData = async () => {
 
 onMounted(() => {
   void refreshActiveModelInfo(getCurrentProjectId())
-  if (session.userName) username.value = session.userName
-  if (session.userEmail) userEmail.value = session.userEmail
-  editorContent.value = chapterContents.value[activeChapter.value] || ''
+  if (sessionUsername) username.value = sessionUsername
+  if (sessionUserEmail) userEmail.value = sessionUserEmail
+  editorContent.value = resolveEditorSeedContent(chapterContents.value[activeChapter.value], null)
   wordCount.value = editorContent.value.replace(/\s/g, '').length
   lastSnapshot = editorContent.value
   loadWorkbenchData()

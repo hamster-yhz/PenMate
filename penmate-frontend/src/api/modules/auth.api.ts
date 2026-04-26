@@ -17,6 +17,25 @@ export interface AuthTokenData {
 
 export type UserProfile = Record<string, unknown>
 
+export function parseAuthErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const maybeResponse = (error as { response?: { data?: { message?: unknown } } }).response
+    const maybeMessage = maybeResponse?.data?.message
+    if (typeof maybeMessage === 'string') {
+      const normalizedMessage = maybeMessage.trim()
+      if (normalizedMessage) {
+        return normalizedMessage
+      }
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+
+  return 'Authentication request failed'
+}
+
 export const authApi = {
   login(payload: LoginPayload) {
     return request.post<AuthTokenData>('/v1/auth/login', payload)

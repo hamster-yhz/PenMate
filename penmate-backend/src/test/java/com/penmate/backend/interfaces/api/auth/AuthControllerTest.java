@@ -181,6 +181,22 @@ class AuthControllerTest {
     }
 
     @Test
+    // Refresh 缺少 refreshToken 字段：应返回参数校验错误。
+    void UT_API_AUTH_REFRESH_MISSING_REFRESH_TOKEN_BAD_REQUEST() throws Exception {
+        String traceId = "UT-TRACE-AUTH-REFRESH-MISSING-REFRESH-TOKEN";
+
+        mockMvc().perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.details[0].field").value("refreshToken"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
     // 退出成功。
     void UT_AUTH_LOGOUT_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-AUTH-LOGOUT-SUCCESS";

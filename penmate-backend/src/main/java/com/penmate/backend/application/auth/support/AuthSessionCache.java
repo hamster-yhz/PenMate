@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.Objects;
 
 @Component
 public class AuthSessionCache {
@@ -18,32 +19,41 @@ public class AuthSessionCache {
     private final ObjectMapper objectMapper;
 
     public AuthSessionCache(StringRedisTemplate stringRedisTemplate, ObjectMapper objectMapper) {
-        this.stringRedisTemplate = stringRedisTemplate;
-        this.objectMapper = objectMapper;
+        this.stringRedisTemplate = Objects.requireNonNull(stringRedisTemplate, "stringRedisTemplate");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
     public void saveSession(AuthUserSessionPayload payload, AuthTokenBundle bundle) {
+        Objects.requireNonNull(payload, "payload must not be null");
+        Objects.requireNonNull(bundle, "bundle must not be null");
+        Objects.requireNonNull(bundle.accessJti(), "accessJti must not be null");
+        Objects.requireNonNull(bundle.refreshJti(), "refreshJti must not be null");
+        Objects.requireNonNull(bundle.accessExpiresAt(), "accessExpiresAt must not be null");
         String json = toJson(payload);
-        stringRedisTemplate.opsForValue().set(ACCESS_PREFIX + bundle.accessJti(), json,
+        stringRedisTemplate.opsForValue().set(ACCESS_PREFIX + bundle.accessJti().trim(), json,
                 Duration.between(java.time.LocalDateTime.now(), bundle.accessExpiresAt()));
-        stringRedisTemplate.opsForValue().set(REFRESH_PREFIX + bundle.refreshJti(), json,
+        stringRedisTemplate.opsForValue().set(REFRESH_PREFIX + bundle.refreshJti().trim(), json,
                 Duration.between(java.time.LocalDateTime.now(), bundle.refreshExpiresAt()));
     }
 
     public AuthUserSessionPayload getByAccessJti(String accessJti) {
-        return parse(stringRedisTemplate.opsForValue().get(ACCESS_PREFIX + accessJti));
+        Objects.requireNonNull(accessJti, "accessJti must not be null");
+        return parse(stringRedisTemplate.opsForValue().get(ACCESS_PREFIX + accessJti.trim()));
     }
 
     public AuthUserSessionPayload getByRefreshJti(String refreshJti) {
-        return parse(stringRedisTemplate.opsForValue().get(REFRESH_PREFIX + refreshJti));
+        Objects.requireNonNull(refreshJti, "refreshJti must not be null");
+        return parse(stringRedisTemplate.opsForValue().get(REFRESH_PREFIX + refreshJti.trim()));
     }
 
     public void revokeAccess(String accessJti) {
-        stringRedisTemplate.delete(ACCESS_PREFIX + accessJti);
+        Objects.requireNonNull(accessJti, "accessJti must not be null");
+        stringRedisTemplate.delete(ACCESS_PREFIX + accessJti.trim());
     }
 
     public void revokeRefresh(String refreshJti) {
-        stringRedisTemplate.delete(REFRESH_PREFIX + refreshJti);
+        Objects.requireNonNull(refreshJti, "refreshJti must not be null");
+        stringRedisTemplate.delete(REFRESH_PREFIX + refreshJti.trim());
     }
 
     private String toJson(AuthUserSessionPayload payload) {

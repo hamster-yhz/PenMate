@@ -67,11 +67,15 @@ public class AuthTokenService {
     }
 
     private Claims parseClaims(String token) {
+        if (token == null || token.isBlank()) {
+            throw BusinessException.unauthorized("Token is blank");
+        }
+        String normalized = token.trim();
         try {
             return Jwts.parser()
                     .verifyWith(key)
                     .build()
-                    .parseSignedClaims(token)
+                    .parseSignedClaims(normalized)
                     .getPayload();
         } catch (Exception ex) {
             throw BusinessException.unauthorized("Token invalid or expired");

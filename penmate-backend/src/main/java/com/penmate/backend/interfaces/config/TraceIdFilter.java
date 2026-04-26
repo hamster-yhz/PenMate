@@ -53,7 +53,10 @@ public class TraceIdFilter extends OncePerRequestFilter {
      * @return 可用的 TraceId
      */
     private String resolveTraceId(String headerTraceId) {
-        return (headerTraceId == null || headerTraceId.isBlank()) ? UUID.randomUUID().toString() : headerTraceId;
+        if (headerTraceId == null || headerTraceId.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+        return headerTraceId.trim();
     }
 }
 

@@ -5,6 +5,7 @@ import com.penmate.backend.application.style.command.StyleCommands.CreateStyleCo
 import com.penmate.backend.application.style.command.StyleCommands.SwitchStyleCommand;
 import com.penmate.backend.application.style.command.StyleCommands.UpdateStyleCommand;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.domain.style.model.StyleProfile;
 import com.penmate.backend.domain.style.repository.StyleRepository;
@@ -36,6 +37,9 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private RealtimeEventService realtimeEventService;
+
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
 
     @InjectMocks
     private StyleApplicationService styleApplicationService;
@@ -137,13 +141,14 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
         String traceId = "UT-TRACE-STYLE-SWITCH";
 
         StyleProfile toStyle = new StyleProfile();
-        toStyle.setId(toStyleId);
+        toStyle.setStyleId(toStyleId);
         StyleProfile fromStyle = new StyleProfile();
-        fromStyle.setId(3L);
+        fromStyle.setStyleId(3L);
 
         when(styleRepository.findById(projectId, toStyleId)).thenReturn(toStyle);
         when(styleRepository.findDefaultByProjectId(projectId)).thenReturn(fromStyle);
         when(styleRepository.setDefault(projectId, toStyleId)).thenReturn(1);
+        when(businessIdGenerator.nextId()).thenReturn(40001L);
 
         StyleProfile result = styleApplicationService.switchStyle(
                 projectId,
@@ -151,10 +156,10 @@ class StyleApplicationServiceTest extends BaseApplicationServiceTest {
                 traceId
         );
 
-        assertThat(result.getId()).isEqualTo(toStyleId);
+        assertThat(result.getStyleId()).isEqualTo(toStyleId);
         verify(styleRepository).clearDefaultByProjectId(projectId);
         verify(styleRepository).setDefault(projectId, toStyleId);
-        verify(styleRepository).insertSwitchLog(projectId, 3L, toStyleId, operatorId, true, "切换文风");
+        verify(styleRepository).insertSwitchLog(eq(40001L), eq(projectId), eq(3L), eq(toStyleId), eq(operatorId), eq(true), eq("切换文风"));
         verify(realtimeEventService).publishProjectEvent(eq(projectId), eq("style.switched"), anyMap());
     }
 

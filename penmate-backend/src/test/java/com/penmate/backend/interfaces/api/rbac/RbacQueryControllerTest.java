@@ -52,6 +52,7 @@ class RbacQueryControllerTest {
         String traceId = "UT-TRACE-RBAC-USERS-LIST";
         IamUser user = new IamUser();
         user.setId(1001L);
+        user.setUserId(1001L);
         user.setEmail("author@penmate.ai");
         user.setDisplayName("作者A");
         user.setStatus(1);
@@ -60,7 +61,7 @@ class RbacQueryControllerTest {
 
         mockMvc().perform(get("/api/v1/users").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(1001))
+                .andExpect(jsonPath("$.data[0].userId").value(1001))
                 .andExpect(jsonPath("$.data[0].email").value("author@penmate.ai"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
@@ -117,6 +118,20 @@ class RbacQueryControllerTest {
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.bound").value(true))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 用户角色分配缺少 roleId 参数：应返回参数校验错误。
+    void UT_RBAC_ASSIGN_ROLE_MISSING_ROLE_ID_BAD_REQUEST() throws Exception {
+        String traceId = "UT-TRACE-RBAC-ASSIGN-ROLE-MISSING-ROLE-ID";
+
+        mockMvc().perform(post("/api/v1/users/1001/roles")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.status").value(400))
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.details[0].field").value("roleId"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
