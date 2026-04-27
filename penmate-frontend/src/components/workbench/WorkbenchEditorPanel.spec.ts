@@ -59,6 +59,8 @@ describe('WorkbenchEditorPanel', () => {
       },
     })
 
+    expect(wrapper.get('.panel-center').classes()).toContain('glass-panel')
+
     expect(wrapper.get('[data-testid="editor-statusbar-stub"]')).toBeTruthy()
     expect(wrapper.get('[data-testid="version-preview-pane-stub"]')).toBeTruthy()
 

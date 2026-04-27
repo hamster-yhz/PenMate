@@ -23,6 +23,12 @@ const mountRegisterForm = (
   })
 
 describe('RegisterForm', () => {
+  it('uses the shared ancient primary button styling', () => {
+    const wrapper = mountRegisterForm()
+
+    expect(wrapper.get('button[type="submit"]').classes()).toContain('btn-ancient')
+  })
+
   it('blocks_submit_when_loading', async () => {
     const wrapper = mountRegisterForm({ loading: true })
 

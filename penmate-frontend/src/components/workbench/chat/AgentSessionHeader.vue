@@ -45,3 +45,109 @@ defineEmits<{
     </div>
   </div>
 </template>
+
+<style scoped lang="less">
+.agent-header {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 32, 0.68));
+}
+
+.agent-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(201, 169, 110, 0.1);
+  box-shadow: inset 0 0 12px rgba(201, 169, 110, 0.08);
+}
+
+.agent-title {
+  font-family: var(--font-heading);
+  color: var(--amber-gold);
+  letter-spacing: 0.08em;
+}
+
+.agent-history-btn,
+.agent-model,
+.agent-status {
+  min-height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(11, 17, 32, 0.56);
+}
+
+.agent-history-btn {
+  padding: 0 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-silk);
+}
+
+.agent-history-btn:hover {
+  color: var(--amber-gold);
+  border-color: var(--border-gold);
+  box-shadow: var(--shadow-gold);
+}
+
+.agent-model,
+.agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--text-secondary);
+}
+
+.agent-model {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.agent-model.empty {
+  color: var(--text-muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--jade-green);
+  box-shadow: 0 0 10px rgba(90, 158, 111, 0.45);
+}
+
+.agent-status.busy .status-dot {
+  background: var(--amber-gold);
+  box-shadow: 0 0 12px rgba(201, 169, 110, 0.45);
+}
+
+.agent-status.failed {
+  color: #f0b9a9;
+  border-color: rgba(192, 60, 45, 0.3);
+  background: rgba(192, 60, 45, 0.08);
+}
+
+.agent-status.failed .status-dot {
+  background: var(--cinnabar);
+  box-shadow: 0 0 12px rgba(192, 60, 45, 0.4);
+}
+
+@media (max-width: 1280px) {
+  .agent-header {
+    grid-template-columns: auto auto 1fr;
+  }
+
+  .agent-model,
+  .agent-status {
+    grid-column: span 3;
+  }
+}
+</style>

@@ -44,6 +44,10 @@ describe('ChatComposer', () => {
       isGenerating: false,
     })
 
+    expect(blankWrapper.get('[data-testid="chat-composer"]').classes()).toContain('workbench-composer')
+    expect(blankWrapper.get('[data-testid="chat-input"]').classes()).toContain('composer-textarea')
+    expect(blankWrapper.get('[data-testid="chat-send"]').classes()).toContain('btn-send')
+
     expect((blankWrapper.get('[data-testid="chat-send"]').element as HTMLButtonElement).disabled).toBe(true)
 
     const busyWrapper = await mountChatComposer({
@@ -101,6 +105,7 @@ describe('ChatComposer', () => {
     })
 
     expect(wrapper.get('[data-testid="model-warning"]').text()).toContain('当前未选择模型')
+    expect(wrapper.get('[data-testid="model-warning"]').classes()).toContain('theme-warning')
     expect(wrapper.get('[data-testid="current-model-value"]').text()).toContain('未选择模型')
 
     await wrapper.get('[data-testid="open-model-settings"]').trigger('click')

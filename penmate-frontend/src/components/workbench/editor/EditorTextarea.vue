@@ -65,7 +65,7 @@ defineExpose({
   <textarea
     ref="textareaRef"
     data-testid="editor-textarea"
-    class="main-editor"
+    class="main-editor workbench-editor-textarea"
     :value="modelValue"
     :placeholder="placeholder"
     @input="onInput"
@@ -74,3 +74,35 @@ defineExpose({
     @keydown="onKeydown"
   ></textarea>
 </template>
+
+<style scoped lang="less">
+.main-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  padding: 24px 28px;
+  border: none;
+  outline: none;
+  resize: none;
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.3), rgba(11, 17, 32, 0.18)),
+    rgba(11, 17, 32, 0.22);
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  caret-color: var(--amber-gold);
+}
+
+.workbench-editor-textarea {
+  border-top: 1px solid rgba(201, 169, 110, 0.04);
+}
+
+.main-editor::placeholder {
+  color: var(--text-muted);
+}
+
+.main-editor:focus {
+  box-shadow: inset 0 0 0 1px rgba(201, 169, 110, 0.12);
+}
+</style>

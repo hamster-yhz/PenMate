@@ -79,6 +79,8 @@ describe('WorkbenchLeftPanel', () => {
   it('renders_tabs_and_forwards_outline_events', async () => {
     const wrapper = mountWorkbenchLeftPanel('outline')
 
+    expect(wrapper.get('.panel-left').classes()).toContain('glass-panel')
+
     expect(wrapper.text()).toContain('大纲')
     expect(wrapper.text()).toContain('角色')
     expect(wrapper.text()).toContain('世界')

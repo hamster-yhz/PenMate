@@ -56,7 +56,7 @@
         @input="$emit('update:confirmPassword', ($event.target as HTMLInputElement).value)"
       />
     </div>
-    <button type="submit" class="btn-submit" :disabled="loading">
+    <button type="submit" class="btn-submit btn-ancient" :disabled="loading">
       <span v-if="!loading">开 启 创 作 之 旅</span>
       <span v-else class="loading-text">
         <span class="loading-dot"></span>
@@ -94,3 +94,7 @@ const handleSubmit = () => {
   emit('submit')
 }
 </script>
+
+<style scoped lang="less">
+@import './auth-form.less';
+</style>

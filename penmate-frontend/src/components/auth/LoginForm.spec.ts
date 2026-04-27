@@ -60,6 +60,14 @@ describe('LoginForm', () => {
     ])
   })
 
+  it('uses the shared ancient primary button styling', async () => {
+    const wrapper = await mountLoginForm()
+
+    expect(wrapper.find('[data-testid="missing-login-form"]').exists()).toBe(false)
+
+    expect(wrapper.get('[data-testid="login-submit"]').classes()).toContain('btn-ancient')
+  })
+
   it('disables_submit_button_and_blocks_submit_when_loading', async () => {
     const wrapper = await mountLoginForm({
       username: 'writer@example.com',

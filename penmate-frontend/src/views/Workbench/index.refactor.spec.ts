@@ -128,4 +128,13 @@ describe('Workbench index refactor', () => {
     expect(source).not.toContain('approvalApi.approve(')
     expect(source).not.toContain('approvalApi.reject(')
   })
+
+  it('wraps the workspace in a home-style atmospheric shell', () => {
+    const source = readWorkbenchSource()
+
+    expect(source).toContain('class="workbench-backdrop"')
+    expect(source).toContain('class="workbench-orb orb-left"')
+    expect(source).toContain('class="workbench-orb orb-right"')
+    expect(source).toContain('class="wb-main workbench-shell"')
+  })
 })

@@ -28,4 +28,26 @@ describe('Login index refactor', () => {
     expect(source).not.toContain('<form class="login-form" @submit.prevent="handleSubmit" v-if="mode === \'login\'">')
     expect(source).not.toContain('<form class="login-form" @submit.prevent="handleSubmit" v-else>')
   })
+
+  it('keeps a home-style cinematic auth shell with showcase panel and ancient back navigation', () => {
+    const source = readLoginSource()
+
+    expect(source).toContain('class="login-shell"')
+    expect(source).toContain('class="login-showcase glass-panel"')
+    expect(source).toContain('class="showcase-badge"')
+    expect(source).toContain('class="showcase-actions"')
+    expect(source).toContain('class="back-home btn-ancient"')
+  })
+
+  it('keeps child-component owned auth styles out of the page shell stylesheet', () => {
+    const source = readLoginSource()
+
+    expect(source).not.toContain('.login-card {')
+    expect(source).not.toContain('.tab-bar {')
+    expect(source).not.toContain('.tab-btn {')
+    expect(source).not.toContain('.tab-indicator {')
+    expect(source).not.toContain('.login-form {')
+    expect(source).not.toContain('.form-input {')
+    expect(source).not.toContain('.btn-submit {')
+  })
 })

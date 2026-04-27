@@ -42,7 +42,7 @@
       </label>
       <a href="#" class="forgot-link">忘记密码？</a>
     </div>
-    <button type="submit" class="btn-submit" data-testid="login-submit" :disabled="loading">
+    <button type="submit" class="btn-submit btn-ancient" data-testid="login-submit" :disabled="loading">
       <span v-if="!loading">踏 入 书 阁</span>
       <span v-else class="loading-text">
         <span class="loading-dot"></span>
@@ -88,3 +88,7 @@ const handleSubmit = () => {
   })
 }
 </script>
+
+<style scoped lang="less">
+@import './auth-form.less';
+</style>

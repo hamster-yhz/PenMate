@@ -50,6 +50,14 @@ describe('EditorToolbar', () => {
   it('emits_toolbar_commands_when_clicking_left_actions', async () => {
     const wrapper = await mountEditorToolbar()
 
+    expect(wrapper.get('.editor-toolbar').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="toolbar-save"]').classes()).toContain('toolbar-btn')
+    expect(wrapper.get('[data-testid="toolbar-undo"]').classes()).toContain('toolbar-btn')
+    expect(wrapper.get('[data-testid="toolbar-redo"]').classes()).toContain('toolbar-btn')
+    expect(wrapper.get('[data-testid="toolbar-bold"]').classes()).toContain('toolbar-btn')
+    expect(wrapper.get('[data-testid="toolbar-italic"]').classes()).toContain('toolbar-btn')
+    expect(wrapper.get('[data-testid="toolbar-quote"]').classes()).toContain('toolbar-btn')
+
     await wrapper.get('[data-testid="toolbar-save"]').trigger('click')
     await wrapper.get('[data-testid="toolbar-undo"]').trigger('click')
     await wrapper.get('[data-testid="toolbar-redo"]').trigger('click')
@@ -82,6 +90,8 @@ describe('EditorToolbar', () => {
     const options = versionSelect.findAll('option')
 
     expect(wrapper.get('[data-testid="chapter-label"]').text()).toBe('第一章：风起')
+    expect(wrapper.get('[data-testid="chapter-label"]').classes()).toContain('toolbar-chapter')
+    expect(versionSelect.classes()).toContain('toolbar-select')
     expect(options).toHaveLength(3)
     expect(options[1].text()).toContain('v7 · 修正文风')
     expect(options[2].text()).toContain('v6 · MANUAL_SAVE')

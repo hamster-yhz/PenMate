@@ -39,6 +39,8 @@ describe('EditorTextarea', () => {
     const textarea = wrapper.get('[data-testid="editor-textarea"]')
 
     expect((textarea.element as HTMLTextAreaElement).value).toBe('初稿正文')
+    expect(textarea.classes()).toContain('main-editor')
+    expect(textarea.classes()).toContain('workbench-editor-textarea')
 
     await textarea.setValue('更新后的正文')
     await textarea.trigger('keyup')

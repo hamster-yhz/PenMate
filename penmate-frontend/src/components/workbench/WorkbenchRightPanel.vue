@@ -1,5 +1,5 @@
 <template>
-  <aside class="panel panel-right" :class="{ collapsed }">
+  <aside class="panel panel-right glass-panel" :class="{ collapsed }">
     <div class="panel-toggle right-toggle" @click="emit('toggle-collapse')">
       {{ collapsed ? '◂' : '▸' }}
     </div>
@@ -138,7 +138,8 @@ watch(
   width: clamp(320px, 26vw, 420px);
   min-width: 0;
   border-left: 1px solid var(--border-subtle);
-  background: rgba(11, 17, 32, 0.5);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(11, 17, 32, 0.56));
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
 
   &.collapsed {
     width: 0;

@@ -38,6 +38,9 @@ describe('VersionPreviewPane', () => {
     const wrapper = await mountVersionPreviewPane()
 
     expect(wrapper.get('[data-testid="version-preview-root"]').text()).toContain('版本对比预览')
+    expect(wrapper.get('[data-testid="version-preview-root"]').classes()).toContain('version-preview')
+    expect(wrapper.get('[data-testid="version-preview-current"]').classes()).toContain('workbench-editor-textarea')
+    expect(wrapper.get('[data-testid="version-preview-selected"]').classes()).toContain('workbench-editor-textarea')
     expect((wrapper.get('[data-testid="version-preview-current"]').element as HTMLTextAreaElement).value).toBe('当前正文')
     expect((wrapper.get('[data-testid="version-preview-selected"]').element as HTMLTextAreaElement).value).toBe('历史版本正文')
     expect((wrapper.get('[data-testid="version-preview-current"]').element as HTMLTextAreaElement).readOnly).toBe(true)

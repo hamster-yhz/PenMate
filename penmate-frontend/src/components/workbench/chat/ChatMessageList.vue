@@ -46,3 +46,16 @@ const handleReplaceSelected = (payload: ChatMessage) => {
     />
   </div>
 </template>
+
+<style scoped lang="less">
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+  padding-bottom: 4px;
+  border-top: 1px solid rgba(201, 169, 110, 0.04);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.08), rgba(11, 17, 32, 0));
+  box-shadow: inset 0 1px 0 var(--border-subtle);
+}
+</style>

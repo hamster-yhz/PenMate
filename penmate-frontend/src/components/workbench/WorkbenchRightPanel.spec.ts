@@ -74,6 +74,8 @@ describe('WorkbenchRightPanel', () => {
       },
     })
 
+    expect(wrapper.get('.panel-right').classes()).toContain('glass-panel')
+
     await wrapper.get('.panel-toggle').trigger('click')
     await wrapper.get('[data-testid="toggle-history"]').trigger('click')
     await wrapper.get('[data-testid="select-conversation"]').trigger('click')

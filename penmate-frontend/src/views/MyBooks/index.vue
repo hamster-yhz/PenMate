@@ -138,7 +138,7 @@ onMounted(() => {
 })
 </script>
 
-<style lang="less" scoped>
+<style lang="less">
 .mybooks-page {
   min-height: 100vh;
   background: var(--bg-primary);

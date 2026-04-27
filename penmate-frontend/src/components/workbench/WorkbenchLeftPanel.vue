@@ -1,5 +1,5 @@
 <template>
-  <aside class="panel panel-left" :class="{ collapsed }">
+  <aside class="panel panel-left glass-panel" :class="{ collapsed }">
     <div class="panel-toggle" @click="emit('toggle-collapse')">
       {{ collapsed ? '▸' : '◂' }}
     </div>
@@ -169,7 +169,8 @@ const emit = defineEmits<{
   width: clamp(248px, 20vw, 320px);
   min-width: 0;
   border-right: 1px solid var(--border-subtle);
-  background: rgba(11, 17, 32, 0.6);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(11, 17, 32, 0.58));
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
 
   &.collapsed {
     width: 0;

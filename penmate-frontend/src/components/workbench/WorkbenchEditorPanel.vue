@@ -1,5 +1,5 @@
 <template>
-  <main class="panel panel-center">
+  <main class="panel panel-center glass-panel">
     <EditorToolbar
       :current-chapter-title="currentChapterTitle"
       :selected-version-no="selectedVersionNo"
@@ -96,7 +96,8 @@ const emit = defineEmits<{
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: rgba(11, 17, 32, 0.3);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.68), rgba(11, 17, 32, 0.4));
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
 }
 
 .editor-area {

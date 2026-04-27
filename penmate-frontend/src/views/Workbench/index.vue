@@ -1,5 +1,10 @@
 <template>
   <div class="workbench-page">
+    <div class="workbench-backdrop" aria-hidden="true">
+      <span class="workbench-orb orb-left"></span>
+      <span class="workbench-orb orb-right"></span>
+    </div>
+
     <WorkbenchHeader
       :novel-title="novelTitle"
       :word-count="wordCount"
@@ -20,7 +25,7 @@
       @logout="handleLogout"
     />
 
-    <div class="wb-main">
+    <div class="wb-main workbench-shell">
       <WorkbenchLeftPanel
         :collapsed="leftCollapsed"
         :left-tabs="leftTabs"
@@ -706,19 +711,68 @@ watch(
 )
 </script>
 
-<style lang="less" scoped>
+<style lang="less">
 .workbench-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
   background: var(--bg-primary);
+  isolation: isolate;
+}
+
+.workbench-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(11, 17, 32, 0.82) 0%, rgba(11, 17, 32, 0.95) 100%),
+    radial-gradient(circle at top center, rgba(201, 169, 110, 0.05) 0%, transparent 44%);
+}
+
+.workbench-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(12px);
+  opacity: 0.4;
+}
+
+.orb-left {
+  top: 72px;
+  left: -120px;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(201, 169, 110, 0.2), transparent 65%);
+}
+
+.orb-right {
+  right: -140px;
+  bottom: -40px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(110, 197, 212, 0.16), transparent 68%);
 }
 
 .wb-main {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+
+.workbench-shell {
+  gap: 16px;
+  padding: 16px 20px 20px;
+}
+
+@media (max-width: 1280px) {
+  .workbench-shell {
+    gap: 12px;
+    padding: 12px 16px 16px;
+  }
 }
 </style>
