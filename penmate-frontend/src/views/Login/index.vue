@@ -1,237 +1,96 @@
 <template>
   <div class="login-page">
-    <!-- Background -->
     <div class="login-bg">
       <img :src="loginBg" alt="" class="bg-img" />
       <div class="bg-overlay"></div>
     </div>
 
-    <!-- Floating particles -->
     <div class="particles" aria-hidden="true">
       <span v-for="n in 15" :key="n" class="p-dot" :style="pStyle(n)"></span>
     </div>
 
-    <!-- Login Card -->
-    <div class="login-card glass-panel">
-      <div class="card-glow-top"></div>
+    <AuthCardShell>
+      <AuthModeTabs v-model="mode" />
 
-      <!-- Logo & Title -->
-      <div class="login-header">
-        <img :src="logoImg" alt="PenMate" class="login-logo" />
-        <h1 class="login-title">笔 友</h1>
-        <p class="login-subtitle">执笔问道 · AI小说Copilot</p>
-      </div>
+      <LoginForm
+        v-if="mode === 'login'"
+        v-model:username="loginForm.username"
+        v-model:password="loginForm.password"
+        v-model:remember="loginForm.remember"
+        :loading="isLoading"
+        @submit="handleLoginSubmit"
+      />
 
-      <!-- Tab Switch -->
-      <div class="tab-bar">
-        <button
-          class="tab-btn"
-          :class="{ active: mode === 'login' }"
-          @click="mode = 'login'"
-        >登 录</button>
-        <button
-          class="tab-btn"
-          :class="{ active: mode === 'register' }"
-          @click="mode = 'register'"
-        >注 册</button>
-        <div class="tab-indicator" :style="{ left: mode === 'login' ? '0%' : '50%' }"></div>
-      </div>
+      <RegisterForm
+        v-else
+        v-model:username="registerForm.username"
+        v-model:email="registerForm.email"
+        v-model:password="registerForm.password"
+        v-model:confirmPassword="registerForm.confirmPassword"
+        :loading="isLoading"
+        @submit="handleRegisterSubmit"
+      />
 
-      <!-- Login Form -->
-      <form class="login-form" @submit.prevent="handleSubmit" v-if="mode === 'login'">
-        <div class="form-group">
-          <label class="form-label">
-            <img :src="iconAgent" alt="" class="label-icon" />
-            <span>账号</span>
-          </label>
-          <input
-            v-model="loginForm.username"
-            type="text"
-            class="form-input"
-            placeholder="请输入用户名或邮箱"
-            autocomplete="username"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">
-            <span class="label-icon-text">🔐</span>
-            <span>密码</span>
-          </label>
-          <input
-            v-model="loginForm.password"
-            type="password"
-            class="form-input"
-            placeholder="请输入密码"
-            autocomplete="current-password"
-          />
-        </div>
-        <div class="form-extra">
-          <label class="remember-me">
-            <input type="checkbox" v-model="loginForm.remember" />
-            <span>记住我</span>
-          </label>
-          <a href="#" class="forgot-link">忘记密码？</a>
-        </div>
-        <button type="submit" class="btn-submit" :disabled="isLoading">
-          <span v-if="!isLoading">踏 入 书 阁</span>
-          <span v-else class="loading-text">
-            <span class="loading-dot"></span>
-            <span class="loading-dot"></span>
-            <span class="loading-dot"></span>
-          </span>
-        </button>
-      </form>
-
-      <!-- Register Form -->
-      <form class="login-form" @submit.prevent="handleSubmit" v-else>
-        <div class="form-group">
-          <label class="form-label">
-            <img :src="iconAgent" alt="" class="label-icon" />
-            <span>用户名</span>
-          </label>
-          <input
-            v-model="registerForm.username"
-            type="text"
-            class="form-input"
-            placeholder="取一个笔名"
-            autocomplete="username"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">
-            <span class="label-icon-text">📮</span>
-            <span>邮箱</span>
-          </label>
-          <input
-            v-model="registerForm.email"
-            type="email"
-            class="form-input"
-            placeholder="请输入邮箱地址"
-            autocomplete="email"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">
-            <span class="label-icon-text">🔐</span>
-            <span>密码</span>
-          </label>
-          <input
-            v-model="registerForm.password"
-            type="password"
-            class="form-input"
-            placeholder="设置密码（6位以上）"
-            autocomplete="new-password"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">
-            <span class="label-icon-text">🔐</span>
-            <span>确认密码</span>
-          </label>
-          <input
-            v-model="registerForm.confirmPassword"
-            type="password"
-            class="form-input"
-            placeholder="再次输入密码"
-            autocomplete="new-password"
-          />
-        </div>
-        <button type="submit" class="btn-submit" :disabled="isLoading">
-          <span v-if="!isLoading">开 启 创 作 之 旅</span>
-          <span v-else class="loading-text">
-            <span class="loading-dot"></span>
-            <span class="loading-dot"></span>
-            <span class="loading-dot"></span>
-          </span>
-        </button>
-      </form>
-
-      <!-- Footer -->
       <div class="login-footer">
         <div class="divider-line">
           <span>或</span>
         </div>
         <p class="footer-hint">
           {{ mode === 'login' ? '还没有账号？' : '已有账号？' }}
-          <a href="#" @click.prevent="mode = mode === 'login' ? 'register' : 'login'">
+          <a href="#" @click.prevent="toggleMode">
             {{ mode === 'login' ? '立即注册' : '返回登录' }}
           </a>
         </p>
       </div>
-    </div>
+    </AuthCardShell>
 
-    <!-- Back to Home -->
-    <a class="back-home" @click.prevent="$router.push('/')">
+    <a class="back-home" @click.prevent="router.push('/')">
       <span>← 返回首页</span>
     </a>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { authApi } from '@/api/modules/auth.api'
-import { setSession } from '@/stores/session'
-
 import loginBg from '@/assets/images/login-bg.png'
-import logoImg from '@/assets/images/logo.png'
-import iconAgent from '@/assets/images/icon-agent.png'
+import AuthCardShell from '@/components/auth/AuthCardShell.vue'
+import AuthModeTabs from '@/components/auth/AuthModeTabs.vue'
+import LoginForm, { type LoginFormSubmitPayload } from '@/components/auth/LoginForm.vue'
+import RegisterForm from '@/components/auth/RegisterForm.vue'
+import { useLoginSubmit } from '@/composables/auth/useLoginSubmit'
 
 const router = useRouter()
 const mode = ref<'login' | 'register'>('login')
-const isLoading = ref(false)
+const { isLoading, submitLogin } = useLoginSubmit()
 
 const loginForm = reactive({
   username: '',
   password: '',
-  remember: false
+  remember: false,
 })
 
 const registerForm = reactive({
   username: '',
   email: '',
   password: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 
-const handleSubmit = async () => {
-  if (mode.value !== 'login') {
-    message.info('当前版本暂未接入注册接口，请先使用已有账号登录')
-    return
-  }
-  if (!loginForm.username.trim() || !loginForm.password.trim()) {
-    message.warning('请输入账号与密码')
-    return
-  }
-  isLoading.value = true
-  try {
-    const tokenData = await authApi.login({
-      email: loginForm.username.trim(),
-      password: loginForm.password
-    })
-    setSession({
-      accessToken: String(tokenData?.accessToken || ''),
-      refreshToken: String(tokenData?.refreshToken || '')
-    })
-
-    const profile = await authApi.me()
-    const uid = Number(profile.userId ?? profile.id ?? profile.uid ?? 0)
-    const email = String(profile.email ?? profile.userEmail ?? loginForm.username.trim())
-    const name = String(profile.displayName ?? profile.username ?? profile.name ?? '创作者')
-    setSession({
-      userId: Number.isFinite(uid) && uid > 0 ? uid : undefined,
-      userEmail: email,
-      userName: name
-    })
-
-    message.success('登录成功')
+const handleLoginSubmit = async (payload: LoginFormSubmitPayload) => {
+  const success = await submitLogin(payload)
+  if (success) {
     router.push('/mybooks')
-  } catch (error: any) {
-    message.error(error?.message || '登录失败')
-  } finally {
-    isLoading.value = false
   }
+}
+
+const handleRegisterSubmit = () => {
+  message.info('当前版本暂未接入注册接口，请先使用已有账号登录')
+}
+
+const toggleMode = () => {
+  mode.value = mode.value === 'login' ? 'register' : 'login'
 }
 
 const pStyle = (_n: number) => {
@@ -246,7 +105,7 @@ const pStyle = (_n: number) => {
     bottom: '-5px',
     animationDuration: `${dur}s`,
     animationDelay: `${delay}s`,
-    opacity: Math.random() * 0.4 + 0.1
+    opacity: Math.random() * 0.4 + 0.1,
   }
 }
 </script>
@@ -261,7 +120,6 @@ const pStyle = (_n: number) => {
   overflow: hidden;
 }
 
-/* Background */
 .login-bg {
   position: absolute;
   inset: 0;
@@ -280,10 +138,9 @@ const pStyle = (_n: number) => {
   inset: 0;
   background:
     radial-gradient(ellipse at 50% 40%, rgba(201, 169, 110, 0.05) 0%, transparent 55%),
-    linear-gradient(180deg, rgba(11,17,32,0.4) 0%, rgba(11,17,32,0.7) 100%);
+    linear-gradient(180deg, rgba(11, 17, 32, 0.4) 0%, rgba(11, 17, 32, 0.7) 100%);
 }
 
-/* Particles */
 .particles {
   position: fixed;
   inset: 0;
@@ -298,7 +155,6 @@ const pStyle = (_n: number) => {
   animation: particleDrift linear infinite;
 }
 
-/* Login Card */
 .login-card {
   position: relative;
   z-index: 10;
@@ -310,7 +166,7 @@ const pStyle = (_n: number) => {
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(201, 169, 110, 0.15);
   border-radius: 16px;
-  box-shadow: 0 8px 48px rgba(0,0,0,0.5), 0 0 60px rgba(201,169,110,0.06);
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.5), 0 0 60px rgba(201, 169, 110, 0.06);
 }
 
 .card-glow-top {
@@ -323,7 +179,6 @@ const pStyle = (_n: number) => {
   opacity: 0.5;
 }
 
-/* Header */
 .login-header {
   text-align: center;
   margin-bottom: 28px;
@@ -335,7 +190,7 @@ const pStyle = (_n: number) => {
   border-radius: 50%;
   object-fit: cover;
   margin-bottom: 12px;
-  filter: drop-shadow(0 0 16px rgba(201,169,110,0.3));
+  filter: drop-shadow(0 0 16px rgba(201, 169, 110, 0.3));
   animation: floatSlow 5s ease-in-out infinite;
 }
 
@@ -353,7 +208,6 @@ const pStyle = (_n: number) => {
   letter-spacing: 0.15em;
 }
 
-/* Tabs */
 .tab-bar {
   position: relative;
   display: flex;
@@ -387,7 +241,6 @@ const pStyle = (_n: number) => {
   transition: left 0.35s var(--ease-silk);
 }
 
-/* Form */
 .login-form {
   display: flex;
   flex-direction: column;
@@ -437,7 +290,7 @@ const pStyle = (_n: number) => {
 
   &:focus {
     border-color: var(--border-gold);
-    box-shadow: 0 0 0 3px rgba(201,169,110,0.08), var(--shadow-gold);
+    box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.08), var(--shadow-gold);
   }
 }
 
@@ -455,7 +308,7 @@ const pStyle = (_n: number) => {
   color: var(--text-secondary);
   cursor: pointer;
 
-  input[type="checkbox"] {
+  input[type='checkbox'] {
     accent-color: var(--amber-gold);
   }
 }
@@ -469,7 +322,6 @@ const pStyle = (_n: number) => {
   }
 }
 
-/* Submit Button */
 .btn-submit {
   width: 100%;
   margin-top: 8px;
@@ -478,7 +330,7 @@ const pStyle = (_n: number) => {
   font-size: 1.1rem;
   letter-spacing: 0.25em;
   color: var(--amber-gold);
-  background: linear-gradient(135deg, rgba(201,169,110,0.15), rgba(201,169,110,0.05));
+  background: linear-gradient(135deg, rgba(201, 169, 110, 0.15), rgba(201, 169, 110, 0.05));
   border: 1px solid var(--border-gold);
   border-radius: 8px;
   cursor: pointer;
@@ -490,7 +342,7 @@ const pStyle = (_n: number) => {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(201,169,110,0.2), rgba(201,169,110,0.08));
+    background: linear-gradient(135deg, rgba(201, 169, 110, 0.2), rgba(201, 169, 110, 0.08));
     opacity: 0;
     transition: opacity 0.4s;
   }
@@ -525,16 +377,29 @@ const pStyle = (_n: number) => {
   background: var(--amber-gold);
   animation: typingPulse 1.2s ease-in-out infinite;
 
-  &:nth-child(2) { animation-delay: 0.2s; }
-  &:nth-child(3) { animation-delay: 0.4s; }
+  &:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  &:nth-child(3) {
+    animation-delay: 0.4s;
+  }
 }
 
 @keyframes typingPulse {
-  0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
-  30% { opacity: 1; transform: scale(1.3); }
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  30% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
 }
 
-/* Footer */
 .login-footer {
   margin-top: 24px;
 }
@@ -545,7 +410,8 @@ const pStyle = (_n: number) => {
   gap: 12px;
   margin-bottom: 16px;
 
-  &::before, &::after {
+  &::before,
+  &::after {
     content: '';
     flex: 1;
     height: 1px;
@@ -573,7 +439,6 @@ const pStyle = (_n: number) => {
   }
 }
 
-/* Back link */
 .back-home {
   position: fixed;
   top: 28px;
@@ -584,7 +449,7 @@ const pStyle = (_n: number) => {
   font-size: 0.9rem;
   color: var(--text-muted);
   letter-spacing: 0.1em;
-  background: rgba(11,17,32,0.5);
+  background: rgba(11, 17, 32, 0.5);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;

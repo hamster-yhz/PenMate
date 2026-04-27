@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import WorldCardItem from './WorldCardItem.vue'
-
-type WorldCard = {
-  cardId: number
-  cardType: 'WORLD'
-  name: string
-  summary: string
-  detailJson: string
-  expanded: boolean
-}
+import type { WorldCard } from '@/components/workbench/workbenchTypes'
 
 const props = defineProps<{
   cards: WorldCard[]

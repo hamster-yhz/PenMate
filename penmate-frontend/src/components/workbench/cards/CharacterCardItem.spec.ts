@@ -132,6 +132,23 @@ describe('CharacterCardItem', () => {
     ])
   })
 
+  it('keeps_rendering_local_draft_values_without_waiting_for_parent_sync', async () => {
+    const wrapper = await mountCharacterCardItem({ expanded: true })
+    const nameInput = wrapper.get('[data-testid="character-card-name-input"]')
+    const summaryInput = wrapper.get('[data-testid="character-card-summary-input"]')
+
+    await nameInput.setValue('沈砚')
+    await summaryInput.setValue('谋士')
+    await wrapper.setProps({
+      card: buildCard({ expanded: true }),
+    })
+
+    expect((wrapper.get('[data-testid="character-card-name-input"]').element as HTMLInputElement).value).toBe('沈砚')
+    expect((wrapper.get('[data-testid="character-card-summary-input"]').element as HTMLInputElement).value).toBe('谋士')
+    expect(wrapper.get('.char-name').text()).toBe('沈砚')
+    expect(wrapper.get('.char-role').text()).toBe('谋士')
+  })
+
   it('emits_save_with_current_card_draft', async () => {
     const wrapper = await mountCharacterCardItem({ expanded: true })
     const saveButton = wrapper.find('[data-testid="character-card-save"]')

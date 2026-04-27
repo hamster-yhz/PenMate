@@ -25,17 +25,44 @@ const cloneCard = (card: CharacterCard): CharacterCard => ({
   ...card,
 })
 
+const isSameCardDraft = (left: CharacterCard, right: CharacterCard) => (
+  left.cardId === right.cardId
+  && left.cardType === right.cardType
+  && left.name === right.name
+  && left.summary === right.summary
+  && left.detailJson === right.detailJson
+  && left.expanded === right.expanded
+)
+
 const cardDraft = ref<CharacterCard>(cloneCard(props.card))
+const draftDirty = ref(false)
 
 watch(
   () => props.card,
   (value) => {
-    cardDraft.value = cloneCard(value)
+    const nextCard = cloneCard(value)
+
+    if (nextCard.cardId !== cardDraft.value.cardId) {
+      cardDraft.value = nextCard
+      draftDirty.value = false
+      return
+    }
+
+    if (isSameCardDraft(nextCard, cardDraft.value)) {
+      cardDraft.value = nextCard
+      draftDirty.value = false
+      return
+    }
+
+    if (!draftDirty.value) {
+      cardDraft.value = nextCard
+    }
   },
   { deep: true },
 )
 
 const updateCard = (patch: Partial<CharacterCard>) => {
+  draftDirty.value = true
   cardDraft.value = {
     ...cardDraft.value,
     ...patch,
@@ -61,25 +88,25 @@ const deleteCard = () => {
 </script>
 
 <template>
-  <div class="character-card-item" :class="{ expanded: card.expanded }" :data-testid="`character-card-${card.cardId}`">
+  <div class="character-card-item" :class="{ expanded: cardDraft.expanded }" :data-testid="`character-card-${cardDraft.cardId}`">
     <div class="char-header" data-testid="character-card-header" @click="toggleExpand">
-      <span class="char-avatar">{{ String(card.name || '角').charAt(0) }}</span>
+      <span class="char-avatar">{{ String(cardDraft.name || '角').charAt(0) }}</span>
       <div class="char-meta">
-        <span class="char-name">{{ String(card.name || '未命名角色') }}</span>
-        <span class="char-role">{{ String(card.summary || '角色卡') }}</span>
+        <span class="char-name">{{ String(cardDraft.name || '未命名角色') }}</span>
+        <span class="char-role">{{ String(cardDraft.summary || '角色卡') }}</span>
       </div>
       <div class="char-actions" @click.stop>
         <button type="button" class="tree-act-btn" data-testid="character-card-save" @click="saveCard">💾</button>
         <button type="button" class="tree-act-btn danger" data-testid="character-card-delete" @click="deleteCard">✕</button>
       </div>
-      <span class="char-toggle">{{ card.expanded ? '▾' : '▸' }}</span>
+      <span class="char-toggle">{{ cardDraft.expanded ? '▾' : '▸' }}</span>
     </div>
 
-    <div v-if="card.expanded" class="char-details" data-testid="character-card-details">
+    <div v-if="cardDraft.expanded" class="char-details" data-testid="character-card-details">
       <div class="char-field-edit">
         <span class="cf-label">名字</span>
         <input
-          :value="card.name"
+          :value="cardDraft.name"
           class="cf-input"
           data-testid="character-card-name-input"
           @input="updateCard({ name: ($event.target as HTMLInputElement).value })"
@@ -88,7 +115,7 @@ const deleteCard = () => {
       <div class="char-field-edit">
         <span class="cf-label">身份</span>
         <input
-          :value="card.summary"
+          :value="cardDraft.summary"
           class="cf-input"
           data-testid="character-card-summary-input"
           @input="updateCard({ summary: ($event.target as HTMLInputElement).value })"
@@ -97,7 +124,7 @@ const deleteCard = () => {
       <div class="char-field-edit">
         <span class="cf-label">性格</span>
         <input
-          :value="card.detailJson"
+          :value="cardDraft.detailJson"
           class="cf-input"
           data-testid="character-card-detail-input"
           @input="updateCard({ detailJson: ($event.target as HTMLInputElement).value })"

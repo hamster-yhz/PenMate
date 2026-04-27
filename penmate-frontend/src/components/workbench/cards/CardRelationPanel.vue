@@ -1,14 +1,16 @@
 <script setup lang="ts">
 type CardOption = {
-  cardId: number | string
+  cardId?: number | string
   name?: string
+  [key: string]: any
 }
 
 type CardRelation = {
-  cardRelationId: number | string
-  fromCardId: number | string
-  toCardId: number | string
+  cardRelationId?: number | string
+  fromCardId?: number | string
+  toCardId?: number | string
   relationType?: string
+  [key: string]: any
 }
 
 const props = defineProps<{

@@ -1,0 +1,77 @@
+import { ref } from 'vue'
+import type { ChatMessage } from '@/components/workbench/workbenchTypes'
+
+type ContextProfile = {
+  projectId?: number | string | null
+  operatorId?: number | string | null
+}
+
+type UseWorkbenchApprovalsDeps = {
+  getContext: () => ContextProfile
+  getMessages: () => ChatMessage[]
+  approve: (projectId: number | string, approvalId: number, payload: Record<string, unknown>) => Promise<unknown>
+  reject: (projectId: number | string, approvalId: number, payload: Record<string, unknown>) => Promise<unknown>
+  notifyWarning?: (message: string) => void
+}
+
+export const useWorkbenchApprovals = (deps: UseWorkbenchApprovalsDeps) => {
+  const approvalBusyIds = ref<string[]>([])
+
+  const isApprovalBusy = (id: string) => approvalBusyIds.value.includes(id)
+
+  const runApprovalAction = async (
+    id: string,
+    request: (projectId: number | string, approvalId: number, payload: Record<string, unknown>) => Promise<unknown>,
+    comment: string,
+    resolvedAction: 'approved' | 'rejected',
+    failureMessage: string,
+  ) => {
+    if (isApprovalBusy(id)) return
+
+    const messageItem = deps.getMessages().find((item) => item.approval?.id === id)
+    if (!messageItem?.approval) return
+    if (messageItem.approval.resolved) return
+    if (!('resolvedAction' in messageItem.approval)) {
+      messageItem.approval.resolvedAction = undefined
+    }
+
+    const { projectId, operatorId } = deps.getContext()
+    const approvalId = Number(id)
+    if (!projectId || !operatorId || approvalId <= 0) {
+      deps.notifyWarning?.('缺少审批上下文，无法完成操作')
+      return
+    }
+
+    approvalBusyIds.value.push(id)
+    try {
+      await request(projectId, approvalId, {
+        reviewedBy: operatorId,
+        comment,
+      })
+      messageItem.approval.resolved = true
+      messageItem.approval.resolvedAction = resolvedAction
+    } catch (error: any) {
+      const message = typeof error === 'string'
+        ? error
+        : error?.message || failureMessage
+      deps.notifyWarning?.(message)
+    } finally {
+      approvalBusyIds.value = approvalBusyIds.value.filter((item) => item !== id)
+    }
+  }
+
+  const handleApprove = async (id: string) => {
+    await runApprovalAction(id, deps.approve, '前端审批通过', 'approved', '审批通过失败')
+  }
+
+  const handleReject = async (id: string) => {
+    await runApprovalAction(id, deps.reject, '前端审批拒绝', 'rejected', '审批拒绝失败')
+  }
+
+  return {
+    approvalBusyIds,
+    isApprovalBusy,
+    handleApprove,
+    handleReject,
+  }
+}

@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import CharacterCardItem from './CharacterCardItem.vue'
-
-type CharacterCard = {
-  cardId: number
-  cardType: 'CHARACTER'
-  name: string
-  summary: string
-  detailJson: string
-  expanded: boolean
-}
+import type { CharacterCard } from '@/components/workbench/workbenchTypes'
 
 const props = defineProps<{
   cards: CharacterCard[]

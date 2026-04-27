@@ -1,4 +1,5 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import type { CardRelation, CharacterCard, WorldCard } from '@/components/workbench/workbenchTypes'
 
 type ContextProfile = {
   projectId?: number | string | null
@@ -25,8 +26,8 @@ type UseWorkbenchCardsDeps = {
 
 export type WorkbenchCardType = 'CHARACTER' | 'WORLD'
 
-const pickCardId = (item: CardRecord) => Number(item.cardId ?? 0)
-const pickRelationId = (item: RelationRecord) => Number(item.cardRelationId ?? 0)
+const pickCardId = (item: CardRecord | CharacterCard | WorldCard) => Number(item.cardId ?? 0)
+const pickRelationId = (item: RelationRecord | CardRelation) => Number(item.cardRelationId ?? 0)
 
 const normalizeCardType = (value: unknown): WorkbenchCardType | '' => {
   const normalized = String(value || '').trim().toUpperCase()
@@ -44,11 +45,48 @@ const normalizeDetailJsonInput = (value: unknown) => {
   }
 }
 
-const withExpandedState = (cards: CardRecord[]) => cards.map((item) => ({ ...item, expanded: false }))
+const toWorkbenchCard = (item: CardRecord): CharacterCard | WorldCard | null => {
+  const cardId = Number(item.cardId ?? 0)
+  const cardType = normalizeCardType(item.cardType)
+  if (!cardId || !cardType) return null
+
+  const baseCard = {
+    cardId,
+    cardType,
+    name: String(item.name ?? ''),
+    summary: String(item.summary ?? ''),
+    detailJson: String(item.detailJson ?? ''),
+    expanded: Boolean(item.expanded),
+  }
+
+  return cardType === 'CHARACTER'
+    ? ({ ...baseCard, cardType: 'CHARACTER' } satisfies CharacterCard)
+    : ({ ...baseCard, cardType: 'WORLD' } satisfies WorldCard)
+}
+
+const withExpandedState = (cards: CardRecord[]) => cards
+  .map((item) => toWorkbenchCard({ ...item, expanded: false }))
+  .filter((item): item is CharacterCard | WorldCard => item !== null)
+
+const toCardRelation = (item: RelationRecord): CardRelation | null => {
+  const cardRelationId = Number(item.cardRelationId ?? 0)
+  const fromCardId = Number(item.fromCardId ?? 0)
+  const toCardId = Number(item.toCardId ?? 0)
+  const relationType = String(item.relationType ?? '').trim()
+  if (!cardRelationId || !fromCardId || !toCardId || !relationType) return null
+
+  return {
+    cardRelationId,
+    fromCardId,
+    toCardId,
+    relationType,
+    description: String(item.description ?? ''),
+  }
+}
 
 export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
-  const projectCards = ref<CardRecord[]>([])
-  const cardRelations = ref<RelationRecord[]>([])
+  const projectCards = ref<Array<CharacterCard | WorldCard>>([])
+  const cardRelations = ref<CardRelation[]>([])
   const relationFromId = ref('')
   const relationToId = ref('')
   const relationType = ref('')
@@ -62,10 +100,11 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
         deps.listCardRelations(projectId),
       ])
       projectCards.value = withExpandedState((cards || []) as CardRecord[])
-      cardRelations.value = (relations || []) as RelationRecord[]
-    } catch {
-      projectCards.value = []
-      cardRelations.value = []
+      cardRelations.value = (relations || [])
+        .map((item) => toCardRelation(item as RelationRecord))
+        .filter((item): item is CardRelation => item !== null)
+    } catch (error: unknown) {
+      deps.notify?.(error instanceof Error ? error.message : '加载资料卡失败')
     }
   }
 
@@ -74,7 +113,7 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
     return String(hit?.name || `卡片#${idLike}`)
   }
 
-  const updateCardDraft = (nextCard: CardRecord) => {
+  const updateCardDraft = (nextCard: CharacterCard | WorldCard) => {
     const cardId = pickCardId(nextCard)
     if (!cardId) return
 
@@ -131,10 +170,13 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
     }
   }
 
-  const saveCard = async (card: CardRecord) => {
+  const saveCard = async (card: CharacterCard | WorldCard) => {
     const { projectId, operatorId } = deps.getContext()
     const cardId = pickCardId(card)
-    if (!projectId || !operatorId || !cardId) return
+    if (!projectId || !operatorId || !cardId) {
+      deps.notify?.('缺少 projectId/operatorId/cardId，无法保存资料卡')
+      return
+    }
 
     const cardType = normalizeCardType(card.cardType)
     if (!cardType) {
@@ -167,10 +209,13 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
     }
   }
 
-  const deleteCardById = async (card: CardRecord) => {
+  const deleteCardById = async (card: CharacterCard | WorldCard) => {
     const { projectId, operatorId } = deps.getContext()
     const cardId = pickCardId(card)
-    if (!projectId || !operatorId || !cardId) return
+    if (!projectId || !operatorId || !cardId) {
+      deps.notify?.('缺少 projectId/operatorId/cardId，无法删除资料卡')
+      return
+    }
 
     try {
       await deps.deleteCard(projectId, cardId, operatorId)
@@ -205,10 +250,13 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
     }
   }
 
-  const deleteRelationById = async (relation: RelationRecord) => {
+  const deleteRelationById = async (relation: CardRelation) => {
     const { projectId, operatorId } = deps.getContext()
     const relationId = pickRelationId(relation)
-    if (!projectId || !operatorId || !relationId) return
+    if (!projectId || !operatorId || !relationId) {
+      deps.notify?.('缺少 projectId/operatorId/relationId，无法删除关系')
+      return
+    }
 
     try {
       await deps.deleteCardRelation(projectId, relationId, operatorId)
@@ -218,8 +266,13 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
     }
   }
 
+  const characterCards = computed(() => projectCards.value.filter((item): item is CharacterCard => item.cardType === 'CHARACTER'))
+  const worldCards = computed(() => projectCards.value.filter((item): item is WorldCard => item.cardType === 'WORLD'))
+
   return {
     projectCards,
+    characterCards,
+    worldCards,
     cardRelations,
     relationFromId,
     relationToId,
