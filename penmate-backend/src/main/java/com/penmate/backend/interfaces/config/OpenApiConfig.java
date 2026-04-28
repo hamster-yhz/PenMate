@@ -82,16 +82,12 @@ public class OpenApiConfig {
         String summary = OPERATION_SUMMARY_MAP.get(endpointKey);
         String description = OPERATION_DESCRIPTION_MAP.get(endpointKey);
 
-        if (operation.getSummary() == null || operation.getSummary().isBlank()) {
-            operation.setSummary(summary == null ? module + " - " + action : summary);
-        }
-        if (operation.getDescription() == null || operation.getDescription().isBlank()) {
-            operation.setDescription(description == null
-                    ? "接口作用：用于" + module + "的" + action + "。\n"
-                    + "调用方式：" + method.toUpperCase(Locale.ROOT) + " " + path + "。\n"
-                    + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。"
-                    : description);
-        }
+        operation.setSummary(summary == null ? module + " - " + action : summary);
+        operation.setDescription(description == null
+                ? "接口作用：用于" + module + "的" + action + "。\n"
+                + "调用方式：" + method.toUpperCase(Locale.ROOT) + " " + path + "。\n"
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。"
+                : description);
     }
 
     private void fillParameterDocs(String path, String method, Operation operation, OpenAPI openApi) {
@@ -99,10 +95,8 @@ public class OpenApiConfig {
             return;
         }
         for (Parameter parameter : operation.getParameters()) {
-            if (parameter.getDescription() == null || parameter.getDescription().isBlank()) {
-                String place = parameter.getIn() == null ? "参数" : parameter.getIn() + "参数";
-                parameter.setDescription(describeField(parameter.getName(), place, path, method));
-            }
+            String place = parameter.getIn() == null ? "参数" : parameter.getIn() + "参数";
+            parameter.setDescription(describeField(parameter.getName(), place, path, method));
             Schema<?> schema = parameter.getSchema();
             if (schema != null && schema.getExample() == null) {
                 schema.setExample(exampleBySchema(schema, openApi));
@@ -193,7 +187,7 @@ public class OpenApiConfig {
         if (path.contains("/novels")) {
             return "小说项目";
         }
-        if (path.contains("/iam") || path.contains("/rbac") || path.contains("/roles") || path.contains("/users") || path.contains("/profile/menus")) {
+        if (path.contains("/iam") || path.contains("/rbac") || path.contains("/roles") || path.contains("/users") || path.contains("/permissions") || path.contains("/profile/menus")) {
             return "RBAC 权限";
         }
         if (path.contains("/ops")) {
@@ -223,6 +217,9 @@ public class OpenApiConfig {
         if ("POST".equals(httpMethod) && "/api/v1/users/{userId}/roles".equals(path)) {
             return "为用户绑定角色";
         }
+        if ("GET".equals(httpMethod) && "/api/v1/users/{userId}/roles".equals(path)) {
+            return "查询用户已绑定角色";
+        }
         if ("DELETE".equals(httpMethod) && "/api/v1/users/{userId}/roles/{roleId}".equals(path)) {
             return "解除用户角色绑定";
         }
@@ -241,6 +238,9 @@ public class OpenApiConfig {
         if ("GET".equals(httpMethod) && "/api/v1/permissions".equals(path)) {
             return "查询权限列表";
         }
+        if ("GET".equals(httpMethod) && "/api/v1/roles/{roleId}/permissions".equals(path)) {
+            return "查询角色已绑定权限";
+        }
         if ("POST".equals(httpMethod) && "/api/v1/roles/{roleId}/permissions".equals(path)) {
             return "为角色绑定权限";
         }
@@ -251,7 +251,7 @@ public class OpenApiConfig {
             return "查询菜单列表";
         }
         if ("GET".equals(httpMethod) && "/api/v1/profile/menus".equals(path)) {
-            return "查询当前用户可见菜单";
+            return "查询指定用户可见菜单";
         }
 
         if (path.endsWith("/login")) {
@@ -356,7 +356,7 @@ public class OpenApiConfig {
 
     private String describeField(String fieldName, String place, String path, String method) {
         String name = fieldName == null ? "field" : fieldName;
-        String n = name.toLowerCase(Locale.ROOT);
+        String n = name.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
 
         // RBAC 语义优先
         if ("id".equals(n) && path.contains("/users/")) {
@@ -365,11 +365,14 @@ public class OpenApiConfig {
         if ("id".equals(n) && path.contains("/roles/")) {
             return place + "：角色业务 ID，用于定位目标角色。";
         }
-        if ("roleid".equals(n)) {
+        if ("roleid".equals(n) && path.contains("/users/") && path.contains("/roles")) {
             return place + "：角色业务 ID，用于绑定/解绑用户角色。";
         }
+        if ("roleid".equals(n) && path.contains("/roles/") && path.contains("/permissions")) {
+            return place + "：目标角色业务 ID，用于查询、绑定或解绑该角色的权限。";
+        }
         if ("permissionid".equals(n)) {
-            return place + "：权限 ID，用于绑定/解绑角色权限。";
+            return place + "：权限业务 ID，用于绑定/解绑角色权限。";
         }
         if ("userid".equals(n) && path.contains("/profile/menus")) {
             return place + "：用户业务 ID，用于查询该用户最终可见菜单（含角色聚合后权限）。";
@@ -450,7 +453,7 @@ public class OpenApiConfig {
         if ("configid".equals(n)) {
             return place + "：模型配置业务 ID，用于定位项目模型配置。";
         }
-        if ("traceid".equals(n)) {
+        if ("traceid".equals(n) || "xtraceid".equals(n)) {
             return place + "：链路追踪 ID，用于日志追踪与问题定位。";
         }
         if ("authorization".equals(n)) {
@@ -564,16 +567,18 @@ public class OpenApiConfig {
         map.put("PUT /api/v1/users/{userId}", "RBAC - 更新用户");
         map.put("DELETE /api/v1/users/{userId}", "RBAC - 删除用户");
         map.put("POST /api/v1/users/{userId}/roles", "RBAC - 为用户绑定角色");
+        map.put("GET /api/v1/users/{userId}/roles", "RBAC - 查询用户已绑定角色");
         map.put("DELETE /api/v1/users/{userId}/roles/{roleId}", "RBAC - 解除用户角色绑定");
         map.put("GET /api/v1/roles", "RBAC - 查询角色列表");
         map.put("POST /api/v1/roles", "RBAC - 创建角色");
         map.put("PUT /api/v1/roles/{roleId}", "RBAC - 更新角色");
         map.put("DELETE /api/v1/roles/{roleId}", "RBAC - 删除角色");
         map.put("GET /api/v1/permissions", "RBAC - 查询权限列表");
+        map.put("GET /api/v1/roles/{roleId}/permissions", "RBAC - 查询角色已绑定权限");
         map.put("POST /api/v1/roles/{roleId}/permissions", "RBAC - 为角色绑定权限");
         map.put("DELETE /api/v1/roles/{roleId}/permissions/{permissionId}", "RBAC - 解除角色权限绑定");
         map.put("GET /api/v1/menus", "RBAC - 查询菜单列表");
-        map.put("GET /api/v1/profile/menus", "RBAC - 查询用户可见菜单");
+        map.put("GET /api/v1/profile/menus", "RBAC - 查询指定用户可见菜单");
 
         return Collections.unmodifiableMap(map);
     }
@@ -622,6 +627,14 @@ public class OpenApiConfig {
         map.put("POST /api/v1/users/{userId}/roles", "接口作用：为指定用户绑定角色。\n"
                 + "关键字段：userId（用户业务 ID）、roleId（角色业务 ID）。\n"
                 + "业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n"
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
+        map.put("GET /api/v1/users/{userId}/roles", "接口作用：查询指定用户当前已绑定的角色集合。\n"
+                + "关键字段：userId（目标用户业务 ID）。\n"
+                + "业务规则：返回结果用于管理端展示、解绑与增量授权。\n"
+                + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
+        map.put("GET /api/v1/roles/{roleId}/permissions", "接口作用：查询指定角色当前已绑定的权限集合。\n"
+                + "关键字段：roleId（目标角色业务 ID）。\n"
+                + "业务规则：返回结果用于管理端展示、解绑与增量授权。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("POST /api/v1/roles/{roleId}/permissions", "接口作用：为指定角色绑定权限。\n"
                 + "关键字段：roleId（角色业务 ID）、permissionId（权限业务 ID）。\n"

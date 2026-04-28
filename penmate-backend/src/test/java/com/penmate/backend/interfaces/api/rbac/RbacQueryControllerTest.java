@@ -3,6 +3,8 @@ package com.penmate.backend.interfaces.api.rbac;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.iam.IamQueryApplicationService;
 import com.penmate.backend.domain.iam.model.IamMenu;
+import com.penmate.backend.domain.iam.model.IamPermission;
+import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -149,6 +152,48 @@ class RbacQueryControllerTest {
                 .andExpect(jsonPath("$.data.status").value(422))
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 查询用户已绑定角色成功。
+    void UT_RBAC_USER_ROLES_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-RBAC-USER-ROLES-LIST";
+        IamRole role = new IamRole();
+        role.setId(2001L);
+        role.setRoleId(2001L);
+        role.setName("管理员");
+        role.setCode("ADMIN");
+        when(iamQueryApplicationService.listUserRoles(1001L)).thenReturn(List.of(role));
+
+        mockMvc().perform(get("/api/v1/users/1001/roles")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].roleId").value(2001))
+                .andExpect(jsonPath("$.data[0].code").value("ADMIN"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+
+        verify(iamQueryApplicationService).listUserRoles(1001L);
+    }
+
+    @Test
+    // 查询角色已绑定权限成功。
+    void UT_RBAC_ROLE_PERMISSIONS_LIST_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-RBAC-ROLE-PERMISSIONS-LIST";
+        IamPermission permission = new IamPermission();
+        permission.setId(3001L);
+        permission.setPermissionId(3001L);
+        permission.setName("RBAC 管理");
+        permission.setCode("rbac.manage");
+        when(iamQueryApplicationService.listRolePermissions(3001L)).thenReturn(List.of(permission));
+
+        mockMvc().perform(get("/api/v1/roles/3001/permissions")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].permissionId").value(3001))
+                .andExpect(jsonPath("$.data[0].code").value("rbac.manage"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+
+        verify(iamQueryApplicationService).listRolePermissions(3001L);
     }
 
     @Test

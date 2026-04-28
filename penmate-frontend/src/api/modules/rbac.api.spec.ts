@@ -39,6 +39,22 @@ describe('rbac.api', () => {
     expect(getMock).toHaveBeenCalledWith('/v1/profile/menus?userId=9')
   })
 
+  it('should_call_user_roles_endpoint_when_list_user_roles_invoked', async () => {
+    getMock.mockResolvedValue([])
+
+    await rbacApi.listUserRoles(11)
+
+    expect(getMock).toHaveBeenCalledWith('/v1/users/11/roles')
+  })
+
+  it('should_call_role_permissions_endpoint_when_list_role_permissions_invoked', async () => {
+    getMock.mockResolvedValue([])
+
+    await rbacApi.listRolePermissions(22)
+
+    expect(getMock).toHaveBeenCalledWith('/v1/roles/22/permissions')
+  })
+
   it('should_throw_error_when_assign_role_permission_rejected', async () => {
     const error = new Error('assign failed')
     postMock.mockRejectedValue(error)

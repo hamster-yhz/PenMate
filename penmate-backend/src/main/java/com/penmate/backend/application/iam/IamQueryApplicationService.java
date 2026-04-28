@@ -68,6 +68,18 @@ public class IamQueryApplicationService {
     }
 
     /**
+     * 查询指定用户已绑定角色。
+     *
+     * @param userId 入参：userId
+     * @return 出参：处理结果
+     */
+    public List<IamRole> listUserRoles(Long userId) {
+        List<IamRole> roles = iamGateway.findRolesByUserId(userId);
+        log.info("查询用户角色列表: userId={}, count={}", userId, roles.size());
+        return roles;
+    }
+
+    /**
      * 查询权限列表。
      *
      * @return 出参：处理结果
@@ -75,6 +87,18 @@ public class IamQueryApplicationService {
     public List<IamPermission> listPermissions() {
         List<IamPermission> permissions = iamGateway.findAllPermissions();
         log.info("查询权限列表: count={}", permissions.size());
+        return permissions;
+    }
+
+    /**
+     * 查询指定角色已绑定权限。
+     *
+     * @param roleId 入参：roleId
+     * @return 出参：处理结果
+     */
+    public List<IamPermission> listRolePermissions(Long roleId) {
+        List<IamPermission> permissions = iamGateway.findPermissionsByRoleId(roleId);
+        log.info("查询角色权限列表: roleId={}, count={}", roleId, permissions.size());
         return permissions;
     }
 

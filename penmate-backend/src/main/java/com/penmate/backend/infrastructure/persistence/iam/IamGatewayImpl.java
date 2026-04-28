@@ -234,6 +234,17 @@ public class IamGatewayImpl implements IamGateway {
     /**
      * 处理业务请求。
      *
+     * @param roleId 入参：roleId
+     * @return 出参：处理结果
+     */
+    @Override
+    public List<IamPermission> findPermissionsByRoleId(Long roleId) {
+        return iamRoleMapper.findPermissionsByRoleId(roleId);
+    }
+
+    /**
+     * 处理业务请求。
+     *
      * @return 出参：处理结果
      */
     @Override

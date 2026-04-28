@@ -45,6 +45,8 @@ public interface IamGateway {
 
     int removePermissionFromRole(Long roleId, Long permissionId);
 
+    List<IamPermission> findPermissionsByRoleId(Long roleId);
+
     List<IamPermission> findAllPermissions();
 
     IamPermission findPermissionById(Long id);

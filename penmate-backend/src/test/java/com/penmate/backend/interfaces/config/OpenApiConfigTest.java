@@ -126,6 +126,30 @@ class OpenApiConfigTest {
     }
 
     @Test
+    void UT_CONFIG_OPENAPI_CUSTOMIZER_SHOULD_DESCRIBE_RBAC_BINDING_QUERY_ENDPOINTS() {
+        OpenAPI openAPI = new OpenAPI();
+        Operation userRolesOperation = new Operation();
+        userRolesOperation.setResponses(new ApiResponses().addApiResponse("200", new ApiResponse()));
+        Operation rolePermissionsOperation = new Operation();
+        rolePermissionsOperation.setResponses(new ApiResponses().addApiResponse("200", new ApiResponse()));
+        PathItem userRolesPath = new PathItem();
+        userRolesPath.setGet(userRolesOperation);
+        PathItem rolePermissionsPath = new PathItem();
+        rolePermissionsPath.setGet(rolePermissionsOperation);
+        Paths paths = new Paths()
+                .addPathItem("/api/v1/users/{userId}/roles", userRolesPath)
+                .addPathItem("/api/v1/roles/{roleId}/permissions", rolePermissionsPath);
+        openAPI.setPaths(paths);
+
+        openApiConfig.defaultApiDocumentationCustomizer().customise(openAPI);
+
+        assertThat(userRolesOperation.getSummary()).contains("RBAC").contains("已绑定角色");
+        assertThat(userRolesOperation.getDescription()).contains("已绑定的角色");
+        assertThat(rolePermissionsOperation.getSummary()).contains("RBAC").contains("已绑定权限");
+        assertThat(rolePermissionsOperation.getDescription()).contains("已绑定的权限");
+    }
+
+    @Test
     void UT_CONFIG_OPENAPI_EXAMPLE_BY_SCHEMA_SHOULD_HANDLE_REF_AND_ARRAY() throws Exception {
         OpenAPI openAPI = new OpenAPI();
         openAPI.setComponents(new Components().addSchemas("RefObject", new ObjectSchema().addProperty("enabled", new Schema<>().type("boolean"))));
@@ -146,6 +170,69 @@ class OpenApiConfigTest {
                 "/api/v1/model");
 
         assertThat(module).isEqualTo("模型配置");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_INFER_ACTION_SHOULD_DESCRIBE_PROFILE_MENUS_AS_TARGET_USER_QUERY() throws Exception {
+        String action = (String) invokePrivate("inferAction",
+                new Class[]{String.class, String.class},
+                "/api/v1/profile/menus", "get");
+
+        assertThat(action).isEqualTo("查询指定用户可见菜单");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_DESCRIBE_FIELD_SHOULD_DISTINGUISH_RBAC_ROLE_AND_PERMISSION_QUERY_SEMANTICS() throws Exception {
+        String roleIdInRolePermissionQuery = (String) invokePrivate("describeField",
+                new Class[]{String.class, String.class, String.class, String.class},
+                "roleId", "path参数", "/api/v1/roles/{roleId}/permissions", "get");
+        String permissionIdInRolePermissionDelete = (String) invokePrivate("describeField",
+                new Class[]{String.class, String.class, String.class, String.class},
+                "permissionId", "path参数", "/api/v1/roles/{roleId}/permissions/{permissionId}", "delete");
+
+        assertThat(roleIdInRolePermissionQuery).contains("目标角色");
+        assertThat(roleIdInRolePermissionQuery).doesNotContain("用户角色");
+        assertThat(permissionIdInRolePermissionDelete).contains("权限业务 ID");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_INFER_MODULE_SHOULD_CLASSIFY_PERMISSIONS_PATH_AS_RBAC() throws Exception {
+        String module = (String) invokePrivate("inferModule",
+                new Class[]{String.class},
+                "/api/v1/permissions");
+
+        assertThat(module).isEqualTo("RBAC 权限");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_DESCRIBE_FIELD_SHOULD_RECOGNIZE_TRACE_HEADER_WITH_HYPHENS() throws Exception {
+        String traceHeaderDescription = (String) invokePrivate("describeField",
+                new Class[]{String.class, String.class, String.class, String.class},
+                "X-Trace-Id", "header参数", "/api/v1/users", "get");
+
+        assertThat(traceHeaderDescription).contains("链路追踪 ID");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_CUSTOMIZER_SHOULD_OVERRIDE_INCORRECT_PREGENERATED_RBAC_SUMMARY_AND_PARAMETER_DESCRIPTIONS() {
+        OpenAPI openAPI = new OpenAPI();
+        Operation operation = new Operation();
+        operation.setSummary("RBAC - 查询用户可见菜单");
+        operation.setDescription("接口作用：查询当前用户可见菜单。");
+        operation.addParametersItem(new Parameter()
+                .in("header")
+                .name("X-Trace-Id")
+                .description("业务语义 ID")
+                .schema(new Schema<>().type("string")));
+        PathItem pathItem = new PathItem();
+        pathItem.setGet(operation);
+        openAPI.setPaths(new Paths().addPathItem("/api/v1/profile/menus", pathItem));
+
+        openApiConfig.defaultApiDocumentationCustomizer().customise(openAPI);
+
+        assertThat(operation.getSummary()).isEqualTo("RBAC - 查询指定用户可见菜单");
+        assertThat(operation.getDescription()).contains("目标用户业务 ID");
+        assertThat(operation.getParameters().get(0).getDescription()).contains("链路追踪 ID");
     }
 
     private Object invokePrivate(String methodName, Class<?>[] parameterTypes, Object... args) throws Exception {

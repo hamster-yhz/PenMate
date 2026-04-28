@@ -25,8 +25,29 @@ const loadRouter = async () => {
 
 describe('router admin rbac guard', () => {
   beforeEach(() => {
+    vi.resetModules()
     listProfileMenusMock.mockReset()
     getSessionMock.mockReset()
+  })
+
+  it('allows_non_admin_routes_without_querying_rbac_menus', async () => {
+    getSessionMock.mockReturnValue({ userId: 1002, accessToken: 'atk' })
+
+    const router = await loadRouter()
+    await router.push('/profile')
+
+    expect(listProfileMenusMock).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.fullPath).toBe('/profile')
+  })
+
+  it('redirects_unauthenticated_users_to_login_when_entering_admin_rbac_route', async () => {
+    getSessionMock.mockReturnValue({ userId: null, accessToken: '' })
+
+    const router = await loadRouter()
+    await router.push('/admin/rbac')
+
+    expect(listProfileMenusMock).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.fullPath).toBe('/login')
   })
 
   it('redirects non admin users away from the admin rbac route', async () => {
@@ -49,5 +70,16 @@ describe('router admin rbac guard', () => {
 
     expect(listProfileMenusMock).toHaveBeenCalledWith(1001)
     expect(router.currentRoute.value.fullPath).toBe('/admin/rbac')
+  })
+
+  it('redirects_to_mybooks_when_rbac_menu_query_fails', async () => {
+    getSessionMock.mockReturnValue({ userId: 1001, accessToken: 'atk' })
+    listProfileMenusMock.mockRejectedValue(new Error('menus failed'))
+
+    const router = await loadRouter()
+    await router.push('/admin/rbac')
+
+    expect(listProfileMenusMock).toHaveBeenCalledWith(1001)
+    expect(router.currentRoute.value.fullPath).toBe('/mybooks')
   })
 })

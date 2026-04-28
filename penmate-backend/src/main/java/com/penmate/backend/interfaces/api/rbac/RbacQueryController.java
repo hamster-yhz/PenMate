@@ -73,12 +73,32 @@ public class RbacQueryController {
     }
 
     /**
+     * 查询指定用户已绑定角色。
+     * <p><b>业务目的：</b>返回用户当前拥有的角色集合，供管理端授权视图展示。</p>
+     */
+    @GetMapping("/users/{userId}/roles")
+    public ApiResponse<List<IamRole>> userRoles(@PathVariable Long userId,
+                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(iamQueryApplicationService.listUserRoles(userId), traceId);
+    }
+
+    /**
      * 查询权限点列表。
      * <p><b>业务目的：</b>返回系统权限点用于角色授权配置。</p>
      */
     @GetMapping("/permissions")
     public ApiResponse<List<IamPermission>> permissions(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(iamQueryApplicationService.listPermissions(), traceId);
+    }
+
+    /**
+     * 查询指定角色已绑定权限。
+     * <p><b>业务目的：</b>返回角色当前拥有的权限集合，供管理端授权视图展示。</p>
+     */
+    @GetMapping("/roles/{roleId}/permissions")
+    public ApiResponse<List<IamPermission>> rolePermissions(@PathVariable Long roleId,
+                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(iamQueryApplicationService.listRolePermissions(roleId), traceId);
     }
 
     /**

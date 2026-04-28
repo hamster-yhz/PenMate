@@ -1,6 +1,7 @@
 package com.penmate.backend.application.iam;
 
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
+import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
@@ -39,6 +40,30 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> iamQueryApplicationService.getUser(1L))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("User not found");
+    }
+
+    @Test
+    void UT_APP_IAM_LIST_USER_ROLES_SUCCESS() {
+        IamRole role = new IamRole();
+        role.setRoleId(2001L);
+        role.setCode("ADMIN");
+        when(iamGateway.findRolesByUserId(1001L)).thenReturn(List.of(role));
+
+        assertThat(iamQueryApplicationService.listUserRoles(1001L)).extracting(IamRole::getCode).containsExactly("ADMIN");
+        verify(iamGateway).findRolesByUserId(1001L);
+    }
+
+    @Test
+    void UT_APP_IAM_LIST_ROLE_PERMISSIONS_SUCCESS() {
+        IamPermission permission = new IamPermission();
+        permission.setPermissionId(3001L);
+        permission.setCode("rbac.manage");
+        when(iamGateway.findPermissionsByRoleId(2001L)).thenReturn(List.of(permission));
+
+        assertThat(iamQueryApplicationService.listRolePermissions(2001L))
+                .extracting(IamPermission::getCode)
+                .containsExactly("rbac.manage");
+        verify(iamGateway).findPermissionsByRoleId(2001L);
     }
 
     @Test

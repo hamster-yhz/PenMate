@@ -22,6 +22,9 @@ export const rbacApi = {
   listRoles() {
     return request.get<AnyRecord[]>('/v1/roles')
   },
+  listUserRoles(userId: IdLike) {
+    return request.get<AnyRecord[]>(`/v1/users/${userId}/roles`)
+  },
   createRole(payload: AnyRecord) {
     return request.post<AnyRecord>('/v1/roles', payload)
   },
@@ -33,6 +36,9 @@ export const rbacApi = {
   },
   listPermissions() {
     return request.get<AnyRecord[]>('/v1/permissions')
+  },
+  listRolePermissions(roleId: IdLike) {
+    return request.get<AnyRecord[]>(`/v1/roles/${roleId}/permissions`)
   },
   assignUserRole(userId: IdLike, roleId: IdLike) {
     return request.post<AnyRecord>(`/v1/users/${userId}/roles?roleId=${roleId}`)

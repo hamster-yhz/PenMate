@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.persistence.iam;
 
+import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -31,6 +32,15 @@ public interface IamRoleMapper {
             WHERE role_id = #{id} AND deleted_at IS NULL
             """)
     IamRole findById(@Param("id") Long id);
+
+    @Select("""
+            SELECT p.id, p.permission_id, p.name, p.code, p.module, p.description
+            FROM iam_permissions p
+            JOIN iam_role_permissions rp ON rp.permission_id = p.permission_id
+            WHERE rp.role_id = #{roleId}
+            ORDER BY p.id DESC
+            """)
+    List<IamPermission> findPermissionsByRoleId(@Param("roleId") Long roleId);
 
     @Insert("""
             INSERT INTO iam_roles(role_id, name, code, description, is_system)
