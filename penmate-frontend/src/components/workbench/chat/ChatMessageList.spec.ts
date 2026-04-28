@@ -71,7 +71,7 @@ describe('ChatMessageList', () => {
   it('renders_message_items_and_re_emits_item_actions', async () => {
     const wrapper = await mountChatMessageList()
 
-    expect(wrapper.get('.chat-messages').exists()).toBe(true)
+    expect(wrapper.find('.chat-messages').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="chat-message-item-stub"]')).toHaveLength(2)
 
     const mergeButtons = wrapper.findAll('[data-testid="emit-merge"]')

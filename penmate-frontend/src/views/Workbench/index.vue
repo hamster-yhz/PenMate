@@ -12,6 +12,7 @@
       :username="username"
       :user-email="userEmail"
       :user-menu-open="userMenuOpen"
+      :can-access-rbac-admin="canAccessRbacAdmin"
       @go-home="router.push('/')"
       @update-title="updateTitle"
       @open-style-manager="showStyleManager = true"
@@ -21,7 +22,7 @@
       @close-user-menu="userMenuOpen = false"
       @go-profile="navigateFromUserMenu('/profile')"
       @go-mybooks="navigateFromUserMenu('/mybooks')"
-      @go-domain-console="navigateFromUserMenu('/domain-console')"
+      @go-rbac-admin="navigateFromUserMenu('/admin/rbac')"
       @logout="handleLogout"
     />
 
@@ -144,6 +145,7 @@ import { agentApi } from '@/api/modules/agent.api'
 import { approvalApi } from '@/api/modules/approval.api'
 import { pluginApi } from '@/api/modules/plugin.api'
 import { modelApi } from '@/api/modules/model.api'
+import { rbacApi } from '@/api/modules/rbac.api'
 import { getSession, clearSession } from '@/stores/session'
 import { authApi } from '@/api/modules/auth.api'
 import { useWorkbenchContext } from '@/composables/workbench/useWorkbenchContext'
@@ -190,6 +192,7 @@ const getContext = () => {
 const username = ref('墨客')
 const userEmail = ref('moke@penmate.com')
 const userMenuOpen = ref(false)
+const canAccessRbacAdmin = ref(false)
 const novelTitle = ref('未命名小说')
 const leftCollapsed = ref(false)
 const rightCollapsed = ref(false)
@@ -692,6 +695,18 @@ onMounted(() => {
   void refreshActiveModelInfo(getCurrentProjectId())
   if (sessionUsername) username.value = sessionUsername
   if (sessionUserEmail) userEmail.value = sessionUserEmail
+  if (session.userId) {
+    void rbacApi
+      .listProfileMenus(session.userId)
+      .then((menus) => {
+        canAccessRbacAdmin.value = (menus || []).some(
+          (menu) => String((menu as Record<string, any>)?.path || '') === '/admin/rbac'
+        )
+      })
+      .catch(() => {
+        canAccessRbacAdmin.value = false
+      })
+  }
   selectChapterDraft(resolveEditorSeedContent(chapterContents.value[activeChapter.value], null))
   loadWorkbenchData()
   loadActivePlugins()

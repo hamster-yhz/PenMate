@@ -25,6 +25,20 @@ const waitForAssertion = async (assertion: () => void, attempts = 50) => {
   throw lastError instanceof Error ? lastError : new Error('等待断言成立超时')
 }
 
+const WorkbenchLeftPanelHarness = {
+  name: 'WorkbenchLeftPanel',
+  props: ['activeLeftTab'],
+  emits: ['update:active-left-tab'],
+  template: `
+    <div>
+      <div data-testid="active-left-tab">{{ activeLeftTab }}</div>
+      <button data-testid="left-tab-outline" @click="$emit('update:active-left-tab', 'outline')">outline</button>
+      <button data-testid="left-tab-characters" @click="$emit('update:active-left-tab', 'characters')">characters</button>
+      <button data-testid="left-tab-world" @click="$emit('update:active-left-tab', 'world')">world</button>
+    </div>
+  `,
+}
+
 const agentApiMock = {
   listConversations: vi.fn(async () => [{ conversationId: 1, title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }]),
   listMessages: vi.fn(async () => []),
@@ -246,6 +260,7 @@ const mountWorkbench = async () => {
   return shallowMount(Workbench, {
     global: {
       stubs: {
+        WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
         WorkbenchRightPanel: false,
         ChatComposer: false,
         AgentSessionHeader: false,
@@ -312,5 +327,17 @@ describe('Workbench index chat parent binding', () => {
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
     expect(agentApiMock.createMessage).toHaveBeenCalledTimes(1)
     expect(agentApiMock.createGeneration).toHaveBeenCalledTimes(1)
+  })
+
+  it('updates_active_left_tab_in_parent_when_left_panel_emits_tab_change', async () => {
+    const wrapper = await mountWorkbench()
+
+    expect(wrapper.get('[data-testid="active-left-tab"]').text()).toBe('outline')
+
+    await wrapper.get('[data-testid="left-tab-world"]').trigger('click')
+    expect(wrapper.get('[data-testid="active-left-tab"]').text()).toBe('world')
+
+    await wrapper.get('[data-testid="left-tab-characters"]').trigger('click')
+    expect(wrapper.get('[data-testid="active-left-tab"]').text()).toBe('characters')
   })
 })

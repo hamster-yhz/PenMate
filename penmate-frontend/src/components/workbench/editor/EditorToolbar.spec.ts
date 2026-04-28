@@ -50,7 +50,7 @@ describe('EditorToolbar', () => {
   it('emits_toolbar_commands_when_clicking_left_actions', async () => {
     const wrapper = await mountEditorToolbar()
 
-    expect(wrapper.get('.editor-toolbar').exists()).toBe(true)
+    expect(wrapper.find('.editor-toolbar').exists()).toBe(true)
     expect(wrapper.get('[data-testid="toolbar-save"]').classes()).toContain('toolbar-btn')
     expect(wrapper.get('[data-testid="toolbar-undo"]').classes()).toContain('toolbar-btn')
     expect(wrapper.get('[data-testid="toolbar-redo"]').classes()).toContain('toolbar-btn')

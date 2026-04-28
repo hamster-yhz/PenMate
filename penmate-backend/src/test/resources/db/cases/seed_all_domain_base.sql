@@ -56,7 +56,8 @@ INSERT INTO iam_permissions (id, permission_id, name, code, module, description,
 (920001, 920001, '项目管理', 'novel.project.manage', 'novel', '项目与卷章管理', NOW(3)),
 (920002, 920002, '审批处理', 'approval.request.review', 'approval', '审批请求处理', NOW(3)),
 (920003, 920003, '插件调用', 'plugin.call.execute', 'plugin', '插件工具调用', NOW(3)),
-(920004, 920004, '模型策略', 'model.policy.manage', 'model', '模型策略维护', NOW(3));
+(920004, 920004, '模型策略', 'model.policy.manage', 'model', '模型策略维护', NOW(3)),
+(920005, 920005, 'RBAC 管理', 'rbac.manage', 'rbac', 'RBAC 管理后台入口', NOW(3));
 
 INSERT INTO iam_user_roles (user_id, role_id, created_at) VALUES
 (920001, 920001, NOW(3)),
@@ -64,7 +65,7 @@ INSERT INTO iam_user_roles (user_id, role_id, created_at) VALUES
 (920003, 920003, NOW(3));
 
 INSERT INTO iam_role_permissions (role_id, permission_id, created_at) VALUES
-(920001, 920001, NOW(3)), (920001, 920002, NOW(3)), (920001, 920003, NOW(3)), (920001, 920004, NOW(3)),
+(920001, 920001, NOW(3)), (920001, 920002, NOW(3)), (920001, 920003, NOW(3)), (920001, 920004, NOW(3)), (920001, 920005, NOW(3)),
 (920002, 920001, NOW(3)),
 (920003, 920002, NOW(3));
 
@@ -72,7 +73,8 @@ INSERT INTO iam_menus (id, menu_id, parent_id, title, path, sort_order, permissi
 (920001, 920001, NULL,   '工作台',   '/workbench',                  1,  NULL,                      1, NOW(3), NOW(3), NULL),
 (920002, 920002, 920001, '小说管理', '/workbench/novel',           10, 'novel.project.manage',    1, NOW(3), NOW(3), NULL),
 (920003, 920003, 920001, '审批中心', '/workbench/approval',        20, 'approval.request.review', 1, NOW(3), NOW(3), NULL),
-(920004, 920004, 920002, '章节编辑', '/workbench/novel/chapters', 11, 'novel.project.manage',    1, NOW(3), NOW(3), NULL);
+(920004, 920004, 920002, '章节编辑', '/workbench/novel/chapters', 11, 'novel.project.manage',    1, NOW(3), NOW(3), NULL),
+(920005, 920005, NULL,   'RBAC 管理', '/admin/rbac',              90, 'rbac.manage',             1, NOW(3), NOW(3), NULL);
 
 -- 小说核心
 INSERT INTO novel_projects (id, project_id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at) VALUES

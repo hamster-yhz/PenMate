@@ -11,6 +11,7 @@ const readWorkbenchComponentSource = (relativePath: string) =>
 describe('workbench visual contract', () => {
   it('keeps themed style blocks on critical editor and chat components', () => {
     const criticalFiles = [
+      './WorkbenchLeftPanel.vue',
       './editor/EditorToolbar.vue',
       './editor/EditorTextarea.vue',
       './editor/VersionPreviewPane.vue',
@@ -25,10 +26,20 @@ describe('workbench visual contract', () => {
     criticalFiles.forEach((filePath) => {
       const source = readWorkbenchComponentSource(filePath)
 
-      expect(source).toContain('<style scoped lang="less">')
+      expect(source).toMatch(/<style[^>]*(scoped[^>]*lang="less"|lang="less"[^>]*scoped)[^>]*>/)
       expect(source).toMatch(/--amber-gold|--border-subtle|--shadow-gold/)
       expect(source).toMatch(/rgba\(11,\s*17,\s*32|rgba\(17,\s*24,\s*39/)
     })
+  })
+
+  it('retains visible themed button contracts for left navigation tabs', () => {
+    const leftPanelSource = readWorkbenchComponentSource('./WorkbenchLeftPanel.vue')
+
+    expect(leftPanelSource).toContain('.left-tabs')
+    expect(leftPanelSource).toContain('.ltab')
+    expect(leftPanelSource).toMatch(/\.ltab\s*\{[\s\S]*?background:\s*rgba\(17,\s*24,\s*39,\s*0\.72\);[\s\S]*?border:\s*1px\s+solid\s+var\(--border-subtle\);[\s\S]*?color:\s*var\(--text-primary\);/)
+    expect(leftPanelSource).toMatch(/\.ltab\s*\{[\s\S]*?&:hover\s*\{[\s\S]*?background:\s*rgba\(201,\s*169,\s*110,\s*0\.06\);[\s\S]*?color:\s*var\(--text-primary\);[\s\S]*?border-color:\s*var\(--border-gold\);[\s\S]*?\}/)
+    expect(leftPanelSource).toMatch(/\.ltab\s*\{[\s\S]*?&\.active\s*\{[\s\S]*?background:\s*rgba\(201,\s*169,\s*110,\s*0\.12\);[\s\S]*?color:\s*var\(--amber-gold\);[\s\S]*?border-color:\s*var\(--border-gold\);[\s\S]*?box-shadow:\s*0 0 8px rgba\(201,\s*169,\s*110,\s*0\.1\);[\s\S]*?\}/)
   })
 
   it('retains workbench-specific theme contracts for editor and chat surfaces', () => {

@@ -5,20 +5,34 @@
     </div>
 
     <div v-show="!collapsed" class="panel-content">
-      <div class="left-tabs">
+      <div class="left-tabs" role="tablist" aria-label="工作台左侧标签导航">
         <button
           v-for="tab in leftTabs"
           :key="tab.key"
+          type="button"
           class="ltab"
           :class="{ active: activeLeftTab === tab.key }"
+          role="tab"
+          :id="getTabId(tab.key)"
+          :aria-controls="getPanelId(tab.key)"
+          :aria-selected="activeLeftTab === tab.key"
+          :data-active="String(activeLeftTab === tab.key)"
+          :tabindex="activeLeftTab === tab.key ? 0 : -1"
           @click="emit('update:active-left-tab', tab.key)"
+          @keydown="handleTabKeydown(tab.key, $event)"
         >
           <img :src="tab.icon" alt="" class="ltab-icon" />
           <span>{{ tab.label }}</span>
         </button>
       </div>
 
-      <div v-if="activeLeftTab === 'outline'" class="tab-content">
+      <div
+        v-show="activeLeftTab === 'outline'"
+        :id="getPanelId('outline')"
+        class="tab-content"
+        role="tabpanel"
+        :aria-labelledby="getTabId('outline')"
+      >
         <OutlineTree
           :volumes="outlineData"
           :active-chapter-key="activeChapter"
@@ -33,7 +47,13 @@
         />
       </div>
 
-      <div v-if="activeLeftTab === 'characters'" class="tab-content">
+      <div
+        v-show="activeLeftTab === 'characters'"
+        :id="getPanelId('characters')"
+        class="tab-content"
+        role="tabpanel"
+        :aria-labelledby="getTabId('characters')"
+      >
         <CharacterCardList
           :cards="characterCards"
           @create-card="emit('create-character-card')"
@@ -44,7 +64,13 @@
         />
       </div>
 
-      <div v-if="activeLeftTab === 'world'" class="tab-content">
+      <div
+        v-show="activeLeftTab === 'world'"
+        :id="getPanelId('world')"
+        class="tab-content"
+        role="tabpanel"
+        :aria-labelledby="getTabId('world')"
+      >
         <WorldCardList
           :cards="worldCards"
           @create-card="emit('create-world-card')"
@@ -74,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick } from 'vue'
 import OutlineTree from '@/components/workbench/outline/OutlineTree.vue'
 import CharacterCardList from '@/components/workbench/cards/CharacterCardList.vue'
 import WorldCardList from '@/components/workbench/cards/WorldCardList.vue'
@@ -87,7 +114,7 @@ interface TabItem {
   icon: string
 }
 
-defineProps<{
+const props = defineProps<{
   collapsed: boolean
   leftTabs: TabItem[]
   activeLeftTab: string
@@ -126,6 +153,53 @@ const emit = defineEmits<{
   (event: 'create-relation'): void
   (event: 'delete-relation', payload: unknown): void
 }>()
+
+const getTabId = (tabKey: string) => `workbench-left-tab-${tabKey}`
+const getPanelId = (tabKey: string) => `workbench-left-panel-${tabKey}`
+
+const focusTabByIndex = async (currentTarget: EventTarget | null, tabIndex: number) => {
+  const currentButton = currentTarget instanceof HTMLButtonElement ? currentTarget : null
+  const tabList = currentButton?.closest('.left-tabs')
+  if (!tabList) return
+
+  await nextTick()
+
+  const tabs = Array.from(tabList.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+  tabs[tabIndex]?.focus()
+}
+
+const handleTabKeydown = async (tabKey: string, event: KeyboardEvent) => {
+  const currentIndex = props.leftTabs.findIndex((tab) => tab.key === tabKey)
+  if (currentIndex === -1) return
+
+  let nextIndex = currentIndex
+
+  switch (event.key) {
+    case 'ArrowRight':
+    case 'Right':
+      nextIndex = (currentIndex + 1) % props.leftTabs.length
+      break
+    case 'ArrowLeft':
+    case 'Left':
+      nextIndex = (currentIndex - 1 + props.leftTabs.length) % props.leftTabs.length
+      break
+    case 'Home':
+      nextIndex = 0
+      break
+    case 'End':
+      nextIndex = props.leftTabs.length - 1
+      break
+    default:
+      return
+  }
+
+  event.preventDefault()
+  const nextTabKey = props.leftTabs[nextIndex]?.key
+  if (!nextTabKey) return
+
+  emit('update:active-left-tab', nextTabKey)
+  await focusTabByIndex(event.currentTarget, nextIndex)
+}
 </script>
 
 <style lang="less" scoped>
@@ -193,33 +267,61 @@ const emit = defineEmits<{
 
 .left-tabs {
   display: flex;
+  gap: 8px;
+  padding: 10px 8px 8px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .ltab {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding: 10px 0;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
+  overflow: hidden;
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.3s;
   letter-spacing: 0.05em;
 
+  &::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 6px;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(201, 169, 110, 0.15), rgba(201, 169, 110, 0.85), rgba(201, 169, 110, 0.15));
+    opacity: 0;
+    transform: scaleX(0.4);
+    transition: opacity 0.3s, transform 0.3s;
+  }
+
   &:hover {
-    color: var(--text-secondary);
+    background: rgba(201, 169, 110, 0.06);
+    color: var(--text-primary);
+    border-color: var(--border-gold);
   }
 
   &.active {
+    background: rgba(201, 169, 110, 0.12);
     color: var(--amber-gold);
-    border-bottom-color: var(--amber-gold);
+    border-color: var(--border-gold);
+    box-shadow: 0 0 8px rgba(201, 169, 110, 0.1);
+    transform: translateY(-1px);
+
+    &::after {
+      opacity: 1;
+      transform: scaleX(1);
+    }
   }
 }
 

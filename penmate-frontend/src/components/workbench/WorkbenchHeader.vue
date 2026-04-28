@@ -38,8 +38,10 @@
           <div class="ud-sep"></div>
           <button class="ud-item" @click="emit('go-profile')">👤 个人中心</button>
           <button class="ud-item" @click="emit('go-mybooks')">📚 我的书架</button>
-          <div class="ud-sep"></div>
-          <button class="ud-item" @click="emit('go-domain-console')">🧪 三域控台</button>
+          <template v-if="canAccessRbacAdmin">
+            <div class="ud-sep"></div>
+            <button class="ud-item" @click="emit('go-rbac-admin')">🛡️ RBAC 管理</button>
+          </template>
           <button class="ud-item danger" @click="emit('logout')">🚪 退出登录</button>
         </div>
       </div>
@@ -59,6 +61,7 @@ defineProps<{
   username: string
   userEmail: string
   userMenuOpen: boolean
+  canAccessRbacAdmin: boolean
 }>()
 
 const emit = defineEmits<{
@@ -71,7 +74,7 @@ const emit = defineEmits<{
   (event: 'close-user-menu'): void
   (event: 'go-profile'): void
   (event: 'go-mybooks'): void
-  (event: 'go-domain-console'): void
+  (event: 'go-rbac-admin'): void
   (event: 'logout'): void
 }>()
 </script>

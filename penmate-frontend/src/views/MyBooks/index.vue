@@ -10,8 +10,8 @@
         <span class="nav-brand">笔友 · 书架</span>
       </div>
       <div class="nav-right">
-        <button class="nav-btn" @click="router.push('/domain-console')">
-          <span>🧪 三域控台</span>
+        <button v-if="canAccessRbacAdmin" class="nav-btn" @click="router.push('/admin/rbac')">
+          <span>🛡️ RBAC 管理</span>
         </button>
         <button class="nav-btn" @click="router.push('/profile')">
           <div class="avatar-sm">{{ userInfo.name.charAt(0) }}</div>
@@ -65,9 +65,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import logoImg from '@/assets/images/logo.png'
+import { rbacApi } from '@/api/modules/rbac.api'
 import BookActionBar from '@/components/bookshelf/BookActionBar.vue'
 import BookCard from '@/components/bookshelf/BookCard.vue'
 import BookEditorModal from '@/components/bookshelf/BookEditorModal.vue'
@@ -78,6 +79,8 @@ import { getSession } from '@/stores/session'
 
 const router = useRouter()
 const session = getSession()
+const adminMenuPaths = ref<string[]>([])
+const canAccessRbacAdmin = computed(() => adminMenuPaths.value.includes('/admin/rbac'))
 
 const userInfo = reactive({
   name: '墨客',
@@ -134,6 +137,18 @@ const handleDeleteVisibilityChange = (visible: boolean) => {
 onMounted(() => {
   if (session.userName) userInfo.name = session.userName
   if (session.userEmail) userInfo.email = session.userEmail
+  if (session.userId) {
+    void rbacApi
+      .listProfileMenus(session.userId)
+      .then((menus) => {
+        adminMenuPaths.value = (menus || [])
+          .map((menu) => String((menu as Record<string, unknown>)?.path || ''))
+          .filter(Boolean)
+      })
+      .catch(() => {
+        adminMenuPaths.value = []
+      })
+  }
   loadBooks()
 })
 </script>

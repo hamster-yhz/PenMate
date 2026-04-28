@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import WorkbenchLeftPanel from './WorkbenchLeftPanel.vue'
 
@@ -75,6 +75,61 @@ const mountWorkbenchLeftPanel = (activeLeftTab = 'outline') =>
     },
   })
 
+const createBaseProps = (activeLeftTab = 'outline') => ({
+  collapsed: false,
+  leftTabs: [
+    { key: 'outline', label: '大纲', icon: '/outline.png' },
+    { key: 'characters', label: '角色', icon: '/character.png' },
+    { key: 'world', label: '世界', icon: '/world.png' },
+  ],
+  activeLeftTab,
+  outlineData: [],
+  activeChapter: '11',
+  outlineOpBusy: false,
+  characterCards: [],
+  worldCards: [],
+  projectCards: [{ cardId: 2, cardType: 'WORLD', name: '北境', summary: '', detailJson: '{}', expanded: false }],
+  cardRelations: [],
+  relationFromId: '',
+  relationToId: '',
+  relationType: '',
+  cardNameById: (cardId: string) => cardId,
+})
+
+const mountControlledWorkbenchLeftPanel = (initialTab = 'outline') => {
+  const Harness = defineComponent({
+    components: { WorkbenchLeftPanel },
+    setup() {
+      const activeLeftTab = ref(initialTab)
+      const props = createBaseProps(initialTab)
+
+      return {
+        activeLeftTab,
+        props,
+      }
+    },
+    template: `
+      <WorkbenchLeftPanel
+        v-bind="props"
+        :active-left-tab="activeLeftTab"
+        @update:active-left-tab="activeLeftTab = $event"
+      />
+    `,
+  })
+
+  return mount(Harness, {
+    attachTo: document.body,
+    global: {
+      stubs: {
+        OutlineTree: OutlineTreeStub,
+        CharacterCardList: CharacterCardListStub,
+        WorldCardList: WorldCardListStub,
+        CardRelationPanel: CardRelationPanelStub,
+      },
+    },
+  })
+}
+
 describe('WorkbenchLeftPanel', () => {
   it('renders_tabs_and_forwards_outline_events', async () => {
     const wrapper = mountWorkbenchLeftPanel('outline')
@@ -92,6 +147,89 @@ describe('WorkbenchLeftPanel', () => {
     expect(wrapper.emitted('toggle-collapse')).toEqual([[]])
     expect(wrapper.emitted('select-chapter')).toEqual([[{ chapterId: 11, key: '11' }]])
     expect(wrapper.emitted('rename-node')).toEqual([[{ nodeKey: 'n-1', title: '新标题' }]])
+  })
+
+  it('keeps_shared_tab_button_class_and_moves_active_state_with_active_left_tab', async () => {
+    const wrapper = mountWorkbenchLeftPanel('outline')
+
+    const tabButtons = wrapper.findAll('button.ltab')
+
+    expect(tabButtons).toHaveLength(3)
+    expect(tabButtons.map((button) => button.text())).toEqual(['大纲', '角色', '世界'])
+    expect(tabButtons.every((button) => button.classes().includes('ltab'))).toBe(true)
+    expect(tabButtons[0]?.classes()).toContain('active')
+    expect(tabButtons[1]?.classes()).not.toContain('active')
+    expect(tabButtons[2]?.classes()).not.toContain('active')
+
+    await wrapper.setProps({ activeLeftTab: 'world' })
+
+    const updatedTabButtons = wrapper.findAll('button.ltab')
+    expect(updatedTabButtons[0]?.classes()).not.toContain('active')
+    expect(updatedTabButtons[1]?.classes()).not.toContain('active')
+    expect(updatedTabButtons[2]?.classes()).toContain('active')
+  })
+
+  it('exposes_active_tab_state_through_tab_semantics_and_debug_attributes', async () => {
+    const wrapper = mountWorkbenchLeftPanel('characters')
+
+    expect(wrapper.get('.left-tabs').attributes('role')).toBe('tablist')
+
+    const initialButtons = wrapper.findAll('button.ltab')
+
+    expect(initialButtons[0]?.attributes('role')).toBe('tab')
+    expect(initialButtons[0]?.attributes('aria-selected')).toBe('false')
+    expect(initialButtons[0]?.attributes('data-active')).toBe('false')
+    expect(initialButtons[1]?.attributes('aria-selected')).toBe('true')
+    expect(initialButtons[1]?.attributes('data-active')).toBe('true')
+    expect(initialButtons[1]?.attributes('tabindex')).toBe('0')
+    expect(initialButtons[1]?.attributes('aria-controls')).toBe('workbench-left-panel-characters')
+    expect(initialButtons[2]?.attributes('aria-selected')).toBe('false')
+    expect(initialButtons[2]?.attributes('data-active')).toBe('false')
+
+    expect(wrapper.get('#workbench-left-panel-characters').attributes('role')).toBe('tabpanel')
+    expect(wrapper.get('#workbench-left-panel-characters').attributes('aria-labelledby')).toBe('workbench-left-tab-characters')
+
+    await wrapper.setProps({ activeLeftTab: 'world' })
+
+    const updatedButtons = wrapper.findAll('button.ltab')
+
+    expect(updatedButtons[1]?.attributes('aria-selected')).toBe('false')
+    expect(updatedButtons[1]?.attributes('data-active')).toBe('false')
+    expect(updatedButtons[1]?.attributes('tabindex')).toBe('-1')
+    expect(updatedButtons[2]?.attributes('aria-selected')).toBe('true')
+    expect(updatedButtons[2]?.attributes('data-active')).toBe('true')
+    expect(updatedButtons[2]?.attributes('tabindex')).toBe('0')
+  })
+
+  it('supports_keyboard_navigation_for_roving_tabindex_tabs', async () => {
+    const wrapper = mountControlledWorkbenchLeftPanel('outline')
+
+    const getTabs = () => wrapper.findAll('button.ltab')
+
+    ;(getTabs()[0]?.element as HTMLButtonElement | undefined)?.focus()
+    expect(document.activeElement).toBe(getTabs()[0]?.element)
+
+    await getTabs()[0]!.trigger('keydown', { key: 'ArrowRight' })
+    expect(getTabs()[1]?.attributes('aria-selected')).toBe('true')
+    expect(getTabs()[1]?.attributes('tabindex')).toBe('0')
+    expect(document.activeElement).toBe(getTabs()[1]?.element)
+
+    await getTabs()[1]!.trigger('keydown', { key: 'End' })
+    expect(getTabs()[2]?.attributes('aria-selected')).toBe('true')
+    expect(getTabs()[2]?.attributes('tabindex')).toBe('0')
+    expect(document.activeElement).toBe(getTabs()[2]?.element)
+
+    await getTabs()[2]!.trigger('keydown', { key: 'Home' })
+    expect(getTabs()[0]?.attributes('aria-selected')).toBe('true')
+    expect(getTabs()[0]?.attributes('tabindex')).toBe('0')
+    expect(document.activeElement).toBe(getTabs()[0]?.element)
+
+    await getTabs()[0]!.trigger('keydown', { key: 'ArrowLeft' })
+    expect(getTabs()[2]?.attributes('aria-selected')).toBe('true')
+    expect(getTabs()[2]?.attributes('tabindex')).toBe('0')
+    expect(document.activeElement).toBe(getTabs()[2]?.element)
+
+    wrapper.unmount()
   })
 
   it('forwards_character_and_relation_events_from_nested_shell_content', async () => {

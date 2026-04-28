@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { rbacApi } from '@/api/modules/rbac.api'
+import { getSession } from '@/stores/session'
 
 const routes = [
   {
@@ -27,15 +29,36 @@ const routes = [
     component: () => import('@/views/Workbench/index.vue')
   },
   {
-    path: '/domain-console',
-    name: 'DomainConsole',
-    component: () => import('@/views/DomainConsole/index.vue')
+    path: '/admin/rbac',
+    name: 'AdminRbac',
+    component: () => import('@/views/AdminRbac/index.vue')
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach(async (to) => {
+  if (to.path !== '/admin/rbac') {
+    return true
+  }
+
+  const session = getSession()
+  if (!session.userId) {
+    return '/login'
+  }
+
+  try {
+    const menus = await rbacApi.listProfileMenus(session.userId)
+    const canAccess = (menus || []).some(
+      (menu) => String((menu as Record<string, unknown>)?.path || '') === '/admin/rbac'
+    )
+    return canAccess ? true : '/mybooks'
+  } catch {
+    return '/mybooks'
+  }
 })
 
 export default router
