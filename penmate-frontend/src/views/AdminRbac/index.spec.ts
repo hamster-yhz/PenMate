@@ -2,6 +2,17 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, type Component } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const createDeferred = <T>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
 const { pushMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
 }))
@@ -212,9 +223,378 @@ describe('AdminRbac view', () => {
     expect(listUserRolesMock).toHaveBeenCalledWith(1001)
     expect(listRolePermissionsMock).toHaveBeenCalledWith(2001)
     expect(wrapper.text()).toContain('已绑定角色')
+
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+
     expect(wrapper.text()).toContain('已绑定权限')
     expect(wrapper.text()).toContain('管理员')
     expect(wrapper.text()).toContain('rbac.manage')
+  })
+
+  it('organizes_the_console_into_tabbed_workspaces_for_users_roles_and_menus', async () => {
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="rbac-tab-users"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-testid="rbac-user-workspace"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-role-workspace"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="rbac-tab-roles"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-testid="rbac-user-workspace"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="rbac-role-workspace"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="rbac-tab-menus"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="rbac-tab-menus"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-testid="rbac-menu-workspace"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-role-workspace"]').exists()).toBe(false)
+  })
+
+  it('filters_and_paginates_the_user_list_for_admin_browsing', async () => {
+    listUsersMock.mockResolvedValue([
+      {
+        userId: 1001,
+        email: 'admin@penmate.ai',
+        displayName: '管理员A',
+        status: 1,
+        authMethod: 'local',
+      },
+      {
+        userId: 1002,
+        email: 'editor@penmate.ai',
+        displayName: '编辑B',
+        status: 1,
+        authMethod: 'oauth',
+      },
+      {
+        userId: 1003,
+        email: 'reviewer@penmate.ai',
+        displayName: '审核C',
+        status: 1,
+        authMethod: 'local',
+      },
+      {
+        userId: 1004,
+        email: 'guest@penmate.ai',
+        displayName: '访客D',
+        status: 0,
+        authMethod: 'sso',
+      },
+      {
+        userId: 1005,
+        email: 'operator@penmate.ai',
+        displayName: '运维E',
+        status: 1,
+        authMethod: 'local',
+      },
+    ])
+
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-user-select-1001"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-user-select-1002"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-user-select-1003"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="rbac-user-search-input"]').setValue('访客')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-user-select-1004"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-user-select-1001"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="rbac-user-search-input"]').setValue('')
+    await wrapper.get('[data-testid="rbac-user-status-filter"]').setValue('0')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-user-select-1004"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-user-select-1002"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="rbac-user-status-filter"]').setValue('all')
+    await wrapper.get('[data-testid="rbac-user-page-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-user-select-1003"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-user-select-1005"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-user-select-1001"]').exists()).toBe(false)
+  })
+
+  it('keeps_the_create_user_form_collapsed_until_the_admin_expands_it', async () => {
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-create-user-email"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="rbac-toggle-create-user"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="rbac-create-user-email"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="rbac-create-user-display-name"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="rbac-toggle-create-user"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="rbac-create-user-email"]').exists()).toBe(false)
+  })
+
+  it('requires_an_explicit_confirmation_step_before_deleting_the_selected_user', async () => {
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-user-delete-trigger"]').trigger('click')
+
+    expect(deleteUserMock).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="rbac-user-delete-confirmation"]').text()).toContain('管理员A')
+
+    await wrapper.get('[data-testid="rbac-user-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(deleteUserMock).toHaveBeenCalledWith(1001)
+  })
+
+  it('requires_an_explicit_confirmation_step_before_deleting_the_active_role', async () => {
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-delete-trigger"]').trigger('click')
+
+    expect(deleteRoleMock).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="rbac-role-delete-confirmation"]').text()).toContain('管理员')
+
+    await wrapper.get('[data-testid="rbac-role-delete-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(deleteRoleMock).toHaveBeenCalledWith(2001)
+  })
+
+  it('keeps_the_latest_selected_user_data_when_an_older_user_request_resolves_later', async () => {
+    const user1002Menus = createDeferred<Array<{ menuId: number, id: number, title: string, path: string, permissionCode: string, visible: boolean }>>()
+    const user1003Menus = createDeferred<Array<{ menuId: number, id: number, title: string, path: string, permissionCode: string, visible: boolean }>>()
+    const user1002Roles = createDeferred<Array<{ roleId: number, id: number, code: string, name: string, description: string, isSystem: boolean }>>()
+    const user1003Roles = createDeferred<Array<{ roleId: number, id: number, code: string, name: string, description: string, isSystem: boolean }>>()
+
+    listUsersMock.mockResolvedValue([
+      {
+        userId: 1001,
+        email: 'admin@penmate.ai',
+        displayName: '管理员A',
+        status: 1,
+        authMethod: 'local',
+      },
+      {
+        userId: 1002,
+        email: 'editor@penmate.ai',
+        displayName: '编辑B',
+        status: 1,
+        authMethod: 'local',
+      },
+      {
+        userId: 1003,
+        email: 'reviewer@penmate.ai',
+        displayName: '审核C',
+        status: 1,
+        authMethod: 'local',
+      },
+    ])
+    listProfileMenusMock.mockImplementation(async (userId: number) => {
+      if (userId === 1001) {
+        return [
+          { menuId: 4001, id: 4001, title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
+        ]
+      }
+
+      if (userId === 1002) {
+        return user1002Menus.promise
+      }
+
+      if (userId === 1003) {
+        return user1003Menus.promise
+      }
+
+      return []
+    })
+    listUserRolesMock.mockImplementation(async (userId: number) => {
+      if (userId === 1001) {
+        return [
+          { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+        ]
+      }
+
+      if (userId === 1002) {
+        return user1002Roles.promise
+      }
+
+      if (userId === 1003) {
+        return user1003Roles.promise
+      }
+
+      return []
+    })
+    listRolePermissionsMock
+      .mockResolvedValueOnce([
+        { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      ])
+      .mockResolvedValue([
+        { permissionId: 3002, id: 3002, code: 'review.approve', name: '审核通过', module: 'review' },
+      ])
+
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-user-search-input"]').setValue('编辑')
+    await wrapper.get('[data-testid="rbac-user-select-1002"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-user-search-input"]').setValue('审核')
+    await wrapper.get('[data-testid="rbac-user-select-1003"]').trigger('click')
+
+    user1003Menus.resolve([
+      { menuId: 4010, id: 4010, title: '审核台', path: '/review', permissionCode: 'review.approve', visible: true },
+    ])
+    user1003Roles.resolve([
+      { roleId: 2003, id: 2003, code: 'REVIEWER', name: '审核员', description: '内容审核', isSystem: false },
+    ])
+    await flushPromises()
+
+    user1002Menus.resolve([
+      { menuId: 4004, id: 4004, title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true },
+    ])
+    user1002Roles.resolve([
+      { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+    ])
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="rbac-active-user-name"]').text()).toContain('审核C')
+    expect(wrapper.text()).toContain('/review')
+    expect(wrapper.text()).toContain('REVIEWER')
+    expect(wrapper.text()).not.toContain('/editor')
+    expect(wrapper.text()).not.toContain('EDITOR')
+  })
+
+  it('keeps_the_latest_selected_role_permissions_when_an_older_role_request_resolves_later', async () => {
+    const role2001Permissions = createDeferred<Array<{ permissionId: number, id: number, code: string, name: string, module: string }>>()
+    const role2002Permissions = createDeferred<Array<{ permissionId: number, id: number, code: string, name: string, module: string }>>()
+
+    listRolesMock.mockResolvedValue([
+      { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+      { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+    ])
+    listRolePermissionsMock
+      .mockResolvedValueOnce([
+        { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      ])
+      .mockImplementationOnce(() => role2002Permissions.promise)
+      .mockImplementationOnce(() => role2001Permissions.promise)
+
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-select-2002"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-select-2001"]').trigger('click')
+
+    role2001Permissions.resolve([
+      { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+    ])
+    await flushPromises()
+
+    role2002Permissions.resolve([
+      { permissionId: 3002, id: 3002, code: 'content.publish', name: '内容发布', module: 'content' },
+    ])
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-role-select-2001"]').classes()).toContain('active')
+    expect(wrapper.text()).toContain('rbac.manage')
+    expect(wrapper.text()).not.toContain('content.publish')
+  })
+
+  it('does_not_let_an_inflight_user_context_override_a_newer_manual_role_selection', async () => {
+    const user1002RolePermissions = createDeferred<Array<{ permissionId: number, id: number, code: string, name: string, module: string }>>()
+
+    listRolesMock.mockResolvedValue([
+      { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+      { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+    ])
+    listUsersMock.mockResolvedValue([
+      {
+        userId: 1001,
+        email: 'admin@penmate.ai',
+        displayName: '管理员A',
+        status: 1,
+        authMethod: 'local',
+      },
+      {
+        userId: 1002,
+        email: 'editor@penmate.ai',
+        displayName: '编辑B',
+        status: 1,
+        authMethod: 'local',
+      },
+    ])
+    listProfileMenusMock.mockImplementation(async (userId: number) => {
+      if (userId === 1001) {
+        return [
+          { menuId: 4001, id: 4001, title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
+        ]
+      }
+
+      return [
+        { menuId: 4004, id: 4004, title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true },
+      ]
+    })
+    listUserRolesMock.mockImplementation(async (userId: number) => {
+      if (userId === 1001) {
+        return [
+          { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+        ]
+      }
+
+      return [
+        { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+        { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+      ]
+    })
+    listRolePermissionsMock.mockImplementation(async (roleId: number) => {
+      if (roleId === 2001) {
+        return user1002RolePermissions.promise
+      }
+
+      return [
+        { permissionId: 3002, id: 3002, code: 'content.publish', name: '内容发布', module: 'content' },
+      ]
+    })
+
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    user1002RolePermissions.resolve([
+      { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+    ])
+    await flushPromises()
+
+    const delayedUser1002RolePermissions = createDeferred<Array<{ permissionId: number, id: number, code: string, name: string, module: string }>>()
+    listRolePermissionsMock.mockImplementation(async (roleId: number) => {
+      if (roleId === 2001) {
+        return delayedUser1002RolePermissions.promise
+      }
+
+      return [
+        { permissionId: 3002, id: 3002, code: 'content.publish', name: '内容发布', module: 'content' },
+      ]
+    })
+
+    await wrapper.get('[data-testid="rbac-user-search-input"]').setValue('编辑')
+    await wrapper.get('[data-testid="rbac-user-select-1002"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-select-2002"]').trigger('click')
+    await flushPromises()
+
+    delayedUser1002RolePermissions.resolve([
+      { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+    ])
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="rbac-role-select-2002"]').classes()).toContain('active')
+    expect(wrapper.find('[data-testid="rbac-remove-role-permission-3002"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-remove-role-permission-3001"]').exists()).toBe(false)
   })
 
   it('creates_user_and_refreshes_the_user_list_when_submitting_new_user', async () => {
@@ -262,6 +642,7 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="rbac-toggle-create-user"]').trigger('click')
     await wrapper.get('[data-testid="rbac-create-user-email"]').setValue('new@penmate.ai')
     await wrapper.get('[data-testid="rbac-create-user-display-name"]').setValue('新管理员')
     await wrapper.get('[data-testid="rbac-create-user-auth-method"]').setValue('local')
@@ -361,7 +742,8 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="rbac-user-delete-submit"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-user-delete-trigger"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-user-delete-confirm"]').trigger('click')
     await flushPromises()
 
     expect(deleteUserMock).toHaveBeenCalledWith(1001)
@@ -465,6 +847,7 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
     await wrapper.get('[data-testid="rbac-assign-permission-permission-id"]').setValue('3002')
     await wrapper.get('[data-testid="rbac-assign-permission-submit"]').trigger('click')
     await flushPromises()
@@ -497,6 +880,7 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
     await wrapper.get('[data-testid="rbac-remove-role-permission-3001"]').trigger('click')
     await flushPromises()
 
@@ -521,6 +905,7 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
     await wrapper.get('[data-testid="rbac-create-role-name"]').setValue('编辑')
     await wrapper.get('[data-testid="rbac-create-role-code"]').setValue('EDITOR')
     await wrapper.get('[data-testid="rbac-create-role-description"]').setValue('内容编辑')
@@ -549,6 +934,7 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
     await wrapper.get('[data-testid="rbac-role-detail-name"]').setValue('管理员-更新')
     await wrapper.get('[data-testid="rbac-role-detail-description"]').setValue('系统管理员-更新')
     await wrapper.get('[data-testid="rbac-role-detail-submit"]').trigger('click')
@@ -575,7 +961,9 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="rbac-role-delete-submit"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-delete-trigger"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-delete-confirm"]').trigger('click')
     await flushPromises()
 
     expect(deleteRoleMock).toHaveBeenCalledWith(2001)
@@ -674,7 +1062,9 @@ describe('AdminRbac view', () => {
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="rbac-role-delete-submit"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-delete-trigger"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-role-delete-confirm"]').trigger('click')
     await flushPromises()
 
     expect(deleteRoleMock).toHaveBeenCalledWith(2001)

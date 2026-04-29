@@ -18,6 +18,30 @@ vi.mock('@/stores/session', () => ({
   getSession: getSessionMock,
 }))
 
+vi.mock('@/views/Home/index.vue', () => ({
+  default: { template: '<div>home</div>' },
+}))
+
+vi.mock('@/views/Login/index.vue', () => ({
+  default: { template: '<div>login</div>' },
+}))
+
+vi.mock('@/views/MyBooks/index.vue', () => ({
+  default: { template: '<div>mybooks</div>' },
+}))
+
+vi.mock('@/views/Profile/index.vue', () => ({
+  default: { template: '<div>profile</div>' },
+}))
+
+vi.mock('@/views/Workbench/index.vue', () => ({
+  default: { template: '<div>workbench</div>' },
+}))
+
+vi.mock('@/views/AdminRbac/index.vue', () => ({
+  default: { template: '<div>admin-rbac</div>' },
+}))
+
 const loadRouter = async () => {
   const mod = await import('./index')
   return mod.default

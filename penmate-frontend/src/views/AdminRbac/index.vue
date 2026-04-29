@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">Admin Console</p>
         <h1>RBAC 管理</h1>
-        <p class="subtitle">面向管理员账号的用户、角色、权限与菜单绑定视图</p>
+        <p class="subtitle">按用户、角色、菜单三个工作区拆分，减少长页面操作负担</p>
       </div>
       <div class="header-actions">
         <button class="ghost-btn" type="button" @click="router.push('/mybooks')">返回书架</button>
@@ -36,139 +36,300 @@
       <span>{{ errorMessage }}</span>
     </section>
 
+    <section class="workspace-tabs" aria-label="RBAC 工作区切换">
+      <button
+        data-testid="rbac-tab-users"
+        class="workspace-tab"
+        :class="{ active: activeWorkspace === 'users' }"
+        type="button"
+        :aria-pressed="String(activeWorkspace === 'users')"
+        @click="activeWorkspace = 'users'"
+      >
+        用户管理
+      </button>
+      <button
+        data-testid="rbac-tab-roles"
+        class="workspace-tab"
+        :class="{ active: activeWorkspace === 'roles' }"
+        type="button"
+        :aria-pressed="String(activeWorkspace === 'roles')"
+        @click="activeWorkspace = 'roles'"
+      >
+        角色权限
+      </button>
+      <button
+        data-testid="rbac-tab-menus"
+        class="workspace-tab"
+        :class="{ active: activeWorkspace === 'menus' }"
+        type="button"
+        :aria-pressed="String(activeWorkspace === 'menus')"
+        @click="activeWorkspace = 'menus'"
+      >
+        菜单预览
+      </button>
+    </section>
+
     <main class="rbac-layout">
-      <section class="panel">
-        <div class="panel-header">
-          <h2>用户列表</h2>
-          <span class="muted">点击用户查看该账号的可见菜单</span>
-        </div>
-
-        <div class="sub-panel create-user-panel">
-          <h3>创建用户</h3>
-          <div class="form-grid">
-            <input
-              v-model="createUserForm.email"
-              data-testid="rbac-create-user-email"
-              class="field-input"
-              type="email"
-              placeholder="邮箱"
-            />
-            <input
-              v-model="createUserForm.displayName"
-              data-testid="rbac-create-user-display-name"
-              class="field-input"
-              type="text"
-              placeholder="展示名"
-            />
-            <input
-              v-model="createUserForm.authMethod"
-              data-testid="rbac-create-user-auth-method"
-              class="field-input"
-              type="text"
-              placeholder="认证方式"
-            />
-            <button
-              data-testid="rbac-create-user-submit"
-              class="primary-btn"
-              type="button"
-              @click="createUser"
-            >
-              创建用户
-            </button>
-          </div>
-        </div>
-
-        <div class="sub-panel">
-          <h3>用户详情</h3>
-          <div class="form-grid">
-            <input
-              v-model="userDetailForm.displayName"
-              data-testid="rbac-user-detail-display-name"
-              class="field-input"
-              type="text"
-              placeholder="展示名"
-            />
-            <select
-              v-model="userDetailForm.status"
-              data-testid="rbac-user-detail-status"
-              class="field-input"
-            >
-              <option :value="1">启用</option>
-              <option :value="0">停用</option>
-            </select>
-            <button
-              data-testid="rbac-user-detail-submit"
-              class="primary-btn"
-              type="button"
-              @click="updateSelectedUser"
-            >
-              保存用户
-            </button>
-            <button
-              data-testid="rbac-user-delete-submit"
-              class="ghost-btn"
-              type="button"
-              @click="deleteSelectedUser"
-            >
-              删除用户
-            </button>
-          </div>
-        </div>
-
-        <div class="sub-panel">
-          <h3>绑定角色</h3>
-          <div class="form-grid">
-            <select
-              v-model="assignRoleForm.roleId"
-              data-testid="rbac-assign-role-role-id"
-              class="field-input"
-            >
-              <option value="">请选择角色</option>
-              <option
-                v-for="role in roles"
-                :key="`assignable-role-${role.roleId || role.id}`"
-                :value="String(role.roleId || role.id || '')"
-              >
-                {{ role.name }} · {{ role.code }}
-              </option>
-            </select>
-            <button
-              data-testid="rbac-assign-role-submit"
-              class="primary-btn"
-              type="button"
-              @click="assignRoleToSelectedUser"
-            >
-              绑定角色
-            </button>
-          </div>
-        </div>
-
-        <div class="user-list">
-          <button
-            v-for="user in users"
-            :key="user.userId"
-            :data-testid="`rbac-user-select-${user.userId}`"
-            class="user-card"
-            :class="{ active: user.userId === activeUserId }"
-            type="button"
-            @click="selectUser(user.userId)"
-          >
-            <div class="user-card-top">
-              <strong>{{ user.displayName }}</strong>
-              <span class="status-badge" :class="{ enabled: user.status === 1 }">
-                {{ user.status === 1 ? '启用' : '停用' }}
-              </span>
+      <template v-if="activeWorkspace === 'users'">
+        <section class="panel workspace-sidebar" data-testid="rbac-user-workspace">
+          <div class="panel-header">
+            <div>
+              <h2>用户管理</h2>
+              <span class="muted">先筛选用户，再处理详情、绑定与删除</span>
             </div>
-            <span>{{ user.email }}</span>
-            <small>userId: {{ user.userId }} · auth: {{ user.authMethod || 'local' }}</small>
-          </button>
-        </div>
-      </section>
+          </div>
 
-      <section class="panel panel-stack">
+          <div class="sub-panel toolbar-panel">
+            <div class="form-grid compact-grid">
+              <input
+                v-model="userSearchQuery"
+                data-testid="rbac-user-search-input"
+                class="field-input"
+                type="text"
+                placeholder="搜索展示名 / 邮箱 / 认证方式"
+              />
+              <select
+                v-model="userStatusFilter"
+                data-testid="rbac-user-status-filter"
+                class="field-input"
+              >
+                <option value="all">全部状态</option>
+                <option value="1">仅启用</option>
+                <option value="0">仅停用</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="sub-panel create-user-panel">
+            <div class="sub-panel-header">
+              <div>
+                <h3>新增用户</h3>
+                <span class="muted">默认收起，避免表单占满首屏</span>
+              </div>
+              <button
+                data-testid="rbac-toggle-create-user"
+                class="ghost-btn inline-action-btn"
+                type="button"
+                @click="createUserExpanded = !createUserExpanded"
+              >
+                {{ createUserExpanded ? '收起表单' : '展开创建' }}
+              </button>
+            </div>
+
+            <div v-if="createUserExpanded" class="form-grid">
+              <input
+                v-model="createUserForm.email"
+                data-testid="rbac-create-user-email"
+                class="field-input"
+                type="email"
+                placeholder="邮箱"
+              />
+              <input
+                v-model="createUserForm.displayName"
+                data-testid="rbac-create-user-display-name"
+                class="field-input"
+                type="text"
+                placeholder="展示名"
+              />
+              <input
+                v-model="createUserForm.authMethod"
+                data-testid="rbac-create-user-auth-method"
+                class="field-input"
+                type="text"
+                placeholder="认证方式"
+              />
+              <button
+                data-testid="rbac-create-user-submit"
+                class="primary-btn"
+                type="button"
+                @click="createUser"
+              >
+                创建用户
+              </button>
+            </div>
+          </div>
+
+          <div v-if="paginatedUsers.length" class="user-list">
+            <button
+              v-for="user in paginatedUsers"
+              :key="user.userId"
+              :data-testid="`rbac-user-select-${user.userId}`"
+              class="user-card"
+              :class="{ active: user.userId === activeUserId }"
+              type="button"
+              @click="selectUser(user.userId)"
+            >
+              <div class="user-card-top">
+                <strong>{{ user.displayName }}</strong>
+                <span class="status-badge" :class="{ enabled: user.status === 1 }">
+                  {{ user.status === 1 ? '启用' : '停用' }}
+                </span>
+              </div>
+              <span>{{ user.email }}</span>
+              <small>userId: {{ user.userId }} · auth: {{ user.authMethod || 'local' }}</small>
+            </button>
+          </div>
+          <div v-else class="empty-state">没有匹配的用户</div>
+
+          <div class="pagination-bar">
+            <span class="muted">{{ userPaginationText }}</span>
+            <div class="pagination-actions">
+              <button class="ghost-btn inline-action-btn" type="button" :disabled="userPage <= 1" @click="previousUserPage">
+                上一页
+              </button>
+              <button
+                data-testid="rbac-user-page-next"
+                class="ghost-btn inline-action-btn"
+                type="button"
+                :disabled="userPage >= userTotalPages"
+                @click="nextUserPage"
+              >
+                下一页
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel panel-stack workspace-main">
+          <div class="panel-header">
+            <div>
+              <h2>用户详情</h2>
+              <span class="muted">当前选中用户：{{ activeUser?.displayName || '未选择' }}</span>
+            </div>
+          </div>
+
+          <div class="sub-panel">
+            <h3>基本信息</h3>
+            <div class="form-grid">
+              <input
+                v-model="userDetailForm.displayName"
+                data-testid="rbac-user-detail-display-name"
+                class="field-input"
+                type="text"
+                placeholder="展示名"
+              />
+              <select
+                v-model="userDetailForm.status"
+                data-testid="rbac-user-detail-status"
+                class="field-input"
+              >
+                <option :value="1">启用</option>
+                <option :value="0">停用</option>
+              </select>
+              <div class="inline-actions">
+                <button
+                  data-testid="rbac-user-detail-submit"
+                  class="primary-btn"
+                  type="button"
+                  @click="updateSelectedUser"
+                >
+                  保存用户
+                </button>
+                <button
+                  data-testid="rbac-user-delete-trigger"
+                  class="ghost-btn"
+                  type="button"
+                  @click="requestDeleteSelectedUser"
+                >
+                  删除用户
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="pendingDeleteUserId === activeUserId && activeUser"
+            class="sub-panel danger-panel"
+            data-testid="rbac-user-delete-confirmation"
+          >
+            <h3>删除确认</h3>
+            <p>确认删除用户 {{ activeUser.displayName }}（{{ activeUser.email }}）？该操作不可撤销。</p>
+            <div class="inline-actions">
+              <button
+                data-testid="rbac-user-delete-confirm"
+                class="primary-btn danger-btn"
+                type="button"
+                @click="deleteSelectedUser"
+              >
+                确认删除
+              </button>
+              <button
+                data-testid="rbac-user-delete-cancel"
+                class="ghost-btn"
+                type="button"
+                @click="cancelDeleteSelectedUser"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+
+          <div class="sub-panel">
+            <h3>绑定角色</h3>
+            <div class="form-grid">
+              <select
+                v-model="assignRoleForm.roleId"
+                data-testid="rbac-assign-role-role-id"
+                class="field-input"
+              >
+                <option value="">请选择角色</option>
+                <option
+                  v-for="role in roles"
+                  :key="`assignable-role-${role.roleId || role.id}`"
+                  :value="String(role.roleId || role.id || '')"
+                >
+                  {{ role.name }} · {{ role.code }}
+                </option>
+              </select>
+              <button
+                data-testid="rbac-assign-role-submit"
+                class="primary-btn"
+                type="button"
+                @click="assignRoleToSelectedUser"
+              >
+                绑定角色
+              </button>
+            </div>
+          </div>
+
+          <div class="sub-panel">
+            <h3>已绑定角色</h3>
+            <ul class="token-list">
+              <li v-for="role in userRoles" :key="`assigned-role-${role.roleId || role.id}`">
+                <div class="token-item-main">
+                  <strong>{{ role.name }}</strong>
+                  <span>{{ role.code }}</span>
+                </div>
+                <button
+                  :data-testid="`rbac-remove-user-role-${role.roleId || role.id}`"
+                  class="ghost-btn inline-action-btn"
+                  type="button"
+                  @click="removeRoleFromSelectedUser(Number(role.roleId || role.id))"
+                >
+                  解绑
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="sub-panel">
+            <h3>当前用户菜单预览</h3>
+            <ul class="menu-list">
+              <li v-for="menu in profileMenus" :key="`user-workspace-menu-${menu.menuId || menu.id}`">
+                <strong>{{ menu.title }}</strong>
+                <span>{{ menu.path }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </template>
+
+      <section v-else-if="activeWorkspace === 'roles'" class="panel panel-stack workspace-single" data-testid="rbac-role-workspace">
         <div class="panel-header">
-          <h2>角色与权限</h2>
-          <span class="muted">对照后端 RBAC 接口只读展示基础资源</span>
+          <div>
+            <h2>角色权限</h2>
+            <span class="muted">集中处理角色信息、权限绑定，并实时查看菜单变化</span>
+          </div>
         </div>
 
         <div class="sub-panel">
@@ -241,47 +402,56 @@
               type="text"
               placeholder="角色描述"
             />
+            <div class="inline-actions">
+              <button
+                data-testid="rbac-role-detail-submit"
+                class="primary-btn"
+                type="button"
+                @click="updateActiveRole"
+              >
+                保存角色
+              </button>
+              <button
+                data-testid="rbac-role-delete-trigger"
+                class="ghost-btn"
+                type="button"
+                @click="requestDeleteActiveRole"
+              >
+                删除角色
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="pendingDeleteRoleId === activeRoleId && activeRole"
+          class="sub-panel danger-panel"
+          data-testid="rbac-role-delete-confirmation"
+        >
+          <h3>删除确认</h3>
+          <p>确认删除角色 {{ activeRole.name }}（{{ activeRole.code }}）？关联用户权限将同步变化。</p>
+          <div class="inline-actions">
             <button
-              data-testid="rbac-role-detail-submit"
-              class="primary-btn"
-              type="button"
-              @click="updateActiveRole"
-            >
-              保存角色
-            </button>
-            <button
-              data-testid="rbac-role-delete-submit"
-              class="ghost-btn"
+              data-testid="rbac-role-delete-confirm"
+              class="primary-btn danger-btn"
               type="button"
               @click="deleteActiveRole"
             >
-              删除角色
+              确认删除
+            </button>
+            <button
+              data-testid="rbac-role-delete-cancel"
+              class="ghost-btn"
+              type="button"
+              @click="cancelDeleteActiveRole"
+            >
+              取消
             </button>
           </div>
         </div>
 
         <div class="sub-panel">
-          <h3>已绑定角色</h3>
-          <ul class="token-list">
-            <li v-for="role in userRoles" :key="`assigned-role-${role.roleId || role.id}`">
-              <div class="token-item-main">
-                <strong>{{ role.name }}</strong>
-                <span>{{ role.code }}</span>
-              </div>
-              <button
-                :data-testid="`rbac-remove-user-role-${role.roleId || role.id}`"
-                class="ghost-btn inline-action-btn"
-                type="button"
-                @click="removeRoleFromSelectedUser(Number(role.roleId || role.id))"
-              >
-                解绑
-              </button>
-            </li>
-          </ul>
-        </div>
-
-        <div class="sub-panel">
-          <h3>权限</h3>
+          <h3>权限池</h3>
           <ul class="token-list">
             <li v-for="permission in permissions" :key="permission.permissionId || permission.id">
               <strong>{{ permission.name }}</strong>
@@ -337,12 +507,24 @@
             </li>
           </ul>
         </div>
+
+        <div class="sub-panel">
+          <h3>当前用户菜单预览</h3>
+          <ul class="menu-list">
+            <li v-for="menu in profileMenus" :key="`role-workspace-menu-${menu.menuId || menu.id}`">
+              <strong>{{ menu.title }}</strong>
+              <span>{{ menu.path }}</span>
+            </li>
+          </ul>
+        </div>
       </section>
 
-      <section class="panel panel-stack">
+      <section v-else class="panel panel-stack workspace-single" data-testid="rbac-menu-workspace">
         <div class="panel-header">
-          <h2>菜单可见性</h2>
-          <span class="muted">当前选中用户：{{ activeUser?.displayName || '未选择' }}</span>
+          <div>
+            <h2>菜单可见性</h2>
+            <span class="muted">当前选中用户：{{ activeUser?.displayName || '未选择' }}</span>
+          </div>
         </div>
 
         <div class="sub-panel">
@@ -412,6 +594,10 @@ type RbacMenu = {
   visible?: boolean
 }
 
+type WorkspaceKey = 'users' | 'roles' | 'menus'
+
+const USER_PAGE_SIZE = 2
+
 const router = useRouter()
 const session = getSession()
 
@@ -449,6 +635,15 @@ const roleDetailForm = ref({
   name: '',
   description: '',
 })
+const activeWorkspace = ref<WorkspaceKey>('users')
+const createUserExpanded = ref(false)
+const pendingDeleteUserId = ref<number | null>(null)
+const pendingDeleteRoleId = ref<number | null>(null)
+const userSearchQuery = ref('')
+const userStatusFilter = ref<'all' | '1' | '0'>('all')
+const userPage = ref(1)
+let latestUserSelectionToken = 0
+let latestRoleSelectionToken = 0
 
 const activeUser = computed(() => users.value.find((item) => item.userId === activeUserId.value) ?? null)
 const activeRole = computed(
@@ -456,6 +651,43 @@ const activeRole = computed(
     ?? userRoles.value.find((item) => (item.roleId || item.id) === activeRoleId.value)
     ?? null
 )
+const filteredUsers = computed(() => {
+  const keyword = userSearchQuery.value.trim().toLowerCase()
+
+  return users.value
+    .filter((user) => {
+      const matchesKeyword = !keyword
+        || user.displayName.toLowerCase().includes(keyword)
+        || user.email.toLowerCase().includes(keyword)
+        || (user.authMethod || 'local').toLowerCase().includes(keyword)
+
+      const matchesStatus = userStatusFilter.value === 'all'
+        || String(user.status) === userStatusFilter.value
+
+      return matchesKeyword && matchesStatus
+    })
+    .sort((left, right) => {
+      if (left.status !== right.status) {
+        return right.status - left.status
+      }
+
+      return left.userId - right.userId
+    })
+})
+const userTotalPages = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / USER_PAGE_SIZE)))
+const paginatedUsers = computed(() => {
+  const start = (userPage.value - 1) * USER_PAGE_SIZE
+  return filteredUsers.value.slice(start, start + USER_PAGE_SIZE)
+})
+const userPaginationText = computed(() => {
+  if (!filteredUsers.value.length) {
+    return '0 / 0'
+  }
+
+  const start = (userPage.value - 1) * USER_PAGE_SIZE + 1
+  const end = Math.min(userPage.value * USER_PAGE_SIZE, filteredUsers.value.length)
+  return `${start}-${end} / ${filteredUsers.value.length}`
+})
 
 watch(
   activeUser,
@@ -467,6 +699,24 @@ watch(
   },
   { immediate: true }
 )
+
+watch(activeUserId, () => {
+  pendingDeleteUserId.value = null
+})
+
+watch(activeRoleId, () => {
+  pendingDeleteRoleId.value = null
+})
+
+watch([userSearchQuery, userStatusFilter], () => {
+  userPage.value = 1
+})
+
+watch(filteredUsers, () => {
+  if (userPage.value > userTotalPages.value) {
+    userPage.value = userTotalPages.value
+  }
+})
 
 watch(
   activeRole,
@@ -503,18 +753,77 @@ const loadUserRoles = async (userId: number) => {
   }
 }
 
+const loadUserContext = async (userId: number, selectionToken: number) => {
+  const roleSelectionTokenAtStart = latestRoleSelectionToken
+  const nextProfileMenus = ((await rbacApi.listProfileMenus(userId)) || []) as RbacMenu[]
+  if (selectionToken !== latestUserSelectionToken) {
+    return false
+  }
+
+  const nextUserRoles = ((await rbacApi.listUserRoles(userId)) || []) as RbacRole[]
+  if (selectionToken !== latestUserSelectionToken) {
+    return false
+  }
+
+  const existingRoleIds = new Set(nextUserRoles.map((item) => item.roleId ?? item.id).filter((item): item is number => item != null))
+
+  profileMenus.value = nextProfileMenus
+  userRoles.value = nextUserRoles
+
+  if (roleSelectionTokenAtStart !== latestRoleSelectionToken) {
+    return true
+  }
+
+  const nextRoleId = existingRoleIds.has(activeRoleId.value ?? -1)
+    ? activeRoleId.value
+    : (nextUserRoles[0]?.roleId ?? nextUserRoles[0]?.id ?? null)
+  const roleCommitToken = ++latestRoleSelectionToken
+
+  let nextRolePermissions: RbacPermission[] = []
+  if (nextRoleId != null) {
+    nextRolePermissions = ((await rbacApi.listRolePermissions(nextRoleId)) || []) as RbacPermission[]
+    if (selectionToken !== latestUserSelectionToken || roleCommitToken !== latestRoleSelectionToken) {
+      return true
+    }
+  }
+
+  if (roleCommitToken !== latestRoleSelectionToken) {
+    return true
+  }
+
+  activeRoleId.value = nextRoleId
+  rolePermissions.value = nextRolePermissions
+  return true
+}
+
+const loadRoleContext = async (roleId: number, selectionToken: number) => {
+  const nextRolePermissions = ((await rbacApi.listRolePermissions(roleId)) || []) as RbacPermission[]
+  if (selectionToken !== latestRoleSelectionToken) {
+    return false
+  }
+
+  rolePermissions.value = nextRolePermissions
+  return true
+}
+
 const selectUser = async (userId: number) => {
   const previousUserId = activeUserId.value
   const previousProfileMenus = [...profileMenus.value]
   const previousUserRoles = [...userRoles.value]
   const previousRolePermissions = [...rolePermissions.value]
   const previousRoleId = activeRoleId.value
+  const selectionToken = ++latestUserSelectionToken
   errorMessage.value = ''
   try {
     activeUserId.value = userId
-    await loadProfileMenus(userId)
-    await loadUserRoles(userId)
+    const committed = await loadUserContext(userId, selectionToken)
+    if (!committed) {
+      return
+    }
   } catch (error) {
+    if (selectionToken !== latestUserSelectionToken) {
+      return
+    }
     activeUserId.value = previousUserId
     profileMenus.value = previousProfileMenus
     userRoles.value = previousUserRoles
@@ -526,11 +835,18 @@ const selectUser = async (userId: number) => {
 
 const selectRole = async (roleId: number) => {
   const previousRoleId = activeRoleId.value
+  const selectionToken = ++latestRoleSelectionToken
   errorMessage.value = ''
   try {
     activeRoleId.value = roleId
-    await loadRolePermissions(roleId)
+    const committed = await loadRoleContext(roleId, selectionToken)
+    if (!committed) {
+      return
+    }
   } catch (error) {
+    if (selectionToken !== latestRoleSelectionToken) {
+      return
+    }
     activeRoleId.value = previousRoleId
     errorMessage.value = error instanceof Error ? error.message : 'role permissions failed'
   }
@@ -539,7 +855,7 @@ const selectRole = async (roleId: number) => {
 const createUser = async () => {
   errorMessage.value = ''
   try {
-    await rbacApi.createUser({
+    const createdUser = await rbacApi.createUser({
       email: createUserForm.value.email,
       displayName: createUserForm.value.displayName,
       status: 1,
@@ -550,10 +866,44 @@ const createUser = async () => {
       displayName: '',
       authMethod: 'local',
     }
+    createUserExpanded.value = false
     await loadPage()
+    if (createdUser?.userId != null) {
+      activeUserId.value = createdUser.userId
+      const createdUserIndex = filteredUsers.value.findIndex((user) => user.userId === createdUser.userId)
+      if (createdUserIndex >= 0) {
+        userPage.value = Math.floor(createdUserIndex / USER_PAGE_SIZE) + 1
+      }
+      await loadProfileMenus(createdUser.userId)
+      await loadUserRoles(createdUser.userId)
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'create user failed'
   }
+}
+
+const requestDeleteSelectedUser = () => {
+  if (activeUserId.value == null) {
+    return
+  }
+
+  pendingDeleteUserId.value = activeUserId.value
+}
+
+const cancelDeleteSelectedUser = () => {
+  pendingDeleteUserId.value = null
+}
+
+const requestDeleteActiveRole = () => {
+  if (activeRoleId.value == null) {
+    return
+  }
+
+  pendingDeleteRoleId.value = activeRoleId.value
+}
+
+const cancelDeleteActiveRole = () => {
+  pendingDeleteRoleId.value = null
 }
 
 const updateSelectedUser = async () => {
@@ -574,13 +924,14 @@ const updateSelectedUser = async () => {
 }
 
 const deleteSelectedUser = async () => {
-  if (activeUserId.value == null) {
+  if (activeUserId.value == null || pendingDeleteUserId.value !== activeUserId.value) {
     return
   }
 
   errorMessage.value = ''
   try {
     await rbacApi.deleteUser(activeUserId.value)
+    pendingDeleteUserId.value = null
     await loadPage()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'delete user failed'
@@ -674,13 +1025,14 @@ const updateActiveRole = async () => {
 }
 
 const deleteActiveRole = async () => {
-  if (activeRoleId.value == null) {
+  if (activeRoleId.value == null || pendingDeleteRoleId.value !== activeRoleId.value) {
     return
   }
 
   errorMessage.value = ''
   try {
     await rbacApi.deleteRole(activeRoleId.value)
+    pendingDeleteRoleId.value = null
     roles.value = ((await rbacApi.listRoles()) || []) as RbacRole[]
     if (activeUserId.value != null) {
       await loadUserRoles(activeUserId.value)
@@ -720,6 +1072,18 @@ const removePermissionFromActiveRole = async (permissionId: number) => {
   }
 }
 
+const previousUserPage = () => {
+  if (userPage.value > 1) {
+    userPage.value -= 1
+  }
+}
+
+const nextUserPage = () => {
+  if (userPage.value < userTotalPages.value) {
+    userPage.value += 1
+  }
+}
+
 const loadPage = async () => {
   errorMessage.value = ''
   try {
@@ -743,8 +1107,8 @@ const loadPage = async () => {
     activeUserId.value = defaultUserId
 
     if (defaultUserId != null) {
-      await loadProfileMenus(defaultUserId)
-      await loadUserRoles(defaultUserId)
+      latestUserSelectionToken += 1
+      await loadUserContext(defaultUserId, latestUserSelectionToken)
     } else {
       profileMenus.value = []
       userRoles.value = []
@@ -777,6 +1141,7 @@ onMounted(() => {
 
 .rbac-header,
 .summary-grid,
+.workspace-tabs,
 .rbac-layout {
   max-width: 1320px;
   margin: 0 auto;
@@ -841,11 +1206,38 @@ h3,
   font-weight: 600;
 }
 
+.danger-btn {
+  background: #f87171;
+  color: #fff7ed;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.workspace-tab {
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.88);
+  color: #cbd5e1;
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.workspace-tab.active {
+  background: rgba(242, 213, 139, 0.18);
+  border-color: #f2d58b;
+  color: #fef3c7;
 }
 
 .error-banner {
@@ -880,12 +1272,17 @@ h3,
 
 .rbac-layout {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
   gap: 16px;
 }
 
 .panel {
   padding: 18px;
+}
+
+.workspace-main,
+.workspace-single {
+  min-width: 0;
 }
 
 .panel-stack {
@@ -943,9 +1340,19 @@ h3,
   border-radius: 10px;
 }
 
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .form-grid {
   display: grid;
   gap: 10px;
+}
+
+.compact-grid {
+  grid-template-columns: minmax(0, 1fr) 180px;
 }
 
 .field-input {
@@ -956,6 +1363,14 @@ h3,
   border-radius: 12px;
   padding: 10px 12px;
   box-sizing: border-box;
+}
+
+.sub-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
 }
 
 .user-card {
@@ -997,6 +1412,37 @@ h3,
   padding: 14px;
 }
 
+.toolbar-panel {
+  margin-bottom: 14px;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.empty-state {
+  padding: 20px 14px;
+  border: 1px dashed #334155;
+  border-radius: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.danger-panel {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.16);
+}
+
 .sub-panel h3 {
   margin-bottom: 10px;
 }
@@ -1020,6 +1466,10 @@ h3,
 @media (max-width: 1100px) {
   .summary-grid,
   .rbac-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-grid {
     grid-template-columns: 1fr;
   }
 }
