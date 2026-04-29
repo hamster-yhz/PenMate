@@ -7,6 +7,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,5 +45,28 @@ class PendingToolInvocationRepositoryImplTest {
         verify(pendingToolInvocationMapper).insert(snapshot);
         verify(pendingToolInvocationMapper).findByApprovalId(88001L);
         assertThat(loaded).isEqualTo(snapshot);
+    }
+
+    @Test
+    void UT_INFRA_AGENT_PENDING_TOOL_INVOCATION_REPOSITORY_FIND_STALE_EXECUTING_SNAPSHOTS() {
+        PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
+                88002L,
+                10002L,
+                8002L,
+                7002L,
+                "book_crud",
+                "{\"operation\":\"delete\"}",
+                "{}",
+                1001L,
+                "trace-approval-2",
+                "book-crud-delete-8002",
+                "executing"
+        );
+        when(pendingToolInvocationMapper.findStaleExecutingSnapshots(10, 100)).thenReturn(List.of(snapshot));
+
+        List<PendingToolInvocationSnapshot> loaded = repository.findStaleExecutingSnapshots(10, 100);
+
+        verify(pendingToolInvocationMapper).findStaleExecutingSnapshots(10, 100);
+        assertThat(loaded).containsExactly(snapshot);
     }
 }

@@ -46,20 +46,25 @@ public class ApprovalApplicationService {
     /** Tool 调用统一网关，审批通过后由其继续恢复并路由到目标 handler。 */
     private final ToolInvocationGateway toolInvocationGateway;
 
+    /** 审批通过后的异步恢复执行器。 */
+    private final ApprovedToolInvocationAsyncResumer approvedToolInvocationAsyncResumer;
+
     /** 实时事件服务，用于广播审批与任务状态事件。 */
     private final RealtimeEventService realtimeEventService;
 
     public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
                                       AgentRepository agentRepository,
-                                      AgentTaskStateMachine taskStateMachine,
-                                      PendingToolInvocationRepository pendingToolInvocationRepository,
-                                      ToolInvocationGateway toolInvocationGateway,
-                                      RealtimeEventService realtimeEventService) {
+                                       AgentTaskStateMachine taskStateMachine,
+                                       PendingToolInvocationRepository pendingToolInvocationRepository,
+                                       ToolInvocationGateway toolInvocationGateway,
+                                       ApprovedToolInvocationAsyncResumer approvedToolInvocationAsyncResumer,
+                                       RealtimeEventService realtimeEventService) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.agentRepository = agentRepository;
         this.taskStateMachine = taskStateMachine;
         this.pendingToolInvocationRepository = pendingToolInvocationRepository;
         this.toolInvocationGateway = toolInvocationGateway;
+        this.approvedToolInvocationAsyncResumer = approvedToolInvocationAsyncResumer;
         this.realtimeEventService = realtimeEventService;
     }
 
@@ -181,10 +186,9 @@ public class ApprovalApplicationService {
     /**
      * 审批通过后恢复任务执行。
      * <p>
-     * 当前实现会先在 {@code waiting_approval} 状态下回写 {@code running}，随后再尝试把快照从
-     * {@code pending} 抢占到 {@code executing} 并继续恢复执行。
-     * 因此它能阻止同一快照被重复执行业务，但在极端并发下仍可能出现任务已回写为 {@code running}
-     * 而本次恢复未真正继续的窗口。
+     * 当前实现先原子 claim 快照，再委派异步恢复执行器。
+     * 这样可避免“任务先改为 {@code running}、快照却未成功 claim”的状态裂缝；
+     * 同一审批重复回调时，也只会有一个线程成功把快照从 {@code pending} 推进到 {@code executing}。
      * </p>
      */
     private void resumeToolInvocationAfterApproved(ApprovalRequest request, String traceId) {
@@ -195,32 +199,12 @@ public class ApprovalApplicationService {
         if (snapshot == null) {
             return;
         }
-        AgentGenerationTask task = agentRepository.findGenerationTask(request.getProjectId(), request.getTaskId());
-        if (task == null) {
-            return;
-        }
-        AgentTaskStatus currentStatus = taskStateMachine.parseStatus(task.getStatus());
-        if (currentStatus == AgentTaskStatus.WAITING_APPROVAL) {
-            // 先恢复为 running，再交由编排器继续执行，保证状态机前后连贯。
-            taskStateMachine.assertTransition(currentStatus.value(), AgentTaskStatus.RUNNING);
-            agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.RUNNING.value(), null);
-        }
-        // 在任务已回写 running 之后，再通过快照状态原子推进抢占恢复执行权，
-        // 从而防止重复审批回调或并发恢复导致同一 tool 被执行多次。
+        // 先通过快照状态原子推进 claim 恢复执行权，避免任务状态先前移而快照未被成功抢占。
         int claimed = pendingToolInvocationRepository.markStatus(request.getId(), "pending", "executing");
         if (claimed != 1) {
             return;
         }
-        // 恢复入口继续收敛到 ToolInvocationGateway，保证首次执行与恢复执行走同一套 handler 路由模型。
-        ToolInvocationGatewayResult result = toolInvocationGateway.resume(snapshot);
-        if ("FAILED".equals(result.status())) {
-            pendingToolInvocationRepository.markStatus(request.getId(), "executing", "failed");
-            agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.FAILED.value(), result.errorMessage());
-            realtimeEventService.publishGenerationFailed(request.getProjectId(), request.getTaskId(), result.errorCode(), result.errorMessage());
-            return;
-        }
-        // 只有恢复执行成功后才把快照封口为 completed，便于后续排障与防重。
-        pendingToolInvocationRepository.markStatus(request.getId(), "executing", "completed");
+        approvedToolInvocationAsyncResumer.resumeApprovedInvocation(request, snapshot);
     }
 
     /**

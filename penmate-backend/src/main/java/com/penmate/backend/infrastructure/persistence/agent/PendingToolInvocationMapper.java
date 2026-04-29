@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.List;
+
 @Mapper
 public interface PendingToolInvocationMapper {
 
@@ -42,4 +44,18 @@ public interface PendingToolInvocationMapper {
     int markStatus(@Param("approvalId") Long approvalId,
                    @Param("expectedStatus") String expectedStatus,
                    @Param("targetStatus") String targetStatus);
+
+    @Select("""
+            SELECT approval_id, project_id, task_id, conversation_id, tool_code,
+                   CAST(tool_args_json AS CHAR) AS tool_args_json,
+                   CAST(context_json AS CHAR) AS context_json,
+                   operator_id, trace_id, idempotency_key, status
+            FROM pending_tool_invocations
+            WHERE status = 'executing'
+              AND updated_at < TIMESTAMPADD(MINUTE, -#{timeoutMinutes}, CURRENT_TIMESTAMP(3))
+            ORDER BY updated_at ASC
+            LIMIT #{limit}
+            """)
+    List<PendingToolInvocationSnapshot> findStaleExecutingSnapshots(@Param("timeoutMinutes") int timeoutMinutes,
+                                                                    @Param("limit") int limit);
 }
