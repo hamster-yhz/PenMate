@@ -3,13 +3,10 @@ package com.penmate.backend.application.agent;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.rag.RagRetrievalService;
-import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
-import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.approval.repository.ApprovalRequestRepository;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
@@ -32,33 +29,32 @@ public class AgentOrchestrator {
     private final AgentRepository agentRepository;
     private final AgentTaskStateMachine taskStateMachine;
     private final RealtimeEventService realtimeEventService;
-    private final ApprovalRequestRepository approvalRequestRepository;
     private final AgentLlmGateway agentLlmGateway;
     private final RagRetrievalService ragRetrievalService;
-    private final PluginToolCoordinator pluginToolCoordinator;
+    private final ToolInvocationGateway toolInvocationGateway;
     private final AgentModelRoutingService agentModelRoutingService;
 
     /**
      * 标准编排入口。
-     * <p>用于新建任务后的首次执行，会走审批门禁判断。</p>
+     * <p>用于新建任务后的首次执行。</p>
      */
     public void run(Long projectId, Long taskId, String traceId) {
-        runInternal(projectId, taskId, traceId, false);
+        runInternal(projectId, taskId, traceId);
     }
 
     /**
      * 审批通过后的恢复入口。
-     * <p>跳过审批门禁，直接继续 RAG/工具/模型生成链路。</p>
+     * <p>当前保留为继续编排入口。</p>
      */
     public void runAfterApproval(Long projectId, Long taskId, String traceId) {
-        runInternal(projectId, taskId, traceId, true);
+        runInternal(projectId, taskId, traceId);
     }
 
     /**
      * Agent 编排主流程。
-     * <p>状态迁移 -> 审批门禁(可选) -> RAG -> Tool -> LLM -> 持久化消息 -> 完成事件。</p>
+     * <p>状态迁移 -> RAG -> Tool -> LLM -> 持久化消息 -> 完成事件。</p>
      */
-    private void runInternal(Long projectId, Long taskId, String traceId, boolean skipApprovalGate) {
+    private void runInternal(Long projectId, Long taskId, String traceId) {
         AgentGenerationTask task = agentRepository.findGenerationTask(projectId, taskId);
         if (task == null) {
             log.warn("编排任务不存在: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
@@ -70,14 +66,6 @@ public class AgentOrchestrator {
             transitionStatus(projectId, task, AgentTaskStatus.RUNNING, null);
             realtimeEventService.publishGenerationStarted(projectId, taskId);
 
-            // 首次执行且命中高风险规则时，先挂起为 waiting_approval，由审批流程恢复执行。
-            if (!skipApprovalGate && shouldPauseForApproval(task)) {
-                ApprovalRequest approvalRequest = createApprovalRequest(task);
-                transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
-                realtimeEventService.publishGenerationWaitingApproval(projectId, taskId, approvalRequest.getId(), approvalRequest.getApprovalType());
-                return;
-            }
-
             // 检索增强：把知识库片段作为后续模型生成上下文的一部分。
             List<RagRetrievedChunk> ragChunks = ragRetrievalService.retrieve(
                     projectId,
@@ -87,13 +75,21 @@ public class AgentOrchestrator {
             ).chunks();
 
             // 工具调用失败不终止主链路，仅清空工具上下文继续生成，避免整体不可用。
-            ToolExecutionResult toolResult = pluginToolCoordinator.execute(new ToolExecutionRequest(
+            ToolInvocationGatewayResult toolResult = toolInvocationGateway.invoke(new ToolInvocationRequest(
                     projectId,
                     taskId,
-                    task.getPromptSnapshot(),
-                    traceId
+                    task.getConversationId(),
+                    "context_enhancer",
+                    "{\"prompt\":\"" + escapeJson(task.getPromptSnapshot()) + "\"}",
+                    0L,
+                    traceId,
+                    "{}",
+                    "context-enhancer-" + taskId
             ));
-            String toolContext = toolResult.success() ? toolResult.output() : "";
+            if ("WAITING_APPROVAL".equals(toolResult.status())) {
+                return;
+            }
+            String toolContext = "SUCCESS".equals(toolResult.status()) && toolResult.toolOutput() != null ? toolResult.toolOutput() : "";
 
             // 模型路由：完全显式模式，严格使用任务携带的模型配置ID，不做默认策略兜底。
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(projectId, task.getModelConfigId(), traceId);
@@ -143,41 +139,6 @@ public class AgentOrchestrator {
             transitionToFailed(projectId, task, ex);
             realtimeEventService.publishGenerationFailed(projectId, taskId, "AGENT_MODEL_CALL_FAILED", ex.getMessage());
         }
-    }
-
-    private boolean shouldPauseForApproval(AgentGenerationTask task) {
-        String taskType = task.getTaskType() == null ? "" : task.getTaskType().toUpperCase();
-        if (taskType.contains("WORLD") || taskType.contains("SETTING")) {
-            return true;
-        }
-        String prompt = task.getPromptSnapshot() == null ? "" : task.getPromptSnapshot();
-        return prompt.contains("世界设定") || prompt.contains("新增设定");
-    }
-
-    private ApprovalRequest createApprovalRequest(AgentGenerationTask task) {
-        AgentConversation conversation = agentRepository.findConversation(task.getProjectId(), task.getConversationId());
-        Long requestedBy = conversation == null || conversation.getUserId() == null ? 0L : conversation.getUserId();
-        ApprovalRequest request = new ApprovalRequest();
-        request.setProjectId(task.getProjectId());
-        request.setTaskId(task.getId());
-        request.setApprovalType("WORLD_SETTING_CREATE");
-        request.setPayloadJson(task.getPromptSnapshot() == null ? "{}" : task.getPromptSnapshot());
-        request.setRiskLevel(2);
-        request.setRequestedBy(requestedBy);
-        request.setStatus("pending");
-
-        int affected = approvalRequestRepository.insert(request);
-        if (affected != 1) {
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create approval request");
-        }
-        realtimeEventService.publishProjectEvent(task.getProjectId(), "approval.created", java.util.Map.of(
-                "approvalId", request.getId(),
-                "taskId", request.getTaskId(),
-                "approvalType", request.getApprovalType(),
-                "riskLevel", request.getRiskLevel(),
-                "status", request.getStatus()
-        ));
-        return request;
     }
 
     /**
@@ -258,6 +219,13 @@ public class AgentOrchestrator {
                 truncated.length(),
                 ex.getClass().getName());
         return truncated;
+    }
+
+    private String escapeJson(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ");
     }
 }
 

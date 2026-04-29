@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent;
 
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.rag.RagRetrievalService;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
@@ -37,6 +38,9 @@ class AgentOrchestratorTest {
     private ApprovalRequestRepository approvalRequestRepository;
 
     @Mock
+    private ApprovalApplicationService approvalApplicationService;
+
+    @Mock
     private AgentLlmGateway agentLlmGateway;
 
     @Mock
@@ -46,13 +50,16 @@ class AgentOrchestratorTest {
     private PluginToolCoordinator pluginToolCoordinator;
 
     @Mock
+    private ToolInvocationGateway toolInvocationGateway;
+
+    @Mock
     private AgentModelRoutingService agentModelRoutingService;
 
     @InjectMocks
     private AgentOrchestrator agentOrchestrator;
 
     @Test
-    void UT_APP_AGENT_ORCHESTRATOR_WAITING_APPROVAL_FLOW() {
+    void UT_APP_AGENT_ORCHESTRATOR_INITIAL_RUN_SHOULD_USE_TOOL_INVOCATION_GATEWAY_INSTEAD_OF_TASK_LEVEL_APPROVAL() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(11L);
         task.setProjectId(1L);
@@ -66,23 +73,23 @@ class AgentOrchestratorTest {
         conversation.setUserId(1001L);
 
         when(agentRepository.findGenerationTask(1L, 11L)).thenReturn(task);
-        when(agentRepository.findConversation(1L, 9L)).thenReturn(conversation);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(11L), any(), any())).thenReturn(1);
-        when(approvalRequestRepository.insert(any())).thenAnswer(invocation -> {
-            ApprovalRequest req = invocation.getArgument(0);
-            req.setId(77L);
-            return 1;
-        });
+        when(ragRetrievalService.retrieve(eq(1L), eq(11L), any(), eq("trace-1")))
+                .thenReturn(new RagRetrievalService.RetrievalResult(java.util.List.of(), 1L));
+        when(toolInvocationGateway.invoke(any())).thenReturn(ToolInvocationGatewayResult.waitingApproval(77L));
 
         agentOrchestrator.run(1L, 11L, "trace-1");
 
         verify(realtimeEventService).publishGenerationStarted(1L, 11L);
-        verify(realtimeEventService).publishGenerationWaitingApproval(1L, 11L, 77L, "WORLD_SETTING_CREATE");
+        verify(toolInvocationGateway).invoke(any());
+        verify(realtimeEventService, never()).publishGenerationWaitingApproval(any(), any(), any(), any());
+        verify(approvalApplicationService, never()).create(any(), any());
+        verify(approvalRequestRepository, never()).insert(any());
         verify(agentLlmGateway, never()).generate(any(), any(), any(), any());
     }
 
     @Test
-    void UT_APP_AGENT_ORCHESTRATOR_RESUME_AFTER_APPROVAL() {
+    void UT_APP_AGENT_ORCHESTRATOR_RESUME_AFTER_APPROVAL_SHOULD_INVOKE_TOOL_GATEWAY() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(12L);
         task.setProjectId(1L);
@@ -94,7 +101,7 @@ class AgentOrchestratorTest {
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(12L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(12L), any(), eq("trace-2")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(java.util.List.of(), 1L));
-        when(pluginToolCoordinator.execute(any())).thenReturn(ToolExecutionResult.success("plugin-a", "tool-a", "tool-context"));
+        when(toolInvocationGateway.invoke(any())).thenReturn(ToolInvocationGatewayResult.success("tool-context"));
         when(agentModelRoutingService.resolveExecutionConfig(1L, null, "trace-2")).thenReturn(null);
         when(agentLlmGateway.generate(eq(task), any(), eq("tool-context"), any())).thenReturn("续写片段");
         when(agentRepository.nextMessageSeq(9L)).thenReturn(3);
@@ -106,6 +113,8 @@ class AgentOrchestratorTest {
         verify(realtimeEventService).publishGenerationStarted(1L, 12L);
         verify(realtimeEventService).publishGenerationToken(eq(1L), eq(12L), any(), eq(false));
         verify(realtimeEventService).publishGenerationDone(1L, 12L, AgentTaskStatus.DONE.value());
+        verify(toolInvocationGateway).invoke(any());
+        verify(pluginToolCoordinator, never()).execute(any());
         verify(approvalRequestRepository, never()).insert(any());
     }
 }

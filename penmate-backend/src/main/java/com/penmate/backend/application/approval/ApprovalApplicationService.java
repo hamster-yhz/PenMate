@@ -1,12 +1,15 @@
 package com.penmate.backend.application.approval;
 
-import com.penmate.backend.application.agent.AgentOrchestrationDispatcher;
 import com.penmate.backend.application.agent.AgentTaskStateMachine;
+import com.penmate.backend.application.agent.ToolInvocationGateway;
+import com.penmate.backend.application.agent.ToolInvocationGatewayResult;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
+import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.approval.repository.ApprovalRequestRepository;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
@@ -18,36 +21,54 @@ import java.util.Map;
 
 /**
  * 审批应用服务。
- * <p>负责审批单创建、查询与审核通过/驳回，并向项目实时通道发布审批状态变更事件。</p>
+ * <p>
+ * 负责审批单创建、查询与审核通过/驳回，并向项目实时通道发布审批状态变更事件。
+ * 在 agent tool 场景下，它同时负责根据审批结果驱动后续动作；
+ * 真正的恢复执行仍需委派给 {@link ToolInvocationGateway} 做最终路由。
+ * </p>
  */
 @Service
 @Slf4j
 public class ApprovalApplicationService {
 
+    /** 审批单仓储，负责审批记录的持久化与状态流转。 */
     private final ApprovalRequestRepository approvalRequestRepository;
+
+    /** Agent 仓储，用于查询与回写生成任务状态。 */
     private final AgentRepository agentRepository;
+
+    /** 任务状态机，用于校验 waiting_approval、running、failed 等状态流转是否合法。 */
     private final AgentTaskStateMachine taskStateMachine;
-    private final AgentOrchestrationDispatcher orchestrationDispatcher;
+
+    /** 待恢复调用快照仓储，用于取回审批挂起时保存的 tool 调用现场。 */
+    private final PendingToolInvocationRepository pendingToolInvocationRepository;
+
+    /** Tool 调用统一网关，审批通过后由其继续恢复并路由到目标 handler。 */
+    private final ToolInvocationGateway toolInvocationGateway;
+
+    /** 实时事件服务，用于广播审批与任务状态事件。 */
     private final RealtimeEventService realtimeEventService;
 
     public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
                                       AgentRepository agentRepository,
                                       AgentTaskStateMachine taskStateMachine,
-                                      AgentOrchestrationDispatcher orchestrationDispatcher,
+                                      PendingToolInvocationRepository pendingToolInvocationRepository,
+                                      ToolInvocationGateway toolInvocationGateway,
                                       RealtimeEventService realtimeEventService) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.agentRepository = agentRepository;
         this.taskStateMachine = taskStateMachine;
-        this.orchestrationDispatcher = orchestrationDispatcher;
+        this.pendingToolInvocationRepository = pendingToolInvocationRepository;
+        this.toolInvocationGateway = toolInvocationGateway;
         this.realtimeEventService = realtimeEventService;
     }
 
     /**
      * 创建审批申请。
      *
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
+     * @param command 审批创建命令
+     * @param traceId 当前链路 traceId
+     * @return 新创建的审批单
      */
     public ApprovalRequest create(CreateApprovalCommand command, String traceId) {
         log.info("创建审批申请: projectId={}, taskId={}, type={}, riskLevel={}, requestedBy={}",
@@ -79,8 +100,8 @@ public class ApprovalApplicationService {
     /**
      * 查询项目下审批申请列表。
      *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
+     * @param projectId 项目 ID
+     * @return 项目下审批申请列表
      */
     public List<ApprovalRequest> listByProject(Long projectId) {
         List<ApprovalRequest> requests = approvalRequestRepository.findByProjectId(projectId);
@@ -91,8 +112,8 @@ public class ApprovalApplicationService {
     /**
      * 查询审批申请详情。
      *
-     * @param approvalId 入参：approvalId
-     * @return 出参：处理结果
+     * @param approvalId 审批单 ID
+     * @return 审批单详情
      */
     public ApprovalRequest detail(Long approvalId) {
         log.info("查询审批详情: approvalId={}", approvalId);
@@ -108,9 +129,9 @@ public class ApprovalApplicationService {
     /**
      * 审核通过审批申请。
      *
-     * @param approvalId 入参：approvalId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
+     * @param approvalId 审批单 ID
+     * @param command 审核命令
+     * @param traceId 当前链路 traceId
      */
     public void approve(Long approvalId, ReviewApprovalCommand command, String traceId) {
         log.info("审批通过请求: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
@@ -126,7 +147,7 @@ public class ApprovalApplicationService {
                 "reviewedBy", command.reviewedBy(),
                 "comment", command.comment()
         ));
-        resumeTaskAfterApproved(request, traceId);
+        resumeToolInvocationAfterApproved(request, traceId);
         writeAudit(traceId, command.reviewedBy(), "approval", "approve", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
         log.info("审批通过成功: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
     }
@@ -134,9 +155,9 @@ public class ApprovalApplicationService {
     /**
      * 驳回审批申请。
      *
-     * @param approvalId 入参：approvalId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
+     * @param approvalId 审批单 ID
+     * @param command 审核命令
+     * @param traceId 当前链路 traceId
      */
     public void reject(Long approvalId, ReviewApprovalCommand command, String traceId) {
         log.info("审批驳回请求: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
@@ -159,10 +180,19 @@ public class ApprovalApplicationService {
 
     /**
      * 审批通过后恢复任务执行。
-     * <p>只在 waiting_approval 状态下先回写 running，再异步继续编排主链路。</p>
+     * <p>
+     * 当前实现会先在 {@code waiting_approval} 状态下回写 {@code running}，随后再尝试把快照从
+     * {@code pending} 抢占到 {@code executing} 并继续恢复执行。
+     * 因此它能阻止同一快照被重复执行业务，但在极端并发下仍可能出现任务已回写为 {@code running}
+     * 而本次恢复未真正继续的窗口。
+     * </p>
      */
-    private void resumeTaskAfterApproved(ApprovalRequest request, String traceId) {
+    private void resumeToolInvocationAfterApproved(ApprovalRequest request, String traceId) {
         if (request.getTaskId() == null || request.getProjectId() == null) {
+            return;
+        }
+        PendingToolInvocationSnapshot snapshot = pendingToolInvocationRepository.findByApprovalId(request.getId());
+        if (snapshot == null) {
             return;
         }
         AgentGenerationTask task = agentRepository.findGenerationTask(request.getProjectId(), request.getTaskId());
@@ -175,8 +205,22 @@ public class ApprovalApplicationService {
             taskStateMachine.assertTransition(currentStatus.value(), AgentTaskStatus.RUNNING);
             agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.RUNNING.value(), null);
         }
-        // 审批恢复场景跳过审批门禁，避免二次进入 waiting_approval。
-        orchestrationDispatcher.dispatchAfterApproval(request.getProjectId(), request.getTaskId(), traceId);
+        // 在任务已回写 running 之后，再通过快照状态原子推进抢占恢复执行权，
+        // 从而防止重复审批回调或并发恢复导致同一 tool 被执行多次。
+        int claimed = pendingToolInvocationRepository.markStatus(request.getId(), "pending", "executing");
+        if (claimed != 1) {
+            return;
+        }
+        // 恢复入口继续收敛到 ToolInvocationGateway，保证首次执行与恢复执行走同一套 handler 路由模型。
+        ToolInvocationGatewayResult result = toolInvocationGateway.resume(snapshot);
+        if ("FAILED".equals(result.status())) {
+            pendingToolInvocationRepository.markStatus(request.getId(), "executing", "failed");
+            agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.FAILED.value(), result.errorMessage());
+            realtimeEventService.publishGenerationFailed(request.getProjectId(), request.getTaskId(), result.errorCode(), result.errorMessage());
+            return;
+        }
+        // 只有恢复执行成功后才把快照封口为 completed，便于后续排障与防重。
+        pendingToolInvocationRepository.markStatus(request.getId(), "executing", "completed");
     }
 
     /**
@@ -195,11 +239,24 @@ public class ApprovalApplicationService {
         if (currentStatus != AgentTaskStatus.WAITING_APPROVAL) {
             return;
         }
+        // 驳回语义不是“延后执行”，而是“当前高风险操作被明确拒绝”，因此直接进入 failed。
         taskStateMachine.assertTransition(currentStatus.value(), AgentTaskStatus.FAILED);
         agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.FAILED.value(), "Approval rejected");
         realtimeEventService.publishGenerationFailed(request.getProjectId(), request.getTaskId(), "AGENT_APPROVAL_REQUIRED", "Approval rejected");
     }
 
+    /**
+     * 审计写入占位方法。
+     *
+     * @param traceId 当前链路 traceId
+     * @param userId 操作者 ID
+     * @param module 模块名
+     * @param action 动作名
+     * @param resourceType 资源类型
+     * @param resourceId 资源 ID
+     * @param requestJson 请求摘要
+     * @param responseCode 响应码
+     */
     private void writeAudit(String traceId,
                             Long userId,
                             String module,

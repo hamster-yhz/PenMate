@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS pending_tool_invocations (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    approval_id BIGINT UNSIGNED NOT NULL,
+    project_id BIGINT UNSIGNED NOT NULL,
+    task_id BIGINT UNSIGNED NOT NULL,
+    conversation_id BIGINT UNSIGNED NULL,
+    tool_code VARCHAR(100) NOT NULL,
+    tool_args_json JSON NULL,
+    context_json JSON NULL,
+    operator_id BIGINT UNSIGNED NULL,
+    trace_id VARCHAR(64) NULL,
+    idempotency_key VARCHAR(128) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_pending_tool_invocations_approval_id (approval_id),
+    UNIQUE KEY uk_pending_tool_invocations_idempotency_key (idempotency_key),
+    KEY idx_pending_tool_invocations_task (project_id, task_id),
+    KEY idx_pending_tool_invocations_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
