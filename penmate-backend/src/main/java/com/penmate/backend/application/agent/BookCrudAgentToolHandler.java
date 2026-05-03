@@ -1,7 +1,7 @@
 package com.penmate.backend.application.agent;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import cn.hutool.json.JSONObject;
+import com.penmate.backend.application.agent.json.AgentJsons;
 import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateProjectCommand;
@@ -29,9 +29,6 @@ import java.util.Map;
 @Slf4j
 public class BookCrudAgentToolHandler implements AgentToolHandler {
 
-    /** 统一 JSON 解析与序列化工具，用于处理 toolArgsJson 与执行结果输出。 */
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
     /** 小说项目应用服务，负责真正的书籍 CRUD 业务。 */
     private final NovelApplicationService novelApplicationService;
 
@@ -56,8 +53,8 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
     @Override
     public void validate(ToolInvocationRequest request) {
         try {
-            JsonNode root = OBJECT_MAPPER.readTree(request.toolArgsJson());
-            String operation = root.path("operation").asText("");
+            JSONObject root = AgentJsons.parseObj(request.toolArgsJson());
+            String operation = AgentJsons.getString(root, "operation");
             log.debug("校验 book_crud 请求: operation={}, taskId={}, traceId={}", operation, request.taskId(), request.traceId());
             if ("delete".equals(operation)) {
                 requireOnlyFields(root, "operation", "projectId");
@@ -77,18 +74,18 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
     @Override
     public ToolInvocationGatewayResult execute(ToolInvocationRequest request) {
         try {
-            JsonNode root = OBJECT_MAPPER.readTree(request.toolArgsJson());
-            String operation = root.path("operation").asText("");
+            JSONObject root = AgentJsons.parseObj(request.toolArgsJson());
+            String operation = AgentJsons.getString(root, "operation");
             log.info("执行 book_crud 工具: operation={}, projectId={}, taskId={}, operatorId={}, traceId={}",
                     operation, request.projectId(), request.taskId(), request.operatorId(), request.traceId());
             // 统一以 operation 做分派，让 agent 只需理解一个 toolCode，
             // 后端内部再映射到具体的小说项目应用服务调用。
             if ("create".equals(operation)) {
                 NovelProject created = novelApplicationService.createProject(new CreateProjectCommand(
-                        root.path("ownerUserId").asLong(),
-                        root.path("title").asText(),
-                        root.path("summary").asText(null),
-                        root.path("status").isMissingNode() || root.path("status").isNull() ? null : root.path("status").asInt()
+                        root.getLong("ownerUserId", 0L),
+                        root.getStr("title", ""),
+                        root.getStr("summary", null),
+                        readNullableInt(root, "status")
                 ), request.traceId());
                 log.info("book_crud 创建成功: newProjectId={}, traceId={}", created.getProjectId(), request.traceId());
                 return ToolInvocationGatewayResult.success(toOutput(created));
@@ -102,9 +99,9 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
                 NovelProject updated = novelApplicationService.updateProject(
                         requirePositiveLong(root, "projectId"),
                         new UpdateProjectCommand(
-                                root.path("title").asText(),
-                                root.path("summary").asText(null),
-                                root.path("status").isMissingNode() || root.path("status").isNull() ? null : root.path("status").asInt()
+                                root.getStr("title", ""),
+                                root.getStr("summary", null),
+                                readNullableInt(root, "status")
                         ),
                         request.traceId()
                 );
@@ -137,7 +134,7 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
         output.put("title", created.getTitle());
         output.put("summary", created.getSummary());
         output.put("status", created.getStatus());
-        return OBJECT_MAPPER.writeValueAsString(output);
+        return AgentJsons.toJson(output);
     }
 
     /**
@@ -157,7 +154,7 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
             item.put("status", project.getStatus());
             output.add(item);
         }
-        return OBJECT_MAPPER.writeValueAsString(output);
+        return AgentJsons.toJson(output);
     }
 
     /**
@@ -167,16 +164,19 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
      * @param fieldName 目标字段名
      * @return 合法的正整数值
      */
-    private long requirePositiveLong(JsonNode root, String fieldName) {
-        JsonNode field = root.path(fieldName);
-        if (field.isMissingNode() || field.isNull()) {
+    private long requirePositiveLong(JSONObject root, String fieldName) {
+        Long value = root.getLong(fieldName);
+        if (value == null) {
             throw new IllegalArgumentException(fieldName + " is required");
         }
-        long value = field.asLong();
         if (value <= 0) {
             throw new IllegalArgumentException(fieldName + " must be positive");
         }
         return value;
+    }
+
+    private Integer readNullableInt(JSONObject root, String fieldName) {
+        return root.containsKey(fieldName) ? root.getInt(fieldName) : null;
     }
 
     /**
@@ -189,11 +189,9 @@ public class BookCrudAgentToolHandler implements AgentToolHandler {
      * @param root 参数 JSON 根节点
      * @param allowedFields 允许字段集合
      */
-    private void requireOnlyFields(JsonNode root, String... allowedFields) {
+    private void requireOnlyFields(JSONObject root, String... allowedFields) {
         java.util.Set<String> allowed = new java.util.HashSet<>(java.util.Arrays.asList(allowedFields));
-        java.util.Iterator<String> fieldNames = root.fieldNames();
-        while (fieldNames.hasNext()) {
-            String fieldName = fieldNames.next();
+        for (String fieldName : root.keySet()) {
             if (!allowed.contains(fieldName)) {
                 throw new IllegalArgumentException("Unexpected field: " + fieldName);
             }

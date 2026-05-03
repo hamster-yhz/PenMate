@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -43,6 +45,16 @@ class ContextEnhancerAgentToolHandlerTest {
         assertThat(captor.getValue().taskId()).isEqualTo(8013L);
         assertThat(captor.getValue().prompt()).isEqualTo("补充帝国冲突");
         assertThat(captor.getValue().traceId()).isEqualTo("trace-context-handler");
+    }
+
+    @Test
+    void UT_APP_AGENT_CONTEXT_ENHANCER_TOOL_HANDLER_DOES_NOT_KEEP_DIRECT_OBJECT_MAPPER_DEPENDENCY() throws Exception {
+        Class<?> handlerType = Class.forName("com.penmate.backend.application.agent.ContextEnhancerAgentToolHandler");
+
+        assertThat(Arrays.stream(handlerType.getDeclaredFields())
+                .map(Field::getType)
+                .toList())
+                .noneMatch(type -> type.equals(com.fasterxml.jackson.databind.ObjectMapper.class));
     }
 
     private Object instantiateHandler(PluginToolCoordinator pluginToolCoordinator) {

@@ -20,13 +20,13 @@
 
 **所有 agent tool 调用先进入统一网关；高风险调用不会直接执行，
 而是先创建审批单并把原始调用冻结成快照；审批通过后，
-再按原始上下文恢复执行同一个 tool handler。**
+系统恢复的是 agent tool loop 上下文，并继续后续 tool/LLM turn，而不只是孤立重放某一个 handler。**
 
 这套设计解决了四个关键问题：
 
 1. 审批判断不散落在各个 tool 内部
 2. 高风险操作在审批前不会真正落业务
-3. 审批通过后能够恢复“原始那一次调用”
+3. 审批通过后能够恢复“原始那一次 loop 上下文”
 4. tool handler 只做业务，不做审批状态机
 
 ---
@@ -78,12 +78,23 @@
 - `traceId`
 - `idempotencyKey`
 - `status`
+- `loopRunId`
+- `llmTurnIndex`
+- `toolCallId`
+- `assistantToolCallsJson`
+- `conversationMessagesJson`
+- `resumeMode`
 
-这意味着恢复执行时不需要重新猜测原意，而是直接取回原始请求现场。
+这意味着恢复执行时不需要重新猜测原意，而是可以直接取回原始 loop 现场，包括：
+
+- 该轮 assistant 发出的全部 `tool_calls`
+- 审批前已经成功执行的前序 tool result
+- 当前待审批的 `tool_call_id`
+- 审批通过后继续发给 LLM 的消息序列
 
 ### 3.4 [`ApprovalApplicationService`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:31)
 
-它是审批领域应用入口，同时负责在审批通过后触发恢复链路；最终恢复路由仍委派给 [`ToolInvocationGateway.resume()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/ToolInvocationGateway.java:147)。
+它是审批领域应用入口，同时负责在审批通过后触发恢复链路；当前主路径会把恢复委派给 [`ApprovedToolInvocationAsyncResumer`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovedToolInvocationAsyncResumer.java:27)，再按 [`resumeMode`](penmate-backend/src/main/java/com/penmate/backend/domain/agent/model/PendingToolInvocationSnapshot.java:22) 进入 loop 恢复。
 
 它负责：
 
@@ -146,9 +157,9 @@
 
 ### 第 4 步：保存 [`PendingToolInvocationSnapshot`](penmate-backend/src/main/java/com/penmate/backend/domain/agent/model/PendingToolInvocationSnapshot.java:22)
 
-这一步解决的是“审批通过后如何继续执行”。
+这一步解决的是“审批通过后如何继续执行整个 loop”。
 
-如果只有审批单，没有快照，那么系统知道“有一件事被通过了”，但不知道“原来具体该调用哪个 tool、带什么参数、处于哪个上下文”。
+如果只有审批单，没有快照，那么系统知道“有一件事被通过了”，但不知道“原来具体该调用哪个 tool、带什么参数、位于第几轮 turn、前面已经执行过哪些 tool result”。
 
 所以两者职责不同：
 
@@ -173,6 +184,8 @@
 
 恢复链路的入口在 [`ApprovalApplicationService.approve()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:135)。
 
+当前默认恢复模式是 `RESUME_LOOP`：审批通过后恢复的是 loop 状态，而不是 legacy 的单次工具重放。
+
 ### 第 1 步：把审批单更新为 approved
 
 审批服务先更新审批单状态。只有当前仍是 `pending` 的审批单才能通过，避免重复审批或非法状态覆盖。
@@ -181,7 +194,7 @@
 
 审批状态落库后，服务会广播 `approval.reviewed` 事件，让前端和其他订阅方知道人工决策已经完成。
 
-### 第 3 步：进入 [`resumeToolInvocationAfterApproved()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:189)
+### 第 3 步：进入 [`resumeToolInvocationAfterApproved()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:194)
 
 这里才是真正的恢复执行主链路。
 
@@ -191,9 +204,20 @@
 
 **审批通过恢复执行，不是重新拼请求，而是取回原始调用快照。**
 
-### 第 4 步：当前实现会先把任务从 `waiting_approval` 回写为 `running`
+### 第 4 步：先把快照从 `pending` 抢占到 `executing`
 
-如果任务当前仍处于 `waiting_approval`，审批服务会先通过 [`AgentTaskStateMachine`](penmate-backend/src/main/java/com/penmate/backend/application/agent/AgentTaskStateMachine.java) 校验流转合法，再把任务改回 `running`。
+审批服务会先调用仓储把快照状态从 `pending` 改为 `executing`。
+
+这个动作本质上是一次防重保护：
+
+- 第一个成功推进状态的人拿到执行权
+- 后续重复回调或并发恢复不会再次执行业务
+
+这也是当前实现与旧版描述的关键差异：**先 claim 快照，再进入异步恢复**，从而避免“任务先改为 `running`、快照却未成功抢占”的状态裂缝。
+
+### 第 5 步：由 [`ApprovedToolInvocationAsyncResumer.resumeApprovedInvocation()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovedToolInvocationAsyncResumer.java:51) 恢复任务并继续 loop
+
+异步恢复器在确认快照仍处于 `executing` 后，才会把 generation task 从 `waiting_approval` 回写为 `running`，然后根据 `resumeMode` 继续执行。
 
 这保证了状态机前后一致：
 
@@ -201,28 +225,19 @@
 - 等审批：`waiting_approval`
 - 审批通过继续执行：`running`
 
-### 第 5 步：再把快照从 `pending` 抢占到 `executing`
+### 第 6 步：按 `resumeMode=RESUME_LOOP` 调用 [`AgentToolLoopController.resumeFromPending()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/loop/AgentToolLoopController.java:119)
 
-审批服务会调用仓储把快照状态从 `pending` 改为 `executing`。
-
-这个动作本质上是一次防重保护：
-
-- 第一个成功推进状态的人拿到执行权
-- 后续重复回调或并发恢复不会再次执行业务
-
-但要注意真实顺序：任务状态回写发生在快照抢占之前，所以当前实现避免的是“重复执行同一快照”，并没有完全消除“任务已是 `running` 但本次恢复未真正继续执行”的窗口。
-
-### 第 6 步：调用 [`ToolInvocationGateway.resume()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/ToolInvocationGateway.java:147)
-
-网关会把快照重新装配为 [`ToolInvocationRequest`](penmate-backend/src/main/java/com/penmate/backend/application/agent/ToolInvocationRequest.java:1)，并按照 `toolCode` 找到对应 handler 直接执行。
+loop controller 会先恢复当前待审批 tool，再把同轮剩余未执行的 tool calls 继续补齐，最后再向 LLM 发起下一轮 turn。
 
 这里要特别强调三点：
 
 1. 恢复阶段不会再次审批
 2. 恢复阶段不会重新拼业务参数
-3. 恢复阶段执行的就是最初那一次工具调用
+3. 恢复阶段恢复的是原始 loop 上下文，不是脱离上下文的单次 handler 调用
 
-### 第 7 步：根据执行结果封口快照
+在这条链路里，底层单个 tool 的真正恢复执行仍通过 [`ToolInvocationGateway.resume()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/ToolInvocationGateway.java:196) 完成，但它已经变成 loop 恢复流程中的一个步骤，而不是最终恢复语义本身。
+
+### 第 7 步：根据执行结果封口快照，并让 generation task 继续走向终态
 
 恢复执行完成后：
 
@@ -230,6 +245,20 @@
 - 失败：快照状态从 `executing` 变为 `failed`，同时任务改为 `failed`
 
 因此快照状态不仅服务于恢复，还服务于排障和幂等控制。
+
+### 第 8 步：保守阈值防止 loop 失控
+
+当前 loop 实现采用保守阈值：
+
+- `MAX_TOOL_TURNS = 4`
+- `MAX_TOOL_CALLS_PER_TURN = 3`
+- 同时只允许 1 个 pending approval
+
+这样做的目的不是限制未来能力，而是在首版多步 tool-calling 落地时，优先防止：
+
+1. 模型持续请求工具导致无限循环
+2. 单轮返回过多 tool calls，扩大审批与恢复复杂度
+3. 同一 generation task 出现多个并发待审批分叉
 
 ---
 
@@ -300,7 +329,7 @@
 > 对 `book_crud.delete` 来说，当前审批识别还是基于原始 JSON 文本里是否精确包含 `"operation":"delete"`，还不是完整的结构化语义判断。
 > 如果不用审批，就直接分发给具体 handler，比如 [`BookCrudAgentToolHandler`](penmate-backend/src/main/java/com/penmate/backend/application/agent/BookCrudAgentToolHandler.java:28)。
 > 如果需要审批，网关会先通过 [`ApprovalApplicationService`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:31) 创建审批单，再把原始调用现场保存成 [`PendingToolInvocationSnapshot`](penmate-backend/src/main/java/com/penmate/backend/domain/agent/model/PendingToolInvocationSnapshot.java:22)，把任务切到 `waiting_approval`。
-> 审批通过后，审批服务按 `approvalId` 找回这份快照，再交还给网关恢复执行。这样恢复的就是原来那一次调用，不是重新拼出来的一份新请求。
+> 审批通过后，审批服务按 `approvalId` 找回这份快照，再恢复原来的 loop 上下文。这样继续的是同一次 tool-calling 对话，不是重新拼出来的一份新请求，也不是只重放某一个 tool handler。
 
 这段话已经覆盖了当前实现最重要的设计主线。
 
@@ -314,9 +343,10 @@
 2. [`DefaultApprovalPolicyEngine.evaluate()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/DefaultApprovalPolicyEngine.java:26)
 3. [`PendingToolInvocationSnapshot`](penmate-backend/src/main/java/com/penmate/backend/domain/agent/model/PendingToolInvocationSnapshot.java:22)
 4. [`ApprovalApplicationService.approve()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:135)
-5. [`ApprovalApplicationService.resumeToolInvocationAfterApproved()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovalApplicationService.java:189)
-6. [`ToolInvocationGateway.resume()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/ToolInvocationGateway.java:147)
-7. [`BookCrudAgentToolHandler.execute()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/BookCrudAgentToolHandler.java:75)
+5. [`ApprovedToolInvocationAsyncResumer.resumeApprovedInvocation()`](penmate-backend/src/main/java/com/penmate/backend/application/approval/ApprovedToolInvocationAsyncResumer.java:51)
+6. [`AgentToolLoopController.resumeFromPending()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/loop/AgentToolLoopController.java:118)
+7. [`ToolInvocationGateway.resume()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/ToolInvocationGateway.java:196)
+8. [`BookCrudAgentToolHandler.execute()`](penmate-backend/src/main/java/com/penmate/backend/application/agent/BookCrudAgentToolHandler.java:75)
 
 按这个顺序最容易串起“首次调用 → 审批挂起 → 审批通过 → 恢复执行”的完整闭环。
 

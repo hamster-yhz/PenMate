@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent;
 
+import com.penmate.backend.application.agent.json.AgentJsons;
 import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateProjectCommand;
@@ -8,11 +9,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -177,6 +182,37 @@ class BookCrudAgentToolHandlerTest {
                 .hasRootCauseMessage("projectId is required");
     }
 
+    @Test
+    void UT_APP_AGENT_BOOK_CRUD_TOOL_HANDLER_VALIDATE_ACCEPTS_HUTOOL_GENERATED_ARGS_JSON() {
+        NovelApplicationService novelApplicationService = mock(NovelApplicationService.class);
+
+        Object handler = instantiateHandler(novelApplicationService);
+        String argsJson = AgentJsons.toJson(Map.of("operation", "delete", "projectId", 9L));
+        ToolInvocationRequest request = new ToolInvocationRequest(
+                1L,
+                2L,
+                3L,
+                "book_crud",
+                argsJson,
+                7L,
+                "trace-1",
+                "{}",
+                "idem-1"
+        );
+
+        assertThatCode(() -> validate(handler, request)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void UT_APP_AGENT_BOOK_CRUD_TOOL_HANDLER_DOES_NOT_KEEP_DIRECT_OBJECT_MAPPER_DEPENDENCY() throws Exception {
+        Class<?> handlerType = Class.forName("com.penmate.backend.application.agent.BookCrudAgentToolHandler");
+
+        assertThat(Arrays.stream(handlerType.getDeclaredFields())
+                .map(Field::getType)
+                .toList())
+                .noneMatch(type -> type.equals(com.fasterxml.jackson.databind.ObjectMapper.class));
+    }
+
     private Object instantiateHandler(NovelApplicationService novelApplicationService) {
         try {
             Class<?> type = Class.forName("com.penmate.backend.application.agent.BookCrudAgentToolHandler");
@@ -200,6 +236,11 @@ class BookCrudAgentToolHandlerTest {
     private Object executeRaw(Object handler, ToolInvocationRequest request) throws Exception {
         Method method = handler.getClass().getMethod("execute", ToolInvocationRequest.class);
         return method.invoke(handler, request);
+    }
+
+    private void validate(Object handler, ToolInvocationRequest request) throws Exception {
+        Method method = handler.getClass().getMethod("validate", ToolInvocationRequest.class);
+        method.invoke(handler, request);
     }
 
     private Object invokeAccessor(Object target, String accessorName) {

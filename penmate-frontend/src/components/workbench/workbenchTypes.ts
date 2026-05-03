@@ -39,6 +39,7 @@ export type ChatMessage = {
   id: number
   role: 'user' | 'assistant' | 'system'
   text: string
+  toolCallId?: string
   approval?: ApprovalCardData
 }
 

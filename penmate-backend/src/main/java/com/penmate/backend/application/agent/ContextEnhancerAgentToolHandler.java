@@ -1,15 +1,13 @@
 package com.penmate.backend.application.agent;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import cn.hutool.json.JSONObject;
+import com.penmate.backend.application.agent.json.AgentJsons;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
 public class ContextEnhancerAgentToolHandler implements AgentToolHandler {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final PluginToolCoordinator pluginToolCoordinator;
 
@@ -25,8 +23,8 @@ public class ContextEnhancerAgentToolHandler implements AgentToolHandler {
     @Override
     public ToolInvocationGatewayResult execute(ToolInvocationRequest request) {
         try {
-            JsonNode root = OBJECT_MAPPER.readTree(request.toolArgsJson());
-            String prompt = root.path("prompt").asText("");
+            JSONObject root = AgentJsons.parseObj(request.toolArgsJson());
+            String prompt = AgentJsons.getString(root, "prompt");
             log.info("执行 context_enhancer 工具: projectId={}, taskId={}, promptLength={}, traceId={}",
                     request.projectId(), request.taskId(), prompt.length(), request.traceId());
             ToolExecutionResult result = pluginToolCoordinator.execute(new ToolExecutionRequest(

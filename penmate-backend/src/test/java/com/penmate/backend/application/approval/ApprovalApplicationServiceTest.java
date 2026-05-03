@@ -3,6 +3,7 @@ package com.penmate.backend.application.approval;
 import com.penmate.backend.application.agent.AgentTaskStateMachine;
 import com.penmate.backend.application.agent.ToolInvocationGateway;
 import com.penmate.backend.application.agent.ToolInvocationGatewayResult;
+import com.penmate.backend.application.agent.loop.AgentToolLoopController;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,6 +50,9 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private ToolInvocationGateway toolInvocationGateway;
+
+    @Mock
+    private AgentToolLoopController agentToolLoopController;
 
     @Mock
     private ApprovedToolInvocationAsyncResumer approvedToolInvocationAsyncResumer;
@@ -112,7 +118,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-1",
                 "book-crud-delete-9001",
-                "pending"
+                "pending",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         when(pendingToolInvocationRepository.findByApprovalId(1L)).thenReturn(snapshot);
         when(pendingToolInvocationRepository.markStatus(1L, "pending", "executing")).thenReturn(1);
@@ -145,7 +158,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-2",
                 "book-crud-delete-9002",
-                "pending"
+                "pending",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         when(pendingToolInvocationRepository.findByApprovalId(2L)).thenReturn(snapshot);
         when(pendingToolInvocationRepository.markStatus(2L, "pending", "executing")).thenReturn(0);
@@ -179,7 +199,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-3",
                 "book-crud-delete-9003",
-                "pending"
+                "pending",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         when(pendingToolInvocationRepository.findByApprovalId(3L)).thenReturn(snapshot);
         when(pendingToolInvocationRepository.markStatus(3L, "pending", "executing")).thenReturn(0);
@@ -193,12 +220,51 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void UT_APP_APPROVAL_APPROVE_SHOULD_RESUME_LOOP_WHEN_SNAPSHOT_RESUME_MODE_IS_RESUME_LOOP() {
+        ApprovalRequest request = new ApprovalRequest();
+        request.setId(8L);
+        request.setProjectId(9L);
+        request.setTaskId(16L);
+        when(approvalRequestRepository.approve(8L, 1001L, "ok")).thenReturn(1);
+        when(approvalRequestRepository.findById(8L)).thenReturn(request);
+
+        PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
+                8L,
+                9L,
+                16L,
+                5L,
+                "book_crud",
+                "{\"operation\":\"delete\",\"projectId\":9008}",
+                "{}",
+                1001L,
+                "trace-8",
+                "book-crud-delete-9008",
+                "pending",
+                "loop-1",
+                2,
+                "call_8",
+                "[{\"id\":\"call_8\"}]",
+                "[{\"role\":\"user\",\"content\":\"delete project\"}]",
+                "RESUME_LOOP",
+                "{\"approvalType\":\"BOOK_DELETE\"}"
+        );
+        when(pendingToolInvocationRepository.findByApprovalId(8L)).thenReturn(snapshot);
+        when(pendingToolInvocationRepository.markStatus(8L, "pending", "executing")).thenReturn(1);
+
+        approvalApplicationService.approve(8L, new ReviewApprovalCommand(1001L, "ok"), "trace-8");
+
+        verify(approvedToolInvocationAsyncResumer).resumeApprovedInvocation(request, snapshot);
+        verify(toolInvocationGateway, never()).resume(any());
+    }
+
+    @Test
     void UT_APP_APPROVAL_ASYNC_RESUMER_SHOULD_MARK_TASK_RUNNING_THEN_COMPLETE_SNAPSHOT_WHEN_RESUME_SUCCEEDS() {
         ApprovedToolInvocationAsyncResumer resumer = new ApprovedToolInvocationAsyncResumer(
                 agentRepository,
                 taskStateMachine,
                 pendingToolInvocationRepository,
                 toolInvocationGateway,
+                agentToolLoopController,
                 realtimeEventService
         );
         ApprovalRequest request = new ApprovalRequest();
@@ -217,7 +283,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-4",
                 "book-crud-delete-9004",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
 
         AgentGenerationTask task = new AgentGenerationTask();
@@ -246,6 +319,7 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 taskStateMachine,
                 pendingToolInvocationRepository,
                 toolInvocationGateway,
+                agentToolLoopController,
                 realtimeEventService
         );
         ApprovalRequest request = new ApprovalRequest();
@@ -264,7 +338,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-5",
                 "book-crud-delete-9005",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
 
         AgentGenerationTask task = new AgentGenerationTask();
@@ -307,6 +388,7 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 taskStateMachine,
                 pendingToolInvocationRepository,
                 toolInvocationGateway,
+                agentToolLoopController,
                 realtimeEventService
         );
         ApprovalRequest request = new ApprovalRequest();
@@ -325,7 +407,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-6",
                 "book-crud-delete-9006",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
 
         AgentGenerationTask task = new AgentGenerationTask();
@@ -356,6 +445,7 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 taskStateMachine,
                 pendingToolInvocationRepository,
                 toolInvocationGateway,
+                agentToolLoopController,
                 realtimeEventService
         );
         ApprovalRequest request = new ApprovalRequest();
@@ -374,7 +464,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-7",
                 "book-crud-delete-9007",
-                "failed"
+                "failed",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         PendingToolInvocationSnapshot originalSnapshot = new PendingToolInvocationSnapshot(
                 7L,
@@ -387,7 +484,14 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-7",
                 "book-crud-delete-9007",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         when(pendingToolInvocationRepository.findByApprovalId(7L)).thenReturn(staleSnapshot);
 
@@ -417,6 +521,56 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         approvalApplicationService.reject(1L, new ReviewApprovalCommand(1001L, "no"), "trace-2");
 
         verify(realtimeEventService).publishGenerationFailed(9L, 7L, "AGENT_APPROVAL_REQUIRED", "Approval rejected");
+    }
+
+    @Test
+    void UT_APP_APPROVAL_REJECT_SHOULD_PUBLISH_TOOL_CALL_FAILED_SEMANTICS_WHEN_LOOP_SNAPSHOT_EXISTS() {
+        ApprovalRequest request = new ApprovalRequest();
+        request.setId(9L);
+        request.setProjectId(9L);
+        request.setTaskId(17L);
+        when(approvalRequestRepository.reject(9L, 1001L, "no")).thenReturn(1);
+        when(approvalRequestRepository.findById(9L)).thenReturn(request);
+
+        PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
+                9L,
+                9L,
+                17L,
+                5L,
+                "book_crud",
+                "{\"operation\":\"delete\",\"projectId\":9009}",
+                "{}",
+                1001L,
+                "trace-9",
+                "book-crud-delete-9009",
+                "pending",
+                "loop-9",
+                2,
+                "call_9",
+                "[{\"id\":\"call_9\"}]",
+                "[{\"role\":\"user\",\"content\":\"delete project\"}]",
+                "RESUME_LOOP",
+                "{\"approvalType\":\"BOOK_DELETE\"}"
+        );
+        when(pendingToolInvocationRepository.findByApprovalId(9L)).thenReturn(snapshot);
+
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(17L);
+        task.setStatus("waiting_approval");
+        when(agentRepository.findGenerationTask(9L, 17L)).thenReturn(task);
+        when(taskStateMachine.parseStatus("waiting_approval")).thenReturn(AgentTaskStatus.WAITING_APPROVAL);
+        doNothing().when(taskStateMachine).assertTransition("waiting_approval", AgentTaskStatus.FAILED);
+        when(agentRepository.updateGenerationTaskStatus(9L, 17L, "failed", "Approval rejected")).thenReturn(1);
+
+        approvalApplicationService.reject(9L, new ReviewApprovalCommand(1001L, "no"), "trace-9");
+
+        verify(realtimeEventService).publishProjectEvent(9L, "generation.tool_call", Map.of(
+                "taskId", 17L,
+                "toolCallId", "call_9",
+                "status", "failed",
+                "errorCode", "AGENT_APPROVAL_REJECTED",
+                "errorMessage", "Approval rejected"
+        ));
     }
 }
 

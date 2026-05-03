@@ -1,6 +1,9 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.common.exception.BusinessException;
 
 /**
  * 不同模型供应商调用策略。
@@ -16,5 +19,13 @@ public interface ProviderChatClient {
      * 调用供应商模型生成。
      */
     String generate(String prompt, AgentLlmExecutionConfig executionConfig);
+
+    /**
+     * 调用供应商模型执行结构化单轮对话。
+     */
+    default AgentLlmTurnResponse generateTurn(AgentLlmTurnRequest request,
+                                              AgentLlmExecutionConfig executionConfig) {
+        throw BusinessException.of("LLM provider does not support structured turn generation");
+    }
 }
 

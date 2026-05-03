@@ -4,6 +4,7 @@ import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
+import com.penmate.backend.application.agent.json.AgentJsons;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
@@ -118,6 +119,12 @@ public class ToolInvocationGateway {
             log.info("tool 调用进入审批挂起: toolCode={}, approvalType={}, approvalId={}, taskId={}, traceId={}",
                     request.toolCode(), decision.approvalType(), approvalRequest.getId(), request.taskId(), request.traceId());
             // 审批命中后保存一份可恢复的调用现场，确保人工通过后可以继续执行“同一次” tool 调用。
+            String resumeMode = request.resumeMode() == null || request.resumeMode().isBlank()
+                    ? "RESUME_LOOP"
+                    : request.resumeMode();
+            String approvalSummaryJson = request.approvalSummaryJson() == null || request.approvalSummaryJson().isBlank()
+                    ? AgentJsons.toJson(java.util.Map.of("approvalType", decision.approvalType()))
+                    : request.approvalSummaryJson();
             pendingToolInvocationRepository.save(new PendingToolInvocationSnapshot(
                     approvalRequest.getId(),
                     request.projectId(),
@@ -129,15 +136,45 @@ public class ToolInvocationGateway {
                     request.operatorId(),
                     request.traceId(),
                     request.idempotencyKey(),
-                    "pending"
+                    "pending",
+                    request.loopRunId(),
+                    request.llmTurnIndex(),
+                    request.toolCallId(),
+                    request.assistantToolCallsJson(),
+                    request.conversationMessagesJson(),
+                    resumeMode,
+                    approvalSummaryJson
             ));
             // 将任务切到等待审批中间态，使前端、编排器和后续恢复逻辑都能识别当前阻塞点。
             agentRepository.updateGenerationTaskStatus(request.projectId(), request.taskId(), "waiting_approval", null);
+            Object argumentsPreview = request.toolArgsJson() == null || request.toolArgsJson().isBlank()
+                    ? null
+                    : AgentJsons.parseObj(request.toolArgsJson());
+            Object approvalPreview = approvalSummaryJson == null || approvalSummaryJson.isBlank()
+                    ? null
+                    : AgentJsons.parseObj(approvalSummaryJson);
+            realtimeEventService.publishGenerationToolCall(
+                    request.projectId(),
+                    request.taskId(),
+                    request.toolCallId(),
+                    request.toolCode(),
+                    request.toolCode(),
+                    "waiting_approval",
+                    approvalRequest.getId(),
+                    decision.approvalType(),
+                    request.llmTurnIndex(),
+                    argumentsPreview,
+                    null,
+                    null
+            );
             realtimeEventService.publishGenerationWaitingApproval(
                     request.projectId(),
                     request.taskId(),
+                    request.toolCallId(),
                     approvalRequest.getId(),
-                    decision.approvalType()
+                    decision.approvalType(),
+                    approvalPreview,
+                    resumeMode
             );
             return ToolInvocationGatewayResult.waitingApproval(approvalRequest.getId());
         }
@@ -170,7 +207,14 @@ public class ToolInvocationGateway {
                 snapshot.operatorId(),
                 snapshot.traceId(),
                 snapshot.contextJson(),
-                snapshot.idempotencyKey()
+                snapshot.idempotencyKey(),
+                snapshot.loopRunId(),
+                snapshot.llmTurnIndex(),
+                snapshot.toolCallId(),
+                snapshot.assistantToolCallsJson(),
+                snapshot.conversationMessagesJson(),
+                snapshot.resumeMode(),
+                snapshot.approvalSummaryJson()
         );
         return findHandler(snapshot.toolCode())
                 .map(handler -> {

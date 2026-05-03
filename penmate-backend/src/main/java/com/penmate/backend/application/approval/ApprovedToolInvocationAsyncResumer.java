@@ -3,6 +3,7 @@ package com.penmate.backend.application.approval;
 import com.penmate.backend.application.agent.AgentTaskStateMachine;
 import com.penmate.backend.application.agent.ToolInvocationGateway;
 import com.penmate.backend.application.agent.ToolInvocationGatewayResult;
+import com.penmate.backend.application.agent.loop.AgentToolLoopController;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
@@ -29,17 +30,20 @@ public class ApprovedToolInvocationAsyncResumer {
     private final AgentTaskStateMachine taskStateMachine;
     private final PendingToolInvocationRepository pendingToolInvocationRepository;
     private final ToolInvocationGateway toolInvocationGateway;
+    private final AgentToolLoopController agentToolLoopController;
     private final RealtimeEventService realtimeEventService;
 
     public ApprovedToolInvocationAsyncResumer(AgentRepository agentRepository,
                                               AgentTaskStateMachine taskStateMachine,
                                               PendingToolInvocationRepository pendingToolInvocationRepository,
                                               ToolInvocationGateway toolInvocationGateway,
+                                              AgentToolLoopController agentToolLoopController,
                                               RealtimeEventService realtimeEventService) {
         this.agentRepository = agentRepository;
         this.taskStateMachine = taskStateMachine;
         this.pendingToolInvocationRepository = pendingToolInvocationRepository;
         this.toolInvocationGateway = toolInvocationGateway;
+        this.agentToolLoopController = agentToolLoopController;
         this.realtimeEventService = realtimeEventService;
     }
 
@@ -52,7 +56,9 @@ public class ApprovedToolInvocationAsyncResumer {
                 return;
             }
             markTaskRunningIfNeeded(request);
-            ToolInvocationGatewayResult result = toolInvocationGateway.resume(snapshot);
+            ToolInvocationGatewayResult result = "RESUME_LOOP".equals(snapshot.resumeMode())
+                    ? agentToolLoopController.resumeFromPending(request, snapshot)
+                    : toolInvocationGateway.resume(snapshot);
             if ("FAILED".equals(result.status())) {
                 sealSnapshotAndTaskAsFailed(request, snapshot, result.errorCode(), result.errorMessage());
                 return;

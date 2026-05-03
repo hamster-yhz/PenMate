@@ -24,7 +24,8 @@ import java.util.Map;
  * <p>
  * 负责审批单创建、查询与审核通过/驳回，并向项目实时通道发布审批状态变更事件。
  * 在 agent tool 场景下，它同时负责根据审批结果驱动后续动作；
- * 真正的恢复执行仍需委派给 {@link ToolInvocationGateway} 做最终路由。
+ * 审批通过后的主恢复语义是委派给 {@link ApprovedToolInvocationAsyncResumer}
+ * 恢复原始 agent tool loop，上层不再以单次 tool handler 重放作为默认路径。
  * </p>
  */
 @Service
@@ -212,6 +213,11 @@ public class ApprovalApplicationService {
      * <p>仅当任务仍处于 waiting_approval 时回写 failed 并广播失败事件。</p>
      */
     private void markTaskFailedAfterRejected(ApprovalRequest request) {
+        PendingToolInvocationSnapshot snapshot = pendingToolInvocationRepository.findByApprovalId(request.getId());
+        if (snapshot != null) {
+            pendingToolInvocationRepository.markStatus(request.getId(), "pending", "failed");
+            publishRejectedToolCallEvent(snapshot);
+        }
         if (request.getTaskId() == null || request.getProjectId() == null) {
             return;
         }
@@ -227,6 +233,19 @@ public class ApprovalApplicationService {
         taskStateMachine.assertTransition(currentStatus.value(), AgentTaskStatus.FAILED);
         agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.FAILED.value(), "Approval rejected");
         realtimeEventService.publishGenerationFailed(request.getProjectId(), request.getTaskId(), "AGENT_APPROVAL_REQUIRED", "Approval rejected");
+    }
+
+    private void publishRejectedToolCallEvent(PendingToolInvocationSnapshot snapshot) {
+        if (snapshot.projectId() == null || snapshot.taskId() == null || snapshot.toolCallId() == null || snapshot.toolCallId().isBlank()) {
+            return;
+        }
+        realtimeEventService.publishProjectEvent(snapshot.projectId(), "generation.tool_call", Map.of(
+                "taskId", snapshot.taskId(),
+                "toolCallId", snapshot.toolCallId(),
+                "status", "failed",
+                "errorCode", "AGENT_APPROVAL_REJECTED",
+                "errorMessage", "Approval rejected"
+        ));
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent;
 
+import com.penmate.backend.application.agent.json.AgentJsons;
 import com.penmate.backend.application.agent.command.AgentCommands.ApplyGenerationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateGenerationCommand;
@@ -11,6 +12,7 @@ import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -145,6 +147,93 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void UT_APP_AGENT_CREATE_GENERATION_NORMALIZES_JSON_SNAPSHOTS_WITH_HUTOOL() {
+        Long projectId = 1L;
+        Long conversationId = 10L;
+        Long operatorId = 1001L;
+        String traceId = "UT-TRACE-AGENT-GEN-NORMALIZE";
+
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(conversationId);
+        when(agentRepository.findConversation(projectId, conversationId)).thenReturn(conversation);
+        when(agentRepository.insertGenerationTask(any(AgentGenerationTask.class))).thenAnswer(invocation -> {
+            AgentGenerationTask task = invocation.getArgument(0);
+            task.setId(502L);
+            return 1;
+        });
+        AgentGenerationTask pendingTask = new AgentGenerationTask();
+        pendingTask.setId(502L);
+        pendingTask.setStatus("pending");
+        when(agentRepository.findGenerationTask(projectId, 502L)).thenReturn(pendingTask);
+
+        agentApplicationService.createGeneration(
+                projectId,
+                new CreateGenerationCommand(
+                        conversationId,
+                        20L,
+                        9001L,
+                        "rewrite",
+                        " { \"content\" : \"hello\" } ",
+                        "style",
+                        " [ { \"tool\" : \"context_enhancer\" } ] ",
+                        operatorId
+                ),
+                traceId
+        );
+
+        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
+        verify(agentRepository).insertGenerationTask(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getPromptSnapshot())
+                .isEqualTo(AgentJsons.toJson(AgentJsons.parseObj("{\"content\":\"hello\"}")));
+        assertThat(taskCaptor.getValue().getStyleProfileSnapshot())
+                .isEqualTo("\"style\"");
+        assertThat(taskCaptor.getValue().getPluginSnapshot())
+                .isEqualTo(AgentJsons.toJson(AgentJsons.parseArray("[{\"tool\":\"context_enhancer\"}]")));
+    }
+
+    @Test
+    void UT_APP_AGENT_CREATE_GENERATION_KEEPS_VALID_JSON_SCALARS_UNCHANGED() {
+        Long projectId = 1L;
+        Long conversationId = 10L;
+        Long operatorId = 1001L;
+        String traceId = "UT-TRACE-AGENT-GEN-SCALARS";
+
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(conversationId);
+        when(agentRepository.findConversation(projectId, conversationId)).thenReturn(conversation);
+        when(agentRepository.insertGenerationTask(any(AgentGenerationTask.class))).thenAnswer(invocation -> {
+            AgentGenerationTask task = invocation.getArgument(0);
+            task.setId(503L);
+            return 1;
+        });
+        AgentGenerationTask pendingTask = new AgentGenerationTask();
+        pendingTask.setId(503L);
+        pendingTask.setStatus("pending");
+        when(agentRepository.findGenerationTask(projectId, 503L)).thenReturn(pendingTask);
+
+        agentApplicationService.createGeneration(
+                projectId,
+                new CreateGenerationCommand(
+                        conversationId,
+                        20L,
+                        9001L,
+                        "rewrite",
+                        "123",
+                        "true",
+                        "\"style\"",
+                        operatorId
+                ),
+                traceId
+        );
+
+        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
+        verify(agentRepository).insertGenerationTask(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getPromptSnapshot()).isEqualTo("123");
+        assertThat(taskCaptor.getValue().getStyleProfileSnapshot()).isEqualTo("true");
+        assertThat(taskCaptor.getValue().getPluginSnapshot()).isEqualTo("\"style\"");
+    }
+
+    @Test
     void UT_APP_AGENT_APPLY_GENERATION_NOT_READY() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(501L);
@@ -195,4 +284,5 @@ class AgentApplicationServiceTest extends BaseApplicationServiceTest {
         verifyNoInteractions(orchestrationDispatcher);
     }
 }
+
 

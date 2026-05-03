@@ -19,6 +19,13 @@ package com.penmate.backend.domain.agent.model;
  * @param idempotencyKey 首次调用所使用的幂等键
  * @param status 快照当前状态；当前实现按字符串约定使用 pending、executing、completed、failed 等值，
  *               但这些状态尚未被类型系统封装为独立领域枚举
+ * @param loopRunId 当前挂起所属的一次 loop 运行实例 ID
+ * @param llmTurnIndex 当前挂起发生于第几轮 LLM turn
+ * @param toolCallId 当前等待审批的 tool call ID
+ * @param assistantToolCallsJson 当前 assistant 输出的 tool_calls JSON
+ * @param conversationMessagesJson 恢复 loop 所需的消息快照 JSON
+ * @param resumeMode 审批通过后的恢复模式
+ * @param approvalSummaryJson 审批摘要 JSON，用于恢复与事件展示
  */
 public record PendingToolInvocationSnapshot(
         Long approvalId,
@@ -31,6 +38,13 @@ public record PendingToolInvocationSnapshot(
         Long operatorId,
         String traceId,
         String idempotencyKey,
-        String status
+        String status,
+        String loopRunId,
+        Integer llmTurnIndex,
+        String toolCallId,
+        String assistantToolCallsJson,
+        String conversationMessagesJson,
+        String resumeMode,
+        String approvalSummaryJson
 ) {
 }

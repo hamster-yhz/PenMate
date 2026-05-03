@@ -1,7 +1,8 @@
 package com.penmate.backend.application.agent;
 
-import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.loop.AgentToolLoopController;
+import com.penmate.backend.application.agent.loop.AgentToolLoopIterationResult;
 import com.penmate.backend.application.rag.RagRetrievalService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Agent 编排入口：驱动状态机与SSE主通道。
@@ -29,9 +31,8 @@ public class AgentOrchestrator {
     private final AgentRepository agentRepository;
     private final AgentTaskStateMachine taskStateMachine;
     private final RealtimeEventService realtimeEventService;
-    private final AgentLlmGateway agentLlmGateway;
+    private final AgentToolLoopController agentToolLoopController;
     private final RagRetrievalService ragRetrievalService;
-    private final ToolInvocationGateway toolInvocationGateway;
     private final AgentModelRoutingService agentModelRoutingService;
 
     /**
@@ -74,27 +75,26 @@ public class AgentOrchestrator {
                     traceId
             ).chunks();
 
-            // 工具调用失败不终止主链路，仅清空工具上下文继续生成，避免整体不可用。
-            ToolInvocationGatewayResult toolResult = toolInvocationGateway.invoke(new ToolInvocationRequest(
-                    projectId,
-                    taskId,
-                    task.getConversationId(),
-                    "context_enhancer",
-                    "{\"prompt\":\"" + escapeJson(task.getPromptSnapshot()) + "\"}",
-                    0L,
-                    traceId,
-                    "{}",
-                    "context-enhancer-" + taskId
-            ));
-            if ("WAITING_APPROVAL".equals(toolResult.status())) {
-                return;
-            }
-            String toolContext = "SUCCESS".equals(toolResult.status()) && toolResult.toolOutput() != null ? toolResult.toolOutput() : "";
+            List<Map<String, Object>> initialMessages = buildInitialMessages(task, ragChunks);
 
             // 模型路由：完全显式模式，严格使用任务携带的模型配置ID，不做默认策略兜底。
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(projectId, task.getModelConfigId(), traceId);
             long llmStartAt = System.currentTimeMillis();
-            String generatedText = agentLlmGateway.generate(task, ragChunks, toolContext, executionConfig);
+            //委派给agentToolLoopController执行，进入工具调用循环，直到模型生成完成或进入等待审批
+            AgentToolLoopIterationResult loopResult = agentToolLoopController.execute(
+                    projectId,
+                    taskId,
+                    task.getConversationId(),
+                    0L,
+                    traceId,
+                    initialMessages,
+                    executionConfig
+            );
+            if (loopResult.waitingApproval()) {
+                transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
+                return;
+            }
+            String generatedText = loopResult.finalAssistantText();
             long llmCostMs = System.currentTimeMillis() - llmStartAt;
             log.info("agent.llm.generate.finished: projectId={}, taskId={}, traceId={}, costMs={}, outputLength={}",
                     projectId,
@@ -221,11 +221,32 @@ public class AgentOrchestrator {
         return truncated;
     }
 
-    private String escapeJson(String raw) {
-        if (raw == null) {
-            return "";
+    private List<Map<String, Object>> buildInitialMessages(AgentGenerationTask task, List<RagRetrievedChunk> ragChunks) {
+        String prompt = task.getPromptSnapshot() == null ? "" : task.getPromptSnapshot().trim();
+        String style = task.getStyleProfileSnapshot() == null ? "" : task.getStyleProfileSnapshot().trim();
+        StringBuilder builder = new StringBuilder();
+
+        if (!style.isEmpty()) {
+            builder.append("写作风格约束：\n").append(style).append("\n\n");
         }
-        return raw.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ");
+        if (ragChunks != null && !ragChunks.isEmpty()) {
+            builder.append("知识库参考：\n");
+            for (RagRetrievedChunk chunk : ragChunks) {
+                builder.append("- [")
+                        .append(chunk.getDocumentTitle() == null ? "文档" : chunk.getDocumentTitle())
+                        .append("#")
+                        .append(chunk.getChunkNo() == null ? 0 : chunk.getChunkNo())
+                        .append("] ")
+                        .append(chunk.getContentText() == null ? "" : chunk.getContentText())
+                        .append("\n");
+            }
+            builder.append("\n");
+        }
+        builder.append("用户指令：\n").append(prompt);
+        return List.of(Map.of(
+                "role", "user",
+                "content", builder.toString()
+        ));
     }
 }
 

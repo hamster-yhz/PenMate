@@ -60,7 +60,14 @@ class ToolInvocationGatewayTest {
                 1001L,
                 "trace-approve-1",
                 "{}",
-                "book-crud-delete-9001"
+                "book-crud-delete-9001",
+                "loop-1",
+                2,
+                "call_1",
+                "[{\"id\":\"call_1\"}]",
+                "[{\"role\":\"assistant\"}]",
+                "RESUME_LOOP",
+                "{\"approvalType\":\"BOOK_DELETE\",\"target\":\"project-9001\"}"
         );
 
         Object result = invokeGateway(gateway, request);
@@ -71,7 +78,29 @@ class ToolInvocationGatewayTest {
         assertThat(invokeAccessor(savedSnapshotRef.get(), "approvalId")).isEqualTo(88001L);
         assertThat(invokeAccessor(savedSnapshotRef.get(), "toolCode")).isEqualTo("book_crud");
         verify(agentRepository).updateGenerationTaskStatus(10001L, 8001L, "waiting_approval", null);
-        verify(realtimeEventService).publishGenerationWaitingApproval(10001L, 8001L, 88001L, "BOOK_DELETE");
+        verify(realtimeEventService).publishGenerationToolCall(
+                10001L,
+                8001L,
+                "call_1",
+                "book_crud",
+                "book_crud",
+                "waiting_approval",
+                88001L,
+                "BOOK_DELETE",
+                2,
+                cn.hutool.json.JSONUtil.parseObj("{\"operation\":\"delete\",\"projectId\":9001}"),
+                null,
+                null
+        );
+        verify(realtimeEventService).publishGenerationWaitingApproval(
+                10001L,
+                8001L,
+                "call_1",
+                88001L,
+                "BOOK_DELETE",
+                cn.hutool.json.JSONUtil.parseObj("{\"approvalType\":\"BOOK_DELETE\",\"target\":\"project-9001\"}"),
+                "RESUME_LOOP"
+        );
     }
 
     @Test

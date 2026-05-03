@@ -9,6 +9,7 @@ DELETE FROM agent_approval_requests WHERE approval_request_id BETWEEN 920001 AND
 DELETE FROM agent_generation_tasks  WHERE task_id BETWEEN 920001 AND 920999;
 DELETE FROM agent_messages          WHERE message_id BETWEEN 920001 AND 920999;
 DELETE FROM agent_conversations     WHERE conversation_id BETWEEN 920001 AND 920999;
+DELETE FROM pending_tool_invocations WHERE approval_id BETWEEN 920001 AND 920999;
 
 DELETE FROM rag_chunks              WHERE chunk_id BETWEEN 920001 AND 920999;
 DELETE FROM rag_documents           WHERE document_id BETWEEN 920001 AND 920999;

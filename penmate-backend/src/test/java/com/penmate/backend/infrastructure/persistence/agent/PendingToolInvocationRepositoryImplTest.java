@@ -35,7 +35,14 @@ class PendingToolInvocationRepositoryImplTest {
                 1001L,
                 "trace-approval-1",
                 "book-crud-delete-8001",
-                "pending"
+                "pending",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         when(pendingToolInvocationMapper.findByApprovalId(88001L)).thenReturn(snapshot);
 
@@ -60,7 +67,14 @@ class PendingToolInvocationRepositoryImplTest {
                 1001L,
                 "trace-approval-2",
                 "book-crud-delete-8002",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         when(pendingToolInvocationMapper.findStaleExecutingSnapshots(10, 100)).thenReturn(List.of(snapshot));
 

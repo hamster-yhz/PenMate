@@ -13,6 +13,12 @@ import java.util.List;
 public interface AgentLlmGateway {
 
     /**
+     * 执行一次结构化 turn 生成。
+     */
+    AgentLlmTurnResponse generateTurn(AgentLlmTurnRequest request,
+                                      AgentLlmExecutionConfig executionConfig);
+
+    /**
      * 执行一次文本生成。
      * <p>输入由任务快照、知识库检索片段、工具增强上下文和执行配置组成；输出为可持久化的最终文本。</p>
      *

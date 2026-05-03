@@ -4,6 +4,7 @@ type ChatMessage = {
   id: number
   role: 'user' | 'assistant' | 'system'
   text: string
+  toolCallId?: string
   approval?: {
     id: string
     message: string
@@ -298,6 +299,149 @@ describe('useWorkbenchChat', () => {
     expect(chat.messages.value[1]).toMatchObject({
       id: 2,
       role: 'assistant',
+      approval: {
+        id: '42',
+        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
+        time: '',
+        resolved: false,
+      },
+    })
+  })
+
+  it('links_tool_call_metadata_onto_waiting_approval_assistant_message', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn().mockResolvedValue({ taskId: 9016, status: 'running' }),
+      getGeneration: vi.fn(),
+      openGenerationStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeGenerationStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '创建新的世界观设定'
+    const sendPromise = chat.sendMessage()
+    await flushPromises()
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.tool_call')?.({
+      data: JSON.stringify({
+        taskId: 9016,
+        toolCallId: 'call_9',
+        pluginCode: 'book_crud',
+        toolName: 'delete_book',
+        status: 'waiting_approval',
+      }),
+    } as MessageEvent<string>)
+    listeners.get('generation.waiting_approval')?.({
+      data: JSON.stringify({
+        approvalId: 42,
+        approvalType: 'WORLD_SETTING_CREATE',
+        status: 'waiting_approval',
+      }),
+    } as MessageEvent<string>)
+    listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+
+    await sendPromise
+
+    expect(chat.messages.value[1]).toMatchObject({
+      id: 2,
+      role: 'assistant',
+      toolCallId: 'call_9',
+      approval: {
+        id: '42',
+        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
+        time: '',
+        resolved: false,
+      },
+    })
+  })
+
+  it('prefers_waiting_approval_tool_call_id_over_stale_tool_call_metadata', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn().mockResolvedValue({ taskId: 9017, status: 'running' }),
+      getGeneration: vi.fn(),
+      openGenerationStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeGenerationStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '创建新的世界观设定'
+    const sendPromise = chat.sendMessage()
+    await flushPromises()
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.tool_call')?.({
+      data: JSON.stringify({
+        taskId: 9017,
+        toolCallId: 'stale_call',
+        pluginCode: 'book_crud',
+        toolName: 'delete_book',
+        status: 'waiting_approval',
+      }),
+    } as MessageEvent<string>)
+    listeners.get('generation.waiting_approval')?.({
+      data: JSON.stringify({
+        toolCallId: 'call_17',
+        approvalId: 42,
+        approvalType: 'WORLD_SETTING_CREATE',
+        status: 'waiting_approval',
+      }),
+    } as MessageEvent<string>)
+    listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+
+    await sendPromise
+
+    expect(chat.messages.value[1]).toMatchObject({
+      id: 2,
+      role: 'assistant',
+      toolCallId: 'call_17',
       approval: {
         id: '42',
         message: '检测到待审批变更（WORLD_SETTING_CREATE）',

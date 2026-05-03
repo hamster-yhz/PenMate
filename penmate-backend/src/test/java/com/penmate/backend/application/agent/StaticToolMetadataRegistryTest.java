@@ -1,9 +1,11 @@
 package com.penmate.backend.application.agent;
 
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,6 +22,19 @@ class StaticToolMetadataRegistryTest {
         Object bookCrudMetadata = invoke(registry, "getRequired", "book_crud");
         assertThat(invokeAccessor(bookCrudMetadata, "toolCode")).isEqualTo("book_crud");
         assertThat(invokeAccessor(bookCrudMetadata, "displayName")).isEqualTo("书籍 CRUD");
+    }
+
+    @Test
+    void UT_APP_AGENT_TOOL_METADATA_REGISTRY_EXPOSES_ONLY_CONTEXT_ENHANCER_TO_LLM_IN_PHASE_B() {
+        StaticToolMetadataRegistry registry = new StaticToolMetadataRegistry();
+
+        List<AgentLlmToolSchema> schemas = registry.toLlmToolSchemas();
+
+        assertThat(schemas).hasSize(1);
+        assertThat(schemas.get(0).toolCode()).isEqualTo("context_enhancer");
+        assertThat(schemas.get(0).description()).isEqualTo("补充上下文");
+        assertThat(schemas).extracting(AgentLlmToolSchema::toolCode)
+                .doesNotContain("book_crud");
     }
 
     private Object instantiate(String className) {

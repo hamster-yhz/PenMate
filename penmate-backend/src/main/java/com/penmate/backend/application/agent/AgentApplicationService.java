@@ -1,7 +1,7 @@
 package com.penmate.backend.application.agent;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import cn.hutool.json.JSONUtil;
+import com.penmate.backend.application.agent.json.AgentJsons;
 import com.penmate.backend.application.agent.command.AgentCommands.ApplyGenerationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateGenerationCommand;
@@ -25,8 +25,6 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 public class AgentApplicationService {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AgentRepository agentRepository;
     private final AgentTaskStateMachine taskStateMachine;
@@ -230,15 +228,22 @@ public class AgentApplicationService {
         }
         String trimmed = rawValue.trim();
         try {
-            OBJECT_MAPPER.readTree(trimmed);
-            return trimmed;
-        } catch (JsonProcessingException ignored) {
-            try {
-                return OBJECT_MAPPER.writeValueAsString(rawValue);
-            } catch (JsonProcessingException e) {
-                throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid JSON payload");
+            if (trimmed.startsWith("{")) {
+                return AgentJsons.toJson(AgentJsons.parseObj(trimmed));
             }
+            if (trimmed.startsWith("[")) {
+                return AgentJsons.toJson(AgentJsons.parseArray(trimmed));
+            }
+            if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+                return trimmed;
+            }
+            if ("true".equals(trimmed) || "false".equals(trimmed) || "null".equals(trimmed)
+                    || trimmed.matches("-?(0|[1-9]\\d*)(\\.\\d+)?([eE][+-]?\\d+)?")) {
+                return trimmed;
+            }
+        } catch (Exception ignored) {
         }
+        return JSONUtil.quote(rawValue);
     }
 
     private void writeAudit(String traceId,

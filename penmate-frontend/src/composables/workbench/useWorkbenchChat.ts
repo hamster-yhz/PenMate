@@ -74,6 +74,11 @@ const parseSseData = (event: MessageEvent<string>) => {
 
 const pickConversationId = (item: ChatRecord) => Number(item.conversationId ?? 0)
 
+const pickToolCallId = (item: ChatRecord): string | undefined => {
+  const toolCallId = String(item.toolCallId ?? item.tool_call_id ?? '').trim()
+  return toolCallId || undefined
+}
+
 const normalizeApprovalResolution = (raw: unknown) => {
   const status = String(raw || '').trim().toLowerCase()
   if (status === 'approved') {
@@ -115,6 +120,14 @@ const buildApprovalCard = (item: ChatRecord): ApprovalCardData | undefined => {
     resolved,
     ...(resolvedAction ? { resolvedAction } : {}),
   }
+}
+
+const applyAssistantEventMetadata = (assistantMsg: ChatMessage, item: ChatRecord) => {
+  const toolCallId = pickToolCallId(item)
+  if (toolCallId) assistantMsg.toolCallId = toolCallId
+
+  const approval = buildApprovalCard(item)
+  if (approval) assistantMsg.approval = approval
 }
 
 const getErrorMessage = (error: unknown, fallback = '未知错误') => {
@@ -177,11 +190,13 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
   const mapApiMessage = (item: ChatRecord): ChatMessage => {
     const approval = buildApprovalCard(item)
+    const toolCallId = pickToolCallId(item)
 
     return {
       id: Number(item.messageId ?? msgIdCounter++),
       role: toChatRole(item.role),
       text: escapeHtml(String(item.contentMd || item.content || item.text || '')),
+      ...(toolCallId ? { toolCallId } : {}),
       ...(approval ? { approval } : {}),
     }
   }
@@ -266,10 +281,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       status = normalizeGenerationStatus(latest?.status)
       if (status) generationTaskStatus.value = status
       if (status === 'waiting_approval') {
-        const approval = buildApprovalCard(latest)
-        if (approval && assistantMsg) {
-          assistantMsg.approval = approval
-        }
+        if (assistantMsg) applyAssistantEventMetadata(assistantMsg, latest)
         generationPhase.value = 'waiting_approval'
         return status
       }
@@ -313,10 +325,18 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       assistantMsg.text += escapeHtml(token)
       deps.scrollChat()
     })
+    deps.addStreamListener(generationStream, 'generation.tool_call', (event) => {
+      const payload = parseSseData(event)
+      applyAssistantEventMetadata(assistantMsg, payload)
+      if (normalizeGenerationStatus(payload.status) === 'waiting_approval') {
+        generationPhase.value = 'waiting_approval'
+        generationTaskStatus.value = 'waiting_approval'
+      }
+      deps.scrollChat()
+    })
     deps.addStreamListener(generationStream, 'generation.waiting_approval', (event) => {
       const payload = parseSseData(event)
-      const approval = buildApprovalCard(payload)
-      if (approval) assistantMsg.approval = approval
+      applyAssistantEventMetadata(assistantMsg, payload)
       generationPhase.value = 'waiting_approval'
       generationTaskStatus.value = 'waiting_approval'
       deps.scrollChat()

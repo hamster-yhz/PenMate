@@ -52,7 +52,14 @@ class PendingToolInvocationTimeoutGuardTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-41",
                 "book-crud-delete-9041",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(21L);
@@ -86,7 +93,14 @@ class PendingToolInvocationTimeoutGuardTest extends BaseApplicationServiceTest {
                 1001L,
                 "trace-42",
                 "book-crud-delete-9042",
-                "executing"
+                "executing",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
         );
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(22L);

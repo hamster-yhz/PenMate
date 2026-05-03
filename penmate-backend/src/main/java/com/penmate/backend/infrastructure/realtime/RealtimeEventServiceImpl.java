@@ -93,11 +93,43 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
                                           String status,
                                           String errorMsg,
                                           String output) {
+        publishGenerationToolCall(projectId, taskId, null, pluginCode, toolName, status, null, null, null, null, errorMsg, output);
+    }
+
+    @Override
+    public void publishGenerationToolCall(Long projectId,
+                                          Long taskId,
+                                          String toolCallId,
+                                          String pluginCode,
+                                          String toolName,
+                                          String status,
+                                          Long approvalId,
+                                          String approvalType,
+                                          Integer iteration,
+                                          Object argumentsPreview,
+                                          String errorMsg,
+                                          String output) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("taskId", taskId);
+        if (toolCallId != null && !toolCallId.isBlank()) {
+            payload.put("toolCallId", toolCallId);
+        }
         payload.put("pluginCode", pluginCode);
+        payload.put("toolCode", pluginCode);
         payload.put("toolName", toolName);
         payload.put("status", status);
+        if (approvalId != null) {
+            payload.put("approvalId", approvalId);
+        }
+        if (approvalType != null && !approvalType.isBlank()) {
+            payload.put("approvalType", approvalType);
+        }
+        if (iteration != null) {
+            payload.put("iteration", iteration);
+        }
+        if (argumentsPreview != null) {
+            payload.put("argumentsPreview", argumentsPreview);
+        }
         payload.put("errorMsg", errorMsg == null ? "" : errorMsg);
         payload.put("output", output == null ? "" : output);
         publishProjectEvent(projectId, "generation.tool_call", payload);
@@ -110,10 +142,30 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
      */
     @Override
     public void publishGenerationWaitingApproval(Long projectId, Long taskId, Long approvalId, String approvalType) {
+        publishGenerationWaitingApproval(projectId, taskId, null, approvalId, approvalType, null, null);
+    }
+
+    @Override
+    public void publishGenerationWaitingApproval(Long projectId,
+                                                 Long taskId,
+                                                 String toolCallId,
+                                                 Long approvalId,
+                                                 String approvalType,
+                                                 Object approvalPreview,
+                                                 String resumeMode) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("taskId", taskId);
+        if (toolCallId != null && !toolCallId.isBlank()) {
+            payload.put("toolCallId", toolCallId);
+        }
         payload.put("approvalId", approvalId);
         payload.put("approvalType", approvalType);
+        if (approvalPreview != null) {
+            payload.put("approvalPreview", approvalPreview);
+        }
+        if (resumeMode != null && !resumeMode.isBlank()) {
+            payload.put("resumeMode", resumeMode);
+        }
         payload.put("status", "waiting_approval");
         publishProjectEvent(projectId, "generation.waiting_approval", payload);
         generationSseEmitterHub.publish(taskId, "generation.waiting_approval", payload);
