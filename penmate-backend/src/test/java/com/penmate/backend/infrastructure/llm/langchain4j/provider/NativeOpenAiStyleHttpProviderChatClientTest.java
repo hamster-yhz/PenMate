@@ -2,7 +2,7 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
-import com.penmate.backend.application.agent.json.AgentJsons;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
         TestNativeClient client = new TestNativeClient();
 
         String requestBody = client.buildRequestBody("hello", "gpt-test");
-        JSONObject root = AgentJsons.parseObj(requestBody);
+        JSONObject root = AgentJsonCodec.parseObj(requestBody);
         JSONArray messages = root.getJSONArray("messages");
 
         assertThat(root.getStr("model")).isEqualTo("gpt-test");

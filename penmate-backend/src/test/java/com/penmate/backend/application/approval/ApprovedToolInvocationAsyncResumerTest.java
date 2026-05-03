@@ -1,14 +1,12 @@
 package com.penmate.backend.application.approval;
 
-import com.penmate.backend.application.agent.AgentTaskStateMachine;
-import com.penmate.backend.application.agent.ToolInvocationGateway;
-import com.penmate.backend.application.agent.ToolInvocationGatewayResult;
-import com.penmate.backend.application.agent.loop.AgentToolLoopController;
+import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
+import com.penmate.backend.domain.agent.service.AgentTaskTransitionPolicy;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
@@ -28,16 +26,13 @@ class ApprovedToolInvocationAsyncResumerTest {
     private AgentRepository agentRepository;
 
     @Mock
-    private AgentTaskStateMachine taskStateMachine;
+    private AgentTaskTransitionPolicy taskStateMachine;
 
     @Mock
     private PendingToolInvocationRepository pendingToolInvocationRepository;
 
     @Mock
-    private ToolInvocationGateway toolInvocationGateway;
-
-    @Mock
-    private AgentToolLoopController agentToolLoopController;
+    private ApprovalAgentResumeCoordinator approvalAgentResumeCoordinator;
 
     @Mock
     private RealtimeEventService realtimeEventService;
@@ -48,8 +43,7 @@ class ApprovedToolInvocationAsyncResumerTest {
                 agentRepository,
                 taskStateMachine,
                 pendingToolInvocationRepository,
-                toolInvocationGateway,
-                agentToolLoopController,
+                approvalAgentResumeCoordinator,
                 realtimeEventService
         );
         ApprovalRequest request = new ApprovalRequest();
@@ -86,14 +80,13 @@ class ApprovedToolInvocationAsyncResumerTest {
         when(pendingToolInvocationRepository.findByApprovalId(11L)).thenReturn(snapshot);
         doNothing().when(taskStateMachine).assertTransition("waiting_approval", AgentTaskStatus.RUNNING);
         when(agentRepository.updateGenerationTaskStatus(9L, 21L, "running", null)).thenReturn(1);
-        when(agentToolLoopController.resumeFromPending(request, snapshot)).thenReturn(ToolInvocationGatewayResult.success("done"));
+        when(approvalAgentResumeCoordinator.resumeApprovedInvocation(request, snapshot)).thenReturn(ToolCallResult.success("done"));
         when(pendingToolInvocationRepository.markStatus(11L, "executing", "completed")).thenReturn(1);
 
         resumer.resumeApprovedInvocation(request, snapshot);
 
         verify(agentRepository).updateGenerationTaskStatus(9L, 21L, "running", null);
-        verify(agentToolLoopController).resumeFromPending(request, snapshot);
-        verify(toolInvocationGateway, never()).resume(snapshot);
+        verify(approvalAgentResumeCoordinator).resumeApprovedInvocation(request, snapshot);
         verify(realtimeEventService, never()).publishGenerationFailed(9L, 21L, "RESUME_LOOP_FAILED", "done");
         verify(pendingToolInvocationRepository).markStatus(11L, "executing", "completed");
     }
@@ -104,8 +97,7 @@ class ApprovedToolInvocationAsyncResumerTest {
                 agentRepository,
                 taskStateMachine,
                 pendingToolInvocationRepository,
-                toolInvocationGateway,
-                agentToolLoopController,
+                approvalAgentResumeCoordinator,
                 realtimeEventService
         );
         ApprovalRequest request = new ApprovalRequest();
@@ -149,7 +141,7 @@ class ApprovedToolInvocationAsyncResumerTest {
         when(agentRepository.updateGenerationTaskStatus(9L, 22L, "running", null)).thenReturn(1);
         when(agentRepository.updateGenerationTaskStatus(9L, 22L, "failed", "loop resume failed")).thenReturn(1);
         when(pendingToolInvocationRepository.markStatus(12L, "executing", "failed")).thenReturn(1);
-        when(agentToolLoopController.resumeFromPending(request, snapshot)).thenReturn(new ToolInvocationGatewayResult(
+        when(approvalAgentResumeCoordinator.resumeApprovedInvocation(request, snapshot)).thenReturn(new ToolCallResult(
                 "FAILED",
                 null,
                 null,
@@ -159,8 +151,7 @@ class ApprovedToolInvocationAsyncResumerTest {
 
         resumer.resumeApprovedInvocation(request, snapshot);
 
-        verify(agentToolLoopController).resumeFromPending(request, snapshot);
-        verify(toolInvocationGateway, never()).resume(snapshot);
+        verify(approvalAgentResumeCoordinator).resumeApprovedInvocation(request, snapshot);
         verify(pendingToolInvocationRepository).markStatus(12L, "executing", "failed");
         verify(agentRepository).updateGenerationTaskStatus(9L, 22L, "failed", "loop resume failed");
         verify(realtimeEventService).publishGenerationFailed(9L, 22L, "RESUME_LOOP_FAILED", "loop resume failed");

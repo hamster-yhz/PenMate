@@ -1,7 +1,7 @@
 package com.penmate.backend.application.approval;
 
-import com.penmate.backend.application.agent.ToolInvocationRequest;
-import com.penmate.backend.application.agent.ToolMetadata;
+import com.penmate.backend.application.agent.tool.catalog.AgentToolDefinition;
+import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +25,7 @@ public class DefaultApprovalPolicyEngine {
      * @param request 本次 tool 调用请求
      * @return 审批决策结果
      */
-    public ApprovalPolicyDecision evaluate(ToolMetadata metadata, ToolInvocationRequest request) {
+    public ApprovalPolicyDecision evaluate(AgentToolDefinition metadata, ToolCallRequest request) {
         if (metadata == null || request == null) {
             throw new IllegalArgumentException("metadata and request must not be null");
         }

@@ -1,9 +1,7 @@
 package com.penmate.backend.application.approval;
 
-import com.penmate.backend.application.agent.AgentTaskStateMachine;
-import com.penmate.backend.application.agent.ToolInvocationGateway;
-import com.penmate.backend.application.agent.ToolInvocationGatewayResult;
-import com.penmate.backend.application.agent.loop.AgentToolLoopController;
+import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
+import com.penmate.backend.application.approval.coordination.AgentApprovalResumeCoordinator;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
@@ -27,23 +25,20 @@ import org.springframework.stereotype.Component;
 public class ApprovedToolInvocationAsyncResumer {
 
     private final AgentRepository agentRepository;
-    private final AgentTaskStateMachine taskStateMachine;
+    private final com.penmate.backend.domain.agent.service.AgentTaskTransitionPolicy taskStateMachine;
     private final PendingToolInvocationRepository pendingToolInvocationRepository;
-    private final ToolInvocationGateway toolInvocationGateway;
-    private final AgentToolLoopController agentToolLoopController;
+    private final ApprovalAgentResumeCoordinator approvalAgentResumeCoordinator;
     private final RealtimeEventService realtimeEventService;
 
     public ApprovedToolInvocationAsyncResumer(AgentRepository agentRepository,
-                                              AgentTaskStateMachine taskStateMachine,
+                                              com.penmate.backend.domain.agent.service.AgentTaskTransitionPolicy taskStateMachine,
                                               PendingToolInvocationRepository pendingToolInvocationRepository,
-                                              ToolInvocationGateway toolInvocationGateway,
-                                              AgentToolLoopController agentToolLoopController,
+                                              ApprovalAgentResumeCoordinator approvalAgentResumeCoordinator,
                                               RealtimeEventService realtimeEventService) {
         this.agentRepository = agentRepository;
         this.taskStateMachine = taskStateMachine;
         this.pendingToolInvocationRepository = pendingToolInvocationRepository;
-        this.toolInvocationGateway = toolInvocationGateway;
-        this.agentToolLoopController = agentToolLoopController;
+        this.approvalAgentResumeCoordinator = approvalAgentResumeCoordinator;
         this.realtimeEventService = realtimeEventService;
     }
 
@@ -56,9 +51,7 @@ public class ApprovedToolInvocationAsyncResumer {
                 return;
             }
             markTaskRunningIfNeeded(request);
-            ToolInvocationGatewayResult result = "RESUME_LOOP".equals(snapshot.resumeMode())
-                    ? agentToolLoopController.resumeFromPending(request, snapshot)
-                    : toolInvocationGateway.resume(snapshot);
+            ToolCallResult result = approvalAgentResumeCoordinator.resumeApprovedInvocation(request, snapshot);
             if ("FAILED".equals(result.status())) {
                 sealSnapshotAndTaskAsFailed(request, snapshot, result.errorCode(), result.errorMessage());
                 return;

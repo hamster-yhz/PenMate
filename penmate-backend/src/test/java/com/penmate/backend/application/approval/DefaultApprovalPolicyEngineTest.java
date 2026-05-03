@@ -70,7 +70,7 @@ class DefaultApprovalPolicyEngineTest {
                                    String approvalType,
                                    Integer riskLevel) {
         try {
-            Class<?> type = Class.forName("com.penmate.backend.application.agent.ToolMetadata");
+            Class<?> type = Class.forName("com.penmate.backend.application.agent.tool.catalog.AgentToolDefinition");
             Constructor<?> constructor = type.getDeclaredConstructor(String.class, String.class, boolean.class, String.class, Integer.class);
             constructor.setAccessible(true);
             return constructor.newInstance(toolCode, displayName, approvalRequired, approvalType, riskLevel);
@@ -89,7 +89,7 @@ class DefaultApprovalPolicyEngineTest {
                                             String contextJson,
                                             String idempotencyKey) {
         try {
-            Class<?> type = Class.forName("com.penmate.backend.application.agent.ToolInvocationRequest");
+            Class<?> type = Class.forName("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
             Constructor<?> constructor = type.getDeclaredConstructor(
                     Long.class,
                     Long.class,

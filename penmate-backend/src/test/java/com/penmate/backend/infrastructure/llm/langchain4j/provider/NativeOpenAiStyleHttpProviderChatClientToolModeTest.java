@@ -2,7 +2,7 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
-import com.penmate.backend.application.agent.json.AgentJsons;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
@@ -73,7 +73,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         );
 
         String requestBody = client.buildTurnRequestBody(request, "gpt-test");
-        JSONObject root = AgentJsons.parseObj(requestBody);
+        JSONObject root = AgentJsonCodec.parseObj(requestBody);
         JSONArray messages = root.getJSONArray("messages");
         JSONArray tools = root.getJSONArray("tools");
         JSONObject firstTool = tools.getJSONObject(0);
@@ -102,7 +102,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         );
 
         String requestBody = client.buildTurnRequestBody(request, "gpt-test");
-        JSONObject root = AgentJsons.parseObj(requestBody);
+        JSONObject root = AgentJsonCodec.parseObj(requestBody);
 
         assertThat(root.getJSONArray("tools")).isNull();
         assertThat(root.getStr("tool_choice", null)).isNull();

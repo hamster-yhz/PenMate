@@ -2,13 +2,13 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
-import com.penmate.backend.application.agent.json.AgentJsons;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 
 import java.io.IOException;
 import java.net.URI;
@@ -17,8 +17,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -115,7 +115,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
 
     protected String buildRequestBody(String prompt, String modelName) {
         try {
-            return AgentJsons.toJson(Map.of(
+            return AgentJsonCodec.toJson(Map.of(
                     "model", modelName,
                     "messages", java.util.List.of(Map.of("role", "user", "content", prompt))
             ));
@@ -135,7 +135,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                     LinkedHashMap<String, Object> function = new LinkedHashMap<>();
                     function.put("name", toolSchema.toolCode());
                     function.put("description", toolSchema.description());
-                    function.put("parameters", AgentJsons.parseObj(toolSchema.parametersJsonSchema()));
+                    function.put("parameters", AgentJsonCodec.parseObj(toolSchema.parametersJsonSchema()));
 
                     LinkedHashMap<String, Object> tool = new LinkedHashMap<>();
                     tool.put("type", "function");
@@ -145,7 +145,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                 body.put("tools", tools);
                 body.put("tool_choice", request.toolChoice());
             }
-            return AgentJsons.toJson(body);
+            return AgentJsonCodec.toJson(body);
         } catch (Exception ex) {
             throw BusinessException.of("Failed to build LLM request");
         }
@@ -153,7 +153,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
 
     protected String extractContent(String responseBody) {
         try {
-            JSONObject root = AgentJsons.parseObj(responseBody);
+            JSONObject root = AgentJsonCodec.parseObj(responseBody);
             JSONArray choices = root.getJSONArray("choices");
             if (choices == null || choices.isEmpty()) {
                 throw BusinessException.of("LLM response content missing");
@@ -174,7 +174,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
 
     protected AgentLlmTurnResponse extractTurnResponse(String responseBody) {
         try {
-            JSONObject root = AgentJsons.parseObj(responseBody);
+            JSONObject root = AgentJsonCodec.parseObj(responseBody);
             JSONArray choices = root.getJSONArray("choices");
             if (choices == null || choices.isEmpty()) {
                 throw BusinessException.of("LLM response content missing");
