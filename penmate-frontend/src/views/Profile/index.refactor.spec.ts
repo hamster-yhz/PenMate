@@ -4,15 +4,32 @@ import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearSession, setSession } from '@/stores/session'
 import ProfileIndex from './index.vue'
 
-const pushMock = vi.fn()
+const { pushMock, getUserModelPreferencesMock, saveUserModelPreferencesMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  getUserModelPreferencesMock: vi.fn(),
+  saveUserModelPreferencesMock: vi.fn(),
+}))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: pushMock,
   }),
 }))
+
+vi.mock('@/api/modules/model.api', async () => {
+  const actual = await vi.importActual<typeof import('@/api/modules/model.api')>('@/api/modules/model.api')
+  return {
+    ...actual,
+    modelApi: {
+      ...actual.modelApi,
+      getUserModelPreferences: getUserModelPreferencesMock,
+      saveUserModelPreferences: saveUserModelPreferencesMock,
+    },
+  }
+})
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const readProfileSource = () => readFileSync(resolve(currentDir, 'index.vue'), 'utf-8')
@@ -22,6 +39,19 @@ const readProfileSettingsSource = () =>
 describe('Profile index refactor', () => {
   beforeEach(() => {
     pushMock.mockReset()
+    getUserModelPreferencesMock.mockReset()
+    saveUserModelPreferencesMock.mockReset()
+    clearSession()
+    setSession({ userId: 1001 })
+    getUserModelPreferencesMock.mockResolvedValue({
+      mainAgentModelConfigId: 9001,
+      dirtyWorkAgentModelConfigId: 9002,
+      candidateConfigs: [
+        { modelConfigId: 9001, modelName: 'gpt-4o-mini', providerName: 'OpenAI', keySourceType: 'USER_KEY' },
+        { modelConfigId: 9002, modelName: 'deepseek-chat', providerName: 'DeepSeek', keySourceType: 'OFFICIAL_KEY' },
+      ],
+    })
+    saveUserModelPreferencesMock.mockResolvedValue('updated')
   })
 
   it('renders split profile sections and wires hero, security, and navigation behaviors', async () => {
@@ -60,6 +90,40 @@ describe('Profile index refactor', () => {
     await wrapper.find('.nav-btn').trigger('click')
 
     expect(pushMock).toHaveBeenCalledWith('/mybooks')
+  })
+
+  it('renders_model_preference_editor_with_loading_save_and_error_feedback', async () => {
+    const wrapper = mount(ProfileIndex)
+
+    expect(getUserModelPreferencesMock).toHaveBeenCalled()
+    await nextTick()
+    await Promise.resolve()
+    await nextTick()
+    expect(wrapper.text()).toContain('模型偏好')
+    expect(wrapper.text()).toContain('主 Agent')
+    expect(wrapper.text()).toContain('脏活 Agent')
+
+    const mainSelect = wrapper.find('[data-testid="model-preference-main-select"]')
+    const dirtySelect = wrapper.find('[data-testid="model-preference-dirty-select"]')
+
+    expect(mainSelect.exists()).toBe(true)
+    expect(dirtySelect.exists()).toBe(true)
+
+    await mainSelect.setValue('9002')
+    await dirtySelect.setValue('9001')
+    await wrapper.find('[data-testid="model-preference-save"]').trigger('click')
+
+    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
+      mainAgentModelConfigId: 9002,
+      dirtyWorkAgentModelConfigId: 9001,
+    })
+    expect(wrapper.text()).toContain('模型偏好已保存')
+
+    saveUserModelPreferencesMock.mockRejectedValueOnce(new Error('save failed'))
+    await wrapper.find('[data-testid="model-preference-save"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('保存模型偏好失败')
   })
 
   it('removes dead parent edit forwarding state after profile split', () => {

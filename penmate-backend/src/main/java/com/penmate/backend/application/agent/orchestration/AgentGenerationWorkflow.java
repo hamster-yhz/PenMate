@@ -62,7 +62,7 @@ public class AgentGenerationWorkflow {
                     traceId
             ).chunks();
 
-            AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(projectId, task.getModelConfigId(), traceId);
+            AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(projectId, task.getUserId(), traceId);
             long llmStartAt = System.currentTimeMillis();
             AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
                     projectId,

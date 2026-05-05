@@ -1,12 +1,15 @@
 package com.penmate.backend.application.model;
 
+import com.penmate.backend.application.model.BuiltinModelProviders;
 import com.penmate.backend.application.model.command.ModelCommands.CreateModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.CreateOfficialModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.CreatePolicyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.SaveUserModelPreferencesCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdateModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdatePolicyCommand;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
-import com.penmate.backend.application.model.BuiltinModelProviders;
+import com.penmate.backend.domain.iam.model.IamUser;
+import com.penmate.backend.domain.iam.repository.IamGateway;
 import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
@@ -21,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,6 +47,9 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private BusinessIdGenerator businessIdGenerator;
+
+    @Mock
+    private IamGateway iamGateway;
 
     @InjectMocks
     private ModelApplicationService modelApplicationService;
@@ -308,6 +315,32 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void UT_APP_MODEL_GET_USER_MODEL_PREFERENCES_DETAIL_SUCCESS() {
+        Long userId = 1001L;
+        IamUser user = new IamUser();
+        user.setId(userId);
+        user.setMainAgentModelConfigId(9001L);
+        user.setDirtyWorkAgentModelConfigId(9002L);
+        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(modelRepository.listUserModelConfigs(userId)).thenReturn(List.of(Map.of(
+                "modelConfigId", 9001L,
+                "modelName", "gpt-4o-mini",
+                "providerId", 1L,
+                "keySourceType", "USER_KEY"
+        )));
+
+        Map<String, Object> result = modelApplicationService.getUserModelPreferencesDetail(userId);
+
+        assertThat(result).containsEntry("mainAgentModelConfigId", 9001L)
+                .containsEntry("dirtyWorkAgentModelConfigId", 9002L);
+        assertThat(result).containsKey("candidateConfigs");
+        assertThat((List<?>) result.get("candidateConfigs")).hasSize(1);
+        verify(iamGateway).findUserById(userId);
+        verify(modelRepository).listUserModelConfigs(userId);
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
     void UT_APP_MODEL_LIST_POLICIES_SUCCESS() {
         Long projectId = 1L;
         when(modelRepository.listProjectPolicies(projectId)).thenReturn(List.of(new ModelProjectPolicy(), new ModelProjectPolicy()));
@@ -515,6 +548,131 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         verify(modelRepository).findProjectPolicy(projectId, policyId);
         verify(modelRepository).clearDefaultPolicy(projectId);
         verify(modelRepository).setDefaultPolicy(projectId, policyId);
+    }
+
+    @Test
+    void UT_APP_MODEL_LIST_USER_MODEL_CONFIGS_SUCCESS() {
+        Long userId = 1001L;
+        List<Map<String, Object>> expected = List.of(Map.of(
+                "modelConfigId", 9001L,
+                "modelName", "gpt-4o-mini",
+                "providerId", 1L,
+                "keySourceType", "USER_KEY"
+        ));
+        when(modelRepository.listUserModelConfigs(userId)).thenReturn(expected);
+
+        List<Map<String, Object>> result = modelApplicationService.listUserModelConfigs(userId);
+
+        assertThat(result).isEqualTo(expected);
+        verify(modelRepository).listUserModelConfigs(userId);
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_SUCCESS() {
+        Long userId = 1001L;
+        Long operatorId = 1002L;
+        String traceId = "UT-TRACE-MODEL-PREFERENCES-SAVE";
+        IamUser user = new IamUser();
+        user.setUserId(userId);
+        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(true);
+        when(modelRepository.existsUsableModelConfig(userId, 9002L)).thenReturn(true);
+        when(modelRepository.updateUserModelPreferences(userId, 9001L, 9002L)).thenReturn(1);
+
+        modelApplicationService.saveUserModelPreferences(
+                userId,
+                operatorId,
+                new SaveUserModelPreferencesCommand(9001L, 9002L),
+                traceId
+        );
+
+        verify(iamGateway).findUserById(userId);
+        verify(modelRepository).existsUsableModelConfig(userId, 9001L);
+        verify(modelRepository).existsUsableModelConfig(userId, 9002L);
+        verify(modelRepository).updateUserModelPreferences(userId, 9001L, 9002L);
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_USER_NOT_FOUND() {
+        when(iamGateway.findUserById(1001L)).thenReturn(null);
+
+        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
+                1001L,
+                1001L,
+                new SaveUserModelPreferencesCommand(9001L, 9002L),
+                "trace"
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("User not found");
+
+        verify(iamGateway).findUserById(1001L);
+        verify(modelRepository, never()).existsUsableModelConfig(anyLong(), anyLong());
+        verify(modelRepository, never()).updateUserModelPreferences(anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_MAIN_CONFIG_UNAVAILABLE() {
+        Long userId = 1001L;
+        IamUser user = new IamUser();
+        user.setUserId(userId);
+        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(false);
+
+        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
+                userId,
+                1001L,
+                new SaveUserModelPreferencesCommand(9001L, 9002L),
+                "trace"
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Main agent model config is unavailable");
+
+        verify(modelRepository).existsUsableModelConfig(userId, 9001L);
+        verify(modelRepository, never()).existsUsableModelConfig(userId, 9002L);
+        verify(modelRepository, never()).updateUserModelPreferences(anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_DIRTY_WORK_CONFIG_UNAVAILABLE() {
+        Long userId = 1001L;
+        IamUser user = new IamUser();
+        user.setUserId(userId);
+        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(true);
+        when(modelRepository.existsUsableModelConfig(userId, 9002L)).thenReturn(false);
+
+        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
+                userId,
+                1001L,
+                new SaveUserModelPreferencesCommand(9001L, 9002L),
+                "trace"
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Dirty work agent model config is unavailable");
+
+        verify(modelRepository).existsUsableModelConfig(userId, 9001L);
+        verify(modelRepository).existsUsableModelConfig(userId, 9002L);
+        verify(modelRepository, never()).updateUserModelPreferences(anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_UPDATE_FAILED() {
+        Long userId = 1001L;
+        IamUser user = new IamUser();
+        user.setUserId(userId);
+        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(true);
+        when(modelRepository.existsUsableModelConfig(userId, 9002L)).thenReturn(true);
+        when(modelRepository.updateUserModelPreferences(userId, 9001L, 9002L)).thenReturn(0);
+
+        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
+                userId,
+                1001L,
+                new SaveUserModelPreferencesCommand(9001L, 9002L),
+                "trace"
+        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Failed to update user model preferences");
+
+        verify(modelRepository).updateUserModelPreferences(userId, 9001L, 9002L);
     }
 }
 

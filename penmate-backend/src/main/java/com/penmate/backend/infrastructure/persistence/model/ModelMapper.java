@@ -12,6 +12,7 @@ import org.apache.ibatis.annotations.Update;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * ModelMapper。
@@ -282,5 +283,43 @@ public interface ModelMapper {
             WHERE project_id = #{projectId} AND project_policy_id = #{policyId} AND deleted_at IS NULL
             """)
     int setDefaultPolicy(@Param("projectId") Long projectId, @Param("policyId") Long policyId);
-}
 
+    @Select("""
+            SELECT model_config_id AS modelConfigId,
+                   model_name AS modelName,
+                   provider_id AS providerId,
+                   key_source_type AS keySourceType,
+                   base_url AS baseUrl,
+                   user_key_id AS userKeyId,
+                   official_key_id AS officialKeyId
+            FROM model_user_configurations
+            WHERE user_id = #{userId} AND deleted_at IS NULL
+            ORDER BY id DESC
+            """)
+    List<Map<String, Object>> listUserModelConfigs(@Param("userId") Long userId);
+
+    @Update("""
+            UPDATE iam_users
+            SET main_agent_model_config_id = #{mainAgentModelConfigId},
+                dirty_work_agent_model_config_id = #{dirtyWorkAgentModelConfigId},
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int updateUserModelPreferences(@Param("userId") Long userId,
+                                   @Param("mainAgentModelConfigId") Long mainAgentModelConfigId,
+                                   @Param("dirtyWorkAgentModelConfigId") Long dirtyWorkAgentModelConfigId);
+
+    @Select("""
+            SELECT COUNT(1)
+            FROM model_user_configurations
+            WHERE user_id = #{userId}
+              AND model_config_id = #{modelConfigId}
+              AND deleted_at IS NULL
+              AND (
+                    (key_source_type = 'USER_KEY' AND user_key_id IS NOT NULL)
+                    OR (key_source_type = 'OFFICIAL_KEY' AND official_key_id IS NOT NULL)
+                  )
+            """)
+    int countUsableModelConfig(@Param("userId") Long userId,
+                               @Param("modelConfigId") Long modelConfigId);
+}

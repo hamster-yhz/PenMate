@@ -12,6 +12,7 @@ import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +49,8 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         user.setEmail("author@penmate.ai");
         user.setStatus(1);
         user.setPasswordHash("StrongPass!23");
+        user.setMainAgentModelConfigId(9001L);
+        user.setDirtyWorkAgentModelConfigId(9002L);
         when(iamGateway.findUserByEmail("author@penmate.ai")).thenReturn(user);
         when(iamGateway.findRolesByUserId(1001L)).thenReturn(List.of());
         when(iamGateway.findPermissionsByUserId(1001L)).thenReturn(List.of());
@@ -57,7 +60,11 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
 
         Map<String, Object> result = authApplicationService.login(new LoginCommand("author@penmate.ai", "StrongPass!23"), traceId);
 
+        ArgumentCaptor<AuthUserSessionPayload> payloadCaptor = ArgumentCaptor.forClass(AuthUserSessionPayload.class);
+        verify(authSessionCache).saveSession(payloadCaptor.capture(), any(AuthTokenBundle.class));
         verify(iamGateway).touchLastLogin(1001L);
+        assertThat(payloadCaptor.getValue().getMainAgentModelConfigId()).isNotNull();
+        assertThat(payloadCaptor.getValue().getDirtyWorkAgentModelConfigId()).isNotNull();
         assertThat(result).containsKeys("accessToken", "refreshToken");
     }
 

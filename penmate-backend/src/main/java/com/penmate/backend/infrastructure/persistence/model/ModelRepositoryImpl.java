@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 模型配置仓储实现。
@@ -282,5 +283,19 @@ public class ModelRepositoryImpl implements ModelRepository {
     public int setDefaultPolicy(Long projectId, Long policyId) {
         return modelMapper.setDefaultPolicy(projectId, policyId);
     }
-}
 
+    @Override
+    public List<Map<String, Object>> listUserModelConfigs(Long userId) {
+        return modelMapper.listUserModelConfigs(userId);
+    }
+
+    @Override
+    public int updateUserModelPreferences(Long userId, Long mainAgentModelConfigId, Long dirtyWorkAgentModelConfigId) {
+        return modelMapper.updateUserModelPreferences(userId, mainAgentModelConfigId, dirtyWorkAgentModelConfigId);
+    }
+
+    @Override
+    public boolean existsUsableModelConfig(Long userId, Long modelConfigId) {
+        return modelMapper.countUsableModelConfig(userId, modelConfigId) > 0;
+    }
+}
