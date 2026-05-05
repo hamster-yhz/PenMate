@@ -7,7 +7,6 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
-import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
@@ -33,7 +32,7 @@ public class ToolCallResumeService {
     private static final int MAX_TOOL_TURNS = 4;
     private static final int MAX_TOOL_CALLS_PER_TURN = 3;
 
-    private final ToolCallApplicationService toolCallApplicationService;
+    private final ToolCallExecutionService toolCallExecutionService;
     private final AgentLlmGateway agentLlmGateway;
     private final AgentToolDefinitionSource toolDefinitionSource;
     private final AgentRepository agentRepository;
@@ -44,7 +43,7 @@ public class ToolCallResumeService {
         List<Map<String, Object>> messages = toolCallSnapshotMapper.parseMessages(snapshot.conversationMessagesJson());
         StringBuilder toolContextBuilder = new StringBuilder();
 
-        ToolCallResult approvedToolResult = toolCallApplicationService.executeToolCall(new ToolCallRequest(
+        ToolCallResult approvedToolResult = toolCallExecutionService.execute(new ToolCallRequest(
                 snapshot.projectId(),
                 snapshot.taskId(),
                 snapshot.conversationId(),
@@ -77,7 +76,7 @@ public class ToolCallResumeService {
             String toolCallId = stringValue(toolCallPayload.get("id"));
             String toolCode = stringValue(mapValue(toolCallPayload.get("function")).get("name"));
             String toolArgsJson = stringValue(mapValue(toolCallPayload.get("function")).get("arguments"));
-            ToolCallResult toolResult = toolCallApplicationService.executeToolCall(toolCallSnapshotMapper.buildLoopResumeRequest(
+            ToolCallResult toolResult = toolCallExecutionService.execute(toolCallSnapshotMapper.buildLoopResumeRequest(
                     snapshot,
                     toolCallPayload,
                     messages,
@@ -108,7 +107,7 @@ public class ToolCallResumeService {
             messages.add(toolCallSnapshotMapper.buildAssistantToolCallMessage(response));
             String assistantToolCallsJson = toolCallSnapshotMapper.toAssistantToolCallsJson(response.toolCalls());
             for (AgentLlmToolCall toolCall : response.toolCalls()) {
-                ToolCallResult toolResult = toolCallApplicationService.executeToolCall(new ToolCallRequest(
+                ToolCallResult toolResult = toolCallExecutionService.execute(new ToolCallRequest(
                         snapshot.projectId(),
                         snapshot.taskId(),
                         snapshot.conversationId(),

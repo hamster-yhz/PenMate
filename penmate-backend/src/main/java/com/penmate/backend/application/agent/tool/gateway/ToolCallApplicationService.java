@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalViewFactory;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
+import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
@@ -45,7 +46,7 @@ public class ToolCallApplicationService {
     private final PendingToolInvocationRepository pendingToolInvocationRepository;
     private final AgentRepository agentRepository;
     private final RealtimeEventService realtimeEventService;
-    private final List<AgentToolHandler> handlers;
+    private final ToolCallExecutionService toolCallExecutionService;
 
     public ToolCallApplicationService(AgentToolDefinitionSource toolDefinitionSource,
                                       DefaultApprovalPolicyEngine approvalPolicyEngine,
@@ -54,7 +55,7 @@ public class ToolCallApplicationService {
                                       PendingToolInvocationRepository pendingToolInvocationRepository,
                                       AgentRepository agentRepository,
                                       RealtimeEventService realtimeEventService,
-                                      List<AgentToolHandler> handlers) {
+                                      ToolCallExecutionService toolCallExecutionService) {
         this.toolDefinitionSource = toolDefinitionSource;
         this.approvalPolicyEngine = approvalPolicyEngine;
         this.toolApprovalViewFactory = toolApprovalViewFactory;
@@ -62,36 +63,13 @@ public class ToolCallApplicationService {
         this.pendingToolInvocationRepository = pendingToolInvocationRepository;
         this.agentRepository = agentRepository;
         this.realtimeEventService = realtimeEventService;
-        this.handlers = handlers;
+        this.toolCallExecutionService = toolCallExecutionService;
     }
 
     public ToolCallResult executeToolCall(ToolCallRequest request) {
         log.info("发起 tool 调用: toolCode={}, projectId={}, taskId={}, conversationId={}, traceId={}",
                 request.toolCode(), request.projectId(), request.taskId(), request.conversationId(), request.traceId());
         AgentToolDescriptor descriptor = toolDefinitionSource.getRequired(request.toolCode());
-        java.util.Optional<AgentToolHandler> handler = findHandler(request.toolCode());
-        if (handler.isEmpty()) {
-            log.warn("tool 调用失败: toolCode={}, reason=handler_not_found, traceId={}", request.toolCode(), request.traceId());
-            return new ToolCallResult(
-                    "FAILED",
-                    null,
-                    null,
-                    "TOOL_HANDLER_NOT_FOUND",
-                    "Tool handler not found: " + request.toolCode()
-            );
-        }
-        try {
-            handler.get().validate(request);
-        } catch (IllegalArgumentException ex) {
-            log.warn("tool 调用校验失败: toolCode={}, traceId={}, message={}", request.toolCode(), request.traceId(), ex.getMessage());
-            return new ToolCallResult(
-                    "FAILED",
-                    null,
-                    null,
-                    "TOOL_VALIDATION_FAILED",
-                    ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage()
-            );
-        }
         ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         log.info("tool 审批决策完成: toolCode={}, approvalRequired={}, approvalType={}, traceId={}",
                 request.toolCode(), decision.approvalRequired(), decision.approvalType(), request.traceId());
@@ -144,12 +122,6 @@ public class ToolCallApplicationService {
             );
             return ToolCallResult.waitingApproval(approvalRequest.getId());
         }
-        return handler.get().execute(request);
-    }
-
-    private java.util.Optional<AgentToolHandler> findHandler(String toolCode) {
-        return handlers.stream()
-                .filter(handler -> handler.toolCode().equals(toolCode))
-                .findFirst();
+        return toolCallExecutionService.execute(request);
     }
 }

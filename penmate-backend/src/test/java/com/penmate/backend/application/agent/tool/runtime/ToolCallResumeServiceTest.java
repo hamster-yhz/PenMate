@@ -7,7 +7,6 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
-import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
@@ -34,7 +33,7 @@ import static org.mockito.Mockito.when;
 class ToolCallResumeServiceTest {
 
     @Mock
-    private ToolCallApplicationService toolCallApplicationService;
+    private ToolCallExecutionService toolCallExecutionService;
 
     @Mock
     private AgentLlmGateway agentLlmGateway;
@@ -56,7 +55,7 @@ class ToolCallResumeServiceTest {
     @BeforeEach
     void setUp() {
         toolCallResumeService = new ToolCallResumeService(
-                toolCallApplicationService,
+                toolCallExecutionService,
                 agentLlmGateway,
                 toolDefinitionSource,
                 agentRepository,
@@ -92,7 +91,7 @@ class ToolCallResumeServiceTest {
 
         when(toolCallSnapshotMapper.parseMessages(snapshot.conversationMessagesJson()))
                 .thenReturn(List.of(Map.of("role", "user", "content", "delete")));
-        when(toolCallApplicationService.executeToolCall(any()))
+        when(toolCallExecutionService.execute(any()))
                 .thenReturn(ToolCallResult.waitingApproval(99L));
 
         assertThatThrownBy(() -> toolCallResumeService.resumeFromPending(request, snapshot))
@@ -145,7 +144,7 @@ class ToolCallResumeServiceTest {
                         "id", "call-1",
                         "function", Map.of("name", "book_crud", "arguments", "{\"operation\":\"list\"}")
                 )));
-        when(toolCallApplicationService.executeToolCall(any()))
+        when(toolCallExecutionService.execute(any()))
                 .thenReturn(ToolCallResult.success("{\"items\":[]}"));
         when(agentRepository.findGenerationTask(1L, 11L)).thenReturn(task);
         when(agentModelRoutingService.resolveExecutionConfig(1L, 66L, "trace-resume-2")).thenReturn(executionConfig);

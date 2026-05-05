@@ -9,6 +9,7 @@ import com.penmate.backend.application.agent.tool.definition.ToolGovernancePolic
 import com.penmate.backend.application.agent.tool.definition.ToolOperationPolicy;
 import com.penmate.backend.application.agent.tool.definition.ToolPresentation;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
+import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
@@ -65,8 +66,11 @@ class ToolCallApplicationServiceTest {
 
     private ToolCallApplicationService toolCallApplicationService;
 
+    private ToolCallExecutionService toolCallExecutionService;
+
     @BeforeEach
     void setUp() {
+        toolCallExecutionService = new ToolCallExecutionService(List.of(handler));
         toolCallApplicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
@@ -75,7 +79,7 @@ class ToolCallApplicationServiceTest {
                 pendingToolInvocationRepository,
                 agentRepository,
                 realtimeEventService,
-                List.of(handler)
+                toolCallExecutionService
         );
     }
 
@@ -120,7 +124,6 @@ class ToolCallApplicationServiceTest {
         ApprovalRequest approvalRequest = new ApprovalRequest();
         approvalRequest.setId(99L);
 
-        when(handler.toolCode()).thenReturn("book_crud");
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(decision);
         when(toolApprovalViewFactory.create(descriptor, decision)).thenReturn(approvalView);
@@ -174,14 +177,15 @@ class ToolCallApplicationServiceTest {
                 null
         );
 
-        when(handler.toolCode()).thenReturn("context_enhancer");
         when(toolDefinitionSource.getRequired("missing_handler_tool")).thenReturn(new AgentToolDescriptor(
                 "missing_handler_tool",
                 new ToolPresentation("不存在的 handler"),
                 new ToolExposure(true, "desc", "{}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
         ));
-
+        when(approvalPolicyEngine.evaluate(org.mockito.ArgumentMatchers.any(), eq(request)))
+                .thenReturn(new ApprovalPolicyDecision(false, ""));
+ 
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
         assertThat(result.status()).isEqualTo("FAILED");
@@ -220,7 +224,8 @@ class ToolCallApplicationServiceTest {
         when(toolDefinitionSource.getRequired("context_enhancer")).thenReturn(descriptor);
         org.mockito.Mockito.doThrow(new IllegalArgumentException("prompt required"))
                 .when(handler).validate(request);
-
+        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
+ 
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
         assertThat(result.status()).isEqualTo("FAILED");
