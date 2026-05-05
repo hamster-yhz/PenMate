@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Agent 会话消息用例应用服务。
+ * <p>负责消息查询、消息落库以及会话最近消息时间刷新，确保消息写入前会话存在性已被校验。</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor

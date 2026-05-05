@@ -12,6 +12,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+/**
+ * Agent 生成任务用例应用服务。
+ * <p>面向接口层提供“创建生成任务、查询任务、应用生成结果”等稳定用例入口，负责前置校验、任务落库和异步编排派发。</p>
+ * <p>它不直接承担 RAG 检索、模型调用或 tool loop 细节，这些长流程职责下沉到
+ * {@link com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflow}。</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor

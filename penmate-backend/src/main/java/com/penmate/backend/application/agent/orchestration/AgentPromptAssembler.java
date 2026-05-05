@@ -7,6 +7,10 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Agent 初始提示词装配器。
+ * <p>负责把任务 prompt、风格快照与 RAG 检索片段拼装成首轮发送给 LLM 的消息列表。</p>
+ */
 @Component
 public class AgentPromptAssembler {
 

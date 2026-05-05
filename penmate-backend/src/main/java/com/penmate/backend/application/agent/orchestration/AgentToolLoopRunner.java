@@ -24,7 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Agent 真实 tool-calling loop runner。
+ * Agent tool-calling 主循环执行器。
+ * <p>该类负责把一次 LLM turn、模型返回的 tool calls、tool 执行结果回填以及多轮对话续跑串成闭环。</p>
+ * <p>它只负责编排 loop 本身：限制轮次与单轮 tool 数量、维护消息上下文、把 tool result 回写为下一轮消息；
+ * 具体 tool 业务执行与审批治理分别委托给
+ * {@link com.penmate.backend.application.agent.tool.handler.AgentToolHandler} 与
+ * {@link ToolCallApplicationService}。</p>
  */
 @Slf4j
 @Component

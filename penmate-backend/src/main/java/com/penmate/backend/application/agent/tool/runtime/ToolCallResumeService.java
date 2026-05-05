@@ -21,7 +21,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 处理审批通过后的 tool-call 恢复与后续 loop 续跑。
+ * 待审批 tool 调用恢复服务。
+ * <p>当人工审批通过后，该服务负责基于 {@link PendingToolInvocationSnapshot} 还原当时的消息上下文、先补执行被挂起的 tool，
+ * 再决定是否继续消费同一批剩余 tool calls，最后在必要时重新进入后续 LLM tool loop。</p>
+ * <p>它是“审批通过 → 原调用恢复 → loop 续跑”这段协议的专用运行时组件，而不是新的业务用例入口。</p>
  */
 @Component
 @RequiredArgsConstructor

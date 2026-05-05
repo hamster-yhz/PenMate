@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Agent 会话用例应用服务。
+ * <p>负责会话列表查询与会话创建这两个直接面向接口层的用例，不承担消息编排或生成任务流程。</p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor

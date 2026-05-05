@@ -6,6 +6,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.Locale;
 
+/**
+ * Agent 任务运行时统计更新器。
+ * <p>负责在生成完成后回写近似 token 使用量与估算成本，供任务运行时信息展示与后续审计使用。</p>
+ */
 @Component
 @RequiredArgsConstructor
 public class AgentTaskRuntimeUpdater {

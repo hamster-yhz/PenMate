@@ -9,6 +9,11 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.springframework.stereotype.Component;
 
+/**
+ * 上下文增强 tool 处理器。
+ * <p>该 handler 将 LLM 传入的增强提示词转交给 {@link PluginToolExecutor}，把插件执行结果作为 tool 输出返回给 loop。</p>
+ * <p>它展示的是“轻量代理外部执行器”的实现模式，与 {@code book_crud} 这种直接编排领域应用服务的复合工具不同。</p>
+ */
 @Component
 public class ContextEnhancerToolHandler implements AgentToolHandler {
 

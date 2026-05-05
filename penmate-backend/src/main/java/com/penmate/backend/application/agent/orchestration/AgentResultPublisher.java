@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Agent 生成结果发布器。
+ * <p>负责把最终生成文本切分为多个小块并经由实时事件服务逐段推送，模拟 token/分片式输出体验。</p>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

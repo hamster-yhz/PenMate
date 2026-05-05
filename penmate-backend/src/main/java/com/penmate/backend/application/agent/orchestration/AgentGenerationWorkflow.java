@@ -14,7 +14,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Agent generation workflow：驱动任务状态、上下文装配与 tool loop。
+ * Agent 生成主工作流。
+ * <p>该工作流负责把一次生成任务的完整链路串起来：任务状态推进、RAG 检索、模型执行配置解析、prompt 装配、tool loop、结果发布与失败封口。</p>
+ * <p>它是跨应用服务、领域仓储、外部网关的长流程协调者，因此更偏 orchestration，而不是单一 CRUD 应用服务。</p>
  */
 @Slf4j
 @Component

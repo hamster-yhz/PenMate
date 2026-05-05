@@ -2,10 +2,11 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.tool.catalog.StaticAgentToolCatalog;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -91,6 +92,65 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         assertThat(function.getJSONObject("parameters").getStr("type")).isEqualTo("object");
         assertThat(function.getJSONObject("parameters").getJSONObject("properties").getJSONObject("prompt").getStr("type"))
                 .isEqualTo("string");
+    }
+
+    @Test
+    void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_BUILDS_TURN_REQUEST_BODY_WITH_MULTIPLE_TOOLS_IN_ORDER() {
+        StaticAgentToolCatalog catalog = new StaticAgentToolCatalog();
+        AgentLlmToolSchema contextEnhancer = new AgentLlmToolSchema(
+                "context_enhancer",
+                "补充上下文",
+                """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "prompt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["prompt"]
+                        }
+                        """
+        );
+        AgentLlmToolSchema bookCrud = catalog.toLlmToolSchemas().stream()
+                .filter(schema -> "book_crud".equals(schema.toolCode()))
+                .findFirst()
+                .orElseThrow();
+        AgentLlmTurnRequest request = new AgentLlmTurnRequest(
+                List.of(Map.of("role", "user", "content", "hello")),
+                List.of(contextEnhancer, bookCrud),
+                "auto"
+        );
+
+        String requestBody = client.buildTurnRequestBody(request, "gpt-test");
+        JSONObject root = AgentJsonCodec.parseObj(requestBody);
+        JSONArray tools = root.getJSONArray("tools");
+
+        assertThat(tools).hasSize(2);
+        assertThat(tools.getJSONObject(0).getJSONObject("function").getStr("name")).isEqualTo("context_enhancer");
+        assertThat(tools.getJSONObject(1).getJSONObject("function").getStr("name")).isEqualTo("book_crud");
+        assertThat(tools.getJSONObject(1).getJSONObject("function").getStr("description"))
+                .contains("书籍 CRUD");
+        assertThat(tools.getJSONObject(1).getJSONObject("function").getJSONObject("parameters")
+                .getJSONObject("properties").getJSONObject("operation").getJSONArray("enum"))
+                .containsExactly("create", "list", "update", "delete");
+        JSONObject bookCrudProperties = tools.getJSONObject(1).getJSONObject("function").getJSONObject("parameters")
+                .getJSONObject("properties");
+        assertThat(bookCrudProperties.containsKey("ownerUserId")).isTrue();
+        assertThat(bookCrudProperties.containsKey("projectId")).isTrue();
+        assertThat(bookCrudProperties.containsKey("title")).isTrue();
+        assertThat(bookCrudProperties.containsKey("summary")).isTrue();
+        assertThat(bookCrudProperties.containsKey("status")).isTrue();
+        JSONArray oneOf = tools.getJSONObject(1).getJSONObject("function").getJSONObject("parameters")
+                .getJSONArray("oneOf");
+        assertThat(oneOf).hasSize(4);
+        assertThat(oneOf.getJSONObject(0).getBool("additionalProperties")).isEqualTo(Boolean.FALSE);
+        assertThat(oneOf.getJSONObject(1).getBool("additionalProperties")).isEqualTo(Boolean.FALSE);
+        assertThat(oneOf.getJSONObject(2).getBool("additionalProperties")).isEqualTo(Boolean.FALSE);
+        assertThat(oneOf.getJSONObject(3).getBool("additionalProperties")).isEqualTo(Boolean.FALSE);
+        assertThat(oneOf.getJSONObject(1).getJSONObject("properties").keySet()).containsExactly("operation");
+        assertThat(oneOf.getJSONObject(3).getJSONObject("properties").keySet())
+                .containsExactlyInAnyOrder("operation", "projectId");
     }
 
     @Test

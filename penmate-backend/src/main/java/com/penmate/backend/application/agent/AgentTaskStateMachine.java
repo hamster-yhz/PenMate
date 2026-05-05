@@ -11,6 +11,8 @@ import java.util.Map;
 
 /**
  * 统一的生成任务状态机守卫。
+ * <p>负责在应用层集中声明 {@code AgentGenerationTask} 的允许状态迁移集合，避免状态写库逻辑散落在各个用例或编排器中。</p>
+ * <p>该类本身不执行持久化，只在写入前做合法性校验，并将非法迁移统一转为业务异常。</p>
  */
 @Component
 public class AgentTaskStateMachine {
@@ -34,6 +36,9 @@ public class AgentTaskStateMachine {
     /**
      * 断言状态迁移是否合法。
      * <p>用于所有状态写库前的统一守卫，不合法直接抛业务异常。</p>
+     *
+     * @param fromRaw 当前持久化状态原始值
+     * @param toStatus 目标状态
      */
     public void assertTransition(String fromRaw, AgentTaskStatus toStatus) {
         AgentTaskStatus fromStatus = AgentTaskStatus.fromValue(fromRaw);

@@ -12,7 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 
+/**
+ * 书籍（当前落在 {@code NovelProject}）增删改查 tool 处理器。
+ * <p>该 handler 采用“单一 {@code toolCode} + {@code operation} 二级分发”的复合工具模式：
+ * 对外统一暴露 {@code book_crud}，内部再按 {@code create/list/update/delete} 分派到具体应用服务动作。</p>
+ * <p>它只负责参数校验、operation 路由和结果格式化；审批判定、待审批快照落库与恢复续跑不在此类中处理。</p>
+ */
 @Component
 @Slf4j
 public class BookCrudToolHandler implements AgentToolHandler {
@@ -33,8 +40,39 @@ public class BookCrudToolHandler implements AgentToolHandler {
         try {
             JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
             String operation = AgentJsonCodec.getString(args, "operation");
-            if ("delete".equalsIgnoreCase(operation) && !args.containsKey("projectId")) {
-                throw new IllegalArgumentException("projectId is required");
+            if (operation == null || operation.isBlank()) {
+                throw new IllegalArgumentException("operation is required");
+            }
+            if (!("create".equalsIgnoreCase(operation)
+                    || "list".equalsIgnoreCase(operation)
+                    || "update".equalsIgnoreCase(operation)
+                    || "delete".equalsIgnoreCase(operation))) {
+                throw new IllegalArgumentException("Unsupported operation: " + operation);
+            }
+            if ("create".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "ownerUserId", "title", "summary", "status"));
+                if (args.getLong("ownerUserId") == null) {
+                    throw new IllegalArgumentException("ownerUserId is required");
+                }
+                String title = args.getStr("title");
+                if (title == null || title.isBlank()) {
+                    throw new IllegalArgumentException("title is required");
+                }
+            }
+            if ("list".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation"));
+            }
+            if ("update".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "projectId", "title", "summary", "status"));
+                if (args.getLong("projectId") == null) {
+                    throw new IllegalArgumentException("projectId is required");
+                }
+            }
+            if ("delete".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "projectId"));
+                if (args.getLong("projectId") == null) {
+                    throw new IllegalArgumentException("projectId is required");
+                }
             }
         } catch (IllegalArgumentException ex) {
             throw ex;
@@ -112,5 +150,13 @@ public class BookCrudToolHandler implements AgentToolHandler {
                         "status", project.getStatus()
                 ))
                 .toList());
+    }
+
+    private void rejectUnexpectedFields(JSONObject args, String operation, Set<String> allowedFields) {
+        for (String fieldName : args.keySet()) {
+            if (!allowedFields.contains(fieldName)) {
+                throw new IllegalArgumentException("Unexpected field for operation " + operation + ": " + fieldName);
+            }
+        }
     }
 }

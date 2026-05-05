@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * 插件型 tool 执行器。
+ * <p>当前用于承接 {@code context_enhancer} 这类通过项目已安装插件执行的工具调用，并统一记录调用日志与实时事件。</p>
+ */
 @Component
 public class PluginToolExecutor {
 

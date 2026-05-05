@@ -1,5 +1,8 @@
 package com.penmate.backend.application.agent.tool.plugin;
 
+/**
+ * 插件型 tool 执行结果。
+ */
 public record PluginToolExecuteResult(
         String pluginCode,
         String toolName,

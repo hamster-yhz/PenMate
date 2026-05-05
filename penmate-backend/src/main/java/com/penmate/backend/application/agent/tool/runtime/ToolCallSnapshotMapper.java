@@ -13,6 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * tool 调用快照映射器。
+ * <p>负责在 LLM tool-call 结构、对话消息列表与待审批快照可持久化 JSON 之间做双向转换，服务于审批挂起与恢复流程。</p>
+ */
 @Component
 public class ToolCallSnapshotMapper {
 

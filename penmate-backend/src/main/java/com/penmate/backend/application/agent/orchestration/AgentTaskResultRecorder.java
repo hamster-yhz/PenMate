@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 持久化生成完成后的 assistant 结果消息。
+ * Agent 结果消息落库器。
+ * <p>负责把生成工作流产出的最终 assistant 文本转换为会话消息并写入仓储，同时刷新会话最后消息指针。</p>
+ * <p>该类只处理“结果消息持久化”这一单一职责，不负责任务状态流转、事件发布或模型调用。</p>
  */
 @Component
 @RequiredArgsConstructor

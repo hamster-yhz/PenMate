@@ -6,7 +6,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
- * 异步触发 generation workflow，避免阻塞创建任务接口。
+ * Agent 生成工作流异步分发器。
+ * <p>负责把“首次执行”与“审批后恢复执行”两类长流程切到异步线程中运行，避免接口层或审批回调线程直接承载完整编排耗时。</p>
+ * <p>该类只负责触发与兜底日志，不承载生成流程本身的业务决策。</p>
  */
 @Slf4j
 @Component

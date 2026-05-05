@@ -20,6 +20,18 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Agent tool 调用治理应用服务。
+ * <p>该类位于 tool gateway / governance 层，统一编排以下职责：</p>
+ * <ol>
+ *   <li>按 {@code toolCode} 读取 {@link AgentToolDefinition} 元数据；</li>
+ *   <li>定位对应 {@link AgentToolHandler} 并执行参数校验；</li>
+ *   <li>调用审批策略引擎判断是否需要人工审批；</li>
+ *   <li>命中审批时创建审批单、保存 {@link PendingToolInvocationSnapshot} 并挂起任务；</li>
+ *   <li>无需审批时把请求分发给具体 handler 执行。</li>
+ * </ol>
+ * <p>因此它不是某个单纯的 tool executor，而是贯穿“执行前治理、挂起与恢复协议”的应用层入口。</p>
+ */
 @Component
 @Slf4j
 public class ToolCallApplicationService {
