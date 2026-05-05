@@ -63,6 +63,8 @@ public class AuthApplicationService {
         payload.setStatus(user.getStatus());
         payload.setRoles(toRoleMaps(roles));
         payload.setPermissions(toPermissionMaps(permissions));
+        payload.setMainAgentModelConfigId(user.getMainAgentModelConfigId());
+        payload.setDirtyWorkAgentModelConfigId(user.getDirtyWorkAgentModelConfigId());
 
         AuthTokenBundle bundle = authTokenService.issueTokens(payload);
         payload.setRefreshJti(bundle.refreshJti());

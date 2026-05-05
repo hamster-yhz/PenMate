@@ -228,5 +228,105 @@ class ModelControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value("updated"));
     }
+
+    @Test
+    // 用户模型偏好读取契约成功：返回当前偏好与候选配置列表。
+    void UT_MODEL_PREFERENCES_DETAIL_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-MODEL-PREFERENCES-DETAIL";
+        when(modelApplicationService.getUserModelPreferencesDetail(1001L)).thenReturn(Map.of(
+                "mainAgentModelConfigId", 9001L,
+                "dirtyWorkAgentModelConfigId", 9002L,
+                "candidateConfigs", List.of(Map.of(
+                        "modelConfigId", 9001L,
+                        "modelName", "gpt-4o-mini",
+                        "providerId", 1,
+                        "keySourceType", "USER_KEY"
+                ))
+        ));
+
+        mockMvc().perform(get("/api/v1/model/preferences")
+                        .param("userId", "1001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mainAgentModelConfigId").value(9001L))
+                .andExpect(jsonPath("$.data.dirtyWorkAgentModelConfigId").value(9002L))
+                .andExpect(jsonPath("$.data.candidateConfigs[0].modelConfigId").value(9001L))
+                .andExpect(jsonPath("$.data.candidateConfigs[0].modelName").value("gpt-4o-mini"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 查询用户模型偏好时用户不存在，应返回业务错误。
+    void UT_MODEL_PREFERENCES_DETAIL_USER_NOT_FOUND() throws Exception {
+        String traceId = "UT-TRACE-MODEL-PREFERENCES-DETAIL-NOT-FOUND";
+        doThrow(new IllegalArgumentException("User not found"))
+                .when(modelApplicationService).getUserModelPreferencesDetail(1001L);
+
+        mockMvc().perform(get("/api/v1/model/preferences")
+                        .param("userId", "1001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 保存用户模型偏好成功。
+    void UT_MODEL_PREFERENCES_SAVE_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-MODEL-PREFERENCES-SAVE";
+        doNothing().when(modelApplicationService).saveUserModelPreferences(eq(1001L), eq(1001L), any(), eq(traceId));
+
+        mockMvc().perform(post("/api/v1/model/preferences")
+                        .param("userId", "1001")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "mainAgentModelConfigId", 9001,
+                                "dirtyWorkAgentModelConfigId", 9002
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("updated"));
+    }
+
+    @Test
+    // 保存用户模型偏好时配置不可用，应返回业务错误。
+    void UT_MODEL_PREFERENCES_SAVE_CONFIG_UNAVAILABLE() throws Exception {
+        String traceId = "UT-TRACE-MODEL-PREFERENCES-SAVE-UNAVAILABLE";
+        doThrow(new IllegalArgumentException("Main agent model config is unavailable"))
+                .when(modelApplicationService).saveUserModelPreferences(eq(1001L), eq(1001L), any(), eq(traceId));
+
+        mockMvc().perform(post("/api/v1/model/preferences")
+                        .param("userId", "1001")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "mainAgentModelConfigId", 9001,
+                                "dirtyWorkAgentModelConfigId", 9002
+                        ))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
+    // 保存用户模型偏好参数非法时应返回校验错误。
+    void UT_MODEL_PREFERENCES_SAVE_INVALID_PARAM() throws Exception {
+        String traceId = "UT-TRACE-MODEL-PREFERENCES-SAVE-INVALID";
+
+        mockMvc().perform(post("/api/v1/model/preferences")
+                        .param("userId", "1001")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "mainAgentModelConfigId", -1,
+                                "dirtyWorkAgentModelConfigId", 0
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
 }
 

@@ -82,26 +82,21 @@ CREATE TABLE IF NOT EXISTS model_official_api_keys (
     KEY idx_model_official_key_provider_deleted (provider_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS model_project_policies (
+CREATE TABLE IF NOT EXISTS model_user_configurations (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    project_policy_id BIGINT UNSIGNED NOT NULL,
-    project_id BIGINT UNSIGNED NOT NULL,
-    policy_name VARCHAR(120) NOT NULL,
-    scene VARCHAR(60) NULL,
-    provider_model_id BIGINT UNSIGNED NULL,
-    model_name VARCHAR(120) NULL,
+    model_config_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    provider_id BIGINT UNSIGNED NOT NULL,
+    model_name VARCHAR(120) NOT NULL,
     base_url VARCHAR(255) NULL,
+    key_source_type VARCHAR(20) NOT NULL,
     user_key_id BIGINT UNSIGNED NULL,
     official_key_id BIGINT UNSIGNED NULL,
-    temperature DECIMAL(4,2) NULL,
-    top_p DECIMAL(4,2) NULL,
-    max_tokens INT NULL,
-    fallback_policy_json JSON NULL,
-    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
-    UNIQUE KEY uk_model_project_policies_policy_id (project_policy_id),
-    KEY idx_model_policy_project_deleted (project_id, deleted_at)
+    UNIQUE KEY uk_model_user_configurations_model_config_id (model_config_id),
+    KEY idx_model_user_config_user_deleted (user_id, deleted_at),
+    KEY idx_model_user_config_provider_deleted (provider_id, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-

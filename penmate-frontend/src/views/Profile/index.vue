@@ -28,6 +28,18 @@
           @change-font-size="updateFontSize"
         />
         <ProfileApiKeyPanel :api-keys="apiKeys" @manage="router.push('/workbench')" />
+        <ProfileModelPreferencePanel
+          :loading="modelPreferenceLoading"
+          :saving="modelPreferenceSaving"
+          :error="modelPreferenceError"
+          :success-message="modelPreferenceSuccessMessage"
+          :options="modelConfigOptions"
+          :main-agent-model-config-id="modelPreferences.mainAgentModelConfigId"
+          :dirty-work-agent-model-config-id="modelPreferences.dirtyWorkAgentModelConfigId"
+          @update:main-agent-model-config-id="modelPreferences.mainAgentModelConfigId = $event"
+          @update:dirty-work-agent-model-config-id="modelPreferences.dirtyWorkAgentModelConfigId = $event"
+          @save="handleSaveModelPreferences"
+        />
       </div>
 
       <ProfileDangerZone @logout="handleLogout" />
@@ -36,10 +48,12 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import logoImg from '@/assets/images/logo.png'
 import ProfileApiKeyPanel from '@/components/profile/ProfileApiKeyPanel.vue'
 import ProfileDangerZone from '@/components/profile/ProfileDangerZone.vue'
+import ProfileModelPreferencePanel from '@/components/profile/ProfileModelPreferencePanel.vue'
 import ProfileHeroCard from '@/components/profile/ProfileHeroCard.vue'
 import ProfilePreferencePanel from '@/components/profile/ProfilePreferencePanel.vue'
 import ProfileSecurityPanel from '@/components/profile/ProfileSecurityPanel.vue'
@@ -55,8 +69,47 @@ const {
   savePassword,
   updateAutoSaveInterval,
   updateFontSize,
+  modelPreferences,
+  modelConfigOptions,
+  loadModelPreferences,
+  saveModelPreferences,
   pStyle,
 } = useProfileSettings()
+
+const modelPreferenceLoading = ref(false)
+const modelPreferenceSaving = ref(false)
+const modelPreferenceError = ref('')
+const modelPreferenceSuccessMessage = ref('')
+
+const handleLoadModelPreferences = async () => {
+  modelPreferenceLoading.value = true
+  modelPreferenceError.value = ''
+  try {
+    await loadModelPreferences()
+  } catch {
+    modelPreferenceError.value = '加载模型偏好失败'
+  } finally {
+    modelPreferenceLoading.value = false
+  }
+}
+
+const handleSaveModelPreferences = async () => {
+  modelPreferenceSaving.value = true
+  modelPreferenceError.value = ''
+  modelPreferenceSuccessMessage.value = ''
+  try {
+    await saveModelPreferences()
+    modelPreferenceSuccessMessage.value = '模型偏好已保存'
+  } catch {
+    modelPreferenceError.value = '保存模型偏好失败'
+  } finally {
+    modelPreferenceSaving.value = false
+  }
+}
+
+onMounted(() => {
+  void handleLoadModelPreferences()
+})
 
 const handleLogout = () => {
   router.push('/login')

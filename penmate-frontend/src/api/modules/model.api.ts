@@ -47,6 +47,12 @@ export const modelApi = {
   listOfficialKeys() {
     return request.get<AnyRecord[]>('/v1/model/official-keys')
   },
+  getUserModelPreferences(userId: IdLike) {
+    return request.get<AnyRecord>(`/v1/model/preferences?userId=${userId}`)
+  },
+  saveUserModelPreferences(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+    return request.post<string>(`/v1/model/preferences?userId=${userId}&operatorId=${operatorId}`, payload)
+  },
   createOfficialKey(operatorId: IdLike, payload: AnyRecord) {
     return request.post<string>(`/v1/model/official-keys?operatorId=${operatorId}`, payload)
   },

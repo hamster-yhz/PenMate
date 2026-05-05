@@ -14,6 +14,8 @@ public class AgentGenerationTask {
     private Long taskId;
     /** 所属项目业务 ID。 */
     private Long projectId;
+    /** 发起任务的用户业务 ID。 */
+    private Long userId;
     /** 关联会话业务 ID。 */
     private Long conversationId;
     /** 关联章节业务 ID。 */

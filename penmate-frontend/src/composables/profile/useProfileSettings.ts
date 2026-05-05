@@ -1,4 +1,6 @@
 import { reactive, ref } from 'vue'
+import { modelApi } from '@/api/modules/model.api'
+import { getSession } from '@/stores/session'
 
 export interface ProfileModel {
   name: string
@@ -29,6 +31,18 @@ export interface ProfilePasswordPayload {
 export interface ProfileActionResult {
   success: boolean
   error?: string
+}
+
+export interface ProfileModelPreferences {
+  mainAgentModelConfigId: number | null
+  dirtyWorkAgentModelConfigId: number | null
+}
+
+export interface ProfileModelConfigOption {
+  modelConfigId: number
+  modelName: string
+  providerName?: string
+  keySourceType?: string
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -64,6 +78,12 @@ export const useProfileSettings = () => {
   ])
 
   const particleStyles = Array.from({ length: 10 }, buildParticleStyle)
+  const session = getSession()
+  const modelPreferences = reactive<ProfileModelPreferences>({
+    mainAgentModelConfigId: null,
+    dirtyWorkAgentModelConfigId: null,
+  })
+  const modelConfigOptions = ref<ProfileModelConfigOption[]>([])
 
   const saveProfile = (nextProfile: Pick<ProfileModel, 'name' | 'bio'>): ProfileActionResult => {
     const name = nextProfile.name.trim()
@@ -119,16 +139,64 @@ export const useProfileSettings = () => {
     profile.fontSize = value
   }
 
+  const resetModelPreferenceState = () => {
+    modelPreferences.mainAgentModelConfigId = null
+    modelPreferences.dirtyWorkAgentModelConfigId = null
+    modelConfigOptions.value = []
+  }
+
+  const loadModelPreferences = async () => {
+    if (!session.userId) {
+      resetModelPreferenceState()
+      return
+    }
+
+    try {
+      const detail = await modelApi.getUserModelPreferences(session.userId)
+      const mainValue = Number(detail.mainAgentModelConfigId ?? 0)
+      const dirtyValue = Number(detail.dirtyWorkAgentModelConfigId ?? 0)
+
+      modelPreferences.mainAgentModelConfigId = mainValue > 0 ? mainValue : null
+      modelPreferences.dirtyWorkAgentModelConfigId = dirtyValue > 0 ? dirtyValue : null
+      modelConfigOptions.value = Array.isArray(detail.candidateConfigs)
+        ? detail.candidateConfigs.map((item) => ({
+            modelConfigId: Number(item.modelConfigId),
+            modelName: String(item.modelName ?? ''),
+            providerName: typeof item.providerName === 'string' ? item.providerName : undefined,
+            keySourceType: typeof item.keySourceType === 'string' ? item.keySourceType : undefined,
+          }))
+        : []
+    } catch (error) {
+      resetModelPreferenceState()
+      throw error
+    }
+  }
+
+  const saveModelPreferences = async () => {
+    if (!session.userId) {
+      throw new Error('缺少用户会话')
+    }
+
+    await modelApi.saveUserModelPreferences(session.userId, session.userId, {
+      mainAgentModelConfigId: modelPreferences.mainAgentModelConfigId,
+      dirtyWorkAgentModelConfigId: modelPreferences.dirtyWorkAgentModelConfigId,
+    })
+  }
+
   const pStyle = (n: number) => particleStyles[n - 1] ?? particleStyles[0]
 
   return {
     profile,
     apiKeys,
+    modelPreferences,
+    modelConfigOptions,
     saveProfile,
     saveEmail,
     savePassword,
     updateAutoSaveInterval,
     updateFontSize,
+    loadModelPreferences,
+    saveModelPreferences,
     pStyle,
   }
 }

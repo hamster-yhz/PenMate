@@ -9,6 +9,7 @@ import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.model.dto.CreateModelKeyDto;
 import com.penmate.backend.interfaces.api.model.dto.CreateModelPolicyDto;
+import com.penmate.backend.interfaces.api.model.dto.SaveUserModelPreferencesDto;
 import com.penmate.backend.interfaces.api.model.dto.UpdateModelKeyDto;
 import com.penmate.backend.interfaces.api.model.dto.UpdateModelPolicyDto;
 import jakarta.validation.Valid;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 模型供应商、密钥与项目模型配置控制器。
@@ -71,6 +73,45 @@ public class ModelController {
     @GetMapping("/model/official-keys")
     public ApiResponse<List<ModelOfficialApiKey>> listOfficialKeys(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(modelApplicationService.listOfficialKeys(), traceId);
+    }
+
+    /**
+     * 查询用户模型偏好详情。
+     * <p><b>业务目的：</b>返回用户当前主 Agent / 脏活 Agent 选择及候选模型配置，供个人中心展示与编辑。</p>
+     * <p><b>流程主线：</b>读取用户业务 ID -> 查询用户偏好详情 -> 封装统一响应。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.getUserModelPreferencesDetail(userId)}。</p>
+     * <p><b>异常与分支：</b>用户不存在时返回业务异常。</p>
+     * <p><b>副作用：</b>无持久化写入。</p>
+     */
+    @GetMapping("/model/preferences")
+    public ApiResponse<Map<String, Object>> getUserModelPreferencesDetail(@RequestParam("userId") Long userId,
+                                                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(modelApplicationService.getUserModelPreferencesDetail(userId), traceId);
+    }
+
+    /**
+     * 保存用户模型偏好。
+     * <p><b>业务目的：</b>维护用户在主 Agent 与脏活 Agent 两类执行场景下的默认模型配置。</p>
+     * <p><b>流程主线：</b>校验配置 ID -> 组装命令对象 -> 调用应用服务保存偏好 -> 返回确认结果。</p>
+     * <p><b>关键调用：</b>{@code modelApplicationService.saveUserModelPreferences(...)}。</p>
+     * <p><b>异常与分支：</b>配置 ID 非法、配置不可用或用户不存在时返回校验/业务异常。</p>
+     * <p><b>副作用：</b>更新 iam_users 上的模型偏好字段。</p>
+     */
+    @PostMapping("/model/preferences")
+    public ApiResponse<String> saveUserModelPreferences(@RequestParam("userId") Long userId,
+                                                        @RequestParam("operatorId") Long operatorId,
+                                                        @Valid @RequestBody SaveUserModelPreferencesDto dto,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        modelApplicationService.saveUserModelPreferences(
+                userId,
+                operatorId,
+                new ModelCommands.SaveUserModelPreferencesCommand(
+                        dto.getMainAgentModelConfigId(),
+                        dto.getDirtyWorkAgentModelConfigId()
+                ),
+                traceId
+        );
+        return ApiResponse.success("updated", traceId);
     }
 
     /**
@@ -319,4 +360,3 @@ public class ModelController {
         return ApiResponse.success("updated", traceId);
     }
 }
-

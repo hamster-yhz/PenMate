@@ -22,6 +22,10 @@ public class IamUser {
     private Integer status;
     /** 认证方式（密码、三方登录等）。 */
     private String authMethod;
+    /** 主 Agent 当前模型配置 ID。 */
+    private Long mainAgentModelConfigId;
+    /** Dirty Work Agent 当前模型配置 ID。 */
+    private Long dirtyWorkAgentModelConfigId;
     /** 最近一次登录时间。 */
     private LocalDateTime lastLoginAt;
 

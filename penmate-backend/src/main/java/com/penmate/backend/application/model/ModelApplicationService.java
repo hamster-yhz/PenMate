@@ -1,11 +1,15 @@
 package com.penmate.backend.application.model;
 
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.command.ModelCommands.CreateModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.CreateOfficialModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.CreatePolicyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.SaveUserModelPreferencesCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdateModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdateOfficialModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdatePolicyCommand;
+import com.penmate.backend.domain.iam.model.IamUser;
+import com.penmate.backend.domain.iam.repository.IamGateway;
 import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelProvider;
@@ -18,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -32,6 +37,7 @@ public class ModelApplicationService {
     private final ModelRepository modelRepository;
     private final BusinessIdGenerator businessIdGenerator;
     private final SecretCryptoService secretCryptoService;
+    private final IamGateway iamGateway;
 
     /**
      * 查询可用模型厂商列表。
@@ -57,6 +63,82 @@ public class ModelApplicationService {
     public List<ModelOfficialApiKey> listOfficialKeys() {
         log.info("查询官方模型密钥列表");
         return modelRepository.listOfficialKeys();
+    }
+
+    /**
+     * 查询用户模型偏好详情。
+     *
+     * @param userId 入参：userId
+     * @return 出参：当前偏好与候选配置列表
+     */
+    public Map<String, Object> getUserModelPreferencesDetail(Long userId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        log.info("查询用户模型偏好详情: userId={}", userId);
+
+        IamUser user = iamGateway.findUserById(userId);
+        if (user == null) {
+            log.warn("查询用户模型偏好详情失败: userId={}, reason=user_not_found", userId);
+            throw BusinessException.of("User not found");
+        }
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("mainAgentModelConfigId", user.getMainAgentModelConfigId());
+        result.put("dirtyWorkAgentModelConfigId", user.getDirtyWorkAgentModelConfigId());
+        result.put("candidateConfigs", modelRepository.listUserModelConfigs(userId));
+        return result;
+    }
+
+    public List<Map<String, Object>> listUserModelConfigs(Long userId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        log.info("查询用户模型配置列表: userId={}", userId);
+        return modelRepository.listUserModelConfigs(userId);
+    }
+
+    public void saveUserModelPreferences(Long userId,
+                                         Long operatorId,
+                                         SaveUserModelPreferencesCommand command,
+                                         String traceId) {
+        Objects.requireNonNull(userId, "userId must not be null");
+        Objects.requireNonNull(operatorId, "operatorId must not be null");
+        Objects.requireNonNull(command, "command must not be null");
+        log.info("保存用户模型偏好: userId={}, operatorId={}, mainAgentModelConfigId={}, dirtyWorkAgentModelConfigId={}",
+                userId,
+                operatorId,
+                command.mainAgentModelConfigId(),
+                command.dirtyWorkAgentModelConfigId());
+
+        IamUser user = iamGateway.findUserById(userId);
+        if (user == null) {
+            log.warn("保存用户模型偏好失败: userId={}, reason=user_not_found", userId);
+            throw BusinessException.of("User not found");
+        }
+
+        if (command.mainAgentModelConfigId() != null
+                && !modelRepository.existsUsableModelConfig(userId, command.mainAgentModelConfigId())) {
+            log.warn("保存用户模型偏好失败: userId={}, mainAgentModelConfigId={}, reason=model_config_unusable",
+                    userId,
+                    command.mainAgentModelConfigId());
+            throw BusinessException.of("Main agent model config is unavailable");
+        }
+        if (command.dirtyWorkAgentModelConfigId() != null
+                && !modelRepository.existsUsableModelConfig(userId, command.dirtyWorkAgentModelConfigId())) {
+            log.warn("保存用户模型偏好失败: userId={}, dirtyWorkAgentModelConfigId={}, reason=model_config_unusable",
+                    userId,
+                    command.dirtyWorkAgentModelConfigId());
+            throw BusinessException.of("Dirty work agent model config is unavailable");
+        }
+
+        int affected = modelRepository.updateUserModelPreferences(
+                userId,
+                command.mainAgentModelConfigId(),
+                command.dirtyWorkAgentModelConfigId()
+        );
+        if (affected != 1) {
+            log.warn("保存用户模型偏好失败: userId={}, reason=update_failed", userId);
+            throw BusinessException.of("Failed to update user model preferences");
+        }
+        writeAudit(traceId, operatorId, "model", "save-user-model-preferences", "iam_users", userId.toString(), null, 200);
+        log.info("保存用户模型偏好成功: userId={}", userId);
     }
 
     /**
@@ -86,7 +168,7 @@ public class ModelApplicationService {
         );
         if (affected < 1) {
             log.error("创建模型密钥失败: userId={}, providerId={}", userId, command.providerId());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create model key");
+            throw BusinessException.of("Failed to create model key");
         }
         writeAudit(traceId, command.operatorId(), "model", "create-model-key", "model_user_api_keys", userId.toString(), null, 200);
         log.info("创建模型密钥成功: userId={}, keyName={}", userId, command.keyName());
@@ -121,7 +203,7 @@ public class ModelApplicationService {
         );
         if (affected != 1) {
             log.warn("更新模型密钥失败: userId={}, keyId={}, reason=not_found", userId, keyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Model key not found");
+            throw BusinessException.of("Model key not found");
         }
         writeAudit(traceId, command.operatorId(), "model", "update-model-key", "model_user_api_keys", keyId.toString(), null, 200);
         log.info("更新模型密钥成功: userId={}, keyId={}", userId, keyId);
@@ -143,7 +225,7 @@ public class ModelApplicationService {
         int affected = modelRepository.softDeleteUserKey(userId, keyId);
         if (affected != 1) {
             log.warn("删除模型密钥失败: userId={}, keyId={}, reason=not_found", userId, keyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Model key not found");
+            throw BusinessException.of("Model key not found");
         }
         writeAudit(traceId, operatorId, "model", "delete-model-key", "model_user_api_keys", keyId.toString(), null, 200);
         log.info("删除模型密钥成功: userId={}, keyId={}", userId, keyId);
@@ -167,7 +249,7 @@ public class ModelApplicationService {
         );
         if (affected < 1) {
             log.error("创建官方模型密钥失败: providerId={}", command.providerId());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create official model key");
+            throw BusinessException.of("Failed to create official model key");
         }
         writeAudit(traceId, command.operatorId(), "model", "create-official-model-key", "model_official_api_keys", command.providerId().toString(), null, 200);
         log.info("创建官方模型密钥成功: providerId={}, keyName={}", command.providerId(), command.keyName());
@@ -179,7 +261,7 @@ public class ModelApplicationService {
         ModelOfficialApiKey existing = modelRepository.findOfficialKey(keyId);
         if (existing == null) {
             log.warn("更新官方模型密钥失败: keyId={}, reason=not_found", keyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Official model key not found");
+            throw BusinessException.of("Official model key not found");
         }
         if (Boolean.TRUE.equals(command.isDefault())) {
             modelRepository.clearDefaultOfficialKey(existing.getProviderId());
@@ -196,7 +278,7 @@ public class ModelApplicationService {
         );
         if (affected != 1) {
             log.warn("更新官方模型密钥失败: keyId={}, reason=not_found", keyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Official model key not found");
+            throw BusinessException.of("Official model key not found");
         }
         writeAudit(traceId, command.operatorId(), "model", "update-official-model-key", "model_official_api_keys", keyId.toString(), null, 200);
         log.info("更新官方模型密钥成功: keyId={}", keyId);
@@ -207,7 +289,7 @@ public class ModelApplicationService {
         int affected = modelRepository.softDeleteOfficialKey(keyId);
         if (affected != 1) {
             log.warn("删除官方模型密钥失败: keyId={}, reason=not_found", keyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Official model key not found");
+            throw BusinessException.of("Official model key not found");
         }
         writeAudit(traceId, operatorId, "model", "delete-official-model-key", "model_official_api_keys", keyId.toString(), null, 200);
         log.info("删除官方模型密钥成功: keyId={}", keyId);
@@ -257,7 +339,7 @@ public class ModelApplicationService {
         );
         if (affected < 1) {
             log.error("创建模型策略失败: projectId={}, policyName={}", projectId, command.policyName());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create model policy");
+            throw BusinessException.of("Failed to create model policy");
         }
         writeAudit(traceId, command.operatorId(), "model", "create-model-policy", "model_project_policies", projectId.toString(), null, 200);
         log.info("创建模型策略成功: projectId={}, policyName={}", projectId, command.policyName());
@@ -296,7 +378,7 @@ public class ModelApplicationService {
         );
         if (affected != 1) {
             log.warn("更新模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
+            throw BusinessException.of("Model policy not found");
         }
         writeAudit(traceId, command.operatorId(), "model", "update-model-policy", "model_project_policies", policyId.toString(), null, 200);
         log.info("更新模型策略成功: projectId={}, policyId={}", projectId, policyId);
@@ -315,7 +397,7 @@ public class ModelApplicationService {
         int affected = modelRepository.softDeletePolicy(projectId, policyId);
         if (affected != 1) {
             log.warn("删除模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
+            throw BusinessException.of("Model policy not found");
         }
         writeAudit(traceId, operatorId, "model", "delete-model-policy", "model_project_policies", policyId.toString(), null, 200);
         log.info("删除模型策略成功: projectId={}, policyId={}", projectId, policyId);
@@ -338,14 +420,14 @@ public class ModelApplicationService {
         ModelProjectPolicy existing = modelRepository.findProjectPolicy(projectId, policyId);
         if (existing == null) {
             log.warn("设置默认模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
+            throw BusinessException.of("Model policy not found");
         }
 
         modelRepository.clearDefaultPolicy(projectId);
         int affected = modelRepository.setDefaultPolicy(projectId, policyId);
         if (affected != 1) {
             log.warn("设置默认模型策略失败: projectId={}, policyId={}, reason=not_found", projectId, policyId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Model policy not found");
+            throw BusinessException.of("Model policy not found");
         }
         writeAudit(traceId, operatorId, "model", "set-default-model-policy", "model_project_policies", policyId.toString(), null, 200);
         log.info("设置默认模型策略成功: projectId={}, policyId={}", projectId, policyId);
@@ -371,5 +453,3 @@ public class ModelApplicationService {
         // 审计模块已移除
     }
 }
-
-

@@ -20,6 +20,10 @@ public class AuthUserSessionPayload {
 
     private List<Map<String, Object>> permissions;
 
+    private Long mainAgentModelConfigId;
+
+    private Long dirtyWorkAgentModelConfigId;
+
     private String refreshJti;
 }
 

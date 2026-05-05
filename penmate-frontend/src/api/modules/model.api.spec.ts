@@ -141,5 +141,31 @@ describe('model.api', () => {
       scene: 'write',
     })
   })
+
+  it('should_call_user_model_preferences_detail_endpoint_when_get_user_model_preferences_invoked', async () => {
+    getMock.mockResolvedValue({
+      mainAgentModelConfigId: 9001,
+      dirtyWorkAgentModelConfigId: 9002,
+      candidateConfigs: [],
+    })
+
+    await modelApi.getUserModelPreferences(1001)
+
+    expect(getMock).toHaveBeenCalledWith('/v1/model/preferences?userId=1001')
+  })
+
+  it('should_call_user_model_preferences_endpoint_when_save_user_model_preferences_invoked', async () => {
+    postMock.mockResolvedValue('updated')
+
+    await modelApi.saveUserModelPreferences(1001, 1001, {
+      mainAgentModelConfigId: 9001,
+      dirtyWorkAgentModelConfigId: 9002,
+    })
+
+    expect(postMock).toHaveBeenCalledWith('/v1/model/preferences?userId=1001&operatorId=1001', {
+      mainAgentModelConfigId: 9001,
+      dirtyWorkAgentModelConfigId: 9002,
+    })
+  })
 })
 

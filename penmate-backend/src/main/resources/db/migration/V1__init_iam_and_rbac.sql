@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS iam_users (
     display_name VARCHAR(80) NOT NULL,
     status TINYINT UNSIGNED NOT NULL DEFAULT 1,
     auth_method VARCHAR(32) NOT NULL DEFAULT 'local',
+    main_agent_model_config_id BIGINT UNSIGNED NULL,
+    dirty_work_agent_model_config_id BIGINT UNSIGNED NULL,
     last_login_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -56,4 +58,3 @@ CREATE TABLE IF NOT EXISTS iam_role_permissions (
     PRIMARY KEY (role_id, permission_id),
     KEY idx_role_perm_perm_role (permission_id, role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-

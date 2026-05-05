@@ -7,6 +7,7 @@ import com.penmate.backend.domain.model.model.ModelUserApiKey;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 public interface ModelRepository {
 
@@ -103,5 +104,10 @@ public interface ModelRepository {
     int clearDefaultPolicy(Long projectId);
 
     int setDefaultPolicy(Long projectId, Long policyId);
-}
 
+    List<Map<String, Object>> listUserModelConfigs(Long userId);
+
+    int updateUserModelPreferences(Long userId, Long mainAgentModelConfigId, Long dirtyWorkAgentModelConfigId);
+
+    boolean existsUsableModelConfig(Long userId, Long modelConfigId);
+}
