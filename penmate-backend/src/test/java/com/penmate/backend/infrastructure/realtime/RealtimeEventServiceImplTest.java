@@ -75,7 +75,7 @@ class RealtimeEventServiceImplTest {
 
         Method method = Arrays.stream(RealtimeEventServiceImpl.class.getMethods())
                 .filter(candidate -> candidate.getName().equals("publishGenerationWaitingApproval"))
-                .filter(candidate -> candidate.getParameterCount() == 7)
+                .filter(candidate -> candidate.getParameterCount() == 8)
                 .findFirst()
                 .orElse(null);
 
@@ -86,6 +86,11 @@ class RealtimeEventServiceImplTest {
             return;
         }
 
+        Class<?> approvalViewType = Class.forName("com.penmate.backend.application.agent.tool.definition.ToolApprovalView");
+        Object approvalView = approvalViewType
+                .getDeclaredConstructor(String.class, String.class, Integer.class, String.class, String.class)
+                .newInstance("book_crud", "书籍 CRUD", 2, "BOOK_DELETE", "delete");
+
         method.invoke(service,
                 9L,
                 17L,
@@ -93,21 +98,26 @@ class RealtimeEventServiceImplTest {
                 42L,
                 "BOOK_DELETE",
                 Map.of("approvalType", "BOOK_DELETE", "target", "project-9"),
-                "RESUME_LOOP");
+                "RESUME_LOOP",
+                approvalView);
 
         Object state = loadTaskState(emitterHub, 17L);
         List<?> bufferedEvents = loadBufferedEvents(state);
         Object event = bufferedEvents.get(0);
 
         assertThat(readField(event, "eventName")).isEqualTo("generation.waiting_approval");
-        assertThat(readField(event, "data")).isEqualTo(Map.of(
-                "taskId", 17L,
-                "toolCallId", "call_9",
-                "approvalId", 42L,
-                "approvalType", "BOOK_DELETE",
-                "approvalPreview", Map.of("approvalType", "BOOK_DELETE", "target", "project-9"),
-                "resumeMode", "RESUME_LOOP",
-                "status", "waiting_approval"
+        assertThat(readField(event, "data")).isEqualTo(Map.ofEntries(
+                Map.entry("taskId", 17L),
+                Map.entry("toolCallId", "call_9"),
+                Map.entry("approvalId", 42L),
+                Map.entry("approvalType", "BOOK_DELETE"),
+                Map.entry("toolCode", "book_crud"),
+                Map.entry("toolDisplayName", "书籍 CRUD"),
+                Map.entry("riskLevel", 2),
+                Map.entry("operationCode", "delete"),
+                Map.entry("approvalPreview", Map.of("approvalType", "BOOK_DELETE", "target", "project-9")),
+                Map.entry("resumeMode", "RESUME_LOOP"),
+                Map.entry("status", "waiting_approval")
         ));
     }
 

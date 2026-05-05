@@ -5,7 +5,10 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.tool.catalog.StaticAgentToolCatalog;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.ContextEnhancerToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
 
@@ -96,7 +99,10 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
 
     @Test
     void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_BUILDS_TURN_REQUEST_BODY_WITH_MULTIPLE_TOOLS_IN_ORDER() {
-        StaticAgentToolCatalog catalog = new StaticAgentToolCatalog();
+        AgentToolDefinitionSource definitionSource = new InMemoryAgentToolDefinitionSource(List.of(
+                new ContextEnhancerToolDefinition(),
+                new BookCrudToolDefinition()
+        ));
         AgentLlmToolSchema contextEnhancer = new AgentLlmToolSchema(
                 "context_enhancer",
                 "补充上下文",
@@ -112,7 +118,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
                         }
                         """
         );
-        AgentLlmToolSchema bookCrud = catalog.toLlmToolSchemas().stream()
+        AgentLlmToolSchema bookCrud = definitionSource.listLlmSchemas().stream()
                 .filter(schema -> "book_crud".equals(schema.toolCode()))
                 .findFirst()
                 .orElseThrow();

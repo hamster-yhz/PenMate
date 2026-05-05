@@ -36,6 +36,10 @@ export interface ApprovalCardData {
   message: string
   time: string
   preview?: Record<string, string>
+  toolCode?: string
+  toolDisplayName?: string
+  riskLevel?: number
+  operationCode?: string
   resolved: boolean
   resolvedAction?: 'approved' | 'rejected'
 }

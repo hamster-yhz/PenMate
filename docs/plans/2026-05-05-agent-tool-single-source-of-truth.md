@@ -243,6 +243,20 @@ export interface ApprovalCardData {
 
 ## 4. 迁移策略
 
+### 4.0 已完成的收尾迁移说明
+
+截至本次清理，后端运行时代码已不再存在 [`StaticAgentToolCatalog`](../../penmate-backend/src/main/java/com/penmate/backend/application/agent/tool/catalog/StaticAgentToolCatalog.java) 的有效消费方，旧的 [`com.penmate.backend.application.agent.tool.catalog.AgentToolDefinition`](../../penmate-backend/src/main/java/com/penmate/backend/application/agent/tool/catalog/AgentToolDefinition.java) 兼容投影也已一并删除。
+
+当前 agent tool 元数据的唯一真源为：
+
+- [`AgentToolDefinitionSource`](../../penmate-backend/src/main/java/com/penmate/backend/application/agent/tool/definition/AgentToolDefinitionSource.java)
+- [`AgentToolDescriptor`](../../penmate-backend/src/main/java/com/penmate/backend/application/agent/tool/definition/AgentToolDescriptor.java)
+- [`ToolExposure`](../../penmate-backend/src/main/java/com/penmate/backend/application/agent/tool/definition/ToolExposure.java)
+- [`ToolGovernancePolicy`](../../penmate-backend/src/main/java/com/penmate/backend/application/agent/tool/definition/ToolGovernancePolicy.java)
+
+迁移后的约束是：任何新的治理、审批、LLM schema 或展示字段消费方，都应直接从 descriptor 真源读取，不再新增 catalog-to-definition 的兼容投影。
+
+
 ### 4.1 总体迁移原则
 
 采用“三阶段兼容迁移”：

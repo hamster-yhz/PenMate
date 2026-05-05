@@ -290,7 +290,15 @@ describe('useWorkbenchChat', () => {
 
     listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
     listeners.get('generation.waiting_approval')?.({
-      data: JSON.stringify({ approvalId: 42, approvalType: 'WORLD_SETTING_CREATE', status: 'waiting_approval' }),
+      data: JSON.stringify({
+        approvalId: 42,
+        approvalType: 'WORLD_SETTING_CREATE',
+        toolCode: 'book_crud',
+        toolDisplayName: '书籍 CRUD',
+        riskLevel: 2,
+        operationCode: 'delete',
+        status: 'waiting_approval',
+      }),
     } as MessageEvent<string>)
     listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
 
@@ -301,8 +309,12 @@ describe('useWorkbenchChat', () => {
       role: 'assistant',
       approval: {
         id: '42',
-        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
+        message: '检测到待审批工具变更（书籍 CRUD）',
         time: '',
+        toolCode: 'book_crud',
+        toolDisplayName: '书籍 CRUD',
+        riskLevel: 2,
+        operationCode: 'delete',
         resolved: false,
       },
     })
@@ -359,6 +371,10 @@ describe('useWorkbenchChat', () => {
       data: JSON.stringify({
         approvalId: 42,
         approvalType: 'WORLD_SETTING_CREATE',
+        toolCode: 'book_crud',
+        toolDisplayName: '书籍 CRUD',
+        riskLevel: 2,
+        operationCode: 'delete',
         status: 'waiting_approval',
       }),
     } as MessageEvent<string>)
@@ -372,8 +388,12 @@ describe('useWorkbenchChat', () => {
       toolCallId: 'call_9',
       approval: {
         id: '42',
-        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
+        message: '检测到待审批工具变更（书籍 CRUD）',
         time: '',
+        toolCode: 'book_crud',
+        toolDisplayName: '书籍 CRUD',
+        riskLevel: 2,
+        operationCode: 'delete',
         resolved: false,
       },
     })
@@ -431,6 +451,10 @@ describe('useWorkbenchChat', () => {
         toolCallId: 'call_17',
         approvalId: 42,
         approvalType: 'WORLD_SETTING_CREATE',
+        toolCode: 'book_crud',
+        toolDisplayName: '书籍 CRUD',
+        riskLevel: 2,
+        operationCode: 'delete',
         status: 'waiting_approval',
       }),
     } as MessageEvent<string>)
@@ -444,8 +468,12 @@ describe('useWorkbenchChat', () => {
       toolCallId: 'call_17',
       approval: {
         id: '42',
-        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
+        message: '检测到待审批工具变更（书籍 CRUD）',
         time: '',
+        toolCode: 'book_crud',
+        toolDisplayName: '书籍 CRUD',
+        riskLevel: 2,
+        operationCode: 'delete',
         resolved: false,
       },
     })

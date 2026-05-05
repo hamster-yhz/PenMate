@@ -6,7 +6,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.tool.catalog.StaticAgentToolCatalog;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -45,7 +45,7 @@ class AgentToolLoopRunnerTest {
     private ToolCallApplicationService toolCallApplicationService;
 
     @Mock
-    private StaticAgentToolCatalog staticAgentToolCatalog;
+    private AgentToolDefinitionSource toolDefinitionSource;
 
     @Mock
     private ToolCallResumeService toolCallResumeService;
@@ -82,7 +82,7 @@ class AgentToolLoopRunnerTest {
                         """
         );
 
-        when(staticAgentToolCatalog.toLlmToolSchemas())
+        when(toolDefinitionSource.listLlmSchemas())
                 .thenReturn(List.of(contextEnhancerSchema));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenReturn(new AgentLlmTurnResponse(
@@ -176,7 +176,7 @@ class AgentToolLoopRunnerTest {
                         """
         );
 
-        when(staticAgentToolCatalog.toLlmToolSchemas())
+        when(toolDefinitionSource.listLlmSchemas())
                 .thenReturn(List.of(contextEnhancerSchema));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenReturn(new AgentLlmTurnResponse(
@@ -222,7 +222,7 @@ class AgentToolLoopRunnerTest {
                 "content", "删除书籍"
         ));
 
-        when(staticAgentToolCatalog.toLlmToolSchemas())
+        when(toolDefinitionSource.listLlmSchemas())
                 .thenReturn(List.of(new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenReturn(new AgentLlmTurnResponse(
@@ -261,7 +261,7 @@ class AgentToolLoopRunnerTest {
                 "content", "先补充上下文再删除"
         ));
 
-        when(staticAgentToolCatalog.toLlmToolSchemas())
+        when(toolDefinitionSource.listLlmSchemas())
                 .thenReturn(List.of(new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenReturn(new AgentLlmTurnResponse(
@@ -341,7 +341,7 @@ class AgentToolLoopRunnerTest {
                 "content", "请依次执行四个工具"
         ));
 
-        when(staticAgentToolCatalog.toLlmToolSchemas()).thenReturn(List.of(
+        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of(
                 new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")
         ));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
@@ -378,7 +378,7 @@ class AgentToolLoopRunnerTest {
                 "content", "不停调用工具"
         ));
 
-        when(staticAgentToolCatalog.toLlmToolSchemas()).thenReturn(List.of(
+        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of(
                 new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")
         ));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))

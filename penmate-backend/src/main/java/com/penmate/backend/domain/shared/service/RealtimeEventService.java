@@ -1,5 +1,7 @@
 package com.penmate.backend.domain.shared.service;
 
+import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
+
 public interface RealtimeEventService {
 
     void publishProjectEvent(Long projectId, String eventType, Object data);
@@ -43,7 +45,7 @@ public interface RealtimeEventService {
                                     String output);
 
     default void publishGenerationWaitingApproval(Long projectId, Long taskId, Long approvalId, String approvalType) {
-        publishGenerationWaitingApproval(projectId, taskId, null, approvalId, approvalType, null, null);
+        publishGenerationWaitingApproval(projectId, taskId, null, approvalId, approvalType, null, null, null);
     }
 
     void publishGenerationWaitingApproval(Long projectId,
@@ -52,7 +54,8 @@ public interface RealtimeEventService {
                                           Long approvalId,
                                           String approvalType,
                                           Object approvalPreview,
-                                          String resumeMode);
+                                          String resumeMode,
+                                          ToolApprovalView approvalView);
 
     void publishGenerationDone(Long projectId, Long taskId, String status);
 

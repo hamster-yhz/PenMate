@@ -1,7 +1,9 @@
 package com.penmate.backend.application.agent.tool.gateway;
 
-import com.penmate.backend.application.agent.tool.catalog.AgentToolDefinition;
-import com.penmate.backend.application.agent.tool.catalog.StaticAgentToolCatalog;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
+import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
+import com.penmate.backend.application.agent.tool.definition.ToolApprovalViewFactory;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -24,7 +26,7 @@ import java.util.List;
  * Agent tool 调用治理应用服务。
  * <p>该类位于 tool gateway / governance 层，统一编排以下职责：</p>
  * <ol>
- *   <li>按 {@code toolCode} 读取 {@link AgentToolDefinition} 元数据；</li>
+ *   <li>按 {@code toolCode} 读取 {@link AgentToolDescriptor} 真源元数据；</li>
  *   <li>定位对应 {@link AgentToolHandler} 并执行参数校验；</li>
  *   <li>调用审批策略引擎判断是否需要人工审批；</li>
  *   <li>命中审批时创建审批单、保存 {@link PendingToolInvocationSnapshot} 并挂起任务；</li>
@@ -36,23 +38,26 @@ import java.util.List;
 @Slf4j
 public class ToolCallApplicationService {
 
-    private final StaticAgentToolCatalog toolCatalog;
+    private final AgentToolDefinitionSource toolDefinitionSource;
     private final DefaultApprovalPolicyEngine approvalPolicyEngine;
+    private final ToolApprovalViewFactory toolApprovalViewFactory;
     private final ApprovalApplicationService approvalApplicationService;
     private final PendingToolInvocationRepository pendingToolInvocationRepository;
     private final AgentRepository agentRepository;
     private final RealtimeEventService realtimeEventService;
     private final List<AgentToolHandler> handlers;
 
-    public ToolCallApplicationService(StaticAgentToolCatalog toolCatalog,
+    public ToolCallApplicationService(AgentToolDefinitionSource toolDefinitionSource,
                                       DefaultApprovalPolicyEngine approvalPolicyEngine,
+                                      ToolApprovalViewFactory toolApprovalViewFactory,
                                       ApprovalApplicationService approvalApplicationService,
                                       PendingToolInvocationRepository pendingToolInvocationRepository,
                                       AgentRepository agentRepository,
                                       RealtimeEventService realtimeEventService,
                                       List<AgentToolHandler> handlers) {
-        this.toolCatalog = toolCatalog;
+        this.toolDefinitionSource = toolDefinitionSource;
         this.approvalPolicyEngine = approvalPolicyEngine;
+        this.toolApprovalViewFactory = toolApprovalViewFactory;
         this.approvalApplicationService = approvalApplicationService;
         this.pendingToolInvocationRepository = pendingToolInvocationRepository;
         this.agentRepository = agentRepository;
@@ -63,7 +68,7 @@ public class ToolCallApplicationService {
     public ToolCallResult executeToolCall(ToolCallRequest request) {
         log.info("发起 tool 调用: toolCode={}, projectId={}, taskId={}, conversationId={}, traceId={}",
                 request.toolCode(), request.projectId(), request.taskId(), request.conversationId(), request.traceId());
-        AgentToolDefinition metadata = toolCatalog.getRequired(request.toolCode());
+        AgentToolDescriptor descriptor = toolDefinitionSource.getRequired(request.toolCode());
         java.util.Optional<AgentToolHandler> handler = findHandler(request.toolCode());
         if (handler.isEmpty()) {
             log.warn("tool 调用失败: toolCode={}, reason=handler_not_found, traceId={}", request.toolCode(), request.traceId());
@@ -87,23 +92,24 @@ public class ToolCallApplicationService {
                     ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage()
             );
         }
-        ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(metadata, request);
+        ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         log.info("tool 审批决策完成: toolCode={}, approvalRequired={}, approvalType={}, traceId={}",
                 request.toolCode(), decision.approvalRequired(), decision.approvalType(), request.traceId());
         if (decision.approvalRequired()) {
+            ToolApprovalView approvalView = toolApprovalViewFactory.create(descriptor, decision);
             ApprovalRequest approvalRequest = approvalApplicationService.create(new CreateApprovalCommand(
                     request.projectId(),
                     request.taskId(),
                     decision.approvalType(),
                     request.toolArgsJson(),
-                    metadata.riskLevel(),
+                    approvalView.riskLevel() == null ? descriptor.governancePolicy().riskLevel() : approvalView.riskLevel(),
                     request.operatorId()
             ), request.traceId());
             String resumeMode = request.resumeMode() == null || request.resumeMode().isBlank()
                     ? "RESUME_LOOP"
                     : request.resumeMode();
             String approvalSummaryJson = request.approvalSummaryJson() == null || request.approvalSummaryJson().isBlank()
-                    ? AgentJsonCodec.toJson(java.util.Map.of("approvalType", decision.approvalType()))
+                    ? AgentJsonCodec.toJson(approvalView)
                     : request.approvalSummaryJson();
             pendingToolInvocationRepository.save(new PendingToolInvocationSnapshot(
                     approvalRequest.getId(),
@@ -126,6 +132,16 @@ public class ToolCallApplicationService {
                     approvalSummaryJson
             ));
             agentRepository.updateGenerationTaskStatus(request.projectId(), request.taskId(), "waiting_approval", null);
+            realtimeEventService.publishGenerationWaitingApproval(
+                    request.projectId(),
+                    request.taskId(),
+                    request.toolCallId(),
+                    approvalRequest.getId(),
+                    decision.approvalType(),
+                    approvalView,
+                    resumeMode,
+                    approvalView
+            );
             return ToolCallResult.waitingApproval(approvalRequest.getId());
         }
         return handler.get().execute(request);

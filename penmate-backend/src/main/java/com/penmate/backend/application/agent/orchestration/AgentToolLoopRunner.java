@@ -6,7 +6,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.tool.catalog.StaticAgentToolCatalog;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -41,7 +41,7 @@ public class AgentToolLoopRunner {
 
     private final AgentLlmGateway agentLlmGateway;
     private final ToolCallApplicationService toolCallApplicationService;
-    private final StaticAgentToolCatalog staticAgentToolCatalog;
+    private final AgentToolDefinitionSource toolDefinitionSource;
     private final ToolCallResumeService toolCallResumeService;
     private final ToolCallSnapshotMapper toolCallSnapshotMapper;
 
@@ -53,7 +53,7 @@ public class AgentToolLoopRunner {
                                                 List<Map<String, Object>> initialMessages,
                                                 AgentLlmExecutionConfig executionConfig) {
         List<Map<String, Object>> messages = new ArrayList<>(initialMessages == null ? List.of() : initialMessages);
-        List<AgentLlmToolSchema> tools = staticAgentToolCatalog.toLlmToolSchemas();
+        List<AgentLlmToolSchema> tools = toolDefinitionSource.listLlmSchemas();
         StringBuilder toolContextBuilder = new StringBuilder();
         int totalToolCalls = 0;
 
@@ -141,7 +141,7 @@ public class AgentToolLoopRunner {
             throw new IllegalStateException("Tool invocation result is null");
         }
         if (!"SUCCESS".equals(toolResult.status())) {
-            log.warn("agent.tool.loop.tool.failed: toolCode={}, status={}, errorCode={}, errorMessage={}",
+            log.warn("agent.tool.loop.tool.failed: toolCode={}, status={}, errorCode={}, errorMessage= {}",
                     toolCall == null ? null : toolCall.toolCode(),
                     toolResult.status(), toolResult.errorCode(), toolResult.errorMessage());
             String errorCode = toolResult.errorCode() == null ? "TOOL_EXECUTION_FAILED" : toolResult.errorCode();

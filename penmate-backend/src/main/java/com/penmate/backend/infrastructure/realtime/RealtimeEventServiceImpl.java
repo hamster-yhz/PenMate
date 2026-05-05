@@ -2,6 +2,7 @@ package com.penmate.backend.infrastructure.realtime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
@@ -142,7 +143,7 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
      */
     @Override
     public void publishGenerationWaitingApproval(Long projectId, Long taskId, Long approvalId, String approvalType) {
-        publishGenerationWaitingApproval(projectId, taskId, null, approvalId, approvalType, null, null);
+        publishGenerationWaitingApproval(projectId, taskId, null, approvalId, approvalType, null, null, null);
     }
 
     @Override
@@ -152,7 +153,8 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
                                                  Long approvalId,
                                                  String approvalType,
                                                  Object approvalPreview,
-                                                 String resumeMode) {
+                                                 String resumeMode,
+                                                 ToolApprovalView approvalView) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("taskId", taskId);
         if (toolCallId != null && !toolCallId.isBlank()) {
@@ -160,6 +162,20 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         }
         payload.put("approvalId", approvalId);
         payload.put("approvalType", approvalType);
+        if (approvalView != null) {
+            if (approvalView.toolCode() != null && !approvalView.toolCode().isBlank()) {
+                payload.put("toolCode", approvalView.toolCode());
+            }
+            if (approvalView.toolDisplayName() != null && !approvalView.toolDisplayName().isBlank()) {
+                payload.put("toolDisplayName", approvalView.toolDisplayName());
+            }
+            if (approvalView.riskLevel() != null) {
+                payload.put("riskLevel", approvalView.riskLevel());
+            }
+            if (approvalView.operationCode() != null && !approvalView.operationCode().isBlank()) {
+                payload.put("operationCode", approvalView.operationCode());
+            }
+        }
         if (approvalPreview != null) {
             payload.put("approvalPreview", approvalPreview);
         }

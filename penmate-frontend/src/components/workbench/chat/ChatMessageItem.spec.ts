@@ -15,6 +15,10 @@ type ChatMessage = {
     id: string
     message: string
     time: string
+    toolCode?: string
+    toolDisplayName?: string
+    riskLevel?: number
+    operationCode?: string
     resolved: boolean
     resolvedAction?: 'approved' | 'rejected'
   }
@@ -85,5 +89,32 @@ describe('ChatMessageItem', () => {
     })
 
     expect(wrapper.get('[data-testid="inline-typing"]').text()).toContain('AI正在创作中')
+  })
+  it('passes_extended_approval_metadata_to_approval_card', async () => {
+    const wrapper = await mountChatMessageItem({
+      msg: {
+        id: 12,
+        role: 'assistant',
+        text: '待审批',
+        approval: {
+          id: '42',
+          message: '检测到待审批工具变更（书籍 CRUD）',
+          time: '2026-05-05 12:00:00',
+          toolCode: 'book_crud',
+          toolDisplayName: '书籍 CRUD',
+          riskLevel: 2,
+          operationCode: 'delete',
+          resolved: false,
+        },
+      },
+    })
+
+    const approvalCard = wrapper.getComponent({ name: 'ApprovalCard' })
+    expect(approvalCard.props('card')).toMatchObject({
+      toolCode: 'book_crud',
+      toolDisplayName: '书籍 CRUD',
+      riskLevel: 2,
+      operationCode: 'delete',
+    })
   })
 })

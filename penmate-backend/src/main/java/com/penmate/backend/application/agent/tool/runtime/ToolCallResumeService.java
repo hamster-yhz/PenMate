@@ -1,13 +1,13 @@
 package com.penmate.backend.application.agent.tool.runtime;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
-import com.penmate.backend.application.agent.tool.catalog.StaticAgentToolCatalog;
-import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
@@ -35,7 +35,7 @@ public class ToolCallResumeService {
 
     private final ToolCallApplicationService toolCallApplicationService;
     private final AgentLlmGateway agentLlmGateway;
-    private final StaticAgentToolCatalog staticAgentToolCatalog;
+    private final AgentToolDefinitionSource toolDefinitionSource;
     private final AgentRepository agentRepository;
     private final AgentModelRoutingService agentModelRoutingService;
     private final ToolCallSnapshotMapper toolCallSnapshotMapper;
@@ -62,6 +62,9 @@ public class ToolCallResumeService {
                 snapshot.resumeMode(),
                 snapshot.approvalSummaryJson()
         ));
+        if ("WAITING_APPROVAL".equals(approvedToolResult.status())) {
+            throw new IllegalStateException("approved tool invocation cannot require approval again: toolCode=" + snapshot.toolCode());
+        }
         if (!"SUCCESS".equals(approvedToolResult.status())) {
             return approvedToolResult;
         }
@@ -92,7 +95,7 @@ public class ToolCallResumeService {
         AgentLlmExecutionConfig executionConfig = resolveExecutionConfig(snapshot);
         for (int turnIndex = 0; turnIndex < MAX_TOOL_TURNS; turnIndex++) {
             AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
-                    new AgentLlmTurnRequest(messages, staticAgentToolCatalog.toLlmToolSchemas(), "auto"),
+                    new AgentLlmTurnRequest(messages, toolDefinitionSource.listLlmSchemas(), "auto"),
                     executionConfig
             );
             if ("tool_calls".equalsIgnoreCase(response.finishReason()) && response.toolCalls().isEmpty()) {

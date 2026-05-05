@@ -108,7 +108,16 @@ const buildApprovalCard = (item: ChatRecord): ApprovalCardData | undefined => {
   if (!approvalId) return undefined
 
   const approvalType = String(item.approvalType || '').trim()
-  const approvalMessage = String(item.approvalMessage || '').trim() || (approvalType ? `检测到待审批变更（${approvalType}）` : '检测到待审批变更')
+  const toolDisplayName = String(item.toolDisplayName || '').trim() || undefined
+  const toolCode = String(item.toolCode || '').trim() || undefined
+  const operationCode = String(item.operationCode || '').trim() || undefined
+  const riskLevel = Number(item.riskLevel)
+  const approvalMessage = String(item.approvalMessage || '').trim()
+    || (toolDisplayName
+      ? `检测到待审批工具变更（${toolDisplayName}）`
+      : approvalType
+        ? `检测到待审批变更（${approvalType}）`
+        : '检测到待审批变更')
   const approvalTime = String(item.approvalTime || item.reviewedAt || item.updatedAt || item.createdAt || '')
   const { resolved, resolvedAction } = normalizeApprovalResolution(item.approvalStatus ?? item.status)
 
@@ -117,6 +126,10 @@ const buildApprovalCard = (item: ChatRecord): ApprovalCardData | undefined => {
     message: approvalMessage,
     time: approvalTime,
     preview: pickApprovalPreview(item),
+    ...(toolCode ? { toolCode } : {}),
+    ...(toolDisplayName ? { toolDisplayName } : {}),
+    ...(Number.isFinite(riskLevel) ? { riskLevel } : {}),
+    ...(operationCode ? { operationCode } : {}),
     resolved,
     ...(resolvedAction ? { resolvedAction } : {}),
   }
