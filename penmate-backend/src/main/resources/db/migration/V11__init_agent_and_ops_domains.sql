@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS agent_generation_tasks (
     project_id BIGINT UNSIGNED NOT NULL,
     conversation_id BIGINT UNSIGNED NOT NULL,
     chapter_id BIGINT UNSIGNED NULL,
-    model_policy_id BIGINT UNSIGNED NULL,
+    model_config_id BIGINT UNSIGNED NULL,
     task_type VARCHAR(40) NOT NULL,
     prompt_snapshot JSON NULL,
     style_profile_snapshot JSON NULL,

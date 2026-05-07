@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.model.dto;
 
-import jakarta.validation.constraints.Positive;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 /**
@@ -11,10 +12,12 @@ import lombok.Data;
 public class SaveUserModelPreferencesDto {
 
     /** 主 Agent 默认模型配置 ID，传空表示清空。 */
-    @Positive(message = "mainAgentModelConfigId must be greater than 0")
-    private Long mainAgentModelConfigId;
+    @Pattern(regexp = "^$|^[1-9]\\d*$", message = "mainAgentModelConfigId must be greater than 0")
+    @JsonDeserialize(using = StringIdOnlyDeserializer.class)
+    private String mainAgentModelConfigId;
 
     /** 脏活 Agent 默认模型配置 ID，传空表示清空。 */
-    @Positive(message = "dirtyWorkAgentModelConfigId must be greater than 0")
-    private Long dirtyWorkAgentModelConfigId;
+    @Pattern(regexp = "^$|^[1-9]\\d*$", message = "dirtyWorkAgentModelConfigId must be greater than 0")
+    @JsonDeserialize(using = StringIdOnlyDeserializer.class)
+    private String dirtyWorkAgentModelConfigId;
 }

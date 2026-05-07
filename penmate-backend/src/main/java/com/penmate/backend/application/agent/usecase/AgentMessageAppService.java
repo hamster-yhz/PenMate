@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.command.AgentCommands.CreateMessage
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.List;
 public class AgentMessageAppService {
 
     private final AgentRepository agentRepository;
+    private final BusinessIdGenerator businessIdGenerator;
 
     public List<AgentMessage> listMessages(Long projectId, Long conversationId) {
         log.info("查询消息列表: projectId={}, conversationId={}", projectId, conversationId);
@@ -34,6 +36,7 @@ public class AgentMessageAppService {
         log.info("创建消息: projectId={}, conversationId={}, role={}", projectId, conversationId, command.role());
         ensureConversation(projectId, conversationId);
         AgentMessage message = new AgentMessage();
+        message.setMessageId(businessIdGenerator.nextId());
         message.setConversationId(conversationId);
         message.setRole(command.role());
         message.setUserMessageType(command.userMessageType());

@@ -72,7 +72,7 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Test
     void UT_APP_APPROVAL_DETAIL_NOT_FOUND() {
-        when(approvalRequestRepository.findById(1L)).thenReturn(null);
+        when(approvalRequestRepository.findByApprovalRequestId(1L)).thenReturn(null);
 
         assertThatThrownBy(() -> approvalApplicationService.detail(1L))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
@@ -81,7 +81,7 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Test
     void UT_APP_APPROVAL_APPROVE_NOT_PENDING() {
-        when(approvalRequestRepository.approve(1L, 1001L, "ok")).thenReturn(0);
+        when(approvalRequestRepository.approveByApprovalRequestId(1L, 1001L, "ok")).thenReturn(0);
 
         assertThatThrownBy(() -> approvalApplicationService.approve(1L, new ReviewApprovalCommand(1001L, "ok"), "trace"))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
@@ -94,8 +94,8 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         request.setId(1L);
         request.setProjectId(9L);
         request.setTaskId(7L);
-        when(approvalRequestRepository.approve(1L, 1001L, "ok")).thenReturn(1);
-        when(approvalRequestRepository.findById(1L)).thenReturn(request);
+        when(approvalRequestRepository.approveByApprovalRequestId(1L, 1001L, "ok")).thenReturn(1);
+        when(approvalRequestRepository.findByApprovalRequestId(1L)).thenReturn(request);
 
         PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
                 1L,
@@ -133,8 +133,8 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         request.setId(2L);
         request.setProjectId(9L);
         request.setTaskId(8L);
-        when(approvalRequestRepository.approve(2L, 1001L, "ok")).thenReturn(1);
-        when(approvalRequestRepository.findById(2L)).thenReturn(request);
+        when(approvalRequestRepository.approveByApprovalRequestId(2L, 1001L, "ok")).thenReturn(1);
+        when(approvalRequestRepository.findByApprovalRequestId(2L)).thenReturn(request);
 
         PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
                 2L,
@@ -173,8 +173,8 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         request.setId(3L);
         request.setProjectId(9L);
         request.setTaskId(11L);
-        when(approvalRequestRepository.approve(3L, 1001L, "ok")).thenReturn(1);
-        when(approvalRequestRepository.findById(3L)).thenReturn(request);
+        when(approvalRequestRepository.approveByApprovalRequestId(3L, 1001L, "ok")).thenReturn(1);
+        when(approvalRequestRepository.findByApprovalRequestId(3L)).thenReturn(request);
 
         PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
                 3L,
@@ -213,8 +213,8 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         request.setId(8L);
         request.setProjectId(9L);
         request.setTaskId(16L);
-        when(approvalRequestRepository.approve(8L, 1001L, "ok")).thenReturn(1);
-        when(approvalRequestRepository.findById(8L)).thenReturn(request);
+        when(approvalRequestRepository.approveByApprovalRequestId(8L, 1001L, "ok")).thenReturn(1);
+        when(approvalRequestRepository.findByApprovalRequestId(8L)).thenReturn(request);
 
         PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
                 8L,
@@ -250,8 +250,8 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         request.setId(1L);
         request.setProjectId(9L);
         request.setTaskId(7L);
-        when(approvalRequestRepository.reject(1L, 1001L, "no")).thenReturn(1);
-        when(approvalRequestRepository.findById(1L)).thenReturn(request);
+        when(approvalRequestRepository.rejectByApprovalRequestId(1L, 1001L, "no")).thenReturn(1);
+        when(approvalRequestRepository.findByApprovalRequestId(1L)).thenReturn(request);
 
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(7L);
@@ -272,8 +272,8 @@ class ApprovalApplicationServiceTest extends BaseApplicationServiceTest {
         request.setId(9L);
         request.setProjectId(9L);
         request.setTaskId(17L);
-        when(approvalRequestRepository.reject(9L, 1001L, "no")).thenReturn(1);
-        when(approvalRequestRepository.findById(9L)).thenReturn(request);
+        when(approvalRequestRepository.rejectByApprovalRequestId(9L, 1001L, "no")).thenReturn(1);
+        when(approvalRequestRepository.findByApprovalRequestId(9L)).thenReturn(request);
 
         PendingToolInvocationSnapshot snapshot = new PendingToolInvocationSnapshot(
                 9L,

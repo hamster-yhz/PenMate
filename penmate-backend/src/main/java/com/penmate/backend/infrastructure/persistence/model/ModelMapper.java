@@ -1,6 +1,5 @@
 package com.penmate.backend.infrastructure.persistence.model;
 
-import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
@@ -10,7 +9,6 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -133,44 +131,6 @@ public interface ModelMapper {
     int softDeleteOfficialKey(@Param("keyId") Long keyId);
 
     @Select("""
-            SELECT id, project_policy_id, project_id, policy_name, scene, provider_model_id, model_name, user_key_id,
-                   base_url, official_key_id,
-                   temperature, top_p, max_tokens,
-                   CAST(fallback_policy_json AS CHAR) AS fallback_policy_json,
-                   is_default, created_at, updated_at, deleted_at
-            FROM model_project_policies
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
-            ORDER BY is_default DESC, id DESC
-            """)
-    List<ModelProjectPolicy> listProjectPolicies(@Param("projectId") Long projectId);
-
-    @Select("""
-            SELECT id, project_policy_id, project_id, policy_name, scene, provider_model_id, model_name, user_key_id,
-                   base_url, official_key_id,
-                   temperature, top_p, max_tokens,
-                   CAST(fallback_policy_json AS CHAR) AS fallback_policy_json,
-                   is_default, created_at, updated_at, deleted_at
-            FROM model_project_policies
-            WHERE project_id = #{projectId} AND project_policy_id = #{policyId} AND deleted_at IS NULL
-            LIMIT 1
-            """)
-    ModelProjectPolicy findProjectPolicy(@Param("projectId") Long projectId,
-                                         @Param("policyId") Long policyId);
-
-    @Select("""
-            SELECT id, project_policy_id, project_id, policy_name, scene, provider_model_id, model_name, user_key_id,
-                   base_url, official_key_id,
-                   temperature, top_p, max_tokens,
-                   CAST(fallback_policy_json AS CHAR) AS fallback_policy_json,
-                   is_default, created_at, updated_at, deleted_at
-            FROM model_project_policies
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
-            ORDER BY is_default DESC, id DESC
-            LIMIT 1
-            """)
-    ModelProjectPolicy findDefaultProjectPolicy(@Param("projectId") Long projectId);
-
-    @Select("""
             SELECT id, provider_id, code, name, base_url, auth_type, status, created_at, updated_at
             FROM model_providers
             WHERE provider_id = #{providerId}
@@ -206,97 +166,104 @@ public interface ModelMapper {
             """)
     ModelOfficialApiKey findDefaultOfficialKey(@Param("providerId") Long providerId);
 
-    @Insert("""
-            INSERT INTO model_project_policies(project_policy_id, project_id, policy_name, scene, provider_model_id, model_name, base_url, user_key_id, official_key_id,
-                                               temperature, top_p, max_tokens, fallback_policy_json, is_default)
-            VALUES (#{projectPolicyId}, #{projectId}, #{policyName}, #{scene}, #{providerModelId}, #{modelName}, #{baseUrl}, #{userKeyId}, #{officialKeyId},
-                    #{temperature}, #{topP}, #{maxTokens}, #{fallbackPolicyJson}, #{isDefault})
-            """)
-    int insertPolicy(@Param("projectPolicyId") Long projectPolicyId,
-                     @Param("projectId") Long projectId,
-                     @Param("policyName") String policyName,
-                     @Param("scene") String scene,
-                     @Param("providerModelId") Long providerModelId,
-                     @Param("modelName") String modelName,
-                     @Param("baseUrl") String baseUrl,
-                     @Param("userKeyId") Long userKeyId,
-                     @Param("officialKeyId") Long officialKeyId,
-                     @Param("temperature") BigDecimal temperature,
-                     @Param("topP") BigDecimal topP,
-                     @Param("maxTokens") Integer maxTokens,
-                     @Param("fallbackPolicyJson") String fallbackPolicyJson,
-                     @Param("isDefault") boolean isDefault);
-
-    @Update("""
-            UPDATE model_project_policies
-            SET policy_name = COALESCE(#{policyName}, policy_name),
-                scene = COALESCE(#{scene}, scene),
-                provider_model_id = COALESCE(#{providerModelId}, provider_model_id),
-                model_name = COALESCE(#{modelName}, model_name),
-                base_url = COALESCE(#{baseUrl}, base_url),
-                user_key_id = COALESCE(#{userKeyId}, user_key_id),
-                official_key_id = COALESCE(#{officialKeyId}, official_key_id),
-                temperature = COALESCE(#{temperature}, temperature),
-                top_p = COALESCE(#{topP}, top_p),
-                max_tokens = COALESCE(#{maxTokens}, max_tokens),
-                fallback_policy_json = COALESCE(#{fallbackPolicyJson}, fallback_policy_json),
-                is_default = COALESCE(#{isDefault}, is_default),
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND project_policy_id = #{policyId} AND deleted_at IS NULL
-            """)
-    int updatePolicy(@Param("projectId") Long projectId,
-                     @Param("policyId") Long policyId,
-                     @Param("policyName") String policyName,
-                     @Param("scene") String scene,
-                     @Param("providerModelId") Long providerModelId,
-                     @Param("modelName") String modelName,
-                     @Param("baseUrl") String baseUrl,
-                     @Param("userKeyId") Long userKeyId,
-                     @Param("officialKeyId") Long officialKeyId,
-                     @Param("temperature") BigDecimal temperature,
-                     @Param("topP") BigDecimal topP,
-                     @Param("maxTokens") Integer maxTokens,
-                     @Param("fallbackPolicyJson") String fallbackPolicyJson,
-                     @Param("isDefault") Boolean isDefault);
-
-    @Update("""
-            UPDATE model_project_policies
-            SET deleted_at = CURRENT_TIMESTAMP(3),
-                is_default = 0,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND project_policy_id = #{policyId} AND deleted_at IS NULL
-            """)
-    int softDeletePolicy(@Param("projectId") Long projectId, @Param("policyId") Long policyId);
-
-    @Update("""
-            UPDATE model_project_policies
-            SET is_default = 0,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
-            """)
-    int clearDefaultPolicy(@Param("projectId") Long projectId);
-
-    @Update("""
-            UPDATE model_project_policies
-            SET is_default = 1,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND project_policy_id = #{policyId} AND deleted_at IS NULL
-            """)
-    int setDefaultPolicy(@Param("projectId") Long projectId, @Param("policyId") Long policyId);
-
     @Select("""
-            SELECT model_config_id AS modelConfigId,
-                   model_name AS modelName,
-                   provider_id AS providerId,
-                   key_source_type AS keySourceType,
-                   base_url AS baseUrl,
-                   user_key_id AS userKeyId,
-                   official_key_id AS officialKeyId
-            FROM model_user_configurations
-            WHERE user_id = #{userId} AND deleted_at IS NULL
-            ORDER BY id DESC
+            SELECT muc.model_config_id AS modelConfigId,
+                   muc.user_id AS userId,
+                   muc.provider_id AS providerId,
+                   muc.model_name AS modelName,
+                   muc.base_url AS baseUrl,
+                   muc.key_source_type AS keySourceType,
+                   muc.user_key_id AS userKeyId,
+                   muc.official_key_id AS officialKeyId,
+                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
+                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
+                   muc.status AS status
+            FROM model_user_configurations muc
+            LEFT JOIN model_user_api_keys muk
+                   ON muc.user_key_id = muk.user_api_key_id
+                  AND muk.deleted_at IS NULL
+            LEFT JOIN model_official_api_keys mok
+                   ON muc.official_key_id = mok.official_api_key_id
+                  AND mok.deleted_at IS NULL
+            WHERE muc.user_id = #{userId}
+              AND muc.deleted_at IS NULL
+            ORDER BY muc.id DESC
             """)
     List<Map<String, Object>> listUserModelConfigs(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT muc.model_config_id AS modelConfigId,
+                   muc.user_id AS userId,
+                   muc.provider_id AS providerId,
+                   muc.model_name AS modelName,
+                   muc.base_url AS baseUrl,
+                   muc.key_source_type AS keySourceType,
+                   muc.user_key_id AS userKeyId,
+                   muc.official_key_id AS officialKeyId,
+                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
+                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.encrypted_api_key ELSE mok.encrypted_api_key END AS encryptedApiKey,
+                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
+                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.status ELSE mok.status END AS keyStatus,
+                   muc.status AS status
+            FROM model_user_configurations muc
+            LEFT JOIN model_user_api_keys muk
+                   ON muc.user_key_id = muk.user_api_key_id
+                  AND muk.deleted_at IS NULL
+            LEFT JOIN model_official_api_keys mok
+                   ON muc.official_key_id = mok.official_api_key_id
+                  AND mok.deleted_at IS NULL
+            WHERE muc.user_id = #{userId}
+              AND muc.model_config_id = #{modelConfigId}
+              AND muc.deleted_at IS NULL
+            LIMIT 1
+            """)
+    Map<String, Object> findUserModelConfig(@Param("userId") Long userId,
+                                            @Param("modelConfigId") Long modelConfigId);
+
+    @Insert("""
+            INSERT INTO model_user_configurations(model_config_id, user_id, provider_id, model_name, base_url, key_source_type, user_key_id, official_key_id, status)
+            VALUES (#{modelConfigId}, #{userId}, #{providerId}, #{modelName}, #{baseUrl}, #{keySourceType}, #{userKeyId}, #{officialKeyId}, #{status})
+            """)
+    int insertUserModelConfig(@Param("modelConfigId") Long modelConfigId,
+                              @Param("userId") Long userId,
+                              @Param("providerId") Long providerId,
+                              @Param("modelName") String modelName,
+                              @Param("baseUrl") String baseUrl,
+                              @Param("keySourceType") String keySourceType,
+                              @Param("userKeyId") Long userKeyId,
+                              @Param("officialKeyId") Long officialKeyId,
+                              @Param("status") String status);
+
+    @Update("""
+            UPDATE model_user_configurations
+            SET provider_id = COALESCE(#{providerId}, provider_id),
+                model_name = COALESCE(#{modelName}, model_name),
+                base_url = COALESCE(#{baseUrl}, base_url),
+                key_source_type = COALESCE(#{keySourceType}, key_source_type),
+                user_key_id = #{userKeyId},
+                official_key_id = #{officialKeyId},
+                status = COALESCE(#{status}, status),
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE user_id = #{userId} AND model_config_id = #{modelConfigId} AND deleted_at IS NULL
+            """)
+    int updateUserModelConfig(@Param("userId") Long userId,
+                              @Param("modelConfigId") Long modelConfigId,
+                              @Param("providerId") Long providerId,
+                              @Param("modelName") String modelName,
+                              @Param("baseUrl") String baseUrl,
+                              @Param("keySourceType") String keySourceType,
+                              @Param("userKeyId") Long userKeyId,
+                              @Param("officialKeyId") Long officialKeyId,
+                              @Param("status") String status);
+
+    @Update("""
+            UPDATE model_user_configurations
+            SET deleted_at = CURRENT_TIMESTAMP(3),
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE user_id = #{userId} AND model_config_id = #{modelConfigId} AND deleted_at IS NULL
+            """)
+    int softDeleteUserModelConfig(@Param("userId") Long userId,
+                                  @Param("modelConfigId") Long modelConfigId);
 
     @Update("""
             UPDATE iam_users
@@ -311,14 +278,21 @@ public interface ModelMapper {
 
     @Select("""
             SELECT COUNT(1)
-            FROM model_user_configurations
-            WHERE user_id = #{userId}
-              AND model_config_id = #{modelConfigId}
-              AND deleted_at IS NULL
+            FROM model_user_configurations muc
+            LEFT JOIN model_user_api_keys muk
+                   ON muc.user_key_id = muk.user_api_key_id
+                  AND muk.deleted_at IS NULL
+            LEFT JOIN model_official_api_keys mok
+                   ON muc.official_key_id = mok.official_api_key_id
+                  AND mok.deleted_at IS NULL
+            WHERE muc.user_id = #{userId}
+              AND muc.model_config_id = #{modelConfigId}
+              AND muc.deleted_at IS NULL
+              AND muc.status = 'active'
               AND (
-                    (key_source_type = 'USER_KEY' AND user_key_id IS NOT NULL)
-                    OR (key_source_type = 'OFFICIAL_KEY' AND official_key_id IS NOT NULL)
-                  )
+                  (muc.key_source_type = 'USER_KEY' AND muk.status = 'active' AND muk.encrypted_api_key IS NOT NULL AND muk.encrypted_api_key <> '')
+                  OR (muc.key_source_type = 'OFFICIAL_KEY' AND mok.status = 'active' AND mok.encrypted_api_key IS NOT NULL AND mok.encrypted_api_key <> '')
+              )
             """)
     int countUsableModelConfig(@Param("userId") Long userId,
                                @Param("modelConfigId") Long modelConfigId);

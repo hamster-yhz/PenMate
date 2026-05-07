@@ -62,7 +62,7 @@ public class AgentGenerationWorkflow {
                     traceId
             ).chunks();
 
-            AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(projectId, task.getUserId(), traceId);
+            AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
             long llmStartAt = System.currentTimeMillis();
             AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
                     projectId,
@@ -103,13 +103,13 @@ public class AgentGenerationWorkflow {
         try {
             transitionStatus(projectId, task, AgentTaskStatus.FAILED, safeErrorMessage(ex));
         } catch (Exception transitionEx) {
-            log.error("失败状态回写异常: projectId={}, taskId={}", projectId, task.getId(), transitionEx);
+            log.error("失败状态回写异常: projectId={}, taskId={}", projectId, task.getTaskId(), transitionEx);
         }
     }
 
     private void transitionStatus(Long projectId, AgentGenerationTask task, AgentTaskStatus targetStatus, String errorMsg) {
         taskStateMachine.assertTransition(task.getStatus(), targetStatus);
-        int affected = agentRepository.updateGenerationTaskStatus(projectId, task.getId(), targetStatus.value(), errorMsg);
+        int affected = agentRepository.updateGenerationTaskStatus(projectId, task.getTaskId(), targetStatus.value(), errorMsg);
         if (affected != 1) {
             throw new IllegalStateException("Failed to update generation task status");
         }

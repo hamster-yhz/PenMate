@@ -10,10 +10,10 @@ public interface ApprovalRequestRepository {
 
     List<ApprovalRequest> findByProjectId(Long projectId);
 
-    ApprovalRequest findById(Long id);
+    ApprovalRequest findByApprovalRequestId(Long approvalRequestId);
 
-    int approve(Long id, Long reviewedBy, String comment);
+    int approveByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment);
 
-    int reject(Long id, Long reviewedBy, String comment);
+    int rejectByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment);
 }
 

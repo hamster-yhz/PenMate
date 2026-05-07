@@ -11,9 +11,9 @@ public interface IamGateway {
 
     IamUser findUserByEmail(String email);
 
-    IamUser findUserById(Long id);
+    IamUser findUserByUserId(Long userId);
 
-    int touchLastLogin(Long id);
+    int touchLastLoginByUserId(Long userId);
 
     List<IamRole> findRolesByUserId(Long userId);
 
@@ -25,7 +25,7 @@ public interface IamGateway {
 
     int updateUserBasic(IamUser user);
 
-    int softDeleteUser(Long id);
+    int softDeleteUserByUserId(Long userId);
 
     int assignRoleToUser(Long userId, Long roleId);
 
@@ -33,13 +33,13 @@ public interface IamGateway {
 
     List<IamRole> findAllRoles();
 
-    IamRole findRoleById(Long id);
+    IamRole findRoleByRoleId(Long roleId);
 
     int insertRole(IamRole role);
 
     int updateRoleBasic(IamRole role);
 
-    int softDeleteRole(Long id);
+    int softDeleteRoleByRoleId(Long roleId);
 
     int assignPermissionToRole(Long roleId, Long permissionId);
 
@@ -49,7 +49,7 @@ public interface IamGateway {
 
     List<IamPermission> findAllPermissions();
 
-    IamPermission findPermissionById(Long id);
+    IamPermission findPermissionByPermissionId(Long permissionId);
 
     List<IamMenu> findVisibleMenus();
 

@@ -68,8 +68,9 @@ public class RbacQueryController {
      * <p><b>业务目的：</b>返回系统角色用于用户授权与角色管理。</p>
      */
     @GetMapping("/roles")
-    public ApiResponse<List<IamRole>> roles(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(iamQueryApplicationService.listRoles(), traceId);
+    public ApiResponse<List<Map<String, Object>>> roles(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Map<String, Object>> items = iamQueryApplicationService.listRoles().stream().map(this::toRoleView).toList();
+        return ApiResponse.success(items, traceId);
     }
 
     /**
@@ -77,9 +78,10 @@ public class RbacQueryController {
      * <p><b>业务目的：</b>返回用户当前拥有的角色集合，供管理端授权视图展示。</p>
      */
     @GetMapping("/users/{userId}/roles")
-    public ApiResponse<List<IamRole>> userRoles(@PathVariable Long userId,
-                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(iamQueryApplicationService.listUserRoles(userId), traceId);
+    public ApiResponse<List<Map<String, Object>>> userRoles(@PathVariable Long userId,
+                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Map<String, Object>> items = iamQueryApplicationService.listUserRoles(userId).stream().map(this::toRoleView).toList();
+        return ApiResponse.success(items, traceId);
     }
 
     /**
@@ -87,8 +89,9 @@ public class RbacQueryController {
      * <p><b>业务目的：</b>返回系统权限点用于角色授权配置。</p>
      */
     @GetMapping("/permissions")
-    public ApiResponse<List<IamPermission>> permissions(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(iamQueryApplicationService.listPermissions(), traceId);
+    public ApiResponse<List<Map<String, Object>>> permissions(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Map<String, Object>> items = iamQueryApplicationService.listPermissions().stream().map(this::toPermissionView).toList();
+        return ApiResponse.success(items, traceId);
     }
 
     /**
@@ -96,9 +99,10 @@ public class RbacQueryController {
      * <p><b>业务目的：</b>返回角色当前拥有的权限集合，供管理端授权视图展示。</p>
      */
     @GetMapping("/roles/{roleId}/permissions")
-    public ApiResponse<List<IamPermission>> rolePermissions(@PathVariable Long roleId,
-                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(iamQueryApplicationService.listRolePermissions(roleId), traceId);
+    public ApiResponse<List<Map<String, Object>>> rolePermissions(@PathVariable Long roleId,
+                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Map<String, Object>> items = iamQueryApplicationService.listRolePermissions(roleId).stream().map(this::toPermissionView).toList();
+        return ApiResponse.success(items, traceId);
     }
 
     /**
@@ -147,10 +151,10 @@ public class RbacQueryController {
      * <p><b>副作用：</b>新增角色记录。</p>
      */
     @PostMapping("/roles")
-    public ApiResponse<IamRole> createRole(@Valid @RequestBody CreateRoleDto dto,
-                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<Map<String, Object>> createRole(@Valid @RequestBody CreateRoleDto dto,
+                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         IamRole role = iamQueryApplicationService.createRole(dto.getName(), dto.getCode(), dto.getDescription(), dto.getIsSystem());
-        return ApiResponse.success(role, traceId);
+        return ApiResponse.success(toRoleView(role), traceId);
     }
 
     /**
@@ -160,11 +164,11 @@ public class RbacQueryController {
      * <p><b>副作用：</b>更新角色记录。</p>
      */
     @PutMapping("/roles/{roleId}")
-    public ApiResponse<IamRole> updateRole(@PathVariable Long roleId,
-                                            @Valid @RequestBody UpdateRoleDto dto,
-                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<Map<String, Object>> updateRole(@PathVariable Long roleId,
+                                                        @Valid @RequestBody UpdateRoleDto dto,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         IamRole role = iamQueryApplicationService.updateRole(roleId, dto.getName(), dto.getDescription());
-        return ApiResponse.success(role, traceId);
+        return ApiResponse.success(toRoleView(role), traceId);
     }
 
     /**
@@ -248,8 +252,9 @@ public class RbacQueryController {
      * <p><b>业务目的：</b>返回全量菜单定义用于管理端菜单配置展示。</p>
      */
     @GetMapping("/menus")
-    public ApiResponse<List<IamMenu>> menus(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(iamQueryApplicationService.listMenus(), traceId);
+    public ApiResponse<List<Map<String, Object>>> menus(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Map<String, Object>> items = iamQueryApplicationService.listMenus().stream().map(this::toMenuView).toList();
+        return ApiResponse.success(items, traceId);
     }
 
     /**
@@ -258,9 +263,10 @@ public class RbacQueryController {
      * <p><b>ID 语义：</b>userId 为用户业务ID。</p>
      */
     @GetMapping("/profile/menus")
-    public ApiResponse<List<IamMenu>> profileMenus(@RequestParam("userId") Long userId,
-                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(iamQueryApplicationService.listProfileMenus(userId), traceId);
+    public ApiResponse<List<Map<String, Object>>> profileMenus(@RequestParam("userId") Long userId,
+                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Map<String, Object>> items = iamQueryApplicationService.listProfileMenus(userId).stream().map(this::toMenuView).toList();
+        return ApiResponse.success(items, traceId);
     }
 
     /**
@@ -269,12 +275,46 @@ public class RbacQueryController {
      */
     private Map<String, Object> toSafeUser(IamUser user) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("userId", user.getUserId());
+        data.put("id", user.getUserId());
         data.put("email", user.getEmail());
         data.put("displayName", user.getDisplayName());
         data.put("status", user.getStatus());
         data.put("authMethod", user.getAuthMethod());
         data.put("lastLoginAt", user.getLastLoginAt());
+        return data;
+    }
+
+    private Map<String, Object> toRoleView(IamRole role) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", role.getRoleId());
+        data.put("name", role.getName());
+        data.put("code", role.getCode());
+        data.put("description", role.getDescription());
+        data.put("isSystem", role.getIsSystem());
+        return data;
+    }
+
+    private Map<String, Object> toPermissionView(IamPermission permission) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", permission.getPermissionId());
+        data.put("name", permission.getName());
+        data.put("code", permission.getCode());
+        data.put("module", permission.getModule());
+        data.put("description", permission.getDescription());
+        return data;
+    }
+
+    private Map<String, Object> toMenuView(IamMenu menu) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", menu.getMenuId() != null ? menu.getMenuId() : menu.getId());
+        if (menu.getParentId() != null) {
+            data.put("parentId", menu.getParentId());
+        }
+        data.put("title", menu.getTitle());
+        data.put("path", menu.getPath());
+        data.put("sortOrder", menu.getSortOrder());
+        data.put("permissionCode", menu.getPermissionCode());
+        data.put("visible", menu.getVisible());
         return data;
     }
 }

@@ -64,8 +64,10 @@ class AgentGenerationWorkflowTest {
     void UT_APP_AGENT_GENERATION_WORKFLOW_INITIAL_RUN_SHOULD_USE_TOOL_LOOP_RUNNER() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(11L);
+        task.setTaskId(11L);
         task.setProjectId(1L);
         task.setUserId(1001L);
+        task.setModelConfigId(66L);
         task.setConversationId(9L);
         task.setTaskType("WORLD_BUILD");
         task.setStatus("pending");
@@ -76,7 +78,7 @@ class AgentGenerationWorkflowTest {
         when(ragRetrievalService.retrieve(eq(1L), eq(11L), any(), eq("trace-1")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1L, 1001L, "trace-1")).thenReturn(null);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-1")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
 
@@ -91,8 +93,10 @@ class AgentGenerationWorkflowTest {
     void UT_APP_AGENT_GENERATION_WORKFLOW_WAITING_APPROVAL_SHOULD_EXPLICITLY_TRANSITION_TASK_STATUS_TO_WAITING_APPROVAL() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(21L);
+        task.setTaskId(21L);
         task.setProjectId(1L);
         task.setUserId(1001L);
+        task.setModelConfigId(66L);
         task.setConversationId(9L);
         task.setTaskType("WORLD_BUILD");
         task.setStatus("pending");
@@ -103,7 +107,7 @@ class AgentGenerationWorkflowTest {
         when(ragRetrievalService.retrieve(eq(1L), eq(21L), any(), eq("trace-wait")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1L, 1001L, "trace-wait")).thenReturn(null);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-wait")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(88L, 1, ""));
 
@@ -123,8 +127,10 @@ class AgentGenerationWorkflowTest {
     void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_ALLOW_DIRECT_COMPLETION() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(31L);
+        task.setTaskId(31L);
         task.setProjectId(1L);
         task.setUserId(1001L);
+        task.setModelConfigId(66L);
         task.setConversationId(9L);
         task.setTaskType("WRITE");
         task.setStatus("pending");
@@ -136,7 +142,7 @@ class AgentGenerationWorkflowTest {
         when(ragRetrievalService.retrieve(eq(1L), eq(31L), any(), eq("trace-direct")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1L, 1001L, "trace-direct")).thenReturn(null);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-direct")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(31L), eq(9L), eq(0L), eq("trace-direct"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("这是直接完成的答复", 0, ""));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any());
@@ -155,8 +161,10 @@ class AgentGenerationWorkflowTest {
     void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_PASS_PLAIN_USER_MESSAGE_TO_LOOP() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(32L);
+        task.setTaskId(32L);
         task.setProjectId(1L);
         task.setUserId(1001L);
+        task.setModelConfigId(66L);
         task.setConversationId(9L);
         task.setTaskType("WORLD_BUILD");
         task.setStatus("pending");
@@ -173,7 +181,7 @@ class AgentGenerationWorkflowTest {
         when(ragRetrievalService.retrieve(eq(1L), eq(32L), any(), eq("trace-plain")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(assembledMessages);
-        when(agentModelRoutingService.resolveExecutionConfig(1L, 1001L, "trace-plain")).thenReturn(null);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-plain")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(66L, 1, ""));
 
@@ -197,8 +205,10 @@ class AgentGenerationWorkflowTest {
     void UT_APP_AGENT_GENERATION_WORKFLOW_RESUME_AFTER_APPROVAL_SHOULD_CONTINUE_LOOP() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(12L);
+        task.setTaskId(12L);
         task.setProjectId(1L);
         task.setUserId(1001L);
+        task.setModelConfigId(66L);
         task.setConversationId(9L);
         task.setTaskType("WRITE");
         task.setStatus("waiting_approval");
@@ -208,7 +218,7 @@ class AgentGenerationWorkflowTest {
         when(ragRetrievalService.retrieve(eq(1L), eq(12L), any(), eq("trace-2")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1L, 1001L, "trace-2")).thenReturn(null);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-2")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("续写片段", 1, "tool-context"));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any());
@@ -222,5 +232,34 @@ class AgentGenerationWorkflowTest {
         verify(agentResultPublisher).publishGenerationTokens(eq(1L), eq(12L), eq("续写片段"), eq("trace-2"));
         verify(realtimeEventService).publishGenerationDone(1L, 12L, AgentTaskStatus.DONE.value());
         verify(agentToolLoopRunner).execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any());
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_USE_TASK_ID_INSTEAD_OF_PHYSICAL_ID_FOR_STATUS_TRANSITION() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(999L);
+        task.setTaskId(41L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("验证 taskId 流转");
+
+        when(agentRepository.findGenerationTask(1L, 41L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(41L), any(), any())).thenReturn(1);
+        when(ragRetrievalService.retrieve(eq(1L), eq(41L), any(), eq("trace-task-id")))
+                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-task-id")).thenReturn(null);
+        when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-task-id"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.waitingApproval(101L, 1, ""));
+
+        agentGenerationWorkflow.run(1L, 41L, "trace-task-id");
+
+        verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.RUNNING.value(), null);
+        verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.WAITING_APPROVAL.value(), null);
+        verify(agentRepository, never()).updateGenerationTaskStatus(eq(1L), eq(999L), any(), any());
     }
 }

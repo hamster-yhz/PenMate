@@ -205,6 +205,21 @@ class OpenApiConfigTest {
     }
 
     @Test
+    void UT_CONFIG_OPENAPI_MODEL_CONFIG_CREATE_DESCRIPTION_SHOULD_DESCRIBE_MODEL_CATEGORY_AND_API_KEY() {
+        OpenAPI openAPI = new OpenAPI();
+        Operation operation = new Operation();
+        operation.setResponses(new ApiResponses().addApiResponse("200", new ApiResponse()));
+        PathItem pathItem = new PathItem().post(operation);
+        openAPI.setPaths(new Paths().addPathItem("/api/v1/model/configs", pathItem));
+
+        openApiConfig.defaultApiDocumentationCustomizer().customise(openAPI);
+
+        assertThat(operation.getDescription()).contains("modelCategory");
+        assertThat(operation.getDescription()).contains("apiKey");
+        assertThat(operation.getDescription()).contains("模型类别");
+    }
+
+    @Test
     void UT_CONFIG_OPENAPI_DESCRIBE_FIELD_SHOULD_RECOGNIZE_TRACE_HEADER_WITH_HYPHENS() throws Exception {
         String traceHeaderDescription = (String) invokePrivate("describeField",
                 new Class[]{String.class, String.class, String.class, String.class},
@@ -233,6 +248,20 @@ class OpenApiConfigTest {
         assertThat(operation.getSummary()).isEqualTo("RBAC - 查询指定用户可见菜单");
         assertThat(operation.getDescription()).contains("目标用户业务 ID");
         assertThat(operation.getParameters().get(0).getDescription()).contains("链路追踪 ID");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_OPERATION_MAPS_SHOULD_NOT_CONTAIN_LEGACY_MODEL_POLICIES_ENDPOINTS() throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, String> summaryMap = (Map<String, String>) invokePrivate("buildOperationSummaryMap", new Class[]{});
+        @SuppressWarnings("unchecked")
+        Map<String, String> descriptionMap = (Map<String, String>) invokePrivate("buildOperationDescriptionMap", new Class[]{});
+        String legacyPathToken = "model" + "-" + "policies";
+        String legacyCompatLabel = "模型策略" + "(兼容)";
+
+        assertThat(summaryMap.keySet()).noneMatch(key -> key.contains(legacyPathToken));
+        assertThat(descriptionMap.keySet()).noneMatch(key -> key.contains(legacyPathToken));
+        assertThat(summaryMap.values()).noneMatch(value -> value.contains(legacyCompatLabel));
     }
 
     private Object invokePrivate(String methodName, Class<?>[] parameterTypes, Object... args) throws Exception {

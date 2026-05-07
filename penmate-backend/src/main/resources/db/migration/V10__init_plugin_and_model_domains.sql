@@ -98,5 +98,8 @@ CREATE TABLE IF NOT EXISTS model_user_configurations (
     deleted_at DATETIME(3) NULL,
     UNIQUE KEY uk_model_user_configurations_model_config_id (model_config_id),
     KEY idx_model_user_config_user_deleted (user_id, deleted_at),
-    KEY idx_model_user_config_provider_deleted (provider_id, deleted_at)
+    KEY idx_model_user_config_provider_deleted (provider_id, deleted_at),
+    KEY idx_model_user_config_user_key (user_key_id),
+    KEY idx_model_user_config_official_key (official_key_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

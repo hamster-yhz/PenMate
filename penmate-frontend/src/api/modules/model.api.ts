@@ -3,34 +3,72 @@ import type { IdLike } from '@/api/types'
 
 type AnyRecord = Record<string, unknown>
 
-const normalizeConfigPayload = (payload: AnyRecord) => {
-  const next: AnyRecord = { ...payload }
-  if (typeof next.configName === 'string' && !next.policyName) {
-    next.policyName = next.configName
+const normalizeBusinessStringId = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null
   }
-  if (typeof next.modelInput === 'string' && !next.modelName) {
-    next.modelName = next.modelInput
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+const normalizeUserModelConfigPayload = (payload: AnyRecord) => {
+  const next: AnyRecord = { ...payload }
+  if (typeof next.modelCategory !== 'string' && typeof next.keySourceType === 'string') {
+    next.modelCategory = next.keySourceType === 'OFFICIAL_KEY' ? 'OFFICIAL_MODEL' : 'USER_MODEL'
   }
   if (typeof next.modelName === 'string') {
     const trimmed = next.modelName.trim()
     next.modelName = trimmed || undefined
   }
-  if (typeof next.providerModelId === 'number' && next.providerModelId <= 0) {
-    next.providerModelId = undefined
-  }
   if (typeof next.baseUrl === 'string') {
     const trimmed = next.baseUrl.trim()
     next.baseUrl = trimmed || undefined
   }
-  if (!next.scene) {
-    next.scene = 'write'
+  if (typeof next.modelCategory === 'string') {
+    const trimmed = next.modelCategory.trim()
+    next.modelCategory = trimmed || undefined
   }
+  if (typeof next.apiKey === 'string') {
+    const trimmed = next.apiKey.trim()
+    next.apiKey = trimmed || undefined
+  }
+  if (typeof next.status === 'string') {
+    const trimmed = next.status.trim()
+    next.status = trimmed || undefined
+  }
+  delete next.id
+  delete next.modelConfigId
+  delete next.modelType
+  delete next.keyName
+  delete next.selectedKeyId
+  delete next.userKeyId
+  delete next.officialKeyId
+  delete next.keySourceType
+  return next
+}
+
+const normalizeUserModelPreferencePayload = (payload: AnyRecord) => ({
+  mainAgentModelConfigId: normalizeBusinessStringId(payload.mainAgentModelConfigId),
+  dirtyWorkAgentModelConfigId: normalizeBusinessStringId(payload.dirtyWorkAgentModelConfigId),
+})
+
+const normalizeProviderPayload = (payload: AnyRecord): AnyRecord | null => {
+  const next: AnyRecord = { ...payload }
+  const providerId = normalizeBusinessStringId(next.providerId)
+  if (providerId === null) {
+    return null
+  }
+  delete next.id
+  next.providerId = providerId
   return next
 }
 
 export const modelApi = {
-  listProviders() {
-    return request.get<AnyRecord[]>('/v1/model/providers')
+  async listProviders() {
+    const providers = await request.get<AnyRecord[]>('/v1/model/providers')
+    return (providers ?? [])
+      .map((item) => normalizeProviderPayload(item))
+      .filter((item): item is AnyRecord => item !== null)
   },
   listKeys(userId: IdLike) {
     return request.get<AnyRecord[]>(`/v1/model/keys?userId=${userId}`)
@@ -47,12 +85,6 @@ export const modelApi = {
   listOfficialKeys() {
     return request.get<AnyRecord[]>('/v1/model/official-keys')
   },
-  getUserModelPreferences(userId: IdLike) {
-    return request.get<AnyRecord>(`/v1/model/preferences?userId=${userId}`)
-  },
-  saveUserModelPreferences(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<string>(`/v1/model/preferences?userId=${userId}&operatorId=${operatorId}`, payload)
-  },
   createOfficialKey(operatorId: IdLike, payload: AnyRecord) {
     return request.post<string>(`/v1/model/official-keys?operatorId=${operatorId}`, payload)
   },
@@ -62,44 +94,31 @@ export const modelApi = {
   deleteOfficialKey(keyId: IdLike, operatorId: IdLike) {
     return request.delete<string>(`/v1/model/official-keys/${keyId}?operatorId=${operatorId}`)
   },
-  listConfigs(projectId: IdLike) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/model-configs`)
+  listUserModelConfigs(userId: IdLike) {
+    return request.get<AnyRecord[]>(`/v1/model/configs?userId=${userId}`)
   },
-  createConfig(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createUserModelConfig(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.post<string>(
-      `/v1/novels/${projectId}/model-configs?operatorId=${operatorId}`,
-      normalizeConfigPayload(payload)
+      `/v1/model/configs?userId=${userId}&operatorId=${operatorId}`,
+      normalizeUserModelConfigPayload(payload)
     )
   },
-  updateConfig(projectId: IdLike, configId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateUserModelConfig(userId: IdLike, businessModelConfigId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.put<string>(
-      `/v1/novels/${projectId}/model-configs/${configId}?operatorId=${operatorId}`,
-      normalizeConfigPayload(payload)
+      `/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`,
+      normalizeUserModelConfigPayload(payload)
     )
   },
-  deleteConfig(projectId: IdLike, configId: IdLike, operatorId: IdLike) {
-    return request.delete<string>(`/v1/novels/${projectId}/model-configs/${configId}?operatorId=${operatorId}`)
+  deleteUserModelConfig(userId: IdLike, businessModelConfigId: IdLike, operatorId: IdLike) {
+    return request.delete<string>(`/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`)
   },
-  setDefaultConfig(projectId: IdLike, configId: IdLike, operatorId: IdLike) {
-    return request.post<string>(`/v1/novels/${projectId}/model-configs/${configId}/set-default?operatorId=${operatorId}`)
+  getUserModelPreferences(userId: IdLike) {
+    return request.get<AnyRecord>(`/v1/model/preferences?userId=${userId}`)
   },
-  listPolicies(projectId: IdLike) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/model-policies`)
-  },
-  createPolicy(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  saveUserModelPreferences(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.post<string>(
-      `/v1/novels/${projectId}/model-policies?operatorId=${operatorId}`,
-      normalizeConfigPayload(payload)
+      `/v1/model/preferences?userId=${userId}&operatorId=${operatorId}`,
+      normalizeUserModelPreferencePayload(payload)
     )
   },
-  updatePolicy(projectId: IdLike, policyId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.put<string>(
-      `/v1/novels/${projectId}/model-policies/${policyId}?operatorId=${operatorId}`,
-      normalizeConfigPayload(payload)
-    )
-  },
-  setDefaultPolicy(projectId: IdLike, policyId: IdLike, operatorId: IdLike) {
-    return request.post<string>(`/v1/novels/${projectId}/model-policies/${policyId}/set-default?operatorId=${operatorId}`)
-  }
 }
-

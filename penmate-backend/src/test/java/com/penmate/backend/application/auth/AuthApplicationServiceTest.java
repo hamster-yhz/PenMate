@@ -62,7 +62,7 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
 
         ArgumentCaptor<AuthUserSessionPayload> payloadCaptor = ArgumentCaptor.forClass(AuthUserSessionPayload.class);
         verify(authSessionCache).saveSession(payloadCaptor.capture(), any(AuthTokenBundle.class));
-        verify(iamGateway).touchLastLogin(1001L);
+        verify(iamGateway).touchLastLoginByUserId(1001L);
         assertThat(payloadCaptor.getValue().getMainAgentModelConfigId()).isNotNull();
         assertThat(payloadCaptor.getValue().getDirtyWorkAgentModelConfigId()).isNotNull();
         assertThat(result).containsKeys("accessToken", "refreshToken");

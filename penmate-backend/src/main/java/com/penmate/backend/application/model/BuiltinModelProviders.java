@@ -32,7 +32,7 @@ public final class BuiltinModelProviders {
             return Optional.empty();
         }
         return PROVIDERS.stream()
-                .filter(item -> providerId.equals(item.getId()))
+                .filter(item -> providerId.equals(item.getProviderId()))
                 .findFirst();
     }
 
@@ -46,9 +46,9 @@ public final class BuiltinModelProviders {
                 .findFirst();
     }
 
-    private static ModelProvider provider(Long id, String code, String name, String baseUrl) {
+    private static ModelProvider provider(Long providerId, String code, String name, String baseUrl) {
         ModelProvider provider = new ModelProvider();
-        provider.setId(id);
+        provider.setProviderId(providerId);
         provider.setCode(code);
         provider.setName(name);
         provider.setBaseUrl(baseUrl);

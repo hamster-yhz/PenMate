@@ -29,9 +29,9 @@ public interface IamRoleMapper {
     @Select("""
             SELECT id, role_id, name, code, description, is_system
             FROM iam_roles
-            WHERE role_id = #{id} AND deleted_at IS NULL
+            WHERE role_id = #{roleId} AND deleted_at IS NULL
             """)
-    IamRole findById(@Param("id") Long id);
+    IamRole findByRoleId(@Param("roleId") Long roleId);
 
     @Select("""
             SELECT p.id, p.permission_id, p.name, p.code, p.module, p.description
@@ -59,9 +59,9 @@ public interface IamRoleMapper {
     @Update("""
             UPDATE iam_roles
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE role_id = #{id} AND deleted_at IS NULL
+            WHERE role_id = #{roleId} AND deleted_at IS NULL
             """)
-    int softDelete(@Param("id") Long id);
+    int softDeleteByRoleId(@Param("roleId") Long roleId);
 
     @Insert("""
             INSERT INTO iam_role_permissions(role_id, permission_id)

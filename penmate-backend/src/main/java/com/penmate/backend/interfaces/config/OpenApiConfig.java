@@ -321,7 +321,7 @@ public class OpenApiConfig {
             case "providers" -> "模型服务商";
             case "models" -> "模型";
             case "keys" -> "用户密钥";
-            case "model-policies" -> "模型策略";
+            case "configs" -> "用户模型配置";
             case "plugins" -> "插件安装";
             case "catalog" -> "插件目录";
             case "call-logs" -> "插件调用日志";
@@ -397,7 +397,7 @@ public class OpenApiConfig {
         if (path.contains("/model/")) {
             switch (n) {
                 case "providerid":
-                    return place + "：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或策略。";
+                    return place + "：模型服务商业务 ID（如 OpenAI、Anthropic），用于绑定密钥或模型配置。";
                 case "providercode":
                     return place + "：模型服务商编码（唯一标识），用于查询该服务商支持的模型列表。";
                 case "providername":
@@ -408,22 +408,16 @@ public class OpenApiConfig {
                     return place + "：调用第三方模型服务的 API 密钥明文，仅在写入时传输。";
                 case "isdefault":
                     return place + "：是否默认配置（1=默认，0=非默认）。";
-                case "policyname":
-                    return place + "：策略名称，用于标识某个场景下的模型路由策略。";
-                case "scene":
-                    return place + "：策略应用场景，如大纲生成、章节润色、角色对话。";
-                case "providermodelid":
-                    return place + "：服务商模型 ID，指向具体可调用模型。";
+                case "keysourcetype":
+                    return place + "：密钥来源类型，仅支持 USER_KEY 或 OFFICIAL_KEY。";
+                case "modelconfigid":
+                    return place + "：用户模型配置业务 ID，用于主 Agent / Dirty Work Agent 偏好绑定。";
                 case "userkeyid":
-                    return place + "：用户 API Key 记录 ID，策略执行时用此密钥发起调用。";
-                case "temperature":
-                    return place + "：采样温度，越高随机性越强，越低结果越稳定。";
-                case "topp":
-                    return place + "：核采样阈值（Top-P），控制候选词概率截断范围。";
+                    return place + "：用户 API Key 记录 ID，模型配置执行时用此密钥发起调用。";
+                case "officialkeyid":
+                    return place + "：官方 API Key 记录 ID，模型配置执行时用此密钥发起调用。";
                 case "maxtokens":
                     return place + "：模型单次生成的最大 token 数上限。";
-                case "fallbackpolicyjson":
-                    return place + "：降级策略 JSON，主模型失败时的备用策略配置。";
                 default:
                     break;
             }
@@ -451,7 +445,7 @@ public class OpenApiConfig {
             return place + "：密钥业务 ID，用于定位用户密钥或官方密钥记录。";
         }
         if ("configid".equals(n)) {
-            return place + "：模型配置业务 ID，用于定位项目模型配置。";
+            return place + "：模型配置业务 ID，用于定位用户模型配置。";
         }
         if ("traceid".equals(n) || "xtraceid".equals(n)) {
             return place + "：链路追踪 ID，用于日志追踪与问题定位。";
@@ -549,16 +543,12 @@ public class OpenApiConfig {
         map.put("POST /api/v1/model/official-keys", "模型配置 - 新增官方 API Key");
         map.put("PATCH /api/v1/model/official-keys/{keyId}", "模型配置 - 更新官方 API Key");
         map.put("DELETE /api/v1/model/official-keys/{keyId}", "模型配置 - 删除官方 API Key");
-        map.put("GET /api/v1/novels/{projectId}/model-configs", "模型配置 - 查询项目模型配置列表");
-        map.put("POST /api/v1/novels/{projectId}/model-configs", "模型配置 - 新增项目模型配置");
-        map.put("PUT /api/v1/novels/{projectId}/model-configs/{configId}", "模型配置 - 更新项目模型配置");
-        map.put("DELETE /api/v1/novels/{projectId}/model-configs/{configId}", "模型配置 - 删除项目模型配置");
-        map.put("POST /api/v1/novels/{projectId}/model-configs/{configId}/set-default", "模型配置 - 设置项目默认模型配置");
-        map.put("GET /api/v1/novels/{projectId}/model-policies", "模型策略(兼容) - 查询项目策略列表");
-        map.put("POST /api/v1/novels/{projectId}/model-policies", "模型策略(兼容) - 新增项目策略");
-        map.put("PUT /api/v1/novels/{projectId}/model-policies/{configId}", "模型策略(兼容) - 更新项目策略");
-        map.put("DELETE /api/v1/novels/{projectId}/model-policies/{configId}", "模型策略(兼容) - 删除项目策略");
-        map.put("POST /api/v1/novels/{projectId}/model-policies/{configId}/set-default", "模型策略(兼容) - 设置默认策略");
+        map.put("GET /api/v1/model/configs", "模型配置 - 查询用户模型配置列表");
+        map.put("POST /api/v1/model/configs", "模型配置 - 新增用户模型配置");
+        map.put("PUT /api/v1/model/configs/{modelConfigId}", "模型配置 - 更新用户模型配置");
+        map.put("DELETE /api/v1/model/configs/{modelConfigId}", "模型配置 - 删除用户模型配置");
+        map.put("GET /api/v1/model/preferences", "模型配置 - 查询用户 Agent 角色偏好");
+        map.put("POST /api/v1/model/preferences", "模型配置 - 保存用户 Agent 角色偏好");
 
         // rbac
         map.put("GET /api/v1/users", "RBAC - 查询用户列表");
@@ -598,20 +588,20 @@ public class OpenApiConfig {
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
         map.put("POST /api/v1/model/keys", "接口作用：为指定用户新增模型 API Key。\n"
-                + "业务规则：可标记默认 key，供策略执行时优先使用。\n"
+                + "业务规则：可标记默认 key，供模型配置选择时复用。\n"
                 + "关键入参：userId（归属用户）、providerId（服务商）、apiKey（密钥明文）。\n"
                 + "返回说明：data 为 created。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
-        map.put("POST /api/v1/novels/{projectId}/model-policies", "接口作用：为项目新增模型调用策略。\n"
-                + "业务规则：策略按 scene 绑定模型、密钥与采样参数；可设置默认策略。\n"
-                + "关键入参：providerModelId、userKeyId、temperature、topP、maxTokens。\n"
+        map.put("POST /api/v1/model/configs", "接口作用：为当前用户新增模型配置。\n"
+                + "业务规则：模型配置按 modelCategory（模型类别）绑定用户模型或官方模型；调用方直接提交 apiKey，后端内部落到对应 Key 资源。\n"
+                + "关键入参：providerId、modelName、modelCategory、apiKey。\n"
                 + "返回说明：data 为 created。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
-        map.put("POST /api/v1/novels/{projectId}/model-policies/{configId}/set-default", "接口作用：将指定策略设为当前项目默认策略。\n"
-                + "业务规则：同一项目仅允许一个默认策略。\n"
-                + "关键入参：projectId、configId、operatorId（均为业务语义 ID）。\n"
+        map.put("POST /api/v1/model/preferences", "接口作用：保存用户主 Agent 与 Dirty Work Agent 的模型偏好。\n"
+                + "业务规则：仅允许选择当前用户可用的模型配置；传 null 表示清空该角色偏好。\n"
+                + "关键入参：userId、mainAgentModelConfigId、dirtyWorkAgentModelConfigId。\n"
                 + "返回说明：data 为 updated。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 

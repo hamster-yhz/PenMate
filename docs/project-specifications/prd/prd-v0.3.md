@@ -172,7 +172,7 @@ v0.2 已定义「Agent主写作 + 人在回路审批 + 插件 + 文风 + RAG」�
 4. 审批卡与任务状态联动展示（待审批/已通过/已驳回）。
 
 #### 7.2.3 数据与存储
-1. `agent_generation_tasks` 补充字段：`model_policy_id`、`token_usage_json`、`cost_json`、`trace_id`。
+1. `agent_generation_tasks` 补充字段：`model_config_id`、`token_usage_json`、`cost_json`、`trace_id`。
 2. `plugin_call_logs` 增加 `task_id` 关联。
 3. `rag_retrieval_logs` 新表（或复用日志表）记录召回详情。
 

@@ -36,7 +36,7 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Test
     void UT_APP_IAM_GET_USER_NOT_FOUND() {
-        when(iamGateway.findUserById(1L)).thenReturn(null);
+        when(iamGateway.findUserByUserId(1L)).thenReturn(null);
         assertThatThrownBy(() -> iamQueryApplicationService.getUser(1L))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("User not found");
@@ -71,7 +71,7 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
         IamRole role = new IamRole();
         role.setId(1L);
         role.setIsSystem(true);
-        when(iamGateway.findRoleById(1L)).thenReturn(role);
+        when(iamGateway.findRoleByRoleId(1L)).thenReturn(role);
 
         assertThatThrownBy(() -> iamQueryApplicationService.deleteRole(1L))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)

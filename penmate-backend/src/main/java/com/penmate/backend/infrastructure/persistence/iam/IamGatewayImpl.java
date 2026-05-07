@@ -45,23 +45,23 @@ public class IamGatewayImpl implements IamGateway {
     /**
      * 处理业务请求。
      *
-     * @param id 入参：id
+     * @param userId 入参：userId
      * @return 出参：处理结果
      */
     @Override
-    public IamUser findUserById(Long id) {
-        return iamUserMapper.findById(id);
+    public IamUser findUserByUserId(Long userId) {
+        return iamUserMapper.findByUserId(userId);
     }
 
     /**
      * 处理业务请求。
      *
-     * @param id 入参：id
+     * @param userId 入参：userId
      * @return 出参：处理结果
      */
     @Override
-    public int touchLastLogin(Long id) {
-        return iamUserMapper.touchLastLogin(id);
+    public int touchLastLoginByUserId(Long userId) {
+        return iamUserMapper.touchLastLoginByUserId(userId);
     }
 
     /**
@@ -121,12 +121,12 @@ public class IamGatewayImpl implements IamGateway {
     /**
      * 处理业务请求。
      *
-     * @param id 入参：id
+     * @param userId 入参：userId
      * @return 出参：处理结果
      */
     @Override
-    public int softDeleteUser(Long id) {
-        return iamUserMapper.softDelete(id);
+    public int softDeleteUserByUserId(Long userId) {
+        return iamUserMapper.softDeleteByUserId(userId);
     }
 
     /**
@@ -166,12 +166,12 @@ public class IamGatewayImpl implements IamGateway {
     /**
      * 处理业务请求。
      *
-     * @param id 入参：id
+     * @param roleId 入参：roleId
      * @return 出参：处理结果
      */
     @Override
-    public IamRole findRoleById(Long id) {
-        return iamRoleMapper.findById(id);
+    public IamRole findRoleByRoleId(Long roleId) {
+        return iamRoleMapper.findByRoleId(roleId);
     }
 
     /**
@@ -199,12 +199,12 @@ public class IamGatewayImpl implements IamGateway {
     /**
      * 处理业务请求。
      *
-     * @param id 入参：id
+     * @param roleId 入参：roleId
      * @return 出参：处理结果
      */
     @Override
-    public int softDeleteRole(Long id) {
-        return iamRoleMapper.softDelete(id);
+    public int softDeleteRoleByRoleId(Long roleId) {
+        return iamRoleMapper.softDeleteByRoleId(roleId);
     }
 
     /**
@@ -255,12 +255,12 @@ public class IamGatewayImpl implements IamGateway {
     /**
      * 处理业务请求。
      *
-     * @param id 入参：id
+     * @param permissionId 入参：permissionId
      * @return 出参：处理结果
      */
     @Override
-    public IamPermission findPermissionById(Long id) {
-        return iamPermissionMapper.findById(id);
+    public IamPermission findPermissionByPermissionId(Long permissionId) {
+        return iamPermissionMapper.findByPermissionId(permissionId);
     }
 
     /**

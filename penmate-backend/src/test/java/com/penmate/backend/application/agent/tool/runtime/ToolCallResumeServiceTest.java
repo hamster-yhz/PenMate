@@ -127,6 +127,7 @@ class ToolCallResumeServiceTest {
                 "{\"approvalType\":\"BOOK_LIST\"}"
         );
         AgentGenerationTask task = new AgentGenerationTask();
+        task.setUserId(1001L);
         task.setModelConfigId(66L);
         AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
                 .modelConfigId(66L)
@@ -147,7 +148,7 @@ class ToolCallResumeServiceTest {
         when(toolCallExecutionService.execute(any()))
                 .thenReturn(ToolCallResult.success("{\"items\":[]}"));
         when(agentRepository.findGenerationTask(1L, 11L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1L, 66L, "trace-resume-2")).thenReturn(executionConfig);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-resume-2")).thenReturn(executionConfig);
         when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of(
                 new AgentLlmToolSchema("book_crud", "书籍 CRUD；必须提供 operation", "{\"type\":\"object\"}")
         ));

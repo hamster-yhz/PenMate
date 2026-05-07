@@ -195,3 +195,34 @@ INSERT INTO ops_migrations (id, migration_id, migration_type, status, progress_p
 (920002, 920002, 'content_to_object_storage', 'done',    100, JSON_OBJECT('migrated', 23, 'failed', 0), NULL,              NOW(3), NOW(3), NOW(3), NOW(3)),
 (920003, 920003, 'vector_rebuild',            'failed',  73,  JSON_OBJECT('processed', 88),             'index corruption', NOW(3), NOW(3), NOW(3), NOW(3));
 
+-- 模型域
+INSERT INTO model_official_api_keys (id, official_api_key_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at) VALUES
+(920001, 920001, 1, 'DBCASE 官方 OpenAI Key',   'cipher-official-openai-920001',   '****openai',   1, NOW(3), 'active',   NOW(3), NOW(3), NULL),
+(920002, 920002, 2, 'DBCASE 官方 DeepSeek Key', 'cipher-official-deepseek-920002', '****deepseek', 1, NOW(3), 'active',   NOW(3), NOW(3), NULL),
+(920003, 920003, 3, 'DBCASE 官方 Anthropic Key','cipher-official-claude-920003',   '****claude',   0, NULL,   'disabled', NOW(3), NOW(3), NULL);
+
+INSERT INTO model_user_api_keys (id, user_api_key_id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at) VALUES
+(920001, 920011, 920002, 1, 'DBCASE Owner OpenAI 主 Key',  'cipher-user-openai-920011',  '****92011', 1, NOW(3), 'active',   NOW(3), NOW(3), NULL),
+(920002, 920012, 920002, 2, 'DBCASE Owner DeepSeek Key',   'cipher-user-deepseek-920012','****92012', 0, NOW(3), 'active',   NOW(3), NOW(3), NULL),
+(920003, 920013, 920001, 1, 'DBCASE Admin OpenAI Key',     'cipher-user-openai-920013',  '****92013', 0, NULL,   'disabled', NOW(3), NOW(3), NULL);
+
+INSERT INTO model_user_configurations (id, model_config_id, user_id, provider_id, model_name, base_url, key_source_type, user_key_id, official_key_id, status, created_at, updated_at, deleted_at) VALUES
+(920001, 920021, 920002, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920011, NULL,   'active',   NOW(3), NOW(3), NULL),
+(920002, 920022, 920002, 2, 'deepseek-chat',  'https://api.deepseek.com', 'USER_KEY',  920012, NULL,   'active',   NOW(3), NOW(3), NULL),
+(920003, 920023, 920002, 1, 'gpt-4.1',        NULL,                    'OFFICIAL_KEY', NULL,   920001, 'active',   NOW(3), NOW(3), NULL),
+(920004, 920024, 920001, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920013, NULL,   'disabled', NOW(3), NOW(3), NULL);
+
+UPDATE iam_users
+SET main_agent_model_config_id = CASE user_id
+        WHEN 920001 THEN 920024
+        WHEN 920002 THEN 920021
+        ELSE main_agent_model_config_id
+    END,
+    dirty_work_agent_model_config_id = CASE user_id
+        WHEN 920001 THEN NULL
+        WHEN 920002 THEN 920023
+        ELSE dirty_work_agent_model_config_id
+    END,
+    updated_at = NOW(3)
+WHERE user_id IN (920001, 920002);
+

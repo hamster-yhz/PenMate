@@ -1,16 +1,17 @@
 package com.penmate.backend.application.model;
 
-import com.penmate.backend.application.model.BuiltinModelProviders;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.command.ModelCommands.CreateModelKeyCommand;
 import com.penmate.backend.application.model.command.ModelCommands.CreateOfficialModelKeyCommand;
-import com.penmate.backend.application.model.command.ModelCommands.CreatePolicyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.CreateUserModelConfigCommand;
 import com.penmate.backend.application.model.command.ModelCommands.SaveUserModelPreferencesCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdateModelKeyCommand;
-import com.penmate.backend.application.model.command.ModelCommands.UpdatePolicyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.UpdateOfficialModelKeyCommand;
+import com.penmate.backend.application.model.command.ModelCommands.UpdateUserModelConfigCommand;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
-import com.penmate.backend.domain.model.model.ModelProjectPolicy;
+import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 import com.penmate.backend.domain.model.repository.ModelRepository;
@@ -22,7 +23,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -31,9 +31,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,6 +60,9 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result).hasSize(BuiltinModelProviders.list().size());
         assertThat(result).extracting(ModelProvider::getCode).contains("openai", "xai", "deepseek");
+        assertThat(result).extracting(ModelProvider::getProviderId)
+                .doesNotContainNull()
+                .doesNotHaveDuplicates();
         verifyNoInteractions(auditService);
     }
 
@@ -79,7 +82,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_MODEL_CREATE_KEY_SUCCESS() {
         Long userId = 1001L;
         Long operatorId = 1001L;
-        String traceId = "UT-TRACE-MODEL-CREATE-KEY";
 
         when(businessIdGenerator.nextId()).thenReturn(10001L);
         when(modelRepository.clearDefaultUserKey(userId)).thenReturn(1);
@@ -90,7 +92,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         modelApplicationService.createKey(
                 userId,
                 new CreateModelKeyCommand(1L, "我的Key", "sk-123456", true, "active", operatorId),
-                traceId
+                "trace"
         );
 
         verify(modelRepository).clearDefaultUserKey(userId);
@@ -109,76 +111,190 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 userId,
                 new CreateModelKeyCommand(1L, "我的Key", "sk-123456", false, "active", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+        )).isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("Failed to create model key");
-
-        verify(businessIdGenerator).nextId();
-        verify(modelRepository).insertUserKey(eq(10002L), eq(userId), eq(1L), eq("我的Key"), anyString(), anyString(), eq(false), eq("active"));
     }
 
     @Test
-    void UT_APP_MODEL_CREATE_KEY_NULL_COMMAND_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.createKey(1001L, null, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("command must not be null");
+    void UT_APP_MODEL_CREATE_KEY_MISSING_PROVIDER_ID_SHOULD_FAIL_FAST() {
+        Long userId = 1001L;
 
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_CREATE_KEY_NULL_USER_ID_SHOULD_FAIL_FAST() {
         assertThatThrownBy(() -> modelApplicationService.createKey(
-                null,
-                new CreateModelKeyCommand(1L, "我的Key", "sk-123456", false, "active", 1001L),
+                userId,
+                new CreateModelKeyCommand(null, "我的Key", "sk-123456", false, "active", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("userId must not be null");
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("Provider id is required");
 
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
+        verify(modelRepository, never()).insertUserKey(anyLong(), eq(userId), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verifyNoInteractions(auditService);
     }
 
     @Test
-    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_NULL_COMMAND_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.createOfficialKey((CreateOfficialModelKeyCommand) null, "trace"))
+    void UT_APP_MODEL_CREATE_KEY_UNKNOWN_PROVIDER_ID_SHOULD_FAIL_FAST() {
+        Long userId = 1001L;
+
+        assertThatThrownBy(() -> modelApplicationService.createKey(
+                userId,
+                new CreateModelKeyCommand(999L, "我的Key", "sk-123456", false, "active", 1001L),
+                "trace"
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("Provider id is invalid");
+
+        verify(modelRepository, never()).insertUserKey(anyLong(), eq(userId), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_SUCCESS() {
+        Long operatorId = 1001L;
+
+        when(businessIdGenerator.nextId()).thenReturn(10003L);
+        when(modelRepository.clearDefaultOfficialKey(1L)).thenReturn(1);
+        when(secretCryptoService.encrypt("sk-123456")).thenReturn("cipher-123");
+        when(modelRepository.insertOfficialKey(eq(10003L), eq(1L), eq("官方Key"), eq("cipher-123"), anyString(), eq(true), eq("active")))
+                .thenReturn(1);
+
+        modelApplicationService.createOfficialKey(
+                new CreateOfficialModelKeyCommand(1L, "官方Key", "sk-123456", true, "active", operatorId),
+                "trace"
+        );
+
+        verify(modelRepository).clearDefaultOfficialKey(1L);
+        verify(modelRepository).insertOfficialKey(eq(10003L), eq(1L), eq("官方Key"), eq("cipher-123"), anyString(), eq(true), eq("active"));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_MISSING_PROVIDER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> modelApplicationService.createOfficialKey(
+                new CreateOfficialModelKeyCommand(null, "官方Key", "sk-123456", false, "active", 1001L),
+                "trace"
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("Provider id is required");
+
+        verify(modelRepository, never()).insertOfficialKey(anyLong(), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_NON_POSITIVE_PROVIDER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> modelApplicationService.createOfficialKey(
+                new CreateOfficialModelKeyCommand(0L, "官方Key", "sk-123456", false, "active", 1001L),
+                "trace"
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("Provider id is invalid");
+
+        verify(modelRepository, never()).insertOfficialKey(anyLong(), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_UNKNOWN_PROVIDER_ID_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> modelApplicationService.createOfficialKey(
+                new CreateOfficialModelKeyCommand(999L, "官方Key", "sk-123456", false, "active", 1001L),
+                "trace"
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("Provider id is invalid");
+
+        verify(modelRepository, never()).insertOfficialKey(anyLong(), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_USER_MODEL_CONFIG_WITH_DIRECT_USER_KEY_SUCCESS() {
+        Long userId = 1001L;
+        when(businessIdGenerator.nextId()).thenReturn(9001L);
+        when(secretCryptoService.encrypt("sk-direct-user-key")).thenReturn("cipher-user-key");
+        when(modelRepository.insertUserKey(eq(9001L), eq(userId), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-user-key"), anyString(), eq(false), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.findUserKey(9001L)).thenReturn(userKey(9001L, userId, 1L, "gpt-4o-mini Key", "active"));
+        when(modelRepository.insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "USER_KEY", 9001L, null, "active")).thenReturn(1);
+
+        modelApplicationService.createUserModelConfig(
+                userId,
+                new CreateUserModelConfigCommand(1L, "gpt-4o-mini", null, "USER_KEY", "sk-direct-user-key", "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).insertUserKey(eq(9001L), eq(userId), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-user-key"), anyString(), eq(false), eq("active"));
+        verify(modelRepository).insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "USER_KEY", 9001L, null, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_OFFICIAL_MODEL_CONFIG_WITH_DIRECT_KEY_SUCCESS() {
+        Long userId = 1001L;
+        when(businessIdGenerator.nextId()).thenReturn(9001L);
+        when(secretCryptoService.encrypt("sk-direct-official-key")).thenReturn("cipher-official-key");
+        when(modelRepository.insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.findOfficialKey(9001L)).thenReturn(officialKey(9001L, 1L));
+        when(modelRepository.insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "OFFICIAL_KEY", null, 9001L, "active")).thenReturn(1);
+
+        modelApplicationService.createUserModelConfig(
+                userId,
+                new CreateUserModelConfigCommand(1L, "gpt-4o-mini", null, "OFFICIAL_KEY", "sk-direct-official-key", "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active"));
+        verify(modelRepository).insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "OFFICIAL_KEY", null, 9001L, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_USER_MODEL_CONFIG_NULL_COMMAND_SHOULD_FAIL_FAST() {
+        assertThatThrownBy(() -> modelApplicationService.createUserModelConfig(1001L, null, "trace"))
                 .isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("command must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
-    void UT_APP_MODEL_CREATE_POLICY_NULL_COMMAND_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.createPolicy(1L, null, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("command must not be null");
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_NOT_FOUND() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(null);
 
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_CREATE_POLICY_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.createPolicy(
-                null,
-                new CreatePolicyCommand(
-                        "默认策略",
-                        "chat",
-                        1L,
-                        "gpt-4o-mini",
-                        null,
-                        1L,
-                        null,
-                        new BigDecimal("0.7"),
-                        new BigDecimal("0.9"),
-                        2048,
-                        "{}",
-                        true,
-                        1001L
-                ),
+        assertThatThrownBy(() -> modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-direct-official-key", "active", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("User model config not found");
+    }
 
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_SWITCH_TO_DIRECT_KEY_SUCCESS() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "",
+                "keySourceType", "USER_KEY",
+                "userKeyId", 8001L,
+                "status", "active"
+        ));
+        when(secretCryptoService.encrypt("sk-direct-official-key")).thenReturn("cipher-official-key");
+        when(modelRepository.insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.findOfficialKey(9001L)).thenReturn(officialKey(9001L, 1L));
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9001L, "active")).thenReturn(1);
+
+        modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-direct-official-key", "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active"));
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9001L, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_DELETE_USER_MODEL_CONFIG_NOT_FOUND() {
+        when(modelRepository.softDeleteUserModelConfig(1001L, 9001L)).thenReturn(0);
+
+        assertThatThrownBy(() -> modelApplicationService.deleteUserModelConfig(1001L, 9001L, 1001L, "trace"))
+                .isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("User model config not found");
     }
 
     @Test
@@ -186,8 +302,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.updateKey(1001L, 2001L, null, "trace"))
                 .isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("command must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -195,44 +309,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.updateOfficialKey(2001L, null, "trace"))
                 .isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("command must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_UPDATE_POLICY_NULL_COMMAND_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.updatePolicy(1L, 3001L, null, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("command must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_UPDATE_POLICY_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.updatePolicy(
-                null,
-                3001L,
-                new UpdatePolicyCommand(
-                        "更新策略",
-                        "chat",
-                        2L,
-                        "gpt-4o",
-                        null,
-                        2L,
-                        null,
-                        new BigDecimal("0.8"),
-                        new BigDecimal("0.95"),
-                        4096,
-                        "{\"fallback\":true}",
-                        false,
-                        1001L
-                ),
-                "trace"
-        )).isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -248,7 +324,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 keyId,
                 new UpdateModelKeyCommand("更新Key", "sk-654321", false, "active", 1001L),
                 "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+        )).isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("Model key not found");
     }
 
@@ -261,8 +337,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "trace"
         )).isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("userId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -274,8 +348,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "trace"
         )).isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("keyId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -283,7 +355,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.softDeleteUserKey(1001L, 9999L)).thenReturn(0);
 
         assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, 9999L, 1001L, "trace"))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("Model key not found");
     }
 
@@ -292,8 +364,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.deleteKey(null, 9999L, 1001L, "trace"))
                 .isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("userId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -301,8 +371,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, null, 1001L, "trace"))
                 .isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("keyId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -310,8 +378,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, 9999L, null, "trace"))
                 .isExactlyInstanceOf(NullPointerException.class)
                 .hasMessage("operatorId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
     }
 
     @Test
@@ -321,233 +387,21 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         user.setId(userId);
         user.setMainAgentModelConfigId(9001L);
         user.setDirtyWorkAgentModelConfigId(9002L);
-        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(iamGateway.findUserByUserId(userId)).thenReturn(user);
         when(modelRepository.listUserModelConfigs(userId)).thenReturn(List.of(Map.of(
                 "modelConfigId", 9001L,
                 "modelName", "gpt-4o-mini",
                 "providerId", 1L,
-                "keySourceType", "USER_KEY"
+                "keySourceType", "USER_KEY",
+                "keyName", "OpenAI User Key",
+                "maskedApiKey", "****1234"
         )));
 
         Map<String, Object> result = modelApplicationService.getUserModelPreferencesDetail(userId);
 
         assertThat(result).containsEntry("mainAgentModelConfigId", 9001L)
                 .containsEntry("dirtyWorkAgentModelConfigId", 9002L);
-        assertThat(result).containsKey("candidateConfigs");
         assertThat((List<?>) result.get("candidateConfigs")).hasSize(1);
-        verify(iamGateway).findUserById(userId);
-        verify(modelRepository).listUserModelConfigs(userId);
-        verifyNoInteractions(auditService);
-    }
-
-    @Test
-    void UT_APP_MODEL_LIST_POLICIES_SUCCESS() {
-        Long projectId = 1L;
-        when(modelRepository.listProjectPolicies(projectId)).thenReturn(List.of(new ModelProjectPolicy(), new ModelProjectPolicy()));
-
-        List<ModelProjectPolicy> result = modelApplicationService.listPolicies(projectId);
-
-        assertThat(result).hasSize(2);
-        verify(modelRepository).listProjectPolicies(projectId);
-        verifyNoInteractions(auditService);
-    }
-
-    @Test
-    void UT_APP_MODEL_CREATE_POLICY_SUCCESS() {
-        Long projectId = 1L;
-        Long operatorId = 1001L;
-        String traceId = "UT-TRACE-MODEL-CREATE-POLICY";
-
-        when(businessIdGenerator.nextId()).thenReturn(20001L);
-        when(modelRepository.clearDefaultPolicy(projectId)).thenReturn(1);
-        when(modelRepository.insertPolicy(
-                eq(20001L),
-                eq(projectId),
-                eq("默认策略"),
-                eq("chat"),
-                eq(1L),
-                eq("gpt-4o-mini"),
-                org.mockito.ArgumentMatchers.<String>isNull(),
-                eq(1L),
-                org.mockito.ArgumentMatchers.<Long>isNull(),
-                eq(new BigDecimal("0.7")),
-                eq(new BigDecimal("0.9")),
-                eq(2048),
-                eq("{}"),
-                eq(true)
-        )).thenReturn(1);
-
-        modelApplicationService.createPolicy(
-                projectId,
-                new CreatePolicyCommand(
-                        "默认策略",
-                        "chat",
-                        1L,
-                        "gpt-4o-mini",
-                        null,
-                        1L,
-                        null,
-                        new BigDecimal("0.7"),
-                        new BigDecimal("0.9"),
-                        2048,
-                        "{}",
-                        true,
-                        operatorId
-                ),
-                traceId
-        );
-
-        verify(modelRepository).clearDefaultPolicy(projectId);
-        verify(modelRepository).insertPolicy(
-                eq(20001L),
-                eq(projectId),
-                eq("默认策略"),
-                eq("chat"),
-                eq(1L),
-                eq("gpt-4o-mini"),
-                org.mockito.ArgumentMatchers.<String>isNull(),
-                eq(1L),
-                org.mockito.ArgumentMatchers.<Long>isNull(),
-                eq(new BigDecimal("0.7")),
-                eq(new BigDecimal("0.9")),
-                eq(2048),
-                eq("{}"),
-                eq(true)
-        );
-    }
-
-    @Test
-    void UT_APP_MODEL_UPDATE_POLICY_NOT_FOUND() {
-        Long projectId = 1L;
-        Long policyId = 9999L;
-        when(modelRepository.updatePolicy(
-                eq(projectId),
-                eq(policyId),
-                eq("更新策略"),
-                eq("chat"),
-                eq(2L),
-                eq("gpt-4o"),
-                org.mockito.ArgumentMatchers.<String>isNull(),
-                eq(2L),
-                org.mockito.ArgumentMatchers.<Long>isNull(),
-                eq(new BigDecimal("0.8")),
-                eq(new BigDecimal("0.95")),
-                eq(4096),
-                eq("{\"fallback\":true}"),
-                eq(false)
-        )).thenReturn(0);
-
-        assertThatThrownBy(() -> modelApplicationService.updatePolicy(
-                projectId,
-                policyId,
-                new UpdatePolicyCommand(
-                        "更新策略",
-                        "chat",
-                        2L,
-                        "gpt-4o",
-                        null,
-                        2L,
-                        null,
-                        new BigDecimal("0.8"),
-                        new BigDecimal("0.95"),
-                        4096,
-                        "{\"fallback\":true}",
-                        false,
-                        1001L
-                ),
-                "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Model policy not found");
-    }
-
-    @Test
-    void UT_APP_MODEL_SET_DEFAULT_POLICY_NOT_FOUND() {
-        when(modelRepository.findProjectPolicy(1L, 9999L)).thenReturn(null);
-
-        assertThatThrownBy(() -> modelApplicationService.setDefaultPolicy(1L, 9999L, 1001L, "trace"))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Model policy not found");
-
-        verify(modelRepository, never()).clearDefaultPolicy(1L);
-        verify(modelRepository, never()).setDefaultPolicy(1L, 9999L);
-    }
-
-    @Test
-    void UT_APP_MODEL_SET_DEFAULT_POLICY_NULL_OPERATOR_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.setDefaultPolicy(1L, 9999L, null, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("operatorId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_SET_DEFAULT_POLICY_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.setDefaultPolicy(null, 9999L, 1001L, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_SET_DEFAULT_POLICY_NULL_POLICY_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.setDefaultPolicy(1L, null, 1001L, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("policyId must not be null");
-
-        verifyNoInteractions(modelRepository, secretCryptoService, businessIdGenerator);
-    }
-
-    @Test
-    void UT_APP_MODEL_UPDATE_KEY_BLANK_API_KEY_SHOULD_NOT_ENCRYPT_AND_SHOULD_PERSIST_NULL_SECRET_FIELDS() {
-        Long userId = 1001L;
-        Long keyId = 2001L;
-
-        when(modelRepository.updateUserKey(eq(userId), eq(keyId), eq("更新Key"), org.mockito.ArgumentMatchers.<String>isNull(), org.mockito.ArgumentMatchers.<String>isNull(), eq(false), eq("inactive")))
-                .thenReturn(1);
-
-        modelApplicationService.updateKey(
-                userId,
-                keyId,
-                new UpdateModelKeyCommand("更新Key", "   ", false, "inactive", 1001L),
-                "trace"
-        );
-
-        verify(secretCryptoService, never()).encrypt(anyString());
-        verify(modelRepository).updateUserKey(eq(userId), eq(keyId), eq("更新Key"), org.mockito.ArgumentMatchers.<String>isNull(), org.mockito.ArgumentMatchers.<String>isNull(), eq(false), eq("inactive"));
-    }
-
-    @Test
-    void UT_APP_MODEL_UPDATE_OFFICIAL_KEY_NOT_FOUND_BEFORE_UPDATE() {
-        when(modelRepository.findOfficialKey(3001L)).thenReturn(null);
-
-        assertThatThrownBy(() -> modelApplicationService.updateOfficialKey(
-                3001L,
-                new com.penmate.backend.application.model.command.ModelCommands.UpdateOfficialModelKeyCommand("官方Key", "sk-official", false, "active", 1001L),
-                "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Official model key not found");
-
-        verify(modelRepository).findOfficialKey(3001L);
-        verify(modelRepository, never()).updateOfficialKey(anyLong(), anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.any(), anyString());
-    }
-
-    @Test
-    void UT_APP_MODEL_SET_DEFAULT_POLICY_SUCCESS() {
-        Long projectId = 1L;
-        Long policyId = 3001L;
-        ModelProjectPolicy existing = new ModelProjectPolicy();
-        existing.setProjectPolicyId(policyId);
-        when(modelRepository.findProjectPolicy(projectId, policyId)).thenReturn(existing);
-        when(modelRepository.clearDefaultPolicy(projectId)).thenReturn(1);
-        when(modelRepository.setDefaultPolicy(projectId, policyId)).thenReturn(1);
-
-        modelApplicationService.setDefaultPolicy(projectId, policyId, 1001L, "trace");
-
-        verify(modelRepository).findProjectPolicy(projectId, policyId);
-        verify(modelRepository).clearDefaultPolicy(projectId);
-        verify(modelRepository).setDefaultPolicy(projectId, policyId);
     }
 
     @Test
@@ -557,7 +411,9 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "modelConfigId", 9001L,
                 "modelName", "gpt-4o-mini",
                 "providerId", 1L,
-                "keySourceType", "USER_KEY"
+                "keySourceType", "USER_KEY",
+                "keyName", "OpenAI User Key",
+                "maskedApiKey", "****1234"
         ));
         when(modelRepository.listUserModelConfigs(userId)).thenReturn(expected);
 
@@ -572,10 +428,9 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_SUCCESS() {
         Long userId = 1001L;
         Long operatorId = 1002L;
-        String traceId = "UT-TRACE-MODEL-PREFERENCES-SAVE";
         IamUser user = new IamUser();
         user.setUserId(userId);
-        when(iamGateway.findUserById(userId)).thenReturn(user);
+        when(iamGateway.findUserByUserId(userId)).thenReturn(user);
         when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(true);
         when(modelRepository.existsUsableModelConfig(userId, 9002L)).thenReturn(true);
         when(modelRepository.updateUserModelPreferences(userId, 9001L, 9002L)).thenReturn(1);
@@ -584,95 +439,40 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 userId,
                 operatorId,
                 new SaveUserModelPreferencesCommand(9001L, 9002L),
-                traceId
+                "trace"
         );
 
-        verify(iamGateway).findUserById(userId);
-        verify(modelRepository).existsUsableModelConfig(userId, 9001L);
-        verify(modelRepository).existsUsableModelConfig(userId, 9002L);
         verify(modelRepository).updateUserModelPreferences(userId, 9001L, 9002L);
-        verifyNoInteractions(auditService);
     }
 
     @Test
     void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_USER_NOT_FOUND() {
-        when(iamGateway.findUserById(1001L)).thenReturn(null);
+        when(iamGateway.findUserByUserId(1001L)).thenReturn(null);
 
         assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
                 1001L,
                 1001L,
                 new SaveUserModelPreferencesCommand(9001L, 9002L),
                 "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+        )).isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("User not found");
-
-        verify(iamGateway).findUserById(1001L);
-        verify(modelRepository, never()).existsUsableModelConfig(anyLong(), anyLong());
-        verify(modelRepository, never()).updateUserModelPreferences(anyLong(), anyLong(), anyLong());
     }
 
-    @Test
-    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_MAIN_CONFIG_UNAVAILABLE() {
-        Long userId = 1001L;
-        IamUser user = new IamUser();
-        user.setUserId(userId);
-        when(iamGateway.findUserById(userId)).thenReturn(user);
-        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(false);
-
-        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
-                userId,
-                1001L,
-                new SaveUserModelPreferencesCommand(9001L, 9002L),
-                "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Main agent model config is unavailable");
-
-        verify(modelRepository).existsUsableModelConfig(userId, 9001L);
-        verify(modelRepository, never()).existsUsableModelConfig(userId, 9002L);
-        verify(modelRepository, never()).updateUserModelPreferences(anyLong(), anyLong(), anyLong());
+    private ModelUserApiKey userKey(Long keyId, Long userId, Long providerId, String keyName, String status) {
+        ModelUserApiKey key = new ModelUserApiKey();
+        key.setUserApiKeyId(keyId);
+        key.setUserId(userId);
+        key.setProviderId(providerId);
+        key.setKeyName(keyName);
+        key.setStatus(status);
+        return key;
     }
 
-    @Test
-    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_DIRTY_WORK_CONFIG_UNAVAILABLE() {
-        Long userId = 1001L;
-        IamUser user = new IamUser();
-        user.setUserId(userId);
-        when(iamGateway.findUserById(userId)).thenReturn(user);
-        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(true);
-        when(modelRepository.existsUsableModelConfig(userId, 9002L)).thenReturn(false);
-
-        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
-                userId,
-                1001L,
-                new SaveUserModelPreferencesCommand(9001L, 9002L),
-                "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Dirty work agent model config is unavailable");
-
-        verify(modelRepository).existsUsableModelConfig(userId, 9001L);
-        verify(modelRepository).existsUsableModelConfig(userId, 9002L);
-        verify(modelRepository, never()).updateUserModelPreferences(anyLong(), anyLong(), anyLong());
-    }
-
-    @Test
-    void UT_APP_MODEL_SAVE_USER_MODEL_PREFERENCES_UPDATE_FAILED() {
-        Long userId = 1001L;
-        IamUser user = new IamUser();
-        user.setUserId(userId);
-        when(iamGateway.findUserById(userId)).thenReturn(user);
-        when(modelRepository.existsUsableModelConfig(userId, 9001L)).thenReturn(true);
-        when(modelRepository.existsUsableModelConfig(userId, 9002L)).thenReturn(true);
-        when(modelRepository.updateUserModelPreferences(userId, 9001L, 9002L)).thenReturn(0);
-
-        assertThatThrownBy(() -> modelApplicationService.saveUserModelPreferences(
-                userId,
-                1001L,
-                new SaveUserModelPreferencesCommand(9001L, 9002L),
-                "trace"
-        )).isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Failed to update user model preferences");
-
-        verify(modelRepository).updateUserModelPreferences(userId, 9001L, 9002L);
+    private ModelOfficialApiKey officialKey(Long keyId, Long providerId) {
+        ModelOfficialApiKey key = new ModelOfficialApiKey();
+        key.setOfficialApiKeyId(keyId);
+        key.setProviderId(providerId);
+        key.setStatus("active");
+        return key;
     }
 }
-

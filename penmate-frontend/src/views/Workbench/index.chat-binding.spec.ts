@@ -30,12 +30,39 @@ const WorkbenchLeftPanelHarness = {
   props: ['activeLeftTab'],
   emits: ['update:active-left-tab'],
   template: `
-    <div>
+    <aside data-testid="layout-left-panel">
       <div data-testid="active-left-tab">{{ activeLeftTab }}</div>
       <button data-testid="left-tab-outline" @click="$emit('update:active-left-tab', 'outline')">outline</button>
       <button data-testid="left-tab-characters" @click="$emit('update:active-left-tab', 'characters')">characters</button>
       <button data-testid="left-tab-world" @click="$emit('update:active-left-tab', 'world')">world</button>
-    </div>
+    </aside>
+  `,
+}
+
+const WorkbenchEditorPanelHarness = {
+  name: 'WorkbenchEditorPanel',
+  template: '<main data-testid="layout-editor-panel">editor</main>',
+}
+
+const WorkbenchRightPanelHarness = {
+  name: 'WorkbenchRightPanel',
+  props: ['chatInput', 'generationStatusText', 'isGenerating'],
+  emits: ['update:chat-input', 'send'],
+  methods: {
+    emitChatInput(this: { $emit: (eventName: string, value: string) => void }, event: Event) {
+      this.$emit('update:chat-input', (event.target as HTMLTextAreaElement | null)?.value || '')
+    },
+  },
+  template: `
+    <aside data-testid="layout-right-panel">
+      <div data-testid="agent-status">{{ generationStatusText }}</div>
+      <textarea
+        data-testid="chat-input"
+        :value="chatInput"
+        @input="emitChatInput"
+      ></textarea>
+      <button data-testid="chat-send" type="button" :disabled="isGenerating" @click="$emit('send')">send</button>
+    </aside>
   `,
 }
 
@@ -114,6 +141,7 @@ vi.mock('@/api/modules/chapter.api', () => ({
     getContentUploadUrl: vi.fn(async () => ({})),
     commitContent: vi.fn(async () => ({})),
     createVersion: vi.fn(async () => ({})),
+    getChapterDetail: vi.fn(async () => ({ content: '' })),
   },
 }))
 
@@ -148,7 +176,11 @@ vi.mock('@/api/modules/plugin.api', () => ({
 
 vi.mock('@/api/modules/model.api', () => ({
   modelApi: {
-    listConfigs: vi.fn(async () => [{ projectPolicyId: 9001, modelName: 'DeepSeek-R1', isDefault: true }]),
+    getUserModelPreferences: vi.fn(async () => ({
+      mainAgentModelConfigId: 'mcfg-9001',
+      dirtyWorkAgentModelConfigId: 'mcfg-9002',
+      candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
+    })),
   },
 }))
 
@@ -214,11 +246,10 @@ vi.mock('@/composables/workbench/useWorkbenchEditor', () => ({
   useWorkbenchEditor: () => ({
     editorRef: ref(null),
     editorContent: ref(''),
-    wordCount: ref(0),
     currentLine: ref(1),
     currentCol: ref(1),
     selectedText: ref(''),
-    saveHint: ref(''),
+    bindEditorTextarea: vi.fn(),
     onEditorInput: vi.fn(),
     updateCursorPos: vi.fn(),
     editorUndo: vi.fn(),
@@ -227,7 +258,6 @@ vi.mock('@/composables/workbench/useWorkbenchEditor', () => ({
     insertPrefix: vi.fn(),
     mergeToEditor: vi.fn(),
     replaceSelected: vi.fn(),
-    saveContent: vi.fn(),
     selectChapterDraft: vi.fn(),
   }),
 }))
@@ -239,17 +269,15 @@ vi.mock('@/composables/workbench/useWorkbenchVersions', () => ({
     selectedVersionContent: ref(''),
     versionDiffSummary: ref(''),
     getCurrentChapterVersions: vi.fn(() => []),
-    loadChapterVersions: vi.fn(async () => undefined),
+    loadVersions: vi.fn(async () => undefined),
     viewSelectedVersion: vi.fn(async () => undefined),
     restoreSelectedVersion: vi.fn(async () => undefined),
-    publishCurrentChapter: vi.fn(async () => undefined),
-    refreshEditorFromRemote: vi.fn(async () => false),
   }),
 }))
 
 vi.mock('@/composables/workbench/useWorkbenchApprovals', () => ({
   useWorkbenchApprovals: () => ({
-    isApprovalBusy: vi.fn(() => false),
+    isApprovalBusy: ref(false),
     handleApprove: vi.fn(async () => undefined),
     handleReject: vi.fn(async () => undefined),
   }),
@@ -261,9 +289,8 @@ const mountWorkbench = async () => {
     global: {
       stubs: {
         WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
-        WorkbenchRightPanel: false,
-        ChatComposer: false,
-        AgentSessionHeader: false,
+        WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
+        WorkbenchRightPanel: WorkbenchRightPanelHarness,
       },
     },
   })
@@ -327,6 +354,42 @@ describe('Workbench index chat parent binding', () => {
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
     expect(agentApiMock.createMessage).toHaveBeenCalledTimes(1)
     expect(agentApiMock.createGeneration).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes_string_model_config_id_to_generation_payload_when_loading_preferred_model', async () => {
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      wrapper.get('[data-testid="chat-input"]')
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('使用已选模型生成内容')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createGeneration).toHaveBeenCalledTimes(1)
+    })
+
+    const generationPayload = agentApiMock.createGeneration.mock.calls[0]?.[2] as Record<string, unknown> | undefined
+    expect(generationPayload).toEqual(
+      expect.objectContaining({
+        modelConfigId: 'mcfg-9001',
+      })
+    )
+  })
+
+  it('passes_nested_preferred_string_model_config_id_to_generation_payload_when_preferences_are_nested', async () => {
+    vi.doMock('@/api/modules/model.api', () => ({
+      modelApi: {
+        getUserModelPreferences: vi.fn(async () => ({
+          preferences: {
+            mainAgentModelConfigId: 'mcfg-nested-9001',
+            dirtyWorkAgentModelConfigId: 'mcfg-nested-9002',
+          },
+          candidateConfigs: [{ modelConfigId: 'mcfg-nested-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
+        })),
+      },
+    }))
   })
 
   it('updates_active_left_tab_in_parent_when_left_panel_emits_tab_change', async () => {

@@ -54,7 +54,7 @@ class RbacQueryControllerTest {
     void UT_RBAC_USERS_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-USERS-LIST";
         IamUser user = new IamUser();
-        user.setId(1001L);
+        user.setId(900001L);
         user.setUserId(1001L);
         user.setEmail("author@penmate.ai");
         user.setDisplayName("作者A");
@@ -64,7 +64,8 @@ class RbacQueryControllerTest {
 
         mockMvc().perform(get("/api/v1/users").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].userId").value(1001))
+                .andExpect(jsonPath("$.data[0].id").value(1001))
+                .andExpect(jsonPath("$.data[0].userId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].email").value("author@penmate.ai"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
@@ -159,7 +160,7 @@ class RbacQueryControllerTest {
     void UT_RBAC_USER_ROLES_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-USER-ROLES-LIST";
         IamRole role = new IamRole();
-        role.setId(2001L);
+        role.setId(920001L);
         role.setRoleId(2001L);
         role.setName("管理员");
         role.setCode("ADMIN");
@@ -168,7 +169,8 @@ class RbacQueryControllerTest {
         mockMvc().perform(get("/api/v1/users/1001/roles")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].roleId").value(2001))
+                .andExpect(jsonPath("$.data[0].id").value(2001))
+                .andExpect(jsonPath("$.data[0].roleId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].code").value("ADMIN"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
 
@@ -180,7 +182,7 @@ class RbacQueryControllerTest {
     void UT_RBAC_ROLE_PERMISSIONS_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLE-PERMISSIONS-LIST";
         IamPermission permission = new IamPermission();
-        permission.setId(3001L);
+        permission.setId(930001L);
         permission.setPermissionId(3001L);
         permission.setName("RBAC 管理");
         permission.setCode("rbac.manage");
@@ -189,7 +191,8 @@ class RbacQueryControllerTest {
         mockMvc().perform(get("/api/v1/roles/3001/permissions")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].permissionId").value(3001))
+                .andExpect(jsonPath("$.data[0].id").value(3001))
+                .andExpect(jsonPath("$.data[0].permissionId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].code").value("rbac.manage"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
 
@@ -233,7 +236,8 @@ class RbacQueryControllerTest {
     void UT_RBAC_ROLES_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLES-LIST";
         com.penmate.backend.domain.iam.model.IamRole role = new com.penmate.backend.domain.iam.model.IamRole();
-        role.setId(3001L);
+        role.setId(940001L);
+        role.setRoleId(3001L);
         role.setCode("editor");
         role.setName("编辑");
         when(iamQueryApplicationService.listRoles()).thenReturn(List.of(role));
@@ -241,6 +245,7 @@ class RbacQueryControllerTest {
         mockMvc().perform(get("/api/v1/roles").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(3001))
+                .andExpect(jsonPath("$.data[0].roleId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].code").value("editor"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }

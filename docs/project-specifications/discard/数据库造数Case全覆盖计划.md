@@ -41,7 +41,7 @@
 | 小说核心 | novel_projects novel_members novel_volumes novel_chapters novel_chapter_versions novel_outline_nodes novel_entity_cards novel_entity_relations | 项目主链、章节状态、版本恢复、树结构、实体关系 | 项目大纲卡片全域单测 |
 | 文风 | style_profiles style_switch_logs | 默认文风、切换审计、警告确认 | style接口与切换规则单测 |
 | 插件 | plugin_catalog plugin_versions plugin_project_installs plugin_call_logs | 安装唯一性、版本兼容、调用日志分页 | plugin接口与调用日志单测 |
-| 模型BYOK | model_providers model_provider_models model_user_api_keys model_project_policies model_invocation_logs | 密钥掩码、策略默认切换、调用记录 | model接口与策略单测 |
+| 模型BYOK | model_providers model_provider_models model_user_api_keys model_user_configurations model_invocation_logs | 密钥掩码、配置切换、调用记录 | model接口与模型配置单测 |
 | Agent审批 | agent_conversations agent_messages agent_generation_tasks agent_approval_requests agent_approval_actions | 生成任务状态机、审批流与动作流水 | agent与approval接口单测 |
 | RAG | rag_documents rag_chunks rag_retrieval_logs | 文档生命周期、分块索引、检索日志 | rag接口与索引任务单测 |
 | 运维任务 | ops_async_jobs ops_migration_tasks | 任务重试、迁移互斥、状态推进 | jobs与migration接口单测 |

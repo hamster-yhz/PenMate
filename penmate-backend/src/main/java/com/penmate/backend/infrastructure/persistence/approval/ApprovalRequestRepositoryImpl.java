@@ -42,40 +42,40 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     }
 
     /**
-     * 按审批单 ID 查询详情。
+     * 按审批业务 ID 查询详情。
      *
-     * @param id 审批单 ID
+     * @param approvalRequestId 审批业务 ID
      * @return 审批请求；不存在时返回 {@code null}
      */
     @Override
-    public ApprovalRequest findById(Long id) {
-        return approvalRequestMapper.findById(id);
+    public ApprovalRequest findByApprovalRequestId(Long approvalRequestId) {
+        return approvalRequestMapper.findByApprovalRequestId(approvalRequestId);
     }
 
     /**
      * 将审批请求标记为通过。
      *
-     * @param id 审批单 ID
+     * @param approvalRequestId 审批业务 ID
      * @param reviewedBy 审核人 ID
      * @param comment 审核意见
      * @return 受影响行数
      */
     @Override
-    public int approve(Long id, Long reviewedBy, String comment) {
-        return approvalRequestMapper.approve(id, reviewedBy, comment);
+    public int approveByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment) {
+        return approvalRequestMapper.approveByApprovalRequestId(approvalRequestId, reviewedBy, comment);
     }
 
     /**
      * 将审批请求标记为拒绝。
      *
-     * @param id 审批单 ID
+     * @param approvalRequestId 审批业务 ID
      * @param reviewedBy 审核人 ID
      * @param comment 审核意见
      * @return 受影响行数
      */
     @Override
-    public int reject(Long id, Long reviewedBy, String comment) {
-        return approvalRequestMapper.reject(id, reviewedBy, comment);
+    public int rejectByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment) {
+        return approvalRequestMapper.rejectByApprovalRequestId(approvalRequestId, reviewedBy, comment);
     }
 }
 

@@ -1,7 +1,5 @@
 package com.penmate.backend.application.model.command;
 
-import java.math.BigDecimal;
-
 public final class ModelCommands {
 
     private ModelCommands() {
@@ -37,34 +35,22 @@ public final class ModelCommands {
                                                 Long operatorId) {
     }
 
-    public record CreatePolicyCommand(String policyName,
-                                      String scene,
-                                      Long providerModelId,
-                                      String modelName,
-                                      String baseUrl,
-                                      Long userKeyId,
-                                      Long officialKeyId,
-                                      BigDecimal temperature,
-                                      BigDecimal topP,
-                                      Integer maxTokens,
-                                      String fallbackPolicyJson,
-                                      Boolean isDefault,
-                                      Long operatorId) {
+    public record CreateUserModelConfigCommand(Long providerId,
+                                               String modelName,
+                                               String baseUrl,
+                                               String keySourceType,
+                                               String apiKey,
+                                               String status,
+                                               Long operatorId) {
     }
 
-    public record UpdatePolicyCommand(String policyName,
-                                      String scene,
-                                      Long providerModelId,
-                                      String modelName,
-                                      String baseUrl,
-                                      Long userKeyId,
-                                      Long officialKeyId,
-                                      BigDecimal temperature,
-                                      BigDecimal topP,
-                                      Integer maxTokens,
-                                      String fallbackPolicyJson,
-                                      Boolean isDefault,
-                                      Long operatorId) {
+    public record UpdateUserModelConfigCommand(Long providerId,
+                                               String modelName,
+                                               String baseUrl,
+                                               String keySourceType,
+                                               String apiKey,
+                                               String status,
+                                               Long operatorId) {
     }
 
     public record SaveUserModelPreferencesCommand(Long mainAgentModelConfigId,

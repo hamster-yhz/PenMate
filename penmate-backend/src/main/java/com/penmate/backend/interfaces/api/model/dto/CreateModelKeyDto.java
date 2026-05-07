@@ -1,15 +1,17 @@
 package com.penmate.backend.interfaces.api.model.dto;
 
-import lombok.Data;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.Data;
 
 @Data
-
 public class CreateModelKeyDto {
 
-    @NotNull
-    private Long providerId;
+    @NotBlank
+    @Pattern(regexp = "^[1-9]\\d*$", message = "providerId must be greater than 0")
+    @JsonDeserialize(using = StringIdOnlyDeserializer.class)
+    private String providerId;
 
     @NotBlank
     private String keyName;
@@ -19,6 +21,4 @@ public class CreateModelKeyDto {
 
     private Boolean isDefault;
     private String status;
-
 }
-

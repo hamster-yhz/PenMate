@@ -137,4 +137,5 @@ describe('Workbench index refactor', () => {
     expect(source).toContain('class="workbench-orb orb-right"')
     expect(source).toContain('class="wb-main workbench-shell"')
   })
+
 })

@@ -24,8 +24,8 @@ public interface IamPermissionMapper {
     @Select("""
             SELECT id, permission_id, name, code, module, description
             FROM iam_permissions
-            WHERE permission_id = #{id}
+            WHERE permission_id = #{permissionId}
             """)
-    IamPermission findById(@Param("id") Long id);
+    IamPermission findByPermissionId(@Param("permissionId") Long permissionId);
 }
 

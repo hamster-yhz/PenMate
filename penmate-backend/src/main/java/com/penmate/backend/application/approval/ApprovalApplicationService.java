@@ -80,7 +80,7 @@ public class ApprovalApplicationService {
 
     public ApprovalRequest detail(Long approvalId) {
         log.info("查询审批详情: approvalId={}", approvalId);
-        ApprovalRequest request = approvalRequestRepository.findById(approvalId);
+        ApprovalRequest request = approvalRequestRepository.findByApprovalRequestId(approvalId);
         if (request == null) {
             log.warn("查询审批详情失败: approvalId={}, reason=not_found", approvalId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Approval request not found");
@@ -91,7 +91,7 @@ public class ApprovalApplicationService {
 
     public void approve(Long approvalId, ReviewApprovalCommand command, String traceId) {
         log.info("审批通过请求: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
-        int affected = approvalRequestRepository.approve(approvalId, command.reviewedBy(), command.comment());
+        int affected = approvalRequestRepository.approveByApprovalRequestId(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
             log.warn("审批通过失败: approvalId={}, reviewedBy={}, reason=invalid_status_or_not_found", approvalId, command.reviewedBy());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Approval is not in pending status or not found");
@@ -110,7 +110,7 @@ public class ApprovalApplicationService {
 
     public void reject(Long approvalId, ReviewApprovalCommand command, String traceId) {
         log.info("审批驳回请求: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
-        int affected = approvalRequestRepository.reject(approvalId, command.reviewedBy(), command.comment());
+        int affected = approvalRequestRepository.rejectByApprovalRequestId(approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
             log.warn("审批驳回失败: approvalId={}, reviewedBy={}, reason=invalid_status_or_not_found", approvalId, command.reviewedBy());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Approval is not in pending status or not found");

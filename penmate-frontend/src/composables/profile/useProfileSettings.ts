@@ -34,18 +34,37 @@ export interface ProfileActionResult {
 }
 
 export interface ProfileModelPreferences {
-  mainAgentModelConfigId: number | null
-  dirtyWorkAgentModelConfigId: number | null
+  mainAgentModelConfigId: string | null
+  dirtyWorkAgentModelConfigId: string | null
 }
 
 export interface ProfileModelConfigOption {
-  modelConfigId: number
+  modelConfigId: string
   modelName: string
   providerName?: string
   keySourceType?: string
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const extractPreferenceRecord = (payload: unknown): Record<string, unknown> => {
+  if (!payload || typeof payload !== 'object') {
+    return {}
+  }
+
+  const record = payload as Record<string, unknown>
+  const nestedPreferences = record.preferences
+  if (nestedPreferences && typeof nestedPreferences === 'object') {
+    return nestedPreferences as Record<string, unknown>
+  }
+
+  const nestedConfig = record.config
+  if (nestedConfig && typeof nestedConfig === 'object') {
+    return nestedConfig as Record<string, unknown>
+  }
+
+  return record
+}
 
 const buildParticleStyle = () => ({
   width: `${Math.random() * 3 + 1}px`,
@@ -145,6 +164,17 @@ export const useProfileSettings = () => {
     modelConfigOptions.value = []
   }
 
+  const normalizeModelConfigId = (value: string | null) => {
+    if (typeof value !== 'string') {
+      return null
+    }
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return null
+    }
+    return modelConfigOptions.value.some((item) => item.modelConfigId === trimmed) ? trimmed : null
+  }
+
   const loadModelPreferences = async () => {
     if (!session.userId) {
       resetModelPreferenceState()
@@ -153,19 +183,31 @@ export const useProfileSettings = () => {
 
     try {
       const detail = await modelApi.getUserModelPreferences(session.userId)
-      const mainValue = Number(detail.mainAgentModelConfigId ?? 0)
-      const dirtyValue = Number(detail.dirtyWorkAgentModelConfigId ?? 0)
+      const preferenceRecord = extractPreferenceRecord(detail)
+      const mainValue = typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId : null
+      const dirtyValue = typeof preferenceRecord.dirtyWorkAgentModelConfigId === 'string' ? preferenceRecord.dirtyWorkAgentModelConfigId : null
 
-      modelPreferences.mainAgentModelConfigId = mainValue > 0 ? mainValue : null
-      modelPreferences.dirtyWorkAgentModelConfigId = dirtyValue > 0 ? dirtyValue : null
-      modelConfigOptions.value = Array.isArray(detail.candidateConfigs)
-        ? detail.candidateConfigs.map((item) => ({
-            modelConfigId: Number(item.modelConfigId),
-            modelName: String(item.modelName ?? ''),
-            providerName: typeof item.providerName === 'string' ? item.providerName : undefined,
-            keySourceType: typeof item.keySourceType === 'string' ? item.keySourceType : undefined,
-          }))
-        : []
+      const candidateConfigs = Array.isArray(detail.candidateConfigs)
+        ? detail.candidateConfigs
+        : Array.isArray(preferenceRecord.candidateConfigs)
+          ? preferenceRecord.candidateConfigs
+          : []
+      const normalizedOptions: ProfileModelConfigOption[] = []
+      for (const item of candidateConfigs) {
+        const modelConfigId = typeof item.modelConfigId === 'string' ? item.modelConfigId.trim() : ''
+        if (!modelConfigId) {
+          continue
+        }
+        normalizedOptions.push({
+          modelConfigId,
+          modelName: String(item.modelName ?? ''),
+          providerName: typeof item.providerName === 'string' ? item.providerName : undefined,
+          keySourceType: typeof item.keySourceType === 'string' ? item.keySourceType : undefined,
+        })
+      }
+      modelConfigOptions.value = normalizedOptions
+      modelPreferences.mainAgentModelConfigId = normalizeModelConfigId(mainValue)
+      modelPreferences.dirtyWorkAgentModelConfigId = normalizeModelConfigId(dirtyValue)
     } catch (error) {
       resetModelPreferenceState()
       throw error
@@ -176,6 +218,9 @@ export const useProfileSettings = () => {
     if (!session.userId) {
       throw new Error('缺少用户会话')
     }
+
+    modelPreferences.mainAgentModelConfigId = normalizeModelConfigId(modelPreferences.mainAgentModelConfigId)
+    modelPreferences.dirtyWorkAgentModelConfigId = normalizeModelConfigId(modelPreferences.dirtyWorkAgentModelConfigId)
 
     await modelApi.saveUserModelPreferences(session.userId, session.userId, {
       mainAgentModelConfigId: modelPreferences.mainAgentModelConfigId,

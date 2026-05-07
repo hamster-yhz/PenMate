@@ -5,10 +5,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.Map;
@@ -64,6 +67,30 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                  HttpServletRequest request) {
+        String traceId = traceId(request);
+        log.warn("请求体不可读: traceId={}, path={}, message={}", traceId, request.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        List<Map<String, String>> details = List.of(
+                Map.of(
+                        "field", "requestBody",
+                        "message", ex.getMostSpecificCause().getMessage()
+                )
+        );
+
+        return ResponseEntity.badRequest().body(
+                ErrorResponse.of(
+                        400,
+                        "VALIDATION_ERROR",
+                        "请求参数校验失败",
+                        details,
+                        request.getRequestURI(),
+                        traceId
+                )
+        );
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex, HttpServletRequest request) {
         String traceId = traceId(request);
@@ -101,6 +128,16 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoHandlerFound(NoHandlerFoundException ex, HttpServletRequest request) {
+        return notFoundResponse(request, ex.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest request) {
+        return notFoundResponse(request, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnknown(Exception ex, HttpServletRequest request) {
         String traceId = traceId(request);
@@ -110,6 +147,21 @@ public class GlobalExceptionHandler {
                         500,
                         "INTERNAL_SERVER_ERROR",
                         "系统开小差了，请稍后重试",
+                        null,
+                        request.getRequestURI(),
+                        traceId
+                )
+        );
+    }
+
+    private ResponseEntity<ErrorResponse> notFoundResponse(HttpServletRequest request, String message) {
+        String traceId = traceId(request);
+        log.warn("资源不存在: traceId={}, path={}, message={}", traceId, request.getRequestURI(), message);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ErrorResponse.of(
+                        404,
+                        "NOT_FOUND",
+                        "请求的资源不存在",
                         null,
                         request.getRequestURI(),
                         traceId
@@ -129,4 +181,3 @@ public class GlobalExceptionHandler {
         return traceId.trim();
     }
 }
-

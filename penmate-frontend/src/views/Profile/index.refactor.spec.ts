@@ -44,11 +44,11 @@ describe('Profile index refactor', () => {
     clearSession()
     setSession({ userId: 1001 })
     getUserModelPreferencesMock.mockResolvedValue({
-      mainAgentModelConfigId: 9001,
-      dirtyWorkAgentModelConfigId: 9002,
+      mainAgentModelConfigId: 'mcfg-9001',
+      dirtyWorkAgentModelConfigId: 'mcfg-9002',
       candidateConfigs: [
-        { modelConfigId: 9001, modelName: 'gpt-4o-mini', providerName: 'OpenAI', keySourceType: 'USER_KEY' },
-        { modelConfigId: 9002, modelName: 'deepseek-chat', providerName: 'DeepSeek', keySourceType: 'OFFICIAL_KEY' },
+        { modelConfigId: 'mcfg-9001', modelName: 'gpt-4o-mini', providerName: 'OpenAI', keySourceType: 'USER_KEY' },
+        { modelConfigId: 'mcfg-9002', modelName: 'deepseek-chat', providerName: 'DeepSeek', keySourceType: 'OFFICIAL_KEY' },
       ],
     })
     saveUserModelPreferencesMock.mockResolvedValue('updated')
@@ -109,13 +109,13 @@ describe('Profile index refactor', () => {
     expect(mainSelect.exists()).toBe(true)
     expect(dirtySelect.exists()).toBe(true)
 
-    await mainSelect.setValue('9002')
-    await dirtySelect.setValue('9001')
+    await mainSelect.setValue('mcfg-9002')
+    await dirtySelect.setValue('mcfg-9001')
     await wrapper.find('[data-testid="model-preference-save"]').trigger('click')
 
     expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
-      mainAgentModelConfigId: 9002,
-      dirtyWorkAgentModelConfigId: 9001,
+      mainAgentModelConfigId: 'mcfg-9002',
+      dirtyWorkAgentModelConfigId: 'mcfg-9001',
     })
     expect(wrapper.text()).toContain('模型偏好已保存')
 

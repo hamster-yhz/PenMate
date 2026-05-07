@@ -69,7 +69,7 @@ public class AuthApplicationService {
         AuthTokenBundle bundle = authTokenService.issueTokens(payload);
         payload.setRefreshJti(bundle.refreshJti());
         authSessionCache.saveSession(payload, bundle);
-        iamGateway.touchLastLogin(user.getId());
+        iamGateway.touchLastLoginByUserId(user.getUserId());
 
         writeAudit(traceId, user.getId(), "auth", "login", "redis_auth_tokens", bundle.accessJti(), command.email(), 200);
 
@@ -177,7 +177,7 @@ public class AuthApplicationService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (IamRole role : roles) {
             Map<String, Object> item = new HashMap<>();
-            item.put("id", role.getId());
+            item.put("id", role.getRoleId());
             item.put("name", role.getName());
             item.put("code", role.getCode());
             result.add(item);
@@ -189,7 +189,7 @@ public class AuthApplicationService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (IamPermission permission : permissions) {
             Map<String, Object> item = new HashMap<>();
-            item.put("id", permission.getId());
+            item.put("id", permission.getPermissionId());
             item.put("name", permission.getName());
             item.put("code", permission.getCode());
             item.put("module", permission.getModule());

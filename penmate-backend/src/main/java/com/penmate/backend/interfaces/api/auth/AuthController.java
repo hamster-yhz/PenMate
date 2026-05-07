@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -102,7 +103,15 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<Map<String, Object>> me(@RequestHeader("Authorization") String authorization,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(authApplicationService.me(authorization), traceId);
+        return ApiResponse.success(toAuthMeView(authApplicationService.me(authorization)), traceId);
+    }
+
+    private Map<String, Object> toAuthMeView(Map<String, Object> source) {
+        Map<String, Object> data = new LinkedHashMap<>(source);
+        Object id = data.containsKey("userId") ? data.get("userId") : data.get("id");
+        data.put("id", id);
+        data.remove("userId");
+        return data;
     }
 }
 

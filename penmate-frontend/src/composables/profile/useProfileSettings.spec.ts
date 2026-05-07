@@ -48,11 +48,11 @@ describe('useProfileSettings', () => {
   it('loads_model_preferences_detail_when_session_user_exists', async () => {
     setSession({ userId: 1001 })
     getUserModelPreferencesMock.mockResolvedValue({
-      mainAgentModelConfigId: 9001,
-      dirtyWorkAgentModelConfigId: 9002,
+      mainAgentModelConfigId: 'mcfg-9001',
+      dirtyWorkAgentModelConfigId: 'mcfg-9002',
       candidateConfigs: [
-        { modelConfigId: 9001, modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
-        { modelConfigId: 9002, modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+        { modelConfigId: 'mcfg-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+        { modelConfigId: 'mcfg-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
       ],
     })
 
@@ -62,18 +62,40 @@ describe('useProfileSettings', () => {
     await settings.loadModelPreferences()
 
     expect(getUserModelPreferencesMock).toHaveBeenCalledWith(1001)
-    expect(settings.modelPreferences.mainAgentModelConfigId).toBe(9001)
-    expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe(9002)
+    expect(settings.modelPreferences.mainAgentModelConfigId).toBe('mcfg-9001')
+    expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe('mcfg-9002')
     expect(settings.modelConfigOptions.value).toHaveLength(2)
+  })
+
+  it('loads_nested_model_preferences_detail_when_session_user_exists', async () => {
+    setSession({ userId: 1001 })
+    getUserModelPreferencesMock.mockResolvedValue({
+      preferences: {
+        mainAgentModelConfigId: 'mcfg-nested-9001',
+        dirtyWorkAgentModelConfigId: 'mcfg-nested-9002',
+      },
+      candidateConfigs: [
+        { modelConfigId: 'mcfg-nested-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+        { modelConfigId: 'mcfg-nested-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+      ],
+    })
+
+    const { useProfileSettings } = await import('./useProfileSettings')
+    const settings = useProfileSettings()
+
+    await settings.loadModelPreferences()
+
+    expect(settings.modelPreferences.mainAgentModelConfigId).toBe('mcfg-nested-9001')
+    expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe('mcfg-nested-9002')
   })
 
   it('clears_model_preference_state_when_loading_fails_after_previous_success', async () => {
     setSession({ userId: 1001 })
     getUserModelPreferencesMock
       .mockResolvedValueOnce({
-        mainAgentModelConfigId: 9001,
-        dirtyWorkAgentModelConfigId: 9002,
-        candidateConfigs: [{ modelConfigId: 9001, modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' }],
+        mainAgentModelConfigId: 'mcfg-9001',
+        dirtyWorkAgentModelConfigId: 'mcfg-9002',
+        candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' }],
       })
       .mockRejectedValueOnce(new Error('load failed'))
 
@@ -90,18 +112,53 @@ describe('useProfileSettings', () => {
 
   it('saves_model_preferences_with_session_user_and_operator', async () => {
     setSession({ userId: 1001 })
+    getUserModelPreferencesMock.mockResolvedValue({
+      mainAgentModelConfigId: 'mcfg-9001',
+      dirtyWorkAgentModelConfigId: 'mcfg-9002',
+      candidateConfigs: [
+        { modelConfigId: 'mcfg-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+        { modelConfigId: 'mcfg-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+      ],
+    })
     saveUserModelPreferencesMock.mockResolvedValue('updated')
 
     const { useProfileSettings } = await import('./useProfileSettings')
     const settings = useProfileSettings()
-    settings.modelPreferences.mainAgentModelConfigId = 9001
-    settings.modelPreferences.dirtyWorkAgentModelConfigId = 9002
+    await settings.loadModelPreferences()
 
     await settings.saveModelPreferences()
 
     expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
-      mainAgentModelConfigId: 9001,
-      dirtyWorkAgentModelConfigId: 9002,
+      mainAgentModelConfigId: 'mcfg-9001',
+      dirtyWorkAgentModelConfigId: 'mcfg-9002',
+    })
+  })
+
+  it('clears_stale_model_preference_ids_when_loaded_preferences_are_not_in_candidate_configs', async () => {
+    setSession({ userId: 1001 })
+    getUserModelPreferencesMock.mockResolvedValue({
+      mainAgentModelConfigId: 'mcfg-2051723276547498000000',
+      dirtyWorkAgentModelConfigId: 'mcfg-2051723276547498000000',
+      candidateConfigs: [
+        { modelConfigId: 'mcfg-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+        { modelConfigId: 'mcfg-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+      ],
+    })
+    saveUserModelPreferencesMock.mockResolvedValue('updated')
+
+    const { useProfileSettings } = await import('./useProfileSettings')
+    const settings = useProfileSettings()
+
+    await settings.loadModelPreferences()
+
+    expect(settings.modelPreferences.mainAgentModelConfigId).toBeNull()
+    expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBeNull()
+
+    await settings.saveModelPreferences()
+
+    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
+      mainAgentModelConfigId: null,
+      dirtyWorkAgentModelConfigId: null,
     })
   })
 })

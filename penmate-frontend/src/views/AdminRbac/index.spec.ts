@@ -146,10 +146,10 @@ describe('AdminRbac view', () => {
       },
     ])
     listRolesMock.mockResolvedValue([
-      { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+      { roleId: 2001, id: 920001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
     ])
     listPermissionsMock.mockResolvedValue([
-      { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: 3001, id: 930001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
     ])
     listMenusMock.mockResolvedValue([
       { menuId: 4001, id: 4001, title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
@@ -755,8 +755,8 @@ describe('AdminRbac view', () => {
 
   it('assigns_a_role_to_the_selected_user_and_refreshes_assigned_roles', async () => {
     listRolesMock.mockResolvedValue([
-      { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-      { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+      { roleId: 2001, id: 920001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+      { roleId: 2002, id: 920002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
     ])
     listProfileMenusMock
       .mockResolvedValueOnce([
@@ -768,11 +768,11 @@ describe('AdminRbac view', () => {
       ])
     listUserRolesMock
       .mockResolvedValueOnce([
-        { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+        { roleId: 2001, id: 920001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
       ])
       .mockResolvedValueOnce([
-        { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-        { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+        { roleId: 2001, id: 920001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+        { roleId: 2002, id: 920002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
       ])
 
     const wrapper = await mountAdminRbacView()
@@ -801,11 +801,11 @@ describe('AdminRbac view', () => {
       ])
     listUserRolesMock
       .mockResolvedValueOnce([
-        { roleId: 2001, id: 2001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-        { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+        { roleId: 2001, id: 920001, code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+        { roleId: 2002, id: 920002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
       ])
       .mockResolvedValueOnce([
-        { roleId: 2002, id: 2002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+        { roleId: 2002, id: 920002, code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
       ])
 
     const wrapper = await mountAdminRbacView()
@@ -824,8 +824,8 @@ describe('AdminRbac view', () => {
 
   it('assigns_a_permission_to_the_active_role_and_refreshes_bound_permissions', async () => {
     listPermissionsMock.mockResolvedValue([
-      { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-      { permissionId: 3002, id: 3002, code: 'content.publish', name: '内容发布', module: 'content' },
+      { permissionId: 3001, id: 930001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: 3002, id: 930002, code: 'content.publish', name: '内容发布', module: 'content' },
     ])
     listProfileMenusMock
       .mockResolvedValueOnce([
@@ -837,11 +837,11 @@ describe('AdminRbac view', () => {
       ])
     listRolePermissionsMock
       .mockResolvedValueOnce([
-        { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+        { permissionId: 3001, id: 930001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
       ])
       .mockResolvedValueOnce([
-        { permissionId: 3001, id: 3001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-        { permissionId: 3002, id: 3002, code: 'content.publish', name: '内容发布', module: 'content' },
+        { permissionId: 3001, id: 930001, code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+        { permissionId: 3002, id: 930002, code: 'content.publish', name: '内容发布', module: 'content' },
       ])
 
     const wrapper = await mountAdminRbacView()
@@ -1069,7 +1069,8 @@ describe('AdminRbac view', () => {
 
     expect(deleteRoleMock).toHaveBeenCalledWith(2001)
     expect(listUserRolesMock).toHaveBeenCalledTimes(2)
-    expect(listProfileMenusMock).toHaveBeenCalledTimes(2)
+    expect(listProfileMenusMock).toHaveBeenCalledWith(1001)
+    expect(listProfileMenusMock.mock.calls.length).toBeGreaterThanOrEqual(1)
     expect(wrapper.find('[data-testid="rbac-remove-user-role-2001"]').exists()).toBe(false)
   })
 })

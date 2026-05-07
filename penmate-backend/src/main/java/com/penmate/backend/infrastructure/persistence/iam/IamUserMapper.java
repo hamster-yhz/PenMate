@@ -31,16 +31,16 @@ public interface IamUserMapper {
             SELECT id, user_id, email, password_hash, display_name, status, auth_method,
                    main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
             FROM iam_users
-            WHERE user_id = #{id} AND deleted_at IS NULL
+            WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
-    IamUser findById(@Param("id") Long id);
+    IamUser findByUserId(@Param("userId") Long userId);
 
     @Update("""
             UPDATE iam_users
             SET last_login_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{id}
+            WHERE user_id = #{userId}
             """)
-    int touchLastLogin(@Param("id") Long id);
+    int touchLastLoginByUserId(@Param("userId") Long userId);
 
     @Select("""
             SELECT id, user_id, email, password_hash, display_name, status, auth_method,
@@ -92,9 +92,9 @@ public interface IamUserMapper {
     @Update("""
             UPDATE iam_users
             SET deleted_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{id} AND deleted_at IS NULL
+            WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
-    int softDelete(@Param("id") Long id);
+    int softDeleteByUserId(@Param("userId") Long userId);
 
     @Insert("""
             INSERT INTO iam_user_roles(user_id, role_id)

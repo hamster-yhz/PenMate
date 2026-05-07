@@ -36,7 +36,7 @@
   - 如 `iam_users.email`、`novel_chapter_versions(chapter_id,version_no)`、`plugin_project_installs(project_id,plugin_id)`、`novel_members(project_id,user_id)`、`rag_chunks(vector_id,vector_store)`
 - 并发/乐观锁模板：见 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
 - 事务回滚模板：见 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
-- 按约定不包含模型与密钥造数：`model_providers` / `model_provider_models` / `model_user_api_keys` / `model_project_policies`
+- 按约定不包含模型与密钥造数：`model_providers` / `model_provider_models` / `model_user_api_keys`
 
 ## 5. 注意事项
 

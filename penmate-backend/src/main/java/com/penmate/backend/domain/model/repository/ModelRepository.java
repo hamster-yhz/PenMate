@@ -1,11 +1,9 @@
 package com.penmate.backend.domain.model.repository;
 
-import com.penmate.backend.domain.model.model.ModelProjectPolicy;
 import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
 import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelUserApiKey;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -55,12 +53,6 @@ public interface ModelRepository {
 
     int softDeleteOfficialKey(Long keyId);
 
-    List<ModelProjectPolicy> listProjectPolicies(Long projectId);
-
-    ModelProjectPolicy findProjectPolicy(Long projectId, Long policyId);
-
-    ModelProjectPolicy findDefaultProjectPolicy(Long projectId);
-
     ModelProvider findProvider(Long providerId);
 
     ModelUserApiKey findUserKey(Long userKeyId);
@@ -69,43 +61,31 @@ public interface ModelRepository {
 
     ModelOfficialApiKey findDefaultOfficialKey(Long providerId);
 
-    int insertPolicy(Long projectPolicyId,
-                     Long projectId,
-                     String policyName,
-                     String scene,
-                     Long providerModelId,
-                     String modelName,
-                     String baseUrl,
-                     Long userKeyId,
-                     Long officialKeyId,
-                     BigDecimal temperature,
-                     BigDecimal topP,
-                     Integer maxTokens,
-                     String fallbackPolicyJson,
-                     boolean isDefault);
-
-    int updatePolicy(Long projectId,
-                     Long policyId,
-                     String policyName,
-                     String scene,
-                     Long providerModelId,
-                     String modelName,
-                     String baseUrl,
-                     Long userKeyId,
-                     Long officialKeyId,
-                     BigDecimal temperature,
-                     BigDecimal topP,
-                     Integer maxTokens,
-                     String fallbackPolicyJson,
-                     Boolean isDefault);
-
-    int softDeletePolicy(Long projectId, Long policyId);
-
-    int clearDefaultPolicy(Long projectId);
-
-    int setDefaultPolicy(Long projectId, Long policyId);
-
     List<Map<String, Object>> listUserModelConfigs(Long userId);
+
+    Map<String, Object> findUserModelConfig(Long userId, Long modelConfigId);
+
+    int insertUserModelConfig(Long modelConfigId,
+                              Long userId,
+                              Long providerId,
+                              String modelName,
+                              String baseUrl,
+                              String keySourceType,
+                              Long userKeyId,
+                              Long officialKeyId,
+                              String status);
+
+    int updateUserModelConfig(Long userId,
+                              Long modelConfigId,
+                              Long providerId,
+                              String modelName,
+                              String baseUrl,
+                              String keySourceType,
+                              Long userKeyId,
+                              Long officialKeyId,
+                              String status);
+
+    int softDeleteUserModelConfig(Long userId, Long modelConfigId);
 
     int updateUserModelPreferences(Long userId, Long mainAgentModelConfigId, Long dirtyWorkAgentModelConfigId);
 

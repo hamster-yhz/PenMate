@@ -19,7 +19,6 @@
 - [x] `penmate-backend/src/main/java/com/penmate/backend/domain/iam/model/IamRole.java`
 - [x] `penmate-backend/src/main/java/com/penmate/backend/domain/iam/model/IamSession.java`
 - [x] `penmate-backend/src/main/java/com/penmate/backend/domain/iam/model/IamUser.java`
-- [x] `penmate-backend/src/main/java/com/penmate/backend/domain/model/model/ModelProjectPolicy.java`
 - [x] `penmate-backend/src/main/java/com/penmate/backend/domain/model/model/ModelProvider.java`
 - [x] `penmate-backend/src/main/java/com/penmate/backend/domain/model/model/ModelProviderModel.java`
 - [x] `penmate-backend/src/main/java/com/penmate/backend/domain/model/model/ModelUserApiKey.java`

@@ -182,10 +182,10 @@ public class ToolCallResumeService {
 
     private AgentLlmExecutionConfig resolveExecutionConfig(PendingToolInvocationSnapshot snapshot) {
         AgentGenerationTask task = agentRepository.findGenerationTask(snapshot.projectId(), snapshot.taskId());
-        if (task == null || task.getModelConfigId() == null) {
+        if (task == null || task.getModelConfigId() == null || task.getUserId() == null) {
             throw new IllegalStateException("Generation task missing execution config for approval resume");
         }
-        return agentModelRoutingService.resolveExecutionConfig(snapshot.projectId(), task.getModelConfigId(), snapshot.traceId());
+        return agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), snapshot.traceId());
     }
 
     private String buildIdempotencyKey(Long taskId, AgentLlmToolCall toolCall) {

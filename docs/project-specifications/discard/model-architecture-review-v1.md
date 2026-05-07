@@ -17,7 +17,6 @@
 - `model_provider_models`：供应商可选模型目录，记录 `model_code` 与展示元信息
 - `model_user_api_keys`：用户自管 key 池
 - `model_official_api_keys`：平台托管 key 池
-- `model_project_policies`：项目级策略，绑定 model 与 key 来源，同时承载采样参数与默认项
 
 ### 2.2 当前调用链
 
@@ -26,7 +25,7 @@ flowchart TD
     A[前端选择策略] --> B[ModelController]
     B --> C[ModelApplicationService]
     C --> D[ModelRepository]
-    D --> E[model_project_policies]
+    D --> E[model_user_configurations]
     E --> F[model_provider_models]
     F --> G[model_providers]
     E --> H[model_user_api_keys]
@@ -151,8 +150,8 @@ flowchart TD
   - `model_user_api_keys`
   - `model_official_api_keys`
 - 调整
-  - `model_project_policies` 改造成 project_model_configs
-  - 保留多条能力，但默认只启用一条 current
+  - `model_user_configurations` 统一承载用户模型配置
+  - 保留多条能力，但按用户显式选择生效
 - 降级为可选
   - `model_provider_models` 作为推荐模型库
 
@@ -163,9 +162,9 @@ flowchart TD
 1. 第一阶段 接口语义调整
    - 将 前端策略文案 改为 当前模型配置
    - 默认仅暴露一条配置
-2. 第二阶段 数据兼容
-   - 在 `model_project_policies` 增加直存字段 provider_code、base_url、model_name
-   - 读路径优先直存字段，缺失时回退 `provider_model_id`
+2. 第二阶段 数据收敛
+   - 统一以 `model_user_configurations` 保存 provider/base_url/model_name
+   - 读路径仅按用户模型配置解析，不再保留策略回退
 3. 第三阶段 解除强依赖
    - `model_provider_models` 改为推荐来源
    - 新增配置时可自由输入 model_name

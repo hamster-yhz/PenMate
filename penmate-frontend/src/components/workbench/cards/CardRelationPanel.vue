@@ -96,7 +96,7 @@ const emit = defineEmits<{
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="less">
 .relation-panel,
 .relation-create,
 .relation-list,
@@ -109,9 +109,81 @@ const emit = defineEmits<{
   flex-direction: column;
 }
 
-.relation-create,
-.relation-item {
+.relation-panel {
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(201, 169, 110, 0.14);
+}
+
+.relation-title {
+  color: var(--amber-gold);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.relation-create {
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.relation-select,
+.cf-input {
+  min-height: 36px;
+  padding: 0 12px;
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  transition: border-color 0.25s var(--ease-silk), box-shadow 0.25s var(--ease-silk), background 0.25s var(--ease-silk);
+}
+
+.relation-select {
+  min-width: 112px;
+  flex: 1 1 148px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+}
+
+.cf-input {
+  flex: 1 1 180px;
+}
+
+.relation-select:focus,
+.cf-input:focus {
+  outline: none;
+  border-color: var(--border-gold);
+  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.14);
+  background: rgba(17, 24, 39, 0.88);
+}
+
+.relation-select option {
+  background: rgba(17, 24, 39, 0.98);
+  color: var(--text-primary);
+}
+
+.tree-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.25s var(--ease-silk);
+
+  &:hover {
+    border-color: var(--border-gold);
+    background: rgba(201, 169, 110, 0.08);
+    color: var(--amber-gold);
+    box-shadow: 0 0 12px rgba(201, 169, 110, 0.12);
+  }
 }
 
 .relation-list {
@@ -119,6 +191,48 @@ const emit = defineEmits<{
 }
 
 .relation-item {
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.52);
+  border: 1px solid rgba(201, 169, 110, 0.12);
+  color: var(--text-primary);
+}
+
+.relation-item span {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.tree-act-btn {
+  flex: 0 0 auto;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-silk);
+
+  &:hover {
+    border-color: var(--border-gold);
+    color: var(--amber-gold);
+    background: rgba(201, 169, 110, 0.08);
+  }
+
+  &.danger:hover {
+    border-color: rgba(248, 113, 113, 0.55);
+    color: #fca5a5;
+    background: rgba(127, 29, 29, 0.32);
+  }
 }
 </style>

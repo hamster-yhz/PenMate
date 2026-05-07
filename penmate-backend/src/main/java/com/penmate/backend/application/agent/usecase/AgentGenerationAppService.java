@@ -8,6 +8,7 @@ import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.service.AgentTaskTransitionPolicy;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class AgentGenerationAppService {
     private final AgentTaskTransitionPolicy taskTransitionPolicy;
     private final AgentGenerationWorkflowDispatcher orchestrationDispatcher;
     private final AgentJsonInputNormalizer jsonInputNormalizer;
+    private final BusinessIdGenerator businessIdGenerator;
 
     public AgentGenerationTask createGeneration(Long projectId,
                                                 CreateGenerationCommand command,
@@ -34,6 +36,7 @@ public class AgentGenerationAppService {
         log.info("创建生成任务: projectId={}, conversationId={}, taskType={}", projectId, command.conversationId(), command.taskType());
         ensureConversation(projectId, command.conversationId());
         AgentGenerationTask task = new AgentGenerationTask();
+        task.setTaskId(businessIdGenerator.nextId());
         task.setProjectId(projectId);
         task.setConversationId(command.conversationId());
         task.setChapterId(command.chapterId());
@@ -48,8 +51,8 @@ public class AgentGenerationAppService {
         if (affected != 1) {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create generation task");
         }
-        orchestrationDispatcher.dispatchInitialRun(projectId, task.getId(), traceId);
-        return getGeneration(projectId, task.getId());
+        orchestrationDispatcher.dispatchInitialRun(projectId, task.getTaskId(), traceId);
+        return getGeneration(projectId, task.getTaskId());
     }
 
     public AgentGenerationTask getGeneration(Long projectId, Long taskId) {

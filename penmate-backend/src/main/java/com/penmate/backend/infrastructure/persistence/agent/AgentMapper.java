@@ -82,7 +82,7 @@ public interface AgentMapper {
 
     @Insert("""
             INSERT INTO agent_generation_tasks(
-                task_id, project_id, conversation_id, chapter_id, model_policy_id, task_type,
+                task_id, project_id, conversation_id, chapter_id, model_config_id, task_type,
                 prompt_snapshot, style_profile_snapshot, plugin_snapshot,
                 token_usage_json, cost_json, trace_id,
                 status, started_at, finished_at, error_msg
@@ -98,7 +98,7 @@ public interface AgentMapper {
 
     @Select("""
             SELECT id, task_id, project_id, conversation_id, chapter_id,
-                   model_policy_id AS model_config_id, task_type,
+                   model_config_id, task_type,
                    CAST(prompt_snapshot AS CHAR) AS prompt_snapshot,
                    CAST(style_profile_snapshot AS CHAR) AS style_profile_snapshot,
                    CAST(plugin_snapshot AS CHAR) AS plugin_snapshot,

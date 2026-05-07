@@ -74,25 +74,25 @@ const {
   error: string
   successMessage: string
   options: ProfileModelConfigOption[]
-  mainAgentModelConfigId: number | null
-  dirtyWorkAgentModelConfigId: number | null
+  mainAgentModelConfigId: string | null
+  dirtyWorkAgentModelConfigId: string | null
 }>()
 
 const emit = defineEmits<{
-  (event: 'update:main-agent-model-config-id', value: number | null): void
-  (event: 'update:dirty-work-agent-model-config-id', value: number | null): void
+  (event: 'update:main-agent-model-config-id', value: string | null): void
+  (event: 'update:dirty-work-agent-model-config-id', value: string | null): void
   (event: 'save'): void
 }>()
 
-const toSelectValue = (value: number | null) => (value == null ? '' : String(value))
+const toSelectValue = (value: string | null) => (value == null ? '' : value)
 
 const parseSelectValue = (event: Event) => {
   const target = event.target as HTMLSelectElement | null
   if (!target) {
     return null
   }
-  const nextValue = Number(target.value)
-  return nextValue > 0 ? nextValue : null
+  const nextValue = target.value.trim()
+  return nextValue || null
 }
 
 const handleSelectChange = (field: 'main-agent' | 'dirty-work-agent', event: Event) => {

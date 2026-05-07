@@ -42,7 +42,7 @@
         class="workspace-tab"
         :class="{ active: activeWorkspace === 'users' }"
         type="button"
-        :aria-pressed="String(activeWorkspace === 'users')"
+        :aria-pressed="activeWorkspace === 'users'"
         @click="activeWorkspace = 'users'"
       >
         用户管理
@@ -52,7 +52,7 @@
         class="workspace-tab"
         :class="{ active: activeWorkspace === 'roles' }"
         type="button"
-        :aria-pressed="String(activeWorkspace === 'roles')"
+        :aria-pressed="activeWorkspace === 'roles'"
         @click="activeWorkspace = 'roles'"
       >
         角色权限
@@ -62,7 +62,7 @@
         class="workspace-tab"
         :class="{ active: activeWorkspace === 'menus' }"
         type="button"
-        :aria-pressed="String(activeWorkspace === 'menus')"
+        :aria-pressed="activeWorkspace === 'menus'"
         @click="activeWorkspace = 'menus'"
       >
         菜单预览
@@ -275,8 +275,8 @@
                 <option value="">请选择角色</option>
                 <option
                   v-for="role in roles"
-                  :key="`assignable-role-${role.roleId || role.id}`"
-                  :value="String(role.roleId || role.id || '')"
+                  :key="`assignable-role-${getRoleBusinessId(role)}`"
+                  :value="String(getRoleBusinessId(role) ?? '')"
                 >
                   {{ role.name }} · {{ role.code }}
                 </option>
@@ -295,16 +295,16 @@
           <div class="sub-panel">
             <h3>已绑定角色</h3>
             <ul class="token-list">
-              <li v-for="role in userRoles" :key="`assigned-role-${role.roleId || role.id}`">
+              <li v-for="role in userRoles" :key="`assigned-role-${getRoleBusinessId(role)}`">
                 <div class="token-item-main">
                   <strong>{{ role.name }}</strong>
                   <span>{{ role.code }}</span>
                 </div>
                 <button
-                  :data-testid="`rbac-remove-user-role-${role.roleId || role.id}`"
+                  :data-testid="`rbac-remove-user-role-${getRoleBusinessId(role)}`"
                   class="ghost-btn inline-action-btn"
                   type="button"
-                  @click="removeRoleFromSelectedUser(Number(role.roleId || role.id))"
+                  @click="removeRoleFromSelectedUser(getRoleBusinessId(role) ?? 0)"
                 >
                   解绑
                 </button>
@@ -315,7 +315,7 @@
           <div class="sub-panel">
             <h3>当前用户菜单预览</h3>
             <ul class="menu-list">
-              <li v-for="menu in profileMenus" :key="`user-workspace-menu-${menu.menuId || menu.id}`">
+              <li v-for="menu in profileMenus" :key="`user-workspace-menu-${getMenuBusinessId(menu)}`">
                 <strong>{{ menu.title }}</strong>
                 <span>{{ menu.path }}</span>
               </li>
@@ -335,13 +335,13 @@
         <div class="sub-panel">
           <h3>角色</h3>
           <ul class="token-list">
-            <li v-for="role in roles" :key="role.roleId || role.id">
+            <li v-for="role in roles" :key="getRoleBusinessId(role) ?? `role-missing-${role.code}`">
               <button
-                :data-testid="`rbac-role-select-${role.roleId || role.id}`"
+                :data-testid="`rbac-role-select-${getRoleBusinessId(role)}`"
                 class="role-select-btn"
-                :class="{ active: (role.roleId || role.id) === activeRoleId }"
+                :class="{ active: getRoleBusinessId(role) === activeRoleId }"
                 type="button"
-                @click="selectRole(Number(role.roleId || role.id))"
+                @click="selectRole(getRoleBusinessId(role) ?? 0)"
               >
                 <strong>{{ role.name }}</strong>
                 <span>{{ role.code }}</span>
@@ -453,7 +453,7 @@
         <div class="sub-panel">
           <h3>权限池</h3>
           <ul class="token-list">
-            <li v-for="permission in permissions" :key="permission.permissionId || permission.id">
+            <li v-for="permission in permissions" :key="getPermissionBusinessId(permission) ?? `permission-missing-${permission.code}`">
               <strong>{{ permission.name }}</strong>
               <span>{{ permission.code }}</span>
             </li>
@@ -471,8 +471,8 @@
               <option value="">请选择权限</option>
               <option
                 v-for="permission in permissions"
-                :key="`assignable-permission-${permission.permissionId || permission.id}`"
-                :value="String(permission.permissionId || permission.id || '')"
+                :key="`assignable-permission-${getPermissionBusinessId(permission)}`"
+                :value="String(getPermissionBusinessId(permission) ?? '')"
               >
                 {{ permission.name }} · {{ permission.code }}
               </option>
@@ -491,16 +491,16 @@
         <div class="sub-panel">
           <h3>已绑定权限</h3>
           <ul class="token-list">
-            <li v-for="permission in rolePermissions" :key="`assigned-permission-${permission.permissionId || permission.id}`">
+            <li v-for="permission in rolePermissions" :key="`assigned-permission-${getPermissionBusinessId(permission)}`">
               <div class="token-item-main">
                 <strong>{{ permission.name }}</strong>
                 <span>{{ permission.code }}</span>
               </div>
               <button
-                :data-testid="`rbac-remove-role-permission-${permission.permissionId || permission.id}`"
+                :data-testid="`rbac-remove-role-permission-${getPermissionBusinessId(permission)}`"
                 class="ghost-btn inline-action-btn"
                 type="button"
-                @click="removePermissionFromActiveRole(Number(permission.permissionId || permission.id))"
+                @click="removePermissionFromActiveRole(getPermissionBusinessId(permission) ?? 0)"
               >
                 解绑
               </button>
@@ -511,7 +511,7 @@
         <div class="sub-panel">
           <h3>当前用户菜单预览</h3>
           <ul class="menu-list">
-            <li v-for="menu in profileMenus" :key="`role-workspace-menu-${menu.menuId || menu.id}`">
+            <li v-for="menu in profileMenus" :key="`role-workspace-menu-${getMenuBusinessId(menu)}`">
               <strong>{{ menu.title }}</strong>
               <span>{{ menu.path }}</span>
             </li>
@@ -530,7 +530,7 @@
         <div class="sub-panel">
           <h3>系统菜单</h3>
           <ul class="menu-list">
-            <li v-for="menu in menus" :key="menu.menuId || menu.id">
+            <li v-for="menu in menus" :key="getMenuBusinessId(menu) ?? `menu-missing-${menu.path}`">
               <strong>{{ menu.title }}</strong>
               <span>{{ menu.path }}</span>
             </li>
@@ -540,7 +540,7 @@
         <div class="sub-panel">
           <h3>用户可见菜单</h3>
           <ul class="menu-list">
-            <li v-for="menu in profileMenus" :key="menu.menuId || menu.id">
+            <li v-for="menu in profileMenus" :key="getMenuBusinessId(menu) ?? `profile-menu-missing-${menu.path}`">
               <strong>{{ menu.title }}</strong>
               <span>{{ menu.path }}</span>
             </li>
@@ -645,10 +645,16 @@ const userPage = ref(1)
 let latestUserSelectionToken = 0
 let latestRoleSelectionToken = 0
 
+const getRoleBusinessId = (role: RbacRole) => (typeof role.roleId === 'number' && role.roleId > 0 ? role.roleId : null)
+const getPermissionBusinessId = (permission: RbacPermission) => (
+  typeof permission.permissionId === 'number' && permission.permissionId > 0 ? permission.permissionId : null
+)
+const getMenuBusinessId = (menu: RbacMenu) => (typeof menu.menuId === 'number' && menu.menuId > 0 ? menu.menuId : null)
+
 const activeUser = computed(() => users.value.find((item) => item.userId === activeUserId.value) ?? null)
 const activeRole = computed(
-  () => roles.value.find((item) => (item.roleId || item.id) === activeRoleId.value)
-    ?? userRoles.value.find((item) => (item.roleId || item.id) === activeRoleId.value)
+  () => roles.value.find((item) => getRoleBusinessId(item) === activeRoleId.value)
+    ?? userRoles.value.find((item) => getRoleBusinessId(item) === activeRoleId.value)
     ?? null
 )
 const filteredUsers = computed(() => {
@@ -739,10 +745,10 @@ const loadRolePermissions = async (roleId: number) => {
 
 const loadUserRoles = async (userId: number) => {
   userRoles.value = ((await rbacApi.listUserRoles(userId)) || []) as RbacRole[]
-  const existingRoleIds = new Set(userRoles.value.map((item) => item.roleId ?? item.id).filter((item): item is number => item != null))
+  const existingRoleIds = new Set(userRoles.value.map((item) => getRoleBusinessId(item)).filter((item): item is number => item != null))
   const defaultRoleId = existingRoleIds.has(activeRoleId.value ?? -1)
     ? activeRoleId.value
-    : (userRoles.value[0]?.roleId ?? userRoles.value[0]?.id ?? null)
+    : (getRoleBusinessId(userRoles.value[0] as RbacRole) ?? null)
 
   activeRoleId.value = defaultRoleId
 
@@ -765,7 +771,7 @@ const loadUserContext = async (userId: number, selectionToken: number) => {
     return false
   }
 
-  const existingRoleIds = new Set(nextUserRoles.map((item) => item.roleId ?? item.id).filter((item): item is number => item != null))
+  const existingRoleIds = new Set(nextUserRoles.map((item) => getRoleBusinessId(item)).filter((item): item is number => item != null))
 
   profileMenus.value = nextProfileMenus
   userRoles.value = nextUserRoles
@@ -776,7 +782,7 @@ const loadUserContext = async (userId: number, selectionToken: number) => {
 
   const nextRoleId = existingRoleIds.has(activeRoleId.value ?? -1)
     ? activeRoleId.value
-    : (nextUserRoles[0]?.roleId ?? nextUserRoles[0]?.id ?? null)
+    : (getRoleBusinessId(nextUserRoles[0] as RbacRole) ?? null)
   const roleCommitToken = ++latestRoleSelectionToken
 
   let nextRolePermissions: RbacPermission[] = []
@@ -868,14 +874,15 @@ const createUser = async () => {
     }
     createUserExpanded.value = false
     await loadPage()
-    if (createdUser?.userId != null) {
-      activeUserId.value = createdUser.userId
-      const createdUserIndex = filteredUsers.value.findIndex((user) => user.userId === createdUser.userId)
+    const createdUserId = typeof createdUser?.userId === 'number' ? createdUser.userId : null
+    if (createdUserId != null) {
+      activeUserId.value = createdUserId
+      const createdUserIndex = filteredUsers.value.findIndex((user) => user.userId === createdUserId)
       if (createdUserIndex >= 0) {
         userPage.value = Math.floor(createdUserIndex / USER_PAGE_SIZE) + 1
       }
-      await loadProfileMenus(createdUser.userId)
-      await loadUserRoles(createdUser.userId)
+      await loadProfileMenus(createdUserId)
+      await loadUserRoles(createdUserId)
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'create user failed'
@@ -1038,14 +1045,9 @@ const deleteActiveRole = async () => {
       await loadUserRoles(activeUserId.value)
       await loadProfileMenus(activeUserId.value)
     }
-    const nextRoleId = roles.value[0]?.roleId ?? roles.value[0]?.id ?? null
-    if (activeRoleId.value == null) {
-      activeRoleId.value = nextRoleId
-    }
-    if (activeRoleId.value != null) {
-      await loadRolePermissions(activeRoleId.value)
-    } else if (nextRoleId != null) {
-      activeRoleId.value = nextRoleId
+    const nextRoleId = getRoleBusinessId(roles.value[0] as RbacRole) ?? null
+    activeRoleId.value = nextRoleId
+    if (nextRoleId != null) {
       await loadRolePermissions(nextRoleId)
     } else {
       rolePermissions.value = []

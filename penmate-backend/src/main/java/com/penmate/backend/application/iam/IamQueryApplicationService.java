@@ -47,7 +47,7 @@ public class IamQueryApplicationService {
      */
     public IamUser getUser(Long id) {
         log.info("查询用户详情: userId={}", id);
-        IamUser user = iamGateway.findUserById(id);
+        IamUser user = iamGateway.findUserByUserId(id);
         if (user == null) {
             log.warn("查询用户详情失败: userId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
@@ -154,7 +154,7 @@ public class IamQueryApplicationService {
      */
     public void deleteUser(Long id) {
         log.info("删除用户: userId={}", id);
-        int affected = iamGateway.softDeleteUser(id);
+        int affected = iamGateway.softDeleteUserByUserId(id);
         if (affected <= 0) {
             log.warn("删除用户失败: userId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
@@ -194,7 +194,7 @@ public class IamQueryApplicationService {
      */
     public IamRole updateRole(Long id, String name, String description) {
         log.info("更新角色: roleId={}, name={}", id, name);
-        IamRole role = iamGateway.findRoleById(id);
+        IamRole role = iamGateway.findRoleByRoleId(id);
         if (role == null) {
             log.warn("更新角色失败: roleId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
@@ -207,7 +207,7 @@ public class IamQueryApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         log.info("更新角色成功: roleId={}", id);
-        return iamGateway.findRoleById(id);
+        return iamGateway.findRoleByRoleId(id);
     }
 
     /**
@@ -217,7 +217,7 @@ public class IamQueryApplicationService {
      */
     public void deleteRole(Long id) {
         log.info("删除角色: roleId={}", id);
-        IamRole role = iamGateway.findRoleById(id);
+        IamRole role = iamGateway.findRoleByRoleId(id);
         if (role == null) {
             log.warn("删除角色失败: roleId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
@@ -226,7 +226,7 @@ public class IamQueryApplicationService {
             log.warn("删除角色失败: roleId={}, reason=system_role", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("System role cannot be deleted");
         }
-        int affected = iamGateway.softDeleteRole(id);
+        int affected = iamGateway.softDeleteRoleByRoleId(id);
         if (affected <= 0) {
             log.warn("删除角色失败: roleId={}, reason=not_found_after_delete", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
@@ -242,11 +242,11 @@ public class IamQueryApplicationService {
      */
     public void assignRoleToUser(Long userId, Long roleId) {
         log.info("绑定用户角色: userId={}, roleId={}", userId, roleId);
-        if (iamGateway.findUserById(userId) == null) {
+        if (iamGateway.findUserByUserId(userId) == null) {
             log.warn("绑定用户角色失败: userId={}, roleId={}, reason=user_not_found", userId, roleId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
-        if (iamGateway.findRoleById(roleId) == null) {
+        if (iamGateway.findRoleByRoleId(roleId) == null) {
             log.warn("绑定用户角色失败: userId={}, roleId={}, reason=role_not_found", userId, roleId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
@@ -278,11 +278,11 @@ public class IamQueryApplicationService {
      */
     public void assignPermissionToRole(Long roleId, Long permissionId) {
         log.info("绑定角色权限: roleId={}, permissionId={}", roleId, permissionId);
-        if (iamGateway.findRoleById(roleId) == null) {
+        if (iamGateway.findRoleByRoleId(roleId) == null) {
             log.warn("绑定角色权限失败: roleId={}, permissionId={}, reason=role_not_found", roleId, permissionId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
-        if (iamGateway.findPermissionById(permissionId) == null) {
+        if (iamGateway.findPermissionByPermissionId(permissionId) == null) {
             log.warn("绑定角色权限失败: roleId={}, permissionId={}, reason=permission_not_found", roleId, permissionId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Permission not found");
         }

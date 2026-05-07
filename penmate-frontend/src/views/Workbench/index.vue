@@ -127,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, type ComponentPublicInstance, type Ref, watch } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import StyleManager from '@/components/workbench/StyleManager.vue'
@@ -145,7 +145,6 @@ import { agentApi } from '@/api/modules/agent.api'
 import { approvalApi } from '@/api/modules/approval.api'
 import { pluginApi } from '@/api/modules/plugin.api'
 import { modelApi } from '@/api/modules/model.api'
-import { rbacApi } from '@/api/modules/rbac.api'
 import { getSession, clearSession } from '@/stores/session'
 import { authApi } from '@/api/modules/auth.api'
 import { useWorkbenchContext } from '@/composables/workbench/useWorkbenchContext'
@@ -180,10 +179,14 @@ const {
   query: route.query,
   session,
 })
-const { saveDraft, clearDraft, resolveStoredDraft, resolveEditorSeedContent, resolveChapterContent } = useWorkbenchDraft()
+const { saveDraft, clearDraft, resolveStoredDraft, resolveEditorSeedContent } = useWorkbenchDraft()
 const chapterLoadGuard = createChapterLoadGuard()
+
 const getCurrentProjectId = () => ensureContext().projectId || initialProjectId
-const resolveOperatorId = () => ensureContext().operatorId || initialOperatorId
+const resolveOperatorId = () => {
+  const { operatorId } = ensureContext()
+  return operatorId || initialOperatorId || 0
+}
 const getContext = () => {
   const { projectId, operatorId } = ensureContext()
   return { projectId, operatorId }
@@ -208,13 +211,17 @@ const leftTabs = ref([
   { key: 'world', label: '世界', icon: iconWorld },
 ])
 
+const setChapterContent = (chapterId: string, content: string) => {
+  chapterContents.value[chapterId] = content
+}
+
 const {
   outlineData,
   activeChapter,
   currentChapterTitle,
   outlineOpBusy,
   loadOutline,
-  selectChapter: selectOutlineChapter,
+  selectChapter,
   addVolume,
   addChapter,
   deleteVolume,
@@ -224,7 +231,10 @@ const {
 } = useWorkbenchOutline({
   getContext,
   reloadOutline: async () => {
-    await loadWorkbenchData()
+    const projectId = getCurrentProjectId()
+    if (projectId) {
+      await loadWorkbenchData(projectId)
+    }
   },
   createOutlineNode: outlineApi.createNode,
   createChapter: novelApi.createChapter,
@@ -232,10 +242,10 @@ const {
   deleteChapter: novelApi.deleteChapter,
   updateOutlineNode: outlineApi.updateNode,
   moveOutlineNode: outlineApi.moveNode,
-  notify: (warningMessage) => {
+  notify: (warningMessage: string) => {
     message.warning(warningMessage)
   },
-  notifySuccess: (successMessage) => {
+  notifySuccess: (successMessage: string) => {
     message.success(successMessage)
   },
 })
@@ -266,15 +276,14 @@ const {
   deleteCard: cardApi.deleteCard,
   createCardRelation: cardApi.createCardRelation,
   deleteCardRelation: cardApi.deleteCardRelation,
-  promptCardName: (defaultName) => window.prompt('请输入卡片名称（必填）', defaultName),
-  notify: (warningMessage) => {
+  promptCardName: (defaultName: string) => window.prompt('请输入资料卡名称', defaultName),
+  notify: (warningMessage: string) => {
     message.warning(warningMessage)
   },
-  notifySuccess: (successMessage) => {
+  notifySuccess: (successMessage: string) => {
     message.success(successMessage)
   },
 })
-
 
 const {
   editorRef,
@@ -298,75 +307,44 @@ const {
   getActiveChapterKey: () => activeChapter.value,
   getProjectId: getCurrentProjectId,
   saveDraft,
-  setChapterContent: (chapterId, content) => {
-    chapterContents.value[chapterId] = content
-  },
+  setChapterContent,
 })
 
-type EditorTextareaExpose = ComponentPublicInstance & {
-  textarea?: HTMLTextAreaElement | Ref<HTMLTextAreaElement | null> | null
-}
-
-const isHtmlTextareaElement = (value: unknown): value is HTMLTextAreaElement =>
-  typeof HTMLTextAreaElement !== 'undefined' && value instanceof HTMLTextAreaElement
-
-const resolveEditorTextareaElement = (instance: Element | ComponentPublicInstance | null): HTMLTextAreaElement | null => {
-  if (!instance || !('textarea' in instance)) return null
-  const textarea = (instance as EditorTextareaExpose).textarea
-  if (isHtmlTextareaElement(textarea)) return textarea
-  if (textarea && typeof textarea === 'object' && 'value' in textarea) {
-    return isHtmlTextareaElement(textarea.value) ? textarea.value : null
+const bindEditorTextarea = (instance: Element | { $el?: Element } | null) => {
+  if (instance instanceof HTMLTextAreaElement) {
+    editorRef.value = instance
+    return
   }
-  return null
-}
-
-const bindEditorTextarea = (instance: Element | ComponentPublicInstance | null) => {
-  editorRef.value = resolveEditorTextareaElement(instance)
-}
-
-const getRequiredOperatorId = () => {
-  const operatorId = resolveOperatorId()
-  if (typeof operatorId !== 'number' || operatorId <= 0) {
-    throw new Error('缺少操作人ID')
+  if (instance && '$el' in instance && instance.$el instanceof HTMLTextAreaElement) {
+    editorRef.value = instance.$el
+    return
   }
-  return operatorId
-}
-
-const syncEditorFromVersion = (content: string) => {
-  selectChapterDraft(content)
-  chapterContents.value[activeChapter.value] = content
+  editorRef.value = null
 }
 
 const fetchText = async (url: string) => {
   const response = await fetch(url)
-  if (!response.ok) throw new Error('读取文本失败')
   return response.text()
 }
 
 const uploadText = async (url: string, content: string) => {
-  let uploadResponse: Response
-  try {
-    uploadResponse = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      body: content,
-    })
-  } catch {
-    throw new Error('直传 OSS 请求失败，请检查网络/CORS/预检配置')
-  }
-
+  const response = await fetch(url, {
+    method: 'PUT',
+    body: content,
+    headers: { 'Content-Type': 'text/plain' },
+  })
   return {
-    ok: uploadResponse.ok,
-    status: uploadResponse.status,
-    etag: (uploadResponse.headers.get('etag') || '').replace(/"/g, '').trim(),
-    checksum: (uploadResponse.headers.get('x-amz-checksum-crc32') || '').trim(),
+    ok: response.ok,
+    status: response.status,
+    etag: response.headers.get('etag') || undefined,
+    checksum: response.headers.get('x-amz-checksum-sha256') || undefined,
   }
 }
 
 const {
   selectedVersionNo,
-  versionBusy,
   selectedVersionContent,
+  versionBusy,
   versionDiffSummary,
   getCurrentChapterVersions,
   loadChapterVersions,
@@ -377,32 +355,44 @@ const {
 } = useWorkbenchVersions({
   getProjectId: getCurrentProjectId,
   getActiveChapterKey: () => activeChapter.value,
-  getOperatorId: getRequiredOperatorId,
+  getOperatorId: resolveOperatorId,
   getEditorContent: () => editorContent.value,
-  setEditorContent: syncEditorFromVersion,
-  setWordCount: (count) => {
+  setEditorContent: (content: string) => {
+    editorContent.value = content
+    setChapterContent(activeChapter.value, content)
+  },
+  setWordCount: (count: number) => {
     wordCount.value = count
   },
-  setLastSnapshot: syncEditorFromVersion,
-  resolveChapterContent,
+  setLastSnapshot: (content: string) => {
+    selectChapterDraft(content)
+  },
+  resolveChapterContent: (projectId: number, chapterId: string | number, remoteContent: string, options?: { preferRemote?: boolean }) => {
+    if (options?.preferRemote) {
+      clearDraft(projectId, chapterId)
+      return remoteContent
+    }
+    const draft = resolveStoredDraft(projectId, chapterId)
+    return draft ?? remoteContent
+  },
   resolveStoredDraft,
   clearDraft,
-  beginChapterRequest: chapterLoadGuard.begin,
-  isChapterRequestCurrent: chapterLoadGuard.isCurrent,
-  listVersions: chapterApi.listVersions,
-  getVersionSnapshotUrl: chapterApi.getVersionSnapshotUrl,
-  getContentUrl: chapterApi.getContentUrl,
-  restoreVersion: async (projectId, chapterId, versionNo, operatorId) => {
+  beginChapterRequest: (chapterId: string) => chapterLoadGuard.begin(chapterId),
+  isChapterRequestCurrent: (chapterId: string, requestId: number) => chapterLoadGuard.isCurrent(chapterId, requestId),
+  listVersions: async (projectId: number, chapterId: number) => chapterApi.listVersions(projectId, chapterId),
+  getVersionSnapshotUrl: async (projectId: number, chapterId: number, versionNo: number) => chapterApi.getVersionSnapshotUrl(projectId, chapterId, versionNo),
+  getContentUrl: async (projectId: number, chapterId: number) => chapterApi.getContentUrl(projectId, chapterId),
+  restoreVersion: async (projectId: number, chapterId: number, versionNo: number, operatorId: number) => {
     await chapterApi.restoreVersion(projectId, chapterId, versionNo, operatorId)
   },
-  publishChapter: async (projectId, chapterId, operatorId) => {
+  publishChapter: async (projectId: number, chapterId: number, operatorId: number) => {
     await chapterApi.publishChapter(projectId, chapterId, operatorId)
   },
-  getContentUploadUrl: chapterApi.getContentUploadUrl,
-  commitContent: async (projectId, chapterId, operatorId, payload) => {
+  getContentUploadUrl: async (projectId: number, chapterId: number) => chapterApi.getContentUploadUrl(projectId, chapterId),
+  commitContent: async (projectId: number, chapterId: number, operatorId: number, payload: Record<string, unknown>) => {
     await chapterApi.commitContent(projectId, chapterId, operatorId, payload)
   },
-  createVersion: async (projectId, chapterId, payload) => {
+  createVersion: async (projectId: number, chapterId: number, payload: Record<string, unknown>) => {
     await chapterApi.createVersion(projectId, chapterId, payload)
   },
   resolveUploadTarget: resolveDirectUploadTarget,
@@ -410,18 +400,24 @@ const {
   hasObjectKeyInStorageUrl,
   fetchText,
   uploadText,
-  notify: (warningMessage) => {
+  notify: (warningMessage: string) => {
     message.warning(warningMessage)
   },
-  notifySuccess: (successMessage) => {
+  notifySuccess: (successMessage: string) => {
     message.success(successMessage)
   },
 })
 
 const activePlugins = ref<string[]>([])
-const activeModelConfigId = ref<number | null>(null)
+const activeModelConfigId = ref<string | null>(null)
 const ENABLE_POLLING_FALLBACK = String(import.meta.env.VITE_AGENT_POLLING_FALLBACK || 'false').toLowerCase() === 'true'
-const pickModelConfigId = (item: Record<string, unknown>) => Number(item.projectPolicyId ?? 0)
+const pickModelConfigId = (item: Record<string, unknown>) => {
+  if (typeof item.modelConfigId !== 'string') {
+    return null
+  }
+  const trimmed = item.modelConfigId.trim()
+  return trimmed || null
+}
 const pickConversationId = (item: Record<string, unknown>) => Number(item.conversationId ?? 0)
 
 const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
@@ -452,8 +448,7 @@ const toPluginName = (item: Record<string, unknown>) => {
   return name || '未命名插件'
 }
 
-const loadActivePlugins = async () => {
-  const projectId = getCurrentProjectId()
+const loadActivePlugins = async (projectId: number) => {
   if (!projectId) {
     activePlugins.value = []
     return
@@ -485,17 +480,46 @@ const ensureConversationId = async (projectId: number, operatorId: number) => {
   return currentConversationId.value
 }
 
-const refreshActiveModelInfo = async (projectId: number) => {
-  if (!projectId) {
+const currentModelName = ref('')
+
+const extractPreferenceRecord = (payload: unknown): Record<string, unknown> => {
+  if (!payload || typeof payload !== 'object') {
+    return {}
+  }
+
+  const record = payload as Record<string, unknown>
+  const nestedPreferences = record.preferences
+  if (nestedPreferences && typeof nestedPreferences === 'object') {
+    return nestedPreferences as Record<string, unknown>
+  }
+
+  const nestedConfig = record.config
+  if (nestedConfig && typeof nestedConfig === 'object') {
+    return nestedConfig as Record<string, unknown>
+  }
+
+  return record
+}
+
+const refreshActiveModelInfo = async () => {
+  const userId = session.userId
+  if (!userId) {
     activeModelConfigId.value = null
     currentModelName.value = ''
     return null
   }
   try {
-    const configs = (await modelApi.listConfigs(projectId)) as Array<Record<string, unknown>>
-    const preferred = configs.find((item) => Boolean(item.isDefault)) || configs[0]
-    const modelConfigId = preferred ? pickModelConfigId(preferred) : 0
-    activeModelConfigId.value = modelConfigId > 0 ? modelConfigId : null
+    const detail = (await modelApi.getUserModelPreferences(userId)) as Record<string, unknown>
+    const preferenceRecord = extractPreferenceRecord(detail)
+    const configs = Array.isArray(detail.candidateConfigs)
+      ? (detail.candidateConfigs as Array<Record<string, unknown>>)
+      : Array.isArray(preferenceRecord.candidateConfigs)
+        ? (preferenceRecord.candidateConfigs as Array<Record<string, unknown>>)
+        : []
+    const preferredId = typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId.trim() : ''
+    const preferred = configs.find((item) => pickModelConfigId(item) === preferredId) || configs[0]
+    const modelConfigId = preferred ? pickModelConfigId(preferred) : null
+    activeModelConfigId.value = modelConfigId
     currentModelName.value = String(preferred?.modelName || '').trim()
     return activeModelConfigId.value
   } catch {
@@ -505,7 +529,7 @@ const refreshActiveModelInfo = async (projectId: number) => {
   }
 }
 
-const ensureModelConfigId = async (projectId: number) => refreshActiveModelInfo(projectId)
+const ensureModelConfigId = async () => (await refreshActiveModelInfo()) || ''
 
 const {
   messages,
@@ -519,8 +543,6 @@ const {
   generationStatusText,
   streamingAssistantMsgId,
   currentConversationId,
-  currentModelName,
-  loadConversationHistory,
   selectConversation,
   toggleConversationPanel,
   sendMessage,
@@ -541,7 +563,7 @@ const {
   addStreamListener: agentApi.addStreamListener,
   scrollChat,
   nextTick,
-  notifyWarning: (warningMessage) => {
+  notifyWarning: (warningMessage: string) => {
     message.warning(warningMessage)
   },
   debugChatState,
@@ -556,7 +578,7 @@ const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
   getMessages: () => messages.value,
   approve: approvalApi.approve,
   reject: approvalApi.reject,
-  notifyWarning: (warningMessage) => {
+  notifyWarning: (warningMessage: string) => {
     message.warning(warningMessage)
   },
 })
@@ -577,7 +599,7 @@ const handleReplaceSelected = (messageItem: ChatMessage) => {
 }
 
 const onModelConfigSaved = () => {
-  void refreshActiveModelInfo(getCurrentProjectId())
+  void refreshActiveModelInfo()
 }
 
 const tryLoadChapterRemoteContent = async (chapterIdLike: string, requestId: number) => {
@@ -613,22 +635,58 @@ const updateTitle = (e: Event) => {
   void novelApi.updateProject(projectId, { title: nextTitle }).catch(() => undefined)
 }
 
-const handleOutlineSelectChapter = async (ch: OutlineChapterNode) => {
-  const chapterKey = String(ch.chapterId || ch.key)
+const handleOutlineSelectChapter = async (chapter: OutlineChapterNode) => {
+  const chapterKey = String(chapter.chapterId || chapter.key)
   const prevProjectId = getCurrentProjectId()
   if (prevProjectId && activeChapter.value) {
-    saveDraft(prevProjectId, activeChapter.value, editorContent.value)
+    saveDraft(prevProjectId, Number(activeChapter.value), editorContent.value)
   }
-  chapterContents.value[activeChapter.value] = editorContent.value
-  selectOutlineChapter(ch)
+
+  activeChapter.value = chapterKey
+  selectChapter(chapter)
+
   const requestId = chapterLoadGuard.begin(chapterKey)
   const currentProjectId = getCurrentProjectId()
-  const localDraft = currentProjectId ? resolveStoredDraft(currentProjectId, chapterKey) : null
-  const chapterContent = chapterContents.value[chapterKey]
-  selectChapterDraft(resolveEditorSeedContent(chapterContent, localDraft))
-  void loadChapterVersions(getCurrentProjectId(), chapterKey)
+  if (currentProjectId) {
+    const localDraft = resolveStoredDraft(currentProjectId, Number(chapterKey))
+    if (localDraft !== null) {
+      chapterContents.value[chapterKey] = localDraft
+      selectChapterDraft(localDraft)
+    } else {
+      const seedContent = resolveEditorSeedContent(undefined, null)
+      chapterContents.value[chapterKey] = seedContent
+      selectChapterDraft(seedContent)
+    }
+  }
+
   await tryLoadChapterRemoteContent(chapterKey, requestId)
-  nextTick(() => editorRef.value?.focus())
+  const projectId = getCurrentProjectId()
+  if (projectId) {
+    await loadChapterVersions(projectId, chapterKey)
+  }
+}
+
+const loadWorkbenchData = async (projectId: number) => {
+  if (!projectId) return
+  const outlineResp = await outlineApi.listOutlineTree(projectId)
+  const chapterResp = await novelApi.listChapters(projectId)
+  const chapterByOutlineNodeId = Object.fromEntries(
+    (chapterResp || [])
+      .map((chapter: Record<string, unknown>) => {
+        const outlineNodeId = Number(chapter.outlineNodeId ?? 0)
+        const chapterId = Number(chapter.chapterId ?? 0)
+        return outlineNodeId > 0 && chapterId > 0 ? [String(outlineNodeId), String(chapterId)] : null
+      })
+      .filter((entry): entry is [string, string] => Array.isArray(entry))
+  )
+
+  loadOutline((outlineResp || []) as Array<Record<string, unknown>>, chapterByOutlineNodeId)
+
+  await Promise.all([
+    loadCardsAndRelations(projectId),
+    loadActivePlugins(projectId),
+    refreshActiveModelInfo(),
+  ])
 }
 
 const navigateFromUserMenu = (path: string) => {
@@ -636,158 +694,44 @@ const navigateFromUserMenu = (path: string) => {
   router.push(path)
 }
 
-const handleLogout = () => {
-  userMenuOpen.value = false
-  authApi.logout().catch(() => undefined).finally(() => {
+const handleLogout = async () => {
+  try {
+    await authApi.logout()
+  } finally {
     clearSession()
     router.push('/login')
-  })
+  }
 }
 
-const loadWorkbenchData = async () => {
+onMounted(async () => {
+  username.value = sessionUsername || username.value
+  userEmail.value = sessionUserEmail || userEmail.value
   const projectId = getCurrentProjectId()
-  if (!projectId) return
-  try {
-    chapterContents.value = {}
-    outlineData.value = []
-    activeChapter.value = ''
-    currentChapterTitle.value = ''
-    selectChapterDraft('')
-
-    const [project, outlines, chapters] = await Promise.all([
-      novelApi.getProject(projectId),
-      outlineApi.listOutlineTree(projectId),
-      novelApi.listChapters(projectId),
-    ])
-
-    novelTitle.value = String((project as Record<string, any>)?.title ?? novelTitle.value)
-
-    const chapterList = (chapters || []) as Array<Record<string, any>>
-    const chapterByOutlineNodeId: Record<string, string> = {}
-    chapterList.forEach((chapter) => {
-      const key = String(chapter.chapterId ?? '')
-      if (!key) return
-      const localDraft = resolveStoredDraft(projectId, key)
-      chapterContents.value[key] = resolveEditorSeedContent(undefined, localDraft)
-      const outlineNodeId = String(chapter.outlineNodeId ?? '')
-      if (outlineNodeId) {
-        chapterByOutlineNodeId[outlineNodeId] = key
-      }
-    })
-
-    const mappedOutline = loadOutline((outlines || []) as Array<Record<string, unknown>>, chapterByOutlineNodeId)
-    await loadCardsAndRelations(projectId)
-    const first = mappedOutline[0]?.children?.[0]
-    if (first) {
-      selectOutlineChapter(first)
-      const firstChapterKey = activeChapter.value
-      selectChapterDraft(resolveEditorSeedContent(chapterContents.value[firstChapterKey], null))
-      const requestId = chapterLoadGuard.begin(firstChapterKey)
-      await tryLoadChapterRemoteContent(firstChapterKey, requestId)
-      await loadChapterVersions(projectId, firstChapterKey)
-    }
-  } catch (error: any) {
-    message.warning(error?.message || '工作台数据加载失败')
-  }
-}
-
-onMounted(() => {
-  void refreshActiveModelInfo(getCurrentProjectId())
-  if (sessionUsername) username.value = sessionUsername
-  if (sessionUserEmail) userEmail.value = sessionUserEmail
-  if (session.userId) {
-    void rbacApi
-      .listProfileMenus(session.userId)
-      .then((menus) => {
-        canAccessRbacAdmin.value = (menus || []).some(
-          (menu) => String((menu as Record<string, any>)?.path || '') === '/admin/rbac'
-        )
-      })
-      .catch(() => {
-        canAccessRbacAdmin.value = false
-      })
-  }
-  selectChapterDraft(resolveEditorSeedContent(chapterContents.value[activeChapter.value], null))
-  loadWorkbenchData()
-  loadActivePlugins()
-  const { projectId, operatorId } = getContext()
-  if (projectId && operatorId) {
-    void loadConversationHistory(projectId, operatorId)
+  if (projectId) {
+    await loadWorkbenchData(projectId)
+  } else {
+    await refreshActiveModelInfo()
   }
 })
 
-watch(
-  () => showPluginWorkshop.value,
-  (visible, prevVisible) => {
-    if (prevVisible && !visible) {
-      void loadActivePlugins()
-    }
-  },
-)
+watch(editorContent, (value) => {
+  chapterContents.value[activeChapter.value] = value
+})
 </script>
 
 <style lang="less">
 .workbench-page {
-  position: relative;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  background: var(--bg-primary);
-  isolation: isolate;
-}
-
-.workbench-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(11, 17, 32, 0.82) 0%, rgba(11, 17, 32, 0.95) 100%),
-    radial-gradient(circle at top center, rgba(201, 169, 110, 0.05) 0%, transparent 44%);
-}
-
-.workbench-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(12px);
-  opacity: 0.4;
-}
-
-.orb-left {
-  top: 72px;
-  left: -120px;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgba(201, 169, 110, 0.2), transparent 65%);
-}
-
-.orb-right {
-  right: -140px;
-  bottom: -40px;
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgba(110, 197, 212, 0.16), transparent 68%);
-}
-
-.wb-main {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  display: flex;
-  overflow: hidden;
 }
 
 .workbench-shell {
-  gap: 16px;
-  padding: 16px 20px 20px;
-}
-
-@media (max-width: 1280px) {
-  .workbench-shell {
-    gap: 12px;
-    padding: 12px 16px 16px;
-  }
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
 }
 </style>

@@ -34,7 +34,16 @@ DELETE FROM iam_role_permissions    WHERE role_id BETWEEN 920001 AND 922999;
 DELETE FROM iam_user_roles          WHERE user_id BETWEEN 920001 AND 922999;
 DELETE FROM iam_permissions         WHERE permission_id BETWEEN 920001 AND 922999;
 DELETE FROM iam_roles               WHERE role_id BETWEEN 920001 AND 922999;
+UPDATE iam_users
+SET main_agent_model_config_id = NULL,
+    dirty_work_agent_model_config_id = NULL
+WHERE user_id BETWEEN 920001 AND 922999;
+
 DELETE FROM iam_users               WHERE user_id BETWEEN 920001 AND 922999;
+
+DELETE FROM model_user_configurations WHERE model_config_id BETWEEN 920001 AND 922999;
+DELETE FROM model_official_api_keys WHERE official_api_key_id BETWEEN 920001 AND 922999;
+DELETE FROM model_user_api_keys     WHERE user_api_key_id BETWEEN 920001 AND 922999;
 
 DELETE FROM ops_async_jobs          WHERE job_id BETWEEN 920001 AND 922999;
 DELETE FROM ops_migrations          WHERE migration_id BETWEEN 920001 AND 922999;

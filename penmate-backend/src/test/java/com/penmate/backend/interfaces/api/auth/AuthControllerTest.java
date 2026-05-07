@@ -105,6 +105,7 @@ class AuthControllerTest {
         String traceId = "UT-TRACE-AUTH-ME-SUCCESS";
         when(authApplicationService.me(anyString())).thenReturn(Map.of(
                 "id", 1001,
+                "userId", 1001,
                 "email", "author@penmate.ai",
                 "displayName", "作者A"
         ));
@@ -114,6 +115,7 @@ class AuthControllerTest {
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(1001))
+                .andExpect(jsonPath("$.data.userId").doesNotExist())
                 .andExpect(jsonPath("$.data.email").value("author@penmate.ai"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
