@@ -30,7 +30,7 @@ export type CardRelation = {
 export type GenerationPhase = 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
 
 export type ConversationItem = {
-  conversationId: number
+  conversationId: string
   title: string
   updatedAt: string
 }

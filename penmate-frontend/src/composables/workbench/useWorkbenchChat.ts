@@ -13,35 +13,27 @@ import {
 } from './useWorkbenchTaskRuntime'
 
 type ContextProfile = {
-  projectId?: number | string | null
-  operatorId?: number | string | null
+  projectId?: string | null
+  operatorId?: string | null
 }
 
 type StreamListener = (event: MessageEvent<string>) => void
 
 type UseWorkbenchChatDeps = {
   getContext: () => ContextProfile
-  getCurrentProjectId: () => number
+  getCurrentProjectId: () => string
   getActiveChapterKey: () => string
   getActivePlugins: () => string[]
-  ensureModelConfigId: (projectId: number) => Promise<string | null>
-  refreshActiveModelInfo?: (projectId: number) => Promise<string | null | void>
-  listSessions: (projectId: number) => Promise<unknown>
-  createSession?: (projectId: number, payload: Record<string, unknown>) => Promise<unknown>
-  getSessionRecovery: (projectId: number, sessionId: number) => Promise<unknown>
-  createTurn: (projectId: number, sessionId: number, payload: Record<string, unknown>) => Promise<unknown>
-  getTask: (projectId: number, taskId: number) => Promise<unknown>
-  openTaskStream: (projectId: number, taskId: number) => EventSource
-  ensureConversationId?: (projectId: number, operatorId: number) => Promise<number | null>
-  listConversations?: (projectId: number) => Promise<unknown>
-  listMessages?: (projectId: number, conversationId: number) => Promise<unknown>
-  createMessage?: (projectId: number, conversationId: number, operatorId: number, payload: Record<string, unknown>) => Promise<unknown>
-  createGeneration?: (projectId: number, operatorId: number, payload: Record<string, unknown>) => Promise<unknown>
-  getGeneration?: (projectId: number, taskId: number) => Promise<unknown>
-  openGenerationStream?: (projectId: number, taskId: number) => EventSource
+  ensureModelConfigId: (projectId: string) => Promise<string | null>
+  refreshActiveModelInfo?: (projectId: string) => Promise<string | null | void>
+  listSessions: (projectId: string) => Promise<unknown>
+  createSession: (projectId: string, payload: Record<string, unknown>) => Promise<unknown>
+  getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
+  createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
+  getTask: (projectId: string, taskId: string) => Promise<unknown>
+  openTaskStream: (projectId: string, taskId: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeTaskStream?: (stream: EventSource | null) => void
-  closeGenerationStream?: (stream: EventSource | null) => void
   revealAssistantText?: (assistantMsg: ChatMessage, rawText: string) => Promise<void>
   scrollChat: () => void
   nextTick: () => Promise<void>
@@ -67,8 +59,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const generationPhase = ref<GenerationPhase>('idle')
   const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
   const streamingAssistantMsgId = ref<number | null>(null)
-  const currentConversationId = ref<number | null>(null)
-  const preferredConversationId = ref<number | null>(null)
+  const currentConversationId = ref<string | null>(null)
+  const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
 
   let msgIdCounter = 1
@@ -100,48 +92,23 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     })
   }
 
-  const listSessions = (projectId: number) => deps.listConversations
-    ? deps.listConversations(projectId)
-    : deps.listSessions(projectId)
+  const listSessions = (projectId: string) => deps.listSessions(projectId)
 
-  const getSessionRecovery = async (projectId: number, sessionId: number) => {
-    if (deps.listMessages) {
-      const messages = await deps.listMessages(projectId, sessionId)
-      return {
-        session: { sessionId },
-        messages,
-      }
-    }
+  const getSessionRecovery = async (projectId: string, sessionId: string) => {
     return deps.getSessionRecovery(projectId, sessionId)
   }
 
-  const createTurn = (projectId: number, sessionId: number, payload: Record<string, unknown>) => {
-    if (deps.createGeneration) {
-      return deps.createGeneration(projectId, Number(payload.operatorId ?? 0), {
-        conversationId: sessionId,
-        chapterId: (payload.taskRequest as Record<string, unknown> | undefined)?.chapterId ?? null,
-        modelConfigId: (payload.taskRequest as Record<string, unknown> | undefined)?.modelConfigId,
-        taskType: (payload.taskRequest as Record<string, unknown> | undefined)?.taskType ?? 'WRITE',
-        promptSnapshot: payload.userMessage,
-        pluginSnapshot: JSON.stringify((payload.taskRequest as Record<string, unknown> | undefined)?.activePlugins ?? []),
-      })
-    }
-    return deps.createTurn(projectId, sessionId, payload)
-  }
+  const createTurn = (projectId: string, sessionId: string, payload: Record<string, unknown>) => deps.createTurn(projectId, sessionId, payload)
 
-  const getTask = (projectId: number, taskId: number) => deps.getGeneration
-    ? deps.getGeneration(projectId, taskId)
-    : deps.getTask(projectId, taskId)
+  const getTask = (projectId: string, taskId: string) => deps.getTask(projectId, taskId)
 
-  const openTaskStream = (projectId: number, taskId: number) => deps.openGenerationStream
-    ? deps.openGenerationStream(projectId, taskId)
-    : deps.openTaskStream(projectId, taskId)
+  const openTaskStream = (projectId: string, taskId: string) => deps.openTaskStream(projectId, taskId)
 
-  const closeTaskStream = deps.closeGenerationStream || deps.closeTaskStream
+  const closeTaskStream = deps.closeTaskStream
 
   const normalizeSessionRecord = (item: ChatRecord) => ({
     ...item,
-    conversationId: Number(item.sessionId ?? item.conversationId ?? 0),
+    conversationId: String(item.sessionId ?? item.conversationId ?? ''),
     title: String(item.title ?? item.sessionTitle ?? ''),
     updatedAt: String(item.updatedAt ?? item.resumedAt ?? item.createdAt ?? ''),
   })
@@ -159,14 +126,11 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     setMsgIdCounter: (value) => {
       msgIdCounter = value
     },
-    listConversations: async (projectId: number) => {
+    listConversations: async (projectId: string) => {
       const sessions = (await listSessions(projectId)) as Array<ChatRecord>
       return (Array.isArray(sessions) ? sessions : []).map(normalizeSessionRecord)
     },
-    listMessages: async (projectId: number, conversationId: number) => {
-      if (deps.listMessages) {
-        return deps.listMessages(projectId, conversationId)
-      }
+    listMessages: async () => {
       return []
     },
     setConversationList: (items) => {
@@ -176,7 +140,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       conversationLoading.value = value
     },
     setCurrentConversationId: (value) => {
-      currentConversationId.value = value
+      currentConversationId.value = value == null ? null : String(value)
     },
     scrollChat,
   })
@@ -188,15 +152,15 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
    */
   const runtime = createTaskRuntime({
     getGenerationTaskStatus: () => generationTaskStatus.value,
-    setGenerationTaskStatus: (value) => {
+    setGenerationTaskStatus: (value: GenerationTaskStatus | '') => {
       generationTaskStatus.value = value
     },
     getGenerationPhase: () => generationPhase.value,
-    setGenerationPhase: (value) => {
+    setGenerationPhase: (value: GenerationPhase) => {
       generationPhase.value = value
     },
     getGenerationStream: () => generationStream,
-    setGenerationStream: (stream) => {
+    setGenerationStream: (stream: EventSource | null) => {
       generationStream = stream
     },
     openGenerationStream: openTaskStream,
@@ -207,11 +171,11 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     scrollChat: deps.scrollChat,
   })
 
-  const loadConversationList = async (projectId: number) => {
+  const loadConversationList = async (projectId: string) => {
     await timeline.loadConversationList(projectId)
   }
 
-  const resolveCurrentSessionId = async (projectId: number) => {
+  const resolveCurrentSessionId = async (projectId: string) => {
     if (currentConversationId.value) {
       return currentConversationId.value
     }
@@ -220,8 +184,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       return preferredConversationId.value
     }
     const sessions = (await listSessions(projectId)) as Array<ChatRecord>
-    const latestSessionId = Number((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? (Array.isArray(sessions) ? sessions[0] : null)?.conversationId ?? 0)
-    if (latestSessionId > 0) {
+    const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? (Array.isArray(sessions) ? sessions[0] : null)?.conversationId ?? '')
+    if (latestSessionId) {
       currentConversationId.value = latestSessionId
       preferredConversationId.value = latestSessionId
       return latestSessionId
@@ -229,16 +193,13 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return null
   }
 
-  const createSessionForSend = async (projectId: number, operatorId: number) => {
-    if (!deps.createSession) {
-      return null
-    }
+  const createSessionForSend = async (projectId: string, operatorId: string) => {
     const created = (await deps.createSession(projectId, {
       userId: operatorId,
       title: '新会话',
     })) as ChatRecord
-    const sessionId = Number(created?.sessionId ?? created?.conversationId ?? 0)
-    if (sessionId > 0) {
+    const sessionId = String(created?.sessionId ?? created?.conversationId ?? '')
+    if (sessionId) {
       currentConversationId.value = sessionId
       preferredConversationId.value = sessionId
       if (showConversationPanel.value) {
@@ -249,10 +210,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return null
   }
 
-  const ensureSessionIdForSend = async (projectId: number, operatorId: number) => {
-    if (deps.ensureConversationId) {
-      return deps.ensureConversationId(projectId, operatorId)
-    }
+  const ensureSessionIdForSend = async (projectId: string, operatorId: string) => {
     const existingSessionId = await resolveCurrentSessionId(projectId)
     if (existingSessionId) {
       return existingSessionId
@@ -260,7 +218,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return createSessionForSend(projectId, operatorId)
   }
 
-  const selectConversation = async (conversationId: number) => {
+  const selectConversation = async (conversationId: string) => {
     const projectId = deps.getCurrentProjectId()
     if (!projectId || !conversationId) return
     const snapshot = await getSessionRecovery(projectId, conversationId)
@@ -275,7 +233,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     await loadConversationList(projectId)
   }
 
-  const loadConversationHistory = async (projectId: number, operatorId: number) => {
+  const loadConversationHistory = async (projectId: string, operatorId: string) => {
     if (!projectId || !operatorId) {
       messages.value = []
       currentConversationId.value = null
@@ -283,23 +241,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     }
 
     try {
-      if (deps.ensureConversationId && deps.listMessages) {
-        const conversationId = await deps.ensureConversationId(projectId, operatorId)
-        if (!conversationId) {
-          messages.value = []
-          currentConversationId.value = null
-          preferredConversationId.value = null
-          return
-        }
-        currentConversationId.value = conversationId
-        preferredConversationId.value = conversationId
-        await timeline.loadConversationMessages(projectId, conversationId)
-        await loadConversationList(projectId)
-        return
-      }
-
       const sessions = (await listSessions(projectId)) as Array<ChatRecord>
-      const latestSessionId = Number((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? (Array.isArray(sessions) ? sessions[0] : null)?.conversationId ?? 0)
+      const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? (Array.isArray(sessions) ? sessions[0] : null)?.conversationId ?? '')
       if (!latestSessionId) {
         messages.value = []
         currentConversationId.value = null
@@ -345,39 +288,31 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     let assistantMsg: ChatMessage | null = null
 
     try {
-      const conversationId = await ensureSessionIdForSend(Number(projectId), Number(operatorId))
+      const conversationId = await ensureSessionIdForSend(projectId, operatorId)
       if (!conversationId) throw new Error('会话初始化失败')
 
-      const modelConfigId = await deps.ensureModelConfigId(Number(projectId))
+      const modelConfigId = await deps.ensureModelConfigId(projectId)
       if (!modelConfigId) {
         deps.onRequireModelSelection?.()
         throw new Error('未选择可用模型，请先在模型设置中保存并切换模型')
       }
 
-      if (deps.createMessage) {
-        await deps.createMessage(Number(projectId), conversationId, Number(operatorId), {
-          role: 'user',
-          userMessageType: 'COMMAND',
-          contentMd: userText,
-          attachmentsJson: '[]',
-          toolCallsJson: '[]',
-        })
-      }
-
-      const generation = (await createTurn(Number(projectId), conversationId, {
-        operatorId: Number(operatorId),
+      const generation = (await createTurn(projectId, conversationId, {
+        operatorId,
         userMessage: userText,
         taskRequest: {
           taskType: 'WRITE',
-          chapterId: Number(deps.getActiveChapterKey()) || null,
+          chapterId: deps.getActiveChapterKey() || null,
           selectedText: '',
           modelConfigId,
           activePlugins: deps.getActivePlugins() || [],
         },
       })) as ChatRecord & { activeTask?: { taskId?: number | string; taskStatus?: string } }
 
-      const taskId = Number(generation.activeTask?.taskId ?? generation.taskId ?? 0)
-      if (!taskId) throw new Error('任务创建失败，缺少 taskId')
+      const taskId = generation.activeTask?.taskId ?? generation.taskId
+      if (taskId == null || String(taskId).trim() === '' || String(taskId) === '0') {
+        throw new Error('任务创建失败，缺少 taskId')
+      }
 
       generationTaskStatus.value = normalizeGenerationStatus(generation.activeTask?.taskStatus ?? generation.status) || 'pending'
       generationPhase.value = 'streaming'
@@ -389,19 +324,20 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
       let finalStatus: GenerationTaskStatus | ''
       try {
-        finalStatus = await runtime.consumeGenerationStream(Number(projectId), taskId, assistantMsg)
+        finalStatus = await runtime.consumeGenerationStream(projectId, String(taskId), assistantMsg)
       } catch (streamError: any) {
         if (!deps.enablePollingFallback) {
           throw streamError
         }
-        finalStatus = await runtime.pollGenerationAsFallback(Number(projectId), taskId, assistantMsg)
+        finalStatus = await runtime.pollGenerationAsFallback(projectId, String(taskId), assistantMsg)
       }
 
       if (finalStatus === 'failed' || finalStatus === 'cancelled') {
         throw new Error(`生成任务结束：${finalStatus}`)
       }
 
-      const hasPendingApproval = !!assistantMsg.approval && !assistantMsg.approval.resolved
+      const assistantState = assistantMsg as ChatMessage
+      const hasPendingApproval = !!assistantState.approval && !assistantState.approval?.resolved
       if (hasPendingApproval) {
         generationPhase.value = 'waiting_approval'
         generationTaskStatus.value = 'waiting_approval'
@@ -444,7 +380,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       msgIdCounter = maxId + 1
     }
 
-    currentConversationId.value = Number(snapshot?.session?.sessionId ?? 0) || null
+    currentConversationId.value = snapshot?.session?.sessionId == null ? null : String(snapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
 
     const taskStatus = normalizeGenerationStatus(snapshot?.activeTask?.taskStatus)
@@ -477,7 +413,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return assistantMsg
   }
 
-  const resumeRunningTask = async (projectId: number, taskId: number) => {
+  const resumeRunningTask = async (projectId: string, taskId: string) => {
     const assistantMsg = resolveAssistantMessageForResume()
     isGenerating.value = true
     generationPhase.value = 'streaming'
@@ -507,7 +443,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         throw new Error(`生成任务结束：${finalStatus}`)
       }
 
-      const hasPendingApproval = !!assistantMsg.approval && !assistantMsg.approval.resolved
+      const assistantState = assistantMsg as ChatMessage
+      const hasPendingApproval = !!assistantState.approval && !assistantState.approval?.resolved
       if (hasPendingApproval) {
         generationPhase.value = 'waiting_approval'
         generationTaskStatus.value = 'waiting_approval'

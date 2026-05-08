@@ -9,25 +9,49 @@ const flushPromises = async (times = 6) => {
 }
 
 describe('useWorkbenchSessionRecovery', () => {
+  it('passes_operator_id_to_resume_session_payload', async () => {
+    const resumeSession = vi.fn().mockResolvedValue({
+      session: { sessionId: '90001', title: '第三章', status: 'ACTIVE', boundStyle: null },
+      activeTask: null,
+      pendingApproval: null,
+      messages: [],
+      workbenchContext: { chapterId: '301', selectedText: '', activePlugins: [], modelConfigId: 'mcfg-001' },
+    })
+
+    const recoveryController = useWorkbenchSessionRecovery({
+      getSessionRecovery: vi.fn(),
+      resumeSession,
+      openTaskStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+      hydrateStore: vi.fn(),
+    })
+
+    await (recoveryController.restore as (...args: any[]) => Promise<unknown>)('101', '90001', '201')
+
+    expect(resumeSession).toHaveBeenCalledWith('101', '90001', {
+      trigger: 'WORKBENCH_ENTER',
+      operatorId: '201',
+    })
+  })
+
   it('hydrates_store_from_recovery_snapshot_and_reconnects_running_task', async () => {
     const sessionState = createWorkbenchSessionState()
     const openTaskStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
     const recovery = {
       session: {
-        sessionId: 90001,
+        sessionId: '90001',
         title: '第三章',
         status: 'ACTIVE',
-        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
-        taskId: 70001,
+        taskId: '70001',
         taskStatus: 'RUNNING',
         streamChannelKey: 'agent-task-70001',
       },
       pendingApproval: null,
       messages: [],
       workbenchContext: {
-        chapterId: 301,
+        chapterId: '301',
         selectedText: '',
         activePlugins: ['outline.search'],
         modelConfigId: 'mcfg-001',
@@ -38,7 +62,7 @@ describe('useWorkbenchSessionRecovery', () => {
       getSessionRecovery: vi.fn().mockResolvedValue(recovery),
       resumeSession: vi.fn().mockResolvedValue(recovery),
       openTaskStream,
-      hydrateStore: (snapshot: typeof recovery) => {
+      hydrateStore: (snapshot: any) => {
         sessionState.sessionId = Number(snapshot?.session?.sessionId ?? 0) || null
         sessionState.title = String(snapshot?.session?.title ?? '')
         sessionState.status = String(snapshot?.session?.status ?? '')
@@ -62,7 +86,7 @@ describe('useWorkbenchSessionRecovery', () => {
       },
     })
 
-    await recoveryController.restore(101, 90001)
+    await recoveryController.restore('101', '90001')
     await flushPromises()
 
     expect(sessionState.sessionId).toBe(90001)
@@ -80,18 +104,128 @@ describe('useWorkbenchSessionRecovery', () => {
       activePlugins: ['outline.search'],
       modelConfigId: 'mcfg-001',
     })
-    expect(openTaskStream).toHaveBeenCalledWith(101, 70001)
+    expect(openTaskStream).toHaveBeenCalledWith('101', '70001')
+  })
+
+  it('keeps_business_ids_as_strings_when_hydrating_store_from_recovery_snapshot', async () => {
+    const oversizedSessionId = '90071992547409931234'
+    const oversizedStyleId = '90071992547409939876'
+    const oversizedTaskId = '90071992547409935678'
+    const oversizedChapterId = '90071992547409933456'
+    const sessionState = createWorkbenchSessionState() as unknown as Record<string, unknown>
+    const recovery = {
+      session: {
+        sessionId: oversizedSessionId,
+        title: '第三章',
+        status: 'ACTIVE',
+        boundStyle: { styleId: oversizedStyleId, name: '冷峻悬疑' },
+      },
+      activeTask: {
+        taskId: oversizedTaskId,
+        taskStatus: 'RUNNING',
+        streamChannelKey: `agent-task-${oversizedTaskId}`,
+      },
+      pendingApproval: null,
+      messages: [],
+      workbenchContext: {
+        chapterId: oversizedChapterId,
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-001',
+      },
+    }
+
+    const recoveryController = useWorkbenchSessionRecovery({
+      getSessionRecovery: vi.fn().mockResolvedValue(recovery),
+      resumeSession: vi.fn().mockResolvedValue(recovery),
+      openTaskStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+      hydrateStore: (snapshot: any) => {
+        sessionState.sessionId = String(snapshot?.session?.sessionId ?? '')
+        sessionState.title = String(snapshot?.session?.title ?? '')
+        sessionState.status = String(snapshot?.session?.status ?? '')
+        sessionState.boundStyle = {
+          styleId: String(snapshot?.session?.boundStyle?.styleId ?? ''),
+          name: String(snapshot?.session?.boundStyle?.name ?? ''),
+        }
+        sessionState.activeTask = {
+          taskId: String(snapshot?.activeTask?.taskId ?? ''),
+          taskStatus: String(snapshot?.activeTask?.taskStatus ?? ''),
+          streamChannelKey: String(snapshot?.activeTask?.streamChannelKey ?? ''),
+        }
+        sessionState.workbenchContext = {
+          chapterId: String(snapshot?.workbenchContext?.chapterId ?? ''),
+          selectedText: String(snapshot?.workbenchContext?.selectedText ?? ''),
+          activePlugins: Array.isArray(snapshot?.workbenchContext?.activePlugins) ? snapshot.workbenchContext.activePlugins : [],
+          modelConfigId: String(snapshot?.workbenchContext?.modelConfigId ?? ''),
+        }
+      },
+    })
+
+    await recoveryController.restore('101', oversizedSessionId, '201')
+    await flushPromises()
+
+    expect(sessionState.sessionId).toBe(oversizedSessionId)
+    expect(sessionState.boundStyle).toEqual({ styleId: oversizedStyleId, name: '冷峻悬疑' })
+    expect(sessionState.activeTask).toEqual({
+      taskId: oversizedTaskId,
+      taskStatus: 'RUNNING',
+      streamChannelKey: `agent-task-${oversizedTaskId}`,
+    })
+    expect(sessionState.workbenchContext).toEqual({
+      chapterId: oversizedChapterId,
+      selectedText: '',
+      activePlugins: ['outline.search'],
+      modelConfigId: 'mcfg-001',
+    })
+  })
+
+  it('preserves_oversized_task_id_when_reconnecting_running_task_during_restore', async () => {
+    const oversizedTaskId = '90071992547409931234'
+    const openTaskStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
+    const recovery = {
+      session: {
+        sessionId: '90001',
+        title: '第三章',
+        status: 'ACTIVE',
+        boundStyle: null,
+      },
+      activeTask: {
+        taskId: oversizedTaskId,
+        taskStatus: 'RUNNING',
+        streamChannelKey: `agent-task-${oversizedTaskId}`,
+      },
+      pendingApproval: null,
+      messages: [],
+      workbenchContext: {
+        chapterId: '301',
+        selectedText: '',
+        activePlugins: [],
+        modelConfigId: 'mcfg-001',
+      },
+    }
+
+    const recoveryController = useWorkbenchSessionRecovery({
+      getSessionRecovery: vi.fn().mockResolvedValue(recovery),
+      resumeSession: vi.fn().mockResolvedValue(recovery),
+      openTaskStream,
+      hydrateStore: vi.fn(),
+    })
+
+    await (recoveryController.restore as (...args: any[]) => Promise<unknown>)('101', '90001', '201')
+    await flushPromises()
+
+    expect(openTaskStream).toHaveBeenCalledWith('101', oversizedTaskId)
   })
 
   it('prefers_resume_running_task_over_direct_stream_open_when_handler_is_provided', async () => {
     const openTaskStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
     const resumeRunningTask = vi.fn().mockResolvedValue(undefined)
     const recovery = {
-      session: { sessionId: 90001, title: '第三章', status: 'ACTIVE', boundStyle: null },
-      activeTask: { taskId: 70001, taskStatus: 'RUNNING', streamChannelKey: 'agent-task-70001' },
+      session: { sessionId: '90001', title: '第三章', status: 'ACTIVE', boundStyle: null },
+      activeTask: { taskId: '70001', taskStatus: 'RUNNING', streamChannelKey: 'agent-task-70001' },
       pendingApproval: null,
       messages: [],
-      workbenchContext: { chapterId: 301, selectedText: '', activePlugins: [], modelConfigId: 'mcfg-001' },
+      workbenchContext: { chapterId: '301', selectedText: '', activePlugins: [], modelConfigId: 'mcfg-001' },
     }
 
     const recoveryController = useWorkbenchSessionRecovery({
@@ -102,10 +236,10 @@ describe('useWorkbenchSessionRecovery', () => {
       hydrateStore: vi.fn(),
     })
 
-    await recoveryController.restore(101, 90001)
+    await recoveryController.restore('101', '90001')
     await flushPromises()
 
-    expect(resumeRunningTask).toHaveBeenCalledWith(101, 70001)
+    expect(resumeRunningTask).toHaveBeenCalledWith('101', '70001')
     expect(openTaskStream).not.toHaveBeenCalled()
   })
 })

@@ -138,6 +138,7 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import type { IdLike } from '@/api/types'
 import StyleManager from '@/components/workbench/StyleManager.vue'
 import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
 import ModelSettings from '@/components/workbench/ModelSettings.vue'
@@ -449,7 +450,7 @@ const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
   })
 }
 
-const openAgentTaskStream = (projectId: number, taskId: number) => {
+const openAgentTaskStream = (projectId: number, taskId: IdLike) => {
   console.info('[agent-ui] task-stream-open', {
     projectId,
     taskId,
@@ -631,8 +632,9 @@ const sessionRecovery = useWorkbenchSessionRecovery({
 
 const resumeWorkbenchSession = async (sessionId: number) => {
   const projectId = getCurrentProjectId()
-  if (!projectId || !sessionId) return
-  await sessionRecovery.restore(projectId, sessionId)
+  const operatorId = resolveOperatorId()
+  if (!projectId || !sessionId || !operatorId) return
+  await sessionRecovery.restore(projectId, sessionId, operatorId)
 }
 
 const handleSelectConversation = async (conversationId: number) => {

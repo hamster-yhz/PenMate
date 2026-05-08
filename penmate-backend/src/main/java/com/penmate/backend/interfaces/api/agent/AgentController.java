@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/v1/novels/{projectId}/agent")
@@ -47,22 +48,22 @@ public class AgentController {
      * 查询当前项目下的会话列表。
      */
     @GetMapping("/sessions")
-    public ApiResponse<List<AgentConversation>> listSessions(@PathVariable Long projectId,
+    public ApiResponse<List<AgentConversation>> listSessions(@PathVariable String projectId,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentConversationAppService.listConversations(projectId), traceId);
+        return ApiResponse.success(agentConversationAppService.listConversations(parseBusinessId(projectId, "projectId")), traceId);
     }
 
     /**
      * 创建一个新会话。
      */
     @PostMapping("/sessions")
-    public ApiResponse<AgentConversation> createSession(@PathVariable Long projectId,
-                                                        @Valid @RequestBody CreateAgentConversationDto dto,
-                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<AgentConversation> createSession(@PathVariable String projectId,
+                                                         @Valid @RequestBody CreateAgentConversationDto dto,
+                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Create agent session request: projectId={}, userId={}, title={}, traceId={}",
                 projectId, dto.getUserId(), dto.getTitle(), traceId);
         return ApiResponse.success(
-                agentConversationAppService.createConversation(projectId, toCommand(dto), traceId),
+                agentConversationAppService.createConversation(parseBusinessId(projectId, "projectId"), toCommand(dto), traceId),
                 traceId
         );
     }
@@ -72,10 +73,13 @@ public class AgentController {
      * <p>控制器仅负责 HTTP 参数绑定与 traceId 透传，具体恢复查询下沉到应用服务。</p>
      */
     @GetMapping("/sessions/{sessionId}/recovery")
-    public ApiResponse<AgentRecoverySnapshotDto> getRecovery(@PathVariable Long projectId,
-                                                             @PathVariable Long sessionId,
+    public ApiResponse<AgentRecoverySnapshotDto> getRecovery(@PathVariable String projectId,
+                                                             @PathVariable String sessionId,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(toRecoveryDto(agentSessionRecoveryAppService.getRecovery(projectId, sessionId, traceId)), traceId);
+        return ApiResponse.success(toRecoveryDto(agentSessionRecoveryAppService.getRecovery(
+                parseBusinessId(projectId, "projectId"),
+                parseBusinessId(sessionId, "sessionId"),
+                traceId)), traceId);
     }
 
     /**
@@ -83,14 +87,19 @@ public class AgentController {
      * <p>控制器不拼装恢复快照，只做 DTO 到用例入参的转换。</p>
      */
     @PostMapping("/sessions/{sessionId}/resume")
-    public ApiResponse<AgentRecoverySnapshotDto> resume(@PathVariable Long projectId,
-                                                        @PathVariable Long sessionId,
+    public ApiResponse<AgentRecoverySnapshotDto> resume(@PathVariable String projectId,
+                                                        @PathVariable String sessionId,
                                                         @Valid @RequestBody ResumeAgentSessionDto dto,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Resume agent session request: projectId={}, sessionId={}, operatorId={}, trigger={}, traceId={}",
                 projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId);
         return ApiResponse.success(
-                toRecoveryDto(agentSessionRecoveryAppService.resumeSession(projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId)),
+                toRecoveryDto(agentSessionRecoveryAppService.resumeSession(
+                        parseBusinessId(projectId, "projectId"),
+                        parseBusinessId(sessionId, "sessionId"),
+                        parseBusinessId(dto.getOperatorId(), "operatorId"),
+                        dto.getTrigger(),
+                        traceId)),
                 traceId
         );
     }
@@ -100,34 +109,57 @@ public class AgentController {
      * <p>该接口是新的 workflow entry，不再暴露历史 createMessage/createGeneration 双接口。</p>
      */
     @PostMapping("/sessions/{sessionId}/turns")
-    public ApiResponse<AgentTaskDto> createTurn(@PathVariable Long projectId,
-                                                @PathVariable Long sessionId,
+    public ApiResponse<AgentTaskDto> createTurn(@PathVariable String projectId,
+                                                @PathVariable String sessionId,
                                                 @Valid @RequestBody CreateAgentTurnDto dto,
                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, taskType={}, traceId={}",
                 projectId, sessionId, dto.getOperatorId(), dto.getTaskRequest().getTaskType(), traceId);
-        AgentTurnResult result = agentTurnAppService.createTurn(projectId, sessionId, toCommand(dto), traceId);
+        AgentTurnResult result = agentTurnAppService.createTurn(
+                parseBusinessId(projectId, "projectId"),
+                parseBusinessId(sessionId, "sessionId"),
+                toCommand(dto),
+                traceId);
         return ApiResponse.success(toTaskDto(result), traceId);
     }
 
     private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {
+        Long userId = parseBusinessId(dto.getUserId(), "userId");
         return new CreateConversationCommand(
-                dto.getUserId(),
+                userId,
                 dto.getTitle(),
                 dto.getStatus(),
-                dto.getUserId()
+                userId
         );
     }
 
     private AgentTurnCommand toCommand(CreateAgentTurnDto dto) {
         CreateAgentTurnDto.TaskRequest request = dto.getTaskRequest();
         return new AgentTurnCommand(
-                dto.getOperatorId(),
+                parseBusinessId(dto.getOperatorId(), "operatorId"),
                 dto.getUserMessage(),
                 request == null
                         ? null
-                        : new AgentTurnCommand.TaskRequest(request.getTaskType(), request.getChapterId(), request.getSelectedText())
+                        : new AgentTurnCommand.TaskRequest(
+                                request.getTaskType(),
+                                parseOptionalBusinessId(request.getChapterId(), "chapterId"),
+                                request.getSelectedText())
         );
+    }
+
+    private Long parseBusinessId(String rawValue, String fieldName) {
+        try {
+            return Long.valueOf(Objects.requireNonNull(rawValue, fieldName + " must not be null"));
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(fieldName + " must be a numeric business id", ex);
+        }
+    }
+
+    private Long parseOptionalBusinessId(String rawValue, String fieldName) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        return parseBusinessId(rawValue, fieldName);
     }
 
     private AgentRecoverySnapshotDto toRecoveryDto(AgentSessionRecoveryResult result) {

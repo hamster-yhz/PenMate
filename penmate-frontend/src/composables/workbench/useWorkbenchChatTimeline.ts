@@ -20,7 +20,7 @@ export const toChatRole = (raw: unknown): ChatMessage['role'] => {
   return 'user'
 }
 
-export const pickConversationId = (item: ChatRecord) => Number(item.conversationId ?? 0)
+export const pickConversationId = (item: ChatRecord) => String(item.sessionId ?? item.conversationId ?? '').trim()
 
 export const pickToolCallId = (item: ChatRecord): string | undefined => {
   const toolCallId = String(item.toolCallId ?? item.tool_call_id ?? '').trim()
@@ -96,11 +96,11 @@ export const createChatTimeline = (deps: {
   setMessages: (messages: ChatMessage[]) => void
   getMsgIdCounter: () => number
   setMsgIdCounter: (value: number) => void
-  listConversations: (projectId: number) => Promise<unknown>
-  listMessages: (projectId: number, conversationId: number) => Promise<unknown>
+  listConversations: (projectId: string) => Promise<unknown>
+  listMessages: (projectId: string, conversationId: string) => Promise<unknown>
   setConversationList: (items: ConversationItem[]) => void
   setConversationLoading: (value: boolean) => void
-  setCurrentConversationId: (value: number | null) => void
+  setCurrentConversationId: (value: string | null) => void
   scrollChat: () => Promise<void>
 }) => {
   const mapApiMessage = (item: ChatRecord): ChatMessage => {
@@ -116,7 +116,7 @@ export const createChatTimeline = (deps: {
     }
   }
 
-  const loadConversationMessages = async (projectId: number, conversationId: number) => {
+  const loadConversationMessages = async (projectId: string, conversationId: string) => {
     const list = (await deps.listMessages(projectId, conversationId)) as Array<ChatRecord>
     const mapped = (Array.isArray(list) ? list : []).map(mapApiMessage)
     deps.setMessages(mapped)
@@ -126,7 +126,7 @@ export const createChatTimeline = (deps: {
     await deps.scrollChat()
   }
 
-  const loadConversationList = async (projectId: number) => {
+  const loadConversationList = async (projectId: string) => {
     if (!projectId) {
       deps.setConversationList([])
       return
@@ -142,7 +142,7 @@ export const createChatTimeline = (deps: {
             title: String(item.title || ''),
             updatedAt: String(item.updatedAt || item.createdAt || ''),
           }))
-          .filter((item) => item.conversationId > 0),
+          .filter((item) => !!item.conversationId),
       )
     } finally {
       deps.setConversationLoading(false)

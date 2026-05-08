@@ -1,5 +1,4 @@
 import request from '@/utils/request'
-import type { IdLike } from '@/api/types'
 
 type AnyRecord = Record<string, unknown>
 type StreamListener = (event: MessageEvent<string>) => void
@@ -15,34 +14,34 @@ const resolveApiBaseUrl = () => {
   return trimTrailingSlash(configuredBase.startsWith('/') ? configuredBase : `/${configuredBase}`)
 }
 
-const buildTaskStreamUrl = (projectId: IdLike, taskId: IdLike) => {
+const buildTaskStreamUrl = (projectId: string, taskId: string) => {
   const apiBase = resolveApiBaseUrl()
   return `${apiBase}/v1/novels/${projectId}/agent/tasks/${taskId}/stream`
 }
 
 export const agentApi = {
-  listSessions(projectId: IdLike) {
+  listSessions(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/agent/sessions`)
   },
-  createSession(projectId: IdLike, payload: AnyRecord) {
+  createSession(projectId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions`, payload)
   },
-  getSessionRecovery(projectId: IdLike, sessionId: IdLike) {
+  getSessionRecovery(projectId: string, sessionId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/recovery`)
   },
-  resumeSession(projectId: IdLike, sessionId: IdLike, payload: AnyRecord) {
+  resumeSession(projectId: string, sessionId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/resume`, payload)
   },
-  createTurn(projectId: IdLike, sessionId: IdLike, payload: AnyRecord) {
+  createTurn(projectId: string, sessionId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
   },
-  getTask(projectId: IdLike, taskId: IdLike) {
+  getTask(projectId: string, taskId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/tasks/${taskId}`)
   },
-  getTaskStreamUrl(projectId: IdLike, taskId: IdLike) {
+  getTaskStreamUrl(projectId: string, taskId: string) {
     return buildTaskStreamUrl(projectId, taskId)
   },
-  openTaskStream(projectId: IdLike, taskId: IdLike) {
+  openTaskStream(projectId: string, taskId: string) {
     const url = buildTaskStreamUrl(projectId, taskId)
     return new EventSource(url)
   },

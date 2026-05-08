@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 public class CreateAgentConversationDto {
 
     @NotNull
-    private Long userId;
+    private String userId;
     private String title;
     private String status;
 

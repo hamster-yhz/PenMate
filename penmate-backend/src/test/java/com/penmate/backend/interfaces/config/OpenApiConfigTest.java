@@ -63,8 +63,39 @@ class OpenApiConfigTest {
 
         Parameter parameter = operation.getParameters().get(0);
         assertThat(parameter.getDescription()).contains("用户业务 ID");
-        assertThat(parameter.getSchema().getExample()).isEqualTo(1);
+        assertThat(parameter.getSchema().getExample()).isEqualTo("1001");
         assertThat(operation.getSummary()).contains("RBAC");
+    }
+
+    @Test
+    void UT_CONFIG_OPENAPI_CUSTOMIZER_SHOULD_FORCE_BUSINESS_ID_FIELDS_TO_STRING_SCHEMA() {
+        OpenAPI openAPI = new OpenAPI();
+        Operation operation = new Operation();
+        operation.addParametersItem(new Parameter().in("path").name("projectId").schema(new Schema<>().type("integer")));
+
+        Schema<?> requestSchema = new ObjectSchema()
+                .addProperty("userId", new Schema<>().type("integer"))
+                .addProperty("operatorId", new Schema<>().type("integer"))
+                .addProperty("taskRequest", new ObjectSchema()
+                        .addProperty("chapterId", new Schema<>().type("integer"))
+                        .addProperty("taskType", new Schema<>().type("string")));
+        operation.setRequestBody(new RequestBody().content(new Content()
+                .addMediaType("application/json", new MediaType().schema(requestSchema))));
+        operation.setResponses(new ApiResponses().addApiResponse("200", new ApiResponse()));
+
+        PathItem pathItem = new PathItem().post(operation);
+        openAPI.setPaths(new Paths().addPathItem("/api/v1/novels/{projectId}/agent/sessions/{sessionId}/turns", pathItem));
+
+        openApiConfig.defaultApiDocumentationCustomizer().customise(openAPI);
+
+        Parameter projectIdParameter = operation.getParameters().get(0);
+        Schema<?> customizedRequestSchema = operation.getRequestBody().getContent().get("application/json").getSchema();
+        Schema<?> taskRequestSchema = (Schema<?>) customizedRequestSchema.getProperties().get("taskRequest");
+
+        assertThat(projectIdParameter.getSchema().getType()).isEqualTo("string");
+        assertThat(((Schema<?>) customizedRequestSchema.getProperties().get("userId")).getType()).isEqualTo("string");
+        assertThat(((Schema<?>) customizedRequestSchema.getProperties().get("operatorId")).getType()).isEqualTo("string");
+        assertThat(((Schema<?>) taskRequestSchema.getProperties().get("chapterId")).getType()).isEqualTo("string");
     }
 
     @Test

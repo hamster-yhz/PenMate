@@ -40,10 +40,10 @@ export const createTaskRuntime = (deps: {
   setGenerationPhase: (value: GenerationPhase) => void
   getGenerationStream: () => EventSource | null
   setGenerationStream: (stream: EventSource | null) => void
-  openGenerationStream: (projectId: number, taskId: number) => EventSource
+  openGenerationStream: (projectId: string, taskId: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeGenerationStream?: (stream: EventSource | null) => void
-  getGeneration: (projectId: number, taskId: number) => Promise<unknown>
+  getGeneration: (projectId: string, taskId: string) => Promise<unknown>
   waitForPolling?: () => Promise<void>
   scrollChat: () => void
 }) => {
@@ -60,7 +60,7 @@ export const createTaskRuntime = (deps: {
     setTimeout(resolve, DEFAULT_POLLING_INTERVAL_MS)
   })
 
-  const pollGenerationAsFallback = async (projectId: number, taskId: number, assistantMsg?: ChatMessage) => {
+  const pollGenerationAsFallback = async (projectId: string, taskId: string, assistantMsg?: ChatMessage) => {
     let status: GenerationTaskStatus | '' = ''
     for (let i = 0; i < 12; i += 1) {
       const latest = (await deps.getGeneration(projectId, taskId)) as ChatRecord
@@ -81,7 +81,7 @@ export const createTaskRuntime = (deps: {
     throw new Error(`生成任务轮询超时，状态：${status || 'unknown'}`)
   }
 
-  const consumeGenerationStream = (projectId: number, taskId: number, assistantMsg: ChatMessage) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
+  const consumeGenerationStream = (projectId: string, taskId: string, assistantMsg: ChatMessage) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
     closeGenerationStream()
     const generationStream = deps.openGenerationStream(projectId, taskId)
     deps.setGenerationStream(generationStream)

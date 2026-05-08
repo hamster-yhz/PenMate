@@ -1,6 +1,6 @@
 type RecoverySnapshot = {
   session?: {
-    sessionId?: number | string | null
+    sessionId?: string | null
     title?: string | null
     status?: string | null
     boundStyle?: {
@@ -9,14 +9,14 @@ type RecoverySnapshot = {
     } | null
   } | null
   activeTask?: {
-    taskId?: number | string | null
+    taskId?: string | null
     taskStatus?: string | null
     streamChannelKey?: string | null
   } | null
   pendingApproval?: Record<string, unknown> | null
   messages?: Array<Record<string, unknown>> | null
   workbenchContext?: {
-    chapterId?: number | string | null
+    chapterId?: string | null
     selectedText?: string | null
     activePlugins?: string[] | null
     modelConfigId?: string | null
@@ -28,18 +28,21 @@ type RecoverySnapshot = {
  * <p>负责调用后端 recovery / resume 接口，并把 snapshot 回填到前端 store；若存在运行中任务，则自动重连任务流。</p>
  */
 export const useWorkbenchSessionRecovery = (deps: {
-  getSessionRecovery: (projectId: number, sessionId: number) => Promise<RecoverySnapshot>
-  resumeSession: (projectId: number, sessionId: number, payload: Record<string, unknown>) => Promise<RecoverySnapshot>
-  openTaskStream: (projectId: number, taskId: number) => EventSource
+  getSessionRecovery: (projectId: string, sessionId: string) => Promise<RecoverySnapshot>
+  resumeSession: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<RecoverySnapshot>
+  openTaskStream: (projectId: string, taskId: string) => EventSource
   hydrateStore: (snapshot: RecoverySnapshot) => void
-  resumeRunningTask?: (projectId: number, taskId: number) => Promise<void>
+  resumeRunningTask?: (projectId: string, taskId: string) => Promise<void>
 }) => {
-  const restore = async (projectId: number, sessionId: number) => {
-    const snapshot = await deps.resumeSession(projectId, sessionId, { trigger: 'WORKBENCH_ENTER' })
+  const restore = async (projectId: string, sessionId: string, operatorId?: string) => {
+    const snapshot = await deps.resumeSession(projectId, sessionId, {
+      trigger: 'WORKBENCH_ENTER',
+      ...(operatorId != null ? { operatorId } : {}),
+    })
     deps.hydrateStore(snapshot)
-    const taskId = Number(snapshot?.activeTask?.taskId ?? 0)
+    const taskId = snapshot?.activeTask?.taskId
     const taskStatus = String(snapshot?.activeTask?.taskStatus ?? '').toUpperCase()
-    if (taskId > 0 && taskStatus === 'RUNNING') {
+    if (taskId != null && String(taskId).trim() !== '' && String(taskId) !== '0' && taskStatus === 'RUNNING') {
       if (deps.resumeRunningTask) {
         await deps.resumeRunningTask(projectId, taskId)
       } else {

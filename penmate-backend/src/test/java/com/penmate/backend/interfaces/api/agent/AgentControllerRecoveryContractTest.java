@@ -60,8 +60,8 @@ class AgentControllerRecoveryContractTest {
         mockMvc().perform(get("/api/v1/novels/101/agent/sessions/90001/recovery")
                         .header("X-Trace-Id", "trace-recovery-1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
-                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value(81))
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
+                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("81"))
                 .andExpect(jsonPath("$.data.activeTask.taskStatus").value("WAITING_APPROVAL"))
                 .andExpect(jsonPath("$.meta.traceId").value("trace-recovery-1"));
 
@@ -77,12 +77,12 @@ class AgentControllerRecoveryContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", "trace-resume-1")
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 201,
+                                "operatorId", "201",
                                 "trigger", "WORKBENCH_ENTER"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
-                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value(81))
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
+                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("81"))
                 .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"))
                 .andExpect(jsonPath("$.meta.traceId").value("trace-resume-1"));
 
@@ -98,17 +98,17 @@ class AgentControllerRecoveryContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", "trace-turn-1")
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 201,
+                                "operatorId", "201",
                                 "userMessage", "继续扩写第三章夜雨追踪段落",
                                 "taskRequest", Map.of(
                                         "taskType", "WRITE",
-                                        "chapterId", 301,
+                                        "chapterId", "301",
                                         "selectedText", "夜雨中的追踪在巷口停住。"
                                 )
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
-                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value(81))
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
+                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("81"))
                 .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"))
                 .andExpect(jsonPath("$.meta.traceId").value("trace-turn-1"));
 
@@ -120,7 +120,7 @@ class AgentControllerRecoveryContractTest {
         mockMvc().perform(post("/api/v1/novels/101/agent/sessions/90001/resume")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 201,
+                                "operatorId", "201",
                                 "trigger", ""
                         ))))
                 .andExpect(status().isBadRequest())
@@ -132,15 +132,77 @@ class AgentControllerRecoveryContractTest {
         mockMvc().perform(post("/api/v1/novels/101/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 201,
+                                "operatorId", "201",
                                 "userMessage", "继续扩写第三章",
                                 "taskRequest", Map.of(
                                         "taskType", "",
-                                        "chapterId", 301
+                                        "chapterId", "301"
                                 )
                         ))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void should_keep_oversized_business_ids_as_string_in_recovery_and_turn_responses() throws Exception {
+        Long oversizedSessionId = 9007199254740991L;
+        Long oversizedStyleId = 9007199254740881L;
+        Long oversizedTaskId = 9007199254740771L;
+        Long oversizedRequestContextId = 9007199254740661L;
+
+        when(agentSessionRecoveryAppService.getRecovery(101L, oversizedSessionId, "trace-oversized-recovery"))
+                .thenReturn(new AgentSessionRecoveryResult(
+                        new AgentSessionRecoveryResult.SessionView(
+                                oversizedSessionId,
+                                "超大 ID 会话",
+                                "ACTIVE",
+                                new AgentSessionRecoveryResult.BoundStyleView(oversizedStyleId, "冷峻悬疑"),
+                                "RUNNING"
+                        ),
+                        new AgentSessionRecoveryResult.ActiveTaskView(oversizedTaskId, "RUNNING", oversizedRequestContextId),
+                        null,
+                        java.util.List.of(),
+                        null
+                ));
+
+        when(agentTurnAppService.createTurn(eq(101L), eq(oversizedSessionId), any(), eq("trace-oversized-turn")))
+                .thenReturn(new AgentTurnResult(
+                        new AgentTurnResult.SessionView(
+                                oversizedSessionId,
+                                "超大 ID 会话",
+                                "ACTIVE",
+                                new AgentTurnResult.BoundStyleView(oversizedStyleId, "冷峻悬疑"),
+                                "RUNNING"
+                        ),
+                        new AgentTurnResult.ActiveTaskView(oversizedTaskId, "RUNNING", oversizedRequestContextId),
+                        "WRITE",
+                        "继续扩写"
+                ));
+
+        mockMvc().perform(get("/api/v1/novels/101/agent/sessions/9007199254740991/recovery")
+                        .header("X-Trace-Id", "trace-oversized-recovery"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.sessionId").value("9007199254740991"))
+                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("9007199254740881"))
+                .andExpect(jsonPath("$.data.activeTask.taskId").value("9007199254740771"))
+                .andExpect(jsonPath("$.data.activeTask.requestContextId").value("9007199254740661"));
+
+        mockMvc().perform(post("/api/v1/novels/101/agent/sessions/9007199254740991/turns")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", "trace-oversized-turn")
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "operatorId", "201",
+                                "userMessage", "继续扩写",
+                                "taskRequest", Map.of(
+                                        "taskType", "WRITE",
+                                        "chapterId", "301"
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.sessionId").value("9007199254740991"))
+                .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("9007199254740881"))
+                .andExpect(jsonPath("$.data.activeTask.taskId").value("9007199254740771"))
+                .andExpect(jsonPath("$.data.activeTask.requestContextId").value("9007199254740661"));
     }
 
     private AgentSessionRecoveryResult recoverySnapshot(Long sessionId, String taskStatus) {

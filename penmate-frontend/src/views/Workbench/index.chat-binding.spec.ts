@@ -395,6 +395,10 @@ describe('Workbench index chat parent binding', () => {
     })
 
     expect(agentApiMock.resumeSession).toHaveBeenCalledTimes(1)
+    expect(agentApiMock.resumeSession).toHaveBeenCalledWith(101, 1, expect.objectContaining({
+      trigger: 'WORKBENCH_ENTER',
+      operatorId: 201,
+    }))
     expect(agentApiMock.getSessionRecovery).not.toHaveBeenCalled()
   })
 
@@ -450,6 +454,43 @@ describe('Workbench index chat parent binding', () => {
 
     await waitForAssertion(() => {
       expect((wrapper.vm as unknown as { messages: Array<{ text: string }> }).messages.some((item) => item.text.includes('恢复后的续写内容'))).toBe(true)
+    })
+  })
+
+  it('preserves_oversized_string_task_id_when_reconnecting_running_session_on_mount', async () => {
+    const oversizedTaskId = '90071992547409931234'
+    agentApiMock.resumeSession = vi.fn(async () => ({
+      session: {
+        sessionId: 90001,
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+      },
+      activeTask: {
+        taskId: oversizedTaskId,
+        taskStatus: 'RUNNING',
+        streamChannelKey: `agent-task-${oversizedTaskId}`,
+      },
+      pendingApproval: null,
+      messages: [
+        {
+          messageId: 1,
+          role: 'assistant',
+          contentMd: '',
+        },
+      ],
+      workbenchContext: {
+        chapterId: 301,
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+      },
+    }))
+
+    await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith(101, oversizedTaskId)
     })
   })
 

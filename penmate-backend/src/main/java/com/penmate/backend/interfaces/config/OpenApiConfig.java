@@ -98,6 +98,9 @@ public class OpenApiConfig {
             String place = parameter.getIn() == null ? "参数" : parameter.getIn() + "参数";
             parameter.setDescription(describeField(parameter.getName(), place, path, method));
             Schema<?> schema = parameter.getSchema();
+            if (schema != null && isBusinessIdField(parameter.getName(), path)) {
+                forceSchemaToString(schema);
+            }
             if (schema != null && schema.getExample() == null) {
                 schema.setExample(exampleBySchema(schema, openApi));
             }
@@ -655,6 +658,10 @@ public class OpenApiConfig {
             }
         }
 
+        if (isBusinessIdField(schema.getName(), path)) {
+            forceSchemaToString(schema);
+        }
+
         if (schema instanceof ArraySchema arraySchema) {
             fillSchemaDescriptions(arraySchema.getItems(), path, method, visited, openApi);
         }
@@ -664,12 +671,34 @@ public class OpenApiConfig {
                 if (rawProperty instanceof Schema) {
                     @SuppressWarnings("unchecked")
                     Schema<?> propertySchema = (Schema<?>) rawProperty;
+                    if (isBusinessIdField(fieldName, path)) {
+                        forceSchemaToString(propertySchema);
+                    }
                     if (propertySchema.getDescription() == null || propertySchema.getDescription().isBlank()) {
                         propertySchema.setDescription(describeField(fieldName, "字段", path, method));
                     }
                     fillSchemaDescriptions(propertySchema, path, method, visited, openApi);
                 }
             });
+        }
+    }
+
+    private boolean isBusinessIdField(String fieldName, String path) {
+        if (fieldName == null || fieldName.isBlank()) {
+            return false;
+        }
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
+        if ("id".equals(normalized)) {
+            return path != null && (path.contains("/{") || path.contains("/users/") || path.contains("/roles/"));
+        }
+        return normalized.endsWith("id") && !"traceid".equals(normalized) && !"xtraceid".equals(normalized);
+    }
+
+    private void forceSchemaToString(Schema<?> schema) {
+        schema.setType("string");
+        schema.setFormat(null);
+        if (schema.getExample() == null || schema.getExample() instanceof Number) {
+            schema.setExample("1001");
         }
     }
 

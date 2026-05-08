@@ -66,7 +66,7 @@ class AgentControllerTest {
         mockMvc().perform(get("/api/v1/novels/10001/agent/sessions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data[0].conversationId").value(90001))
+                .andExpect(jsonPath("$.data[0].conversationId").value("90001"))
                 .andExpect(jsonPath("$.data[0].title").value("第三章夜雨追踪"));
 
         verify(agentConversationAppService).listConversations(10001L);
@@ -84,7 +84,7 @@ class AgentControllerTest {
                                 "title", "新会话"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.conversationId").value(90002))
+                .andExpect(jsonPath("$.data.conversationId").value("90002"))
                 .andExpect(jsonPath("$.data.title").value("新会话"));
 
         verify(agentConversationAppService).createConversation(eq(10001L), any(), eq(null));
@@ -99,7 +99,7 @@ class AgentControllerTest {
         mockMvc().perform(get("/api/v1/novels/10001/agent/sessions/90001/recovery")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
                 .andExpect(jsonPath("$.data.activeTask.taskStatus").value("WAITING_APPROVAL"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
 
@@ -116,11 +116,11 @@ class AgentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 1001,
+                                "operatorId", "1001",
                                 "trigger", "WORKBENCH_ENTER"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
                 .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"));
 
         verify(agentSessionRecoveryAppService).resumeSession(10001L, 90001L, 1001L, "WORKBENCH_ENTER", traceId);
@@ -131,7 +131,7 @@ class AgentControllerTest {
         mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/resume")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 1001,
+                                "operatorId", "1001",
                                 "trigger", ""
                         ))))
                 .andExpect(status().isBadRequest())
@@ -148,16 +148,16 @@ class AgentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 1001,
+                                "operatorId", "1001",
                                 "userMessage", "继续扩写第三章",
                                 "taskRequest", Map.of(
                                         "taskType", "WRITE",
-                                        "chapterId", 301,
+                                        "chapterId", "301",
                                         "selectedText", "夜雨中的追踪在巷口停住。"
                                 )
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
                 .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"))
                 .andExpect(jsonPath("$.data.taskType").value("WRITE"));
 
@@ -169,11 +169,11 @@ class AgentControllerTest {
         mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", 1001,
+                                "operatorId", "1001",
                                 "userMessage", "继续扩写第三章",
                                 "taskRequest", Map.of(
                                         "taskType", "",
-                                        "chapterId", 301
+                                        "chapterId", "301"
                                 )
                         ))))
                 .andExpect(status().isBadRequest())
