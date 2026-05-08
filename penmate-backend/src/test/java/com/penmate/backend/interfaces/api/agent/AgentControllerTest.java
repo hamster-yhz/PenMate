@@ -1,39 +1,40 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.application.agent.command.AgentCommands;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
-import com.penmate.backend.application.agent.usecase.AgentGenerationAppService;
-import com.penmate.backend.application.agent.usecase.AgentMessageAppService;
-import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
+import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
+import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
+import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
-import com.penmate.backend.domain.agent.model.AgentMessage;
-import com.penmate.backend.domain.shared.service.GenerationStreamService;
+import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Agent 控制器回归测试。
+ * <p>此处只冻结 session-agent 重构后仍应存在的新路由，
+ * 并显式验证历史 conversation/message/generation 路由已不再暴露，避免回归时重新引入兼容运行时代码。</p>
+ */
 @ExtendWith(MockitoExtension.class)
 class AgentControllerTest {
 
@@ -41,13 +42,10 @@ class AgentControllerTest {
     private AgentConversationAppService agentConversationAppService;
 
     @Mock
-    private AgentMessageAppService agentMessageAppService;
+    private AgentSessionRecoveryAppService agentSessionRecoveryAppService;
 
     @Mock
-    private AgentGenerationAppService agentGenerationAppService;
-
-    @Mock
-    private GenerationStreamService generationStreamService;
+    private AgentTurnAppService agentTurnAppService;
 
     @InjectMocks
     private AgentController agentController;
@@ -61,187 +59,201 @@ class AgentControllerTest {
     }
 
     @Test
-    void UT_AGENT_CONVERSATION_LIST_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-AGENT-CONV-LIST";
-        AgentConversation conv = new AgentConversation();
-        conv.setId(7001L);
-        conv.setTitle("第一卷讨论");
-        when(agentConversationAppService.listConversations(10001L)).thenReturn(List.of(conv));
+    void UT_AGENT_SESSION_LIST_SUCCESS() throws Exception {
+        when(agentConversationAppService.listConversations(10001L))
+                .thenReturn(List.of(conversation(90001L, "第三章夜雨追踪")));
 
-        mockMvc().perform(get("/api/v1/novels/10001/agent/conversations")
-                        .header("X-Trace-Id", traceId))
+        mockMvc().perform(get("/api/v1/novels/10001/agent/sessions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(7001))
-                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].conversationId").value(90001))
+                .andExpect(jsonPath("$.data[0].title").value("第三章夜雨追踪"));
+
+        verify(agentConversationAppService).listConversations(10001L);
     }
 
     @Test
-    void UT_AGENT_CONVERSATION_CREATE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-AGENT-CONV-CREATE";
-        AgentConversation conv = new AgentConversation();
-        conv.setId(7002L);
-        when(agentConversationAppService.createConversation(eq(10001L), any(AgentCommands.CreateConversationCommand.class), eq(traceId))).thenReturn(conv);
+    void UT_AGENT_SESSION_CREATE_SUCCESS() throws Exception {
+        when(agentConversationAppService.createConversation(eq(10001L), any(), eq(null)))
+                .thenReturn(conversation(90002L, "新会话"));
 
-        mockMvc().perform(post("/api/v1/novels/10001/agent/conversations")
-                        .param("operatorId", "1001")
+        mockMvc().perform(post("/api/v1/novels/10001/agent/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "userId", 1001,
-                                "title", "终章修订"
+                                "title", "新会话"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(7002));
+                .andExpect(jsonPath("$.data.conversationId").value(90002))
+                .andExpect(jsonPath("$.data.title").value("新会话"));
+
+        verify(agentConversationAppService).createConversation(eq(10001L), any(), eq(null));
     }
 
     @Test
-    void UT_AGENT_MESSAGE_PARAM_INVALID() throws Exception {
-        String traceId = "UT-TRACE-AGENT-MSG-INVALID";
+    void UT_AGENT_RECOVERY_GET_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-AGENT-RECOVERY-GET";
+        when(agentSessionRecoveryAppService.getRecovery(10001L, 90001L, traceId))
+                .thenReturn(recoverySnapshot(90001L, "WAITING_APPROVAL"));
 
-        mockMvc().perform(post("/api/v1/novels/10001/agent/conversations/7001/messages")
-                        .param("operatorId", "1001")
+        mockMvc().perform(get("/api/v1/novels/10001/agent/sessions/90001/recovery")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("WAITING_APPROVAL"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+
+        verify(agentSessionRecoveryAppService).getRecovery(10001L, 90001L, traceId);
+    }
+
+    @Test
+    void UT_AGENT_RESUME_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-AGENT-RESUME";
+        when(agentSessionRecoveryAppService.resumeSession(eq(10001L), eq(90001L), eq(1001L), eq("WORKBENCH_ENTER"), eq(traceId)))
+                .thenReturn(recoverySnapshot(90001L, "RUNNING"));
+
+        mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/resume")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "role", "",
-                                "contentMd", ""
+                                "operatorId", 1001,
+                                "trigger", "WORKBENCH_ENTER"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"));
+
+        verify(agentSessionRecoveryAppService).resumeSession(10001L, 90001L, 1001L, "WORKBENCH_ENTER", traceId);
+    }
+
+    @Test
+    void UT_AGENT_RESUME_PARAM_INVALID() throws Exception {
+        mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/resume")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "operatorId", 1001,
+                                "trigger", ""
                         ))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.status").value(400))
                 .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
-    void UT_AGENT_GENERATION_CREATE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-AGENT-GEN-CREATE";
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(8001L);
-        when(agentGenerationAppService.createGeneration(eq(10001L), any(AgentCommands.CreateGenerationCommand.class), eq(traceId))).thenReturn(task);
+    void UT_AGENT_TURN_CREATE_SUCCESS() throws Exception {
+        String traceId = "UT-TRACE-AGENT-TURN-CREATE";
+        when(agentTurnAppService.createTurn(eq(10001L), eq(90001L), any(), eq(traceId)))
+                .thenReturn(agentTask(90001L, "RUNNING", "WRITE", "继续扩写第三章"));
 
-        mockMvc().perform(post("/api/v1/novels/10001/agent/generations")
-                        .param("operatorId", "1001")
+        mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "conversationId", 7001,
-                                "modelConfigId", 9001,
-                                "taskType", "draft"
+                                "operatorId", 1001,
+                                "userMessage", "继续扩写第三章",
+                                "taskRequest", Map.of(
+                                        "taskType", "WRITE",
+                                        "chapterId", 301,
+                                        "selectedText", "夜雨中的追踪在巷口停住。"
+                                )
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(8001));
+                .andExpect(jsonPath("$.data.session.sessionId").value(90001))
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"))
+                .andExpect(jsonPath("$.data.taskType").value("WRITE"));
+
+        verify(agentTurnAppService).createTurn(eq(10001L), eq(90001L), any(), eq(traceId));
     }
 
     @Test
-    void UT_AGENT_GENERATION_APPLY_CONFLICT() throws Exception {
-        String traceId = "UT-TRACE-AGENT-GEN-APPLY-CONFLICT";
-        doThrow(new IllegalArgumentException("Generation task is not applicable"))
-                .when(agentGenerationAppService).applyGeneration(eq(10001L), eq(8001L), any(AgentCommands.ApplyGenerationCommand.class), eq(traceId));
-
-        mockMvc().perform(post("/api/v1/novels/10001/agent/generations/8001/apply")
-                        .param("operatorId", "1001")
+    void UT_AGENT_TURN_PARAM_INVALID() throws Exception {
+        mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of("applyNote", "accept"))))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.data.status").value(422))
-                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "operatorId", 1001,
+                                "userMessage", "继续扩写第三章",
+                                "taskRequest", Map.of(
+                                        "taskType", "",
+                                        "chapterId", 301
+                                )
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
-    void UT_AGENT_GENERATION_APPLY_STATE_TRANSITION_INVALID() throws Exception {
-        String traceId = "UT-TRACE-AGENT-GEN-STATE-INVALID";
-        doThrow(BusinessException.of(HttpStatus.UNPROCESSABLE_ENTITY,
-                "AGENT_STATE_TRANSITION_INVALID",
-                "Invalid generation task state transition",
-                null))
-                .when(agentGenerationAppService).applyGeneration(eq(10001L), eq(8001L), any(AgentCommands.ApplyGenerationCommand.class), eq(traceId));
-
-        mockMvc().perform(post("/api/v1/novels/10001/agent/generations/8001/apply")
-                        .param("operatorId", "1001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of("applyNote", "accept"))))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.data.status").value(422))
-                .andExpect(jsonPath("$.data.errorCode").value("AGENT_STATE_TRANSITION_INVALID"));
+    void UT_AGENT_LEGACY_CONVERSATION_ROUTE_NOT_FOUND() throws Exception {
+        mockMvc().perform(get("/api/v1/novels/10001/agent/conversations"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void UT_AGENT_SSE_STREAM_CONNECT_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-AGENT-SSE-CONNECT";
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(8002L);
-        when(agentGenerationAppService.getGeneration(10001L, 8002L)).thenReturn(task);
-        when(generationStreamService.openStream(8002L)).thenReturn(new SseEmitter(5000L));
-
-        mockMvc().perform(get("/api/v1/novels/10001/agent/generations/8002/stream")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void UT_AGENT_MESSAGE_CREATE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-AGENT-MSG-CREATE";
-        AgentMessage message = new AgentMessage();
-        message.setId(7101L);
-        message.setRole("user");
-        when(agentMessageAppService.createMessage(eq(10001L), eq(7001L), any(AgentCommands.CreateMessageCommand.class), eq(traceId))).thenReturn(message);
-
+    void UT_AGENT_LEGACY_MESSAGE_ROUTE_NOT_FOUND() throws Exception {
         mockMvc().perform(post("/api/v1/novels/10001/agent/conversations/7001/messages")
-                        .param("operatorId", "1001")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "role", "user",
-                                "contentMd", "继续扩写",
-                                "userMessageType", "instruction"
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(7101))
-                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+                        .content("{}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void UT_AGENT_GENERATION_APPLY_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-AGENT-GEN-APPLY-SUCCESS";
-        AgentGenerationTask applied = new AgentGenerationTask();
-        applied.setId(8001L);
-        applied.setStatus("applied");
-        when(agentGenerationAppService.applyGeneration(eq(10001L), eq(8001L), any(AgentCommands.ApplyGenerationCommand.class), eq(traceId))).thenReturn(applied);
+    void UT_AGENT_LEGACY_GENERATION_ROUTE_NOT_FOUND() throws Exception {
+        mockMvc().perform(post("/api/v1/novels/10001/agent/generations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
 
+    @Test
+    void UT_AGENT_LEGACY_GENERATION_APPLY_ROUTE_NOT_FOUND() throws Exception {
         mockMvc().perform(post("/api/v1/novels/10001/agent/generations/8001/apply")
-                        .param("operatorId", "1001")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of("applyNote", "apply"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(8001))
-                .andExpect(jsonPath("$.data.status").value("applied"));
+                        .content("{}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void UT_AGENT_SSE_STREAM_TOKEN_ORDER() throws Exception {
-        String traceId = "UT-TRACE-AGENT-SSE-TOKEN-ORDER";
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(8003L);
-        when(agentGenerationAppService.getGeneration(10001L, 8003L)).thenReturn(task);
-        when(generationStreamService.openStream(8003L)).thenReturn(new SseEmitter(5000L));
-
-        mockMvc().perform(get("/api/v1/novels/10001/agent/generations/8003/stream")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk());
+    void UT_AGENT_LEGACY_STREAM_ROUTE_NOT_FOUND() throws Exception {
+        mockMvc().perform(get("/api/v1/novels/10001/agent/generations/8002/stream"))
+                .andExpect(status().isNotFound());
     }
 
-    @Test
-    void UT_AGENT_SSE_STREAM_DONE_EVENT() throws Exception {
-        String traceId = "UT-TRACE-AGENT-SSE-DONE";
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(8004L);
-        when(agentGenerationAppService.getGeneration(10001L, 8004L)).thenReturn(task);
-        when(generationStreamService.openStream(8004L)).thenReturn(new SseEmitter(5000L));
+    private AgentConversation conversation(Long sessionId, String title) {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setConversationId(sessionId);
+        conversation.setProjectId(10001L);
+        conversation.setUserId(1001L);
+        conversation.setTitle(title);
+        conversation.setStatus("ACTIVE");
+        return conversation;
+    }
 
-        mockMvc().perform(get("/api/v1/novels/10001/agent/generations/8004/stream")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk());
+    private AgentSessionRecoveryResult recoverySnapshot(Long sessionId, String taskStatus) {
+        return new AgentSessionRecoveryResult(
+                new AgentSessionRecoveryResult.SessionView(
+                        sessionId,
+                        "第三章夜雨追踪",
+                        "ACTIVE",
+                        new AgentSessionRecoveryResult.BoundStyleView(81L, "冷峻悬疑"),
+                        taskStatus
+                ),
+                new AgentSessionRecoveryResult.ActiveTaskView(70001L, taskStatus, 71001L),
+                null,
+                java.util.List.of(),
+                null
+        );
+    }
+
+    private AgentTurnResult agentTask(Long sessionId, String taskStatus, String taskType, String userMessage) {
+        return new AgentTurnResult(
+                new AgentTurnResult.SessionView(
+                        sessionId,
+                        "第三章夜雨追踪",
+                        "ACTIVE",
+                        new AgentTurnResult.BoundStyleView(81L, "冷峻悬疑"),
+                        taskStatus
+                ),
+                new AgentTurnResult.ActiveTaskView(70001L, taskStatus, 71001L),
+                taskType,
+                userMessage
+        );
     }
 }

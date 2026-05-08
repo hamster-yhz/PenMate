@@ -1,8 +1,7 @@
 package com.penmate.backend.interfaces.api.model;
 
-import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
-import com.penmate.backend.application.agent.usecase.AgentGenerationAppService;
-import com.penmate.backend.application.agent.usecase.AgentMessageAppService;
+import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
+import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.auth.AuthApplicationService;
 import com.penmate.backend.application.iam.IamQueryApplicationService;
@@ -12,6 +11,7 @@ import com.penmate.backend.application.ops.OpsApplicationService;
 import com.penmate.backend.application.plugin.PluginApplicationService;
 import com.penmate.backend.application.rag.RagApplicationService;
 import com.penmate.backend.application.style.StyleApplicationService;
+import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.shared.service.GenerationStreamService;
 import com.penmate.backend.interfaces.api.agent.AgentController;
 import com.penmate.backend.interfaces.api.approval.ApprovalController;
@@ -72,13 +72,10 @@ class LegacyRouteExposureMvcTest {
     private ApprovalApplicationService approvalApplicationService;
 
     @MockBean
-    private AgentConversationAppService agentConversationAppService;
+    private AgentSessionRecoveryAppService agentSessionRecoveryAppService;
 
     @MockBean
-    private AgentMessageAppService agentMessageAppService;
-
-    @MockBean
-    private AgentGenerationAppService agentGenerationAppService;
+    private AgentTurnAppService agentTurnAppService;
 
     @MockBean
     private GenerationStreamService generationStreamService;
@@ -106,6 +103,9 @@ class LegacyRouteExposureMvcTest {
 
     @MockBean
     private StyleApplicationService styleApplicationService;
+
+    @MockBean
+    private SessionStyleBindingAppService sessionStyleBindingAppService;
 
     @Test
     void IT_MVC_LEGACY_MODEL_POLICY_ROUTE_SHOULD_NOT_BE_EXPOSED_ANYWHERE() throws Exception {

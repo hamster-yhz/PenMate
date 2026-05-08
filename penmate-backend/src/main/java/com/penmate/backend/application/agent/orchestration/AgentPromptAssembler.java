@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
 import org.springframework.stereotype.Component;
 
@@ -9,14 +10,18 @@ import java.util.Map;
 
 /**
  * Agent 初始提示词装配器。
- * <p>负责把任务 prompt、风格快照与 RAG 检索片段拼装成首轮发送给 LLM 的消息列表。</p>
+ * <p>负责把任务 prompt、任务上下文中的风格快照与 RAG 检索片段拼装成首轮发送给 LLM 的消息列表。</p>
  */
 @Component
 public class AgentPromptAssembler {
 
-    public List<Map<String, Object>> buildInitialMessages(AgentGenerationTask task, List<RagRetrievedChunk> ragChunks) {
+    public List<Map<String, Object>> buildInitialMessages(AgentGenerationTask task,
+                                                          AgentTaskContext taskContext,
+                                                          List<RagRetrievedChunk> ragChunks) {
         String prompt = task.getPromptSnapshot() == null ? "" : task.getPromptSnapshot().trim();
-        String style = task.getStyleProfileSnapshot() == null ? "" : task.getStyleProfileSnapshot().trim();
+        String style = taskContext == null || taskContext.getStyleSnapshotJson() == null
+                ? ""
+                : taskContext.getStyleSnapshotJson().trim();
         StringBuilder builder = new StringBuilder();
 
         if (!style.isEmpty()) {

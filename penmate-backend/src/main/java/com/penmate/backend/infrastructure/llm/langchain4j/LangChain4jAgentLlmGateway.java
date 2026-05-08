@@ -102,12 +102,7 @@ public class LangChain4jAgentLlmGateway implements AgentLlmGateway {
      */
     private String buildPrompt(AgentGenerationTask task, List<RagRetrievedChunk> ragChunks, String toolContext) {
         String prompt = task.getPromptSnapshot() == null ? "" : task.getPromptSnapshot().trim();
-        String style = task.getStyleProfileSnapshot() == null ? "" : task.getStyleProfileSnapshot().trim();
         StringBuilder builder = new StringBuilder();
-
-        if (!style.isEmpty()) {
-            builder.append("写作风格约束：\n").append(style).append("\n\n");
-        }
         if (ragChunks != null && !ragChunks.isEmpty()) {
             builder.append("知识库参考：\n");
             for (RagRetrievedChunk chunk : ragChunks) {

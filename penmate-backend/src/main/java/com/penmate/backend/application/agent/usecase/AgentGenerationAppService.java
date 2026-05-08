@@ -1,8 +1,8 @@
 package com.penmate.backend.application.agent.usecase;
 
-import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.command.AgentCommands.ApplyGenerationCommand;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateGenerationCommand;
+import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
@@ -43,7 +43,6 @@ public class AgentGenerationAppService {
         task.setModelConfigId(command.modelConfigId());
         task.setTaskType(command.taskType());
         task.setPromptSnapshot(jsonInputNormalizer.normalize(command.promptSnapshot()));
-        task.setStyleProfileSnapshot(jsonInputNormalizer.normalize(command.styleProfileSnapshot()));
         task.setPluginSnapshot(jsonInputNormalizer.normalize(command.pluginSnapshot()));
         task.setTraceId(traceId);
         task.setStatus(AgentTaskStatus.PENDING.value());

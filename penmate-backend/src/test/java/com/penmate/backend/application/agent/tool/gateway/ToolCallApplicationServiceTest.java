@@ -19,6 +19,7 @@ import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
+import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -152,7 +153,7 @@ class ToolCallApplicationServiceTest {
                 "BOOK_DELETE",
                 approvalView,
                 "RESUME_LOOP",
-                approvalView
+                new ApprovalView("book_crud", "书籍 CRUD", 5, "BOOK_DELETE", "delete")
         );
     }
 

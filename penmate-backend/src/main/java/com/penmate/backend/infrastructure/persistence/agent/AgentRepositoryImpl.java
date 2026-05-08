@@ -16,9 +16,12 @@ import java.util.List;
 public class AgentRepositoryImpl implements AgentRepository {
 
     private final AgentMapper agentMapper;
+    private final AgentSessionMapper agentSessionMapper;
 
-    public AgentRepositoryImpl(AgentMapper agentMapper) {
+    public AgentRepositoryImpl(AgentMapper agentMapper,
+                               AgentSessionMapper agentSessionMapper) {
         this.agentMapper = agentMapper;
+        this.agentSessionMapper = agentSessionMapper;
     }
 
     /**
@@ -27,7 +30,7 @@ public class AgentRepositoryImpl implements AgentRepository {
      */
     @Override
     public List<AgentConversation> listConversations(Long projectId) {
-        return agentMapper.listConversations(projectId);
+        return agentSessionMapper.listConversationSummaries(projectId);
     }
 
     /**
@@ -36,7 +39,7 @@ public class AgentRepositoryImpl implements AgentRepository {
      */
     @Override
     public AgentConversation findConversation(Long projectId, Long conversationId) {
-        return agentMapper.findConversation(projectId, conversationId);
+        return agentSessionMapper.findConversationSummary(projectId, conversationId);
     }
 
     /**
@@ -45,7 +48,7 @@ public class AgentRepositoryImpl implements AgentRepository {
      */
     @Override
     public int insertConversation(AgentConversation conversation) {
-        return agentMapper.insertConversation(conversation);
+        return agentSessionMapper.insertConversationSummary(conversation);
     }
 
     /**

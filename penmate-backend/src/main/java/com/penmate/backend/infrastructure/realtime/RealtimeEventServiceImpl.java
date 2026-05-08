@@ -2,7 +2,7 @@ package com.penmate.backend.infrastructure.realtime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
+import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
@@ -154,7 +154,7 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
                                                  String approvalType,
                                                  Object approvalPreview,
                                                  String resumeMode,
-                                                 ToolApprovalView approvalView) {
+                                                 ApprovalView approvalView) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("taskId", taskId);
         if (toolCallId != null && !toolCallId.isBlank()) {

@@ -1,11 +1,10 @@
 package com.penmate.backend.interfaces.api.agent.dto;
 
-import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 
 @Data
-
 public class CreateAgentGenerationDto {
 
     @NotNull
@@ -19,8 +18,5 @@ public class CreateAgentGenerationDto {
     @NotBlank
     private String taskType;
     private String promptSnapshot;
-    private String styleProfileSnapshot;
     private String pluginSnapshot;
-
 }
-

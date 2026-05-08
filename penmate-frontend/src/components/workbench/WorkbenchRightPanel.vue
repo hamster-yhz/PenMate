@@ -10,7 +10,9 @@
         :generation-status-text="generationStatusText"
         :is-generating="isGenerating"
         :generation-phase="generationPhase"
+        :bound-style-name="boundStyleName"
         @toggle-history="emit('toggle-history')"
+        @create-session="emit('create-session')"
       />
 
       <ConversationHistoryPanel
@@ -55,27 +57,43 @@ import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
 import ChatComposer from '@/components/workbench/chat/ChatComposer.vue'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   collapsed: boolean
-  currentModelName: string
-  generationStatusText: string
-  isGenerating: boolean
-  generationPhase: GenerationPhase
-  showConversationPanel: boolean
-  conversationLoading: boolean
-  conversationList: ConversationItem[]
-  currentConversationId: number | null
+  currentModelName?: string
+  generationStatusText?: string
+  isGenerating?: boolean
+  generationPhase?: GenerationPhase
+  boundStyleName?: string
+  showConversationPanel?: boolean
+  conversationLoading?: boolean
+  conversationList?: ConversationItem[]
+  currentConversationId?: number | null
   bindChatContainer: (element: HTMLElement | null) => void
-  messages: ChatMessage[]
-  streamingAssistantMsgId: number | null
+  messages?: ChatMessage[]
+  streamingAssistantMsgId?: number | null
   isApprovalBusy: (approvalId: string) => boolean
-  chatInput: string
-  activePlugins: string[]
-}>()
+  chatInput?: string
+  activePlugins?: string[]
+}>(), {
+  currentModelName: '',
+  generationStatusText: '',
+  isGenerating: false,
+  generationPhase: 'idle',
+  boundStyleName: '',
+  showConversationPanel: false,
+  conversationLoading: false,
+  conversationList: () => [],
+  currentConversationId: null,
+  messages: () => [],
+  streamingAssistantMsgId: null,
+  chatInput: '',
+  activePlugins: () => [],
+})
 
 const emit = defineEmits<{
   (event: 'toggle-collapse'): void
   (event: 'toggle-history'): void
+  (event: 'create-session'): void
   (event: 'select-conversation', payload: number): void
   (event: 'merge-to-editor', payload: ChatMessage): void
   (event: 'replace-selected', payload: ChatMessage): void

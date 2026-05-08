@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.shared.service;
 
-import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
+import com.penmate.backend.domain.shared.model.ApprovalView;
 
 public interface RealtimeEventService {
 
@@ -33,16 +33,16 @@ public interface RealtimeEventService {
 
     void publishGenerationToolCall(Long projectId,
                                    Long taskId,
-                                    String toolCallId,
-                                    String pluginCode,
-                                    String toolName,
-                                    String status,
-                                    Long approvalId,
-                                    String approvalType,
-                                    Integer iteration,
-                                    Object argumentsPreview,
-                                    String errorMsg,
-                                    String output);
+                                   String toolCallId,
+                                   String pluginCode,
+                                   String toolName,
+                                   String status,
+                                   Long approvalId,
+                                   String approvalType,
+                                   Integer iteration,
+                                   Object argumentsPreview,
+                                   String errorMsg,
+                                   String output);
 
     default void publishGenerationWaitingApproval(Long projectId, Long taskId, Long approvalId, String approvalType) {
         publishGenerationWaitingApproval(projectId, taskId, null, approvalId, approvalType, null, null, null);
@@ -55,10 +55,9 @@ public interface RealtimeEventService {
                                           String approvalType,
                                           Object approvalPreview,
                                           String resumeMode,
-                                          ToolApprovalView approvalView);
+                                          ApprovalView approvalView);
 
     void publishGenerationDone(Long projectId, Long taskId, String status);
 
     void publishGenerationFailed(Long projectId, Long taskId, String errorCode, String errorMsg);
 }
-

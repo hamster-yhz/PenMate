@@ -101,13 +101,17 @@ public class GenerationSseEmitterHub {
 
         try {
             emitter.send(SseEmitter.event().name("connected").data(Map.of("taskId", taskId)));
-            for (StreamEvent event : state.snapshotBufferedEvents()) {
+            java.util.List<StreamEvent> bufferedEvents = state.snapshotBufferedEvents();
+            log.info("SSE emitter connected: taskId={}, bufferedReplayCount={}, completed={}, emitterCount={}",
+                    taskId, bufferedEvents.size(), state.isCompleted(), state.emitterCount());
+            for (StreamEvent event : bufferedEvents) {
                 emitter.send(SseEmitter.event().name(event.eventName()).data(event.data()));
             }
             if (state.isCompleted()) {
                 emitter.complete();
             }
         } catch (IOException e) {
+            log.warn("SSE emitter init failed: taskId={}, error={}", taskId, e.getMessage());
             remove(taskId, emitter);
         }
         return emitter;
@@ -132,6 +136,7 @@ public class GenerationSseEmitterHub {
             try {
                 emitter.send(SseEmitter.event().name(eventName).data(data));
             } catch (IOException e) {
+                log.warn("SSE publish failed: taskId={}, eventName={}, error={}", taskId, eventName, e.getMessage());
                 remove(taskId, emitter);
             }
         });

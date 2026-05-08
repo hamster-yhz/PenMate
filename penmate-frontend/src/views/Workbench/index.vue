@@ -101,6 +101,7 @@
         :conversation-loading="conversationLoading"
         :conversation-list="conversationList"
         :current-conversation-id="currentConversationId"
+        :bound-style-name="boundStyleName"
         :bind-chat-container="bindChatContainer"
         :messages="messages"
         :streaming-assistant-msg-id="streamingAssistantMsgId"
@@ -109,6 +110,7 @@
         :active-plugins="activePlugins"
         @toggle-collapse="rightCollapsed = !rightCollapsed"
         @toggle-history="toggleConversationPanel"
+        @create-session="handleCreateSession"
         @select-conversation="handleSelectConversation"
         @merge-to-editor="handleMergeToEditor"
         @replace-selected="handleReplaceSelected"
@@ -120,7 +122,13 @@
       />
     </div>
 
-    <StyleManager :visible="showStyleManager" @close="showStyleManager = false" />
+    <StyleManager
+      :visible="showStyleManager"
+      :project-id="getCurrentProjectId()"
+      :operator-id="resolveOperatorId()"
+      :session-id="currentConversationId"
+      @close="showStyleManager = false"
+    />
     <PluginWorkshop :visible="showPluginWorkshop" @close="showPluginWorkshop = false" />
     <ModelSettings :visible="showModelSettings" @close="showModelSettings = false" @saved="onModelConfigSaved" />
   </div>
@@ -157,6 +165,7 @@ import { useWorkbenchEditor } from '@/composables/workbench/useWorkbenchEditor'
 import { useWorkbenchVersions } from '@/composables/workbench/useWorkbenchVersions'
 import { useWorkbenchChat } from '@/composables/workbench/useWorkbenchChat'
 import { useWorkbenchApprovals } from '@/composables/workbench/useWorkbenchApprovals'
+import { useWorkbenchSessionRecovery } from '@/composables/workbench/useWorkbenchSessionRecovery'
 import {
   hasObjectKeyInStorageUrl,
   normalizeObjectStorageUrl,
@@ -410,6 +419,7 @@ const {
 
 const activePlugins = ref<string[]>([])
 const activeModelConfigId = ref<string | null>(null)
+const boundStyleName = ref('')
 const ENABLE_POLLING_FALLBACK = String(import.meta.env.VITE_AGENT_POLLING_FALLBACK || 'false').toLowerCase() === 'true'
 const pickModelConfigId = (item: Record<string, unknown>) => {
   if (typeof item.modelConfigId !== 'string') {
@@ -418,7 +428,13 @@ const pickModelConfigId = (item: Record<string, unknown>) => {
   const trimmed = item.modelConfigId.trim()
   return trimmed || null
 }
-const pickConversationId = (item: Record<string, unknown>) => Number(item.conversationId ?? 0)
+const pickConversationId = (item: Record<string, unknown>) => Number(item.sessionId ?? item.conversationId ?? 0)
+const syncBoundStyleName = (session: Record<string, unknown> | null | undefined) => {
+  const boundStyle = session && typeof session === 'object'
+    ? (session.boundStyle as Record<string, unknown> | null | undefined)
+    : null
+  boundStyleName.value = String(boundStyle?.name || '')
+}
 
 const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
   console.info('[agent-ui] chat-state', {
@@ -431,6 +447,14 @@ const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
     lastMessageLength: messages.value[messages.value.length - 1]?.text?.length || 0,
     ...extra,
   })
+}
+
+const openAgentTaskStream = (projectId: number, taskId: number) => {
+  console.info('[agent-ui] task-stream-open', {
+    projectId,
+    taskId,
+  })
+  return agentApi.openTaskStream(projectId, taskId)
 }
 
 const bindChatContainer = (element: HTMLElement | null) => {
@@ -459,25 +483,6 @@ const loadActivePlugins = async (projectId: number) => {
   } catch {
     activePlugins.value = []
   }
-}
-
-const ensureConversationId = async (projectId: number, operatorId: number) => {
-  if (currentConversationId.value) return currentConversationId.value
-  const conversations = (await agentApi.listConversations(projectId)) as Array<Record<string, unknown>>
-  const existing = conversations[0]
-  const existingConversationId = existing ? pickConversationId(existing) : 0
-  if (existingConversationId > 0) {
-    currentConversationId.value = existingConversationId
-    return currentConversationId.value
-  }
-  const created = (await agentApi.createConversation(projectId, operatorId, {
-    userId: operatorId,
-    title: 'Workbench 会话',
-    contextScopeJson: '{}',
-    status: 'ACTIVE',
-  })) as Record<string, unknown>
-  currentConversationId.value = pickConversationId(created) || null
-  return currentConversationId.value
 }
 
 const currentModelName = ref('')
@@ -543,23 +548,46 @@ const {
   generationStatusText,
   streamingAssistantMsgId,
   currentConversationId,
-  selectConversation,
+  loadConversationList,
   toggleConversationPanel,
   sendMessage,
+  resumeRunningTask,
+  hydrateFromRecoverySnapshot,
 } = useWorkbenchChat({
   getContext,
   getCurrentProjectId,
   getActiveChapterKey: () => activeChapter.value,
   getActivePlugins: () => activePlugins.value,
-  ensureConversationId,
   ensureModelConfigId,
   refreshActiveModelInfo,
-  listConversations: agentApi.listConversations,
-  listMessages: agentApi.listMessages,
-  createMessage: agentApi.createMessage,
-  createGeneration: agentApi.createGeneration,
-  getGeneration: agentApi.getGeneration,
-  openGenerationStream: agentApi.openGenerationStream,
+  listSessions: agentApi.listSessions,
+  createSession: agentApi.createSession,
+  getSessionRecovery: agentApi.getSessionRecovery,
+  createTurn: async (projectId, sessionId, payload) => {
+    debugChatState('create-turn-request', {
+      projectId,
+      sessionId,
+      operatorId: payload.operatorId,
+      taskType: (payload.taskRequest as Record<string, unknown> | undefined)?.taskType || '',
+      chapterId: (payload.taskRequest as Record<string, unknown> | undefined)?.chapterId ?? null,
+      activePluginCount: Array.isArray((payload.taskRequest as Record<string, unknown> | undefined)?.activePlugins)
+        ? ((payload.taskRequest as Record<string, unknown> | undefined)?.activePlugins as unknown[]).length
+        : 0,
+      userMessageLength: String(payload.userMessage || '').length,
+    })
+    const result = (await agentApi.createTurn(projectId, sessionId, payload)) as Record<string, unknown>
+    syncBoundStyleName((result.session as Record<string, unknown> | null | undefined) || null)
+    debugChatState('create-turn-created', {
+      projectId,
+      sessionId,
+      taskId: Number((result.activeTask as Record<string, unknown> | null | undefined)?.taskId ?? 0),
+      taskStatus: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskStatus ?? ''),
+      sessionStatus: String((result.session as Record<string, unknown> | null | undefined)?.status ?? ''),
+    })
+    return result
+  },
+  getTask: agentApi.getTask,
+  openTaskStream: (projectId, taskId) => openAgentTaskStream(projectId, taskId),
   addStreamListener: agentApi.addStreamListener,
   scrollChat,
   nextTick,
@@ -583,9 +611,51 @@ const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
   },
 })
 
+const sessionRecovery = useWorkbenchSessionRecovery({
+  getSessionRecovery: agentApi.getSessionRecovery,
+  resumeSession: agentApi.resumeSession,
+  openTaskStream: (projectId, taskId) => openAgentTaskStream(projectId, taskId),
+  resumeRunningTask,
+  hydrateStore: (snapshot) => {
+    hydrateFromRecoverySnapshot(snapshot)
+    syncBoundStyleName((snapshot?.session as Record<string, unknown> | null | undefined) || null)
+    const workbenchContext = snapshot?.workbenchContext || {}
+    const chapterId = Number(workbenchContext.chapterId ?? 0)
+    if (chapterId > 0) {
+      activeChapter.value = String(chapterId)
+    }
+    const plugins = Array.isArray(workbenchContext.activePlugins) ? workbenchContext.activePlugins : []
+    activePlugins.value = plugins.map((item) => String(item)).filter(Boolean)
+  },
+})
+
+const resumeWorkbenchSession = async (sessionId: number) => {
+  const projectId = getCurrentProjectId()
+  if (!projectId || !sessionId) return
+  await sessionRecovery.restore(projectId, sessionId)
+}
+
 const handleSelectConversation = async (conversationId: number) => {
   if (!conversationId) return
-  await selectConversation(conversationId)
+  await resumeWorkbenchSession(conversationId)
+}
+
+const handleCreateSession = async () => {
+  const projectId = getCurrentProjectId()
+  const operatorId = resolveOperatorId()
+  if (!projectId || !operatorId) return
+  const created = (await agentApi.createSession(projectId, {
+    userId: operatorId,
+    title: '新会话',
+  })) as Record<string, unknown>
+  const sessionId = pickConversationId(created)
+  if (sessionId <= 0) return
+  currentConversationId.value = sessionId
+  messages.value = []
+  boundStyleName.value = ''
+  if (showConversationPanel.value) {
+    await loadConversationList(projectId)
+  }
 }
 
 const handleMergeToEditor = (messageItem: ChatMessage) => {
@@ -709,6 +779,11 @@ onMounted(async () => {
   const projectId = getCurrentProjectId()
   if (projectId) {
     await loadWorkbenchData(projectId)
+    const conversations = (await agentApi.listSessions(projectId)) as Array<Record<string, unknown>>
+    const latestSessionId = pickConversationId(conversations[0] || {})
+    if (latestSessionId > 0) {
+      await resumeWorkbenchSession(latestSessionId)
+    }
   } else {
     await refreshActiveModelInfo()
   }

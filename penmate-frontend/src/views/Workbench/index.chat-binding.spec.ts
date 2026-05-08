@@ -67,13 +67,18 @@ const WorkbenchRightPanelHarness = {
 }
 
 const agentApiMock = {
-  listConversations: vi.fn(async () => [{ conversationId: 1, title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }]),
-  listMessages: vi.fn(async () => []),
-  createConversation: vi.fn(async () => ({ conversationId: 1 })),
-  createMessage: vi.fn(async () => ({ messageId: 11 })),
-  createGeneration: vi.fn(async () => ({ taskId: 77, status: 'pending' })),
-  getGeneration: vi.fn(async () => ({ status: 'done' })),
-  openGenerationStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+  listSessions: vi.fn(async () => [{ sessionId: 1, title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }]),
+  createSession: vi.fn(async () => ({ sessionId: 90002, title: '新会话', status: 'ACTIVE' })),
+  getSessionRecovery: vi.fn(async () => null as any),
+  resumeSession: vi.fn(async () => null as any),
+  createTurn: vi.fn<(...args: any[]) => Promise<any>>(async () => ({
+    session: { sessionId: 90001, title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: 81, name: '冷峻悬疑' } },
+    activeTask: { taskId: 77, taskStatus: 'RUNNING', requestContextId: 70101 },
+    taskType: 'WRITE',
+    userMessage: '测试消息',
+  })),
+  getTask: vi.fn(async () => ({ status: 'done' })),
+  openTaskStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
   addStreamListener: vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
     const current = streamListeners.get(eventName) || []
     current.push(listener)
@@ -299,10 +304,177 @@ const mountWorkbench = async () => {
 describe('Workbench index chat parent binding', () => {
   beforeEach(() => {
     streamListeners.clear()
-    agentApiMock.createMessage.mockClear()
-    agentApiMock.createGeneration.mockClear()
-    agentApiMock.openGenerationStream.mockClear()
+    agentApiMock.createTurn.mockClear()
+    agentApiMock.getTask.mockClear()
+    agentApiMock.openTaskStream.mockClear()
     agentApiMock.addStreamListener.mockClear()
+    agentApiMock.listSessions.mockClear()
+    agentApiMock.getSessionRecovery = vi.fn(async () => ({
+      session: {
+        sessionId: 90001,
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+      },
+      activeTask: {
+        taskId: 70001,
+        taskStatus: 'WAITING_APPROVAL',
+        streamChannelKey: 'agent-task-70001',
+      },
+      pendingApproval: {
+        approvalId: 45,
+        approvalType: 'chapter_patch',
+        approvalMessage: '请先审批改写方案',
+        approvalTime: '2026-04-26 23:10:00',
+        approvalStatus: 'pending',
+      },
+      messages: [
+        {
+          messageId: 1,
+          role: 'assistant',
+          contentMd: '',
+          approvalId: 45,
+          approvalType: 'chapter_patch',
+          approvalMessage: '请先审批改写方案',
+          approvalTime: '2026-04-26 23:10:00',
+          approvalStatus: 'pending',
+        },
+      ],
+      workbenchContext: {
+        chapterId: 301,
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+      },
+    }))
+    agentApiMock.resumeSession = vi.fn(async () => ({
+      session: {
+        sessionId: 90001,
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+      },
+      activeTask: {
+        taskId: 70001,
+        taskStatus: 'WAITING_APPROVAL',
+        streamChannelKey: 'agent-task-70001',
+      },
+      pendingApproval: {
+        approvalId: 45,
+        approvalType: 'chapter_patch',
+        approvalMessage: '请先审批改写方案',
+        approvalTime: '2026-04-26 23:10:00',
+        approvalStatus: 'pending',
+      },
+      messages: [
+        {
+          messageId: 1,
+          role: 'assistant',
+          contentMd: '',
+          approvalId: 45,
+          approvalType: 'chapter_patch',
+          approvalMessage: '请先审批改写方案',
+          approvalTime: '2026-04-26 23:10:00',
+          approvalStatus: 'pending',
+        },
+      ],
+      workbenchContext: {
+        chapterId: 301,
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+      },
+    }))
+  })
+
+  it('resumes_latest_session_on_mount_and_restores_task_status', async () => {
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
+    })
+
+    expect(agentApiMock.resumeSession).toHaveBeenCalledTimes(1)
+    expect(agentApiMock.getSessionRecovery).not.toHaveBeenCalled()
+  })
+
+  it('reconnects_running_session_on_mount_and_consumes_stream_events', async () => {
+    agentApiMock.resumeSession = vi.fn(async () => ({
+      session: {
+        sessionId: 90001,
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+      },
+      activeTask: {
+        taskId: 70001,
+        taskStatus: 'RUNNING',
+        streamChannelKey: 'agent-task-70001',
+      },
+      pendingApproval: null,
+      messages: [
+        {
+          messageId: 1,
+          role: 'assistant',
+          contentMd: '',
+        },
+      ],
+      workbenchContext: {
+        chapterId: 301,
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+      },
+    }))
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.resumeSession).toHaveBeenCalledTimes(1)
+      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith(101, 70001)
+    })
+
+    await waitForAssertion(() => {
+      expect(streamListeners.get('generation.started')?.length || 0).toBeGreaterThan(0)
+      expect(streamListeners.get('generation.token')?.length || 0).toBeGreaterThan(0)
+      expect(streamListeners.get('generation.done')?.length || 0).toBeGreaterThan(0)
+    })
+
+    emitStreamEvent('generation.started')
+    emitStreamEvent('generation.token', {
+      token: '恢复后的续写内容',
+    })
+    emitStreamEvent('generation.done', {
+      status: 'done',
+    })
+
+    await waitForAssertion(() => {
+      expect((wrapper.vm as unknown as { messages: Array<{ text: string }> }).messages.some((item) => item.text.includes('恢复后的续写内容'))).toBe(true)
+    })
+  })
+
+  it('clears_bound_style_when_turn_response_has_no_bound_style', async () => {
+    agentApiMock.createTurn = vi.fn(async () => ({
+      session: { sessionId: 90001, title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: null },
+      activeTask: { taskId: 77, taskStatus: 'RUNNING', requestContextId: 70101 },
+      taskType: 'WRITE',
+      userMessage: '测试消息',
+    }))
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('使用无风格响应继续生成')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
+    })
+
+    expect((wrapper.vm as unknown as { boundStyleName: string }).boundStyleName).toBe('')
   })
 
   it('re_enables_followup_send_after_waiting_approval_through_real_useWorkbenchChat_to_parent_binding', async () => {
@@ -317,8 +489,7 @@ describe('Workbench index chat parent binding', () => {
     await wrapper.get('[data-testid="chat-send"]').trigger('click')
 
     await waitForAssertion(() => {
-      expect(agentApiMock.createMessage).toHaveBeenCalledTimes(1)
-      expect(agentApiMock.createGeneration).toHaveBeenCalledTimes(1)
+      expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
     })
 
     await waitForAssertion(() => {
@@ -352,8 +523,7 @@ describe('Workbench index chat parent binding', () => {
     })
 
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
-    expect(agentApiMock.createMessage).toHaveBeenCalledTimes(1)
-    expect(agentApiMock.createGeneration).toHaveBeenCalledTimes(1)
+    expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
   })
 
   it('passes_string_model_config_id_to_generation_payload_when_loading_preferred_model', async () => {
@@ -367,13 +537,15 @@ describe('Workbench index chat parent binding', () => {
     await wrapper.get('[data-testid="chat-send"]').trigger('click')
 
     await waitForAssertion(() => {
-      expect(agentApiMock.createGeneration).toHaveBeenCalledTimes(1)
+      expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
     })
 
-    const generationPayload = agentApiMock.createGeneration.mock.calls[0]?.[2] as Record<string, unknown> | undefined
+    const generationPayload = (agentApiMock.createTurn.mock.calls[0] as unknown[] | undefined)?.[2] as Record<string, unknown> | undefined
     expect(generationPayload).toEqual(
       expect.objectContaining({
-        modelConfigId: 'mcfg-9001',
+        taskRequest: expect.objectContaining({
+          modelConfigId: 'mcfg-9001',
+        }),
       })
     )
   })

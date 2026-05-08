@@ -22,6 +22,7 @@ const mountAgentSessionHeader = async (
     generationStatusText: string
     isGenerating: boolean
     generationPhase: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
+    boundStyleName: string
   }> = {},
 ) => {
   const AgentSessionHeader = await loadAgentSessionHeader()
@@ -38,6 +39,31 @@ const mountAgentSessionHeader = async (
 }
 
 describe('AgentSessionHeader', () => {
+  it('shows_bound_style_from_session_recovery_snapshot', async () => {
+    const wrapper = await mountAgentSessionHeader({
+      currentModelName: 'DeepSeek-R1',
+      generationStatusText: '等待审批',
+      isGenerating: false,
+      generationPhase: 'waiting_approval',
+      boundStyleName: '冷峻悬疑',
+    })
+
+    expect(wrapper.text()).toContain('冷峻悬疑')
+  })
+
+  it('renders_new_session_entry_and_emits_create_session', async () => {
+    const wrapper = await mountAgentSessionHeader({
+      currentModelName: 'DeepSeek-R1',
+      generationStatusText: '就绪',
+      isGenerating: false,
+      generationPhase: 'idle',
+    })
+
+    await wrapper.get('[data-testid="create-session"]').trigger('click')
+
+    expect(wrapper.emitted('create-session')).toEqual([[]])
+  })
+
   it('renders_model_fallback_status_and_emits_toggle_history', async () => {
     const wrapper = await mountAgentSessionHeader({
       currentModelName: '',

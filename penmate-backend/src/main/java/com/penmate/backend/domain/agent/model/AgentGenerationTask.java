@@ -1,6 +1,7 @@
 package com.penmate.backend.domain.agent.model;
 
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -29,8 +30,6 @@ public class AgentGenerationTask {
     private String taskType;
     /** 提示词快照文本。 */
     private String promptSnapshot;
-    /** 风格配置快照（JSON/文本）。 */
-    private String styleProfileSnapshot;
     /** 插件上下文快照（JSON）。 */
     private String pluginSnapshot;
     /** Token 消耗统计（JSON）。 */
@@ -49,6 +48,4 @@ public class AgentGenerationTask {
     private String errorMsg;
     /** 创建时间。 */
     private LocalDateTime createdAt;
-
 }
-

@@ -10,7 +10,6 @@ public class CreateAgentConversationDto {
     @NotNull
     private Long userId;
     private String title;
-    private String contextScopeJson;
     private String status;
 
 }

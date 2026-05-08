@@ -86,7 +86,7 @@ class RealtimeEventServiceImplTest {
             return;
         }
 
-        Class<?> approvalViewType = Class.forName("com.penmate.backend.application.agent.tool.definition.ToolApprovalView");
+        Class<?> approvalViewType = Class.forName("com.penmate.backend.domain.shared.model.ApprovalView");
         Object approvalView = approvalViewType
                 .getDeclaredConstructor(String.class, String.class, Integer.class, String.class, String.class)
                 .newInstance("book_crud", "书籍 CRUD", 2, "BOOK_DELETE", "delete");

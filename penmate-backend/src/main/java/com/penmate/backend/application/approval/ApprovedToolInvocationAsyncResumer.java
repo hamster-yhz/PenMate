@@ -87,6 +87,8 @@ public class ApprovedToolInvocationAsyncResumer {
         }
         taskStateMachine.assertTransition(currentStatus.value(), AgentTaskStatus.RUNNING);
         agentRepository.updateGenerationTaskStatus(request.getProjectId(), request.getTaskId(), AgentTaskStatus.RUNNING.value(), null);
+        log.info("审批恢复桥接已切换任务状态: approvalId={}, taskId={}, from=WAITING_APPROVAL, to=RUNNING",
+                request.getId(), request.getTaskId());
     }
 
     private void sealSnapshotAndTaskAsFailed(ApprovalRequest request,

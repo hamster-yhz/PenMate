@@ -5,9 +5,12 @@ import WorkbenchRightPanel from './WorkbenchRightPanel.vue'
 
 const AgentSessionHeaderStub = defineComponent({
   name: 'AgentSessionHeader',
-  emits: ['toggle-history'],
+  emits: ['toggle-history', 'create-session'],
   setup(_, { emit }) {
-    return () => h('button', { 'data-testid': 'toggle-history', onClick: () => emit('toggle-history') })
+    return () => h('div', [
+      h('button', { 'data-testid': 'toggle-history', onClick: () => emit('toggle-history') }),
+      h('button', { 'data-testid': 'create-session', onClick: () => emit('create-session') }),
+    ])
   },
 })
 
@@ -53,6 +56,7 @@ describe('WorkbenchRightPanel', () => {
         generationStatusText: '等待审批',
         isGenerating: false,
         generationPhase: 'waiting_approval',
+        boundStyleName: '冷峻悬疑',
         showConversationPanel: true,
         conversationLoading: false,
         conversationList: [{ conversationId: 77, title: '会话1', updatedAt: '2026-04-27 10:00:00' }],
@@ -78,6 +82,7 @@ describe('WorkbenchRightPanel', () => {
 
     await wrapper.get('.panel-toggle').trigger('click')
     await wrapper.get('[data-testid="toggle-history"]').trigger('click')
+    await wrapper.get('[data-testid="create-session"]').trigger('click')
     await wrapper.get('[data-testid="select-conversation"]').trigger('click')
     await wrapper.get('[data-testid="merge-to-editor"]').trigger('click')
     await wrapper.get('[data-testid="approve-message"]').trigger('click')
@@ -87,6 +92,7 @@ describe('WorkbenchRightPanel', () => {
 
     expect(wrapper.emitted('toggle-collapse')).toEqual([[]])
     expect(wrapper.emitted('toggle-history')).toEqual([[]])
+    expect(wrapper.emitted('create-session')).toEqual([[]])
     expect(wrapper.emitted('select-conversation')).toEqual([[77]])
     expect(wrapper.emitted('merge-to-editor')).toEqual([[{ messageId: 9 }]])
     expect(wrapper.emitted('approve')).toEqual([['approval-9']])

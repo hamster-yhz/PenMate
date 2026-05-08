@@ -1,30 +1,28 @@
 package com.penmate.backend.interfaces.api.agent;
 
-import com.penmate.backend.application.agent.command.AgentCommands;
+import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
-import com.penmate.backend.application.agent.usecase.AgentGenerationAppService;
-import com.penmate.backend.application.agent.usecase.AgentMessageAppService;
+import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
+import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
+import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
+import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
+import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
-import com.penmate.backend.domain.agent.model.AgentMessage;
-import com.penmate.backend.domain.shared.service.GenerationStreamService;
-import com.penmate.backend.interfaces.api.agent.dto.ApplyAgentGenerationDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentTaskDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
-import com.penmate.backend.interfaces.api.agent.dto.CreateAgentGenerationDto;
-import com.penmate.backend.interfaces.api.agent.dto.CreateAgentMessageDto;
+import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
+import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -34,120 +32,146 @@ import java.util.List;
 public class AgentController {
 
     private final AgentConversationAppService agentConversationAppService;
-    private final AgentMessageAppService agentMessageAppService;
-    private final AgentGenerationAppService agentGenerationAppService;
-    private final GenerationStreamService generationStreamService;
+    private final AgentSessionRecoveryAppService agentSessionRecoveryAppService;
+    private final AgentTurnAppService agentTurnAppService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
-                           AgentMessageAppService agentMessageAppService,
-                           AgentGenerationAppService agentGenerationAppService,
-                           GenerationStreamService generationStreamService) {
+                           AgentSessionRecoveryAppService agentSessionRecoveryAppService,
+                           AgentTurnAppService agentTurnAppService) {
         this.agentConversationAppService = agentConversationAppService;
-        this.agentMessageAppService = agentMessageAppService;
-        this.agentGenerationAppService = agentGenerationAppService;
-        this.generationStreamService = generationStreamService;
+        this.agentSessionRecoveryAppService = agentSessionRecoveryAppService;
+        this.agentTurnAppService = agentTurnAppService;
     }
 
-    @GetMapping("/conversations")
-    public ApiResponse<List<AgentConversation>> listConversations(@PathVariable Long projectId,
-                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    /**
+     * 查询当前项目下的会话列表。
+     */
+    @GetMapping("/sessions")
+    public ApiResponse<List<AgentConversation>> listSessions(@PathVariable Long projectId,
+                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(agentConversationAppService.listConversations(projectId), traceId);
     }
 
-    @PostMapping("/conversations")
-    public ApiResponse<AgentConversation> createConversation(@PathVariable Long projectId,
-                                                             @Valid @RequestBody CreateAgentConversationDto dto,
-                                                             @RequestParam("operatorId") Long operatorId,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentConversationAppService.createConversation(
-                projectId,
-                new AgentCommands.CreateConversationCommand(
-                        dto.getUserId(),
-                        dto.getTitle(),
-                        dto.getContextScopeJson(),
-                        dto.getStatus(),
-                        operatorId
-                ),
-                traceId
-        ), traceId);
-    }
-
-    @GetMapping("/conversations/{conversationId}/messages")
-    public ApiResponse<List<AgentMessage>> listMessages(@PathVariable Long projectId,
-                                                        @PathVariable Long conversationId,
+    /**
+     * 创建一个新会话。
+     */
+    @PostMapping("/sessions")
+    public ApiResponse<AgentConversation> createSession(@PathVariable Long projectId,
+                                                        @Valid @RequestBody CreateAgentConversationDto dto,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentMessageAppService.listMessages(projectId, conversationId), traceId);
-    }
-
-    @PostMapping("/conversations/{conversationId}/messages")
-    public ApiResponse<AgentMessage> createMessage(@PathVariable Long projectId,
-                                                   @PathVariable Long conversationId,
-                                                   @Valid @RequestBody CreateAgentMessageDto dto,
-                                                   @RequestParam("operatorId") Long operatorId,
-                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentMessageAppService.createMessage(
-                projectId,
-                conversationId,
-                new AgentCommands.CreateMessageCommand(
-                        dto.getRole(),
-                        dto.getUserMessageType(),
-                        dto.getContentMd(),
-                        dto.getAttachmentsJson(),
-                        dto.getToolCallsJson(),
-                        operatorId
-                ),
+        log.info("Create agent session request: projectId={}, userId={}, title={}, traceId={}",
+                projectId, dto.getUserId(), dto.getTitle(), traceId);
+        return ApiResponse.success(
+                agentConversationAppService.createConversation(projectId, toCommand(dto), traceId),
                 traceId
-        ), traceId);
+        );
     }
 
-    @PostMapping("/generations")
-    public ApiResponse<AgentGenerationTask> createGeneration(@PathVariable Long projectId,
-                                                             @Valid @RequestBody CreateAgentGenerationDto dto,
-                                                             @RequestParam("operatorId") Long operatorId,
+    /**
+     * 查询会话恢复快照。
+     * <p>控制器仅负责 HTTP 参数绑定与 traceId 透传，具体恢复查询下沉到应用服务。</p>
+     */
+    @GetMapping("/sessions/{sessionId}/recovery")
+    public ApiResponse<AgentRecoverySnapshotDto> getRecovery(@PathVariable Long projectId,
+                                                             @PathVariable Long sessionId,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentGenerationAppService.createGeneration(
-                projectId,
-                new AgentCommands.CreateGenerationCommand(
-                        dto.getConversationId(),
-                        dto.getChapterId(),
-                        dto.getModelConfigId(),
-                        dto.getTaskType(),
-                        dto.getPromptSnapshot(),
-                        dto.getStyleProfileSnapshot(),
-                        dto.getPluginSnapshot(),
-                        operatorId
+        return ApiResponse.success(toRecoveryDto(agentSessionRecoveryAppService.getRecovery(projectId, sessionId, traceId)), traceId);
+    }
+
+    /**
+     * 恢复一个会话并返回最新恢复快照。
+     * <p>控制器不拼装恢复快照，只做 DTO 到用例入参的转换。</p>
+     */
+    @PostMapping("/sessions/{sessionId}/resume")
+    public ApiResponse<AgentRecoverySnapshotDto> resume(@PathVariable Long projectId,
+                                                        @PathVariable Long sessionId,
+                                                        @Valid @RequestBody ResumeAgentSessionDto dto,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        log.info("Resume agent session request: projectId={}, sessionId={}, operatorId={}, trigger={}, traceId={}",
+                projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId);
+        return ApiResponse.success(
+                toRecoveryDto(agentSessionRecoveryAppService.resumeSession(projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId)),
+                traceId
+        );
+    }
+
+    /**
+     * 创建新的 agent turn，并返回当前运行中的任务视图。
+     * <p>该接口是新的 workflow entry，不再暴露历史 createMessage/createGeneration 双接口。</p>
+     */
+    @PostMapping("/sessions/{sessionId}/turns")
+    public ApiResponse<AgentTaskDto> createTurn(@PathVariable Long projectId,
+                                                @PathVariable Long sessionId,
+                                                @Valid @RequestBody CreateAgentTurnDto dto,
+                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, taskType={}, traceId={}",
+                projectId, sessionId, dto.getOperatorId(), dto.getTaskRequest().getTaskType(), traceId);
+        AgentTurnResult result = agentTurnAppService.createTurn(projectId, sessionId, toCommand(dto), traceId);
+        return ApiResponse.success(toTaskDto(result), traceId);
+    }
+
+    private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {
+        return new CreateConversationCommand(
+                dto.getUserId(),
+                dto.getTitle(),
+                dto.getStatus(),
+                dto.getUserId()
+        );
+    }
+
+    private AgentTurnCommand toCommand(CreateAgentTurnDto dto) {
+        CreateAgentTurnDto.TaskRequest request = dto.getTaskRequest();
+        return new AgentTurnCommand(
+                dto.getOperatorId(),
+                dto.getUserMessage(),
+                request == null
+                        ? null
+                        : new AgentTurnCommand.TaskRequest(request.getTaskType(), request.getChapterId(), request.getSelectedText())
+        );
+    }
+
+    private AgentRecoverySnapshotDto toRecoveryDto(AgentSessionRecoveryResult result) {
+        AgentSessionRecoveryResult.SessionView session = result == null ? null : result.session();
+        AgentSessionRecoveryResult.BoundStyleView boundStyle = session == null ? null : session.boundStyle();
+        AgentSessionRecoveryResult.ActiveTaskView activeTask = result == null ? null : result.activeTask();
+        return new AgentRecoverySnapshotDto(
+                new AgentRecoverySnapshotDto.SessionDto(
+                        session == null ? null : session.sessionId(),
+                        session == null ? null : session.title(),
+                        session == null ? null : session.status(),
+                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(boundStyle.styleId(), boundStyle.name()),
+                        session == null ? null : session.taskStatus()
                 ),
-                traceId
-        ), traceId);
+                activeTask == null ? null : new AgentRecoverySnapshotDto.ActiveTaskDto(
+                        activeTask.taskId(),
+                        activeTask.taskStatus(),
+                        activeTask.requestContextId()
+                ),
+                result == null ? null : result.pendingApproval(),
+                result == null ? java.util.List.of() : result.messages(),
+                result == null ? null : result.workbenchContext()
+        );
     }
 
-    @GetMapping("/generations/{taskId}")
-    public ApiResponse<AgentGenerationTask> getGeneration(@PathVariable Long projectId,
-                                                           @PathVariable Long taskId,
-                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentGenerationAppService.getGeneration(projectId, taskId), traceId);
-    }
-
-    @PostMapping("/generations/{taskId}/apply")
-    public ApiResponse<AgentGenerationTask> applyGeneration(@PathVariable Long projectId,
-                                                             @PathVariable Long taskId,
-                                                             @RequestBody(required = false) ApplyAgentGenerationDto dto,
-                                                             @RequestParam("operatorId") Long operatorId,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentGenerationAppService.applyGeneration(
-                projectId,
-                taskId,
-                new AgentCommands.ApplyGenerationCommand(operatorId, dto == null ? null : dto.getApplyNote()),
-                traceId
-        ), traceId);
-    }
-
-    @GetMapping(value = "/generations/{taskId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamGeneration(@PathVariable Long projectId,
-                                       @PathVariable Long taskId,
-                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        log.info("SSE subscribe request: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
-        agentGenerationAppService.getGeneration(projectId, taskId);
-        return generationStreamService.openStream(taskId);
+    private AgentTaskDto toTaskDto(AgentTurnResult result) {
+        AgentTurnResult.SessionView session = result.session();
+        AgentTurnResult.BoundStyleView boundStyle = session == null ? null : session.boundStyle();
+        AgentTurnResult.ActiveTaskView activeTask = result.activeTask();
+        return new AgentTaskDto(
+                new AgentRecoverySnapshotDto.SessionDto(
+                        session == null ? null : session.sessionId(),
+                        session == null ? null : session.title(),
+                        session == null ? null : session.status(),
+                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(boundStyle.styleId(), boundStyle.name()),
+                        session == null ? null : session.taskStatus()
+                ),
+                new AgentRecoverySnapshotDto.ActiveTaskDto(
+                        activeTask == null ? null : activeTask.taskId(),
+                        activeTask == null ? null : activeTask.taskStatus(),
+                        activeTask == null ? null : activeTask.requestContextId()
+                ),
+                result.taskType(),
+                result.userMessage()
+        );
     }
 }

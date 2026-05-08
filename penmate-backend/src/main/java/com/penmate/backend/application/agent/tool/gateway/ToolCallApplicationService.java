@@ -13,6 +13,7 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
+import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
@@ -110,6 +111,13 @@ public class ToolCallApplicationService {
                     approvalSummaryJson
             ));
             agentRepository.updateGenerationTaskStatus(request.projectId(), request.taskId(), "waiting_approval", null);
+            ApprovalView realtimeApprovalView = new ApprovalView(
+                    approvalView.toolCode(),
+                    approvalView.toolDisplayName(),
+                    approvalView.riskLevel(),
+                    approvalView.approvalType(),
+                    approvalView.operationCode()
+            );
             realtimeEventService.publishGenerationWaitingApproval(
                     request.projectId(),
                     request.taskId(),
@@ -118,7 +126,7 @@ public class ToolCallApplicationService {
                     decision.approvalType(),
                     approvalView,
                     resumeMode,
-                    approvalView
+                    realtimeApprovalView
             );
             return ToolCallResult.waitingApproval(approvalRequest.getId());
         }

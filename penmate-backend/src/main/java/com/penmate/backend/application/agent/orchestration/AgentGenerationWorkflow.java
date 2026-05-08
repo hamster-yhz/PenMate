@@ -2,7 +2,9 @@ package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
@@ -35,6 +37,7 @@ public class AgentGenerationWorkflow {
     private final AgentResultPublisher agentResultPublisher;
     private final AgentTaskRuntimeUpdater agentTaskRuntimeUpdater;
     private final AgentTaskResultRecorder agentTaskResultRecorder;
+    private final SessionStyleBindingAppService sessionStyleBindingAppService;
 
     public void run(Long projectId, Long taskId, String traceId) {
         runInternal(projectId, taskId, traceId);
@@ -62,6 +65,7 @@ public class AgentGenerationWorkflow {
                     traceId
             ).chunks();
 
+            AgentTaskContext taskContext = buildTaskContext(projectId, task);
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
             long llmStartAt = System.currentTimeMillis();
             AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
@@ -70,7 +74,7 @@ public class AgentGenerationWorkflow {
                     task.getConversationId(),
                     0L,
                     traceId,
-                    agentPromptAssembler.buildInitialMessages(task, ragChunks),
+                    agentPromptAssembler.buildInitialMessages(task, taskContext, ragChunks),
                     executionConfig
             );
             if (loopResult.waitingApproval()) {
@@ -97,6 +101,14 @@ public class AgentGenerationWorkflow {
             transitionToFailed(projectId, task, ex);
             realtimeEventService.publishGenerationFailed(projectId, taskId, "AGENT_MODEL_CALL_FAILED", ex.getMessage());
         }
+    }
+
+    private AgentTaskContext buildTaskContext(Long projectId, AgentGenerationTask task) {
+        AgentTaskContext taskContext = AgentTaskContext.recoveryOf(task.getTaskId(), task.getStatus(), null);
+        if (sessionStyleBindingAppService != null) {
+            taskContext.setStyleSnapshotJson(sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, task.getConversationId()));
+        }
+        return taskContext;
     }
 
     private void transitionToFailed(Long projectId, AgentGenerationTask task, Exception ex) {

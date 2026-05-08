@@ -54,15 +54,18 @@ import logoImg from '@/assets/images/logo.png'
 import iconStyle from '@/assets/images/icon-style.png'
 import iconPlugin from '@/assets/images/feature-plugin.png'
 
-defineProps<{
+withDefaults(defineProps<{
   novelTitle: string
-  wordCount: number
-  saveHint: string
+  wordCount?: number
+  saveHint?: string
   username: string
   userEmail: string
   userMenuOpen: boolean
   canAccessRbacAdmin: boolean
-}>()
+}>(), {
+  wordCount: 0,
+  saveHint: '',
+})
 
 const emit = defineEmits<{
   (event: 'go-home'): void

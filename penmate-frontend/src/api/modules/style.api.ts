@@ -19,8 +19,11 @@ export const styleApi = {
   deleteStyle(projectId: IdLike, styleId: IdLike, operatorId: IdLike) {
     return request.delete<string>(`/v1/novels/${projectId}/styles/${styleId}?operatorId=${operatorId}`)
   },
-  switchStyle(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<string>(`/v1/novels/${projectId}/styles/switch?operatorId=${operatorId}`, payload)
+  switchStyle(projectId: IdLike, operatorId: IdLike, payload: AnyRecord, sessionId?: IdLike | null) {
+    const sessionQuery = sessionId === undefined || sessionId === null || String(sessionId).trim() === ''
+      ? ''
+      : `&sessionId=${sessionId}`
+    return request.post<string>(`/v1/novels/${projectId}/styles/switch?operatorId=${operatorId}${sessionQuery}`, payload)
   },
   analyzeSample(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/styles/analyze-sample?operatorId=${operatorId}`, payload)

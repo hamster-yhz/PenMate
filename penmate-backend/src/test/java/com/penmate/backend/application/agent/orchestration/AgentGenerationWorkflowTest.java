@@ -2,16 +2,20 @@ package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.rag.RagRetrievalService;
+import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
@@ -57,6 +61,9 @@ class AgentGenerationWorkflowTest {
     @Mock
     private AgentTaskResultRecorder agentTaskResultRecorder;
 
+    @Mock
+    private SessionStyleBindingAppService sessionStyleBindingAppService;
+
     @InjectMocks
     private AgentGenerationWorkflow agentGenerationWorkflow;
 
@@ -77,7 +84,7 @@ class AgentGenerationWorkflowTest {
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(11L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(11L), any(), eq("trace-1")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-1")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
@@ -106,7 +113,7 @@ class AgentGenerationWorkflowTest {
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(21L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(21L), any(), eq("trace-wait")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-wait")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(88L, 1, ""));
@@ -135,13 +142,12 @@ class AgentGenerationWorkflowTest {
         task.setTaskType("WRITE");
         task.setStatus("pending");
         task.setPromptSnapshot("直接总结剧情冲突");
-        task.setStyleProfileSnapshot("简洁");
 
         when(agentRepository.findGenerationTask(1L, 31L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(31L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(31L), any(), eq("trace-direct")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-direct")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(31L), eq(9L), eq(0L), eq("trace-direct"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("这是直接完成的答复", 0, ""));
@@ -158,7 +164,7 @@ class AgentGenerationWorkflowTest {
     }
 
     @Test
-    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_PASS_PLAIN_USER_MESSAGE_TO_LOOP() {
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_PASS_STYLE_FROM_SESSION_BINDING_LOOKUP() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(32L);
         task.setTaskId(32L);
@@ -169,36 +175,26 @@ class AgentGenerationWorkflowTest {
         task.setTaskType("WORLD_BUILD");
         task.setStatus("pending");
         task.setPromptSnapshot("补完城市背景");
-        task.setStyleProfileSnapshot("史诗感");
 
-        List<Map<String, Object>> assembledMessages = List.of(Map.of(
-                "role", "user",
-                "content", "写作风格约束：\n史诗感\n\n用户指令：\n补完城市背景"
-        ));
-
+        when(sessionStyleBindingAppService.getBoundStyleSnapshotJson(1L, 9L)).thenReturn("{\"styleId\":81,\"label\":\"史诗感\"}");
         when(agentRepository.findGenerationTask(1L, 32L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(32L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(32L), any(), eq("trace-plain")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(assembledMessages);
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of(
+                "role", "user",
+                "content", "写作风格约束：\n{\"styleId\":81,\"label\":\"史诗感\"}\n\n用户指令：\n补完城市背景"
+        )));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-plain")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(66L, 1, ""));
 
         agentGenerationWorkflow.run(1L, 32L, "trace-plain");
 
-        org.mockito.ArgumentCaptor<List<Map<String, Object>>> messagesCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
-        verify(agentToolLoopRunner).execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), messagesCaptor.capture(), any());
-        List<Map<String, Object>> messages = messagesCaptor.getValue();
-
-        assertThat(messages).hasSize(1);
-        assertThat(messages.get(0)).containsEntry("role", "user");
-        assertThat(String.valueOf(messages.get(0).get("content")))
-                .contains("写作风格约束：")
-                .contains("史诗感")
-                .contains("用户指令：\n补完城市背景")
-                .doesNotContain("context_enhancer")
-                .doesNotContain("toolCode");
+        ArgumentCaptor<AgentTaskContext> contextCaptor = ArgumentCaptor.forClass(AgentTaskContext.class);
+        verify(agentPromptAssembler).buildInitialMessages(eq(task), contextCaptor.capture(), any());
+        assertThat(contextCaptor.getValue()).isNotNull();
+        assertThat(contextCaptor.getValue().getStyleSnapshotJson()).isEqualTo("{\"styleId\":81,\"label\":\"史诗感\"}");
     }
 
     @Test
@@ -217,7 +213,7 @@ class AgentGenerationWorkflowTest {
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(12L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(12L), any(), eq("trace-2")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-2")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("续写片段", 1, "tool-context"));
@@ -251,7 +247,7 @@ class AgentGenerationWorkflowTest {
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(41L), any(), any())).thenReturn(1);
         when(ragRetrievalService.retrieve(eq(1L), eq(41L), any(), eq("trace-task-id")))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-task-id")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-task-id"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(101L, 1, ""));
@@ -261,5 +257,15 @@ class AgentGenerationWorkflowTest {
         verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.RUNNING.value(), null);
         verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.WAITING_APPROVAL.value(), null);
         verify(agentRepository, never()).updateGenerationTaskStatus(eq(1L), eq(999L), any(), any());
+    }
+
+    private static void setField(Object target, String fieldName, Object value) {
+        try {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("failed to set field: " + fieldName, ex);
+        }
     }
 }

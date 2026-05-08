@@ -69,7 +69,7 @@ public class AuthApplicationService {
         AuthTokenBundle bundle = authTokenService.issueTokens(payload);
         payload.setRefreshJti(bundle.refreshJti());
         authSessionCache.saveSession(payload, bundle);
-        iamGateway.touchLastLoginByUserId(user.getUserId());
+        iamGateway.touchLastLoginByUserId(user.getId());
 
         writeAudit(traceId, user.getId(), "auth", "login", "redis_auth_tokens", bundle.accessJti(), command.email(), 200);
 

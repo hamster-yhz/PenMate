@@ -115,7 +115,12 @@ import iconStyle from '@/assets/images/icon-style.png'
 import { styleApi } from '@/api/modules/style.api'
 import { getSession } from '@/stores/session'
 
-const props = defineProps<{ visible: boolean }>()
+const props = defineProps<{
+  visible: boolean
+  projectId?: number
+  operatorId?: number | null
+  sessionId?: number | null
+}>()
 defineEmits(['close'])
 const route = useRoute()
 const session = getSession()
@@ -145,13 +150,19 @@ const currentStyle = computed(() => {
   return `${config.tone} · ${config.tempo} · ${config.descPreference}`
 })
 
-const getProjectId = () => Number(route.query.projectId || 0)
+const getProjectId = () => Number(props.projectId || route.query.projectId || 0)
 const pickStyleId = (item: StyleItem | null | undefined) => Number(item?.styleId ?? 0)
 
 const getOperatorId = () => {
+  if (typeof props.operatorId === 'number' && props.operatorId > 0) return props.operatorId
   if (typeof session.userId === 'number' && session.userId > 0) return session.userId
   const fromQuery = Number(route.query.operatorId || 0)
   return fromQuery > 0 ? fromQuery : null
+}
+
+const getSessionId = () => {
+  const sessionId = Number(props.sessionId || 0)
+  return sessionId > 0 ? sessionId : null
 }
 
 const applyStyleToForm = (style: StyleItem | null | undefined) => {
@@ -206,11 +217,12 @@ const setAsDefault = async () => {
   }
   saving.value = true
   try {
+    const sessionId = getSessionId()
     await styleApi.switchStyle(projectId, operatorId, {
       toStyleId,
       warningConfirmed: true,
       reason: '手动设为默认文风'
-    })
+    }, sessionId)
     await loadStyles()
     message.success('默认文风已切换')
   } catch (error: any) {
@@ -313,11 +325,12 @@ const confirmChange = async (warningConfirmed = true) => {
     }
 
     if (styleId > 0) {
+      const sessionId = getSessionId()
       await styleApi.switchStyle(projectId, operatorId, {
         toStyleId: styleId,
         warningConfirmed,
         reason: 'Workbench 文风切换'
-      })
+      }, sessionId)
     }
 
     await loadStyles()

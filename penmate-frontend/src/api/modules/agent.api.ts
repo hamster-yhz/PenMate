@@ -15,41 +15,38 @@ const resolveApiBaseUrl = () => {
   return trimTrailingSlash(configuredBase.startsWith('/') ? configuredBase : `/${configuredBase}`)
 }
 
+const buildTaskStreamUrl = (projectId: IdLike, taskId: IdLike) => {
+  const apiBase = resolveApiBaseUrl()
+  return `${apiBase}/v1/novels/${projectId}/agent/tasks/${taskId}/stream`
+}
+
 export const agentApi = {
-  listConversations(projectId: IdLike) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/agent/conversations`)
+  listSessions(projectId: IdLike) {
+    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/agent/sessions`)
   },
-  createConversation(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/conversations?operatorId=${operatorId}`, payload)
+  createSession(projectId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions`, payload)
   },
-  listMessages(projectId: IdLike, conversationId: IdLike) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/agent/conversations/${conversationId}/messages`)
+  getSessionRecovery(projectId: IdLike, sessionId: IdLike) {
+    return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/recovery`)
   },
-  createMessage(projectId: IdLike, conversationId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/agent/conversations/${conversationId}/messages?operatorId=${operatorId}`,
-      payload
-    )
+  resumeSession(projectId: IdLike, sessionId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/resume`, payload)
   },
-  createGeneration(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/generations?operatorId=${operatorId}`, payload)
+  createTurn(projectId: IdLike, sessionId: IdLike, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
   },
-  getGeneration(projectId: IdLike, taskId: IdLike) {
-    return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/generations/${taskId}`)
+  getTask(projectId: IdLike, taskId: IdLike) {
+    return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/tasks/${taskId}`)
   },
-  applyGeneration(projectId: IdLike, taskId: IdLike, operatorId: IdLike, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/generations/${taskId}/apply?operatorId=${operatorId}`, payload)
+  getTaskStreamUrl(projectId: IdLike, taskId: IdLike) {
+    return buildTaskStreamUrl(projectId, taskId)
   },
-  getGenerationStreamUrl(projectId: IdLike, taskId: IdLike) {
-    const apiBase = resolveApiBaseUrl()
-    return `${apiBase}/v1/novels/${projectId}/agent/generations/${taskId}/stream`
-  },
-  openGenerationStream(projectId: IdLike, taskId: IdLike) {
-    const url = this.getGenerationStreamUrl(projectId, taskId)
+  openTaskStream(projectId: IdLike, taskId: IdLike) {
+    const url = buildTaskStreamUrl(projectId, taskId)
     return new EventSource(url)
   },
   addStreamListener(stream: EventSource, eventName: string, listener: StreamListener) {
     stream.addEventListener(eventName, listener as EventListener)
   }
 }
-

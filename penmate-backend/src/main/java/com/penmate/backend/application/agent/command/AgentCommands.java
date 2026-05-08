@@ -15,7 +15,6 @@ public final class AgentCommands {
      */
     public record CreateConversationCommand(Long userId,
                                             String title,
-                                            String contextScopeJson,
                                             String status,
                                             Long operatorId) {
     }
@@ -34,14 +33,13 @@ public final class AgentCommands {
 
     /**
      * 创建生成任务命令。
-     * <p>封装一次 agent 生成任务的静态输入，包括会话、模型配置、prompt 与风格/插件快照。</p>
+     * <p>封装一次 agent 生成任务的静态输入，包括会话、模型配置、prompt 与插件快照。</p>
      */
     public record CreateGenerationCommand(Long conversationId,
                                           Long chapterId,
                                           Long modelConfigId,
                                           String taskType,
                                           String promptSnapshot,
-                                          String styleProfileSnapshot,
                                           String pluginSnapshot,
                                           Long operatorId) {
     }
@@ -54,4 +52,3 @@ public final class AgentCommands {
                                          String applyNote) {
     }
 }
-

@@ -4,12 +4,16 @@
 SET NAMES utf8mb4;
 
 -- cleanup: child -> parent
+DELETE FROM agent_pending_approvals  WHERE pending_approval_id BETWEEN 920001 AND 920999;
 DELETE FROM agent_approval_actions  WHERE approval_action_id BETWEEN 920001 AND 920999;
 DELETE FROM agent_approval_requests WHERE approval_request_id BETWEEN 920001 AND 920999;
-DELETE FROM agent_generation_tasks  WHERE task_id BETWEEN 920001 AND 920999;
+DELETE FROM agent_task_results      WHERE result_id BETWEEN 920001 AND 920999;
+DELETE FROM agent_task_contexts     WHERE context_id BETWEEN 920001 AND 920999;
+DELETE FROM agent_tasks             WHERE task_id BETWEEN 920001 AND 920999;
 DELETE FROM agent_messages          WHERE message_id BETWEEN 920001 AND 920999;
-DELETE FROM agent_conversations     WHERE conversation_id BETWEEN 920001 AND 920999;
-DELETE FROM pending_tool_invocations WHERE approval_id BETWEEN 920001 AND 920999;
+DELETE FROM agent_turns             WHERE turn_id BETWEEN 920001 AND 920999;
+DELETE FROM agent_session_style_bindings WHERE binding_id BETWEEN 920001 AND 920999;
+DELETE FROM agent_sessions          WHERE session_id BETWEEN 920001 AND 920999;
 
 DELETE FROM rag_chunks              WHERE chunk_id BETWEEN 920001 AND 920999;
 DELETE FROM rag_documents           WHERE document_id BETWEEN 920001 AND 920999;
@@ -121,13 +125,10 @@ INSERT INTO novel_card_relations (id, card_relation_id, project_id, from_card_id
 (920003, 920003, 920001, 920001, 920004, 'owns',       '角色持有道具', NOW(3), NULL);
 
 -- 文风
+-- 基础 seed 仅保留项目级稳定文风档案；切换日志属于行为历史，由具体测试自行构造。
 INSERT INTO style_profiles (id, style_id, project_id, name, is_default, pace, tone, narrative_focus, prompt_template, sample_text, created_at, updated_at, deleted_at) VALUES
 (920001, 920001, 920001, '平稳叙事',    1, 'medium', 'neutral', 'character', '请保持平稳叙事', '默认文风样本',   NOW(3), NOW(3), NULL),
 (920002, 920002, 920001, '高张力快节奏', 0, 'fast',   'dark',    'plot',      '请提升冲突密度', '快节奏文风样本', NOW(3), NOW(3), NULL);
-
-INSERT INTO style_switch_logs (id, style_switch_log_id, project_id, from_style_id, to_style_id, switched_by, warning_confirmed, reason, created_at) VALUES
-(920001, 920001, 920001, 920001, 920002, 920002, 1, '切换到战斗场景文风', NOW(3)),
-(920002, 920002, 920001, 920002, 920001, 920002, 0, '恢复默认文风', NOW(3));
 
 -- 插件
 INSERT INTO plugin_catalog (id, plugin_id, code, name, category, provider, status, latest_version, created_at, updated_at) VALUES
@@ -143,30 +144,17 @@ INSERT INTO plugin_call_logs (id, plugin_call_log_id, project_id, plugin_code, t
 (920002, 920002, 920001, 'character-polisher', 'polish_character', JSON_OBJECT('cardId', 920001),    NULL,                    560, 'failed',  'tool timeout', NOW(3));
 
 -- Agent + 审批
-INSERT INTO agent_conversations (id, conversation_id, project_id, user_id, title, context_scope_json, last_message_at, status, created_at, updated_at, deleted_at) VALUES
-(920001, 920001, 920001, 920002, '第一卷创作会话', JSON_OBJECT('chapterIds', JSON_ARRAY(920001, 920002)), NOW(3), 'active',   NOW(3), NOW(3), NULL),
-(920002, 920002, 920001, 920001, '审批复核会话',   JSON_OBJECT('mode', 'approval'), NOW(3), 'archived', NOW(3), NOW(3), NULL);
+-- 基础 seed 仅保留“可被恢复/可被继续创建 turn”的稳定主数据：session 与当前生效 style 绑定。
+-- agent_turns / agent_messages / agent_tasks / agent_task_contexts / agent_task_results /
+-- agent_pending_approvals / agent_approval_requests / agent_approval_actions 只在 cleanup 中参与，
+-- 用于保证脚本可重复执行；这些运行时/断点/审批数据不在 baseline insert 中预置，必须由具体测试按场景单独造数。
+INSERT INTO agent_sessions (id, session_id, project_id, owner_user_id, title, session_status, bound_style_id, active_context_version, last_turn_id, last_task_id, last_message_at, resumed_at, created_at, updated_at, deleted_at) VALUES
+(920001, 920001, 920001, 920002, '第一卷创作会话', 'ACTIVE',   920001, 1, NULL, NULL, NULL, NULL, NOW(3), NOW(3), NULL),
+(920002, 920002, 920001, 920001, '审批复核会话',   'ARCHIVED', 920002, 1, NULL, NULL, NULL, NULL, NOW(3), NOW(3), NULL);
 
-INSERT INTO agent_messages (id, message_id, conversation_id, role, user_message_type, content_md, attachments_json, tool_calls_json, seq_no, created_at) VALUES
-(920001, 920001, 920001, 'system', NULL,     '你是创作助手。',     NULL, NULL,                                             1, NOW(3)),
-(920002, 920002, 920001, 'user',   'prompt', '请扩写第1章冲突。',   JSON_ARRAY(), NULL,                                    2, NOW(3)),
-(920003, 920003, 920001, 'assistant', NULL,  '已生成扩写草稿。',   NULL, JSON_ARRAY(JSON_OBJECT('tool', 'expand_plot')), 3, NOW(3)),
-(920004, 920004, 920001, 'tool',   NULL,     '插件调用完成。',     NULL, NULL,                                             4, NOW(3));
-
-INSERT INTO agent_generation_tasks (id, task_id, project_id, conversation_id, chapter_id, task_type, prompt_snapshot, style_profile_snapshot, plugin_snapshot, status, started_at, finished_at, error_msg, created_at) VALUES
-(920001, 920001, 920001, 920001, 920001, 'draft',     JSON_OBJECT('prompt', 'draft chapter 1'),     JSON_OBJECT('styleId', 920001), JSON_ARRAY('plot-expander'),      'done',    NOW(3), NOW(3), NULL,               NOW(3)),
-(920002, 920002, 920001, 920001, 920001, 'rewrite',   JSON_OBJECT('prompt', 'rewrite chapter 1'),   JSON_OBJECT('styleId', 920002), JSON_ARRAY('character-polisher'), 'failed',  NOW(3), NOW(3), 'provider timeout', NOW(3)),
-(920003, 920003, 920001, 920002, 920002, 'expand',    JSON_OBJECT('prompt', 'expand chapter 2'),    JSON_OBJECT('styleId', 920001), JSON_ARRAY('plot-expander'),      'running', NOW(3), NULL,    NULL,              NOW(3)),
-(920004, 920004, 920001, 920002, 920002, 'summarize', JSON_OBJECT('prompt', 'summarize chapter 2'), JSON_OBJECT('styleId', 920001), JSON_ARRAY(),                      'pending', NULL,   NULL,    NULL,              NOW(3));
-
-INSERT INTO agent_approval_requests (id, approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status, requested_by, reviewed_by, reviewed_at, review_comment, created_at, updated_at) VALUES
-(920001, 920001, 920001, 920001, 'publish', JSON_OBJECT('chapterId', 920001), 2, 'approved', 920002, 920001, NOW(3), '可发布', NOW(3), NOW(3)),
-(920002, 920002, 920001, 920002, 'rewrite', JSON_OBJECT('chapterId', 920001), 3, 'rejected', 920002, 920001, NOW(3), '需补充动机描写', NOW(3), NOW(3)),
-(920003, 920003, 920001, 920003, 'expand',  JSON_OBJECT('chapterId', 920002), 1, 'pending',  920002, NULL, NULL, NULL, NOW(3), NOW(3));
-
-INSERT INTO agent_approval_actions (id, approval_action_id, request_id, action, operator_id, comment, created_at) VALUES
-(920001, 920001, 920001, 'approve', 920001, '通过', NOW(3)),
-(920002, 920002, 920002, 'reject',  920001, '驳回', NOW(3));
+INSERT INTO agent_session_style_bindings (id, binding_id, session_id, style_id, source, activated_at, deactivated_at, created_at) VALUES
+(920001, 920001, 920001, 920001, 'PROJECT_DEFAULT', NOW(3), NULL, NOW(3)),
+(920002, 920002, 920002, 920002, 'MANUAL_SWITCH',   NOW(3), NULL, NOW(3));
 
 -- RAG + 对象存储
 INSERT INTO rag_documents (id, document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag, mime_type, parse_status, index_status, created_at, updated_at, deleted_at) VALUES

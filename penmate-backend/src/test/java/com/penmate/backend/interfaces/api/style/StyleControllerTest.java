@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.style;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.style.StyleApplicationService;
+import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.style.model.StyleProfile;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -35,6 +37,9 @@ class StyleControllerTest {
     @Mock
     private StyleApplicationService styleApplicationService;
 
+    @Mock
+    private SessionStyleBindingAppService sessionStyleBindingAppService;
+
     @InjectMocks
     private StyleController styleController;
 
@@ -47,7 +52,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 文风列表查询成功。
     void UT_STYLE_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-LIST";
         StyleProfile style = new StyleProfile();
@@ -66,7 +70,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 文风创建成功。
     void UT_STYLE_CREATE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-CREATE";
         StyleProfile created = new StyleProfile();
@@ -89,7 +92,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 切换文风未确认警告。
     void UT_STYLE_SWITCH_WARN_NOT_CONFIRMED_422() throws Exception {
         String traceId = "UT-TRACE-STYLE-SWITCH-WARN";
         doThrow(new IllegalArgumentException("STYLE_SWITCH_NOT_CONFIRMED"))
@@ -97,6 +99,7 @@ class StyleControllerTest {
 
         mockMvc().perform(post("/api/v1/novels/10001/styles/switch")
                         .param("operatorId", "1001")
+                        .param("sessionId", "90001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -111,7 +114,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 样文分析参数错误（sampleText 为空）。
     void UT_STYLE_ANALYZE_INVALID_PARAM() throws Exception {
         String traceId = "UT-TRACE-STYLE-ANALYZE-INVALID";
 
@@ -127,7 +129,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 删除文风成功。
     void UT_STYLE_DELETE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-DELETE";
         doNothing().when(styleApplicationService).deleteStyle(anyLong(), anyLong(), anyLong(), eq(traceId));
@@ -141,7 +142,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 文风更新成功。
     void UT_STYLE_UPDATE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-UPDATE";
         StyleProfile updated = new StyleProfile();
@@ -163,15 +163,16 @@ class StyleControllerTest {
     }
 
     @Test
-    // 切换文风成功。
     void UT_STYLE_SWITCH_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-SWITCH-SUCCESS";
         StyleProfile style = new StyleProfile();
         style.setId(302L);
+        style.setStyleId(302L);
         when(styleApplicationService.switchStyle(eq(10001L), any(), eq(traceId))).thenReturn(style);
 
         mockMvc().perform(post("/api/v1/novels/10001/styles/switch")
                         .param("operatorId", "1001")
+                        .param("sessionId", "90001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -181,10 +182,11 @@ class StyleControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(302));
+
+        verify(sessionStyleBindingAppService).bind(10001L, 90001L, 302L, 1001L, traceId);
     }
 
     @Test
-    // 切换文风目标不存在。
     void UT_STYLE_SWITCH_NOT_FOUND() throws Exception {
         String traceId = "UT-TRACE-STYLE-SWITCH-NOT-FOUND";
         doThrow(new IllegalArgumentException("Style not found"))
@@ -192,6 +194,7 @@ class StyleControllerTest {
 
         mockMvc().perform(post("/api/v1/novels/10001/styles/switch")
                         .param("operatorId", "1001")
+                        .param("sessionId", "90001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -205,7 +208,6 @@ class StyleControllerTest {
     }
 
     @Test
-    // 样文分析成功。
     void UT_STYLE_ANALYZE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-ANALYZE-SUCCESS";
         when(styleApplicationService.analyzeSample(eq(10001L), any(), eq(traceId)))
@@ -221,4 +223,3 @@ class StyleControllerTest {
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 }
-

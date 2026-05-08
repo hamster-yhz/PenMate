@@ -64,7 +64,6 @@ class AgentGenerationAppServiceTest {
                         4001L,
                         "WRITE",
                         "prompt-json",
-                        "style-json",
                         "plugin-json",
                         1001L
                 ),
@@ -78,6 +77,8 @@ class AgentGenerationAppServiceTest {
         verify(orchestrationDispatcher).dispatchInitialRun(projectId, 940001L, "trace-2");
         assertThat(inserted.getTaskId()).as("taskId should be generated before insert").isEqualTo(940001L);
         assertThat(inserted.getModelConfigId()).as("generation task should persist explicit modelConfigId").isEqualTo(4001L);
+        assertThat(inserted.getPromptSnapshot()).isEqualTo("prompt-json");
+        assertThat(inserted.getPluginSnapshot()).isEqualTo("plugin-json");
         assertThat(result.getTaskId()).isEqualTo(inserted.getTaskId());
     }
 }
