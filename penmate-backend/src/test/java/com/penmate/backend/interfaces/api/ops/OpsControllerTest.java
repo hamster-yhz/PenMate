@@ -45,12 +45,14 @@ class OpsControllerTest {
         String traceId = "UT-TRACE-OPS-JOB-GET";
         OpsAsyncJob job = new OpsAsyncJob();
         job.setId(6001L);
+        job.setJobId(6001L);
         job.setStatus("success");
         when(opsApplicationService.getJob(6001L)).thenReturn(job);
 
         mockMvc().perform(get("/api/v1/jobs/6001").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(6001))
+                .andExpect(jsonPath("$.data.jobId").isString())
+                .andExpect(jsonPath("$.data.jobId").value("6001"))
                 .andExpect(jsonPath("$.data.status").value("success"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
@@ -61,12 +63,14 @@ class OpsControllerTest {
         String traceId = "UT-TRACE-OPS-JOB-LIST";
         OpsAsyncJob job = new OpsAsyncJob();
         job.setId(6002L);
+        job.setJobId(6002L);
         job.setJobType("migration");
         when(opsApplicationService.listJobs(isNull(), isNull())).thenReturn(List.of(job));
 
         mockMvc().perform(get("/api/v1/jobs").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(6002))
+                .andExpect(jsonPath("$.data[0].jobId").isString())
+                .andExpect(jsonPath("$.data[0].jobId").value("6002"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -92,6 +96,7 @@ class OpsControllerTest {
         String traceId = "UT-TRACE-OPS-MIGRATION-RUN";
         OpsMigrationTask task = new OpsMigrationTask();
         task.setId(7001L);
+        task.setMigrationId(7001L);
         task.setStatus("running");
         when(opsApplicationService.startContentToObjectStorageMigration(1001L, traceId)).thenReturn(task);
 
@@ -99,7 +104,8 @@ class OpsControllerTest {
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(7001))
+                .andExpect(jsonPath("$.data.migrationId").isString())
+                .andExpect(jsonPath("$.data.migrationId").value("7001"))
                 .andExpect(jsonPath("$.data.status").value("running"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
@@ -125,6 +131,7 @@ class OpsControllerTest {
         String traceId = "UT-TRACE-OPS-JOB-RETRY-SUCCESS";
         OpsAsyncJob job = new OpsAsyncJob();
         job.setId(6003L);
+        job.setJobId(6003L);
         job.setStatus("queued");
         when(opsApplicationService.retryJob(6003L, 1001L, traceId)).thenReturn(job);
 
@@ -132,7 +139,8 @@ class OpsControllerTest {
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(6003))
+                .andExpect(jsonPath("$.data.jobId").isString())
+                .andExpect(jsonPath("$.data.jobId").value("6003"))
                 .andExpect(jsonPath("$.data.status").value("queued"));
     }
 
@@ -142,13 +150,15 @@ class OpsControllerTest {
         String traceId = "UT-TRACE-OPS-MIGRATION-GET";
         OpsMigrationTask task = new OpsMigrationTask();
         task.setId(7001L);
+        task.setMigrationId(7001L);
         task.setStatus("success");
         when(opsApplicationService.getMigration(7001L)).thenReturn(task);
 
         mockMvc().perform(get("/api/v1/migrations/7001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(7001))
+                .andExpect(jsonPath("$.data.migrationId").isString())
+                .andExpect(jsonPath("$.data.migrationId").value("7001"))
                 .andExpect(jsonPath("$.data.status").value("success"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }

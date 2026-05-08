@@ -138,7 +138,6 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import type { IdLike } from '@/api/types'
 import StyleManager from '@/components/workbench/StyleManager.vue'
 import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
 import ModelSettings from '@/components/workbench/ModelSettings.vue'
@@ -192,14 +191,27 @@ const {
 const { saveDraft, clearDraft, resolveStoredDraft, resolveEditorSeedContent } = useWorkbenchDraft()
 const chapterLoadGuard = createChapterLoadGuard()
 
-const getCurrentProjectId = () => ensureContext().projectId || initialProjectId
+const getCurrentProjectId = () => ensureContext().projectId || initialProjectId || ''
 const resolveOperatorId = () => {
   const { operatorId } = ensureContext()
-  return operatorId || initialOperatorId || 0
+  return operatorId || initialOperatorId || ''
 }
 const getContext = () => {
   const { projectId, operatorId } = ensureContext()
-  return { projectId, operatorId }
+  return {
+    projectId: projectId || null,
+    operatorId: operatorId || null,
+  }
+}
+const getAgentProjectId = () => getCurrentProjectId()
+const getAgentOperatorId = () => resolveOperatorId()
+const getAgentContext = () => {
+  const projectId = getAgentProjectId()
+  const operatorId = getAgentOperatorId()
+  return {
+    projectId: projectId || null,
+    operatorId: operatorId || null,
+  }
 }
 
 const username = ref('墨客')
@@ -377,7 +389,7 @@ const {
   setLastSnapshot: (content: string) => {
     selectChapterDraft(content)
   },
-  resolveChapterContent: (projectId: number, chapterId: string | number, remoteContent: string, options?: { preferRemote?: boolean }) => {
+  resolveChapterContent: (projectId: string, chapterId: string, remoteContent: string, options?: { preferRemote?: boolean }) => {
     if (options?.preferRemote) {
       clearDraft(projectId, chapterId)
       return remoteContent
@@ -389,20 +401,20 @@ const {
   clearDraft,
   beginChapterRequest: (chapterId: string) => chapterLoadGuard.begin(chapterId),
   isChapterRequestCurrent: (chapterId: string, requestId: number) => chapterLoadGuard.isCurrent(chapterId, requestId),
-  listVersions: async (projectId: number, chapterId: number) => chapterApi.listVersions(projectId, chapterId),
-  getVersionSnapshotUrl: async (projectId: number, chapterId: number, versionNo: number) => chapterApi.getVersionSnapshotUrl(projectId, chapterId, versionNo),
-  getContentUrl: async (projectId: number, chapterId: number) => chapterApi.getContentUrl(projectId, chapterId),
-  restoreVersion: async (projectId: number, chapterId: number, versionNo: number, operatorId: number) => {
-    await chapterApi.restoreVersion(projectId, chapterId, versionNo, operatorId)
+  listVersions: async (projectId: string, chapterId: string) => chapterApi.listVersions(projectId, chapterId),
+  getVersionSnapshotUrl: async (projectId: string, chapterId: string, versionNo: number) => chapterApi.getVersionSnapshotUrl(projectId, chapterId, String(versionNo)),
+  getContentUrl: async (projectId: string, chapterId: string) => chapterApi.getContentUrl(projectId, chapterId),
+  restoreVersion: async (projectId: string, chapterId: string, versionNo: number, operatorId: string) => {
+    await chapterApi.restoreVersion(projectId, chapterId, String(versionNo), operatorId)
   },
-  publishChapter: async (projectId: number, chapterId: number, operatorId: number) => {
+  publishChapter: async (projectId: string, chapterId: string, operatorId: string) => {
     await chapterApi.publishChapter(projectId, chapterId, operatorId)
   },
-  getContentUploadUrl: async (projectId: number, chapterId: number) => chapterApi.getContentUploadUrl(projectId, chapterId),
-  commitContent: async (projectId: number, chapterId: number, operatorId: number, payload: Record<string, unknown>) => {
+  getContentUploadUrl: async (projectId: string, chapterId: string) => chapterApi.getContentUploadUrl(projectId, chapterId),
+  commitContent: async (projectId: string, chapterId: string, operatorId: string, payload: Record<string, unknown>) => {
     await chapterApi.commitContent(projectId, chapterId, operatorId, payload)
   },
-  createVersion: async (projectId: number, chapterId: number, payload: Record<string, unknown>) => {
+  createVersion: async (projectId: string, chapterId: string, payload: Record<string, unknown>) => {
     await chapterApi.createVersion(projectId, chapterId, payload)
   },
   resolveUploadTarget: resolveDirectUploadTarget,
@@ -429,7 +441,7 @@ const pickModelConfigId = (item: Record<string, unknown>) => {
   const trimmed = item.modelConfigId.trim()
   return trimmed || null
 }
-const pickConversationId = (item: Record<string, unknown>) => Number(item.sessionId ?? item.conversationId ?? 0)
+const pickConversationId = (item: Record<string, unknown>) => String(item.sessionId ?? '').trim()
 const syncBoundStyleName = (session: Record<string, unknown> | null | undefined) => {
   const boundStyle = session && typeof session === 'object'
     ? (session.boundStyle as Record<string, unknown> | null | undefined)
@@ -450,7 +462,7 @@ const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
   })
 }
 
-const openAgentTaskStream = (projectId: number, taskId: IdLike) => {
+const openAgentTaskStream = (projectId: string, taskId: string) => {
   console.info('[agent-ui] task-stream-open', {
     projectId,
     taskId,
@@ -473,7 +485,7 @@ const toPluginName = (item: Record<string, unknown>) => {
   return name || '未命名插件'
 }
 
-const loadActivePlugins = async (projectId: number) => {
+const loadActivePlugins = async (projectId: string) => {
   if (!projectId) {
     activePlugins.value = []
     return
@@ -555,15 +567,15 @@ const {
   resumeRunningTask,
   hydrateFromRecoverySnapshot,
 } = useWorkbenchChat({
-  getContext,
-  getCurrentProjectId,
+  getContext: getAgentContext,
+  getCurrentProjectId: getAgentProjectId,
   getActiveChapterKey: () => activeChapter.value,
   getActivePlugins: () => activePlugins.value,
   ensureModelConfigId,
   refreshActiveModelInfo,
-  listSessions: agentApi.listSessions,
-  createSession: agentApi.createSession,
-  getSessionRecovery: agentApi.getSessionRecovery,
+  listSessions: (projectId) => agentApi.listSessions(projectId),
+  createSession: (projectId, payload) => agentApi.createSession(projectId, payload),
+  getSessionRecovery: (projectId, sessionId) => agentApi.getSessionRecovery(projectId, sessionId),
   createTurn: async (projectId, sessionId, payload) => {
     debugChatState('create-turn-request', {
       projectId,
@@ -581,13 +593,13 @@ const {
     debugChatState('create-turn-created', {
       projectId,
       sessionId,
-      taskId: Number((result.activeTask as Record<string, unknown> | null | undefined)?.taskId ?? 0),
+      taskId: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskId ?? ''),
       taskStatus: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskStatus ?? ''),
       sessionStatus: String((result.session as Record<string, unknown> | null | undefined)?.status ?? ''),
     })
     return result
   },
-  getTask: agentApi.getTask,
+  getTask: (projectId, taskId) => agentApi.getTask(projectId, taskId),
   openTaskStream: (projectId, taskId) => openAgentTaskStream(projectId, taskId),
   addStreamListener: agentApi.addStreamListener,
   scrollChat,
@@ -613,45 +625,45 @@ const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
 })
 
 const sessionRecovery = useWorkbenchSessionRecovery({
-  getSessionRecovery: agentApi.getSessionRecovery,
-  resumeSession: agentApi.resumeSession,
+  getSessionRecovery: (projectId, sessionId) => agentApi.getSessionRecovery(projectId, sessionId),
+  resumeSession: (projectId, sessionId, payload) => agentApi.resumeSession(projectId, sessionId, payload),
   openTaskStream: (projectId, taskId) => openAgentTaskStream(projectId, taskId),
   resumeRunningTask,
   hydrateStore: (snapshot) => {
     hydrateFromRecoverySnapshot(snapshot)
     syncBoundStyleName((snapshot?.session as Record<string, unknown> | null | undefined) || null)
     const workbenchContext = snapshot?.workbenchContext || {}
-    const chapterId = Number(workbenchContext.chapterId ?? 0)
-    if (chapterId > 0) {
-      activeChapter.value = String(chapterId)
+    const chapterId = String(workbenchContext.chapterId ?? '').trim()
+    if (chapterId && chapterId !== '0') {
+      activeChapter.value = chapterId
     }
     const plugins = Array.isArray(workbenchContext.activePlugins) ? workbenchContext.activePlugins : []
     activePlugins.value = plugins.map((item) => String(item)).filter(Boolean)
   },
 })
 
-const resumeWorkbenchSession = async (sessionId: number) => {
-  const projectId = getCurrentProjectId()
-  const operatorId = resolveOperatorId()
+const resumeWorkbenchSession = async (sessionId: string) => {
+  const projectId = getAgentProjectId()
+  const operatorId = getAgentOperatorId()
   if (!projectId || !sessionId || !operatorId) return
   await sessionRecovery.restore(projectId, sessionId, operatorId)
 }
 
-const handleSelectConversation = async (conversationId: number) => {
+const handleSelectConversation = async (conversationId: string) => {
   if (!conversationId) return
   await resumeWorkbenchSession(conversationId)
 }
 
 const handleCreateSession = async () => {
-  const projectId = getCurrentProjectId()
-  const operatorId = resolveOperatorId()
+  const projectId = getAgentProjectId()
+  const operatorId = getAgentOperatorId()
   if (!projectId || !operatorId) return
   const created = (await agentApi.createSession(projectId, {
     userId: operatorId,
     title: '新会话',
   })) as Record<string, unknown>
   const sessionId = pickConversationId(created)
-  if (sessionId <= 0) return
+  if (!sessionId) return
   currentConversationId.value = sessionId
   messages.value = []
   boundStyleName.value = ''
@@ -674,25 +686,30 @@ const onModelConfigSaved = () => {
   void refreshActiveModelInfo()
 }
 
-const tryLoadChapterRemoteContent = async (chapterIdLike: string, requestId: number) => {
+const normalizeBusinessId = (value: unknown) => {
+  const normalized = String(value ?? '').trim()
+  return normalized || null
+}
+
+const tryLoadChapterRemoteContent = async (chapterIdInput: string, requestId: number) => {
   const projectId = getCurrentProjectId()
-  const chapterId = Number(chapterIdLike)
+  const chapterId = normalizeBusinessId(chapterIdInput)
   if (!projectId || !chapterId) return
   try {
     const loaded = await refreshEditorFromRemote(projectId, chapterId, requestId)
     if (!loaded) {
-      if (!chapterLoadGuard.isCurrent(String(chapterId), requestId)) return
+      if (!chapterLoadGuard.isCurrent(chapterId, requestId)) return
       const localDraft = resolveStoredDraft(projectId, chapterId)
       if (localDraft !== null) {
-        chapterContents.value[String(chapterId)] = localDraft
+        chapterContents.value[chapterId] = localDraft
         selectChapterDraft(localDraft)
       }
     }
   } catch {
-    if (!chapterLoadGuard.isCurrent(String(chapterId), requestId)) return
+    if (!chapterLoadGuard.isCurrent(chapterId, requestId)) return
     const localDraft = resolveStoredDraft(projectId, chapterId)
     if (localDraft !== null) {
-      chapterContents.value[String(chapterId)] = localDraft
+      chapterContents.value[chapterId] = localDraft
       selectChapterDraft(localDraft)
     }
   }
@@ -711,7 +728,7 @@ const handleOutlineSelectChapter = async (chapter: OutlineChapterNode) => {
   const chapterKey = String(chapter.chapterId || chapter.key)
   const prevProjectId = getCurrentProjectId()
   if (prevProjectId && activeChapter.value) {
-    saveDraft(prevProjectId, Number(activeChapter.value), editorContent.value)
+    saveDraft(prevProjectId, activeChapter.value, editorContent.value)
   }
 
   activeChapter.value = chapterKey
@@ -720,7 +737,7 @@ const handleOutlineSelectChapter = async (chapter: OutlineChapterNode) => {
   const requestId = chapterLoadGuard.begin(chapterKey)
   const currentProjectId = getCurrentProjectId()
   if (currentProjectId) {
-    const localDraft = resolveStoredDraft(currentProjectId, Number(chapterKey))
+    const localDraft = resolveStoredDraft(currentProjectId, chapterKey)
     if (localDraft !== null) {
       chapterContents.value[chapterKey] = localDraft
       selectChapterDraft(localDraft)
@@ -738,16 +755,16 @@ const handleOutlineSelectChapter = async (chapter: OutlineChapterNode) => {
   }
 }
 
-const loadWorkbenchData = async (projectId: number) => {
+const loadWorkbenchData = async (projectId: string) => {
   if (!projectId) return
   const outlineResp = await outlineApi.listOutlineTree(projectId)
   const chapterResp = await novelApi.listChapters(projectId)
   const chapterByOutlineNodeId = Object.fromEntries(
     (chapterResp || [])
       .map((chapter: Record<string, unknown>) => {
-        const outlineNodeId = Number(chapter.outlineNodeId ?? 0)
-        const chapterId = Number(chapter.chapterId ?? 0)
-        return outlineNodeId > 0 && chapterId > 0 ? [String(outlineNodeId), String(chapterId)] : null
+        const outlineNodeId = normalizeBusinessId(chapter.outlineNodeId)
+        const chapterId = normalizeBusinessId(chapter.chapterId)
+        return outlineNodeId && chapterId ? [outlineNodeId, chapterId] : null
       })
       .filter((entry): entry is [string, string] => Array.isArray(entry))
   )
@@ -781,9 +798,9 @@ onMounted(async () => {
   const projectId = getCurrentProjectId()
   if (projectId) {
     await loadWorkbenchData(projectId)
-    const conversations = (await agentApi.listSessions(projectId)) as Array<Record<string, unknown>>
+    const conversations = (await agentApi.listSessions(String(projectId))) as Array<Record<string, unknown>>
     const latestSessionId = pickConversationId(conversations[0] || {})
-    if (latestSessionId > 0) {
+    if (latestSessionId) {
       await resumeWorkbenchSession(latestSessionId)
     }
   } else {
@@ -812,3 +829,4 @@ watch(editorContent, (value) => {
   overflow: hidden;
 }
 </style>
+

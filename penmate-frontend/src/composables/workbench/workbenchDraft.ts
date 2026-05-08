@@ -1,6 +1,6 @@
-export const getDraftStorageKey = (projectId: number, chapterId: string | number) => `penmate.chapterDraft.${projectId}.${chapterId}`
+export const getDraftStorageKey = (projectId: string, chapterId: string) => `penmate.chapterDraft.${projectId}.${chapterId}`
 
-export const saveChapterDraftLocal = (projectId: number, chapterId: string | number, content: string) => {
+export const saveChapterDraftLocal = (projectId: string, chapterId: string, content: string) => {
   try {
     localStorage.setItem(getDraftStorageKey(projectId, chapterId), content)
   } catch {
@@ -8,7 +8,7 @@ export const saveChapterDraftLocal = (projectId: number, chapterId: string | num
   }
 }
 
-export const clearChapterDraftLocal = (projectId: number, chapterId: string | number) => {
+export const clearChapterDraftLocal = (projectId: string, chapterId: string) => {
   try {
     localStorage.removeItem(getDraftStorageKey(projectId, chapterId))
   } catch {
@@ -16,7 +16,7 @@ export const clearChapterDraftLocal = (projectId: number, chapterId: string | nu
   }
 }
 
-export const readChapterDraftLocal = (projectId: number, chapterId: string | number) => {
+export const readChapterDraftLocal = (projectId: string, chapterId: string) => {
   try {
     return localStorage.getItem(getDraftStorageKey(projectId, chapterId)) || ''
   } catch {

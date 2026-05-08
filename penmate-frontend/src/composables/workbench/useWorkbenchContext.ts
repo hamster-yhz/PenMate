@@ -8,7 +8,7 @@ export interface WorkbenchContextQuery {
 }
 
 export interface WorkbenchContextSession {
-  userId?: number
+  userId?: string
   userName?: string
   userEmail?: string
 }
@@ -20,24 +20,24 @@ export interface WorkbenchContextOptions {
 
 const pickScalar = (value: unknown) => Array.isArray(value) ? value[0] : value
 
-const toPositiveNumber = (value: unknown) => {
-  const normalized = Number(pickScalar(value) ?? 0)
-  return Number.isFinite(normalized) && normalized > 0 ? normalized : 0
+const toBusinessId = (value: unknown) => {
+  const normalized = String(pickScalar(value) ?? '').trim()
+  return normalized || null
 }
 
-const readStoredPositiveNumber = (storageKey: string) => {
+const readStoredBusinessId = (storageKey: string) => {
   try {
-    const cached = Number(window.localStorage.getItem(storageKey) || 0)
-    return Number.isFinite(cached) && cached > 0 ? cached : 0
+    const cached = String(window.localStorage.getItem(storageKey) ?? '').trim()
+    return cached || null
   } catch {
-    return 0
+    return null
   }
 }
 
-const writeStoredPositiveNumber = (storageKey: string, value: number) => {
-  if (!Number.isFinite(value) || value <= 0) return
+const writeStoredBusinessId = (storageKey: string, value: string | null) => {
+  if (!value) return
   try {
-    window.localStorage.setItem(storageKey, String(value))
+    window.localStorage.setItem(storageKey, value)
   } catch {
     // 忽略浏览器存储异常
   }
@@ -48,27 +48,24 @@ export const useWorkbenchContext = ({ query, session }: WorkbenchContextOptions)
   const userEmail = typeof session.userEmail === 'string' ? session.userEmail : ''
 
   const getCurrentProjectId = () => {
-    const queryProjectId = toPositiveNumber(query.projectId)
-    if (queryProjectId > 0) return queryProjectId
-    return readStoredPositiveNumber(LAST_PROJECT_ID_KEY)
+    const queryProjectId = toBusinessId(query.projectId)
+    if (queryProjectId) return queryProjectId
+    return readStoredBusinessId(LAST_PROJECT_ID_KEY)
   }
 
   const resolveOperatorId = () => {
-    const queryOperatorId = toPositiveNumber(query.operatorId) || toPositiveNumber(query.userId)
-    if (queryOperatorId > 0) return queryOperatorId
-    const sessionOperatorId = typeof session.userId === 'number' && session.userId > 0 ? session.userId : 0
-    if (sessionOperatorId > 0) return sessionOperatorId
-    const cachedOperatorId = readStoredPositiveNumber(LAST_OPERATOR_ID_KEY)
-    return cachedOperatorId > 0 ? cachedOperatorId : null
+    const queryOperatorId = toBusinessId(query.operatorId)
+    if (queryOperatorId) return queryOperatorId
+    const sessionOperatorId = toBusinessId(session.userId)
+    if (sessionOperatorId) return sessionOperatorId
+    return readStoredBusinessId(LAST_OPERATOR_ID_KEY)
   }
 
   const getContext = () => {
     const projectId = getCurrentProjectId()
     const operatorId = resolveOperatorId()
-    writeStoredPositiveNumber(LAST_PROJECT_ID_KEY, projectId)
-    if (operatorId) {
-      writeStoredPositiveNumber(LAST_OPERATOR_ID_KEY, operatorId)
-    }
+    writeStoredBusinessId(LAST_PROJECT_ID_KEY, projectId)
+    writeStoredBusinessId(LAST_OPERATOR_ID_KEY, operatorId)
     return {
       projectId,
       operatorId,

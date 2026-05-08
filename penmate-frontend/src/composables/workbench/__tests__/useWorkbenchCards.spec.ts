@@ -31,15 +31,15 @@ describe('useWorkbenchCards', () => {
   it('loads_cards_and_relations_with_expanded_state_reset_and_name_lookup', async () => {
     const useWorkbenchCards = await loadUseWorkbenchCards()
     const listCards = vi.fn(async () => [
-      { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}' },
-      { cardId: 12, cardType: 'WORLD', name: '北境', summary: '地理', detailJson: '{}' },
+      { cardId: 'card-11', cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}' },
+      { cardId: 'card-12', cardType: 'WORLD', name: '北境', summary: '地理', detailJson: '{}' },
     ])
     const listCardRelations = vi.fn(async () => [
-      { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护' },
+      { cardRelationId: 'rel-91', fromCardId: 'card-11', toCardId: 'card-12', relationType: '守护' },
     ])
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards,
       listCardRelations,
       createCard: vi.fn(async () => ({})),
@@ -50,18 +50,18 @@ describe('useWorkbenchCards', () => {
       promptCardName: vi.fn(() => '新角色'),
     })
 
-    await cards.loadCardsAndRelations(101)
+    await cards.loadCardsAndRelations('project-101')
 
-    expect(listCards).toHaveBeenCalledWith(101)
-    expect(listCardRelations).toHaveBeenCalledWith(101)
+    expect(listCards).toHaveBeenCalledWith('project-101')
+    expect(listCardRelations).toHaveBeenCalledWith('project-101')
     expect(cards.projectCards.value).toEqual([
-      { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}', expanded: false },
-      { cardId: 12, cardType: 'WORLD', name: '北境', summary: '地理', detailJson: '{}', expanded: false },
+      { cardId: 'card-11', cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}', expanded: false },
+      { cardId: 'card-12', cardType: 'WORLD', name: '北境', summary: '地理', detailJson: '{}', expanded: false },
     ])
     expect(cards.cardRelations.value).toEqual([
-      { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护', description: '' },
+      { cardRelationId: 'rel-91', fromCardId: 'card-11', toCardId: 'card-12', relationType: '守护', description: '' },
     ])
-    expect(cards.cardNameById('11')).toBe('林霜')
+    expect(cards.cardNameById('card-11')).toBe('林霜')
     expect(cards.cardNameById('999')).toBe('卡片#999')
   })
 
@@ -71,18 +71,18 @@ describe('useWorkbenchCards', () => {
     const listCards = vi
       .fn()
       .mockResolvedValueOnce([
-        { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}' },
+        { cardId: '11', cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}' },
       ])
       .mockRejectedValueOnce(new Error('load cards failed'))
     const listCardRelations = vi
       .fn()
       .mockResolvedValueOnce([
-        { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护' },
+        { cardRelationId: '91', fromCardId: '11', toCardId: '12', relationType: '守护' },
       ])
       .mockResolvedValueOnce([])
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards,
       listCardRelations,
       createCard: vi.fn(async () => ({})),
@@ -94,14 +94,14 @@ describe('useWorkbenchCards', () => {
       notify,
     })
 
-    await cards.loadCardsAndRelations(101)
-    await cards.loadCardsAndRelations(101)
+    await cards.loadCardsAndRelations('project-101')
+    await cards.loadCardsAndRelations('project-101')
 
     expect(cards.projectCards.value).toEqual([
-      { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}', expanded: false },
+      { cardId: '11', cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}', expanded: false },
     ])
     expect(cards.cardRelations.value).toEqual([
-      { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护', description: '' },
+      { cardRelationId: '91', fromCardId: '11', toCardId: '12', relationType: '守护', description: '' },
     ])
     expect(notify).toHaveBeenCalledWith('load cards failed')
   })
@@ -110,13 +110,13 @@ describe('useWorkbenchCards', () => {
     const useWorkbenchCards = await loadUseWorkbenchCards()
     const createCard = vi.fn(async () => ({}))
     const listCards = vi.fn(async () => [
-      { cardId: 31, cardType: 'CHARACTER', name: '沈砚', summary: '', detailJson: '{}' },
+      { cardId: '31', cardType: 'CHARACTER', name: '沈砚', summary: '', detailJson: '{}' },
     ])
     const listCardRelations = vi.fn(async () => [])
     const promptCardName = vi.fn(() => '沈砚')
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards,
       listCardRelations,
       createCard,
@@ -130,14 +130,14 @@ describe('useWorkbenchCards', () => {
     await cards.createCardQuick('CHARACTER')
 
     expect(promptCardName).toHaveBeenCalledWith('新角色')
-    expect(createCard).toHaveBeenCalledWith(101, 201, {
+    expect(createCard).toHaveBeenCalledWith('project-101', 'operator-201', {
       cardType: 'CHARACTER',
       name: '沈砚',
       summary: '',
       detailJson: '{}',
     })
     expect(cards.projectCards.value).toEqual([
-      { cardId: 31, cardType: 'CHARACTER', name: '沈砚', summary: '', detailJson: '{}', expanded: false },
+      { cardId: '31', cardType: 'CHARACTER', name: '沈砚', summary: '', detailJson: '{}', expanded: false },
     ])
   })
 
@@ -148,7 +148,7 @@ describe('useWorkbenchCards', () => {
     const promptCardName = vi.fn(() => '  ')
 
     const cardsWithoutContext = useWorkbenchCards({
-      getContext: () => ({ projectId: 0, operatorId: 0 }),
+      getContext: () => ({ projectId: '', operatorId: '' }),
       listCards: vi.fn(async () => []),
       listCardRelations: vi.fn(async () => []),
       createCard,
@@ -163,7 +163,7 @@ describe('useWorkbenchCards', () => {
     await cardsWithoutContext.createCardQuick('CHARACTER')
 
     const cardsWithContext = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards: vi.fn(async () => []),
       listCardRelations: vi.fn(async () => []),
       createCard,
@@ -190,7 +190,7 @@ describe('useWorkbenchCards', () => {
     const updateCard = vi.fn(async () => ({}))
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards: vi.fn(async () => []),
       listCardRelations: vi.fn(async () => []),
       createCard: vi.fn(async () => ({})),
@@ -203,7 +203,7 @@ describe('useWorkbenchCards', () => {
     })
 
     await cards.saveCard({
-      cardId: 11,
+      cardId: 'card-11',
       cardType: 'CHARACTER',
       name: '林霜',
       summary: '剑客',
@@ -221,7 +221,7 @@ describe('useWorkbenchCards', () => {
     const updateCard = vi.fn(async () => ({}))
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards: vi.fn(async () => []),
       listCardRelations: vi.fn(async () => []),
       createCard: vi.fn(async () => ({})),
@@ -234,7 +234,7 @@ describe('useWorkbenchCards', () => {
     })
 
     await cards.saveCard({
-      cardId: 11,
+      cardId: 'card-11',
       cardType: 'CHARACTER',
       name: '林霜',
       summary: '剑客',
@@ -242,7 +242,7 @@ describe('useWorkbenchCards', () => {
       expanded: true,
     })
 
-    expect(updateCard).toHaveBeenCalledWith(101, 11, 201, {
+    expect(updateCard).toHaveBeenCalledWith('project-101', 'card-11', 'operator-201', {
       cardType: 'CHARACTER',
       name: '林霜',
       summary: '剑客',
@@ -259,7 +259,7 @@ describe('useWorkbenchCards', () => {
     const deleteCardRelation = vi.fn(async () => undefined)
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 0, operatorId: 0 }),
+      getContext: () => ({ projectId: '', operatorId: '' }),
       listCards: vi.fn(async () => []),
       listCardRelations: vi.fn(async () => []),
       createCard: vi.fn(async () => ({})),
@@ -272,7 +272,7 @@ describe('useWorkbenchCards', () => {
     })
 
     await cards.saveCard({
-      cardId: 11,
+      cardId: 'card-11',
       cardType: 'CHARACTER',
       name: '林霜',
       summary: '剑客',
@@ -280,14 +280,14 @@ describe('useWorkbenchCards', () => {
       expanded: false,
     })
     await cards.deleteCardById({
-      cardId: 11,
+      cardId: 'card-11',
       cardType: 'CHARACTER',
       name: '林霜',
       summary: '剑客',
       detailJson: '{}',
       expanded: false,
     })
-    await cards.deleteRelationById({ cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护' })
+    await cards.deleteRelationById({ cardRelationId: 'rel-91', fromCardId: 'card-11', toCardId: 'card-12', relationType: '守护' })
 
     expect(updateCard).not.toHaveBeenCalled()
     expect(deleteCard).not.toHaveBeenCalled()
@@ -301,15 +301,15 @@ describe('useWorkbenchCards', () => {
     const useWorkbenchCards = await loadUseWorkbenchCards()
     const createCardRelation = vi.fn(async () => ({}))
     const listCards = vi.fn(async () => [
-      { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '', detailJson: '{}' },
-      { cardId: 12, cardType: 'WORLD', name: '北境', summary: '', detailJson: '{}' },
+      { cardId: 'card-11', cardType: 'CHARACTER', name: '林霜', summary: '', detailJson: '{}' },
+      { cardId: 'card-12', cardType: 'WORLD', name: '北境', summary: '', detailJson: '{}' },
     ])
     const listCardRelations = vi.fn(async () => [
-      { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护' },
+      { cardRelationId: 'rel-91', fromCardId: 'card-11', toCardId: 'card-12', relationType: '守护' },
     ])
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards,
       listCardRelations,
       createCard: vi.fn(async () => ({})),
@@ -320,39 +320,69 @@ describe('useWorkbenchCards', () => {
       promptCardName: vi.fn(() => '新角色'),
     })
 
-    cards.relationFromId.value = '11'
-    cards.relationToId.value = '12'
+    cards.relationFromId.value = 'card-11'
+    cards.relationToId.value = 'card-12'
     cards.relationType.value = '守护'
 
     await cards.createRelation()
 
-    expect(createCardRelation).toHaveBeenCalledWith(101, 201, {
-      fromCardId: 11,
-      toCardId: 12,
+    expect(createCardRelation).toHaveBeenCalledWith('project-101', 'operator-201', {
+      fromCardId: 'card-11',
+      toCardId: 'card-12',
       relationType: '守护',
       description: '',
     })
     expect(cards.relationType.value).toBe('')
     expect(cards.cardRelations.value).toEqual([
-      { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护', description: '' },
+      { cardRelationId: 'rel-91', fromCardId: 'card-11', toCardId: 'card-12', relationType: '守护', description: '' },
     ])
+  })
+
+  it('keeps_string_business_ids_when_creating_relations', async () => {
+    const useWorkbenchCards = await loadUseWorkbenchCards()
+    const createCardRelation = vi.fn(async () => ({}))
+
+    const cards = useWorkbenchCards({
+      getContext: () => ({ projectId: 'project-alpha', operatorId: 'operator-beta' }),
+      listCards: vi.fn(async () => []),
+      listCardRelations: vi.fn(async () => []),
+      createCard: vi.fn(async () => ({})),
+      updateCard: vi.fn(async () => ({})),
+      deleteCard: vi.fn(async () => undefined),
+      createCardRelation,
+      deleteCardRelation: vi.fn(async () => undefined),
+      promptCardName: vi.fn(() => '新角色'),
+    })
+
+    cards.relationFromId.value = 'card-from-A'
+    cards.relationToId.value = 'card-to-B'
+    cards.relationType.value = '盟友'
+
+    await cards.createRelation()
+
+    expect(createCardRelation).toHaveBeenCalledWith('project-alpha', 'operator-beta', {
+      fromCardId: 'card-from-A',
+      toCardId: 'card-to-B',
+      relationType: '盟友',
+      description: '',
+    })
   })
 
   it('preserves_existing_state_and_notifies_when_relation_list_reload_fails', async () => {
     const useWorkbenchCards = await loadUseWorkbenchCards()
     const notify = vi.fn()
     const listCards = vi.fn(async () => [
-      { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}' },
+      { cardId: '11', cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}' },
     ])
     const listCardRelations = vi
       .fn()
       .mockResolvedValueOnce([
-        { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护' },
+        { cardRelationId: '91', fromCardId: '11', toCardId: '12', relationType: '守护' },
       ])
       .mockRejectedValueOnce(new Error('load relations failed'))
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards,
       listCardRelations,
       createCard: vi.fn(async () => ({})),
@@ -364,14 +394,14 @@ describe('useWorkbenchCards', () => {
       notify,
     })
 
-    await cards.loadCardsAndRelations(101)
-    await cards.loadCardsAndRelations(101)
+    await cards.loadCardsAndRelations('project-101')
+    await cards.loadCardsAndRelations('project-101')
 
     expect(cards.projectCards.value).toEqual([
-      { cardId: 11, cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}', expanded: false },
+      { cardId: '11', cardType: 'CHARACTER', name: '林霜', summary: '剑客', detailJson: '{}', expanded: false },
     ])
     expect(cards.cardRelations.value).toEqual([
-      { cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护', description: '' },
+      { cardRelationId: '91', fromCardId: '11', toCardId: '12', relationType: '守护', description: '' },
     ])
     expect(notify).toHaveBeenCalledWith('load relations failed')
   })
@@ -384,7 +414,7 @@ describe('useWorkbenchCards', () => {
       .mockRejectedValueOnce(new Error('create relation failed'))
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards: vi.fn(async () => []),
       listCardRelations: vi.fn(async () => []),
       createCard: vi.fn(async () => ({})),
@@ -416,7 +446,7 @@ describe('useWorkbenchCards', () => {
     const listCardRelations = vi.fn(async () => [])
 
     const cards = useWorkbenchCards({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       listCards,
       listCardRelations,
       createCard: vi.fn(async () => ({})),
@@ -428,17 +458,17 @@ describe('useWorkbenchCards', () => {
     })
 
     await cards.deleteCardById({
-      cardId: 11,
+      cardId: 'card-11',
       cardType: 'CHARACTER',
       name: '林霜',
       summary: '',
       detailJson: '{}',
       expanded: false,
     })
-    await cards.deleteRelationById({ cardRelationId: 91, fromCardId: 11, toCardId: 12, relationType: '守护' })
+    await cards.deleteRelationById({ cardRelationId: 'rel-91', fromCardId: 'card-11', toCardId: 'card-12', relationType: '守护' })
 
-    expect(deleteCard).toHaveBeenCalledWith(101, 11, 201)
-    expect(deleteCardRelation).toHaveBeenCalledWith(101, 91, 201)
+    expect(deleteCard).toHaveBeenCalledWith('project-101', 'card-11', 'operator-201')
+    expect(deleteCardRelation).toHaveBeenCalledWith('project-101', 'rel-91', 'operator-201')
     expect(listCards).toHaveBeenCalledTimes(2)
     expect(listCardRelations).toHaveBeenCalledTimes(2)
   })

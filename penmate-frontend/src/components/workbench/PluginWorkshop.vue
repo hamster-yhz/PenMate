@@ -67,7 +67,7 @@ const route = useRoute()
 const session = getSession()
 
 interface Plugin {
-  id: string | number
+  id: string
   code: string
   emoji: string
   name: string
@@ -83,12 +83,16 @@ const plugins = ref<Plugin[]>([])
 
 const installedCount = computed(() => plugins.value.filter(p => p.installed).length)
 
-const getProjectId = () => Number(route.query.projectId || 0)
-const pickCatalogPluginId = (item: Record<string, unknown>, fallback: string) => String(item.pluginId ?? fallback)
+const toBusinessId = (value: unknown) => {
+  const normalized = String(value ?? '').trim()
+  return normalized || null
+}
+const getProjectId = () => toBusinessId(route.query.projectId)
+const pickCatalogPluginId = (item: Record<string, unknown>, fallback: string) => String(item.pluginId ?? fallback).trim() || fallback
 const getOperatorId = () => {
-  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
-  const fromQuery = Number(route.query.operatorId || 0)
-  return fromQuery > 0 ? fromQuery : null
+  const sessionUserId = toBusinessId(session.userId)
+  if (sessionUserId) return sessionUserId
+  return toBusinessId(route.query.operatorId)
 }
 
 const toTagList = (value: unknown): string[] => {

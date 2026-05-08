@@ -129,6 +129,16 @@ describe('Workbench index refactor', () => {
     expect(source).not.toContain('approvalApi.reject(')
   })
 
+  it('keeps_workbench_business_ids_string_only_without_numeric_or_fallback_contracts', () => {
+    const source = readWorkbenchSource()
+
+    expect(source).not.toContain('Number(chapterIdLike)')
+    expect(source).not.toContain('Number(activeChapter.value)')
+    expect(source).not.toContain('Number(chapterKey)')
+    expect(source).not.toContain('outlineNodeId > 0 && chapterId > 0')
+    expect(source).not.toContain('conversationId ?? sessionId')
+  })
+
   it('wraps the workspace in a home-style atmospheric shell', () => {
     const source = readWorkbenchSource()
 

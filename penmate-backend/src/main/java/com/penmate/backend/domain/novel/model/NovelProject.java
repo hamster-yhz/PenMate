@@ -1,5 +1,7 @@
 package com.penmate.backend.domain.novel.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -11,8 +13,10 @@ public class NovelProject {
     /** 数据库物理主键 ID。 */
     private Long id;
     /** 项目业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
     /** 项目拥有者用户业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long ownerUserId;
     /** 小说项目标题。 */
     private String title;

@@ -42,7 +42,7 @@ describe('Profile index refactor', () => {
     getUserModelPreferencesMock.mockReset()
     saveUserModelPreferencesMock.mockReset()
     clearSession()
-    setSession({ userId: 1001 })
+    setSession({ userId: '1001' })
     getUserModelPreferencesMock.mockResolvedValue({
       mainAgentModelConfigId: 'mcfg-9001',
       dirtyWorkAgentModelConfigId: 'mcfg-9002',
@@ -113,7 +113,7 @@ describe('Profile index refactor', () => {
     await dirtySelect.setValue('mcfg-9001')
     await wrapper.find('[data-testid="model-preference-save"]').trigger('click')
 
-    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
+    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith('1001', '1001', {
       mainAgentModelConfigId: 'mcfg-9002',
       dirtyWorkAgentModelConfigId: 'mcfg-9001',
     })

@@ -28,6 +28,13 @@ public class OpsController {
         this.opsApplicationService = opsApplicationService;
     }
 
+    private Long requireLongId(String raw, String fieldName) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return Long.valueOf(raw.trim());
+    }
+
     /**
      * 查询异步作业详情。
      * <p><b>业务目的：</b>返回指定作业的执行状态、错误信息与重试信息，供运维面板展示。</p>
@@ -42,9 +49,9 @@ public class OpsController {
      * @return 出参：处理结果
      */
     @GetMapping("/jobs/{jobId}")
-    public ApiResponse<OpsAsyncJob> getJob(@PathVariable Long jobId,
+    public ApiResponse<OpsAsyncJob> getJob(@PathVariable String jobId,
                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(opsApplicationService.getJob(jobId), traceId);
+        return ApiResponse.success(opsApplicationService.getJob(requireLongId(jobId, "jobId")), traceId);
     }
 
     /**
@@ -82,10 +89,10 @@ public class OpsController {
      * @return 出参：处理结果
      */
     @PostMapping("/jobs/{jobId}/retry")
-    public ApiResponse<OpsAsyncJob> retryJob(@PathVariable Long jobId,
-                                             @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<OpsAsyncJob> retryJob(@PathVariable String jobId,
+                                             @RequestParam("operatorId") String operatorId,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(opsApplicationService.retryJob(jobId, operatorId, traceId), traceId);
+        return ApiResponse.success(opsApplicationService.retryJob(requireLongId(jobId, "jobId"), requireLongId(operatorId, "operatorId"), traceId), traceId);
     }
 
     /**
@@ -102,9 +109,9 @@ public class OpsController {
      * @return 出参：处理结果
      */
     @PostMapping("/migrations/content-to-object-storage")
-    public ApiResponse<OpsMigrationTask> runContentMigration(@RequestParam("operatorId") Long operatorId,
+    public ApiResponse<OpsMigrationTask> runContentMigration(@RequestParam("operatorId") String operatorId,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(opsApplicationService.startContentToObjectStorageMigration(operatorId, traceId), traceId);
+        return ApiResponse.success(opsApplicationService.startContentToObjectStorageMigration(requireLongId(operatorId, "operatorId"), traceId), traceId);
     }
 
     /**
@@ -121,9 +128,9 @@ public class OpsController {
      * @return 出参：处理结果
      */
     @GetMapping("/migrations/{migrationId}")
-    public ApiResponse<OpsMigrationTask> getMigration(@PathVariable Long migrationId,
+    public ApiResponse<OpsMigrationTask> getMigration(@PathVariable String migrationId,
                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(opsApplicationService.getMigration(migrationId), traceId);
+        return ApiResponse.success(opsApplicationService.getMigration(requireLongId(migrationId, "migrationId")), traceId);
     }
 }
 

@@ -1,5 +1,6 @@
 package com.penmate.backend.interfaces.api.model;
 
+import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
@@ -33,7 +34,10 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(
@@ -70,6 +74,9 @@ class LegacyRouteExposureMvcTest {
 
     @MockBean
     private ApprovalApplicationService approvalApplicationService;
+
+    @MockBean
+    private AgentConversationAppService agentConversationAppService;
 
     @MockBean
     private AgentSessionRecoveryAppService agentSessionRecoveryAppService;
@@ -109,7 +116,15 @@ class LegacyRouteExposureMvcTest {
 
     @Test
     void IT_MVC_LEGACY_MODEL_POLICY_ROUTE_SHOULD_NOT_BE_EXPOSED_ANYWHERE() throws Exception {
-        mockMvc.perform(get("/api/v1/novels/920001/model-policies"))
+        String legacyRoute = "/api/v1/novels/920001/model-policies";
+
+        mockMvc.perform(get(legacyRoute))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post(legacyRoute))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put(legacyRoute))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete(legacyRoute))
                 .andExpect(status().isNotFound());
     }
 }

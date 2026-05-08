@@ -52,6 +52,10 @@ const loadUseWorkbenchChat = async (): Promise<UseWorkbenchChatFactory> => {
       deps.listSessions = deps.listConversations
     }
 
+    if (!deps.listSessions) {
+      deps.listSessions = vi.fn().mockResolvedValue([])
+    }
+
     if (!deps.getSessionRecovery && deps.listMessages) {
       deps.getSessionRecovery = async (projectId: string, sessionId: string) => ({
         session: { sessionId },
@@ -107,28 +111,27 @@ const flushPromises = async (times = 8) => {
 describe('useWorkbenchChat', () => {
   it('loads_conversation_list_and_normalizes_items', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
-    const listConversations = vi.fn().mockResolvedValue([
-      { conversationId: '81', title: '第一轮', updatedAt: '2026-04-26 20:00:00' },
-      { conversationId: '', title: 'invalid', updatedAt: 'ignored' },
-      { conversationId: '82', title: '', createdAt: '2026-04-26 20:02:00' },
+    const listSessions = vi.fn().mockResolvedValue([
+      { sessionId: '81', title: '第一轮', updatedAt: '2026-04-26 20:00:00' },
+      { sessionId: '', title: 'invalid', updatedAt: 'ignored' },
+      { sessionId: '82', title: '', createdAt: '2026-04-26 20:02:00' },
     ])
 
     const chat = useWorkbenchChat({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
-      getCurrentProjectId: () => 101,
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
       getActiveChapterKey: () => '301',
       getActivePlugins: () => ['outline.search'],
-      ensureConversationId: vi.fn(),
       ensureModelConfigId: vi.fn(),
       refreshActiveModelInfo: vi.fn(),
-      listConversations,
-      listMessages: vi.fn(),
-      createMessage: vi.fn(),
-      createGeneration: vi.fn(),
-      getGeneration: vi.fn(),
-      openGenerationStream: vi.fn(),
+      listSessions,
+      createSession: vi.fn(),
+      getSessionRecovery: vi.fn(),
+      createTurn: vi.fn(),
+      getTask: vi.fn(),
+      openTaskStream: vi.fn(),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -140,12 +143,47 @@ describe('useWorkbenchChat', () => {
 
     await chat.loadConversationList('101')
 
-    expect(listConversations).toHaveBeenCalledWith('101')
+    expect(listSessions).toHaveBeenCalledWith('101')
     expect(chat.conversationList.value).toEqual([
       { conversationId: '81', title: '第一轮', updatedAt: '2026-04-26 20:00:00' },
       { conversationId: '82', title: '', updatedAt: '2026-04-26 20:02:00' },
     ])
     expect(chat.conversationLoading.value).toBe(false)
+  })
+
+  it('does_not_accept_conversation_id_fallback_when_listing_sessions', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listSessions = vi.fn().mockResolvedValue([
+      { conversationId: 'legacy-81', title: '旧会话', updatedAt: '2026-04-26 20:00:00' },
+    ])
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => [],
+      ensureModelConfigId: vi.fn(),
+      refreshActiveModelInfo: vi.fn(),
+      listSessions,
+      createSession: vi.fn(),
+      getSessionRecovery: vi.fn(),
+      createTurn: vi.fn(),
+      getTask: vi.fn(),
+      openTaskStream: vi.fn(),
+      addStreamListener: vi.fn(),
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    await chat.loadConversationList('101')
+
+    expect(chat.conversationList.value).toEqual([])
   })
 
   it('loads_history_from_latest_session_recovery_and_maps_messages', async () => {
@@ -200,7 +238,7 @@ describe('useWorkbenchChat', () => {
     expect(chat.currentConversationId.value).toBe('88')
     expect(chat.messages.value).toEqual([
       {
-        id: 9,
+        id: '9',
         role: 'assistant',
         text: '你好<br/>世界',
         approval: {
@@ -208,9 +246,10 @@ describe('useWorkbenchChat', () => {
           message: '检测到待审批变更（WORLD_SETTING_CREATE）',
           time: '',
           resolved: false,
+          preview: undefined,
         },
       },
-      { id: 10, role: 'system', text: 'tool output' },
+      { id: '10', role: 'system', text: 'tool output' },
     ])
   })
 
@@ -329,10 +368,10 @@ describe('useWorkbenchChat', () => {
 
   it('creates_new_session_before_first_turn_when_no_existing_sessions', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
-    const createSession = vi.fn().mockResolvedValue({ sessionId: 99001, title: '新会话', status: 'ACTIVE' })
+    const createSession = vi.fn().mockResolvedValue({ sessionId: '99001', title: '新会话', status: 'ACTIVE' })
     const createTurn = vi.fn().mockResolvedValue({
-      session: { sessionId: 99001, title: '新会话', status: 'ACTIVE', boundStyle: null },
-      activeTask: { taskId: 70009, taskStatus: 'RUNNING' },
+      session: { sessionId: '99001', title: '新会话', status: 'ACTIVE', boundStyle: null },
+      activeTask: { taskId: '70009', taskStatus: 'RUNNING' },
       taskType: 'WRITE',
       userMessage: '第一条消息',
     })
@@ -431,8 +470,8 @@ describe('useWorkbenchChat', () => {
   it('does_not_fallback_to_latest_history_session_after_explicit_new_session_creation', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const createTurn = vi.fn().mockResolvedValue({
-      session: { sessionId: 99001, title: '新会话', status: 'ACTIVE', boundStyle: null },
-      activeTask: { taskId: 70010, taskStatus: 'RUNNING' },
+      session: { sessionId: '99001', title: '新会话', status: 'ACTIVE', boundStyle: null },
+      activeTask: { taskId: '70010', taskStatus: 'RUNNING' },
       taskType: 'WRITE',
       userMessage: '新会话第一条消息',
     })
@@ -445,11 +484,11 @@ describe('useWorkbenchChat', () => {
       ensureModelConfigId: vi.fn().mockResolvedValue('mcfg-9001'),
       refreshActiveModelInfo: vi.fn(),
       listSessions: vi.fn().mockResolvedValue([
-        { sessionId: 88001, title: '历史会话', status: 'ACTIVE' },
+        { sessionId: '88001', title: '历史会话', status: 'ACTIVE' },
       ]),
       createSession: vi.fn(),
       getSessionRecovery: vi.fn().mockResolvedValue({
-        session: { sessionId: 99001, title: '新会话', status: 'ACTIVE' },
+        session: { sessionId: '99001', title: '新会话', status: 'ACTIVE' },
         messages: [],
       }),
       createTurn,
@@ -1323,7 +1362,7 @@ describe('useWorkbenchChat', () => {
     await resumePromise
 
     expect(chat.messages.value).toEqual([
-      { id: 1, role: 'assistant', text: '恢复续写' },
+      { id: '1', role: 'assistant', text: '恢复续写' },
     ])
     expect(chat.streamingAssistantMsgId.value).toBe(null)
     expect(chat.isGenerating.value).toBe(false)
@@ -1433,7 +1472,7 @@ describe('useWorkbenchChat', () => {
 
     expect(getGeneration).toHaveBeenCalledWith('101', '70001')
     expect(chat.messages.value).toEqual([
-      { id: 1, role: 'assistant', text: '生成任务已完成，状态：done' },
+      { id: '1', role: 'assistant', text: '生成任务已完成，状态：done' },
     ])
     expect(chat.streamingAssistantMsgId.value).toBe(null)
     expect(chat.isGenerating.value).toBe(false)

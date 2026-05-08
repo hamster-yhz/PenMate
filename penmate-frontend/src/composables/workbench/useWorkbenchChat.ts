@@ -58,7 +58,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const isGenerating = ref(false)
   const generationPhase = ref<GenerationPhase>('idle')
   const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
-  const streamingAssistantMsgId = ref<number | null>(null)
+  const streamingAssistantMsgId = ref<string | number | null>(null)
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
@@ -108,7 +108,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
   const normalizeSessionRecord = (item: ChatRecord) => ({
     ...item,
-    conversationId: String(item.sessionId ?? item.conversationId ?? ''),
+    conversationId: String(item.sessionId ?? ''),
     title: String(item.title ?? item.sessionTitle ?? ''),
     updatedAt: String(item.updatedAt ?? item.resumedAt ?? item.createdAt ?? ''),
   })
@@ -184,7 +184,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       return preferredConversationId.value
     }
     const sessions = (await listSessions(projectId)) as Array<ChatRecord>
-    const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? (Array.isArray(sessions) ? sessions[0] : null)?.conversationId ?? '')
+    const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? '')
     if (latestSessionId) {
       currentConversationId.value = latestSessionId
       preferredConversationId.value = latestSessionId
@@ -198,7 +198,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       userId: operatorId,
       title: '新会话',
     })) as ChatRecord
-    const sessionId = String(created?.sessionId ?? created?.conversationId ?? '')
+    const sessionId = String(created?.sessionId ?? '')
     if (sessionId) {
       currentConversationId.value = sessionId
       preferredConversationId.value = sessionId
@@ -242,7 +242,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
     try {
       const sessions = (await listSessions(projectId)) as Array<ChatRecord>
-      const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? (Array.isArray(sessions) ? sessions[0] : null)?.conversationId ?? '')
+      const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? '')
       if (!latestSessionId) {
         messages.value = []
         currentConversationId.value = null
@@ -307,7 +307,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
           modelConfigId,
           activePlugins: deps.getActivePlugins() || [],
         },
-      })) as ChatRecord & { activeTask?: { taskId?: number | string; taskStatus?: string } }
+      })) as ChatRecord & { activeTask?: { taskId?: string; taskStatus?: string } }
 
       const taskId = generation.activeTask?.taskId ?? generation.taskId
       if (taskId == null || String(taskId).trim() === '' || String(taskId) === '0') {
@@ -375,7 +375,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     const recoveryMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : []
     const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
     messages.value = mappedMessages
-    const maxId = mappedMessages.reduce((max, item) => (item.id > max ? item.id : max), 0)
+    const maxId = mappedMessages.reduce((max, item) => {
+      const numericId = Number(item.id)
+      return Number.isFinite(numericId) && numericId > max ? numericId : max
+    }, 0)
     if (maxId >= msgIdCounter) {
       msgIdCounter = maxId + 1
     }

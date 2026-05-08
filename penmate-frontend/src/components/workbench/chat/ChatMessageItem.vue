@@ -5,7 +5,7 @@ import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 const props = withDefaults(defineProps<{
   msg: ChatMessage
   isGenerating?: boolean
-  streamingAssistantMsgId?: number | null
+  streamingAssistantMsgId?: string | number | null
   approvalBusy?: boolean
 }>(), {
   isGenerating: false,

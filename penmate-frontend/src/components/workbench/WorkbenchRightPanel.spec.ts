@@ -18,7 +18,7 @@ const ConversationHistoryPanelStub = defineComponent({
   name: 'ConversationHistoryPanel',
   emits: ['select-conversation'],
   setup(_, { emit }) {
-    return () => h('button', { 'data-testid': 'select-conversation', onClick: () => emit('select-conversation', 77) })
+    return () => h('button', { 'data-testid': 'select-conversation', onClick: () => emit('select-conversation', '77') })
   },
 })
 
@@ -59,8 +59,8 @@ describe('WorkbenchRightPanel', () => {
         boundStyleName: '冷峻悬疑',
         showConversationPanel: true,
         conversationLoading: false,
-        conversationList: [{ conversationId: 77, title: '会话1', updatedAt: '2026-04-27 10:00:00' }],
-        currentConversationId: 77,
+        conversationList: [{ conversationId: '77', title: '会话1', updatedAt: '2026-04-27 10:00:00' }],
+        currentConversationId: '77',
         bindChatContainer: () => undefined,
         messages: [],
         streamingAssistantMsgId: null,
@@ -93,7 +93,7 @@ describe('WorkbenchRightPanel', () => {
     expect(wrapper.emitted('toggle-collapse')).toEqual([[]])
     expect(wrapper.emitted('toggle-history')).toEqual([[]])
     expect(wrapper.emitted('create-session')).toEqual([[]])
-    expect(wrapper.emitted('select-conversation')).toEqual([[77]])
+    expect(wrapper.emitted('select-conversation')).toEqual([['77']])
     expect(wrapper.emitted('merge-to-editor')).toEqual([[{ messageId: 9 }]])
     expect(wrapper.emitted('approve')).toEqual([['approval-9']])
     expect(wrapper.emitted('update:chat-input')).toEqual([['继续生成']])

@@ -1,20 +1,18 @@
 import request from '@/utils/request'
-import type { IdLike } from '@/api/types'
 
 type AnyRecord = Record<string, unknown>
 
 export const approvalApi = {
-  listApprovals(projectId: IdLike) {
+  listApprovals(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/approvals`)
   },
-  getApproval(projectId: IdLike, approvalId: IdLike) {
+  getApproval(projectId: string, approvalId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/approvals/${approvalId}`)
   },
-  approve(projectId: IdLike, approvalId: IdLike, payload: AnyRecord) {
+  approve(projectId: string, approvalId: string, payload: AnyRecord) {
     return request.post<string>(`/v1/novels/${projectId}/approvals/${approvalId}/approve`, payload)
   },
-  reject(projectId: IdLike, approvalId: IdLike, payload: AnyRecord) {
+  reject(projectId: string, approvalId: string, payload: AnyRecord) {
     return request.post<string>(`/v1/novels/${projectId}/approvals/${approvalId}/reject`, payload)
   }
 }
-

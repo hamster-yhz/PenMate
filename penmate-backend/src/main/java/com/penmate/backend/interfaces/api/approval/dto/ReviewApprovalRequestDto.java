@@ -1,14 +1,14 @@
 package com.penmate.backend.interfaces.api.approval.dto;
 
 import lombok.Data;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 
 @Data
 
 public class ReviewApprovalRequestDto {
 
-    @NotNull
-    private Long reviewedBy;
+    @NotBlank
+    private String reviewedBy;
 
     private String comment;
 

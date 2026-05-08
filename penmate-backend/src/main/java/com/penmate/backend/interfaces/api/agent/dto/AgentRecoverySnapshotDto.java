@@ -19,7 +19,7 @@ public record AgentRecoverySnapshotDto(
      * 会话摘要 DTO。
      */
     public record SessionDto(
-            Long sessionId,
+            String sessionId,
             String title,
             String status,
             BoundStyleDto boundStyle,
@@ -31,7 +31,7 @@ public record AgentRecoverySnapshotDto(
      * 会话绑定风格摘要 DTO。
      */
     public record BoundStyleDto(
-            Long styleId,
+            String styleId,
             String name
     ) {
     }
@@ -40,9 +40,9 @@ public record AgentRecoverySnapshotDto(
      * 当前激活任务摘要 DTO。
      */
     public record ActiveTaskDto(
-            Long taskId,
+            String taskId,
             String taskStatus,
-            Long requestContextId
+            String requestContextId
     ) {
     }
 }

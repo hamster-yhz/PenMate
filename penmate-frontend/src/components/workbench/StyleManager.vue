@@ -117,9 +117,9 @@ import { getSession } from '@/stores/session'
 
 const props = defineProps<{
   visible: boolean
-  projectId?: number
-  operatorId?: number | null
-  sessionId?: number | null
+  projectId?: string | null
+  operatorId?: string | null
+  sessionId?: string | null
 }>()
 defineEmits(['close'])
 const route = useRoute()
@@ -150,19 +150,24 @@ const currentStyle = computed(() => {
   return `${config.tone} · ${config.tempo} · ${config.descPreference}`
 })
 
-const getProjectId = () => Number(props.projectId || route.query.projectId || 0)
-const pickStyleId = (item: StyleItem | null | undefined) => Number(item?.styleId ?? 0)
+const toBusinessId = (value: unknown) => {
+  const normalized = String(value ?? '').trim()
+  return normalized || null
+}
+const getProjectId = () => toBusinessId(props.projectId ?? route.query.projectId)
+const pickStyleId = (item: StyleItem | null | undefined) => toBusinessId(item?.styleId)
 
 const getOperatorId = () => {
-  if (typeof props.operatorId === 'number' && props.operatorId > 0) return props.operatorId
-  if (typeof session.userId === 'number' && session.userId > 0) return session.userId
-  const fromQuery = Number(route.query.operatorId || 0)
-  return fromQuery > 0 ? fromQuery : null
+  const propOperatorId = toBusinessId(props.operatorId)
+  if (propOperatorId) return propOperatorId
+  const sessionUserId = toBusinessId(session.userId)
+  if (sessionUserId) return sessionUserId
+  return toBusinessId(route.query.operatorId)
 }
 
 const getSessionId = () => {
-  const sessionId = Number(props.sessionId || 0)
-  return sessionId > 0 ? sessionId : null
+  const sessionId = String(props.sessionId ?? '').trim()
+  return sessionId && sessionId !== '0' ? sessionId : null
 }
 
 const applyStyleToForm = (style: StyleItem | null | undefined) => {
@@ -182,9 +187,9 @@ const loadStyles = async () => {
     styleOptions.value = Array.isArray(list) ? list : []
     const defaultStyle = styleOptions.value.find((item) => Boolean(item.isDefault)) || styleOptions.value[0]
     if (defaultStyle) {
-      const id = String(pickStyleId(defaultStyle) || '')
+      const id = pickStyleId(defaultStyle) || ''
       selectedStyleId.value = id
-      activeDefaultStyleId.value = String(pickStyleId(styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle) || '')
+      activeDefaultStyleId.value = pickStyleId(styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle) || ''
       applyStyleToForm(defaultStyle)
     }
   } catch (error: any) {
@@ -193,7 +198,7 @@ const loadStyles = async () => {
 }
 
 const handleStyleSelect = () => {
-  const target = styleOptions.value.find((item) => String(pickStyleId(item) || '') === selectedStyleId.value)
+  const target = styleOptions.value.find((item) => (pickStyleId(item) || '') === selectedStyleId.value)
   if (!target) return
   const projectId = getProjectId()
   const styleId = pickStyleId(target)
@@ -210,7 +215,7 @@ const handleStyleSelect = () => {
 const setAsDefault = async () => {
   const projectId = getProjectId()
   const operatorId = getOperatorId()
-  const toStyleId = Number(selectedStyleId.value || 0)
+  const toStyleId = selectedStyleId.value.trim()
   if (!projectId || !operatorId || !toStyleId) {
     message.warning('缺少 projectId/operatorId/styleId，无法设为默认')
     return
@@ -235,12 +240,12 @@ const setAsDefault = async () => {
 const deleteSelectedStyle = async () => {
   const projectId = getProjectId()
   const operatorId = getOperatorId()
-  const styleId = Number(selectedStyleId.value || 0)
+  const styleId = selectedStyleId.value.trim()
   if (!projectId || !operatorId || !styleId) {
     message.warning('缺少 projectId/operatorId/styleId，无法删除文风')
     return
   }
-  if (String(styleId) === String(activeDefaultStyleId.value)) {
+  if (styleId === activeDefaultStyleId.value) {
     message.warning('默认文风不可直接删除，请先切换默认文风')
     return
   }
@@ -313,18 +318,18 @@ const confirmChange = async (warningConfirmed = true) => {
       sampleText: sampleText.value
     }
 
-    let styleId = Number(selectedStyleId.value || 0)
-    if (styleId > 0) {
+    let styleId = selectedStyleId.value.trim()
+    if (styleId) {
       await styleApi.updateStyle(projectId, styleId, operatorId, payload)
     } else {
       const created = (await styleApi.createStyle(projectId, operatorId, {
         ...payload,
         isDefault: true
       })) as Record<string, unknown>
-      styleId = Number(created?.styleId ?? 0)
+      styleId = toBusinessId(created?.styleId) || ''
     }
 
-    if (styleId > 0) {
+    if (styleId) {
       const sessionId = getSessionId()
       await styleApi.switchStyle(projectId, operatorId, {
         toStyleId: styleId,

@@ -1,19 +1,11 @@
 import request from '@/utils/request'
-import type { IdLike } from '@/api/types'
 
 export type AnyRecord = Record<string, unknown>
 
 const normalizeProjectPayload = (payload: AnyRecord) => {
   const next: AnyRecord = { ...payload }
 
-  if (next.ownerUserId == null && next.ownerId != null) {
-    next.ownerUserId = next.ownerId
-  }
   delete next.ownerId
-
-  if ((next.summary == null || next.summary === '') && typeof next.description === 'string') {
-    next.summary = next.description
-  }
   delete next.description
 
   return next
@@ -26,110 +18,110 @@ export const novelApi = {
   createProject(payload: AnyRecord) {
     return request.post<AnyRecord>('/v1/novels', normalizeProjectPayload(payload))
   },
-  getProject(projectId: IdLike) {
+  getProject(projectId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}`)
   },
-  updateProject(projectId: IdLike, payload: AnyRecord) {
+  updateProject(projectId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}`, normalizeProjectPayload(payload))
   },
-  deleteProject(projectId: IdLike, operatorId: IdLike) {
+  deleteProject(projectId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}?operatorId=${operatorId}`)
   },
-  listVolumes(projectId: IdLike) {
+  listVolumes(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/volumes`)
   },
-  createVolume(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createVolume(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/volumes?operatorId=${operatorId}`, payload)
   },
-  updateVolume(projectId: IdLike, volumeId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateVolume(projectId: string, volumeId: string, operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/volumes/${volumeId}?operatorId=${operatorId}`, payload)
   },
-  deleteVolume(projectId: IdLike, volumeId: IdLike, operatorId: IdLike) {
+  deleteVolume(projectId: string, volumeId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/volumes/${volumeId}?operatorId=${operatorId}`)
   },
-  listChapters(projectId: IdLike) {
+  listChapters(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/chapters`)
   },
-  createChapter(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createChapter(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters?operatorId=${operatorId}`, payload)
   },
-  getChapter(projectId: IdLike, chapterId: IdLike) {
+  getChapter(projectId: string, chapterId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}`)
   },
-  updateChapter(projectId: IdLike, chapterId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateChapter(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}?operatorId=${operatorId}`, payload)
   },
-  deleteChapter(projectId: IdLike, chapterId: IdLike, operatorId: IdLike) {
+  deleteChapter(projectId: string, chapterId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/chapters/${chapterId}?operatorId=${operatorId}`)
   },
-  publishChapter(projectId: IdLike, chapterId: IdLike, operatorId: IdLike) {
+  publishChapter(projectId: string, chapterId: string, operatorId: string) {
     return request.post<string>(`/v1/novels/${projectId}/chapters/${chapterId}/publish?operatorId=${operatorId}`)
   },
-  listChapterVersions(projectId: IdLike, chapterId: IdLike) {
+  listChapterVersions(projectId: string, chapterId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/chapters/${chapterId}/versions`)
   },
-  createChapterVersion(projectId: IdLike, chapterId: IdLike, payload: AnyRecord) {
+  createChapterVersion(projectId: string, chapterId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/versions`, payload)
   },
-  getChapterVersion(projectId: IdLike, chapterId: IdLike, versionNo: IdLike) {
+  getChapterVersion(projectId: string, chapterId: string, versionNo: number) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}`)
   },
-  restoreChapterVersion(projectId: IdLike, chapterId: IdLike, versionNo: IdLike, operatorId: IdLike) {
+  restoreChapterVersion(projectId: string, chapterId: string, versionNo: number, operatorId: string) {
     return request.post<AnyRecord>(
       `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore?operatorId=${operatorId}`
     )
   },
-  getChapterContentUrl(projectId: IdLike, chapterId: IdLike) {
+  getChapterContentUrl(projectId: string, chapterId: string) {
     return request.get<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-url`)
   },
-  getChapterContentUploadUrl(projectId: IdLike, chapterId: IdLike) {
+  getChapterContentUploadUrl(projectId: string, chapterId: string) {
     return request.post<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-upload-url`)
   },
-  commitChapterContent(projectId: IdLike, chapterId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  commitChapterContent(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/content-commit?operatorId=${operatorId}`, payload)
   },
-  getChapterVersionSnapshotUrl(projectId: IdLike, chapterId: IdLike, versionNo: IdLike) {
+  getChapterVersionSnapshotUrl(projectId: string, chapterId: string, versionNo: number) {
     return request.get<Record<string, string>>(
       `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`
     )
   },
-  listOutlineTree(projectId: IdLike) {
+  listOutlineTree(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/outlines/tree`)
   },
-  createOutlineNode(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createOutlineNode(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes?operatorId=${operatorId}`, payload)
   },
-  updateOutlineNode(projectId: IdLike, nodeId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateOutlineNode(projectId: string, nodeId: string, operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`, payload)
   },
-  moveOutlineNode(projectId: IdLike, nodeId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  moveOutlineNode(projectId: string, nodeId: string, operatorId: string, payload: AnyRecord) {
     return request.patch<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}/move?operatorId=${operatorId}`, payload)
   },
-  deleteOutlineNode(projectId: IdLike, nodeId: IdLike, operatorId: IdLike) {
+  deleteOutlineNode(projectId: string, nodeId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`)
   },
-  listCards(projectId: IdLike) {
+  listCards(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/cards`)
   },
-  createCard(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createCard(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/cards?operatorId=${operatorId}`, payload)
   },
-  getCard(projectId: IdLike, cardId: IdLike) {
+  getCard(projectId: string, cardId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}/cards/${cardId}`)
   },
-  updateCard(projectId: IdLike, cardId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateCard(projectId: string, cardId: string, operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/cards/${cardId}?operatorId=${operatorId}`, payload)
   },
-  deleteCard(projectId: IdLike, cardId: IdLike, operatorId: IdLike) {
+  deleteCard(projectId: string, cardId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/cards/${cardId}?operatorId=${operatorId}`)
   },
-  listCardRelations(projectId: IdLike) {
+  listCardRelations(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/card-relations`)
   },
-  createCardRelation(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createCardRelation(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/card-relations?operatorId=${operatorId}`, payload)
   },
-  deleteCardRelation(projectId: IdLike, relationId: IdLike, operatorId: IdLike) {
+  deleteCardRelation(projectId: string, relationId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/card-relations/${relationId}?operatorId=${operatorId}`)
   }
 }

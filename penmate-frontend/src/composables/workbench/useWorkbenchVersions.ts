@@ -10,31 +10,31 @@ type UploadResult = {
 }
 
 type UseWorkbenchVersionsDeps = {
-  getProjectId: () => number
+  getProjectId: () => string
   getActiveChapterKey: () => string
-  getOperatorId: () => number
+  getOperatorId: () => string
   getEditorContent: () => string
   setEditorContent: (content: string) => void
   setWordCount: (count: number) => void
   setLastSnapshot: (content: string) => void
   resolveChapterContent: (
-    projectId: number,
-    chapterId: string | number,
+    projectId: string,
+    chapterId: string,
     remoteContent: string,
     options?: { preferRemote?: boolean },
   ) => string
-  resolveStoredDraft: (projectId: number, chapterId: string | number) => string | null
-  clearDraft: (projectId: number, chapterId: string | number) => void
+  resolveStoredDraft: (projectId: string, chapterId: string) => string | null
+  clearDraft: (projectId: string, chapterId: string) => void
   beginChapterRequest: (chapterId: string) => number
   isChapterRequestCurrent: (chapterId: string, requestId: number) => boolean
-  listVersions: (projectId: number, chapterId: number) => Promise<unknown>
-  getVersionSnapshotUrl: (projectId: number, chapterId: number, versionNo: number) => Promise<unknown>
-  getContentUrl: (projectId: number, chapterId: number) => Promise<unknown>
-  restoreVersion: (projectId: number, chapterId: number, versionNo: number, operatorId: number) => Promise<void>
-  publishChapter: (projectId: number, chapterId: number, operatorId: number) => Promise<void>
-  getContentUploadUrl: (projectId: number, chapterId: number) => Promise<unknown>
-  commitContent: (projectId: number, chapterId: number, operatorId: number, payload: Record<string, unknown>) => Promise<void>
-  createVersion: (projectId: number, chapterId: number, payload: Record<string, unknown>) => Promise<void>
+  listVersions: (projectId: string, chapterId: string) => Promise<unknown>
+  getVersionSnapshotUrl: (projectId: string, chapterId: string, versionNo: number) => Promise<unknown>
+  getContentUrl: (projectId: string, chapterId: string) => Promise<unknown>
+  restoreVersion: (projectId: string, chapterId: string, versionNo: number, operatorId: string) => Promise<void>
+  publishChapter: (projectId: string, chapterId: string, operatorId: string) => Promise<void>
+  getContentUploadUrl: (projectId: string, chapterId: string) => Promise<unknown>
+  commitContent: (projectId: string, chapterId: string, operatorId: string, payload: Record<string, unknown>) => Promise<void>
+  createVersion: (projectId: string, chapterId: string, payload: Record<string, unknown>) => Promise<void>
   resolveUploadTarget: (payload: VersionRecord) => {
     uploadUrl: string
     objectKey: string
@@ -67,11 +67,10 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
 
   const getCurrentChapterVersions = () => chapterVersions.value[deps.getActiveChapterKey()] || []
 
-  const loadChapterVersions = async (projectId: number, chapterId: string) => {
-    const numericChapterId = Number(chapterId)
-    if (!projectId || !numericChapterId) return
+  const loadChapterVersions = async (projectId: string, chapterId: string) => {
+    if (!projectId || !chapterId) return
     try {
-      const versions = await deps.listVersions(projectId, numericChapterId)
+      const versions = await deps.listVersions(projectId, chapterId)
       const versionList = Array.isArray(versions) ? (versions as VersionRecord[]) : []
       chapterVersions.value[chapterId] = versionList
       if (chapterId === deps.getActiveChapterKey()) {
@@ -88,7 +87,7 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
 
   const viewSelectedVersion = async () => {
     const projectId = deps.getProjectId()
-    const chapterId = Number(deps.getActiveChapterKey())
+    const chapterId = deps.getActiveChapterKey()
     const versionNo = Number(selectedVersionNo.value)
     if (!projectId || !chapterId || !versionNo) {
       deps.notify('请选择有效版本后再查看')
@@ -116,8 +115,8 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
   }
 
   const refreshEditorFromRemote = async (
-    projectId: number,
-    chapterId: number,
+    projectId: string,
+    chapterId: string,
     requestId: number,
     options?: { preferRemote?: boolean },
   ) => {
@@ -125,7 +124,7 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
     const downloadUrl = deps.normalizeStorageUrl(pickString(contentResp, ['downloadUrl', 'url', 'getUrl']))
     if (!downloadUrl || !deps.hasObjectKeyInStorageUrl(downloadUrl, '/read/')) return false
     const text = await deps.fetchText(downloadUrl)
-    if (!deps.isChapterRequestCurrent(String(chapterId), requestId)) return false
+    if (!deps.isChapterRequestCurrent(chapterId, requestId)) return false
     const resolvedContent = deps.resolveChapterContent(projectId, chapterId, text, options)
     deps.setEditorContent(resolvedContent)
     deps.setWordCount(countWords(resolvedContent))
@@ -135,7 +134,7 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
 
   const restoreSelectedVersion = async () => {
     const projectId = deps.getProjectId()
-    const chapterId = Number(deps.getActiveChapterKey())
+    const chapterId = deps.getActiveChapterKey()
     const operatorId = deps.getOperatorId()
     const versionNo = Number(selectedVersionNo.value)
     if (!projectId || !chapterId || !operatorId || !versionNo) {
@@ -146,9 +145,9 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
     versionBusy.value = true
     try {
       await deps.restoreVersion(projectId, chapterId, versionNo, operatorId)
-      const requestId = deps.beginChapterRequest(String(chapterId))
+      const requestId = deps.beginChapterRequest(chapterId)
       await refreshEditorFromRemote(projectId, chapterId, requestId, { preferRemote: true })
-      await loadChapterVersions(projectId, String(chapterId))
+      await loadChapterVersions(projectId, chapterId)
       selectedVersionContent.value = ''
       versionDiffSummary.value = ''
       deps.notifySuccess(`已恢复到版本 v${versionNo}`)
@@ -159,7 +158,7 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
     }
   }
 
-  const uploadAndCommitContent = async (projectId: number, chapterId: number, content: string, operatorId: number) => {
+  const uploadAndCommitContent = async (projectId: string, chapterId: string, content: string, operatorId: string) => {
     const uploadResp = toRecord(await deps.getContentUploadUrl(projectId, chapterId))
     const { uploadUrl, objectKey, storageProvider } = deps.resolveUploadTarget(uploadResp)
 
@@ -185,7 +184,7 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
 
   const publishCurrentChapter = async () => {
     const projectId = deps.getProjectId()
-    const chapterId = Number(deps.getActiveChapterKey())
+    const chapterId = deps.getActiveChapterKey()
     const operatorId = deps.getOperatorId()
     if (!projectId || !chapterId || !operatorId) {
       deps.notify('缺少 projectId/chapterId/operatorId，无法发布章节')

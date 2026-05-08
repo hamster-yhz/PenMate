@@ -25,7 +25,7 @@ vi.mock('ant-design-vue', () => ({
 
 vi.mock('@/stores/session', () => ({
   getSession: () => ({
-    userId: 101,
+    userId: '101',
   }),
 }))
 
@@ -43,7 +43,13 @@ vi.mock('@/api/modules/model.api', () => ({
   },
 }))
 
-const providerFixture = [{ providerId: 'provider-openai-900719925474099312345', displayName: 'OpenAI' }]
+const providerFixture = [
+  {
+    providerId: 'provider-openai-900719925474099312345',
+    providerName: 'OpenAI',
+    displayName: 'OpenAI',
+  },
+]
 const userKeyFixture = [
   {
     keyId: 'uk-501',
@@ -122,8 +128,8 @@ describe('ModelSettings', () => {
     expect(mocks.listProviders).toHaveBeenCalledTimes(1)
     expect(mocks.listKeys).not.toHaveBeenCalled()
     expect(mocks.listOfficialKeys).not.toHaveBeenCalled()
-    expect(mocks.listUserModelConfigs).toHaveBeenCalledWith(101)
-    expect(mocks.getUserModelPreferences).toHaveBeenCalledWith(101)
+    expect(mocks.listUserModelConfigs).toHaveBeenCalledWith('101')
+    expect(mocks.getUserModelPreferences).toHaveBeenCalledWith('101')
     expect(wrapper.text()).toContain('模型池')
     expect(wrapper.find('.api-form').exists()).toBe(false)
     expect(wrapper.findAll('.config-card')).toHaveLength(2)
@@ -222,8 +228,8 @@ describe('ModelSettings', () => {
     await flushPromises()
 
     expect(mocks.createUserModelConfig).toHaveBeenCalledWith(
-      101,
-      101,
+      '101',
+      '101',
       expect.objectContaining({
         providerId: 'provider-openai-900719925474099312345',
         modelName: 'claude-3-7-sonnet',
@@ -246,7 +252,7 @@ describe('ModelSettings', () => {
     await secondCardButtons[0].trigger('click')
     await flushPromises()
 
-    expect(mocks.saveUserModelPreferences).toHaveBeenCalledWith(101, 101, {
+    expect(mocks.saveUserModelPreferences).toHaveBeenCalledWith('101', '101', {
       mainAgentModelConfigId: 'mcfg-1002',
       dirtyWorkAgentModelConfigId: 'mcfg-1002',
     })
@@ -261,7 +267,7 @@ describe('ModelSettings', () => {
     await firstCardButtons[1].trigger('click')
     await flushPromises()
 
-    expect(mocks.saveUserModelPreferences).toHaveBeenCalledWith(101, 101, {
+    expect(mocks.saveUserModelPreferences).toHaveBeenCalledWith('101', '101', {
       mainAgentModelConfigId: 'mcfg-1001',
       dirtyWorkAgentModelConfigId: 'mcfg-1001',
     })
@@ -286,8 +292,8 @@ describe('ModelSettings', () => {
     await flushPromises()
 
     expect(mocks.createUserModelConfig).toHaveBeenCalledWith(
-      101,
-      101,
+      '101',
+      '101',
       expect.objectContaining({
         providerId: 'provider-openai-900719925474099312345',
         modelName: 'gpt-4.1-mini',
@@ -325,9 +331,9 @@ describe('ModelSettings', () => {
     await flushPromises()
 
     expect(mocks.updateUserModelConfig).toHaveBeenCalledWith(
-      101,
+      '101',
       'mcfg-1001',
-      101,
+      '101',
       expect.objectContaining({
         modelCategory: 'OFFICIAL_MODEL',
         apiKey: 'sk-direct-official-key',
@@ -370,7 +376,7 @@ describe('ModelSettings', () => {
     await wrapper.findAll('.config-card').at(0)!.find('.card-delete-btn').trigger('click')
     await flushPromises()
 
-    expect(mocks.deleteUserModelConfig).toHaveBeenCalledWith(101, 'mcfg-1001', 101)
+    expect(mocks.deleteUserModelConfig).toHaveBeenCalledWith('101', 'mcfg-1001', '101')
     expect(mocks.listUserModelConfigs).toHaveBeenCalledTimes(2)
   })
 

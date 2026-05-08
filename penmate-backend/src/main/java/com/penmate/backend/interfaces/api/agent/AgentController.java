@@ -10,6 +10,7 @@ import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentTaskDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
@@ -45,46 +46,52 @@ public class AgentController {
     }
 
     /**
-     * 查询当前项目下的会话列表。
+     * 查询当前项目下的会话列表�?
      */
     @GetMapping("/sessions")
-    public ApiResponse<List<AgentConversation>> listSessions(@PathVariable String projectId,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(agentConversationAppService.listConversations(parseBusinessId(projectId, "projectId")), traceId);
-    }
-
-    /**
-     * 创建一个新会话。
-     */
-    @PostMapping("/sessions")
-    public ApiResponse<AgentConversation> createSession(@PathVariable String projectId,
-                                                         @Valid @RequestBody CreateAgentConversationDto dto,
-                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        log.info("Create agent session request: projectId={}, userId={}, title={}, traceId={}",
-                projectId, dto.getUserId(), dto.getTitle(), traceId);
+    public ApiResponse<List<AgentSessionDto>> listSessions(@PathVariable String projectId,
+                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(
-                agentConversationAppService.createConversation(parseBusinessId(projectId, "projectId"), toCommand(dto), traceId),
+                agentConversationAppService.listConversations(requireLongId(projectId, "projectId"))
+                        .stream()
+                        .map(this::toSessionDto)
+                        .toList(),
                 traceId
         );
     }
 
     /**
-     * 查询会话恢复快照。
-     * <p>控制器仅负责 HTTP 参数绑定与 traceId 透传，具体恢复查询下沉到应用服务。</p>
+     * 创建一个新会话�?
+     */
+    @PostMapping("/sessions")
+    public ApiResponse<AgentSessionDto> createSession(@PathVariable String projectId,
+                                                      @Valid @RequestBody CreateAgentConversationDto dto,
+                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        log.info("Create agent session request: projectId={}, userId={}, title={}, traceId={}",
+                projectId, dto.getUserId(), dto.getTitle(), traceId);
+        return ApiResponse.success(
+                toSessionDto(agentConversationAppService.createConversation(requireLongId(projectId, "projectId"), toCommand(dto), traceId)),
+                traceId
+        );
+    }
+
+    /**
+     * 查询会话恢复快照�?
+     * <p>控制器仅负责 HTTP 参数绑定�?traceId 透传，具体恢复查询下沉到应用服务�?/p>
      */
     @GetMapping("/sessions/{sessionId}/recovery")
     public ApiResponse<AgentRecoverySnapshotDto> getRecovery(@PathVariable String projectId,
                                                              @PathVariable String sessionId,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(toRecoveryDto(agentSessionRecoveryAppService.getRecovery(
-                parseBusinessId(projectId, "projectId"),
-                parseBusinessId(sessionId, "sessionId"),
+                requireLongId(projectId, "projectId"),
+                requireLongId(sessionId, "sessionId"),
                 traceId)), traceId);
     }
 
     /**
-     * 恢复一个会话并返回最新恢复快照。
-     * <p>控制器不拼装恢复快照，只做 DTO 到用例入参的转换。</p>
+     * 恢复一个会话并返回最新恢复快照�?
+     * <p>控制器不拼装恢复快照，只�?DTO 到用例入参的转换�?/p>
      */
     @PostMapping("/sessions/{sessionId}/resume")
     public ApiResponse<AgentRecoverySnapshotDto> resume(@PathVariable String projectId,
@@ -95,9 +102,9 @@ public class AgentController {
                 projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId);
         return ApiResponse.success(
                 toRecoveryDto(agentSessionRecoveryAppService.resumeSession(
-                        parseBusinessId(projectId, "projectId"),
-                        parseBusinessId(sessionId, "sessionId"),
-                        parseBusinessId(dto.getOperatorId(), "operatorId"),
+                        requireLongId(projectId, "projectId"),
+                        requireLongId(sessionId, "sessionId"),
+                        requireLongId(dto.getOperatorId(), "operatorId"),
                         dto.getTrigger(),
                         traceId)),
                 traceId
@@ -105,8 +112,8 @@ public class AgentController {
     }
 
     /**
-     * 创建新的 agent turn，并返回当前运行中的任务视图。
-     * <p>该接口是新的 workflow entry，不再暴露历史 createMessage/createGeneration 双接口。</p>
+     * 创建新的 agent turn，并返回当前运行中的任务视图�?
+     * <p>该接口是新的 workflow entry，不再暴露历�?createMessage/createGeneration 双接口�?/p>
      */
     @PostMapping("/sessions/{sessionId}/turns")
     public ApiResponse<AgentTaskDto> createTurn(@PathVariable String projectId,
@@ -116,15 +123,15 @@ public class AgentController {
         log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, taskType={}, traceId={}",
                 projectId, sessionId, dto.getOperatorId(), dto.getTaskRequest().getTaskType(), traceId);
         AgentTurnResult result = agentTurnAppService.createTurn(
-                parseBusinessId(projectId, "projectId"),
-                parseBusinessId(sessionId, "sessionId"),
+                requireLongId(projectId, "projectId"),
+                requireLongId(sessionId, "sessionId"),
                 toCommand(dto),
                 traceId);
         return ApiResponse.success(toTaskDto(result), traceId);
     }
 
     private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {
-        Long userId = parseBusinessId(dto.getUserId(), "userId");
+        Long userId = requireLongId(dto.getUserId(), "userId");
         return new CreateConversationCommand(
                 userId,
                 dto.getTitle(),
@@ -136,30 +143,41 @@ public class AgentController {
     private AgentTurnCommand toCommand(CreateAgentTurnDto dto) {
         CreateAgentTurnDto.TaskRequest request = dto.getTaskRequest();
         return new AgentTurnCommand(
-                parseBusinessId(dto.getOperatorId(), "operatorId"),
+                requireLongId(dto.getOperatorId(), "operatorId"),
                 dto.getUserMessage(),
                 request == null
                         ? null
                         : new AgentTurnCommand.TaskRequest(
                                 request.getTaskType(),
-                                parseOptionalBusinessId(request.getChapterId(), "chapterId"),
+                                optionalLongId(request.getChapterId(), "chapterId"),
                                 request.getSelectedText())
         );
     }
 
-    private Long parseBusinessId(String rawValue, String fieldName) {
+    private Long requireLongId(String rawValue, String fieldName) {
+        String normalized = Objects.requireNonNull(rawValue, fieldName + " must not be null").trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        if (!normalized.matches("^\\d+$")) {
+            throw new IllegalArgumentException(fieldName + " must be a numeric string business id");
+        }
         try {
-            return Long.valueOf(Objects.requireNonNull(rawValue, fieldName + " must not be null"));
+            return Long.valueOf(normalized);
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(fieldName + " must be a numeric business id", ex);
+            throw new IllegalArgumentException(fieldName + " must be a valid numeric string business id", ex);
         }
     }
 
-    private Long parseOptionalBusinessId(String rawValue, String fieldName) {
+    private Long optionalLongId(String rawValue, String fieldName) {
         if (rawValue == null || rawValue.isBlank()) {
             return null;
         }
-        return parseBusinessId(rawValue, fieldName);
+        return requireLongId(rawValue, fieldName);
+    }
+
+    private String stringifyBusinessId(Long value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private AgentRecoverySnapshotDto toRecoveryDto(AgentSessionRecoveryResult result) {
@@ -168,20 +186,28 @@ public class AgentController {
         AgentSessionRecoveryResult.ActiveTaskView activeTask = result == null ? null : result.activeTask();
         return new AgentRecoverySnapshotDto(
                 new AgentRecoverySnapshotDto.SessionDto(
-                        session == null ? null : session.sessionId(),
+                        session == null ? null : stringifyBusinessId(session.sessionId()),
                         session == null ? null : session.title(),
                         session == null ? null : session.status(),
-                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(boundStyle.styleId(), boundStyle.name()),
+                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(stringifyBusinessId(boundStyle.styleId()), boundStyle.name()),
                         session == null ? null : session.taskStatus()
                 ),
                 activeTask == null ? null : new AgentRecoverySnapshotDto.ActiveTaskDto(
-                        activeTask.taskId(),
+                        stringifyBusinessId(activeTask.taskId()),
                         activeTask.taskStatus(),
-                        activeTask.requestContextId()
+                        stringifyBusinessId(activeTask.requestContextId())
                 ),
                 result == null ? null : result.pendingApproval(),
                 result == null ? java.util.List.of() : result.messages(),
                 result == null ? null : result.workbenchContext()
+        );
+    }
+
+    private AgentSessionDto toSessionDto(AgentConversation conversation) {
+        return new AgentSessionDto(
+                conversation == null ? null : stringifyBusinessId(conversation.getConversationId()),
+                conversation == null ? null : conversation.getTitle(),
+                conversation == null ? null : conversation.getStatus()
         );
     }
 
@@ -191,19 +217,21 @@ public class AgentController {
         AgentTurnResult.ActiveTaskView activeTask = result.activeTask();
         return new AgentTaskDto(
                 new AgentRecoverySnapshotDto.SessionDto(
-                        session == null ? null : session.sessionId(),
+                        session == null ? null : stringifyBusinessId(session.sessionId()),
                         session == null ? null : session.title(),
                         session == null ? null : session.status(),
-                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(boundStyle.styleId(), boundStyle.name()),
+                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(stringifyBusinessId(boundStyle.styleId()), boundStyle.name()),
                         session == null ? null : session.taskStatus()
                 ),
                 new AgentRecoverySnapshotDto.ActiveTaskDto(
-                        activeTask == null ? null : activeTask.taskId(),
+                        activeTask == null ? null : stringifyBusinessId(activeTask.taskId()),
                         activeTask == null ? null : activeTask.taskStatus(),
-                        activeTask == null ? null : activeTask.requestContextId()
+                        activeTask == null ? null : stringifyBusinessId(activeTask.requestContextId())
                 ),
                 result.taskType(),
                 result.userMessage()
         );
     }
 }
+
+

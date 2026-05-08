@@ -1,5 +1,7 @@
 package com.penmate.backend.domain.plugin.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -11,10 +13,13 @@ public class PluginProjectInstall {
     /** 数据库物理主键 ID。 */
     private Long id;
     /** 安装记录业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long pluginInstallId;
     /** 所属项目业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
     /** 插件业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long pluginId;
     /** 插件编码。 */
     private String pluginCode;
@@ -27,6 +32,7 @@ public class PluginProjectInstall {
     /** 是否启用。 */
     private Boolean enabled;
     /** 安装人用户业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long installedBy;
     /** 安装时间。 */
     private LocalDateTime installedAt;

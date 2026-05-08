@@ -80,7 +80,7 @@ describe('useLoginSubmit', () => {
     expect(getSession()).toMatchObject({
       accessToken: 'access-1',
       refreshToken: 'refresh-1',
-      userId: 8,
+      userId: '8',
       userEmail: 'writer@example.com',
       userName: 'Writer',
     })

@@ -67,10 +67,10 @@ const props = withDefaults(defineProps<{
   showConversationPanel?: boolean
   conversationLoading?: boolean
   conversationList?: ConversationItem[]
-  currentConversationId?: number | null
+  currentConversationId?: string | null
   bindChatContainer: (element: HTMLElement | null) => void
   messages?: ChatMessage[]
-  streamingAssistantMsgId?: number | null
+  streamingAssistantMsgId?: string | number | null
   isApprovalBusy: (approvalId: string) => boolean
   chatInput?: string
   activePlugins?: string[]
@@ -94,7 +94,7 @@ const emit = defineEmits<{
   (event: 'toggle-collapse'): void
   (event: 'toggle-history'): void
   (event: 'create-session'): void
-  (event: 'select-conversation', payload: number): void
+  (event: 'select-conversation', payload: string): void
   (event: 'merge-to-editor', payload: ChatMessage): void
   (event: 'replace-selected', payload: ChatMessage): void
   (event: 'approve', payload: string): void

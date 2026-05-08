@@ -56,6 +56,20 @@ public class NovelController {
         this.novelApplicationService = novelApplicationService;
     }
 
+    private Long requireLongId(String raw, String fieldName) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return Long.valueOf(raw.trim());
+    }
+
+    private Long optionalLongId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return Long.valueOf(raw.trim());
+    }
+
     /**
      * 查询小说项目列表。
      * <p>流程：调用应用服务读取项目清单并返回统一响应。</p>
@@ -81,7 +95,7 @@ public class NovelController {
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createProject(
                 new NovelCommands.CreateProjectCommand(
-                        dto.getOwnerUserId(),
+                        requireLongId(dto.getOwnerUserId(), "ownerUserId"),
                         dto.getTitle(),
                         dto.getSummary(),
                         dto.getStatus()
@@ -99,9 +113,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}")
-    public ApiResponse<NovelProject> getProject(@PathVariable Long projectId,
+    public ApiResponse<NovelProject> getProject(@PathVariable String projectId,
                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getProject(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.getProject(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -114,11 +128,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PutMapping("/{projectId}")
-    public ApiResponse<NovelProject> updateProject(@PathVariable Long projectId,
+    public ApiResponse<NovelProject> updateProject(@PathVariable String projectId,
                                                    @Valid @RequestBody UpdateNovelProjectDto dto,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateProject(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 new NovelCommands.UpdateProjectCommand(dto.getTitle(), dto.getSummary(), dto.getStatus()),
                 traceId
         ), traceId);
@@ -134,10 +148,10 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}")
-    public ApiResponse<String> deleteProject(@PathVariable Long projectId,
-                                             @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> deleteProject(@PathVariable String projectId,
+                                             @RequestParam("operatorId") String operatorId,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteProject(projectId, operatorId, traceId);
+        novelApplicationService.deleteProject(requireLongId(projectId, "projectId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -150,9 +164,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/volumes")
-    public ApiResponse<List<NovelVolume>> listVolumes(@PathVariable Long projectId,
+    public ApiResponse<List<NovelVolume>> listVolumes(@PathVariable String projectId,
                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listVolumes(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.listVolumes(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -166,14 +180,14 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/volumes")
-    public ApiResponse<NovelVolume> createVolume(@PathVariable Long projectId,
-                                                  @Valid @RequestBody CreateNovelVolumeDto dto,
-                                                  @RequestParam("operatorId") Long operatorId,
-                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelVolume> createVolume(@PathVariable String projectId,
+                                                   @Valid @RequestBody CreateNovelVolumeDto dto,
+                                                   @RequestParam("operatorId") String operatorId,
+                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createVolume(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateVolumeCommand(dto.getTitle(), dto.getSortOrder(), dto.getDescription()),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -190,16 +204,16 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PutMapping("/{projectId}/volumes/{volumeId}")
-    public ApiResponse<NovelVolume> updateVolume(@PathVariable Long projectId,
-                                                  @PathVariable Long volumeId,
-                                                  @Valid @RequestBody UpdateNovelVolumeDto dto,
-                                                  @RequestParam("operatorId") Long operatorId,
-                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelVolume> updateVolume(@PathVariable String projectId,
+                                                  @PathVariable String volumeId,
+                                                   @Valid @RequestBody UpdateNovelVolumeDto dto,
+                                                   @RequestParam("operatorId") String operatorId,
+                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateVolume(
-                projectId,
-                volumeId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(volumeId, "volumeId"),
                 new NovelCommands.UpdateVolumeCommand(dto.getTitle(), dto.getSortOrder(), dto.getDescription()),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -215,11 +229,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}/volumes/{volumeId}")
-    public ApiResponse<String> deleteVolume(@PathVariable Long projectId,
-                                            @PathVariable Long volumeId,
-                                            @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> deleteVolume(@PathVariable String projectId,
+                                            @PathVariable String volumeId,
+                                            @RequestParam("operatorId") String operatorId,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteVolume(projectId, volumeId, operatorId, traceId);
+        novelApplicationService.deleteVolume(requireLongId(projectId, "projectId"), requireLongId(volumeId, "volumeId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -232,9 +246,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/chapters")
-    public ApiResponse<List<NovelChapter>> listChapters(@PathVariable Long projectId,
+    public ApiResponse<List<NovelChapter>> listChapters(@PathVariable String projectId,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listChapters(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.listChapters(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -248,15 +262,15 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/chapters")
-    public ApiResponse<NovelChapter> createChapter(@PathVariable Long projectId,
-                                                    @Valid @RequestBody CreateNovelChapterDto dto,
-                                                    @RequestParam("operatorId") Long operatorId,
-                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelChapter> createChapter(@PathVariable String projectId,
+                                                     @Valid @RequestBody CreateNovelChapterDto dto,
+                                                     @RequestParam("operatorId") String operatorId,
+                                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createChapter(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateChapterCommand(
-                        dto.getVolumeId(),
-                        dto.getOutlineNodeId(),
+                        optionalLongId(dto.getVolumeId()),
+                        optionalLongId(dto.getOutlineNodeId()),
                         dto.getTitle(),
                         dto.getChapterNo(),
                         dto.getStatus(),
@@ -268,7 +282,7 @@ public class NovelController {
                         dto.getContentChecksum(),
                         dto.getStorageProvider()
                 ),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -283,10 +297,10 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/chapters/{chapterId}")
-    public ApiResponse<NovelChapter> getChapter(@PathVariable Long projectId,
-                                                @PathVariable Long chapterId,
+    public ApiResponse<NovelChapter> getChapter(@PathVariable String projectId,
+                                                @PathVariable String chapterId,
                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapter(projectId, chapterId), traceId);
+        return ApiResponse.success(novelApplicationService.getChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
     }
 
     /**
@@ -301,17 +315,17 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PutMapping("/{projectId}/chapters/{chapterId}")
-    public ApiResponse<NovelChapter> updateChapter(@PathVariable Long projectId,
-                                                    @PathVariable Long chapterId,
-                                                    @Valid @RequestBody UpdateNovelChapterDto dto,
-                                                    @RequestParam("operatorId") Long operatorId,
-                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelChapter> updateChapter(@PathVariable String projectId,
+                                                    @PathVariable String chapterId,
+                                                     @Valid @RequestBody UpdateNovelChapterDto dto,
+                                                     @RequestParam("operatorId") String operatorId,
+                                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateChapter(
-                projectId,
-                chapterId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(chapterId, "chapterId"),
                 new NovelCommands.UpdateChapterCommand(
-                        dto.getVolumeId(),
-                        dto.getOutlineNodeId(),
+                        optionalLongId(dto.getVolumeId()),
+                        optionalLongId(dto.getOutlineNodeId()),
                         dto.getTitle(),
                         dto.getChapterNo(),
                         dto.getStatus(),
@@ -323,7 +337,7 @@ public class NovelController {
                         dto.getContentChecksum(),
                         dto.getStorageProvider()
                 ),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -339,11 +353,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}/chapters/{chapterId}")
-    public ApiResponse<String> deleteChapter(@PathVariable Long projectId,
-                                             @PathVariable Long chapterId,
-                                             @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> deleteChapter(@PathVariable String projectId,
+                                             @PathVariable String chapterId,
+                                             @RequestParam("operatorId") String operatorId,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteChapter(projectId, chapterId, operatorId, traceId);
+        novelApplicationService.deleteChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -358,11 +372,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/chapters/{chapterId}/publish")
-    public ApiResponse<String> publishChapter(@PathVariable Long projectId,
-                                              @PathVariable Long chapterId,
-                                              @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> publishChapter(@PathVariable String projectId,
+                                              @PathVariable String chapterId,
+                                              @RequestParam("operatorId") String operatorId,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.publishChapter(projectId, chapterId, operatorId, traceId);
+        novelApplicationService.publishChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("published", traceId);
     }
 
@@ -375,9 +389,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/members")
-    public ApiResponse<List<NovelMember>> listMembers(@PathVariable Long projectId,
+    public ApiResponse<List<NovelMember>> listMembers(@PathVariable String projectId,
                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listMembers(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.listMembers(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -391,14 +405,14 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/members")
-    public ApiResponse<NovelMember> addMember(@PathVariable Long projectId,
+    public ApiResponse<NovelMember> addMember(@PathVariable String projectId,
                                                @Valid @RequestBody AddNovelMemberDto dto,
-                                               @RequestParam("operatorId") Long operatorId,
+                                               @RequestParam("operatorId") String operatorId,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.addMember(
-                projectId,
-                new NovelCommands.AddMemberCommand(dto.getUserId(), dto.getMemberRole()),
-                operatorId,
+                requireLongId(projectId, "projectId"),
+                new NovelCommands.AddMemberCommand(requireLongId(dto.getUserId(), "userId"), dto.getMemberRole()),
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -415,16 +429,16 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @org.springframework.web.bind.annotation.PatchMapping("/{projectId}/members/{userId}")
-    public ApiResponse<NovelMember> updateMember(@PathVariable Long projectId,
-                                                  @PathVariable Long userId,
-                                                  @Valid @RequestBody UpdateNovelMemberDto dto,
-                                                  @RequestParam("operatorId") Long operatorId,
-                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelMember> updateMember(@PathVariable String projectId,
+                                                  @PathVariable String userId,
+                                                   @Valid @RequestBody UpdateNovelMemberDto dto,
+                                                   @RequestParam("operatorId") String operatorId,
+                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateMember(
-                projectId,
-                userId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(userId, "userId"),
                 new NovelCommands.UpdateMemberCommand(dto.getMemberRole()),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -440,11 +454,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}/members/{userId}")
-    public ApiResponse<String> removeMember(@PathVariable Long projectId,
-                                            @PathVariable Long userId,
-                                            @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> removeMember(@PathVariable String projectId,
+                                            @PathVariable String userId,
+                                            @RequestParam("operatorId") String operatorId,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.removeMember(projectId, userId, operatorId, traceId);
+        novelApplicationService.removeMember(requireLongId(projectId, "projectId"), requireLongId(userId, "userId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("removed", traceId);
     }
 
@@ -458,10 +472,10 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/chapters/{chapterId}/versions")
-    public ApiResponse<List<NovelChapterVersion>> listChapterVersions(@PathVariable Long projectId,
-                                                                      @PathVariable Long chapterId,
+    public ApiResponse<List<NovelChapterVersion>> listChapterVersions(@PathVariable String projectId,
+                                                                      @PathVariable String chapterId,
                                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listChapterVersions(projectId, chapterId), traceId);
+        return ApiResponse.success(novelApplicationService.listChapterVersions(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
     }
 
     /**
@@ -475,14 +489,14 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/chapters/{chapterId}/versions")
-    public ApiResponse<NovelChapterVersion> createChapterVersion(@PathVariable Long projectId,
-                                                                  @PathVariable Long chapterId,
+    public ApiResponse<NovelChapterVersion> createChapterVersion(@PathVariable String projectId,
+                                                                  @PathVariable String chapterId,
                                                                   @Valid @RequestBody CreateChapterVersionDto dto,
                                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createChapterVersion(
-                projectId,
-                chapterId,
-                new NovelCommands.CreateChapterVersionCommand(dto.getChangeType(), dto.getChangeReason(), dto.getCreatedBy()),
+                requireLongId(projectId, "projectId"),
+                requireLongId(chapterId, "chapterId"),
+                new NovelCommands.CreateChapterVersionCommand(dto.getChangeType(), dto.getChangeReason(), requireLongId(dto.getCreatedBy(), "createdBy")),
                 traceId
         ), traceId);
     }
@@ -498,11 +512,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/chapters/{chapterId}/versions/{versionNo}")
-    public ApiResponse<NovelChapterVersion> getChapterVersion(@PathVariable Long projectId,
-                                                              @PathVariable Long chapterId,
+    public ApiResponse<NovelChapterVersion> getChapterVersion(@PathVariable String projectId,
+                                                              @PathVariable String chapterId,
                                                               @PathVariable Integer versionNo,
                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterVersion(projectId, chapterId, versionNo), traceId);
+        return ApiResponse.success(novelApplicationService.getChapterVersion(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo), traceId);
     }
 
     /**
@@ -517,12 +531,12 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/chapters/{chapterId}/versions/{versionNo}/restore")
-    public ApiResponse<NovelChapter> restoreChapterVersion(@PathVariable Long projectId,
-                                                           @PathVariable Long chapterId,
+    public ApiResponse<NovelChapter> restoreChapterVersion(@PathVariable String projectId,
+                                                           @PathVariable String chapterId,
                                                            @PathVariable Integer versionNo,
-                                                           @RequestParam("operatorId") Long operatorId,
+                                                           @RequestParam("operatorId") String operatorId,
                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.restoreChapterVersion(projectId, chapterId, versionNo, operatorId, traceId), traceId);
+        return ApiResponse.success(novelApplicationService.restoreChapterVersion(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo, requireLongId(operatorId, "operatorId"), traceId), traceId);
     }
 
     /**
@@ -535,10 +549,10 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/chapters/{chapterId}/content-url")
-    public ApiResponse<Map<String, String>> getChapterContentUrl(@PathVariable Long projectId,
-                                                                 @PathVariable Long chapterId,
+    public ApiResponse<Map<String, String>> getChapterContentUrl(@PathVariable String projectId,
+                                                                 @PathVariable String chapterId,
                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterContentUrl(projectId, chapterId), traceId);
+        return ApiResponse.success(novelApplicationService.getChapterContentUrl(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
     }
 
     /**
@@ -551,10 +565,10 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/chapters/{chapterId}/content-upload-url")
-    public ApiResponse<Map<String, String>> getChapterContentUploadUrl(@PathVariable Long projectId,
-                                                                       @PathVariable Long chapterId,
+    public ApiResponse<Map<String, String>> getChapterContentUploadUrl(@PathVariable String projectId,
+                                                                       @PathVariable String chapterId,
                                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterContentUploadUrl(projectId, chapterId), traceId);
+        return ApiResponse.success(novelApplicationService.getChapterContentUploadUrl(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
     }
 
     /**
@@ -569,14 +583,14 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/chapters/{chapterId}/content-commit")
-    public ApiResponse<NovelChapter> commitChapterContent(@PathVariable Long projectId,
-                                                           @PathVariable Long chapterId,
-                                                           @Valid @RequestBody CommitChapterContentDto dto,
-                                                           @RequestParam("operatorId") Long operatorId,
-                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelChapter> commitChapterContent(@PathVariable String projectId,
+                                                           @PathVariable String chapterId,
+                                                            @Valid @RequestBody CommitChapterContentDto dto,
+                                                            @RequestParam("operatorId") String operatorId,
+                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.commitChapterContent(
-                projectId,
-                chapterId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(chapterId, "chapterId"),
                 new NovelCommands.CommitChapterContentCommand(
                         dto.getObjectKey(),
                         dto.getEtag(),
@@ -585,7 +599,7 @@ public class NovelController {
                         dto.getStorageProvider(),
                         dto.getContent()
                 ),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -601,11 +615,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/chapters/{chapterId}/versions/{versionNo}/snapshot-url")
-    public ApiResponse<Map<String, String>> getChapterVersionSnapshotUrl(@PathVariable Long projectId,
-                                                                          @PathVariable Long chapterId,
+    public ApiResponse<Map<String, String>> getChapterVersionSnapshotUrl(@PathVariable String projectId,
+                                                                          @PathVariable String chapterId,
                                                                           @PathVariable Integer versionNo,
                                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterVersionSnapshotUrl(projectId, chapterId, versionNo), traceId);
+        return ApiResponse.success(novelApplicationService.getChapterVersionSnapshotUrl(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo), traceId);
     }
 
     /**
@@ -617,9 +631,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/outlines/tree")
-    public ApiResponse<List<NovelOutlineNode>> listOutlineTree(@PathVariable Long projectId,
+    public ApiResponse<List<NovelOutlineNode>> listOutlineTree(@PathVariable String projectId,
                                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listOutlineTree(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.listOutlineTree(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -633,20 +647,20 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/outlines/nodes")
-    public ApiResponse<NovelOutlineNode> createOutlineNode(@PathVariable Long projectId,
-                                                            @Valid @RequestBody CreateNovelOutlineNodeDto dto,
-                                                            @RequestParam("operatorId") Long operatorId,
-                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelOutlineNode> createOutlineNode(@PathVariable String projectId,
+                                                             @Valid @RequestBody CreateNovelOutlineNodeDto dto,
+                                                             @RequestParam("operatorId") String operatorId,
+                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createOutlineNode(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateOutlineNodeCommand(
-                        dto.getParentId(),
+                        optionalLongId(dto.getParentId()),
                         dto.getTitle(),
                         dto.getNodeType(),
                         dto.getSortOrder(),
                         dto.getContent()
                 ),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -663,22 +677,22 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PutMapping("/{projectId}/outlines/nodes/{nodeId}")
-    public ApiResponse<NovelOutlineNode> updateOutlineNode(@PathVariable Long projectId,
-                                                            @PathVariable Long nodeId,
-                                                            @Valid @RequestBody UpdateNovelOutlineNodeDto dto,
-                                                            @RequestParam("operatorId") Long operatorId,
-                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelOutlineNode> updateOutlineNode(@PathVariable String projectId,
+                                                            @PathVariable String nodeId,
+                                                             @Valid @RequestBody UpdateNovelOutlineNodeDto dto,
+                                                             @RequestParam("operatorId") String operatorId,
+                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateOutlineNode(
-                projectId,
-                nodeId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(nodeId, "nodeId"),
                 new NovelCommands.UpdateOutlineNodeCommand(
-                        dto.getParentId(),
+                        optionalLongId(dto.getParentId()),
                         dto.getTitle(),
                         dto.getNodeType(),
                         dto.getSortOrder(),
                         dto.getContent()
                 ),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -695,16 +709,16 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @org.springframework.web.bind.annotation.PatchMapping("/{projectId}/outlines/nodes/{nodeId}/move")
-    public ApiResponse<String> moveOutlineNode(@PathVariable Long projectId,
-                                                @PathVariable Long nodeId,
-                                                @Valid @RequestBody MoveNovelOutlineNodeDto dto,
-                                                @RequestParam("operatorId") Long operatorId,
-                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<String> moveOutlineNode(@PathVariable String projectId,
+                                                @PathVariable String nodeId,
+                                                 @Valid @RequestBody MoveNovelOutlineNodeDto dto,
+                                                 @RequestParam("operatorId") String operatorId,
+                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         novelApplicationService.moveOutlineNode(
-                projectId,
-                nodeId,
-                new NovelCommands.MoveOutlineNodeCommand(dto.getParentId(), dto.getSortOrder()),
-                operatorId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(nodeId, "nodeId"),
+                new NovelCommands.MoveOutlineNodeCommand(optionalLongId(dto.getParentId()), dto.getSortOrder()),
+                requireLongId(operatorId, "operatorId"),
                 traceId
         );
         return ApiResponse.success("moved", traceId);
@@ -721,11 +735,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}/outlines/nodes/{nodeId}")
-    public ApiResponse<String> deleteOutlineNode(@PathVariable Long projectId,
-                                                 @PathVariable Long nodeId,
-                                                 @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> deleteOutlineNode(@PathVariable String projectId,
+                                                 @PathVariable String nodeId,
+                                                 @RequestParam("operatorId") String operatorId,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteOutlineNode(projectId, nodeId, operatorId, traceId);
+        novelApplicationService.deleteOutlineNode(requireLongId(projectId, "projectId"), requireLongId(nodeId, "nodeId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -738,9 +752,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/cards")
-    public ApiResponse<List<NovelCard>> listCards(@PathVariable Long projectId,
+    public ApiResponse<List<NovelCard>> listCards(@PathVariable String projectId,
                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listCards(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.listCards(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -754,14 +768,14 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/cards")
-    public ApiResponse<NovelCard> createCard(@PathVariable Long projectId,
-                                              @Valid @RequestBody CreateNovelCardDto dto,
-                                              @RequestParam("operatorId") Long operatorId,
-                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelCard> createCard(@PathVariable String projectId,
+                                               @Valid @RequestBody CreateNovelCardDto dto,
+                                               @RequestParam("operatorId") String operatorId,
+                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createCard(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateCardCommand(dto.getCardType(), dto.getName(), dto.getSummary(), dto.getDetailJson()),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -776,10 +790,10 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/cards/{cardId}")
-    public ApiResponse<NovelCard> getCard(@PathVariable Long projectId,
-                                          @PathVariable Long cardId,
+    public ApiResponse<NovelCard> getCard(@PathVariable String projectId,
+                                          @PathVariable String cardId,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getCard(projectId, cardId), traceId);
+        return ApiResponse.success(novelApplicationService.getCard(requireLongId(projectId, "projectId"), requireLongId(cardId, "cardId")), traceId);
     }
 
     /**
@@ -794,16 +808,16 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PutMapping("/{projectId}/cards/{cardId}")
-    public ApiResponse<NovelCard> updateCard(@PathVariable Long projectId,
-                                              @PathVariable Long cardId,
-                                              @Valid @RequestBody UpdateNovelCardDto dto,
-                                              @RequestParam("operatorId") Long operatorId,
-                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<NovelCard> updateCard(@PathVariable String projectId,
+                                              @PathVariable String cardId,
+                                               @Valid @RequestBody UpdateNovelCardDto dto,
+                                               @RequestParam("operatorId") String operatorId,
+                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateCard(
-                projectId,
-                cardId,
+                requireLongId(projectId, "projectId"),
+                requireLongId(cardId, "cardId"),
                 new NovelCommands.UpdateCardCommand(dto.getCardType(), dto.getName(), dto.getSummary(), dto.getDetailJson()),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -819,11 +833,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}/cards/{cardId}")
-    public ApiResponse<String> deleteCard(@PathVariable Long projectId,
-                                          @PathVariable Long cardId,
-                                          @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> deleteCard(@PathVariable String projectId,
+                                          @PathVariable String cardId,
+                                          @RequestParam("operatorId") String operatorId,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteCard(projectId, cardId, operatorId, traceId);
+        novelApplicationService.deleteCard(requireLongId(projectId, "projectId"), requireLongId(cardId, "cardId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -836,9 +850,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping("/{projectId}/card-relations")
-    public ApiResponse<List<NovelCardRelation>> listCardRelations(@PathVariable Long projectId,
+    public ApiResponse<List<NovelCardRelation>> listCardRelations(@PathVariable String projectId,
                                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listCardRelations(projectId), traceId);
+        return ApiResponse.success(novelApplicationService.listCardRelations(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -852,19 +866,19 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @PostMapping("/{projectId}/card-relations")
-    public ApiResponse<NovelCardRelation> createCardRelation(@PathVariable Long projectId,
+    public ApiResponse<NovelCardRelation> createCardRelation(@PathVariable String projectId,
                                                               @Valid @RequestBody CreateNovelCardRelationDto dto,
-                                                              @RequestParam("operatorId") Long operatorId,
+                                                              @RequestParam("operatorId") String operatorId,
                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createCardRelation(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateCardRelationCommand(
-                        dto.getFromCardId(),
-                        dto.getToCardId(),
+                        requireLongId(dto.getFromCardId(), "fromCardId"),
+                        requireLongId(dto.getToCardId(), "toCardId"),
                         dto.getRelationType(),
                         dto.getDescription()
                 ),
-                operatorId,
+                requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
     }
@@ -880,11 +894,11 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/{projectId}/card-relations/{relationId}")
-    public ApiResponse<String> deleteCardRelation(@PathVariable Long projectId,
-                                                  @PathVariable Long relationId,
-                                                  @RequestParam("operatorId") Long operatorId,
+    public ApiResponse<String> deleteCardRelation(@PathVariable String projectId,
+                                                  @PathVariable String relationId,
+                                                  @RequestParam("operatorId") String operatorId,
                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteCardRelation(projectId, relationId, operatorId, traceId);
+        novelApplicationService.deleteCardRelation(requireLongId(projectId, "projectId"), requireLongId(relationId, "relationId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 }

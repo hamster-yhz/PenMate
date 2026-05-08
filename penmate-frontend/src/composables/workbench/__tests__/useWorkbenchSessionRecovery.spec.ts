@@ -63,22 +63,22 @@ describe('useWorkbenchSessionRecovery', () => {
       resumeSession: vi.fn().mockResolvedValue(recovery),
       openTaskStream,
       hydrateStore: (snapshot: any) => {
-        sessionState.sessionId = Number(snapshot?.session?.sessionId ?? 0) || null
+        sessionState.sessionId = String(snapshot?.session?.sessionId ?? '') || null
         sessionState.title = String(snapshot?.session?.title ?? '')
         sessionState.status = String(snapshot?.session?.status ?? '')
         sessionState.boundStyle = {
-          styleId: Number(snapshot?.session?.boundStyle?.styleId ?? 0) || null,
+          styleId: String(snapshot?.session?.boundStyle?.styleId ?? '') || null,
           name: String(snapshot?.session?.boundStyle?.name ?? ''),
         }
         sessionState.activeTask = {
-          taskId: Number(snapshot?.activeTask?.taskId ?? 0) || null,
+          taskId: String(snapshot?.activeTask?.taskId ?? '') || null,
           taskStatus: String(snapshot?.activeTask?.taskStatus ?? ''),
           streamChannelKey: String(snapshot?.activeTask?.streamChannelKey ?? ''),
         }
         sessionState.pendingApproval = snapshot?.pendingApproval ?? null
         sessionState.messages = Array.isArray(snapshot?.messages) ? snapshot.messages : []
         sessionState.workbenchContext = {
-          chapterId: Number(snapshot?.workbenchContext?.chapterId ?? 0) || null,
+          chapterId: String(snapshot?.workbenchContext?.chapterId ?? '') || null,
           selectedText: String(snapshot?.workbenchContext?.selectedText ?? ''),
           activePlugins: Array.isArray(snapshot?.workbenchContext?.activePlugins) ? snapshot.workbenchContext.activePlugins : [],
           modelConfigId: String(snapshot?.workbenchContext?.modelConfigId ?? ''),
@@ -89,17 +89,17 @@ describe('useWorkbenchSessionRecovery', () => {
     await recoveryController.restore('101', '90001')
     await flushPromises()
 
-    expect(sessionState.sessionId).toBe(90001)
+    expect(sessionState.sessionId).toBe('90001')
     expect(sessionState.title).toBe('第三章')
     expect(sessionState.status).toBe('ACTIVE')
-    expect(sessionState.boundStyle).toEqual({ styleId: 81, name: '冷峻悬疑' })
+    expect(sessionState.boundStyle).toEqual({ styleId: '81', name: '冷峻悬疑' })
     expect(sessionState.activeTask).toEqual({
-      taskId: 70001,
+      taskId: '70001',
       taskStatus: 'RUNNING',
       streamChannelKey: 'agent-task-70001',
     })
     expect(sessionState.workbenchContext).toEqual({
-      chapterId: 301,
+      chapterId: '301',
       selectedText: '',
       activePlugins: ['outline.search'],
       modelConfigId: 'mcfg-001',

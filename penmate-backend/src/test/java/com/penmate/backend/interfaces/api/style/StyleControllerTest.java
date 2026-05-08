@@ -55,7 +55,7 @@ class StyleControllerTest {
     void UT_STYLE_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-LIST";
         StyleProfile style = new StyleProfile();
-        style.setId(301L);
+        style.setStyleId(301L);
         style.setProjectId(10001L);
         style.setName("叙事文风A");
 
@@ -64,7 +64,7 @@ class StyleControllerTest {
         mockMvc().perform(get("/api/v1/novels/10001/styles")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(301))
+                .andExpect(jsonPath("$.data[0].styleId").value("301"))
                 .andExpect(jsonPath("$.data[0].name").value("叙事文风A"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
@@ -73,7 +73,8 @@ class StyleControllerTest {
     void UT_STYLE_CREATE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-CREATE";
         StyleProfile created = new StyleProfile();
-        created.setId(302L);
+        created.setStyleId(302L);
+        created.setProjectId(10001L);
         created.setName("终章加速风格");
 
         when(styleApplicationService.createStyle(eq(10001L), any(), eq(traceId))).thenReturn(created);
@@ -87,7 +88,7 @@ class StyleControllerTest {
                                 "isDefault", false
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(302))
+                .andExpect(jsonPath("$.data.styleId").value("302"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -103,7 +104,7 @@ class StyleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "toStyleId", 301,
+                                "toStyleId", "301",
                                 "warningConfirmed", false,
                                 "reason", "测试"
                         ))))
@@ -145,7 +146,8 @@ class StyleControllerTest {
     void UT_STYLE_UPDATE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-UPDATE";
         StyleProfile updated = new StyleProfile();
-        updated.setId(301L);
+        updated.setStyleId(301L);
+        updated.setProjectId(10001L);
         updated.setName("更新文风");
         when(styleApplicationService.updateStyle(eq(10001L), eq(301L), any(), eq(traceId))).thenReturn(updated);
 
@@ -158,7 +160,7 @@ class StyleControllerTest {
                                 "pace", "fast"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(301))
+                .andExpect(jsonPath("$.data.styleId").value("301"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -166,8 +168,8 @@ class StyleControllerTest {
     void UT_STYLE_SWITCH_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-STYLE-SWITCH-SUCCESS";
         StyleProfile style = new StyleProfile();
-        style.setId(302L);
         style.setStyleId(302L);
+        style.setProjectId(10001L);
         when(styleApplicationService.switchStyle(eq(10001L), any(), eq(traceId))).thenReturn(style);
 
         mockMvc().perform(post("/api/v1/novels/10001/styles/switch")
@@ -176,12 +178,12 @@ class StyleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "toStyleId", 302,
+                                "toStyleId", "302",
                                 "warningConfirmed", true,
                                 "reason", "测试切换"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(302));
+                .andExpect(jsonPath("$.data.styleId").value("302"));
 
         verify(sessionStyleBindingAppService).bind(10001L, 90001L, 302L, 1001L, traceId);
     }
@@ -198,7 +200,7 @@ class StyleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "toStyleId", 999,
+                                "toStyleId", "999",
                                 "warningConfirmed", true,
                                 "reason", "测试"
                         ))))
@@ -222,4 +224,14 @@ class StyleControllerTest {
                 .andExpect(jsonPath("$.data.pace").value("fast"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
+    @Test
+    void UT_STYLE_REJECTS_LEGACY_PREFIX_IDS() throws Exception {
+        String traceId = "UT-TRACE-STYLE-LEGACY-ID-REJECT";
+
+        mockMvc().perform(get("/api/v1/novels/project-10001/styles")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
 }
+

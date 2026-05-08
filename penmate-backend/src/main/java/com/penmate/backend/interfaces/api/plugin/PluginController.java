@@ -36,6 +36,13 @@ public class PluginController {
         this.pluginApplicationService = pluginApplicationService;
     }
 
+    private Long requireLongId(String raw, String fieldName) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must not be blank");
+        }
+        return Long.valueOf(raw.trim());
+    }
+
     /**
      * 查询插件市场目录。
      * <p><b>业务目的：</b>返回当前系统可安装插件清单，供工作台展示与筛选。</p>
@@ -84,9 +91,9 @@ public class PluginController {
      * @return 出参：处理结果
      */
     @GetMapping("/novels/{projectId}/plugins")
-    public ApiResponse<List<PluginProjectInstall>> projectPlugins(@PathVariable Long projectId,
+    public ApiResponse<List<PluginProjectInstall>> projectPlugins(@PathVariable String projectId,
                                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(pluginApplicationService.listProjectInstalls(projectId), traceId);
+        return ApiResponse.success(pluginApplicationService.listProjectInstalls(requireLongId(projectId, "projectId")), traceId);
     }
 
     /**
@@ -105,13 +112,13 @@ public class PluginController {
      * @return 出参：处理结果
      */
     @PostMapping("/novels/{projectId}/plugins/install")
-    public ApiResponse<String> install(@PathVariable Long projectId,
+    public ApiResponse<String> install(@PathVariable String projectId,
                                        @Valid @RequestBody InstallPluginDto dto,
-                                       @RequestParam("operatorId") Long operatorId,
+                                       @RequestParam("operatorId") String operatorId,
                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         pluginApplicationService.install(
-                projectId,
-                new PluginCommands.InstallPluginCommand(dto.getPluginCode(), dto.getVersion(), dto.getConfigJson(), operatorId),
+                requireLongId(projectId, "projectId"),
+                new PluginCommands.InstallPluginCommand(dto.getPluginCode(), dto.getVersion(), dto.getConfigJson(), requireLongId(operatorId, "operatorId")),
                 traceId
         );
         return ApiResponse.success("installed", traceId);
@@ -134,15 +141,15 @@ public class PluginController {
      * @return 出参：处理结果
      */
     @PatchMapping("/novels/{projectId}/plugins/{pluginCode}")
-    public ApiResponse<String> updateInstall(@PathVariable Long projectId,
+    public ApiResponse<String> updateInstall(@PathVariable String projectId,
                                              @PathVariable String pluginCode,
                                              @RequestBody UpdatePluginInstallDto dto,
-                                             @RequestParam("operatorId") Long operatorId,
+                                             @RequestParam("operatorId") String operatorId,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         pluginApplicationService.updateInstall(
-                projectId,
+                requireLongId(projectId, "projectId"),
                 pluginCode,
-                new PluginCommands.UpdatePluginInstallCommand(dto.getEnabled(), dto.getConfigJson(), operatorId),
+                new PluginCommands.UpdatePluginInstallCommand(dto.getEnabled(), dto.getConfigJson(), requireLongId(operatorId, "operatorId")),
                 traceId
         );
         return ApiResponse.success("updated", traceId);
@@ -164,11 +171,11 @@ public class PluginController {
      * @return 出参：处理结果
      */
     @DeleteMapping("/novels/{projectId}/plugins/{pluginCode}")
-    public ApiResponse<String> deleteInstall(@PathVariable Long projectId,
+    public ApiResponse<String> deleteInstall(@PathVariable String projectId,
                                              @PathVariable String pluginCode,
-                                             @RequestParam("operatorId") Long operatorId,
+                                             @RequestParam("operatorId") String operatorId,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        pluginApplicationService.deleteInstall(projectId, pluginCode, operatorId, traceId);
+        pluginApplicationService.deleteInstall(requireLongId(projectId, "projectId"), pluginCode, requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -186,9 +193,9 @@ public class PluginController {
      * @return 出参：处理结果
      */
     @GetMapping("/novels/{projectId}/plugins/call-logs")
-    public ApiResponse<List<PluginCallLog>> callLogs(@PathVariable Long projectId,
+    public ApiResponse<List<PluginCallLog>> callLogs(@PathVariable String projectId,
                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(pluginApplicationService.listCallLogs(projectId), traceId);
+        return ApiResponse.success(pluginApplicationService.listCallLogs(requireLongId(projectId, "projectId")), traceId);
     }
 }
 

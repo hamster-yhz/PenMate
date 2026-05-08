@@ -50,7 +50,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 用户列表查询成功。
     void UT_RBAC_USERS_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-USERS-LIST";
         IamUser user = new IamUser();
@@ -64,14 +63,14 @@ class RbacQueryControllerTest {
 
         mockMvc().perform(get("/api/v1/users").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(1001))
+                .andExpect(jsonPath("$.data[0].id").isString())
+                .andExpect(jsonPath("$.data[0].id").value("1001"))
                 .andExpect(jsonPath("$.data[0].userId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].email").value("author@penmate.ai"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
     @Test
-    // 创建用户参数错误。
     void UT_RBAC_USERS_CREATE_INVALID_PARAM() throws Exception {
         String traceId = "UT-TRACE-RBAC-USERS-CREATE-INVALID";
 
@@ -89,7 +88,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 创建用户邮箱冲突。
     void UT_RBAC_USERS_CREATE_CONFLICT_EMAIL() throws Exception {
         String traceId = "UT-TRACE-RBAC-USERS-CREATE-CONFLICT";
         doThrow(new IllegalArgumentException("Email already exists"))
@@ -112,7 +110,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 用户角色分配成功。
     void UT_RBAC_ASSIGN_ROLE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ASSIGN-ROLE-SUCCESS";
         doNothing().when(iamQueryApplicationService).assignRoleToUser(1001L, 2001L);
@@ -126,7 +123,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 用户角色分配缺少 roleId 参数：应返回参数校验错误。
     void UT_RBAC_ASSIGN_ROLE_MISSING_ROLE_ID_BAD_REQUEST() throws Exception {
         String traceId = "UT-TRACE-RBAC-ASSIGN-ROLE-MISSING-ROLE-ID";
 
@@ -140,7 +136,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 用户角色分配失败（角色不存在）。
     void UT_RBAC_ASSIGN_ROLE_NOT_FOUND() throws Exception {
         String traceId = "UT-TRACE-RBAC-ASSIGN-ROLE-NOT-FOUND";
         doThrow(new IllegalArgumentException("Role not found"))
@@ -156,7 +151,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 查询用户已绑定角色成功。
     void UT_RBAC_USER_ROLES_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-USER-ROLES-LIST";
         IamRole role = new IamRole();
@@ -169,7 +163,8 @@ class RbacQueryControllerTest {
         mockMvc().perform(get("/api/v1/users/1001/roles")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(2001))
+                .andExpect(jsonPath("$.data[0].id").isString())
+                .andExpect(jsonPath("$.data[0].id").value("2001"))
                 .andExpect(jsonPath("$.data[0].roleId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].code").value("ADMIN"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
@@ -178,7 +173,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 查询角色已绑定权限成功。
     void UT_RBAC_ROLE_PERMISSIONS_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLE-PERMISSIONS-LIST";
         IamPermission permission = new IamPermission();
@@ -191,7 +185,8 @@ class RbacQueryControllerTest {
         mockMvc().perform(get("/api/v1/roles/3001/permissions")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(3001))
+                .andExpect(jsonPath("$.data[0].id").isString())
+                .andExpect(jsonPath("$.data[0].id").value("3001"))
                 .andExpect(jsonPath("$.data[0].permissionId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].code").value("rbac.manage"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
@@ -200,7 +195,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 个人菜单查询成功。
     void UT_RBAC_PROFILE_MENUS_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-PROFILE-MENUS";
         IamMenu menu = new IamMenu();
@@ -213,13 +207,13 @@ class RbacQueryControllerTest {
                         .param("userId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(11))
+                .andExpect(jsonPath("$.data[0].id").isString())
+                .andExpect(jsonPath("$.data[0].id").value("11"))
                 .andExpect(jsonPath("$.data[0].path").value("/workbench"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
     @Test
-    // 删除角色成功。
     void UT_RBAC_ROLES_DELETE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLES-DELETE";
         doNothing().when(iamQueryApplicationService).deleteRole(3001L);
@@ -232,10 +226,9 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 角色列表查询成功。
     void UT_RBAC_ROLES_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLES-LIST";
-        com.penmate.backend.domain.iam.model.IamRole role = new com.penmate.backend.domain.iam.model.IamRole();
+        IamRole role = new IamRole();
         role.setId(940001L);
         role.setRoleId(3001L);
         role.setCode("editor");
@@ -244,14 +237,14 @@ class RbacQueryControllerTest {
 
         mockMvc().perform(get("/api/v1/roles").header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(3001))
+                .andExpect(jsonPath("$.data[0].id").isString())
+                .andExpect(jsonPath("$.data[0].id").value("3001"))
                 .andExpect(jsonPath("$.data[0].roleId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].code").value("editor"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
     @Test
-    // 创建角色编码冲突。
     void UT_RBAC_ROLES_CREATE_CONFLICT_CODE() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLES-CREATE-CONFLICT";
         doThrow(new IllegalArgumentException("Role code already exists"))
@@ -272,7 +265,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 角色更新不存在。
     void UT_RBAC_ROLES_UPDATE_NOT_FOUND() throws Exception {
         String traceId = "UT-TRACE-RBAC-ROLES-UPDATE-NOT-FOUND";
         doThrow(new IllegalArgumentException("Role not found"))
@@ -291,7 +283,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 移除用户角色成功。
     void UT_RBAC_REMOVE_ROLE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-REMOVE-ROLE";
         doNothing().when(iamQueryApplicationService).removeRoleFromUser(1001L, 2001L);
@@ -304,7 +295,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 分配角色幂等成功。
     void UT_RBAC_ASSIGN_ROLE_IDEMPOTENT() throws Exception {
         String traceId = "UT-TRACE-RBAC-ASSIGN-ROLE-IDEMPOTENT";
         doNothing().when(iamQueryApplicationService).assignRoleToUser(1001L, 2001L);
@@ -317,7 +307,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 分配权限成功。
     void UT_RBAC_ASSIGN_PERMISSION_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-ASSIGN-PERMISSION-SUCCESS";
         doNothing().when(iamQueryApplicationService).assignPermissionToRole(3001L, 4001L);
@@ -331,7 +320,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 分配权限幂等成功。
     void UT_RBAC_ASSIGN_PERMISSION_IDEMPOTENT() throws Exception {
         String traceId = "UT-TRACE-RBAC-ASSIGN-PERMISSION-IDEMPOTENT";
         doNothing().when(iamQueryApplicationService).assignPermissionToRole(3001L, 4001L);
@@ -344,7 +332,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 菜单列表查询成功。
     void UT_RBAC_MENUS_LIST_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-MENUS-LIST";
         IamMenu menu = new IamMenu();
@@ -360,7 +347,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 用户删除成功。
     void UT_RBAC_USERS_DELETE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RBAC-USERS-DELETE";
         doNothing().when(iamQueryApplicationService).deleteUser(1001L);
@@ -372,7 +358,6 @@ class RbacQueryControllerTest {
     }
 
     @Test
-    // 用户更新不存在。
     void UT_RBAC_USERS_UPDATE_NOT_FOUND() throws Exception {
         String traceId = "UT-TRACE-RBAC-USERS-UPDATE-NOT-FOUND";
         doThrow(new IllegalArgumentException("User not found"))
@@ -389,5 +374,14 @@ class RbacQueryControllerTest {
                 .andExpect(jsonPath("$.data.status").value(422))
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
-}
 
+    @Test
+    void UT_RBAC_REJECTS_LEGACY_PREFIX_IDS() throws Exception {
+        String traceId = "UT-TRACE-RBAC-LEGACY-ID-REJECT";
+
+        mockMvc().perform(get("/api/v1/users/user-1001/roles")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+}

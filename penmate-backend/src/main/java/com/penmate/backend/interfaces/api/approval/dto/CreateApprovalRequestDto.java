@@ -8,10 +8,10 @@ import jakarta.validation.constraints.NotNull;
 
 public class CreateApprovalRequestDto {
 
-    @NotNull
-    private Long projectId;
+    @NotBlank
+    private String projectId;
 
-    private Long taskId;
+    private String taskId;
 
     @NotBlank
     private String approvalType;
@@ -22,8 +22,8 @@ public class CreateApprovalRequestDto {
     @NotNull
     private Integer riskLevel;
 
-    @NotNull
-    private Long requestedBy;
+    @NotBlank
+    private String requestedBy;
 
 }
 

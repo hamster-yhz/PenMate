@@ -2,8 +2,8 @@ import { computed, ref } from 'vue'
 import type { CardRelation, CharacterCard, WorldCard } from '@/components/workbench/workbenchTypes'
 
 type ContextProfile = {
-  projectId?: number | string | null
-  operatorId?: number | string | null
+  projectId?: string | null
+  operatorId?: string | null
 }
 
 type CardRecord = Record<string, any>
@@ -12,13 +12,13 @@ type CardApiPayload = Record<string, unknown>
 
 type UseWorkbenchCardsDeps = {
   getContext: () => ContextProfile
-  listCards: (projectId: number | string) => Promise<CardRecord[]>
-  listCardRelations: (projectId: number | string) => Promise<RelationRecord[]>
-  createCard: (projectId: number | string, operatorId: number | string, payload: CardApiPayload) => Promise<unknown>
-  updateCard: (projectId: number | string, cardId: number | string, operatorId: number | string, payload: CardApiPayload) => Promise<unknown>
-  deleteCard: (projectId: number | string, cardId: number | string, operatorId: number | string) => Promise<unknown>
-  createCardRelation: (projectId: number | string, operatorId: number | string, payload: CardApiPayload) => Promise<unknown>
-  deleteCardRelation: (projectId: number | string, relationId: number | string, operatorId: number | string) => Promise<unknown>
+  listCards: (projectId: string) => Promise<CardRecord[]>
+  listCardRelations: (projectId: string) => Promise<RelationRecord[]>
+  createCard: (projectId: string, operatorId: string, payload: CardApiPayload) => Promise<unknown>
+  updateCard: (projectId: string, cardId: string, operatorId: string, payload: CardApiPayload) => Promise<unknown>
+  deleteCard: (projectId: string, cardId: string, operatorId: string) => Promise<unknown>
+  createCardRelation: (projectId: string, operatorId: string, payload: CardApiPayload) => Promise<unknown>
+  deleteCardRelation: (projectId: string, relationId: string, operatorId: string) => Promise<unknown>
   promptCardName: (defaultName: string) => string | null | undefined
   notify?: (message: string) => void
   notifySuccess?: (message: string) => void
@@ -26,8 +26,16 @@ type UseWorkbenchCardsDeps = {
 
 export type WorkbenchCardType = 'CHARACTER' | 'WORLD'
 
-const pickCardId = (item: CardRecord | CharacterCard | WorldCard) => Number(item.cardId ?? 0)
-const pickRelationId = (item: RelationRecord | CardRelation) => Number(item.cardRelationId ?? 0)
+const toBusinessId = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  const normalized = value.trim()
+  return normalized || ''
+}
+
+const pickCardId = (item: CardRecord | CharacterCard | WorldCard) => toBusinessId(item.cardId)
+const pickRelationId = (item: RelationRecord | CardRelation) => toBusinessId(item.cardRelationId)
 
 const normalizeCardType = (value: unknown): WorkbenchCardType | '' => {
   const normalized = String(value || '').trim().toUpperCase()
@@ -46,7 +54,7 @@ const normalizeDetailJsonInput = (value: unknown) => {
 }
 
 const toWorkbenchCard = (item: CardRecord): CharacterCard | WorldCard | null => {
-  const cardId = Number(item.cardId ?? 0)
+  const cardId = toBusinessId(item.cardId)
   const cardType = normalizeCardType(item.cardType)
   if (!cardId || !cardType) return null
 
@@ -69,9 +77,9 @@ const withExpandedState = (cards: CardRecord[]) => cards
   .filter((item): item is CharacterCard | WorldCard => item !== null)
 
 const toCardRelation = (item: RelationRecord): CardRelation | null => {
-  const cardRelationId = Number(item.cardRelationId ?? 0)
-  const fromCardId = Number(item.fromCardId ?? 0)
-  const toCardId = Number(item.toCardId ?? 0)
+  const cardRelationId = toBusinessId(item.cardRelationId)
+  const fromCardId = toBusinessId(item.fromCardId)
+  const toCardId = toBusinessId(item.toCardId)
   const relationType = String(item.relationType ?? '').trim()
   if (!cardRelationId || !fromCardId || !toCardId || !relationType) return null
 
@@ -91,7 +99,7 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
   const relationToId = ref('')
   const relationType = ref('')
 
-  const loadCardsAndRelations = async (projectId: number | string) => {
+  const loadCardsAndRelations = async (projectId: string) => {
     if (!projectId) return
 
     try {
@@ -109,7 +117,7 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
   }
 
   const cardNameById = (idLike: string) => {
-    const hit = projectCards.value.find((item) => String(pickCardId(item)) === String(idLike))
+    const hit = projectCards.value.find((item) => pickCardId(item) === idLike)
     return String(hit?.name || `卡片#${idLike}`)
   }
 
@@ -126,7 +134,7 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
     })
   }
 
-  const toggleCardExpanded = ({ cardId, expanded }: { cardId: number; expanded: boolean }) => {
+  const toggleCardExpanded = ({ cardId, expanded }: { cardId: string; expanded: boolean }) => {
     const index = projectCards.value.findIndex((item) => pickCardId(item) === cardId)
     if (index < 0) return
 
@@ -227,8 +235,8 @@ export const useWorkbenchCards = (deps: UseWorkbenchCardsDeps) => {
 
   const createRelation = async () => {
     const { projectId, operatorId } = deps.getContext()
-    const fromCardId = Number(relationFromId.value)
-    const toCardId = Number(relationToId.value)
+    const fromCardId = relationFromId.value.trim()
+    const toCardId = relationToId.value.trim()
     const relationTypeValue = relationType.value.trim()
 
     if (!projectId || !operatorId || !fromCardId || !toCardId || !relationTypeValue) {

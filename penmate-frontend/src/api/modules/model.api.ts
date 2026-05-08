@@ -1,5 +1,4 @@
 import request from '@/utils/request'
-import type { IdLike } from '@/api/types'
 
 type AnyRecord = Record<string, unknown>
 
@@ -63,59 +62,68 @@ const normalizeProviderPayload = (payload: AnyRecord): AnyRecord | null => {
   return next
 }
 
+const assertNoLegacyOnlyProviderEntries = (providers: AnyRecord[]) => {
+  const hasLegacyOnlyEntry = providers.some((item) => item != null && typeof item === 'object' && 'id' in item && normalizeBusinessStringId((item as AnyRecord).providerId) === null)
+  if (hasLegacyOnlyEntry) {
+    throw new Error('Invalid provider contract')
+  }
+}
+
 export const modelApi = {
   async listProviders() {
     const providers = await request.get<AnyRecord[]>('/v1/model/providers')
-    return (providers ?? [])
+    const normalizedProviders = Array.isArray(providers) ? providers : []
+    assertNoLegacyOnlyProviderEntries(normalizedProviders)
+    return normalizedProviders
       .map((item) => normalizeProviderPayload(item))
       .filter((item): item is AnyRecord => item !== null)
   },
-  listKeys(userId: IdLike) {
+  listKeys(userId: string) {
     return request.get<AnyRecord[]>(`/v1/model/keys?userId=${userId}`)
   },
-  createKey(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createKey(userId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/model/keys?userId=${userId}&operatorId=${operatorId}`, payload)
   },
-  updateKey(keyId: IdLike, userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateKey(keyId: string, userId: string, operatorId: string, payload: AnyRecord) {
     return request.patch<string>(`/v1/model/keys/${keyId}?userId=${userId}&operatorId=${operatorId}`, payload)
   },
-  deleteKey(keyId: IdLike, userId: IdLike, operatorId: IdLike) {
+  deleteKey(keyId: string, userId: string, operatorId: string) {
     return request.delete<string>(`/v1/model/keys/${keyId}?userId=${userId}&operatorId=${operatorId}`)
   },
   listOfficialKeys() {
     return request.get<AnyRecord[]>('/v1/model/official-keys')
   },
-  createOfficialKey(operatorId: IdLike, payload: AnyRecord) {
+  createOfficialKey(operatorId: string, payload: AnyRecord) {
     return request.post<string>(`/v1/model/official-keys?operatorId=${operatorId}`, payload)
   },
-  updateOfficialKey(keyId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateOfficialKey(keyId: string, operatorId: string, payload: AnyRecord) {
     return request.patch<string>(`/v1/model/official-keys/${keyId}?operatorId=${operatorId}`, payload)
   },
-  deleteOfficialKey(keyId: IdLike, operatorId: IdLike) {
+  deleteOfficialKey(keyId: string, operatorId: string) {
     return request.delete<string>(`/v1/model/official-keys/${keyId}?operatorId=${operatorId}`)
   },
-  listUserModelConfigs(userId: IdLike) {
+  listUserModelConfigs(userId: string) {
     return request.get<AnyRecord[]>(`/v1/model/configs?userId=${userId}`)
   },
-  createUserModelConfig(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  createUserModelConfig(userId: string, operatorId: string, payload: AnyRecord) {
     return request.post<string>(
       `/v1/model/configs?userId=${userId}&operatorId=${operatorId}`,
       normalizeUserModelConfigPayload(payload)
     )
   },
-  updateUserModelConfig(userId: IdLike, businessModelConfigId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  updateUserModelConfig(userId: string, businessModelConfigId: string, operatorId: string, payload: AnyRecord) {
     return request.put<string>(
       `/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`,
       normalizeUserModelConfigPayload(payload)
     )
   },
-  deleteUserModelConfig(userId: IdLike, businessModelConfigId: IdLike, operatorId: IdLike) {
+  deleteUserModelConfig(userId: string, businessModelConfigId: string, operatorId: string) {
     return request.delete<string>(`/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`)
   },
-  getUserModelPreferences(userId: IdLike) {
+  getUserModelPreferences(userId: string) {
     return request.get<AnyRecord>(`/v1/model/preferences?userId=${userId}`)
   },
-  saveUserModelPreferences(userId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  saveUserModelPreferences(userId: string, operatorId: string, payload: AnyRecord) {
     return request.post<string>(
       `/v1/model/preferences?userId=${userId}&operatorId=${operatorId}`,
       normalizeUserModelPreferencePayload(payload)

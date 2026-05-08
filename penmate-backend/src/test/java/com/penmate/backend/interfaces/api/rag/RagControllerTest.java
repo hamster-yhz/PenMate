@@ -44,11 +44,12 @@ class RagControllerTest {
     }
 
     @Test
-    // 创建文档成功。
+    // 创建文档成功�?
     void UT_RAG_DOCUMENT_CREATE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-DOC-CREATE";
         RagDocument doc = new RagDocument();
-        doc.setId(9001L);
+        doc.setDocumentId(9001L);
+        doc.setProjectId(10001L);
         doc.setDocType("design");
         doc.setTitle("世界观设定");
 
@@ -64,12 +65,12 @@ class RagControllerTest {
                                 "originObjectKey", "novels/10001/rag/obj-1"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(9001))
+                .andExpect(jsonPath("$.data.documentId").value("9001"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
     @Test
-    // 上传URL获取成功。
+    // 上传URL获取成功�?
     void UT_RAG_UPLOAD_URL_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-UPLOAD-URL";
         when(ragApplicationService.getDocumentUploadUrl(10001L)).thenReturn(Map.of(
@@ -85,7 +86,7 @@ class RagControllerTest {
     }
 
     @Test
-    // 向量化异常映射。
+    // 向量化异常映射�?
     void UT_RAG_EMBED_ERROR_CODE_MAPPING() throws Exception {
         String traceId = "UT-TRACE-RAG-EMBED-ERROR";
         doThrow(new IllegalArgumentException("Embedding provider timeout"))
@@ -101,7 +102,7 @@ class RagControllerTest {
     }
 
     @Test
-    // 检索日志分页接口基本成功（返回列表）。
+    // 检索日志分页接口基本成功（返回列表）�?
     void UT_RAG_RETRIEVAL_LOGS_PAGINATION_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-LOGS";
         when(ragApplicationService.listRetrievalLogs(10001L)).thenReturn(List.of(Map.of(
@@ -117,7 +118,7 @@ class RagControllerTest {
     }
 
     @Test
-    // 删除文档成功。
+    // 删除文档成功�?
     void UT_RAG_DOCUMENT_DELETE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-DOC-DELETE";
 
@@ -130,37 +131,39 @@ class RagControllerTest {
     }
 
     @Test
-    // 解析文档成功。
+    // 解析文档成功�?
     void UT_RAG_PARSE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-PARSE";
         RagDocument doc = new RagDocument();
-        doc.setId(9001L);
+        doc.setDocumentId(9001L);
+        doc.setProjectId(10001L);
         when(ragApplicationService.parseDocument(eq(10001L), eq(9001L), any(), eq(traceId))).thenReturn(doc);
 
         mockMvc().perform(post("/api/v1/novels/10001/rag/documents/9001/parse")
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(9001));
+                .andExpect(jsonPath("$.data.documentId").value("9001"));
     }
 
     @Test
-    // 向量化成功。
+    // 向量化成功�?
     void UT_RAG_EMBED_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-EMBED";
         RagDocument doc = new RagDocument();
-        doc.setId(9001L);
+        doc.setDocumentId(9001L);
+        doc.setProjectId(10001L);
         when(ragApplicationService.embedDocument(eq(10001L), eq(9001L), any(), eq(traceId))).thenReturn(doc);
 
         mockMvc().perform(post("/api/v1/novels/10001/rag/documents/9001/embed")
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(9001));
+                .andExpect(jsonPath("$.data.documentId").value("9001"));
     }
 
     @Test
-    // 索引状态查询成功。
+    // 索引状态查询成功�?
     void UT_RAG_INDEX_STATUS_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-RAG-INDEX-STATUS";
         when(ragApplicationService.getIndexStatus(10001L, 9001L)).thenReturn(Map.of("status", "indexed"));
@@ -171,5 +174,15 @@ class RagControllerTest {
                 .andExpect(jsonPath("$.data.status").value("indexed"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
+    @Test
+    void UT_RAG_REJECTS_LEGACY_PREFIX_IDS() throws Exception {
+        String traceId = "UT-TRACE-RAG-LEGACY-ID-REJECT";
+
+        mockMvc().perform(get("/api/v1/novels/project-10001/rag/documents/document-9001")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
 }
+
 

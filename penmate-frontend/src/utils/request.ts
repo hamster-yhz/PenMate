@@ -1,4 +1,5 @@
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
+import { parse, isSafeNumber, toSafeNumberOrThrow } from 'lossless-json'
 import type { ApiEnvelope, ApiErrorPayload, AppError } from '@/api/types'
 import { clearSession, getSession, setSession } from '@/stores/session'
 
@@ -7,9 +8,32 @@ interface RequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
 }
 
+const parseJsonLosslessly = (raw: unknown) => {
+  if (typeof raw !== 'string') {
+    return raw
+  }
+
+  const payload = raw.trim()
+  if (!payload) {
+    return raw
+  }
+
+  try {
+    return parse(payload, undefined, (value: string) => {
+      if (isSafeNumber(value)) {
+        return toSafeNumberOrThrow(value)
+      }
+      return value
+    })
+  } catch {
+    return raw
+  }
+}
+
 const requestRaw = axios.create({
   baseURL: import.meta.env.VITE_APP_API_BASE_URL || '/api',
-  timeout: 10000
+  timeout: 10000,
+  transformResponse: [(data) => parseJsonLosslessly(data)]
 })
 
 let refreshPromise: Promise<string> | null = null

@@ -9,7 +9,7 @@ type ApprovalCardData = {
 }
 
 type ChatMessage = {
-  id: number
+  id: string
   role: 'user' | 'assistant' | 'system'
   text: string
   approval?: ApprovalCardData
@@ -33,7 +33,7 @@ describe('useWorkbenchApprovals', () => {
     const approve = vi.fn().mockResolvedValue('ok')
     const messages = [
       {
-        id: 1,
+        id: 'message-1',
         role: 'assistant',
         text: '待审批消息',
         approval: {
@@ -46,7 +46,7 @@ describe('useWorkbenchApprovals', () => {
     ] as ChatMessage[]
 
     const approvals = useWorkbenchApprovals({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       getMessages: () => messages,
       approve,
       reject: vi.fn(),
@@ -55,8 +55,8 @@ describe('useWorkbenchApprovals', () => {
 
     await approvals.handleApprove('42')
 
-    expect(approve).toHaveBeenCalledWith(101, 42, {
-      reviewedBy: 201,
+    expect(approve).toHaveBeenCalledWith('project-101', '42', {
+      reviewedBy: 'operator-201',
       comment: '前端审批通过',
     })
     expect(messages[0].approval).toMatchObject({
@@ -72,7 +72,7 @@ describe('useWorkbenchApprovals', () => {
     const reject = vi.fn().mockResolvedValue('ok')
     const messages = [
       {
-        id: 2,
+        id: 'message-2',
         role: 'assistant',
         text: '待审批消息',
         approval: {
@@ -85,7 +85,7 @@ describe('useWorkbenchApprovals', () => {
     ] as ChatMessage[]
 
     const approvals = useWorkbenchApprovals({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       getMessages: () => messages,
       approve: vi.fn(),
       reject,
@@ -94,8 +94,8 @@ describe('useWorkbenchApprovals', () => {
 
     await approvals.handleReject('43')
 
-    expect(reject).toHaveBeenCalledWith(101, 43, {
-      reviewedBy: 201,
+    expect(reject).toHaveBeenCalledWith('project-101', '43', {
+      reviewedBy: 'operator-201',
       comment: '前端审批拒绝',
     })
     expect(messages[0].approval).toMatchObject({
@@ -111,7 +111,7 @@ describe('useWorkbenchApprovals', () => {
     const approve = vi.fn().mockRejectedValue('网络故障')
     const messages = [
       {
-        id: 4,
+        id: 'message-4',
         role: 'assistant',
         text: '待审批消息',
         approval: {
@@ -124,7 +124,7 @@ describe('useWorkbenchApprovals', () => {
     ] as ChatMessage[]
 
     const approvals = useWorkbenchApprovals({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       getMessages: () => messages,
       approve,
       reject: vi.fn(),
@@ -133,8 +133,8 @@ describe('useWorkbenchApprovals', () => {
 
     await approvals.handleApprove('44')
 
-    expect(approve).toHaveBeenCalledWith(101, 44, {
-      reviewedBy: 201,
+    expect(approve).toHaveBeenCalledWith('project-101', '44', {
+      reviewedBy: 'operator-201',
       comment: '前端审批通过',
     })
     expect(notifyWarning).toHaveBeenCalledWith('网络故障')
@@ -151,7 +151,7 @@ describe('useWorkbenchApprovals', () => {
     const approve = vi.fn().mockResolvedValue('ok')
     const messages = [
       {
-        id: 5,
+        id: 'message-5',
         role: 'assistant',
         text: '已处理审批消息',
         approval: {
@@ -165,7 +165,7 @@ describe('useWorkbenchApprovals', () => {
     ] as ChatMessage[]
 
     const approvals = useWorkbenchApprovals({
-      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
       getMessages: () => messages,
       approve,
       reject: vi.fn(),
@@ -189,7 +189,7 @@ describe('useWorkbenchApprovals', () => {
     const approve = vi.fn()
     const messages = [
       {
-        id: 3,
+        id: 'message-3',
         role: 'assistant',
         text: '待审批消息',
         approval: {
@@ -202,7 +202,7 @@ describe('useWorkbenchApprovals', () => {
     ] as ChatMessage[]
 
     const approvals = useWorkbenchApprovals({
-      getContext: () => ({ projectId: 0, operatorId: 0 }),
+      getContext: () => ({ projectId: '', operatorId: '' }),
       getMessages: () => messages,
       approve,
       reject: vi.fn(),
@@ -216,6 +216,39 @@ describe('useWorkbenchApprovals', () => {
     expect(messages[0].approval).toMatchObject({
       resolved: false,
       resolvedAction: undefined,
+    })
+  })
+
+  it('accepts_non_numeric_approval_ids_as_string_only_business_ids', async () => {
+    const useWorkbenchApprovals = await loadUseWorkbenchApprovals()
+    const approve = vi.fn().mockResolvedValue('ok')
+    const messages = [
+      {
+        id: 'message-x',
+        role: 'assistant',
+        text: '待审批消息',
+        approval: {
+          id: 'approval-xyz',
+          message: '字符串审批 ID',
+          time: '20:05',
+          resolved: false,
+        },
+      },
+    ] as ChatMessage[]
+
+    const approvals = useWorkbenchApprovals({
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
+      getMessages: () => messages,
+      approve,
+      reject: vi.fn(),
+      notifyWarning: vi.fn(),
+    })
+
+    await approvals.handleApprove('approval-xyz')
+
+    expect(approve).toHaveBeenCalledWith('project-101', 'approval-xyz', {
+      reviewedBy: 'operator-201',
+      comment: '前端审批通过',
     })
   })
 })

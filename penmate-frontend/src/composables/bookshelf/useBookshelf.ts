@@ -181,7 +181,7 @@ export const useBookshelf = () => {
           description: bookForm.description,
           genre: bookForm.genre,
           tags,
-          ownerId: session.userId,
+          ownerId: session.userId || undefined,
         })
         message.success('作品已创建')
       }
@@ -203,7 +203,7 @@ export const useBookshelf = () => {
 
     deleting.value = true
     try {
-      await novelApi.deleteProject(deletingBook.value.id, session.userId || 0)
+      await novelApi.deleteProject(deletingBook.value.id, session.userId || '')
       message.success('作品已删除')
       await loadBooks()
       closeDeleteDialog()

@@ -5,7 +5,7 @@ import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 withDefaults(defineProps<{
   messages?: ChatMessage[]
   isGenerating?: boolean
-  streamingAssistantMsgId?: number | null
+  streamingAssistantMsgId?: string | number | null
   isApprovalBusy?: (id: string) => boolean
 }>(), {
   messages: () => [],

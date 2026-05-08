@@ -1,5 +1,7 @@
 package com.penmate.backend.domain.novel.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 @Data
 /**
@@ -9,10 +11,13 @@ public class NovelOutlineNode {
     /** 数据库物理主键 ID。 */
     private Long id;
     /** 节点业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long outlineNodeId;
     /** 所属项目业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
     /** 父节点业务 ID，根节点可为空。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long parentId;
     /** 节点标题。 */
     private String title;

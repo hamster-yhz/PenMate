@@ -189,7 +189,13 @@ const form = reactive({
   apiKey: '',
 })
 
-const getUserId = () => (typeof session.userId === 'number' && session.userId > 0 ? session.userId : null)
+const getUserId = () => {
+  if (typeof session.userId !== 'string') {
+    return null
+  }
+  const normalized = session.userId.trim()
+  return normalized || null
+}
 const getOperatorId = () => getUserId()
 
 const isFormVisible = computed(() => formMode.value !== null)
@@ -197,7 +203,6 @@ const deriveKeySourceType = (item: AnyRecord): KeySourceType =>
   String(item.keySourceType ?? 'USER_KEY') === 'OFFICIAL_KEY' ? 'OFFICIAL_KEY' : 'USER_KEY'
 
 const formatKeySourceTypeLabel = (keySourceType: KeySourceType) => (keySourceType === 'OFFICIAL_KEY' ? '官方模型' : '用户模型')
-const formatKeyOptionLabel = (item: AnyRecord) => String(item.keyName ?? item.name ?? item.displayName ?? '未命名 Key')
 const extractPreferenceRecord = (payload: unknown): AnyRecord => {
   if (!payload || typeof payload !== 'object') {
     return {}

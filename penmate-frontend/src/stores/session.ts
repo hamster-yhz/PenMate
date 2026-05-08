@@ -1,7 +1,7 @@
 export interface SessionState {
   accessToken: string
   refreshToken: string
-  userId?: number
+  userId?: string
   userName?: string
   userEmail?: string
 }

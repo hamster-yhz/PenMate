@@ -6,8 +6,8 @@ type ChatMessageLike = {
 
 type UseWorkbenchEditorDeps = {
   getActiveChapterKey: () => string
-  getProjectId: () => number
-  saveDraft: (projectId: number, chapterId: string | number, content: string) => void
+  getProjectId: () => string | null
+  saveDraft: (projectId: string, chapterId: string, content: string) => void
   setChapterContent?: (chapterId: string, content: string) => void
 }
 

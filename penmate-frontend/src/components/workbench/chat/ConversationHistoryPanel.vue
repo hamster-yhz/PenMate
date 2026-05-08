@@ -5,7 +5,7 @@ withDefaults(defineProps<{
   visible?: boolean
   loading?: boolean
   conversations?: ConversationItem[]
-  currentConversationId?: number | null
+  currentConversationId?: string | null
 }>(), {
   visible: false,
   loading: false,
@@ -14,10 +14,10 @@ withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  'select-conversation': [conversationId: number]
+  'select-conversation': [conversationId: string]
 }>()
 
-const handleSelect = (conversationId: number) => {
+const handleSelect = (conversationId: string) => {
   emit('select-conversation', conversationId)
 }
 </script>

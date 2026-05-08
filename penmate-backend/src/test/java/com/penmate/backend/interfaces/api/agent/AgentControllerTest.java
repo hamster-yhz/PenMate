@@ -66,7 +66,8 @@ class AgentControllerTest {
         mockMvc().perform(get("/api/v1/novels/10001/agent/sessions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data[0].conversationId").value("90001"))
+                .andExpect(jsonPath("$.data[0].sessionId").value("90001"))
+                .andExpect(jsonPath("$.data[0].conversationId").doesNotExist())
                 .andExpect(jsonPath("$.data[0].title").value("第三章夜雨追踪"));
 
         verify(agentConversationAppService).listConversations(10001L);
@@ -80,11 +81,12 @@ class AgentControllerTest {
         mockMvc().perform(post("/api/v1/novels/10001/agent/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "userId", 1001,
+                                "userId", "1001",
                                 "title", "新会话"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.conversationId").value("90002"))
+                .andExpect(jsonPath("$.data.sessionId").value("90002"))
+                .andExpect(jsonPath("$.data.conversationId").doesNotExist())
                 .andExpect(jsonPath("$.data.title").value("新会话"));
 
         verify(agentConversationAppService).createConversation(eq(10001L), any(), eq(null));
@@ -255,5 +257,14 @@ class AgentControllerTest {
                 taskType,
                 userMessage
         );
+    }
+    @Test
+    void UT_AGENT_REJECTS_LEGACY_PREFIX_IDS() throws Exception {
+        String traceId = "UT-TRACE-AGENT-LEGACY-ID-REJECT";
+
+        mockMvc().perform(get("/api/v1/novels/project-10001/agent/sessions/session-90001/recovery")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
     }
 }

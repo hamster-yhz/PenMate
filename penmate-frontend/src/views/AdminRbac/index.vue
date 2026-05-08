@@ -155,9 +155,9 @@
               :key="user.userId"
               :data-testid="`rbac-user-select-${user.userId}`"
               class="user-card"
-              :class="{ active: user.userId === activeUserId }"
+              :class="{ active: toBusinessId(user.userId) === activeUserId }"
               type="button"
-              @click="selectUser(user.userId)"
+              @click="selectUser(String(user.userId))"
             >
               <div class="user-card-top">
                 <strong>{{ user.displayName }}</strong>
@@ -304,7 +304,7 @@
                   :data-testid="`rbac-remove-user-role-${getRoleBusinessId(role)}`"
                   class="ghost-btn inline-action-btn"
                   type="button"
-                  @click="removeRoleFromSelectedUser(getRoleBusinessId(role) ?? 0)"
+                  @click="removeRoleFromSelectedUser(getRoleBusinessId(role) ?? '')"
                 >
                   解绑
                 </button>
@@ -341,7 +341,7 @@
                 class="role-select-btn"
                 :class="{ active: getRoleBusinessId(role) === activeRoleId }"
                 type="button"
-                @click="selectRole(getRoleBusinessId(role) ?? 0)"
+                @click="selectRole(getRoleBusinessId(role) ?? '')"
               >
                 <strong>{{ role.name }}</strong>
                 <span>{{ role.code }}</span>
@@ -500,7 +500,7 @@
                 :data-testid="`rbac-remove-role-permission-${getPermissionBusinessId(permission)}`"
                 class="ghost-btn inline-action-btn"
                 type="button"
-                @click="removePermissionFromActiveRole(getPermissionBusinessId(permission) ?? 0)"
+                @click="removePermissionFromActiveRole(getPermissionBusinessId(permission) ?? '')"
               >
                 解绑
               </button>
@@ -558,35 +558,32 @@ import { rbacApi } from '@/api/modules/rbac.api'
 import { getSession } from '@/stores/session'
 
 type RbacUser = {
-  userId: number
+  userId: string
   email: string
   displayName: string
   status: number
   authMethod?: string
 }
 
-type RbacRole = {
-  id?: number
-  roleId?: number
+ type RbacRole = {
+  roleId: string
   code: string
   name: string
   description?: string
   isSystem?: boolean
 }
 
-type RbacPermission = {
-  id?: number
-  permissionId?: number
+ type RbacPermission = {
+  permissionId: string
   code: string
   name: string
   module?: string
   description?: string
 }
 
-type RbacMenu = {
-  id?: number
-  menuId?: number
-  parentId?: number | null
+ type RbacMenu = {
+  menuId: string
+  parentId?: string | null
   title: string
   path: string
   sortOrder?: number
@@ -601,6 +598,142 @@ const USER_PAGE_SIZE = 2
 const router = useRouter()
 const session = getSession()
 
+const toBusinessId = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const normalized = value.trim()
+  return normalized || null
+}
+
+const normalizeRbacUser = (value: unknown): RbacUser | null => {
+  if (value == null || typeof value !== 'object') {
+    return null
+  }
+
+  const candidate = value as Record<string, unknown>
+  const userId = toBusinessId(candidate.userId)
+  const email = toBusinessId(candidate.email)
+  const displayName = toBusinessId(candidate.displayName)
+  const status = typeof candidate.status === 'number' ? candidate.status : null
+
+  if (userId == null || email == null || displayName == null || status == null) {
+    return null
+  }
+
+  return {
+    userId,
+    email,
+    displayName,
+    status,
+    authMethod: typeof candidate.authMethod === 'string' && candidate.authMethod.trim()
+      ? candidate.authMethod
+      : undefined,
+  }
+}
+
+const normalizeRbacRole = (value: unknown): RbacRole | null => {
+  if (value == null || typeof value !== 'object') {
+    return null
+  }
+
+  const candidate = value as Record<string, unknown>
+  const roleId = toBusinessId(candidate.roleId)
+  const code = toBusinessId(candidate.code)
+  const name = toBusinessId(candidate.name)
+
+  if (roleId == null || code == null || name == null) {
+    return null
+  }
+
+  const description = typeof candidate.description === 'string' && candidate.description.trim()
+    ? candidate.description
+    : undefined
+
+  return {
+    roleId,
+    code,
+    name,
+    description,
+    isSystem: typeof candidate.isSystem === 'boolean' ? candidate.isSystem : undefined,
+  }
+}
+
+const normalizeRbacPermission = (value: unknown): RbacPermission | null => {
+  if (value == null || typeof value !== 'object') {
+    return null
+  }
+
+  const candidate = value as Record<string, unknown>
+  const permissionId = toBusinessId(candidate.permissionId)
+  const code = toBusinessId(candidate.code)
+  const name = toBusinessId(candidate.name)
+
+  if (permissionId == null || code == null || name == null) {
+    return null
+  }
+
+  const module = typeof candidate.module === 'string' && candidate.module.trim()
+    ? candidate.module
+    : undefined
+  const description = typeof candidate.description === 'string' && candidate.description.trim()
+    ? candidate.description
+    : undefined
+
+  return {
+    permissionId,
+    code,
+    name,
+    module,
+    description,
+  }
+}
+
+const normalizeRbacMenu = (value: unknown): RbacMenu | null => {
+  if (value == null || typeof value !== 'object') {
+    return null
+  }
+
+  const candidate = value as Record<string, unknown>
+  const menuId = toBusinessId(candidate.menuId)
+  const title = toBusinessId(candidate.title)
+  const path = toBusinessId(candidate.path)
+
+  if (menuId == null || title == null || path == null) {
+    return null
+  }
+
+  const parentId = candidate.parentId == null ? null : toBusinessId(candidate.parentId)
+
+  return {
+    menuId,
+    parentId,
+    title,
+    path,
+    sortOrder: typeof candidate.sortOrder === 'number' ? candidate.sortOrder : undefined,
+    permissionCode: typeof candidate.permissionCode === 'string' && candidate.permissionCode.trim()
+      ? candidate.permissionCode
+      : undefined,
+    visible: typeof candidate.visible === 'boolean' ? candidate.visible : undefined,
+  }
+}
+
+const normalizeRbacRoleList = (value: unknown): RbacRole[] => Array.isArray(value)
+  ? value.map(normalizeRbacRole).filter((item): item is RbacRole => item != null)
+  : []
+
+const normalizeRbacPermissionList = (value: unknown): RbacPermission[] => Array.isArray(value)
+  ? value.map(normalizeRbacPermission).filter((item): item is RbacPermission => item != null)
+  : []
+
+const normalizeRbacUserList = (value: unknown): RbacUser[] => Array.isArray(value)
+  ? value.map(normalizeRbacUser).filter((item): item is RbacUser => item != null)
+  : []
+
+const normalizeRbacMenuList = (value: unknown): RbacMenu[] => Array.isArray(value)
+  ? value.map(normalizeRbacMenu).filter((item): item is RbacMenu => item != null)
+  : []
+
 const users = ref<RbacUser[]>([])
 const roles = ref<RbacRole[]>([])
 const permissions = ref<RbacPermission[]>([])
@@ -608,8 +741,8 @@ const menus = ref<RbacMenu[]>([])
 const profileMenus = ref<RbacMenu[]>([])
 const userRoles = ref<RbacRole[]>([])
 const rolePermissions = ref<RbacPermission[]>([])
-const activeUserId = ref<number | null>(session.userId ?? null)
-const activeRoleId = ref<number | null>(null)
+const activeUserId = ref<string | null>(toBusinessId(session.userId))
+const activeRoleId = ref<string | null>(null)
 const errorMessage = ref('')
 const createUserForm = ref({
   email: '',
@@ -637,21 +770,19 @@ const roleDetailForm = ref({
 })
 const activeWorkspace = ref<WorkspaceKey>('users')
 const createUserExpanded = ref(false)
-const pendingDeleteUserId = ref<number | null>(null)
-const pendingDeleteRoleId = ref<number | null>(null)
+const pendingDeleteUserId = ref<string | null>(null)
+const pendingDeleteRoleId = ref<string | null>(null)
 const userSearchQuery = ref('')
 const userStatusFilter = ref<'all' | '1' | '0'>('all')
 const userPage = ref(1)
 let latestUserSelectionToken = 0
 let latestRoleSelectionToken = 0
 
-const getRoleBusinessId = (role: RbacRole) => (typeof role.roleId === 'number' && role.roleId > 0 ? role.roleId : null)
-const getPermissionBusinessId = (permission: RbacPermission) => (
-  typeof permission.permissionId === 'number' && permission.permissionId > 0 ? permission.permissionId : null
-)
-const getMenuBusinessId = (menu: RbacMenu) => (typeof menu.menuId === 'number' && menu.menuId > 0 ? menu.menuId : null)
+const getRoleBusinessId = (role: RbacRole) => toBusinessId(role.roleId)
+const getPermissionBusinessId = (permission: RbacPermission) => toBusinessId(permission.permissionId)
+const getMenuBusinessId = (menu: RbacMenu) => toBusinessId(menu.menuId)
 
-const activeUser = computed(() => users.value.find((item) => item.userId === activeUserId.value) ?? null)
+const activeUser = computed(() => users.value.find((item) => toBusinessId(item.userId) === activeUserId.value) ?? null)
 const activeRole = computed(
   () => roles.value.find((item) => getRoleBusinessId(item) === activeRoleId.value)
     ?? userRoles.value.find((item) => getRoleBusinessId(item) === activeRoleId.value)
@@ -677,7 +808,7 @@ const filteredUsers = computed(() => {
         return right.status - left.status
       }
 
-      return left.userId - right.userId
+      return String(left.userId).localeCompare(String(right.userId), undefined, { numeric: true })
     })
 })
 const userTotalPages = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / USER_PAGE_SIZE)))
@@ -735,18 +866,18 @@ watch(
   { immediate: true }
 )
 
-const loadProfileMenus = async (userId: number) => {
-  profileMenus.value = ((await rbacApi.listProfileMenus(userId)) || []) as RbacMenu[]
+const loadProfileMenus = async (userId: string) => {
+  profileMenus.value = normalizeRbacMenuList(await rbacApi.listProfileMenus(userId))
 }
 
-const loadRolePermissions = async (roleId: number) => {
-  rolePermissions.value = ((await rbacApi.listRolePermissions(roleId)) || []) as RbacPermission[]
+const loadRolePermissions = async (roleId: string) => {
+  rolePermissions.value = normalizeRbacPermissionList(await rbacApi.listRolePermissions(roleId))
 }
 
-const loadUserRoles = async (userId: number) => {
-  userRoles.value = ((await rbacApi.listUserRoles(userId)) || []) as RbacRole[]
-  const existingRoleIds = new Set(userRoles.value.map((item) => getRoleBusinessId(item)).filter((item): item is number => item != null))
-  const defaultRoleId = existingRoleIds.has(activeRoleId.value ?? -1)
+const loadUserRoles = async (userId: string) => {
+  userRoles.value = normalizeRbacRoleList(await rbacApi.listUserRoles(userId))
+  const existingRoleIds = new Set(userRoles.value.map((item) => getRoleBusinessId(item)).filter((item): item is string => item != null))
+  const defaultRoleId = activeRoleId.value && existingRoleIds.has(activeRoleId.value)
     ? activeRoleId.value
     : (getRoleBusinessId(userRoles.value[0] as RbacRole) ?? null)
 
@@ -759,19 +890,19 @@ const loadUserRoles = async (userId: number) => {
   }
 }
 
-const loadUserContext = async (userId: number, selectionToken: number) => {
+const loadUserContext = async (userId: string, selectionToken: number) => {
   const roleSelectionTokenAtStart = latestRoleSelectionToken
-  const nextProfileMenus = ((await rbacApi.listProfileMenus(userId)) || []) as RbacMenu[]
+  const nextProfileMenus = normalizeRbacMenuList(await rbacApi.listProfileMenus(userId))
   if (selectionToken !== latestUserSelectionToken) {
     return false
   }
 
-  const nextUserRoles = ((await rbacApi.listUserRoles(userId)) || []) as RbacRole[]
+  const nextUserRoles = normalizeRbacRoleList(await rbacApi.listUserRoles(userId))
   if (selectionToken !== latestUserSelectionToken) {
     return false
   }
 
-  const existingRoleIds = new Set(nextUserRoles.map((item) => getRoleBusinessId(item)).filter((item): item is number => item != null))
+  const existingRoleIds = new Set(nextUserRoles.map((item) => getRoleBusinessId(item)).filter((item): item is string => item != null))
 
   profileMenus.value = nextProfileMenus
   userRoles.value = nextUserRoles
@@ -780,14 +911,14 @@ const loadUserContext = async (userId: number, selectionToken: number) => {
     return true
   }
 
-  const nextRoleId = existingRoleIds.has(activeRoleId.value ?? -1)
+  const nextRoleId = activeRoleId.value && existingRoleIds.has(activeRoleId.value)
     ? activeRoleId.value
     : (getRoleBusinessId(nextUserRoles[0] as RbacRole) ?? null)
   const roleCommitToken = ++latestRoleSelectionToken
 
   let nextRolePermissions: RbacPermission[] = []
   if (nextRoleId != null) {
-    nextRolePermissions = ((await rbacApi.listRolePermissions(nextRoleId)) || []) as RbacPermission[]
+    nextRolePermissions = normalizeRbacPermissionList(await rbacApi.listRolePermissions(nextRoleId))
     if (selectionToken !== latestUserSelectionToken || roleCommitToken !== latestRoleSelectionToken) {
       return true
     }
@@ -802,8 +933,8 @@ const loadUserContext = async (userId: number, selectionToken: number) => {
   return true
 }
 
-const loadRoleContext = async (roleId: number, selectionToken: number) => {
-  const nextRolePermissions = ((await rbacApi.listRolePermissions(roleId)) || []) as RbacPermission[]
+const loadRoleContext = async (roleId: string, selectionToken: number) => {
+  const nextRolePermissions = normalizeRbacPermissionList(await rbacApi.listRolePermissions(roleId))
   if (selectionToken !== latestRoleSelectionToken) {
     return false
   }
@@ -812,7 +943,7 @@ const loadRoleContext = async (roleId: number, selectionToken: number) => {
   return true
 }
 
-const selectUser = async (userId: number) => {
+const selectUser = async (userId: string) => {
   const previousUserId = activeUserId.value
   const previousProfileMenus = [...profileMenus.value]
   const previousUserRoles = [...userRoles.value]
@@ -839,7 +970,7 @@ const selectUser = async (userId: number) => {
   }
 }
 
-const selectRole = async (roleId: number) => {
+const selectRole = async (roleId: string) => {
   const previousRoleId = activeRoleId.value
   const selectionToken = ++latestRoleSelectionToken
   errorMessage.value = ''
@@ -874,10 +1005,10 @@ const createUser = async () => {
     }
     createUserExpanded.value = false
     await loadPage()
-    const createdUserId = typeof createdUser?.userId === 'number' ? createdUser.userId : null
+    const createdUserId = toBusinessId(createdUser?.userId)
     if (createdUserId != null) {
       activeUserId.value = createdUserId
-      const createdUserIndex = filteredUsers.value.findIndex((user) => user.userId === createdUserId)
+      const createdUserIndex = filteredUsers.value.findIndex((user) => toBusinessId(user.userId) === createdUserId)
       if (createdUserIndex >= 0) {
         userPage.value = Math.floor(createdUserIndex / USER_PAGE_SIZE) + 1
       }
@@ -952,7 +1083,7 @@ const assignRoleToSelectedUser = async () => {
 
   errorMessage.value = ''
   try {
-    await rbacApi.assignUserRole(activeUserId.value, Number(assignRoleForm.value.roleId))
+    await rbacApi.assignUserRole(activeUserId.value, assignRoleForm.value.roleId)
     assignRoleForm.value.roleId = ''
     await loadUserRoles(activeUserId.value)
     await loadProfileMenus(activeUserId.value)
@@ -961,7 +1092,7 @@ const assignRoleToSelectedUser = async () => {
   }
 }
 
-const removeRoleFromSelectedUser = async (roleId: number) => {
+const removeRoleFromSelectedUser = async (roleId: string) => {
   if (activeUserId.value == null) {
     return
   }
@@ -983,7 +1114,7 @@ const assignPermissionToActiveRole = async () => {
 
   errorMessage.value = ''
   try {
-    await rbacApi.assignRolePermission(activeRoleId.value, Number(assignPermissionForm.value.permissionId))
+    await rbacApi.assignRolePermission(activeRoleId.value, assignPermissionForm.value.permissionId)
     assignPermissionForm.value.permissionId = ''
     await loadRolePermissions(activeRoleId.value)
     if (activeUserId.value != null) {
@@ -1008,7 +1139,7 @@ const createRole = async () => {
       code: '',
       description: '',
     }
-    roles.value = ((await rbacApi.listRoles()) || []) as RbacRole[]
+    roles.value = normalizeRbacRoleList(await rbacApi.listRoles())
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'create role failed'
   }
@@ -1025,7 +1156,7 @@ const updateActiveRole = async () => {
       name: roleDetailForm.value.name,
       description: roleDetailForm.value.description,
     })
-    roles.value = ((await rbacApi.listRoles()) || []) as RbacRole[]
+    roles.value = normalizeRbacRoleList(await rbacApi.listRoles())
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'update role failed'
   }
@@ -1040,7 +1171,7 @@ const deleteActiveRole = async () => {
   try {
     await rbacApi.deleteRole(activeRoleId.value)
     pendingDeleteRoleId.value = null
-    roles.value = ((await rbacApi.listRoles()) || []) as RbacRole[]
+    roles.value = normalizeRbacRoleList(await rbacApi.listRoles())
     if (activeUserId.value != null) {
       await loadUserRoles(activeUserId.value)
       await loadProfileMenus(activeUserId.value)
@@ -1057,7 +1188,7 @@ const deleteActiveRole = async () => {
   }
 }
 
-const removePermissionFromActiveRole = async (permissionId: number) => {
+const removePermissionFromActiveRole = async (permissionId: string) => {
   if (activeRoleId.value == null) {
     return
   }
@@ -1096,15 +1227,15 @@ const loadPage = async () => {
       rbacApi.listMenus(),
     ])
 
-    users.value = (userList || []) as RbacUser[]
-    roles.value = (roleList || []) as RbacRole[]
-    permissions.value = (permissionList || []) as RbacPermission[]
-    menus.value = (menuList || []) as RbacMenu[]
+    users.value = normalizeRbacUserList(userList)
+    roles.value = normalizeRbacRoleList(roleList)
+    permissions.value = normalizeRbacPermissionList(permissionList)
+    menus.value = normalizeRbacMenuList(menuList)
 
-    const existingUserIds = new Set(users.value.map((item) => item.userId))
-    const defaultUserId = existingUserIds.has(activeUserId.value ?? -1)
+    const existingUserIds = new Set(users.value.map((item) => toBusinessId(item.userId)).filter((item): item is string => item != null))
+    const defaultUserId = activeUserId.value && existingUserIds.has(activeUserId.value)
       ? activeUserId.value
-      : users.value[0]?.userId ?? null
+      : toBusinessId(users.value[0]?.userId)
 
     activeUserId.value = defaultUserId
 

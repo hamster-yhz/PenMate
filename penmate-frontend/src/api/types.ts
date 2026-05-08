@@ -27,6 +27,3 @@ export interface AppError extends Error {
   traceId?: string
   details?: unknown
 }
-
-export type IdLike = number | string
-

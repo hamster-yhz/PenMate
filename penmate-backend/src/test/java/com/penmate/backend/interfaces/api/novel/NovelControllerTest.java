@@ -55,6 +55,8 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-PROJECT-CREATE";
         NovelProject project = new NovelProject();
         project.setId(10001L);
+        project.setProjectId(10001L);
+        project.setOwnerUserId(1001L);
         project.setTitle("第七星环");
         when(novelApplicationService.createProject(any(), eq(traceId))).thenReturn(project);
 
@@ -62,12 +64,15 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "ownerUserId", 1001,
+                                "ownerUserId", "1001",
                                 "title", "第七星环",
                                 "summary", "赛博东方"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(10001))
+                .andExpect(jsonPath("$.data.projectId").isString())
+                .andExpect(jsonPath("$.data.ownerUserId").isString())
+                .andExpect(jsonPath("$.data.projectId").value("10001"))
+                .andExpect(jsonPath("$.data.ownerUserId").value("1001"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -80,7 +85,7 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "ownerUserId", 1001,
+                                "ownerUserId", "1001",
                                 "title", ""
                         ))))
                 .andExpect(status().isBadRequest())
@@ -100,7 +105,7 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "userId", 2001,
+                                "userId", "2001",
                                 "memberRole", "editor"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
@@ -129,13 +134,15 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-VERSION-RESTORE";
         NovelChapter chapter = new NovelChapter();
         chapter.setId(3001L);
+        chapter.setChapterId(3001L);
         when(novelApplicationService.restoreChapterVersion(10001L, 3001L, 3, 1001L, traceId)).thenReturn(chapter);
 
         mockMvc().perform(post("/api/v1/novels/10001/chapters/3001/versions/3/restore")
                         .param("operatorId", "1001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(3001));
+                .andExpect(jsonPath("$.data.chapterId").isString())
+                .andExpect(jsonPath("$.data.chapterId").value("3001"));
     }
 
     @Test
@@ -211,7 +218,7 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "parentId", 9999,
+                                "parentId", "9999",
                                 "sortOrder", 1
                         ))))
                 .andExpect(status().isUnprocessableEntity())
@@ -249,8 +256,8 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "fromCardId", 1,
-                                "toCardId", 2,
+                                "fromCardId", "1",
+                                "toCardId", "2",
                                 "relationType", "ally"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
@@ -271,7 +278,7 @@ class NovelControllerTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "changeType", "manual",
                                 "changeReason", "润色",
-                                "createdBy", 1001
+                                "createdBy", "1001"
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.versionNo").value(2));
@@ -283,6 +290,7 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-PROJECT-UPDATE";
         NovelProject project = new NovelProject();
         project.setId(10001L);
+        project.setProjectId(10001L);
         project.setTitle("第七星环-修订");
         when(novelApplicationService.updateProject(eq(10001L), any(), eq(traceId))).thenReturn(project);
 
@@ -295,7 +303,8 @@ class NovelControllerTest {
                                 "status", 1
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(10001));
+                .andExpect(jsonPath("$.data.projectId").isString())
+                .andExpect(jsonPath("$.data.projectId").value("10001"));
     }
 
     @Test
@@ -340,11 +349,14 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "userId", 2001,
+                                "userId", "2001",
                                 "memberRole", "editor"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userId").value(2001));
+                .andExpect(jsonPath("$.data.projectId").isString())
+                .andExpect(jsonPath("$.data.userId").isString())
+                .andExpect(jsonPath("$.data.projectId").value("10001"))
+                .andExpect(jsonPath("$.data.userId").value("2001"));
     }
 
     @Test
@@ -372,6 +384,8 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-VOLUME-CREATE";
         com.penmate.backend.domain.novel.model.NovelVolume volume = new com.penmate.backend.domain.novel.model.NovelVolume();
         volume.setId(2101L);
+        volume.setVolumeId(2101L);
+        volume.setProjectId(10001L);
         volume.setTitle("第一卷");
         when(novelApplicationService.createVolume(eq(10001L), any(), eq(1001L), eq(traceId))).thenReturn(volume);
 
@@ -385,7 +399,8 @@ class NovelControllerTest {
                                 "description", "卷描述"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(2101));
+                .andExpect(jsonPath("$.data.volumeId").isString())
+                .andExpect(jsonPath("$.data.volumeId").value("2101"));
     }
 
     @Test
@@ -448,7 +463,7 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "parentId", 9000,
+                                "parentId", "9000",
                                 "sortOrder", 1
                         ))))
                 .andExpect(status().isOk())
@@ -461,6 +476,8 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-CARD-CREATE";
         NovelCard card = new NovelCard();
         card.setId(5001L);
+        card.setCardId(5001L);
+        card.setProjectId(10001L);
         card.setName("主角");
         when(novelApplicationService.createCard(eq(10001L), any(), eq(1001L), eq(traceId))).thenReturn(card);
 
@@ -474,7 +491,8 @@ class NovelControllerTest {
                                 "summary", "简介"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(5001));
+                .andExpect(jsonPath("$.data.cardId").isString())
+                .andExpect(jsonPath("$.data.cardId").value("5001"));
     }
 
     @Test
@@ -483,6 +501,8 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-RELATION-CREATE";
         com.penmate.backend.domain.novel.model.NovelCardRelation relation = new com.penmate.backend.domain.novel.model.NovelCardRelation();
         relation.setId(6001L);
+        relation.setCardRelationId(6001L);
+        relation.setProjectId(10001L);
         when(novelApplicationService.createCardRelation(eq(10001L), any(), eq(1001L), eq(traceId))).thenReturn(relation);
 
         mockMvc().perform(post("/api/v1/novels/10001/card-relations")
@@ -490,12 +510,13 @@ class NovelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "fromCardId", 1,
-                                "toCardId", 2,
+                                "fromCardId", "1",
+                                "toCardId", "2",
                                 "relationType", "ally"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(6001));
+                .andExpect(jsonPath("$.data.relationId").isString())
+                .andExpect(jsonPath("$.data.relationId").value("6001"));
     }
 
     @Test
@@ -538,7 +559,7 @@ class NovelControllerTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "changeType", "manual",
                                 "changeReason", "重复版本",
-                                "createdBy", 1001
+                                "createdBy", "1001"
                         ))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.status").value(422));
@@ -550,13 +571,15 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-PROJECT-LIST";
         NovelProject project = new NovelProject();
         project.setId(10001L);
+        project.setProjectId(10001L);
         project.setTitle("第七星环");
         when(novelApplicationService.listProjects()).thenReturn(java.util.List.of(project));
 
         mockMvc().perform(get("/api/v1/novels")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(10001))
+                .andExpect(jsonPath("$.data[0].projectId").isString())
+                .andExpect(jsonPath("$.data[0].projectId").value("10001"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -566,13 +589,15 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-PROJECT-GET";
         NovelProject project = new NovelProject();
         project.setId(10001L);
+        project.setProjectId(10001L);
         project.setTitle("第七星环");
         when(novelApplicationService.getProject(10001L)).thenReturn(project);
 
         mockMvc().perform(get("/api/v1/novels/10001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(10001))
+                .andExpect(jsonPath("$.data.projectId").isString())
+                .andExpect(jsonPath("$.data.projectId").value("10001"))
                 .andExpect(jsonPath("$.data.title").value("第七星环"));
     }
 
@@ -638,13 +663,16 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-OUTLINE-TREE-LIST";
         NovelOutlineNode node = new NovelOutlineNode();
         node.setId(9001L);
+        node.setOutlineNodeId(9001L);
+        node.setProjectId(10001L);
         node.setTitle("第一幕");
         when(novelApplicationService.listOutlineTree(10001L)).thenReturn(java.util.List.of(node));
 
         mockMvc().perform(get("/api/v1/novels/10001/outlines/tree")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(9001))
+                .andExpect(jsonPath("$.data[0].outlineNodeId").isString())
+                .andExpect(jsonPath("$.data[0].outlineNodeId").value("9001"))
                 .andExpect(jsonPath("$.data[0].title").value("第一幕"));
     }
 
@@ -654,13 +682,16 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-CARD-LIST";
         NovelCard card = new NovelCard();
         card.setId(5001L);
+        card.setCardId(5001L);
+        card.setProjectId(10001L);
         card.setName("主角");
         when(novelApplicationService.listCards(10001L)).thenReturn(java.util.List.of(card));
 
         mockMvc().perform(get("/api/v1/novels/10001/cards")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(5001))
+                .andExpect(jsonPath("$.data[0].cardId").isString())
+                .andExpect(jsonPath("$.data[0].cardId").value("5001"))
                 .andExpect(jsonPath("$.data[0].name").value("主角"));
     }
 
@@ -670,13 +701,16 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-CARD-GET";
         NovelCard card = new NovelCard();
         card.setId(5001L);
+        card.setCardId(5001L);
+        card.setProjectId(10001L);
         card.setName("主角");
         when(novelApplicationService.getCard(10001L, 5001L)).thenReturn(card);
 
         mockMvc().perform(get("/api/v1/novels/10001/cards/5001")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(5001))
+                .andExpect(jsonPath("$.data.cardId").isString())
+                .andExpect(jsonPath("$.data.cardId").value("5001"))
                 .andExpect(jsonPath("$.data.name").value("主角"));
     }
 
@@ -686,6 +720,8 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-CARD-UPDATE";
         NovelCard card = new NovelCard();
         card.setId(5001L);
+        card.setCardId(5001L);
+        card.setProjectId(10001L);
         card.setName("主角-修订");
         when(novelApplicationService.updateCard(eq(10001L), eq(5001L), any(), eq(1001L), eq(traceId))).thenReturn(card);
 
@@ -699,7 +735,8 @@ class NovelControllerTest {
                                 "summary", "新简介"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(5001))
+                .andExpect(jsonPath("$.data.cardId").isString())
+                .andExpect(jsonPath("$.data.cardId").value("5001"))
                 .andExpect(jsonPath("$.data.name").value("主角-修订"));
     }
 
@@ -722,12 +759,15 @@ class NovelControllerTest {
         String traceId = "UT-TRACE-NOVEL-RELATION-LIST";
         com.penmate.backend.domain.novel.model.NovelCardRelation relation = new com.penmate.backend.domain.novel.model.NovelCardRelation();
         relation.setId(6001L);
+        relation.setCardRelationId(6001L);
+        relation.setProjectId(10001L);
         when(novelApplicationService.listCardRelations(10001L)).thenReturn(java.util.List.of(relation));
 
         mockMvc().perform(get("/api/v1/novels/10001/card-relations")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(6001));
+                .andExpect(jsonPath("$.data[0].relationId").isString())
+                .andExpect(jsonPath("$.data[0].relationId").value("6001"));
     }
 }
 

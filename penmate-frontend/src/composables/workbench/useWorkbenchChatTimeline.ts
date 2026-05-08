@@ -20,7 +20,7 @@ export const toChatRole = (raw: unknown): ChatMessage['role'] => {
   return 'user'
 }
 
-export const pickConversationId = (item: ChatRecord) => String(item.sessionId ?? item.conversationId ?? '').trim()
+export const pickConversationId = (item: ChatRecord) => String(item.sessionId ?? '').trim()
 
 export const pickToolCallId = (item: ChatRecord): string | undefined => {
   const toolCallId = String(item.toolCallId ?? item.tool_call_id ?? '').trim()
@@ -52,8 +52,8 @@ const pickApprovalPreview = (item: ChatRecord): Record<string, string> | undefin
 }
 
 export const buildApprovalCard = (item: ChatRecord): ApprovalCardData | undefined => {
-  const approvalId = Number(item.approvalId ?? 0)
-  if (!approvalId) return undefined
+  const approvalId = String(item.approvalId ?? '').trim()
+  if (!approvalId || approvalId === '0') return undefined
 
   const approvalType = String(item.approvalType || '').trim()
   const toolDisplayName = String(item.toolDisplayName || '').trim() || undefined
@@ -70,7 +70,7 @@ export const buildApprovalCard = (item: ChatRecord): ApprovalCardData | undefine
   const { resolved, resolvedAction } = normalizeApprovalResolution(item.approvalStatus ?? item.status)
 
   return {
-    id: String(approvalId),
+    id: approvalId,
     message: approvalMessage,
     time: approvalTime,
     preview: pickApprovalPreview(item),
@@ -107,8 +107,9 @@ export const createChatTimeline = (deps: {
     const approval = buildApprovalCard(item)
     const toolCallId = pickToolCallId(item)
 
+    const messageId = String(item.messageId ?? '').trim()
     return {
-      id: Number(item.messageId ?? deps.getMsgIdCounter()),
+      id: messageId || deps.getMsgIdCounter(),
       role: toChatRole(item.role),
       text: escapeHtml(String(item.contentMd || item.content || item.text || '')),
       ...(toolCallId ? { toolCallId } : {}),
@@ -120,8 +121,11 @@ export const createChatTimeline = (deps: {
     const list = (await deps.listMessages(projectId, conversationId)) as Array<ChatRecord>
     const mapped = (Array.isArray(list) ? list : []).map(mapApiMessage)
     deps.setMessages(mapped)
-    const maxId = mapped.reduce((max, item) => (item.id > max ? item.id : max), 0)
-    if (maxId >= deps.getMsgIdCounter()) deps.setMsgIdCounter(maxId + 1)
+    const maxNumericId = mapped.reduce((max, item) => {
+      const numericId = typeof item.id === 'number' ? item.id : Number.NaN
+      return Number.isFinite(numericId) && numericId > max ? numericId : max
+    }, 0)
+    if (maxNumericId >= deps.getMsgIdCounter()) deps.setMsgIdCounter(maxNumericId + 1)
     deps.setCurrentConversationId(conversationId)
     await deps.scrollChat()
   }

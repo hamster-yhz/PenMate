@@ -67,13 +67,13 @@ const WorkbenchRightPanelHarness = {
 }
 
 const agentApiMock = {
-  listSessions: vi.fn(async () => [{ sessionId: 1, title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }]),
-  createSession: vi.fn(async () => ({ sessionId: 90002, title: '新会话', status: 'ACTIVE' })),
+  listSessions: vi.fn(async () => [{ sessionId: '1', title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }]),
+  createSession: vi.fn(async () => ({ sessionId: '90002', title: '新会话', status: 'ACTIVE' })),
   getSessionRecovery: vi.fn(async () => null as any),
   resumeSession: vi.fn(async () => null as any),
   createTurn: vi.fn<(...args: any[]) => Promise<any>>(async () => ({
-    session: { sessionId: 90001, title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: 81, name: '冷峻悬疑' } },
-    activeTask: { taskId: 77, taskStatus: 'RUNNING', requestContextId: 70101 },
+    session: { sessionId: '90001', title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: '81', name: '冷峻悬疑' } },
+    activeTask: { taskId: '77', taskStatus: 'RUNNING', requestContextId: '70101' },
     taskType: 'WRITE',
     userMessage: '测试消息',
   })),
@@ -311,18 +311,18 @@ describe('Workbench index chat parent binding', () => {
     agentApiMock.listSessions.mockClear()
     agentApiMock.getSessionRecovery = vi.fn(async () => ({
       session: {
-        sessionId: 90001,
+        sessionId: '90001',
         title: '第三章夜雨追踪',
         status: 'ACTIVE',
-        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
-        taskId: 70001,
+        taskId: '70001',
         taskStatus: 'WAITING_APPROVAL',
         streamChannelKey: 'agent-task-70001',
       },
       pendingApproval: {
-        approvalId: 45,
+        approvalId: '45',
         approvalType: 'chapter_patch',
         approvalMessage: '请先审批改写方案',
         approvalTime: '2026-04-26 23:10:00',
@@ -330,10 +330,10 @@ describe('Workbench index chat parent binding', () => {
       },
       messages: [
         {
-          messageId: 1,
+          messageId: '1',
           role: 'assistant',
           contentMd: '',
-          approvalId: 45,
+          approvalId: '45',
           approvalType: 'chapter_patch',
           approvalMessage: '请先审批改写方案',
           approvalTime: '2026-04-26 23:10:00',
@@ -341,7 +341,7 @@ describe('Workbench index chat parent binding', () => {
         },
       ],
       workbenchContext: {
-        chapterId: 301,
+        chapterId: '301',
         selectedText: '',
         activePlugins: ['outline.search'],
         modelConfigId: 'mcfg-9001',
@@ -349,18 +349,18 @@ describe('Workbench index chat parent binding', () => {
     }))
     agentApiMock.resumeSession = vi.fn(async () => ({
       session: {
-        sessionId: 90001,
+        sessionId: '90001',
         title: '第三章夜雨追踪',
         status: 'ACTIVE',
-        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
-        taskId: 70001,
+        taskId: '70001',
         taskStatus: 'WAITING_APPROVAL',
         streamChannelKey: 'agent-task-70001',
       },
       pendingApproval: {
-        approvalId: 45,
+        approvalId: '45',
         approvalType: 'chapter_patch',
         approvalMessage: '请先审批改写方案',
         approvalTime: '2026-04-26 23:10:00',
@@ -368,10 +368,10 @@ describe('Workbench index chat parent binding', () => {
       },
       messages: [
         {
-          messageId: 1,
+          messageId: '1',
           role: 'assistant',
           contentMd: '',
-          approvalId: 45,
+          approvalId: '45',
           approvalType: 'chapter_patch',
           approvalMessage: '请先审批改写方案',
           approvalTime: '2026-04-26 23:10:00',
@@ -379,7 +379,7 @@ describe('Workbench index chat parent binding', () => {
         },
       ],
       workbenchContext: {
-        chapterId: 301,
+        chapterId: '301',
         selectedText: '',
         activePlugins: ['outline.search'],
         modelConfigId: 'mcfg-9001',
@@ -395,9 +395,9 @@ describe('Workbench index chat parent binding', () => {
     })
 
     expect(agentApiMock.resumeSession).toHaveBeenCalledTimes(1)
-    expect(agentApiMock.resumeSession).toHaveBeenCalledWith(101, 1, expect.objectContaining({
+    expect(agentApiMock.resumeSession).toHaveBeenCalledWith('101', '1', expect.objectContaining({
       trigger: 'WORKBENCH_ENTER',
-      operatorId: 201,
+      operatorId: '201',
     }))
     expect(agentApiMock.getSessionRecovery).not.toHaveBeenCalled()
   })
@@ -405,26 +405,26 @@ describe('Workbench index chat parent binding', () => {
   it('reconnects_running_session_on_mount_and_consumes_stream_events', async () => {
     agentApiMock.resumeSession = vi.fn(async () => ({
       session: {
-        sessionId: 90001,
+        sessionId: '90001',
         title: '第三章夜雨追踪',
         status: 'ACTIVE',
-        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
-        taskId: 70001,
+        taskId: '70001',
         taskStatus: 'RUNNING',
         streamChannelKey: 'agent-task-70001',
       },
       pendingApproval: null,
       messages: [
         {
-          messageId: 1,
+          messageId: '1',
           role: 'assistant',
           contentMd: '',
         },
       ],
       workbenchContext: {
-        chapterId: 301,
+        chapterId: '301',
         selectedText: '',
         activePlugins: ['outline.search'],
         modelConfigId: 'mcfg-9001',
@@ -435,7 +435,7 @@ describe('Workbench index chat parent binding', () => {
 
     await waitForAssertion(() => {
       expect(agentApiMock.resumeSession).toHaveBeenCalledTimes(1)
-      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith(101, 70001)
+      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith('101', '70001')
     })
 
     await waitForAssertion(() => {
@@ -457,14 +457,17 @@ describe('Workbench index chat parent binding', () => {
     })
   })
 
-  it('preserves_oversized_string_task_id_when_reconnecting_running_session_on_mount', async () => {
+  it('preserves_oversized_string_ids_when_reconnecting_running_session_on_mount', async () => {
+    const oversizedSessionId = '90071992547409939876'
     const oversizedTaskId = '90071992547409931234'
+    const oversizedChapterId = '90071992547409935678'
+    agentApiMock.listSessions = vi.fn(async () => [{ sessionId: oversizedSessionId, title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }])
     agentApiMock.resumeSession = vi.fn(async () => ({
       session: {
-        sessionId: 90001,
+        sessionId: oversizedSessionId,
         title: '第三章夜雨追踪',
         status: 'ACTIVE',
-        boundStyle: { styleId: 81, name: '冷峻悬疑' },
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
         taskId: oversizedTaskId,
@@ -480,24 +483,99 @@ describe('Workbench index chat parent binding', () => {
         },
       ],
       workbenchContext: {
-        chapterId: 301,
+        chapterId: oversizedChapterId,
         selectedText: '',
         activePlugins: ['outline.search'],
         modelConfigId: 'mcfg-9001',
       },
     }))
 
-    await mountWorkbench()
+    const wrapper = await mountWorkbench()
 
     await waitForAssertion(() => {
-      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith(101, oversizedTaskId)
+      expect(agentApiMock.resumeSession).toHaveBeenCalledWith('101', oversizedSessionId, {
+        operatorId: '201',
+        trigger: 'WORKBENCH_ENTER',
+      })
+      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith('101', oversizedTaskId)
     })
+
+    expect((wrapper.vm as unknown as { currentConversationId: string }).currentConversationId).toBe(oversizedSessionId)
+    expect((wrapper.vm as unknown as { activeChapter: string }).activeChapter).toBe(oversizedChapterId)
+  })
+
+  it('passes_recovered_oversized_session_id_to_create_turn_without_precision_loss', async () => {
+    const oversizedSessionId = '2052639275832553472'
+    const oversizedTaskId = '2052639275832553999'
+    agentApiMock.listSessions = vi.fn(async () => [{ sessionId: oversizedSessionId, title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }])
+    agentApiMock.resumeSession = vi.fn(async () => ({
+      session: {
+        sessionId: oversizedSessionId,
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
+      },
+      activeTask: {
+        taskId: oversizedTaskId,
+        taskStatus: 'WAITING_APPROVAL',
+        streamChannelKey: `agent-task-${oversizedTaskId}`,
+      },
+      pendingApproval: {
+        approvalId: '45',
+        approvalType: 'chapter_patch',
+        approvalMessage: '请先审批改写方案',
+        approvalTime: '2026-04-26 23:10:00',
+        approvalStatus: 'pending',
+      },
+      messages: [
+        {
+          messageId: '1',
+          role: 'assistant',
+          contentMd: '',
+          approvalId: '45',
+          approvalType: 'chapter_patch',
+          approvalMessage: '请先审批改写方案',
+          approvalTime: '2026-04-26 23:10:00',
+          approvalStatus: 'pending',
+        },
+      ],
+      workbenchContext: {
+        chapterId: '301',
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+      },
+    }))
+    agentApiMock.createTurn = vi.fn(async (_projectId: string, sessionId: string) => ({
+      session: { sessionId, title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: '81', name: '冷峻悬疑' } },
+      activeTask: { taskId: 'task-77', taskStatus: 'RUNNING', requestContextId: '70101' },
+      taskType: 'WRITE',
+      userMessage: '继续生成正文',
+    }))
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect((wrapper.vm as unknown as { currentConversationId: string }).currentConversationId).toBe(oversizedSessionId)
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('继续生成正文')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
+    })
+
+    expect(agentApiMock.createTurn).toHaveBeenCalledWith('101', oversizedSessionId, expect.objectContaining({
+      operatorId: '201',
+      userMessage: '继续生成正文',
+    }))
   })
 
   it('clears_bound_style_when_turn_response_has_no_bound_style', async () => {
     agentApiMock.createTurn = vi.fn(async () => ({
-      session: { sessionId: 90001, title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: null },
-      activeTask: { taskId: 77, taskStatus: 'RUNNING', requestContextId: 70101 },
+      session: { sessionId: '90001', title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: null },
+      activeTask: { taskId: '77', taskStatus: 'RUNNING', requestContextId: '70101' },
       taskType: 'WRITE',
       userMessage: '测试消息',
     }))

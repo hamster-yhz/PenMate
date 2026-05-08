@@ -1,15 +1,15 @@
 import { reactive } from 'vue'
 
 export type WorkbenchSessionState = {
-  sessionId: number | null
+  sessionId: string | null
   title: string
   status: string
-  boundStyle: { styleId: number | null; name: string }
-  activeTask: { taskId: number | null; taskStatus: string; streamChannelKey: string }
+  boundStyle: { styleId: string | null; name: string }
+  activeTask: { taskId: string | null; taskStatus: string; streamChannelKey: string }
   pendingApproval: Record<string, unknown> | null
   messages: Array<Record<string, unknown>>
   workbenchContext: {
-    chapterId: number | null
+    chapterId: string | null
     selectedText: string
     activePlugins: string[]
     modelConfigId: string

@@ -3,6 +3,22 @@ import request from '@/utils/request'
 type AnyRecord = Record<string, unknown>
 type StreamListener = (event: MessageEvent<string>) => void
 
+type AgentBusinessId = string
+
+type AgentSessionRecord = AnyRecord & {
+  sessionId?: AgentBusinessId
+}
+
+type AgentTaskRecord = AnyRecord & {
+  taskId?: AgentBusinessId
+  taskStatus?: string
+}
+
+type AgentSessionSnapshot = AnyRecord & {
+  session?: AgentSessionRecord
+  activeTask?: AgentTaskRecord
+}
+
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 
 const resolveApiBaseUrl = () => {
@@ -21,22 +37,22 @@ const buildTaskStreamUrl = (projectId: string, taskId: string) => {
 
 export const agentApi = {
   listSessions(projectId: string) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/agent/sessions`)
+    return request.get<AgentSessionRecord[]>(`/v1/novels/${projectId}/agent/sessions`)
   },
   createSession(projectId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions`, payload)
+    return request.post<AgentSessionRecord>(`/v1/novels/${projectId}/agent/sessions`, payload)
   },
   getSessionRecovery(projectId: string, sessionId: string) {
-    return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/recovery`)
+    return request.get<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/recovery`)
   },
   resumeSession(projectId: string, sessionId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/resume`, payload)
+    return request.post<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/resume`, payload)
   },
   createTurn(projectId: string, sessionId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
+    return request.post<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
   },
   getTask(projectId: string, taskId: string) {
-    return request.get<AnyRecord>(`/v1/novels/${projectId}/agent/tasks/${taskId}`)
+    return request.get<AgentTaskRecord>(`/v1/novels/${projectId}/agent/tasks/${taskId}`)
   },
   getTaskStreamUrl(projectId: string, taskId: string) {
     return buildTaskStreamUrl(projectId, taskId)

@@ -8,7 +8,7 @@ const MissingConversationHistoryPanel = defineComponent({
 })
 
 type ConversationItem = {
-  conversationId: number
+  conversationId: string
   title: string
   updatedAt: string
 }
@@ -27,7 +27,7 @@ const mountConversationHistoryPanel = async (
     visible: boolean
     loading: boolean
     conversations: ConversationItem[]
-    currentConversationId: number | null
+    currentConversationId: string | null
   }> = {},
 ) => {
   const ConversationHistoryPanel = await loadConversationHistoryPanel()
@@ -65,10 +65,10 @@ describe('ConversationHistoryPanel', () => {
   it('renders_conversations_and_emits_selection', async () => {
     const wrapper = await mountConversationHistoryPanel({
       conversations: [
-        { conversationId: 81, title: '第一轮', updatedAt: '2026-04-26 20:00:00' },
-        { conversationId: 82, title: '', updatedAt: '2026-04-26 20:02:00' },
+        { conversationId: '81', title: '第一轮', updatedAt: '2026-04-26 20:00:00' },
+        { conversationId: '82', title: '', updatedAt: '2026-04-26 20:02:00' },
       ],
-      currentConversationId: 82,
+      currentConversationId: '82',
     })
 
     const items = wrapper.findAll('[data-testid="conversation-item"]')
@@ -78,6 +78,6 @@ describe('ConversationHistoryPanel', () => {
 
     await items[0].trigger('click')
 
-    expect(wrapper.emitted('select-conversation')).toEqual([[81]])
+    expect(wrapper.emitted('select-conversation')).toEqual([['81']])
   })
 })

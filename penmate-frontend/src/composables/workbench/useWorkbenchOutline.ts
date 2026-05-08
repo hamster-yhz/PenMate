@@ -7,8 +7,8 @@ import {
 } from './workbenchOutline'
 
 type ContextProfile = {
-  projectId?: number | string | null
-  operatorId?: number | string | null
+  projectId?: string | null
+  operatorId?: string | null
 }
 
 type OutlineApiPayload = Record<string, unknown>
@@ -16,12 +16,12 @@ type OutlineApiPayload = Record<string, unknown>
 type UseWorkbenchOutlineDeps = {
   getContext: () => ContextProfile
   reloadOutline: () => Promise<void>
-  createOutlineNode: (projectId: number | string, operatorId: number | string, payload: OutlineApiPayload) => Promise<unknown>
-  createChapter: (projectId: number | string, operatorId: number | string, payload: OutlineApiPayload) => Promise<unknown>
-  deleteOutlineNode: (projectId: number | string, nodeId: number | string, operatorId: number | string) => Promise<unknown>
-  deleteChapter: (projectId: number | string, chapterId: number | string, operatorId: number | string) => Promise<unknown>
-  updateOutlineNode: (projectId: number | string, nodeId: number | string, operatorId: number | string, payload: OutlineApiPayload) => Promise<unknown>
-  moveOutlineNode: (projectId: number | string, nodeId: number | string, operatorId: number | string, payload: OutlineApiPayload) => Promise<unknown>
+  createOutlineNode: (projectId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
+  createChapter: (projectId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
+  deleteOutlineNode: (projectId: string, nodeId: string, operatorId: string) => Promise<unknown>
+  deleteChapter: (projectId: string, chapterId: string, operatorId: string) => Promise<unknown>
+  updateOutlineNode: (projectId: string, nodeId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
+  moveOutlineNode: (projectId: string, nodeId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
   notify?: (message: string) => void
   notifySuccess?: (message: string) => void
 }
@@ -48,7 +48,15 @@ type OutlineTreeNode = (OutlineVolumeNode | OutlineChapterNode) & {
 
 const VOLUME_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 
-const pickOutlineNodeId = (item: Record<string, unknown>) => Number(item.outlineNodeId ?? 0)
+const toBusinessId = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  const normalized = value.trim()
+  return normalized || ''
+}
+
+const pickOutlineNodeId = (item: Record<string, unknown>) => toBusinessId(item.outlineNodeId)
 
 const findVolumeIndexByKey = (volumes: OutlineVolumeNode[], nodeKey: string) => volumes.findIndex((item) => item.key === nodeKey)
 
@@ -90,7 +98,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   }
 
   const selectChapter = (chapter: OutlineChapterNode) => {
-    activeChapter.value = String(chapter.chapterId || chapter.key)
+    activeChapter.value = chapter.chapterId || chapter.key
     currentChapterTitle.value = chapter.title
   }
 
@@ -132,7 +140,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
       return
     }
 
-    const volumeNodeId = Number(volume.key)
+    const volumeNodeId = toBusinessId(volume.key)
     if (!volumeNodeId) {
       deps.notify?.('分卷节点ID异常，无法创建章节')
       return
@@ -142,7 +150,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     const title = `第${idx + 1}章：未命名`
 
     outlineOpBusy.value = true
-    let createdOutlineNodeId = 0
+    let createdOutlineNodeId = ''
     try {
       const createdOutline = await deps.createOutlineNode(projectId, operatorId, {
         parentId: volumeNodeId,
@@ -181,11 +189,11 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     if (volumeIndex < 0) return
     const volume = outlineData.value[volumeIndex]
 
-    if (projectId && operatorId && Number(nodeKey)) {
+    if (projectId && operatorId && nodeKey) {
       try {
-        await deps.deleteOutlineNode(projectId, Number(nodeKey), operatorId)
+        await deps.deleteOutlineNode(projectId, nodeKey, operatorId)
         outlineData.value.splice(volumeIndex, 1)
-        const removedActive = volume.children.some((chapter) => activeChapter.value === String(chapter.chapterId || chapter.key))
+        const removedActive = volume.children.some((chapter) => activeChapter.value === (chapter.chapterId || chapter.key))
         if (removedActive) {
           clearSelection(activeChapter, currentChapterTitle)
         }
@@ -203,14 +211,14 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
 
     if (!volume || !chapter) return
 
-    if (projectId && operatorId && Number(nodeKey)) {
+    if (projectId && operatorId && nodeKey) {
       try {
-        if (Number(chapter.chapterId)) {
-          await deps.deleteChapter(projectId, Number(chapter.chapterId), operatorId)
+        if (chapter.chapterId) {
+          await deps.deleteChapter(projectId, chapter.chapterId, operatorId)
         }
-        await deps.deleteOutlineNode(projectId, Number(nodeKey), operatorId)
+        await deps.deleteOutlineNode(projectId, nodeKey, operatorId)
         volume.children.splice(chapterIndex, 1)
-        if (activeChapter.value === String(chapter.chapterId || chapter.key)) {
+        if (activeChapter.value === (chapter.chapterId || chapter.key)) {
           clearSelection(activeChapter, currentChapterTitle)
         }
       } catch (error: unknown) {
@@ -229,14 +237,14 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     const previousTitle = target.title
     const previousCurrentChapterTitle = currentChapterTitle.value
     target.title = nextTitle
-    if (activeChapter.value === String(target.chapterId || target.key)) {
+    if (activeChapter.value === (target.chapterId || target.key)) {
       currentChapterTitle.value = nextTitle
     }
 
     const { projectId, operatorId } = deps.getContext()
-    if (projectId && operatorId && Number(nodeKey)) {
+    if (projectId && operatorId && nodeKey) {
       try {
-        await deps.updateOutlineNode(projectId, Number(nodeKey), operatorId, { title: nextTitle })
+        await deps.updateOutlineNode(projectId, nodeKey, operatorId, { title: nextTitle })
       } catch (error: unknown) {
         target.title = previousTitle
         currentChapterTitle.value = previousCurrentChapterTitle
@@ -253,9 +261,9 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
       const targetIdx = currentIdx + direction
       if (currentIdx < 0 || targetIdx < 0 || targetIdx >= outlineData.value.length) return
 
-      if (projectId && operatorId && Number(nodeKey)) {
+      if (projectId && operatorId && nodeKey) {
         try {
-          await deps.moveOutlineNode(projectId, Number(nodeKey), operatorId, {
+          await deps.moveOutlineNode(projectId, nodeKey, operatorId, {
             parentId: null,
             sortOrder: targetIdx + 1,
           })
@@ -277,10 +285,10 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     const targetIdx = currentIdx + direction
     if (currentIdx < 0 || targetIdx < 0 || targetIdx >= volume.children.length) return
 
-    if (projectId && operatorId && Number(nodeKey)) {
+    if (projectId && operatorId && nodeKey) {
       try {
-        await deps.moveOutlineNode(projectId, Number(nodeKey), operatorId, {
-          parentId: Number(parentKey) || null,
+        await deps.moveOutlineNode(projectId, nodeKey, operatorId, {
+          parentId: parentKey || null,
           sortOrder: targetIdx + 1,
         })
       } catch (error: unknown) {

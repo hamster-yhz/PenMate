@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 @Data
 
 public class CreateNovelOutlineNodeDto {
-    private Long parentId;
+    private String parentId;
 
     @NotBlank
     private String title;

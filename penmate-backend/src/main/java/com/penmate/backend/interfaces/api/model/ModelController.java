@@ -64,7 +64,7 @@ public class ModelController {
     public ApiResponse<List<Map<String, Object>>> listKeys(
             @RequestParam("userId") String userId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = modelApplicationService.listUserKeys(parseRequiredPositiveId(userId, "userId")).stream()
+        List<Map<String, Object>> items = modelApplicationService.listUserKeys(requirePositiveLongId(userId, "userId")).stream()
                 .map(this::toUserKeyView)
                 .toList();
         return ApiResponse.success(items, traceId);
@@ -77,14 +77,14 @@ public class ModelController {
             @Valid @RequestBody CreateModelKeyDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.createKey(
-                parseRequiredPositiveId(userId, "userId"),
+                requirePositiveLongId(userId, "userId"),
                 new ModelCommands.CreateModelKeyCommand(
-                        parseRequiredPositiveId(dto.getProviderId(), "providerId"),
+                        requirePositiveLongId(dto.getProviderId(), "providerId"),
                         dto.getKeyName(),
                         dto.getApiKey(),
                         dto.getIsDefault(),
                         dto.getStatus(),
-                        parseRequiredPositiveId(operatorId, "operatorId")
+                        requirePositiveLongId(operatorId, "operatorId")
                 ),
                 traceId
         );
@@ -99,14 +99,14 @@ public class ModelController {
             @RequestBody UpdateModelKeyDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.updateKey(
-                parseRequiredPositiveId(userId, "userId"),
-                parseRequiredPositiveId(keyId, "keyId"),
+                requirePositiveLongId(userId, "userId"),
+                requirePositiveLongId(keyId, "keyId"),
                 new ModelCommands.UpdateModelKeyCommand(
                         dto.getKeyName(),
                         dto.getApiKey(),
                         dto.getIsDefault(),
                         dto.getStatus(),
-                        parseRequiredPositiveId(operatorId, "operatorId")
+                        requirePositiveLongId(operatorId, "operatorId")
                 ),
                 traceId
         );
@@ -120,9 +120,9 @@ public class ModelController {
             @RequestParam("operatorId") String operatorId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.deleteKey(
-                parseRequiredPositiveId(userId, "userId"),
-                parseRequiredPositiveId(keyId, "keyId"),
-                parseRequiredPositiveId(operatorId, "operatorId"),
+                requirePositiveLongId(userId, "userId"),
+                requirePositiveLongId(keyId, "keyId"),
+                requirePositiveLongId(operatorId, "operatorId"),
                 traceId
         );
         return ApiResponse.success("deleted", traceId);
@@ -144,12 +144,12 @@ public class ModelController {
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.createOfficialKey(
                 new ModelCommands.CreateOfficialModelKeyCommand(
-                        parseRequiredPositiveId(dto.getProviderId(), "providerId"),
+                        requirePositiveLongId(dto.getProviderId(), "providerId"),
                         dto.getKeyName(),
                         dto.getApiKey(),
                         dto.getIsDefault(),
                         dto.getStatus(),
-                        parseRequiredPositiveId(operatorId, "operatorId")
+                        requirePositiveLongId(operatorId, "operatorId")
                 ),
                 traceId
         );
@@ -163,13 +163,13 @@ public class ModelController {
             @RequestBody UpdateOfficialModelKeyDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.updateOfficialKey(
-                parseRequiredPositiveId(keyId, "keyId"),
+                requirePositiveLongId(keyId, "keyId"),
                 new ModelCommands.UpdateOfficialModelKeyCommand(
                         dto.getKeyName(),
                         dto.getApiKey(),
                         dto.getIsDefault(),
                         dto.getStatus(),
-                        parseRequiredPositiveId(operatorId, "operatorId")
+                        requirePositiveLongId(operatorId, "operatorId")
                 ),
                 traceId
         );
@@ -182,8 +182,8 @@ public class ModelController {
             @RequestParam("operatorId") String operatorId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.deleteOfficialKey(
-                parseRequiredPositiveId(keyId, "keyId"),
-                parseRequiredPositiveId(operatorId, "operatorId"),
+                requirePositiveLongId(keyId, "keyId"),
+                requirePositiveLongId(operatorId, "operatorId"),
                 traceId
         );
         return ApiResponse.success("deleted", traceId);
@@ -193,7 +193,7 @@ public class ModelController {
     public ApiResponse<List<Map<String, Object>>> listUserModelConfigs(
             @RequestParam("userId") String userId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = modelApplicationService.listUserModelConfigs(parseRequiredPositiveId(userId, "userId")).stream()
+        List<Map<String, Object>> items = modelApplicationService.listUserModelConfigs(requirePositiveLongId(userId, "userId")).stream()
                 .map(this::stringifyBusinessIds)
                 .toList();
         return ApiResponse.success(items, traceId);
@@ -206,15 +206,15 @@ public class ModelController {
             @Valid @RequestBody CreateUserModelConfigDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.createUserModelConfig(
-                parseRequiredPositiveId(userId, "userId"),
+                requirePositiveLongId(userId, "userId"),
                 new ModelCommands.CreateUserModelConfigCommand(
-                        parseRequiredPositiveId(dto.getProviderId(), "providerId"),
+                        requirePositiveLongId(dto.getProviderId(), "providerId"),
                         dto.getModelName(),
                         dto.getBaseUrl(),
                         mapModelCategoryToKeySourceType(dto.getModelCategory()),
                         dto.getApiKey(),
                         dto.getStatus(),
-                        parseRequiredPositiveId(operatorId, "operatorId")
+                        requirePositiveLongId(operatorId, "operatorId")
                 ),
                 traceId
         );
@@ -229,16 +229,16 @@ public class ModelController {
             @Valid @RequestBody UpdateUserModelConfigDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.updateUserModelConfig(
-                parseRequiredPositiveId(userId, "userId"),
-                parseRequiredPositiveId(modelConfigId, "modelConfigId"),
+                requirePositiveLongId(userId, "userId"),
+                requirePositiveLongId(modelConfigId, "modelConfigId"),
                 new ModelCommands.UpdateUserModelConfigCommand(
-                        parseOptionalPositiveId(dto.getProviderId(), "providerId"),
+                        optionalPositiveLongId(dto.getProviderId(), "providerId"),
                         dto.getModelName(),
                         dto.getBaseUrl(),
                         mapModelCategoryToKeySourceType(dto.getModelCategory()),
                         dto.getApiKey(),
                         dto.getStatus(),
-                        parseRequiredPositiveId(operatorId, "operatorId")
+                        requirePositiveLongId(operatorId, "operatorId")
                 ),
                 traceId
         );
@@ -252,9 +252,9 @@ public class ModelController {
             @RequestParam("operatorId") String operatorId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.deleteUserModelConfig(
-                parseRequiredPositiveId(userId, "userId"),
-                parseRequiredPositiveId(modelConfigId, "modelConfigId"),
-                parseRequiredPositiveId(operatorId, "operatorId"),
+                requirePositiveLongId(userId, "userId"),
+                requirePositiveLongId(modelConfigId, "modelConfigId"),
+                requirePositiveLongId(operatorId, "operatorId"),
                 traceId
         );
         return ApiResponse.success("deleted", traceId);
@@ -305,7 +305,7 @@ public class ModelController {
             @RequestParam("userId") String userId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(
-                stringifyBusinessIds(modelApplicationService.getUserModelPreferencesDetail(parseRequiredPositiveId(userId, "userId"))),
+                stringifyBusinessIds(modelApplicationService.getUserModelPreferencesDetail(requirePositiveLongId(userId, "userId"))),
                 traceId
         );
     }
@@ -317,11 +317,11 @@ public class ModelController {
             @Valid @RequestBody SaveUserModelPreferencesDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         modelApplicationService.saveUserModelPreferences(
-                parseRequiredPositiveId(userId, "userId"),
-                parseRequiredPositiveId(operatorId, "operatorId"),
+                requirePositiveLongId(userId, "userId"),
+                requirePositiveLongId(operatorId, "operatorId"),
                 new ModelCommands.SaveUserModelPreferencesCommand(
-                        parseOptionalPositiveId(dto.getMainAgentModelConfigId(), "mainAgentModelConfigId"),
-                        parseOptionalPositiveId(dto.getDirtyWorkAgentModelConfigId(), "dirtyWorkAgentModelConfigId")
+                        optionalPositiveLongId(dto.getMainAgentModelConfigId(), "mainAgentModelConfigId"),
+                        optionalPositiveLongId(dto.getDirtyWorkAgentModelConfigId(), "dirtyWorkAgentModelConfigId")
                 ),
                 traceId
         );
@@ -339,21 +339,21 @@ public class ModelController {
         };
     }
 
-    private Long parseRequiredPositiveId(String rawValue, String fieldName) {
+    private Long requirePositiveLongId(String rawValue, String fieldName) {
         if (rawValue == null || rawValue.trim().isEmpty()) {
             throw BusinessException.of(fieldName + " is required");
         }
-        return parsePositiveId(rawValue, fieldName);
+        return parsePositiveLongValue(rawValue, fieldName);
     }
 
-    private Long parseOptionalPositiveId(String rawValue, String fieldName) {
+    private Long optionalPositiveLongId(String rawValue, String fieldName) {
         if (rawValue == null || rawValue.trim().isEmpty()) {
             return null;
         }
-        return parsePositiveId(rawValue, fieldName);
+        return parsePositiveLongValue(rawValue, fieldName);
     }
 
-    private Long parsePositiveId(String rawValue, String fieldName) {
+    private Long parsePositiveLongValue(String rawValue, String fieldName) {
         String normalized = rawValue.trim();
         if (!normalized.matches("^[1-9]\\d*$")) {
             throw BusinessException.of(fieldName + " must be greater than 0");
@@ -409,3 +409,5 @@ public class ModelController {
         return value;
     }
 }
+
+

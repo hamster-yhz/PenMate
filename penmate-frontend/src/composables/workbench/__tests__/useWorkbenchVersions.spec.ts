@@ -7,12 +7,12 @@ type UseWorkbenchVersionsFactory = (deps: any) => {
   versionDiffSummary: { value: string }
   versionBusy: { value: boolean }
   getCurrentChapterVersions: () => Array<Record<string, unknown>>
-  loadChapterVersions: (projectId: number, chapterId: string) => Promise<void>
+  loadChapterVersions: (projectId: string, chapterId: string) => Promise<void>
   viewSelectedVersion: () => Promise<void>
   restoreSelectedVersion: () => Promise<void>
   publishCurrentChapter: () => Promise<void>
-  refreshEditorFromRemote: (projectId: number, chapterId: number, requestId: number, options?: { preferRemote?: boolean }) => Promise<boolean>
-  uploadAndCommitContent: (projectId: number, chapterId: number, content: string, operatorId: number) => Promise<void>
+  refreshEditorFromRemote: (projectId: string, chapterId: string, requestId: number, options?: { preferRemote?: boolean }) => Promise<boolean>
+  uploadAndCommitContent: (projectId: string, chapterId: string, content: string, operatorId: string) => Promise<void>
 }
 
 const loadUseWorkbenchVersions = async (): Promise<UseWorkbenchVersionsFactory> => {
@@ -47,9 +47,9 @@ describe('useWorkbenchVersions', () => {
     ])
 
     const versions = useWorkbenchVersions({
-      getProjectId: () => 101,
+      getProjectId: () => 'project-101',
       getActiveChapterKey: () => '301',
-      getOperatorId: () => 201,
+      getOperatorId: () => 'operator-201',
       getEditorContent: () => '当前正文',
       setEditorContent: vi.fn(),
       setWordCount: vi.fn(),
@@ -76,9 +76,9 @@ describe('useWorkbenchVersions', () => {
       notifySuccess: vi.fn(),
     })
 
-    await versions.loadChapterVersions(101, '301')
+    await versions.loadChapterVersions('project-101', '301')
 
-    expect(listVersions).toHaveBeenCalledWith(101, 301)
+    expect(listVersions).toHaveBeenCalledWith('project-101', '301')
     expect(versions.chapterVersions.value['301']).toEqual([
       { chapterVersionId: 501, versionNo: 9, changeReason: '修正文风' },
       { chapterVersionId: 500, versionNo: 8, changeType: 'MANUAL_SAVE' },
@@ -92,9 +92,9 @@ describe('useWorkbenchVersions', () => {
     const fetchText = vi.fn(async () => '版本中的正文片段')
 
     const versions = useWorkbenchVersions({
-      getProjectId: () => 101,
+      getProjectId: () => 'project-101',
       getActiveChapterKey: () => '301',
-      getOperatorId: () => 201,
+      getOperatorId: () => 'operator-201',
       getEditorContent: () => '当前正文',
       setEditorContent: vi.fn(),
       setWordCount: vi.fn(),
@@ -141,9 +141,9 @@ describe('useWorkbenchVersions', () => {
     const notifySuccess = vi.fn()
 
     const versions = useWorkbenchVersions({
-      getProjectId: () => 101,
+      getProjectId: () => 'project-101',
       getActiveChapterKey: () => '301',
-      getOperatorId: () => 201,
+      getOperatorId: () => 'operator-201',
       getEditorContent: () => '当前正文',
       setEditorContent,
       setWordCount,
@@ -173,13 +173,13 @@ describe('useWorkbenchVersions', () => {
     versions.selectedVersionNo.value = '7'
     await versions.restoreSelectedVersion()
 
-    expect(restoreVersion).toHaveBeenCalledWith(101, 301, 7, 201)
+    expect(restoreVersion).toHaveBeenCalledWith('project-101', '301', 7, 'operator-201')
     expect(beginChapterRequest).toHaveBeenCalledWith('301')
     expect(fetchText).toHaveBeenCalledWith('https://oss.example/read/chapter-301.txt')
     expect(setEditorContent).toHaveBeenCalledWith('恢复后的远端正文')
     expect(setWordCount).toHaveBeenCalledWith(8)
     expect(setLastSnapshot).toHaveBeenCalledWith('恢复后的远端正文')
-    expect(listVersions).toHaveBeenCalledWith(101, 301)
+    expect(listVersions).toHaveBeenCalledWith('project-101', '301')
     expect(versions.selectedVersionContent.value).toBe('')
     expect(versions.versionDiffSummary.value).toBe('')
     expect(notifySuccess).toHaveBeenCalledWith('已恢复到版本 v7')
@@ -205,9 +205,9 @@ describe('useWorkbenchVersions', () => {
     const notifySuccess = vi.fn()
 
     const versions = useWorkbenchVersions({
-      getProjectId: () => 101,
+      getProjectId: () => 'project-101',
       getActiveChapterKey: () => '301',
-      getOperatorId: () => 201,
+      getOperatorId: () => 'operator-201',
       getEditorContent: () => '待发布正文',
       setEditorContent: vi.fn(),
       setWordCount: vi.fn(),
@@ -236,22 +236,22 @@ describe('useWorkbenchVersions', () => {
 
     await versions.publishCurrentChapter()
 
-    expect(getContentUploadUrl).toHaveBeenCalledWith(101, 301)
+    expect(getContentUploadUrl).toHaveBeenCalledWith('project-101', '301')
     expect(uploadText).toHaveBeenCalledWith('https://oss.example/upload/chapter-301.txt', '待发布正文')
-    expect(commitContent).toHaveBeenCalledWith(101, 301, 201, {
+    expect(commitContent).toHaveBeenCalledWith('project-101', '301', 'operator-201', {
       objectKey: 'chapter-301.txt',
       etag: 'etag-301',
       size: 15,
       checksum: 'crc32-301',
       storageProvider: 'OSS',
     })
-    expect(createVersion).toHaveBeenCalledWith(101, 301, {
+    expect(createVersion).toHaveBeenCalledWith('project-101', '301', {
       changeType: 'MANUAL_SAVE',
       changeReason: '前端手动保存',
-      createdBy: 201,
+      createdBy: 'operator-201',
     })
-    expect(publishChapter).toHaveBeenCalledWith(101, 301, 201)
-    expect(listVersions).toHaveBeenCalledWith(101, 301)
+    expect(publishChapter).toHaveBeenCalledWith('project-101', '301', 'operator-201')
+    expect(listVersions).toHaveBeenCalledWith('project-101', '301')
     expect(notifySuccess).toHaveBeenCalledWith('章节已发布')
   })
 })

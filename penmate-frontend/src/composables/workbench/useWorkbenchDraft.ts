@@ -24,17 +24,17 @@ export const createChapterLoadGuard = () => {
 }
 
 export const useWorkbenchDraft = () => {
-  const readDraft = (projectId: number, chapterId: string | number) => readChapterDraftLocal(projectId, chapterId)
+  const readDraft = (projectId: string, chapterId: string) => readChapterDraftLocal(projectId, chapterId)
 
-  const saveDraft = (projectId: number, chapterId: string | number, content: string) => {
+  const saveDraft = (projectId: string, chapterId: string, content: string) => {
     saveChapterDraftLocal(projectId, chapterId, content)
   }
 
-  const clearDraft = (projectId: number, chapterId: string | number) => {
+  const clearDraft = (projectId: string, chapterId: string) => {
     clearChapterDraftLocal(projectId, chapterId)
   }
 
-  const hasDraft = (projectId: number, chapterId: string | number) => {
+  const hasDraft = (projectId: string, chapterId: string) => {
     try {
       return window.localStorage.getItem(getDraftStorageKey(projectId, chapterId)) !== null
     } catch {
@@ -42,7 +42,7 @@ export const useWorkbenchDraft = () => {
     }
   }
 
-  const resolveStoredDraft = (projectId: number, chapterId: string | number) => {
+  const resolveStoredDraft = (projectId: string, chapterId: string) => {
     if (!hasDraft(projectId, chapterId)) return null
     return readDraft(projectId, chapterId)
   }
@@ -53,8 +53,8 @@ export const useWorkbenchDraft = () => {
   }
 
   const resolveChapterContent = (
-    projectId: number,
-    chapterId: string | number,
+    projectId: string,
+    chapterId: string,
     remoteContent: string,
     options?: { preferRemote?: boolean },
   ) => {

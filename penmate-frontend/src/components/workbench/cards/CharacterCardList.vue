@@ -8,7 +8,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'create-card': []
-  'toggle-expand': [{ cardId: number; expanded: boolean }]
+  'toggle-expand': [{ cardId: string; expanded: boolean }]
   'update:card': [CharacterCard]
   save: [CharacterCard]
   delete: [CharacterCard]

@@ -2,7 +2,7 @@ import type { ApprovalCardData } from '@/components/workbench/ApprovalCard.vue'
 import type { OutlineChapterNode, OutlineVolumeNode } from '@/composables/workbench/workbenchOutline'
 
 export type WorkbenchCardBase = {
-  cardId: number
+  cardId: string
   name: string
   summary: string
   detailJson: string
@@ -20,9 +20,9 @@ export type WorldCard = WorkbenchCardBase & {
 export type WorkbenchCard = CharacterCard | WorldCard
 
 export type CardRelation = {
-  cardRelationId: number
-  fromCardId: number
-  toCardId: number
+  cardRelationId: string
+  fromCardId: string
+  toCardId: string
   relationType: string
   description?: string
 }
@@ -36,7 +36,7 @@ export type ConversationItem = {
 }
 
 export type ChatMessage = {
-  id: number
+  id: number | string
   role: 'user' | 'assistant' | 'system'
   text: string
   toolCallId?: string

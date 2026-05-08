@@ -2,15 +2,15 @@ import { ref } from 'vue'
 import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 
 type ContextProfile = {
-  projectId?: number | string | null
-  operatorId?: number | string | null
+  projectId?: string | null
+  operatorId?: string | null
 }
 
-type UseWorkbenchApprovalsDeps = {
+ type UseWorkbenchApprovalsDeps = {
   getContext: () => ContextProfile
   getMessages: () => ChatMessage[]
-  approve: (projectId: number | string, approvalId: number, payload: Record<string, unknown>) => Promise<unknown>
-  reject: (projectId: number | string, approvalId: number, payload: Record<string, unknown>) => Promise<unknown>
+  approve: (projectId: string, approvalId: string, payload: Record<string, unknown>) => Promise<unknown>
+  reject: (projectId: string, approvalId: string, payload: Record<string, unknown>) => Promise<unknown>
   notifyWarning?: (message: string) => void
 }
 
@@ -21,7 +21,7 @@ export const useWorkbenchApprovals = (deps: UseWorkbenchApprovalsDeps) => {
 
   const runApprovalAction = async (
     id: string,
-    request: (projectId: number | string, approvalId: number, payload: Record<string, unknown>) => Promise<unknown>,
+    request: (projectId: string, approvalId: string, payload: Record<string, unknown>) => Promise<unknown>,
     comment: string,
     resolvedAction: 'approved' | 'rejected',
     failureMessage: string,
@@ -36,8 +36,8 @@ export const useWorkbenchApprovals = (deps: UseWorkbenchApprovalsDeps) => {
     }
 
     const { projectId, operatorId } = deps.getContext()
-    const approvalId = Number(id)
-    if (!projectId || !operatorId || approvalId <= 0) {
+    const approvalId = id.trim()
+    if (!projectId || !operatorId || !approvalId) {
       deps.notifyWarning?.('缺少审批上下文，无法完成操作')
       return
     }

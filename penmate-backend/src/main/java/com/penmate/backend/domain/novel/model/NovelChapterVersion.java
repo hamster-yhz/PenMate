@@ -1,5 +1,7 @@
 package com.penmate.backend.domain.novel.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -11,8 +13,11 @@ public class NovelChapterVersion {
     /** 数据库物理主键 ID。 */
     private Long id;
     /** 章节版本业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long chapterVersionId;
+
     /** 所属章节业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long chapterId;
     /** 版本号。 */
     private Integer versionNo;
@@ -29,6 +34,7 @@ public class NovelChapterVersion {
     /** 快照校验和。 */
     private String snapshotChecksum;
     /** 创建该版本的用户业务 ID。 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long createdBy;
     /** 版本创建时间。 */
     private LocalDateTime createdAt;

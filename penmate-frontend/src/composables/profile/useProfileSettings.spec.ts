@@ -46,7 +46,7 @@ describe('useProfileSettings', () => {
   })
 
   it('loads_model_preferences_detail_when_session_user_exists', async () => {
-    setSession({ userId: 1001 })
+    setSession({ userId: '1001' })
     getUserModelPreferencesMock.mockResolvedValue({
       mainAgentModelConfigId: 'mcfg-9001',
       dirtyWorkAgentModelConfigId: 'mcfg-9002',
@@ -61,14 +61,14 @@ describe('useProfileSettings', () => {
 
     await settings.loadModelPreferences()
 
-    expect(getUserModelPreferencesMock).toHaveBeenCalledWith(1001)
+    expect(getUserModelPreferencesMock).toHaveBeenCalledWith('1001')
     expect(settings.modelPreferences.mainAgentModelConfigId).toBe('mcfg-9001')
     expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe('mcfg-9002')
     expect(settings.modelConfigOptions.value).toHaveLength(2)
   })
 
   it('loads_nested_model_preferences_detail_when_session_user_exists', async () => {
-    setSession({ userId: 1001 })
+    setSession({ userId: '1001' })
     getUserModelPreferencesMock.mockResolvedValue({
       preferences: {
         mainAgentModelConfigId: 'mcfg-nested-9001',
@@ -90,7 +90,7 @@ describe('useProfileSettings', () => {
   })
 
   it('clears_model_preference_state_when_loading_fails_after_previous_success', async () => {
-    setSession({ userId: 1001 })
+    setSession({ userId: '1001' })
     getUserModelPreferencesMock
       .mockResolvedValueOnce({
         mainAgentModelConfigId: 'mcfg-9001',
@@ -111,7 +111,7 @@ describe('useProfileSettings', () => {
   })
 
   it('saves_model_preferences_with_session_user_and_operator', async () => {
-    setSession({ userId: 1001 })
+    setSession({ userId: '1001' })
     getUserModelPreferencesMock.mockResolvedValue({
       mainAgentModelConfigId: 'mcfg-9001',
       dirtyWorkAgentModelConfigId: 'mcfg-9002',
@@ -128,14 +128,14 @@ describe('useProfileSettings', () => {
 
     await settings.saveModelPreferences()
 
-    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
+    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith('1001', '1001', {
       mainAgentModelConfigId: 'mcfg-9001',
       dirtyWorkAgentModelConfigId: 'mcfg-9002',
     })
   })
 
   it('clears_stale_model_preference_ids_when_loaded_preferences_are_not_in_candidate_configs', async () => {
-    setSession({ userId: 1001 })
+    setSession({ userId: '1001' })
     getUserModelPreferencesMock.mockResolvedValue({
       mainAgentModelConfigId: 'mcfg-2051723276547498000000',
       dirtyWorkAgentModelConfigId: 'mcfg-2051723276547498000000',
@@ -156,7 +156,7 @@ describe('useProfileSettings', () => {
 
     await settings.saveModelPreferences()
 
-    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith(1001, 1001, {
+    expect(saveUserModelPreferencesMock).toHaveBeenCalledWith('1001', '1001', {
       mainAgentModelConfigId: null,
       dirtyWorkAgentModelConfigId: null,
     })

@@ -34,12 +34,12 @@ export const useLoginSubmit = () => {
       })
 
       const profile = await authApi.me()
-      const uid = Number(profile.userId ?? profile.id ?? profile.uid ?? 0)
+      const uid = String(profile.userId ?? profile.id ?? profile.uid ?? '').trim()
       const email = String(profile.email ?? profile.userEmail ?? username)
       const name = String(profile.displayName ?? profile.username ?? profile.name ?? '创作者')
 
       setSession({
-        userId: Number.isFinite(uid) && uid > 0 ? uid : undefined,
+        userId: uid || undefined,
         userEmail: email,
         userName: name,
       })

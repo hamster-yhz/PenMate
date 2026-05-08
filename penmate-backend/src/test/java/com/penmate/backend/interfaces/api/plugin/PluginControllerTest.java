@@ -98,6 +98,29 @@ class PluginControllerTest {
     }
 
     @Test
+    // 项目插件列表响应中的业务 ID 应为 string 语义字段。
+    void UT_PLUGIN_PROJECT_LIST_RESPONSE_BUSINESS_IDS_ARE_STRING_FIELDS() throws Exception {
+        String traceId = "UT-TRACE-PLUGIN-PROJECT-LIST-STRING-ID";
+        com.penmate.backend.domain.plugin.model.PluginProjectInstall install = new com.penmate.backend.domain.plugin.model.PluginProjectInstall();
+        install.setProjectId(10001L);
+        install.setPluginInstallId(8001L);
+        install.setInstalledBy(1001L);
+        install.setPluginCode("knowledge-rag");
+        when(pluginApplicationService.listProjectInstalls(10001L)).thenReturn(List.of(install));
+
+        mockMvc().perform(get("/api/v1/novels/10001/plugins")
+                        .header("X-Trace-Id", traceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].projectId").isString())
+                .andExpect(jsonPath("$.data[0].pluginInstallId").isString())
+                .andExpect(jsonPath("$.data[0].installedBy").isString())
+                .andExpect(jsonPath("$.data[0].projectId").value("10001"))
+                .andExpect(jsonPath("$.data[0].pluginInstallId").value("8001"))
+                .andExpect(jsonPath("$.data[0].installedBy").value("1001"))
+                .andExpect(jsonPath("$.meta.traceId").value(traceId));
+    }
+
+    @Test
     // 安装插件重复冲突。
     void UT_PLUGIN_INSTALL_DUPLICATE_409() throws Exception {
         String traceId = "UT-TRACE-PLUGIN-INSTALL-DUPLICATE";

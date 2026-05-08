@@ -1,5 +1,4 @@
 import request from '@/utils/request'
-import type { IdLike } from '@/api/types'
 
 type AnyRecord = Record<string, unknown>
 
@@ -10,19 +9,19 @@ export const pluginApi = {
   getCatalogItem(pluginCode: string) {
     return request.get<AnyRecord>(`/v1/plugins/catalog/${pluginCode}`)
   },
-  listProjectPlugins(projectId: IdLike) {
+  listProjectPlugins(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/plugins`)
   },
-  installPlugin(projectId: IdLike, operatorId: IdLike, payload: AnyRecord) {
+  installPlugin(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<string>(`/v1/novels/${projectId}/plugins/install?operatorId=${operatorId}`, payload)
   },
-  updateInstall(projectId: IdLike, pluginCode: string, operatorId: IdLike, payload: AnyRecord) {
+  updateInstall(projectId: string, pluginCode: string, operatorId: string, payload: AnyRecord) {
     return request.patch<string>(`/v1/novels/${projectId}/plugins/${pluginCode}?operatorId=${operatorId}`, payload)
   },
-  deleteInstall(projectId: IdLike, pluginCode: string, operatorId: IdLike) {
+  deleteInstall(projectId: string, pluginCode: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/plugins/${pluginCode}?operatorId=${operatorId}`)
   },
-  listCallLogs(projectId: IdLike) {
+  listCallLogs(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/plugins/call-logs`)
   }
 }

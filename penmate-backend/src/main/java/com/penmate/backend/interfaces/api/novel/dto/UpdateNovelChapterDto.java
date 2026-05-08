@@ -8,8 +8,8 @@ import jakarta.validation.constraints.NotNull;
 
 public class UpdateNovelChapterDto {
 
-    private Long volumeId;
-    private Long outlineNodeId;
+    private String volumeId;
+    private String outlineNodeId;
 
     @NotBlank
     private String title;

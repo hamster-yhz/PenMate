@@ -1,21 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-type CharacterCard = {
-  cardId: number
-  cardType: 'CHARACTER'
-  name: string
-  summary: string
-  detailJson: string
-  expanded: boolean
-}
+import type { CharacterCard } from '@/components/workbench/workbenchTypes'
 
 const props = defineProps<{
   card: CharacterCard
 }>()
 
 const emit = defineEmits<{
-  'toggle-expand': [{ cardId: number; expanded: boolean }]
+  'toggle-expand': [{ cardId: string; expanded: boolean }]
   'update:card': [CharacterCard]
   save: [CharacterCard]
   delete: [CharacterCard]
