@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.query.AgentSessionRecoveryQueryServ
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.model.AgentSessionRecoverySnapshot;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.List;
  * <p>负责把领域 recovery snapshot 映射为应用层结果模型，并保证恢复 contract 命名单一来源。</p>
  */
 @Service
+@Slf4j
 public class AgentSessionRecoveryAppService {
 
     private final AgentSessionRecoveryQueryService agentSessionRecoveryQueryService;
@@ -23,7 +25,19 @@ public class AgentSessionRecoveryAppService {
     }
 
     public AgentSessionRecoveryResult getRecovery(Long projectId, Long sessionId, String traceId) {
-        return toResult(agentSessionRecoveryQueryService.getRecoverySnapshot(projectId, sessionId, traceId));
+        log.info("Agent session recovery requested: projectId={}, sessionId={}, traceId={}", projectId, sessionId, traceId);
+        AgentSessionRecoveryResult result = toResult(agentSessionRecoveryQueryService.getRecoverySnapshot(projectId, sessionId, traceId));
+        log.info("Agent session recovery resolved: projectId={}, sessionId={}, traceId={}, hasSession={}, activeTaskId={}, activeTaskStatus={}, messageCount={}, hasPendingApproval={}, hasWorkbenchContext={}",
+                projectId,
+                sessionId,
+                traceId,
+                result.session() != null,
+                result.activeTask() == null ? null : result.activeTask().taskId(),
+                result.activeTask() == null ? null : result.activeTask().taskStatus(),
+                result.messages() == null ? 0 : result.messages().size(),
+                result.pendingApproval() != null,
+                result.workbenchContext() != null);
+        return result;
     }
 
     public AgentSessionRecoveryResult resumeSession(Long projectId,
@@ -31,7 +45,22 @@ public class AgentSessionRecoveryAppService {
                                                     Long operatorId,
                                                     String trigger,
                                                     String traceId) {
-        return toResult(agentSessionRecoveryQueryService.getRecoverySnapshot(projectId, sessionId, traceId));
+        log.info("Agent session resume requested: projectId={}, sessionId={}, operatorId={}, trigger={}, traceId={}",
+                projectId,
+                sessionId,
+                operatorId,
+                trigger,
+                traceId);
+        AgentSessionRecoveryResult result = toResult(agentSessionRecoveryQueryService.getRecoverySnapshot(projectId, sessionId, traceId));
+        log.info("Agent session resume resolved: projectId={}, sessionId={}, traceId={}, hasSession={}, activeTaskId={}, activeTaskStatus={}, hasPendingApproval={}",
+                projectId,
+                sessionId,
+                traceId,
+                result.session() != null,
+                result.activeTask() == null ? null : result.activeTask().taskId(),
+                result.activeTask() == null ? null : result.activeTask().taskStatus(),
+                result.pendingApproval() != null);
+        return result;
     }
 
     private AgentSessionRecoveryResult toResult(AgentSessionRecoverySnapshot snapshot) {
@@ -55,6 +84,7 @@ public class AgentSessionRecoveryAppService {
                         session.getLastTaskStatus()
                 ),
                 activeTask == null ? null : new AgentSessionRecoveryResult.ActiveTaskView(
+                        activeTask.getTurnId(),
                         activeTask.getTaskId(),
                         activeTask.getTaskStatus(),
                         activeTask.getContextId()

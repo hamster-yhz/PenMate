@@ -92,22 +92,22 @@ describe('agentApi', () => {
     expect(requestMock.get).toHaveBeenNthCalledWith(2, '/v1/novels/novel-101/agent/tasks/task-70001')
   })
 
-  it('builds_task_stream_url_from_api_base', async () => {
+  it('builds_turn_stream_url_from_api_base', async () => {
     const { agentApi } = await import('./agent.api')
 
-    expect(agentApi.getTaskStreamUrl('novel-101', 'task-70001')).toContain('/v1/novels/novel-101/agent/tasks/task-70001/stream')
+    expect(agentApi.getTurnStreamUrl('novel-101', 'session-90001', 'turn-50001')).toContain('/v1/novels/novel-101/agent/sessions/session-90001/turns/turn-50001/stream')
   })
 
-  it('opens_task_stream_when_called_without_object_binding', async () => {
+  it('opens_turn_stream_when_called_without_object_binding', async () => {
     const eventSourceMock = vi.fn().mockImplementation((url: string) => ({ url }))
     vi.stubGlobal('EventSource', eventSourceMock)
 
     const { agentApi } = await import('./agent.api')
-    const openTaskStream = agentApi.openTaskStream
+    const openTurnStream = agentApi.openTurnStream
 
-    const stream = openTaskStream('novel-101', 'task-70001')
+    const stream = openTurnStream('novel-101', 'session-90001', 'turn-50001')
 
-    expect(eventSourceMock).toHaveBeenCalledWith(expect.stringContaining('/v1/novels/novel-101/agent/tasks/task-70001/stream'))
-    expect(stream).toEqual({ url: expect.stringContaining('/v1/novels/novel-101/agent/tasks/task-70001/stream') })
+    expect(eventSourceMock).toHaveBeenCalledWith(expect.stringContaining('/v1/novels/novel-101/agent/sessions/session-90001/turns/turn-50001/stream'))
+    expect(stream).toEqual({ url: expect.stringContaining('/v1/novels/novel-101/agent/sessions/session-90001/turns/turn-50001/stream') })
   })
 })

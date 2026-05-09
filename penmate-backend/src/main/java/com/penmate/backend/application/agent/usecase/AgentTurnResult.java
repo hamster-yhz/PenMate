@@ -27,6 +27,7 @@ public record AgentTurnResult(
     }
 
     public record ActiveTaskView(
+            Long turnId,
             Long taskId,
             String taskStatus,
             Long requestContextId

@@ -8,6 +8,9 @@ import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
+import com.penmate.backend.domain.shared.service.GenerationStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentTaskDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Objects;
@@ -36,13 +40,19 @@ public class AgentController {
     private final AgentConversationAppService agentConversationAppService;
     private final AgentSessionRecoveryAppService agentSessionRecoveryAppService;
     private final AgentTurnAppService agentTurnAppService;
+    private final AgentSessionRepository agentSessionRepository;
+    private final GenerationStreamService generationStreamService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentSessionRecoveryAppService agentSessionRecoveryAppService,
-                           AgentTurnAppService agentTurnAppService) {
+                           AgentTurnAppService agentTurnAppService,
+                           AgentSessionRepository agentSessionRepository,
+                           GenerationStreamService generationStreamService) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentSessionRecoveryAppService = agentSessionRecoveryAppService;
         this.agentTurnAppService = agentTurnAppService;
+        this.agentSessionRepository = agentSessionRepository;
+        this.generationStreamService = generationStreamService;
     }
 
     /**
@@ -130,6 +140,23 @@ public class AgentController {
         return ApiResponse.success(toTaskDto(result), traceId);
     }
 
+    @GetMapping(path = "/sessions/{sessionId}/turns/{turnId}/stream", produces = "text/event-stream")
+    public SseEmitter openTurnStream(@PathVariable String projectId,
+                                     @PathVariable String sessionId,
+                                     @PathVariable String turnId,
+                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long resolvedProjectId = requireLongId(projectId, "projectId");
+        Long resolvedSessionId = requireLongId(sessionId, "sessionId");
+        Long resolvedTurnId = requireLongId(turnId, "turnId");
+        AgentTaskContext task = agentSessionRepository.findTaskByTurnId(resolvedProjectId, resolvedSessionId, resolvedTurnId);
+        if (task == null || task.getTaskId() == null) {
+            throw new IllegalArgumentException("turnId does not resolve to an active task stream");
+        }
+        log.info("Open agent turn stream request: projectId={}, sessionId={}, turnId={}, taskId={}, traceId={}",
+                resolvedProjectId, resolvedSessionId, resolvedTurnId, task.getTaskId(), traceId);
+        return generationStreamService.openStream(task.getTaskId());
+    }
+
     private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {
         Long userId = requireLongId(dto.getUserId(), "userId");
         return new CreateConversationCommand(
@@ -193,6 +220,7 @@ public class AgentController {
                         session == null ? null : session.taskStatus()
                 ),
                 activeTask == null ? null : new AgentRecoverySnapshotDto.ActiveTaskDto(
+                        stringifyBusinessId(activeTask.turnId()),
                         stringifyBusinessId(activeTask.taskId()),
                         activeTask.taskStatus(),
                         stringifyBusinessId(activeTask.requestContextId())
@@ -224,6 +252,7 @@ public class AgentController {
                         session == null ? null : session.taskStatus()
                 ),
                 new AgentRecoverySnapshotDto.ActiveTaskDto(
+                        activeTask == null ? null : stringifyBusinessId(activeTask.turnId()),
                         activeTask == null ? null : stringifyBusinessId(activeTask.taskId()),
                         activeTask == null ? null : activeTask.taskStatus(),
                         activeTask == null ? null : stringifyBusinessId(activeTask.requestContextId())

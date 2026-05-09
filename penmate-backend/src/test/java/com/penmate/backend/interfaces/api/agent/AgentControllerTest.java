@@ -7,6 +7,9 @@ import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
+import com.penmate.backend.domain.shared.service.GenerationStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -28,6 +32,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -46,6 +51,12 @@ class AgentControllerTest {
 
     @Mock
     private AgentTurnAppService agentTurnAppService;
+
+    @Mock
+    private AgentSessionRepository agentSessionRepository;
+
+    @Mock
+    private GenerationStreamService generationStreamService;
 
     @InjectMocks
     private AgentController agentController;
@@ -218,6 +229,22 @@ class AgentControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void UT_AGENT_TURN_STREAM_ROUTE_EXPOSED() throws Exception {
+        AgentTaskContext taskContext = new AgentTaskContext();
+        taskContext.setTurnId(50001L);
+        taskContext.setTaskId(70001L);
+        when(agentSessionRepository.findTaskByTurnId(10001L, 90001L, 50001L)).thenReturn(taskContext);
+        when(generationStreamService.openStream(70001L)).thenReturn(new SseEmitter());
+
+        mockMvc().perform(get("/api/v1/novels/10001/agent/sessions/90001/turns/50001/stream")
+                        .header("Accept", "text/event-stream"))
+                .andExpect(status().isOk());
+
+        verify(agentSessionRepository).findTaskByTurnId(10001L, 90001L, 50001L);
+        verify(generationStreamService).openStream(70001L);
+    }
+
     private AgentConversation conversation(Long sessionId, String title) {
         AgentConversation conversation = new AgentConversation();
         conversation.setConversationId(sessionId);
@@ -237,7 +264,7 @@ class AgentControllerTest {
                         new AgentSessionRecoveryResult.BoundStyleView(81L, "冷峻悬疑"),
                         taskStatus
                 ),
-                new AgentSessionRecoveryResult.ActiveTaskView(70001L, taskStatus, 71001L),
+                new AgentSessionRecoveryResult.ActiveTaskView(50001L, 70001L, taskStatus, 71001L),
                 null,
                 java.util.List.of(),
                 null
@@ -253,7 +280,7 @@ class AgentControllerTest {
                         new AgentTurnResult.BoundStyleView(81L, "冷峻悬疑"),
                         taskStatus
                 ),
-                new AgentTurnResult.ActiveTaskView(70001L, taskStatus, 71001L),
+                new AgentTurnResult.ActiveTaskView(50001L, 70001L, taskStatus, 71001L),
                 taskType,
                 userMessage
         );

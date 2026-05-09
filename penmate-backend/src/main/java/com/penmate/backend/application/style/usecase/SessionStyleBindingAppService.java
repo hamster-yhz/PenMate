@@ -3,6 +3,7 @@ package com.penmate.backend.application.style.usecase;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 会话风格绑定应用服务。
@@ -21,6 +22,7 @@ public class SessionStyleBindingAppService {
      * 绑定会话当前生效风格。
      * <p>返回已绑定的风格业务 ID，作为后续 turn/task 装配的唯一输入。</p>
      */
+    @Transactional
     public Long bind(Long projectId, Long sessionId, Long styleId, Long operatorId, String traceId) {
         if (projectId == null) {
             throw new IllegalArgumentException("projectId must not be null");

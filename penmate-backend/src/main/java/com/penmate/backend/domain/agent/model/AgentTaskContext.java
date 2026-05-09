@@ -7,6 +7,8 @@ public class AgentTaskContext {
 
     /** 上下文业务 ID。 */
     private Long contextId;
+    /** 所属 turn 业务 ID。 */
+    private Long turnId;
     /** 所属任务业务 ID。 */
     private Long taskId;
     /** 任务状态；recovery contract 的 activeTask.taskStatus 来源。 */
@@ -38,6 +40,7 @@ public class AgentTaskContext {
         }
         AgentTaskContext copied = new AgentTaskContext();
         copied.contextId = source.contextId;
+        copied.turnId = source.turnId;
         copied.taskId = source.taskId;
         copied.taskStatus = source.taskStatus;
         copied.activeApprovalId = source.activeApprovalId;
@@ -81,6 +84,10 @@ public class AgentTaskContext {
 
     public Long getTaskId() {
         return taskId;
+    }
+
+    public Long getTurnId() {
+        return turnId;
     }
 
     public String getTaskStatus() {
@@ -133,5 +140,25 @@ public class AgentTaskContext {
      */
     public void setStyleSnapshotJson(String styleSnapshotJson) {
         this.styleSnapshotJson = styleSnapshotJson;
+    }
+
+    public void setContextId(Long contextId) {
+        this.contextId = contextId;
+    }
+
+    public void setTurnId(Long turnId) {
+        this.turnId = turnId;
+    }
+
+    public void setTaskId(Long taskId) {
+        this.taskId = taskId;
+    }
+
+    public void setTaskStatus(String taskStatus) {
+        this.taskStatus = taskStatus;
+    }
+
+    public void setActiveApprovalId(Long activeApprovalId) {
+        this.activeApprovalId = activeApprovalId;
     }
 }

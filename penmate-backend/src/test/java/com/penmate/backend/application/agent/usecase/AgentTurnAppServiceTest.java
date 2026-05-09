@@ -5,6 +5,7 @@ import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +33,8 @@ class AgentTurnAppServiceTest {
     void should_create_turn_message_task_context_and_result_pipeline() {
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 bindingAppServiceWithBoundStyle(null),
+                agentRepository(),
+                sessionRepository(),
                 businessIdGenerator(930001L, 940001L, 950001L)
         );
         Long projectId = 920001L;
@@ -58,6 +62,8 @@ class AgentTurnAppServiceTest {
         SessionStyleBindingAppService bindingAppService = bindingAppServiceWithBoundStyle(81L);
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 bindingAppService,
+                agentRepository(),
+                sessionRepository(),
                 businessIdGenerator(930002L, 940002L, 950002L)
         ) {
             @Override
@@ -89,6 +95,8 @@ class AgentTurnAppServiceTest {
     void should_return_ids_from_created_message_and_task_pipeline() {
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 bindingAppServiceWithBoundStyle(null),
+                agentRepository(),
+                sessionRepository(),
                 businessIdGenerator(930003L, 940003L, 950003L)
         ) {
             @Override
@@ -97,6 +105,7 @@ class AgentTurnAppServiceTest {
                 message.setMessageId(930001L);
                 message.setConversationId(sessionId);
                 message.setContentMd(command.userMessage());
+                message.setSeqNo(1);
                 return message;
             }
 
@@ -108,8 +117,10 @@ class AgentTurnAppServiceTest {
                                                                String traceId) {
                 AgentGenerationTask task = new AgentGenerationTask();
                 task.setTaskId(940001L);
+                task.setProjectId(projectId);
                 task.setConversationId(sessionId);
                 task.setTaskType(command.taskRequest().taskType());
+                task.setStatus("pending");
                 return task;
             }
         };
@@ -131,6 +142,8 @@ class AgentTurnAppServiceTest {
     void should_return_request_context_id_from_created_task_context() {
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 bindingAppServiceWithBoundStyle(null),
+                agentRepository(),
+                sessionRepository(),
                 businessIdGenerator(930004L, 940004L, 950004L)
         ) {
             @Override
@@ -139,6 +152,7 @@ class AgentTurnAppServiceTest {
                 message.setMessageId(930002L);
                 message.setConversationId(sessionId);
                 message.setContentMd(command.userMessage());
+                message.setSeqNo(1);
                 return message;
             }
 
@@ -150,8 +164,10 @@ class AgentTurnAppServiceTest {
                                                                String traceId) {
                 AgentGenerationTask task = new AgentGenerationTask();
                 task.setTaskId(940002L);
+                task.setProjectId(projectId);
                 task.setConversationId(sessionId);
                 task.setTaskType(command.taskRequest().taskType());
+                task.setStatus("pending");
                 return task;
             }
 
@@ -165,7 +181,7 @@ class AgentTurnAppServiceTest {
                 AgentTaskContext context = new AgentTaskContext();
                 setField(context, "contextId", 950002L);
                 setField(context, "taskId", task.getTaskId());
-                setField(context, "taskStatus", "RUNNING");
+                setField(context, "taskStatus", "pending");
                 return context;
             }
         };
@@ -186,6 +202,8 @@ class AgentTurnAppServiceTest {
     void should_generate_message_task_and_context_ids_via_business_id_generator() {
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 bindingAppServiceWithBoundStyle(null),
+                agentRepository(),
+                sessionRepository(),
                 businessIdGenerator(930101L, 940101L, 950101L)
         );
 
@@ -209,7 +227,35 @@ class AgentTurnAppServiceTest {
         }
         when(repository.findSession(920001L, 920002L)).thenReturn(session);
         when(repository.findSession(920001L, 920001L)).thenReturn(session);
+        when(repository.nextTurnSeq(920002L)).thenReturn(1);
+        when(repository.insertTurn(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.isNull())).thenReturn(1);
+        when(repository.insertSessionMessage(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(1);
+        when(repository.insertRuntimeTask(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn(1);
+        when(repository.insertTaskContext(any())).thenReturn(1);
+        when(repository.updateLastTurn(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(1);
+        when(repository.updateLastRunningTask(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(1);
         return new SessionStyleBindingAppService(repository);
+    }
+
+    private static AgentRepository agentRepository() {
+        AgentRepository repository = mock(AgentRepository.class);
+        when(repository.nextMessageSeq(920002L)).thenReturn(1);
+        when(repository.insertMessage(any())).thenReturn(1);
+        when(repository.touchConversationLastMessage(920002L)).thenReturn(1);
+        return repository;
+    }
+
+    private static AgentSessionRepository sessionRepository() {
+        AgentSessionRepository repository = mock(AgentSessionRepository.class);
+        when(repository.nextTurnSeq(920002L)).thenReturn(1);
+        when(repository.insertTurn(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.isNull())).thenReturn(1);
+        when(repository.insertSessionMessage(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(1);
+        when(repository.insertRuntimeTask(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn(1);
+        when(repository.updateRuntimeTaskTurnLink(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(1);
+        when(repository.insertTaskContext(any())).thenReturn(1);
+        when(repository.updateLastTurn(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(1);
+        when(repository.updateLastRunningTask(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(1);
+        return repository;
     }
 
     private static void setField(Object target, String fieldName, Object value) {

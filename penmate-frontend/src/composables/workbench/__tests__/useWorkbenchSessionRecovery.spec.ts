@@ -21,7 +21,7 @@ describe('useWorkbenchSessionRecovery', () => {
     const recoveryController = useWorkbenchSessionRecovery({
       getSessionRecovery: vi.fn(),
       resumeSession,
-      openTaskStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+      openTurnStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
       hydrateStore: vi.fn(),
     })
 
@@ -35,7 +35,7 @@ describe('useWorkbenchSessionRecovery', () => {
 
   it('hydrates_store_from_recovery_snapshot_and_reconnects_running_task', async () => {
     const sessionState = createWorkbenchSessionState()
-    const openTaskStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
+    const openTurnStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
     const recovery = {
       session: {
         sessionId: '90001',
@@ -44,9 +44,10 @@ describe('useWorkbenchSessionRecovery', () => {
         boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
+        turnId: '50001',
         taskId: '70001',
         taskStatus: 'RUNNING',
-        streamChannelKey: 'agent-task-70001',
+        streamChannelKey: 'agent-turn-50001',
       },
       pendingApproval: null,
       messages: [],
@@ -61,7 +62,7 @@ describe('useWorkbenchSessionRecovery', () => {
     const recoveryController = useWorkbenchSessionRecovery({
       getSessionRecovery: vi.fn().mockResolvedValue(recovery),
       resumeSession: vi.fn().mockResolvedValue(recovery),
-      openTaskStream,
+      openTurnStream,
       hydrateStore: (snapshot: any) => {
         sessionState.sessionId = String(snapshot?.session?.sessionId ?? '') || null
         sessionState.title = String(snapshot?.session?.title ?? '')
@@ -71,6 +72,7 @@ describe('useWorkbenchSessionRecovery', () => {
           name: String(snapshot?.session?.boundStyle?.name ?? ''),
         }
         sessionState.activeTask = {
+          turnId: String(snapshot?.activeTask?.turnId ?? '') || null,
           taskId: String(snapshot?.activeTask?.taskId ?? '') || null,
           taskStatus: String(snapshot?.activeTask?.taskStatus ?? ''),
           streamChannelKey: String(snapshot?.activeTask?.streamChannelKey ?? ''),
@@ -94,9 +96,10 @@ describe('useWorkbenchSessionRecovery', () => {
     expect(sessionState.status).toBe('ACTIVE')
     expect(sessionState.boundStyle).toEqual({ styleId: '81', name: '冷峻悬疑' })
     expect(sessionState.activeTask).toEqual({
+      turnId: '50001',
       taskId: '70001',
       taskStatus: 'RUNNING',
-      streamChannelKey: 'agent-task-70001',
+      streamChannelKey: 'agent-turn-50001',
     })
     expect(sessionState.workbenchContext).toEqual({
       chapterId: '301',
@@ -104,7 +107,7 @@ describe('useWorkbenchSessionRecovery', () => {
       activePlugins: ['outline.search'],
       modelConfigId: 'mcfg-001',
     })
-    expect(openTaskStream).toHaveBeenCalledWith('101', '70001')
+    expect(openTurnStream).toHaveBeenCalledWith('101', '90001', '50001')
   })
 
   it('keeps_business_ids_as_strings_when_hydrating_store_from_recovery_snapshot', async () => {
@@ -121,9 +124,10 @@ describe('useWorkbenchSessionRecovery', () => {
         boundStyle: { styleId: oversizedStyleId, name: '冷峻悬疑' },
       },
       activeTask: {
+        turnId: '90071992547409936789',
         taskId: oversizedTaskId,
         taskStatus: 'RUNNING',
-        streamChannelKey: `agent-task-${oversizedTaskId}`,
+        streamChannelKey: 'agent-turn-90071992547409936789',
       },
       pendingApproval: null,
       messages: [],
@@ -138,7 +142,7 @@ describe('useWorkbenchSessionRecovery', () => {
     const recoveryController = useWorkbenchSessionRecovery({
       getSessionRecovery: vi.fn().mockResolvedValue(recovery),
       resumeSession: vi.fn().mockResolvedValue(recovery),
-      openTaskStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+      openTurnStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
       hydrateStore: (snapshot: any) => {
         sessionState.sessionId = String(snapshot?.session?.sessionId ?? '')
         sessionState.title = String(snapshot?.session?.title ?? '')
@@ -148,6 +152,7 @@ describe('useWorkbenchSessionRecovery', () => {
           name: String(snapshot?.session?.boundStyle?.name ?? ''),
         }
         sessionState.activeTask = {
+          turnId: String(snapshot?.activeTask?.turnId ?? ''),
           taskId: String(snapshot?.activeTask?.taskId ?? ''),
           taskStatus: String(snapshot?.activeTask?.taskStatus ?? ''),
           streamChannelKey: String(snapshot?.activeTask?.streamChannelKey ?? ''),
@@ -167,9 +172,10 @@ describe('useWorkbenchSessionRecovery', () => {
     expect(sessionState.sessionId).toBe(oversizedSessionId)
     expect(sessionState.boundStyle).toEqual({ styleId: oversizedStyleId, name: '冷峻悬疑' })
     expect(sessionState.activeTask).toEqual({
+      turnId: '90071992547409936789',
       taskId: oversizedTaskId,
       taskStatus: 'RUNNING',
-      streamChannelKey: `agent-task-${oversizedTaskId}`,
+      streamChannelKey: 'agent-turn-90071992547409936789',
     })
     expect(sessionState.workbenchContext).toEqual({
       chapterId: oversizedChapterId,
@@ -179,9 +185,9 @@ describe('useWorkbenchSessionRecovery', () => {
     })
   })
 
-  it('preserves_oversized_task_id_when_reconnecting_running_task_during_restore', async () => {
-    const oversizedTaskId = '90071992547409931234'
-    const openTaskStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
+  it('preserves_oversized_turn_id_when_reconnecting_running_task_during_restore', async () => {
+    const oversizedTurnId = '90071992547409931234'
+    const openTurnStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
     const recovery = {
       session: {
         sessionId: '90001',
@@ -190,9 +196,10 @@ describe('useWorkbenchSessionRecovery', () => {
         boundStyle: null,
       },
       activeTask: {
-        taskId: oversizedTaskId,
+        turnId: oversizedTurnId,
+        taskId: '70001',
         taskStatus: 'RUNNING',
-        streamChannelKey: `agent-task-${oversizedTaskId}`,
+        streamChannelKey: `agent-turn-${oversizedTurnId}`,
       },
       pendingApproval: null,
       messages: [],
@@ -207,22 +214,21 @@ describe('useWorkbenchSessionRecovery', () => {
     const recoveryController = useWorkbenchSessionRecovery({
       getSessionRecovery: vi.fn().mockResolvedValue(recovery),
       resumeSession: vi.fn().mockResolvedValue(recovery),
-      openTaskStream,
+      openTurnStream,
       hydrateStore: vi.fn(),
     })
 
     await (recoveryController.restore as (...args: any[]) => Promise<unknown>)('101', '90001', '201')
     await flushPromises()
 
-    expect(openTaskStream).toHaveBeenCalledWith('101', oversizedTaskId)
+    expect(openTurnStream).toHaveBeenCalledWith('101', '90001', oversizedTurnId)
   })
 
-  it('prefers_resume_running_task_over_direct_stream_open_when_handler_is_provided', async () => {
-    const openTaskStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
-    const resumeRunningTask = vi.fn().mockResolvedValue(undefined)
+  it('opens_turn_stream_directly_when_resume_running_task_handler_is_not_provided', async () => {
+    const openTurnStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
     const recovery = {
       session: { sessionId: '90001', title: '第三章', status: 'ACTIVE', boundStyle: null },
-      activeTask: { taskId: '70001', taskStatus: 'RUNNING', streamChannelKey: 'agent-task-70001' },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING', streamChannelKey: 'agent-turn-50001' },
       pendingApproval: null,
       messages: [],
       workbenchContext: { chapterId: '301', selectedText: '', activePlugins: [], modelConfigId: 'mcfg-001' },
@@ -231,7 +237,31 @@ describe('useWorkbenchSessionRecovery', () => {
     const recoveryController = useWorkbenchSessionRecovery({
       getSessionRecovery: vi.fn().mockResolvedValue(recovery),
       resumeSession: vi.fn().mockResolvedValue(recovery),
-      openTaskStream,
+      openTurnStream,
+      hydrateStore: vi.fn(),
+    })
+
+    await recoveryController.restore('101', '90001')
+    await flushPromises()
+
+    expect(openTurnStream).toHaveBeenCalledWith('101', '90001', '50001')
+  })
+
+  it('prefers_resume_running_task_over_direct_stream_open_when_handler_is_provided', async () => {
+    const openTurnStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
+    const resumeRunningTask = vi.fn().mockResolvedValue(undefined)
+    const recovery = {
+      session: { sessionId: '90001', title: '第三章', status: 'ACTIVE', boundStyle: null },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING', streamChannelKey: 'agent-turn-50001' },
+      pendingApproval: null,
+      messages: [],
+      workbenchContext: { chapterId: '301', selectedText: '', activePlugins: [], modelConfigId: 'mcfg-001' },
+    }
+
+    const recoveryController = useWorkbenchSessionRecovery({
+      getSessionRecovery: vi.fn().mockResolvedValue(recovery),
+      resumeSession: vi.fn().mockResolvedValue(recovery),
+      openTurnStream,
       resumeRunningTask,
       hydrateStore: vi.fn(),
     })
@@ -239,7 +269,7 @@ describe('useWorkbenchSessionRecovery', () => {
     await recoveryController.restore('101', '90001')
     await flushPromises()
 
-    expect(resumeRunningTask).toHaveBeenCalledWith('101', '70001')
-    expect(openTaskStream).not.toHaveBeenCalled()
+    expect(resumeRunningTask).toHaveBeenCalledWith('101', '90001', '50001')
+    expect(openTurnStream).not.toHaveBeenCalled()
   })
 })

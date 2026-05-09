@@ -147,6 +147,7 @@ class AgentControllerRecoveryContractTest {
     void should_keep_oversized_business_ids_as_string_in_recovery_and_turn_responses() throws Exception {
         Long oversizedSessionId = 9007199254740991L;
         Long oversizedStyleId = 9007199254740881L;
+        Long oversizedTurnId = 9007199254740990L;
         Long oversizedTaskId = 9007199254740771L;
         Long oversizedRequestContextId = 9007199254740661L;
 
@@ -159,7 +160,7 @@ class AgentControllerRecoveryContractTest {
                                 new AgentSessionRecoveryResult.BoundStyleView(oversizedStyleId, "冷峻悬疑"),
                                 "RUNNING"
                         ),
-                        new AgentSessionRecoveryResult.ActiveTaskView(oversizedTaskId, "RUNNING", oversizedRequestContextId),
+                        new AgentSessionRecoveryResult.ActiveTaskView(oversizedTurnId, oversizedTaskId, "RUNNING", oversizedRequestContextId),
                         null,
                         java.util.List.of(),
                         null
@@ -174,7 +175,7 @@ class AgentControllerRecoveryContractTest {
                                 new AgentTurnResult.BoundStyleView(oversizedStyleId, "冷峻悬疑"),
                                 "RUNNING"
                         ),
-                        new AgentTurnResult.ActiveTaskView(oversizedTaskId, "RUNNING", oversizedRequestContextId),
+                        new AgentTurnResult.ActiveTaskView(oversizedTurnId, oversizedTaskId, "RUNNING", oversizedRequestContextId),
                         "WRITE",
                         "继续扩写"
                 ));
@@ -184,6 +185,7 @@ class AgentControllerRecoveryContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.sessionId").value("9007199254740991"))
                 .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("9007199254740881"))
+                .andExpect(jsonPath("$.data.activeTask.turnId").value("9007199254740990"))
                 .andExpect(jsonPath("$.data.activeTask.taskId").value("9007199254740771"))
                 .andExpect(jsonPath("$.data.activeTask.requestContextId").value("9007199254740661"));
 
@@ -201,6 +203,7 @@ class AgentControllerRecoveryContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.sessionId").value("9007199254740991"))
                 .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("9007199254740881"))
+                .andExpect(jsonPath("$.data.activeTask.turnId").value("9007199254740990"))
                 .andExpect(jsonPath("$.data.activeTask.taskId").value("9007199254740771"))
                 .andExpect(jsonPath("$.data.activeTask.requestContextId").value("9007199254740661"));
     }
@@ -214,7 +217,7 @@ class AgentControllerRecoveryContractTest {
                         new AgentSessionRecoveryResult.BoundStyleView(81L, "冷峻悬疑"),
                         taskStatus
                 ),
-                new AgentSessionRecoveryResult.ActiveTaskView(70001L, taskStatus, 71001L),
+                new AgentSessionRecoveryResult.ActiveTaskView(50001L, 70001L, taskStatus, 71001L),
                 null,
                 java.util.List.of(),
                 null
@@ -230,7 +233,7 @@ class AgentControllerRecoveryContractTest {
                         new AgentTurnResult.BoundStyleView(81L, "冷峻悬疑"),
                         taskStatus
                 ),
-                new AgentTurnResult.ActiveTaskView(70001L, taskStatus, 71001L),
+                new AgentTurnResult.ActiveTaskView(50001L, 70001L, taskStatus, 71001L),
                 taskType,
                 userMessage
         );

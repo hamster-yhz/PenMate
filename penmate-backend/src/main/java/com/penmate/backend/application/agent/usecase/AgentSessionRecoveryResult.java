@@ -30,6 +30,7 @@ public record AgentSessionRecoveryResult(
     }
 
     public record ActiveTaskView(
+            Long turnId,
             Long taskId,
             String taskStatus,
             Long requestContextId

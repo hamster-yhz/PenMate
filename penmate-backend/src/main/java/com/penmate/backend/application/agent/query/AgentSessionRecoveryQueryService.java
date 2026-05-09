@@ -6,6 +6,7 @@ import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -18,6 +19,7 @@ import java.util.Map;
  * 以保证 WAITING_APPROVAL 场景可被工作台直接恢复。</p>
  */
 @Service
+@Slf4j
 public class AgentSessionRecoveryQueryService {
 
     private final AgentSessionRepository agentSessionRepository;
@@ -30,10 +32,13 @@ public class AgentSessionRecoveryQueryService {
     }
 
     public AgentSessionRecoverySnapshot getRecoverySnapshot(Long projectId, Long sessionId, String traceId) {
+        log.info("Agent recovery snapshot query started: projectId={}, sessionId={}, traceId={}", projectId, sessionId, traceId);
         AgentSessionRecoverySnapshot snapshot = agentSessionRepository.findRecoverySnapshot(projectId, sessionId);
         if (snapshot == null) {
+            log.info("Agent recovery snapshot not found, fallback to session lookup: projectId={}, sessionId={}, traceId={}", projectId, sessionId, traceId);
             AgentSession session = agentSessionRepository.findSession(projectId, sessionId);
             if (session == null) {
+                log.warn("Agent recovery session not found: projectId={}, sessionId={}, traceId={}", projectId, sessionId, traceId);
                 return null;
             }
             snapshot = AgentSessionRecoverySnapshot.of(
@@ -45,17 +50,52 @@ public class AgentSessionRecoveryQueryService {
             );
         }
 
+        log.info("Agent recovery snapshot loaded: projectId={}, sessionId={}, traceId={}, hasSession={}, activeTaskId={}, activeTaskStatus={}, activeApprovalId={}, messageCount={}, hasPendingApproval={}, hasWorkbenchContext={}",
+                projectId,
+                sessionId,
+                traceId,
+                snapshot.getSession() != null,
+                snapshot.getActiveTask() == null ? null : snapshot.getActiveTask().getTaskId(),
+                snapshot.getActiveTask() == null ? null : snapshot.getActiveTask().getTaskStatus(),
+                snapshot.getActiveTask() == null ? null : snapshot.getActiveTask().getActiveApprovalId(),
+                snapshot.getMessages() == null ? 0 : snapshot.getMessages().size(),
+                snapshot.getPendingApproval() != null,
+                snapshot.getWorkbenchContext() != null);
+
         if (snapshot.getPendingApproval() != null) {
+            log.info("Agent recovery snapshot already contains pending approval: projectId={}, sessionId={}, traceId={}, activeTaskId={}",
+                    projectId,
+                    sessionId,
+                    traceId,
+                    snapshot.getActiveTask() == null ? null : snapshot.getActiveTask().getTaskId());
             return snapshot;
         }
         AgentTaskContext activeTask = snapshot.getActiveTask();
         if (activeTask == null || activeTask.getActiveApprovalId() == null) {
+            log.info("Agent recovery snapshot has no active approval to enrich: projectId={}, sessionId={}, traceId={}, activeTaskId={}",
+                    projectId,
+                    sessionId,
+                    traceId,
+                    activeTask == null ? null : activeTask.getTaskId());
             return snapshot;
         }
         PendingToolInvocationSnapshot pendingSnapshot = pendingToolInvocationRepository.findByApprovalId(activeTask.getActiveApprovalId());
         if (pendingSnapshot == null) {
+            log.warn("Agent recovery pending approval snapshot missing: projectId={}, sessionId={}, traceId={}, activeTaskId={}, approvalId={}",
+                    projectId,
+                    sessionId,
+                    traceId,
+                    activeTask.getTaskId(),
+                    activeTask.getActiveApprovalId());
             return snapshot;
         }
+        log.info("Agent recovery pending approval enriched: projectId={}, sessionId={}, traceId={}, activeTaskId={}, approvalId={}, pendingStatus={}",
+                projectId,
+                sessionId,
+                traceId,
+                activeTask.getTaskId(),
+                activeTask.getActiveApprovalId(),
+                pendingSnapshot.status());
         return AgentSessionRecoverySnapshot.of(
                 snapshot.getSession(),
                 decorateTaskStatus(activeTask, snapshot.getSession()),

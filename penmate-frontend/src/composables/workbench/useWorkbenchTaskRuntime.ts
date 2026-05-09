@@ -40,7 +40,7 @@ export const createTaskRuntime = (deps: {
   setGenerationPhase: (value: GenerationPhase) => void
   getGenerationStream: () => EventSource | null
   setGenerationStream: (stream: EventSource | null) => void
-  openGenerationStream: (projectId: string, taskId: string) => EventSource
+  openGenerationStream: (projectId: string, sessionId: string, turnId: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeGenerationStream?: (stream: EventSource | null) => void
   getGeneration: (projectId: string, taskId: string) => Promise<unknown>
@@ -81,9 +81,9 @@ export const createTaskRuntime = (deps: {
     throw new Error(`生成任务轮询超时，状态：${status || 'unknown'}`)
   }
 
-  const consumeGenerationStream = (projectId: string, taskId: string, assistantMsg: ChatMessage) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
+  const consumeGenerationStream = (projectId: string, sessionId: string, turnId: string, assistantMsg: ChatMessage) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
     closeGenerationStream()
-    const generationStream = deps.openGenerationStream(projectId, taskId)
+    const generationStream = deps.openGenerationStream(projectId, sessionId, turnId)
     deps.setGenerationStream(generationStream)
     let settled = false
 

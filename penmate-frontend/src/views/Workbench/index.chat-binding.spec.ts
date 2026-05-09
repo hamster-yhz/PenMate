@@ -73,12 +73,12 @@ const agentApiMock = {
   resumeSession: vi.fn(async () => null as any),
   createTurn: vi.fn<(...args: any[]) => Promise<any>>(async () => ({
     session: { sessionId: '90001', title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: '81', name: '冷峻悬疑' } },
-    activeTask: { taskId: '77', taskStatus: 'RUNNING', requestContextId: '70101' },
+    activeTask: { turnId: '77', taskId: '77', taskStatus: 'RUNNING', requestContextId: '70101' },
     taskType: 'WRITE',
     userMessage: '测试消息',
   })),
   getTask: vi.fn(async () => ({ status: 'done' })),
-  openTaskStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+  openTurnStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
   addStreamListener: vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
     const current = streamListeners.get(eventName) || []
     current.push(listener)
@@ -306,7 +306,7 @@ describe('Workbench index chat parent binding', () => {
     streamListeners.clear()
     agentApiMock.createTurn.mockClear()
     agentApiMock.getTask.mockClear()
-    agentApiMock.openTaskStream.mockClear()
+    agentApiMock.openTurnStream.mockClear()
     agentApiMock.addStreamListener.mockClear()
     agentApiMock.listSessions.mockClear()
     agentApiMock.getSessionRecovery = vi.fn(async () => ({
@@ -411,9 +411,10 @@ describe('Workbench index chat parent binding', () => {
         boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
+        turnId: '70001',
         taskId: '70001',
         taskStatus: 'RUNNING',
-        streamChannelKey: 'agent-task-70001',
+        streamChannelKey: 'agent-turn-70001',
       },
       pendingApproval: null,
       messages: [
@@ -435,7 +436,7 @@ describe('Workbench index chat parent binding', () => {
 
     await waitForAssertion(() => {
       expect(agentApiMock.resumeSession).toHaveBeenCalledTimes(1)
-      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith('101', '70001')
+      expect(agentApiMock.openTurnStream).toHaveBeenCalledWith('101', '1', '70001')
     })
 
     await waitForAssertion(() => {
@@ -470,9 +471,10 @@ describe('Workbench index chat parent binding', () => {
         boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
+        turnId: oversizedTaskId,
         taskId: oversizedTaskId,
         taskStatus: 'RUNNING',
-        streamChannelKey: `agent-task-${oversizedTaskId}`,
+        streamChannelKey: `agent-turn-${oversizedTaskId}`,
       },
       pendingApproval: null,
       messages: [
@@ -497,7 +499,7 @@ describe('Workbench index chat parent binding', () => {
         operatorId: '201',
         trigger: 'WORKBENCH_ENTER',
       })
-      expect(agentApiMock.openTaskStream).toHaveBeenCalledWith('101', oversizedTaskId)
+      expect(agentApiMock.openTurnStream).toHaveBeenCalledWith('101', oversizedSessionId, oversizedTaskId)
     })
 
     expect((wrapper.vm as unknown as { currentConversationId: string }).currentConversationId).toBe(oversizedSessionId)
@@ -516,9 +518,10 @@ describe('Workbench index chat parent binding', () => {
         boundStyle: { styleId: '81', name: '冷峻悬疑' },
       },
       activeTask: {
+        turnId: oversizedTaskId,
         taskId: oversizedTaskId,
         taskStatus: 'WAITING_APPROVAL',
-        streamChannelKey: `agent-task-${oversizedTaskId}`,
+        streamChannelKey: `agent-turn-${oversizedTaskId}`,
       },
       pendingApproval: {
         approvalId: '45',
@@ -548,7 +551,7 @@ describe('Workbench index chat parent binding', () => {
     }))
     agentApiMock.createTurn = vi.fn(async (_projectId: string, sessionId: string) => ({
       session: { sessionId, title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: '81', name: '冷峻悬疑' } },
-      activeTask: { taskId: 'task-77', taskStatus: 'RUNNING', requestContextId: '70101' },
+      activeTask: { turnId: 'turn-77', taskId: 'task-77', taskStatus: 'RUNNING', requestContextId: '70101' },
       taskType: 'WRITE',
       userMessage: '继续生成正文',
     }))
@@ -575,7 +578,7 @@ describe('Workbench index chat parent binding', () => {
   it('clears_bound_style_when_turn_response_has_no_bound_style', async () => {
     agentApiMock.createTurn = vi.fn(async () => ({
       session: { sessionId: '90001', title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: null },
-      activeTask: { taskId: '77', taskStatus: 'RUNNING', requestContextId: '70101' },
+      activeTask: { turnId: '77', taskId: '77', taskStatus: 'RUNNING', requestContextId: '70101' },
       taskType: 'WRITE',
       userMessage: '测试消息',
     }))

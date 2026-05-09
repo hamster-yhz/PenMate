@@ -9,6 +9,7 @@ type RecoverySnapshot = {
     } | null
   } | null
   activeTask?: {
+    turnId?: string | null
     taskId?: string | null
     taskStatus?: string | null
     streamChannelKey?: string | null
@@ -30,9 +31,9 @@ type RecoverySnapshot = {
 export const useWorkbenchSessionRecovery = (deps: {
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<RecoverySnapshot>
   resumeSession: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<RecoverySnapshot>
-  openTaskStream: (projectId: string, taskId: string) => EventSource
+  openTurnStream: (projectId: string, sessionId: string, turnId: string) => EventSource
   hydrateStore: (snapshot: RecoverySnapshot) => void
-  resumeRunningTask?: (projectId: string, taskId: string) => Promise<void>
+  resumeRunningTask?: (projectId: string, sessionId: string, turnId: string) => Promise<void>
 }) => {
   const restore = async (projectId: string, sessionId: string, operatorId?: string) => {
     const snapshot = await deps.resumeSession(projectId, sessionId, {
@@ -40,13 +41,13 @@ export const useWorkbenchSessionRecovery = (deps: {
       ...(operatorId != null ? { operatorId } : {}),
     })
     deps.hydrateStore(snapshot)
-    const taskId = snapshot?.activeTask?.taskId
+    const turnId = snapshot?.activeTask?.turnId
     const taskStatus = String(snapshot?.activeTask?.taskStatus ?? '').toUpperCase()
-    if (taskId != null && String(taskId).trim() !== '' && String(taskId) !== '0' && taskStatus === 'RUNNING') {
+    if (turnId != null && String(turnId).trim() !== '' && String(turnId) !== '0' && taskStatus === 'RUNNING') {
       if (deps.resumeRunningTask) {
-        await deps.resumeRunningTask(projectId, taskId)
+        await deps.resumeRunningTask(projectId, sessionId, turnId)
       } else {
-        deps.openTaskStream(projectId, taskId)
+        deps.openTurnStream(projectId, sessionId, turnId)
       }
     }
     return snapshot

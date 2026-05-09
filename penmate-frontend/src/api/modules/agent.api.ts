@@ -10,6 +10,7 @@ type AgentSessionRecord = AnyRecord & {
 }
 
 type AgentTaskRecord = AnyRecord & {
+  turnId?: AgentBusinessId
   taskId?: AgentBusinessId
   taskStatus?: string
 }
@@ -30,9 +31,9 @@ const resolveApiBaseUrl = () => {
   return trimTrailingSlash(configuredBase.startsWith('/') ? configuredBase : `/${configuredBase}`)
 }
 
-const buildTaskStreamUrl = (projectId: string, taskId: string) => {
+const buildTurnStreamUrl = (projectId: string, sessionId: string, turnId: string) => {
   const apiBase = resolveApiBaseUrl()
-  return `${apiBase}/v1/novels/${projectId}/agent/tasks/${taskId}/stream`
+  return `${apiBase}/v1/novels/${projectId}/agent/sessions/${sessionId}/turns/${turnId}/stream`
 }
 
 export const agentApi = {
@@ -54,11 +55,11 @@ export const agentApi = {
   getTask(projectId: string, taskId: string) {
     return request.get<AgentTaskRecord>(`/v1/novels/${projectId}/agent/tasks/${taskId}`)
   },
-  getTaskStreamUrl(projectId: string, taskId: string) {
-    return buildTaskStreamUrl(projectId, taskId)
+  getTurnStreamUrl(projectId: string, sessionId: string, turnId: string) {
+    return buildTurnStreamUrl(projectId, sessionId, turnId)
   },
-  openTaskStream(projectId: string, taskId: string) {
-    const url = buildTaskStreamUrl(projectId, taskId)
+  openTurnStream(projectId: string, sessionId: string, turnId: string) {
+    const url = buildTurnStreamUrl(projectId, sessionId, turnId)
     return new EventSource(url)
   },
   addStreamListener(stream: EventSource, eventName: string, listener: StreamListener) {

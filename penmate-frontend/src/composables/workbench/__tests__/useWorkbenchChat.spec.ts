@@ -37,7 +37,7 @@ type UseWorkbenchChatFactory = (deps: any) => {
   loadConversationHistory: (projectId: string, operatorId: string) => Promise<void>
   selectConversation: (conversationId: string) => Promise<void>
   sendMessage: () => Promise<void>
-  resumeRunningTask: (projectId: string, taskId: string) => Promise<void>
+  resumeRunningTask: (projectId: string, sessionId: string, turnId: string) => Promise<void>
   hydrateFromRecoverySnapshot: (snapshot: Record<string, unknown> | null | undefined) => void
   toggleConversationPanel: () => Promise<void>
 }
@@ -70,13 +70,18 @@ const loadUseWorkbenchChat = async (): Promise<UseWorkbenchChatFactory> => {
     if (!deps.createTurn && deps.createGeneration) {
       deps.createTurn = async (projectId: string, sessionId: string, payload: Record<string, unknown>) => {
         const result = await deps.createGeneration(projectId, payload.operatorId, payload)
+        const resultRecord = (result || {}) as Record<string, unknown>
+        const activeTaskRecord = (resultRecord.activeTask || {}) as Record<string, unknown>
+        const resolvedTaskId = activeTaskRecord.taskId ?? resultRecord.taskId
+        const resolvedTurnId = activeTaskRecord.turnId ?? resultRecord.turnId ?? resolvedTaskId
         return {
-          ...(result || {}),
-          activeTask: (result as Record<string, unknown>)?.activeTask ?? {
-            taskId: (result as Record<string, unknown>)?.taskId,
-            taskStatus: (result as Record<string, unknown>)?.status,
+          ...resultRecord,
+          activeTask: resultRecord.activeTask ?? {
+            turnId: resolvedTurnId,
+            taskId: resolvedTaskId,
+            taskStatus: resultRecord.status,
           },
-          session: (result as Record<string, unknown>)?.session ?? {
+          session: resultRecord.session ?? {
             sessionId,
             title: '会话',
             status: 'ACTIVE',
@@ -88,10 +93,6 @@ const loadUseWorkbenchChat = async (): Promise<UseWorkbenchChatFactory> => {
 
     if (!deps.getTask && deps.getGeneration) {
       deps.getTask = deps.getGeneration
-    }
-
-    if (!deps.openTaskStream && deps.openGenerationStream) {
-      deps.openTaskStream = deps.openGenerationStream
     }
 
     if (!deps.closeTaskStream && deps.closeGenerationStream) {
@@ -129,7 +130,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery: vi.fn(),
       createTurn: vi.fn(),
       getTask: vi.fn(),
-      openTaskStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
       closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
@@ -169,7 +170,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery: vi.fn(),
       createTurn: vi.fn(),
       getTask: vi.fn(),
-      openTaskStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
       closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
@@ -219,7 +220,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery,
       createTurn: vi.fn(),
       getTask: vi.fn(),
-      openTaskStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
       closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
@@ -286,7 +287,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery,
       createTurn: vi.fn(),
       getTask: vi.fn(),
-      openTaskStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
       closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
@@ -335,9 +336,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn(),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat,
       nextTick,
@@ -388,7 +389,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery: vi.fn(),
       createTurn,
       getTask: vi.fn().mockResolvedValue({ status: 'done' }),
-      openTaskStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
@@ -437,7 +438,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery: vi.fn(),
       createTurn,
       getTask: vi.fn().mockResolvedValue({ status: 'done' }),
-      openTaskStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
@@ -493,7 +494,7 @@ describe('useWorkbenchChat', () => {
       }),
       createTurn,
       getTask: vi.fn().mockResolvedValue({ status: 'done' }),
-      openTaskStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
@@ -536,9 +537,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn(),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -579,9 +580,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9001, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -648,9 +649,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9016, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -727,9 +728,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9017, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -794,7 +795,8 @@ describe('useWorkbenchChat', () => {
     })
     const stream = { close: vi.fn() } as unknown as EventSource
     const oversizedTaskId = '90071992547409931234'
-    const openGenerationStream = vi.fn().mockReturnValue(stream)
+    const oversizedTurnId = '90071992547409939876'
+    const openTurnStream = vi.fn().mockReturnValue(stream)
 
     const chat = useWorkbenchChat({
       getContext: () => ({ projectId: 101, operatorId: 201 }),
@@ -809,13 +811,13 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({
         taskId: oversizedTaskId,
-        activeTask: { taskId: oversizedTaskId, taskStatus: 'RUNNING' },
+        activeTask: { turnId: oversizedTurnId, taskId: oversizedTaskId, taskStatus: 'RUNNING' },
         status: 'running',
       }),
       getGeneration: vi.fn(),
-      openGenerationStream,
+      openTurnStream,
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -834,7 +836,7 @@ describe('useWorkbenchChat', () => {
 
     await sendPromise
 
-    expect(openGenerationStream).toHaveBeenCalledWith(101, oversizedTaskId)
+    expect(openTurnStream).toHaveBeenCalledWith(101, '90001', oversizedTurnId)
   })
 
   it('does_not_append_completion_text_after_waiting_approval_followed_by_done_event', async () => {
@@ -858,9 +860,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9005, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -917,9 +919,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9015, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -973,11 +975,11 @@ describe('useWorkbenchChat', () => {
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9006, status: 'pending' }),
       getGeneration,
       waitForPolling,
-      openGenerationStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1021,9 +1023,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn(),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn(),
+      openTurnStream: vi.fn(),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1072,11 +1074,11 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9002, status: 'pending' }),
       getGeneration,
-      openGenerationStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1123,11 +1125,11 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9004, status: 'pending' }),
       getGeneration,
-      openGenerationStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1157,7 +1159,7 @@ describe('useWorkbenchChat', () => {
     const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
       listeners.set(eventName, listener)
     })
-    const closeGenerationStream = vi.fn()
+    const closeTaskStream = vi.fn()
     const stream = { close: vi.fn() } as unknown as EventSource
 
     const chat = useWorkbenchChat({
@@ -1173,9 +1175,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9003, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream,
+      closeTaskStream,
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1204,7 +1206,7 @@ describe('useWorkbenchChat', () => {
     expect(chat.generationTaskStatus.value).toBe('failed')
     expect(chat.streamingAssistantMsgId.value).toBe(null)
     expect(chat.isGenerating.value).toBe(false)
-    expect(closeGenerationStream).toHaveBeenCalled()
+    expect(closeTaskStream).toHaveBeenCalled()
     expect(stream.close).toHaveBeenCalled()
   })
 
@@ -1224,11 +1226,11 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9007, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw '流服务断开'
       }),
       addStreamListener: vi.fn(),
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1270,9 +1272,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn().mockResolvedValue({ taskId: 9008, status: 'running' }),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream: vi.fn(),
+      closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1312,7 +1314,7 @@ describe('useWorkbenchChat', () => {
     const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
       listeners.set(eventName, listener)
     })
-    const closeGenerationStream = vi.fn()
+    const closeTaskStream = vi.fn()
     const stream = { close: vi.fn() } as unknown as EventSource
 
     const chat = useWorkbenchChat({
@@ -1328,9 +1330,9 @@ describe('useWorkbenchChat', () => {
       createMessage: vi.fn().mockResolvedValue({}),
       createGeneration: vi.fn(),
       getGeneration: vi.fn(),
-      openGenerationStream: vi.fn().mockReturnValue(stream),
+      openTurnStream: vi.fn().mockReturnValue(stream),
       addStreamListener,
-      closeGenerationStream,
+      closeTaskStream,
       revealAssistantText: vi.fn(),
       scrollChat: vi.fn(),
       nextTick: async () => undefined,
@@ -1342,13 +1344,13 @@ describe('useWorkbenchChat', () => {
 
     chat.hydrateFromRecoverySnapshot({
       session: { sessionId: '90001' },
-      activeTask: { taskId: '70001', taskStatus: 'RUNNING' },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING' },
       messages: [
         { messageId: 1, role: 'assistant', contentMd: '' },
       ],
     })
 
-    const resumePromise = chat.resumeRunningTask('101', '70001')
+    const resumePromise = chat.resumeRunningTask('101', '90001', '50001')
     await flushPromises(20)
 
     listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
@@ -1368,18 +1370,18 @@ describe('useWorkbenchChat', () => {
     expect(chat.isGenerating.value).toBe(false)
     expect(chat.generationPhase.value).toBe('idle')
     expect(chat.generationTaskStatus.value).toBe('')
-    expect(closeGenerationStream).toHaveBeenCalled()
+    expect(closeTaskStream).toHaveBeenCalled()
     expect(stream.close).toHaveBeenCalled()
   })
 
-  it('resumes_running_task_with_oversized_string_task_id_without_precision_loss', async () => {
+  it('resumes_running_task_with_oversized_string_turn_id_without_precision_loss', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const listeners = new Map<string, (event: MessageEvent<string>) => void>()
     const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
       listeners.set(eventName, listener)
     })
     const stream = { close: vi.fn() } as unknown as EventSource
-    const oversizedTaskId = '90071992547409931234'
+    const oversizedTurnId = '90071992547409931234'
     const openGenerationStream = vi.fn().mockReturnValue(stream)
 
     const chat = useWorkbenchChat({
@@ -1394,7 +1396,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery: vi.fn(),
       createTurn: vi.fn(),
       getTask: vi.fn(),
-      openTaskStream: openGenerationStream,
+      openTurnStream: openGenerationStream,
       addStreamListener,
       closeTaskStream: vi.fn(),
       revealAssistantText: vi.fn(),
@@ -1408,13 +1410,13 @@ describe('useWorkbenchChat', () => {
 
     chat.hydrateFromRecoverySnapshot({
       session: { sessionId: '90001' },
-      activeTask: { taskId: oversizedTaskId, taskStatus: 'RUNNING' },
+      activeTask: { turnId: oversizedTurnId, taskId: '70001', taskStatus: 'RUNNING' },
       messages: [
         { messageId: 1, role: 'assistant', contentMd: '' },
       ],
     })
 
-    const resumePromise = chat.resumeRunningTask('101', oversizedTaskId)
+    const resumePromise = chat.resumeRunningTask('101', '90001', oversizedTurnId)
     await flushPromises(20)
 
     listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
@@ -1424,7 +1426,7 @@ describe('useWorkbenchChat', () => {
 
     await resumePromise
 
-    expect(openGenerationStream).toHaveBeenCalledWith('101', oversizedTaskId)
+    expect(openGenerationStream).toHaveBeenCalledWith('101', '90001', oversizedTurnId)
   })
 
   it('resumes_running_task_and_falls_back_to_polling_when_stream_fails', async () => {
@@ -1445,7 +1447,7 @@ describe('useWorkbenchChat', () => {
       getSessionRecovery: vi.fn(),
       createTurn: vi.fn(),
       getTask: getGeneration,
-      openTaskStream: vi.fn(() => {
+      openTurnStream: vi.fn(() => {
         throw new Error('stream unavailable')
       }),
       addStreamListener: vi.fn(),
@@ -1462,13 +1464,13 @@ describe('useWorkbenchChat', () => {
 
     chat.hydrateFromRecoverySnapshot({
       session: { sessionId: '90001' },
-      activeTask: { taskId: '70001', taskStatus: 'RUNNING' },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING' },
       messages: [
         { messageId: 1, role: 'assistant', contentMd: '' },
       ],
     })
 
-    await chat.resumeRunningTask('101', '70001')
+    await chat.resumeRunningTask('101', '90001', '50001')
 
     expect(getGeneration).toHaveBeenCalledWith('101', '70001')
     expect(chat.messages.value).toEqual([

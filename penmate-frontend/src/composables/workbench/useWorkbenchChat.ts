@@ -31,7 +31,7 @@ type UseWorkbenchChatDeps = {
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
   getTask: (projectId: string, taskId: string) => Promise<unknown>
-  openTaskStream: (projectId: string, taskId: string) => EventSource
+  openTurnStream: (projectId: string, sessionId: string, turnId: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeTaskStream?: (stream: EventSource | null) => void
   revealAssistantText?: (assistantMsg: ChatMessage, rawText: string) => Promise<void>
@@ -62,6 +62,11 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
+  const currentActiveTask = ref<{ sessionId: string | null; turnId: string | null; taskId: string | null }>({
+    sessionId: null,
+    turnId: null,
+    taskId: null,
+  })
 
   let msgIdCounter = 1
   let generationStream: EventSource | null = null
@@ -102,7 +107,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
   const getTask = (projectId: string, taskId: string) => deps.getTask(projectId, taskId)
 
-  const openTaskStream = (projectId: string, taskId: string) => deps.openTaskStream(projectId, taskId)
+  const openTurnStream = (projectId: string, sessionId: string, turnId: string) => deps.openTurnStream(projectId, sessionId, turnId)
 
   const closeTaskStream = deps.closeTaskStream
 
@@ -163,7 +168,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     setGenerationStream: (stream: EventSource | null) => {
       generationStream = stream
     },
-    openGenerationStream: openTaskStream,
+    openGenerationStream: openTurnStream,
     addStreamListener: deps.addStreamListener,
     closeGenerationStream: closeTaskStream,
     getGeneration: getTask,
@@ -310,8 +315,17 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       })) as ChatRecord & { activeTask?: { taskId?: string; taskStatus?: string } }
 
       const taskId = generation.activeTask?.taskId ?? generation.taskId
+      const turnId = generation.activeTask?.turnId
+      if (turnId == null || String(turnId).trim() === '' || String(turnId) === '0') {
+        throw new Error('任务创建失败，缺少 turnId')
+      }
       if (taskId == null || String(taskId).trim() === '' || String(taskId) === '0') {
         throw new Error('任务创建失败，缺少 taskId')
+      }
+      currentActiveTask.value = {
+        sessionId: conversationId,
+        turnId: String(turnId),
+        taskId: String(taskId),
       }
 
       generationTaskStatus.value = normalizeGenerationStatus(generation.activeTask?.taskStatus ?? generation.status) || 'pending'
@@ -324,7 +338,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
       let finalStatus: GenerationTaskStatus | ''
       try {
-        finalStatus = await runtime.consumeGenerationStream(projectId, String(taskId), assistantMsg)
+        finalStatus = await runtime.consumeGenerationStream(projectId, conversationId, String(turnId), assistantMsg)
       } catch (streamError: any) {
         if (!deps.enablePollingFallback) {
           throw streamError
@@ -385,6 +399,11 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
     currentConversationId.value = snapshot?.session?.sessionId == null ? null : String(snapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
+    currentActiveTask.value = {
+      sessionId: currentConversationId.value,
+      turnId: snapshot?.activeTask?.turnId == null ? null : String(snapshot.activeTask.turnId),
+      taskId: snapshot?.activeTask?.taskId == null ? null : String(snapshot.activeTask.taskId),
+    }
 
     const taskStatus = normalizeGenerationStatus(snapshot?.activeTask?.taskStatus)
     if (taskStatus === 'waiting_approval') {
@@ -416,30 +435,35 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return assistantMsg
   }
 
-  const resumeRunningTask = async (projectId: string, taskId: string) => {
+  const resumeRunningTask = async (projectId: string, sessionId: string, turnId: string) => {
     const assistantMsg = resolveAssistantMessageForResume()
     isGenerating.value = true
     generationPhase.value = 'streaming'
     generationTaskStatus.value = 'running'
     streamingAssistantMsgId.value = assistantMsg.id
-    debugChatState('resume-stream-start', { projectId, taskId })
+    debugChatState('resume-stream-start', { projectId, sessionId, turnId })
     await scrollChat()
 
     try {
       let finalStatus: GenerationTaskStatus | ''
       try {
-        finalStatus = await runtime.consumeGenerationStream(projectId, taskId, assistantMsg)
+        finalStatus = await runtime.consumeGenerationStream(projectId, sessionId, turnId, assistantMsg)
       } catch (streamError: any) {
         debugChatState('resume-stream-error', {
           projectId,
-          taskId,
+          sessionId,
+          turnId,
           errorMessage: runtime.getErrorMessage(streamError),
           fallbackEnabled: !!deps.enablePollingFallback,
         })
         if (!deps.enablePollingFallback) {
           throw streamError
         }
-        finalStatus = await runtime.pollGenerationAsFallback(projectId, taskId, assistantMsg)
+        const recoveryTaskId = String(currentActiveTask.value.taskId ?? '')
+        if (!recoveryTaskId || recoveryTaskId === '0') {
+          throw new Error('恢复续流失败，缺少 taskId 用于轮询兜底')
+        }
+        finalStatus = await runtime.pollGenerationAsFallback(projectId, recoveryTaskId, assistantMsg)
       }
 
       if (finalStatus === 'failed' || finalStatus === 'cancelled') {
@@ -468,7 +492,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         generationPhase.value = 'idle'
         generationTaskStatus.value = ''
       }
-      debugChatState('resume-stream-finished', { projectId, taskId })
+      debugChatState('resume-stream-finished', { projectId, sessionId, turnId })
       await scrollChat()
     }
   }

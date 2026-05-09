@@ -40,6 +40,7 @@ public record AgentRecoverySnapshotDto(
      * 当前激活任务摘要 DTO。
      */
     public record ActiveTaskDto(
+            String turnId,
             String taskId,
             String taskStatus,
             String requestContextId
