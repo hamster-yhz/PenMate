@@ -22,8 +22,12 @@ INSERT INTO novel_projects (id, project_id, owner_user_id, title, summary, statu
 (921001, 921001, 920002, RPAD('边界项目', 200, '测'), NULL, 0, NOW(3), NOW(3), NULL)
 ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at);
 
+INSERT INTO novel_outline_nodes (id, outline_node_id, project_id, parent_id, title, node_type, sort_order, content, created_at, updated_at, deleted_at) VALUES
+(921001, 921001, 921001, NULL, '边界章节节点', 'chapter', 1, '边界章节节点内容', NOW(3), NOW(3), NULL)
+ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at);
+
 INSERT INTO novel_chapters (id, chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count, excerpt, content_object_key, content_etag, content_size, content_checksum, storage_provider, last_generated_at, created_at, updated_at, deleted_at) VALUES
-(921001, 921001, NULL, NULL, NULL, RPAD('边界章节', 200, '章'), 1, 0, 0, NULL, 'dbcase/boundary/chapter/921001.md', NULL, 0, NULL, 's3', NULL, NOW(3), NOW(3), NULL)
+(921001, 921001, 921001, NULL, 921001, RPAD('边界章节', 200, '章'), 1, 0, 0, NULL, 'dbcase/boundary/chapter/921001.md', NULL, 0, NULL, 's3', NULL, NOW(3), NOW(3), NULL)
 ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at);
 
 -- Style：默认与非默认并存

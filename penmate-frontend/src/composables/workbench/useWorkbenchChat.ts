@@ -11,6 +11,7 @@ import {
   normalizeGenerationStatus,
   type GenerationTaskStatus,
 } from './useWorkbenchTaskRuntime'
+import { pickBusinessRecord } from '@/utils/apiPayload'
 
 type ContextProfile = {
   projectId?: string | null
@@ -100,7 +101,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const listSessions = (projectId: string) => deps.listSessions(projectId)
 
   const getSessionRecovery = async (projectId: string, sessionId: string) => {
-    return deps.getSessionRecovery(projectId, sessionId)
+    return pickBusinessRecord(await deps.getSessionRecovery(projectId, sessionId))
   }
 
   const createTurn = (projectId: string, sessionId: string, payload: Record<string, unknown>) => deps.createTurn(projectId, sessionId, payload)
@@ -199,7 +200,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const createSessionForSend = async (projectId: string, operatorId: string) => {
-    const created = (await deps.createSession(projectId, {
+    const created = pickBusinessRecord(await deps.createSession(projectId, {
       userId: operatorId,
       title: '新会话',
     })) as ChatRecord
@@ -302,7 +303,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         throw new Error('未选择可用模型，请先在模型设置中保存并切换模型')
       }
 
-      const generation = (await createTurn(projectId, conversationId, {
+      const generation = pickBusinessRecord(await createTurn(projectId, conversationId, {
         operatorId,
         userMessage: userText,
         taskRequest: {
@@ -386,7 +387,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const hydrateFromRecoverySnapshot = (snapshot: Record<string, any> | null | undefined) => {
-    const recoveryMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : []
+    const normalizedSnapshot = pickBusinessRecord(snapshot)
+    const recoveryMessages = Array.isArray(normalizedSnapshot.messages) ? normalizedSnapshot.messages : []
     const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
     messages.value = mappedMessages
     const maxId = mappedMessages.reduce((max, item) => {
@@ -397,15 +399,15 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       msgIdCounter = maxId + 1
     }
 
-    currentConversationId.value = snapshot?.session?.sessionId == null ? null : String(snapshot.session.sessionId)
+    currentConversationId.value = normalizedSnapshot?.session?.sessionId == null ? null : String(normalizedSnapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
     currentActiveTask.value = {
       sessionId: currentConversationId.value,
-      turnId: snapshot?.activeTask?.turnId == null ? null : String(snapshot.activeTask.turnId),
-      taskId: snapshot?.activeTask?.taskId == null ? null : String(snapshot.activeTask.taskId),
+      turnId: normalizedSnapshot?.activeTask?.turnId == null ? null : String(normalizedSnapshot.activeTask.turnId),
+      taskId: normalizedSnapshot?.activeTask?.taskId == null ? null : String(normalizedSnapshot.activeTask.taskId),
     }
 
-    const taskStatus = normalizeGenerationStatus(snapshot?.activeTask?.taskStatus)
+    const taskStatus = normalizeGenerationStatus(normalizedSnapshot?.activeTask?.taskStatus)
     if (taskStatus === 'waiting_approval') {
       generationPhase.value = 'waiting_approval'
       generationTaskStatus.value = 'waiting_approval'

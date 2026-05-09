@@ -137,6 +137,7 @@ describe('Workbench index refactor', () => {
     expect(source).not.toContain('Number(chapterKey)')
     expect(source).not.toContain('outlineNodeId > 0 && chapterId > 0')
     expect(source).not.toContain('conversationId ?? sessionId')
+    expect(source).not.toContain('virtual-chapter-')
   })
 
   it('wraps the workspace in a home-style atmospheric shell', () => {

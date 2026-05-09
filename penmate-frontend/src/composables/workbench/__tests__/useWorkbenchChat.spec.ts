@@ -316,6 +316,169 @@ describe('useWorkbenchChat', () => {
     ])
   })
 
+  it('maps_recovery_messages_when_backend_uses_message_content_aliases', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const getSessionRecovery = vi.fn().mockResolvedValue({
+      session: { sessionId: '88' },
+      messages: [
+        {
+          id: 'msg-user-1',
+          messageRole: 'USER',
+          contentMarkdown: '用户输入正文',
+        },
+        {
+          id: 'msg-assistant-1',
+          messageRole: 'ASSISTANT',
+          markdownContent: '助手恢复正文',
+        },
+      ],
+    })
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => [],
+      ensureModelConfigId: vi.fn(),
+      refreshActiveModelInfo: vi.fn(),
+      listSessions: vi.fn().mockResolvedValue([{ sessionId: '88', title: '当前会话', updatedAt: '2026-04-26 20:03:00' }]),
+      createSession: vi.fn(),
+      getSessionRecovery,
+      createTurn: vi.fn(),
+      getTask: vi.fn(),
+      openTurnStream: vi.fn(),
+      addStreamListener: vi.fn(),
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    await chat.loadConversationHistory('101', '201')
+
+    expect(chat.messages.value).toEqual([
+      { id: 'msg-user-1', role: 'user', text: '用户输入正文' },
+      { id: 'msg-assistant-1', role: 'assistant', text: '助手恢复正文' },
+    ])
+  })
+
+  it('creates_session_for_send_when_backend_keeps_new_session_under_data_field', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const createSession = vi.fn().mockResolvedValue({
+      data: {
+        sessionId: 'session-90001',
+        title: '新会话',
+      },
+    })
+    const createTurn = vi.fn().mockResolvedValue({
+      data: {
+        session: { sessionId: 'session-90001', title: '新会话', status: 'ACTIVE' },
+        activeTask: { turnId: 'turn-77', taskId: 'task-77', taskStatus: 'WAITING_APPROVAL' },
+      },
+    })
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => [],
+      ensureModelConfigId: vi.fn().mockResolvedValue('mcfg-9001'),
+      refreshActiveModelInfo: vi.fn(),
+      listSessions: vi.fn().mockResolvedValue([]),
+      createSession,
+      getSessionRecovery: vi.fn(),
+      createTurn,
+      getTask: vi.fn(),
+      openTurnStream: vi.fn(() => ({ close: vi.fn() } as unknown as EventSource)),
+      addStreamListener: vi.fn((_stream, eventName, listener) => {
+        if (eventName === 'generation.waiting_approval') {
+          listener({
+            data: JSON.stringify({
+              approvalId: '45',
+              approvalType: 'chapter_patch',
+              approvalMessage: '待审批',
+              approvalStatus: 'pending',
+            }),
+          } as MessageEvent<string>)
+        }
+        if (eventName === 'generation.done') {
+          listener({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+        }
+      }),
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '新会话首条消息'
+    await chat.sendMessage()
+
+    expect(createSession).toHaveBeenCalledTimes(1)
+    expect(createTurn).toHaveBeenCalledWith('101', 'session-90001', expect.objectContaining({
+      userMessage: '新会话首条消息',
+    }))
+    expect(chat.currentConversationId.value).toBe('session-90001')
+  })
+
+  it('loads_history_when_recovery_snapshot_is_still_nested_under_data_field', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listSessions = vi.fn().mockResolvedValue([
+      { sessionId: '88', title: '当前会话', updatedAt: '2026-04-26 20:03:00' },
+    ])
+    const getSessionRecovery = vi.fn().mockResolvedValue({
+      data: {
+        session: { sessionId: '88' },
+        messages: [
+          {
+            messageId: '9',
+            role: 'assistant',
+            contentMd: '从 data 内层恢复的消息',
+          },
+        ],
+      },
+    })
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => [],
+      ensureModelConfigId: vi.fn(),
+      refreshActiveModelInfo: vi.fn(),
+      listSessions,
+      createSession: vi.fn(),
+      getSessionRecovery,
+      createTurn: vi.fn(),
+      getTask: vi.fn(),
+      openTurnStream: vi.fn(),
+      addStreamListener: vi.fn(),
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    await chat.loadConversationHistory('101', '201')
+
+    expect(chat.currentConversationId.value).toBe('88')
+    expect(chat.messages.value).toEqual([
+      { id: '9', role: 'assistant', text: '从 data 内层恢复的消息' },
+    ])
+  })
+
   it('requires_model_selection_before_generation_when_no_model_available', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const onRequireModelSelection = vi.fn()

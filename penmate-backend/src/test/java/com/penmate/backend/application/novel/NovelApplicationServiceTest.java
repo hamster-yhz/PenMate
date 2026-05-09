@@ -15,11 +15,13 @@ import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,6 +72,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         NovelProject project = new NovelProject();
         project.setId(920002L);
         project.setTitle("DBCASE_长夜行_连载");
+        when(businessIdGenerator.nextId()).thenReturn(930001L);
         when(novelGateway.findProjectById(920002L)).thenReturn(project);
         when(novelGateway.insertOutlineNode(any(NovelOutlineNode.class))).thenAnswer(invocation -> {
             NovelOutlineNode node = invocation.getArgument(0);
@@ -85,9 +88,16 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
                 "trace-test"
         );
 
+        ArgumentCaptor<NovelOutlineNode> nodeCaptor = ArgumentCaptor.forClass(NovelOutlineNode.class);
+        verify(novelGateway).insertOutlineNode(nodeCaptor.capture());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass((Class) Map.class);
+        verify(realtimeEventService).publishProjectEvent(eq(920002L), eq("outline.node.created"), payloadCaptor.capture());
         assertThat(created.getId()).isEqualTo(123L);
+        assertThat(created.getOutlineNodeId()).isEqualTo(930001L);
         assertThat(created.getParentId()).isNull();
-        verify(realtimeEventService).publishProjectEvent(eq(920002L), eq("outline.node.created"), any());
+        assertThat(nodeCaptor.getValue().getOutlineNodeId()).isEqualTo(930001L);
+        assertThat(payloadCaptor.getValue()).containsEntry("nodeId", 930001L);
     }
 
     @Test

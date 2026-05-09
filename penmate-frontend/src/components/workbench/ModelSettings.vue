@@ -138,6 +138,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { modelApi } from '@/api/modules/model.api'
 import { getSession } from '@/stores/session'
+import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{
@@ -190,10 +191,7 @@ const form = reactive({
 })
 
 const getUserId = () => {
-  if (typeof session.userId !== 'string') {
-    return null
-  }
-  const normalized = session.userId.trim()
+  const normalized = String(session.userId ?? '').trim()
   return normalized || null
 }
 const getOperatorId = () => getUserId()
@@ -208,7 +206,7 @@ const extractPreferenceRecord = (payload: unknown): AnyRecord => {
     return {}
   }
 
-  const record = payload as AnyRecord
+  const record = pickBusinessRecord(payload)
   const nestedPreferences = record.preferences
   if (nestedPreferences && typeof nestedPreferences === 'object') {
     return nestedPreferences as AnyRecord
@@ -321,13 +319,21 @@ const loadData = async () => {
   }
 
   try {
-    const [providersResp, configsResp, preferencesResp] = await Promise.all([
+    const [providersResult, configsResult, preferencesResult] = await Promise.allSettled([
       modelApi.listProviders(),
       modelApi.listUserModelConfigs(userId),
       modelApi.getUserModelPreferences(userId),
     ])
 
-    providerOptions.value = ((providersResp || []) as AnyRecord[])
+    const providersResp = providersResult.status === 'fulfilled' ? providersResult.value : []
+    if (configsResult.status !== 'fulfilled' || preferencesResult.status !== 'fulfilled') {
+      throw new Error('required model payload failed to load')
+    }
+
+    const configsResp = configsResult.value
+    const preferencesResp = preferencesResult.value
+
+    providerOptions.value = pickBusinessArray<AnyRecord>(providersResp)
       .map((item) => {
         const providerId = normalizeBusinessStringId(item.providerId)
         if (!providerId) {
@@ -340,7 +346,23 @@ const loadData = async () => {
       })
       .filter((item): item is ProviderOption => item !== null)
 
-    userConfigs.value = ((configsResp || []) as AnyRecord[])
+    const preferencesDetail = pickBusinessRecord(preferencesResp)
+    const preferenceRecord = extractPreferenceRecord(preferencesDetail)
+    const fallbackConfigs = Array.isArray(preferencesDetail.candidateConfigs)
+      ? (preferencesDetail.candidateConfigs as AnyRecord[])
+      : Array.isArray(preferenceRecord.candidateConfigs)
+        ? (preferenceRecord.candidateConfigs as AnyRecord[])
+        : Array.isArray(preferencesDetail.modelConfigs)
+          ? (preferencesDetail.modelConfigs as AnyRecord[])
+          : Array.isArray(preferenceRecord.modelConfigs)
+            ? (preferenceRecord.modelConfigs as AnyRecord[])
+            : []
+    const normalizedConfigs = pickBusinessArray<AnyRecord>(configsResp)
+    const resolvedConfigs = normalizedConfigs.length > 0
+      ? normalizedConfigs
+      : fallbackConfigs
+
+    userConfigs.value = resolvedConfigs
       .map((item) => {
         const modelConfigId = normalizeBusinessStringId(item.modelConfigId)
         const providerId = normalizeBusinessStringId(item.providerId)
@@ -365,7 +387,6 @@ const loadData = async () => {
       })
       .filter((item): item is UserModelConfig => item !== null)
 
-    const preferenceRecord = extractPreferenceRecord(preferencesResp)
     mainAgentModelConfigId.value = normalizeAssignedConfigId(normalizeBusinessStringId(preferenceRecord.mainAgentModelConfigId))
     dirtyWorkAgentModelConfigId.value = normalizeAssignedConfigId(normalizeBusinessStringId(preferenceRecord.dirtyWorkAgentModelConfigId))
 

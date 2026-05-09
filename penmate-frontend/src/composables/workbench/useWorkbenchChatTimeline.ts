@@ -20,6 +20,23 @@ export const toChatRole = (raw: unknown): ChatMessage['role'] => {
   return 'user'
 }
 
+const pickMessageId = (item: ChatRecord) => {
+  const messageId = String(item.messageId ?? item.id ?? item.msgId ?? '').trim()
+  return messageId || null
+}
+
+const pickMessageRole = (item: ChatRecord) => item.role ?? item.messageRole ?? item.message_type
+
+const pickMessageText = (item: ChatRecord) => {
+  const rawText = item.contentMd
+    ?? item.contentMarkdown
+    ?? item.markdownContent
+    ?? item.content
+    ?? item.text
+    ?? item.message
+  return String(rawText ?? '')
+}
+
 export const pickConversationId = (item: ChatRecord) => String(item.sessionId ?? '').trim()
 
 export const pickToolCallId = (item: ChatRecord): string | undefined => {
@@ -107,11 +124,11 @@ export const createChatTimeline = (deps: {
     const approval = buildApprovalCard(item)
     const toolCallId = pickToolCallId(item)
 
-    const messageId = String(item.messageId ?? '').trim()
+    const messageId = pickMessageId(item)
     return {
       id: messageId || deps.getMsgIdCounter(),
-      role: toChatRole(item.role),
-      text: escapeHtml(String(item.contentMd || item.content || item.text || '')),
+      role: toChatRole(pickMessageRole(item)),
+      text: escapeHtml(pickMessageText(item)),
       ...(toolCallId ? { toolCallId } : {}),
       ...(approval ? { approval } : {}),
     }

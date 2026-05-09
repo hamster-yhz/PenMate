@@ -31,6 +31,14 @@ class AgentBaseSeedSqlContractTest {
     void resetSchema() throws Exception {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS novel_card_relations");
+            statement.execute("DROP TABLE IF EXISTS novel_cards");
+            statement.execute("DROP TABLE IF EXISTS novel_chapter_versions");
+            statement.execute("DROP TABLE IF EXISTS novel_chapters");
+            statement.execute("DROP TABLE IF EXISTS novel_outline_nodes");
+            statement.execute("DROP TABLE IF EXISTS novel_volumes");
+            statement.execute("DROP TABLE IF EXISTS novel_members");
+            statement.execute("DROP TABLE IF EXISTS novel_projects");
             statement.execute("DROP TABLE IF EXISTS agent_approval_actions");
             statement.execute("DROP TABLE IF EXISTS agent_approval_requests");
             statement.execute("DROP TABLE IF EXISTS agent_pending_approvals");
@@ -56,7 +64,10 @@ class AgentBaseSeedSqlContractTest {
 
         assertThat(sql)
                 .doesNotContain("agent_conversations")
-                .doesNotContain("agent_generation_tasks");
+                .doesNotContain("agent_generation_tasks")
+                .doesNotContain("(920001, 920001, 920001, 920003, NULL,")
+                .doesNotContain("(920002, 920002, 920001, NULL,   NULL,")
+                .doesNotContain("(920003, 920003, 920001, NULL,   NULL,");
 
         executeBlock(sql, "-- 文风", "-- 插件");
         executeBlock(sql, "-- Agent + 审批", "-- RAG + 对象存储");
@@ -74,6 +85,30 @@ class AgentBaseSeedSqlContractTest {
         assertThat(countRows("agent_pending_approvals")).isZero();
         assertThat(countRows("agent_approval_requests")).isZero();
         assertThat(countRows("agent_approval_actions")).isZero();
+    }
+
+    @Test
+    void should_keep_real_outline_node_mapping_for_every_seeded_chapter() throws Exception {
+        String sql;
+        try (var inputStream = new ClassPathResource("db/cases/seed_all_domain_base.sql").getInputStream()) {
+            sql = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+        }
+
+        executeBlock(sql, "-- 小说核心", "-- 基础 seed");
+
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("""
+                     SELECT COUNT(*)
+                     FROM novel_chapters c
+                     LEFT JOIN novel_outline_nodes o
+                       ON o.outline_node_id = c.outline_node_id
+                     WHERE c.chapter_id BETWEEN 920001 AND 920999
+                       AND (c.outline_node_id IS NULL OR o.outline_node_id IS NULL)
+                     """)) {
+            resultSet.next();
+            assertThat(resultSet.getLong(1)).isZero();
+        }
     }
 
     private static void createSchema(Statement statement) throws Exception {
@@ -146,6 +181,14 @@ class AgentBaseSeedSqlContractTest {
         statement.execute("CREATE TABLE agent_pending_approvals (id BIGINT PRIMARY KEY, pending_approval_id BIGINT NOT NULL)");
         statement.execute("CREATE TABLE agent_approval_requests (id BIGINT PRIMARY KEY, approval_request_id BIGINT NOT NULL)");
         statement.execute("CREATE TABLE agent_approval_actions (id BIGINT PRIMARY KEY, approval_action_id BIGINT NOT NULL)");
+        statement.execute("CREATE TABLE novel_projects (id BIGINT PRIMARY KEY, project_id BIGINT NOT NULL, owner_user_id BIGINT NOT NULL, title VARCHAR(200) NOT NULL, summary VARCHAR(2000) NULL, status INT NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP NULL)");
+        statement.execute("CREATE TABLE novel_members (project_id BIGINT NOT NULL, user_id BIGINT NOT NULL, member_role VARCHAR(50) NOT NULL, joined_at TIMESTAMP NOT NULL)");
+        statement.execute("CREATE TABLE novel_volumes (id BIGINT PRIMARY KEY, volume_id BIGINT NOT NULL, project_id BIGINT NOT NULL, title VARCHAR(200) NOT NULL, sort_order INT NOT NULL, description VARCHAR(2000) NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP NULL)");
+        statement.execute("CREATE TABLE novel_outline_nodes (id BIGINT PRIMARY KEY, outline_node_id BIGINT NOT NULL, project_id BIGINT NOT NULL, parent_id BIGINT NULL, title VARCHAR(200) NOT NULL, node_type VARCHAR(50) NOT NULL, sort_order INT NOT NULL, content VARCHAR(4000) NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP NULL)");
+        statement.execute("CREATE TABLE novel_chapters (id BIGINT PRIMARY KEY, chapter_id BIGINT NOT NULL, project_id BIGINT NOT NULL, volume_id BIGINT NULL, outline_node_id BIGINT NULL, title VARCHAR(200) NOT NULL, chapter_no INT NOT NULL, status INT NOT NULL, word_count INT NOT NULL, excerpt VARCHAR(2000) NULL, content_object_key VARCHAR(500) NULL, content_etag VARCHAR(255) NULL, content_size BIGINT NOT NULL, content_checksum VARCHAR(255) NULL, storage_provider VARCHAR(50) NULL, last_generated_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP NULL)");
+        statement.execute("CREATE TABLE novel_chapter_versions (id BIGINT PRIMARY KEY, chapter_version_id BIGINT NOT NULL, chapter_id BIGINT NOT NULL, version_no INT NOT NULL, change_type VARCHAR(50) NOT NULL, change_reason VARCHAR(255) NULL, snapshot_object_key VARCHAR(500) NOT NULL, snapshot_etag VARCHAR(255) NULL, snapshot_size BIGINT NOT NULL, snapshot_checksum VARCHAR(255) NULL, created_by BIGINT NOT NULL, created_at TIMESTAMP NOT NULL)");
+        statement.execute("CREATE TABLE novel_cards (id BIGINT PRIMARY KEY, card_id BIGINT NOT NULL, project_id BIGINT NOT NULL, card_type VARCHAR(50) NOT NULL, name VARCHAR(200) NOT NULL, summary VARCHAR(2000) NULL, detail_json VARCHAR(4000) NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP NULL)");
+        statement.execute("CREATE TABLE novel_card_relations (id BIGINT PRIMARY KEY, card_relation_id BIGINT NOT NULL, project_id BIGINT NOT NULL, from_card_id BIGINT NOT NULL, to_card_id BIGINT NOT NULL, relation_type VARCHAR(50) NOT NULL, description VARCHAR(2000) NULL, created_at TIMESTAMP NOT NULL, deleted_at TIMESTAMP NULL)");
     }
 
     private void executeBlock(String sql, String startMarker, String endMarker) throws Exception {

@@ -179,14 +179,16 @@ vi.mock('@/api/modules/plugin.api', () => ({
   },
 }))
 
+const modelApiMock = {
+  getUserModelPreferences: vi.fn(async () => ({
+    mainAgentModelConfigId: 'mcfg-9001',
+    dirtyWorkAgentModelConfigId: 'mcfg-9002',
+    candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
+  })),
+}
+
 vi.mock('@/api/modules/model.api', () => ({
-  modelApi: {
-    getUserModelPreferences: vi.fn(async () => ({
-      mainAgentModelConfigId: 'mcfg-9001',
-      dirtyWorkAgentModelConfigId: 'mcfg-9002',
-      candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
-    })),
-  },
+  modelApi: modelApiMock,
 }))
 
 vi.mock('@/api/modules/auth.api', () => ({
@@ -309,6 +311,12 @@ describe('Workbench index chat parent binding', () => {
     agentApiMock.openTurnStream.mockClear()
     agentApiMock.addStreamListener.mockClear()
     agentApiMock.listSessions.mockClear()
+    modelApiMock.getUserModelPreferences.mockReset()
+    modelApiMock.getUserModelPreferences.mockResolvedValue({
+      mainAgentModelConfigId: 'mcfg-9001',
+      dirtyWorkAgentModelConfigId: 'mcfg-9002',
+      candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
+    })
     agentApiMock.getSessionRecovery = vi.fn(async () => ({
       session: {
         sessionId: '90001',
@@ -400,6 +408,282 @@ describe('Workbench index chat parent binding', () => {
       operatorId: '201',
     }))
     expect(agentApiMock.getSessionRecovery).not.toHaveBeenCalled()
+  })
+
+  it('bridges_chapters_when_list_chapters_payload_is_still_nested_under_data_field', async () => {
+    const loadOutline = vi.fn(() => [])
+    const listOutlineTree = vi.fn(async () => [
+      { outlineNodeId: 'node-11', title: '第一章', nodeType: 'CHAPTER', parentId: 'node-10' },
+      { outlineNodeId: 'node-10', title: '第一卷', nodeType: 'VOLUME' },
+    ])
+    const listChapters = vi.fn(async () => ({
+      data: [
+        { chapterId: 'chapter-301', outlineNodeId: 'node-11', title: '第一章' },
+      ],
+    }))
+
+    vi.doMock('@/api/modules/outline.api', () => ({
+      outlineApi: {
+        listOutlineTree,
+        createNode: vi.fn(async () => ({})),
+        deleteNode: vi.fn(async () => ({})),
+        updateNode: vi.fn(async () => ({})),
+        moveNode: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/api/modules/novel.api', () => ({
+      novelApi: {
+        getProject: vi.fn(async () => ({ title: '测试小说' })),
+        listChapters,
+        updateProject: vi.fn(async () => ({})),
+        createChapter: vi.fn(async () => ({})),
+        deleteChapter: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/composables/workbench/useWorkbenchOutline', () => ({
+      useWorkbenchOutline: () => ({
+        outlineData: ref([]),
+        activeChapter: ref('1'),
+        currentChapterTitle: ref('第一章'),
+        outlineOpBusy: ref(false),
+        loadOutline,
+        selectChapter: vi.fn(),
+        addVolume: vi.fn(),
+        addChapter: vi.fn(),
+        deleteVolume: vi.fn(),
+        deleteChapter: vi.fn(),
+        renameNode: vi.fn(),
+        moveNode: vi.fn(),
+      }),
+    }))
+
+    const Workbench = (await import('./index.vue?chapters-data-nested')).default
+    await shallowMount(Workbench, {
+      global: {
+        stubs: {
+          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
+          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
+          WorkbenchRightPanel: WorkbenchRightPanelHarness,
+        },
+      },
+    })
+    await waitForAssertion(() => {
+      expect(loadOutline).toHaveBeenCalledWith(
+        [
+          { outlineNodeId: 'node-11', title: '第一章', nodeType: 'CHAPTER', parentId: 'node-10' },
+          { outlineNodeId: 'node-10', title: '第一卷', nodeType: 'VOLUME' },
+        ],
+        { 'node-11': 'chapter-301' }
+      )
+    })
+  })
+
+  it('falls_back_to_chapter_tree_when_outline_tree_is_empty_but_chapters_exist', async () => {
+    const loadOutline = vi.fn(() => [])
+    const listOutlineTree = vi.fn(async () => ({
+      data: [],
+    }))
+    const listChapters = vi.fn(async () => ({
+      data: [
+        { chapterId: 'chapter-301', outlineNodeId: 'node-11', title: '第一章' },
+        { chapterId: 'chapter-302', outlineNodeId: 'node-12', title: '第二章' },
+      ],
+    }))
+
+    vi.doMock('@/api/modules/outline.api', () => ({
+      outlineApi: {
+        listOutlineTree,
+        createNode: vi.fn(async () => ({})),
+        deleteNode: vi.fn(async () => ({})),
+        updateNode: vi.fn(async () => ({})),
+        moveNode: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/api/modules/novel.api', () => ({
+      novelApi: {
+        getProject: vi.fn(async () => ({ title: '测试小说' })),
+        listChapters,
+        updateProject: vi.fn(async () => ({})),
+        createChapter: vi.fn(async () => ({})),
+        deleteChapter: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/composables/workbench/useWorkbenchOutline', () => ({
+      useWorkbenchOutline: () => ({
+        outlineData: ref([]),
+        activeChapter: ref('1'),
+        currentChapterTitle: ref('第一章'),
+        outlineOpBusy: ref(false),
+        loadOutline,
+        selectChapter: vi.fn(),
+        addVolume: vi.fn(),
+        addChapter: vi.fn(),
+        deleteVolume: vi.fn(),
+        deleteChapter: vi.fn(),
+        renameNode: vi.fn(),
+        moveNode: vi.fn(),
+      }),
+    }))
+
+    const Workbench = (await import('./index.vue?outline-empty-chapters-fallback')).default
+    await shallowMount(Workbench, {
+      global: {
+        stubs: {
+          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
+          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
+          WorkbenchRightPanel: WorkbenchRightPanelHarness,
+        },
+      },
+    })
+
+    await waitForAssertion(() => {
+      expect(loadOutline).toHaveBeenCalledWith(
+        [
+          { outlineNodeId: 'virtual-volume-root', title: '未分卷', nodeType: 'VOLUME' },
+          { outlineNodeId: 'node-11', chapterId: 'chapter-301', title: '第一章', nodeType: 'CHAPTER', parentId: 'virtual-volume-root' },
+          { outlineNodeId: 'node-12', chapterId: 'chapter-302', title: '第二章', nodeType: 'CHAPTER', parentId: 'virtual-volume-root' },
+        ],
+        {
+          'node-11': 'chapter-301',
+          'node-12': 'chapter-302',
+        }
+      )
+    })
+  })
+
+  it('falls_back_to_chapter_tree_when_outline_tree_has_no_volume_nodes_but_chapters_exist', async () => {
+    const loadOutline = vi.fn(() => [])
+    const listOutlineTree = vi.fn(async () => ({
+      data: [
+        { outlineNodeId: 'node-11', title: '第一章', nodeType: 'CHAPTER', parentId: 'node-10' },
+      ],
+    }))
+    const listChapters = vi.fn(async () => ({
+      data: [
+        { chapterId: 'chapter-301', outlineNodeId: 'node-11', title: '第一章' },
+      ],
+    }))
+
+    vi.doMock('@/api/modules/outline.api', () => ({
+      outlineApi: {
+        listOutlineTree,
+        createNode: vi.fn(async () => ({})),
+        deleteNode: vi.fn(async () => ({})),
+        updateNode: vi.fn(async () => ({})),
+        moveNode: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/api/modules/novel.api', () => ({
+      novelApi: {
+        getProject: vi.fn(async () => ({ title: '测试小说' })),
+        listChapters,
+        updateProject: vi.fn(async () => ({})),
+        createChapter: vi.fn(async () => ({})),
+        deleteChapter: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/composables/workbench/useWorkbenchOutline', () => ({
+      useWorkbenchOutline: () => ({
+        outlineData: ref([]),
+        activeChapter: ref('1'),
+        currentChapterTitle: ref('第一章'),
+        outlineOpBusy: ref(false),
+        loadOutline,
+        selectChapter: vi.fn(),
+        addVolume: vi.fn(),
+        addChapter: vi.fn(),
+        deleteVolume: vi.fn(),
+        deleteChapter: vi.fn(),
+        renameNode: vi.fn(),
+        moveNode: vi.fn(),
+      }),
+    }))
+
+    const Workbench = (await import('./index.vue?outline-chapter-only-fallback')).default
+    await shallowMount(Workbench, {
+      global: {
+        stubs: {
+          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
+          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
+          WorkbenchRightPanel: WorkbenchRightPanelHarness,
+        },
+      },
+    })
+
+    await waitForAssertion(() => {
+      expect(loadOutline).toHaveBeenCalledWith(
+        [
+          { outlineNodeId: 'virtual-volume-root', title: '未分卷', nodeType: 'VOLUME' },
+          { outlineNodeId: 'node-11', chapterId: 'chapter-301', title: '第一章', nodeType: 'CHAPTER', parentId: 'virtual-volume-root' },
+        ],
+        {
+          'node-11': 'chapter-301',
+        }
+      )
+    })
+  })
+
+  it('drops_chapters_without_real_outline_node_id_instead_of_generating_virtual_chapter_nodes', async () => {
+    const loadOutline = vi.fn(() => [])
+    const listOutlineTree = vi.fn(async () => ({
+      data: [],
+    }))
+    const listChapters = vi.fn(async () => ({
+      data: [
+        { chapterId: 'chapter-301', outlineNodeId: null, title: '第一章' },
+        { chapterId: 'chapter-302', outlineNodeId: undefined, title: '第二章' },
+      ],
+    }))
+
+    vi.doMock('@/api/modules/outline.api', () => ({
+      outlineApi: {
+        listOutlineTree,
+        createNode: vi.fn(async () => ({})),
+        deleteNode: vi.fn(async () => ({})),
+        updateNode: vi.fn(async () => ({})),
+        moveNode: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/api/modules/novel.api', () => ({
+      novelApi: {
+        getProject: vi.fn(async () => ({ title: '测试小说' })),
+        listChapters,
+        updateProject: vi.fn(async () => ({})),
+        createChapter: vi.fn(async () => ({})),
+        deleteChapter: vi.fn(async () => ({})),
+      },
+    }))
+    vi.doMock('@/composables/workbench/useWorkbenchOutline', () => ({
+      useWorkbenchOutline: () => ({
+        outlineData: ref([]),
+        activeChapter: ref('1'),
+        currentChapterTitle: ref('第一章'),
+        outlineOpBusy: ref(false),
+        loadOutline,
+        selectChapter: vi.fn(),
+        addVolume: vi.fn(),
+        addChapter: vi.fn(),
+        deleteVolume: vi.fn(),
+        deleteChapter: vi.fn(),
+        renameNode: vi.fn(),
+        moveNode: vi.fn(),
+      }),
+    }))
+
+    const Workbench = (await import('./index.vue?chapters-without-real-outline-node-id')).default
+    await shallowMount(Workbench, {
+      global: {
+        stubs: {
+          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
+          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
+          WorkbenchRightPanel: WorkbenchRightPanelHarness,
+        },
+      },
+    })
+
+    await waitForAssertion(() => {
+      expect(loadOutline).toHaveBeenCalledWith([], {})
+    })
   })
 
   it('reconnects_running_session_on_mount_and_consumes_stream_events', async () => {
@@ -643,6 +927,54 @@ describe('Workbench index chat parent binding', () => {
     expect((wrapper.vm as unknown as { boundStyleName: string }).boundStyleName).toBe('')
   })
 
+  it('passes_nested_turn_payload_to_generation_flow_when_backend_keeps_turn_result_under_data_field', async () => {
+    agentApiMock.createTurn = vi.fn(async () => ({
+      data: {
+        session: { sessionId: '90001', title: '第三章夜雨追踪', status: 'ACTIVE', boundStyle: { styleId: '81', name: '冷峻悬疑' } },
+        activeTask: { turnId: 'nested-turn-77', taskId: 'nested-task-77', taskStatus: 'RUNNING', requestContextId: '70101' },
+        taskType: 'WRITE',
+        userMessage: '嵌套 turn 响应',
+      },
+    }))
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('嵌套 turn 响应')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
+      expect(agentApiMock.openTurnStream).toHaveBeenCalledWith('101', '90001', 'nested-turn-77')
+    })
+  })
+
+  it('creates_new_session_from_nested_payload_when_clicking_create_session_button', async () => {
+    agentApiMock.createSession = vi.fn(async () => ({
+      data: {
+        sessionId: 'session-nested-90001',
+        title: '新会话',
+        status: 'ACTIVE',
+      },
+    }))
+
+    const wrapper = await mountWorkbench()
+    const createSessionHandler = wrapper.findComponent(WorkbenchRightPanelHarness)
+    createSessionHandler.vm.$emit('create-session')
+    await nextTick()
+    await nextTick()
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createSession).toHaveBeenCalledTimes(1)
+    })
+
+    expect((wrapper.vm as unknown as { currentConversationId: string }).currentConversationId).toBe('session-nested-90001')
+    expect((wrapper.vm as unknown as { boundStyleName: string }).boundStyleName).toBe('')
+  })
+
   it('re_enables_followup_send_after_waiting_approval_through_real_useWorkbenchChat_to_parent_binding', async () => {
     const wrapper = await mountWorkbench()
 
@@ -717,17 +1049,36 @@ describe('Workbench index chat parent binding', () => {
   })
 
   it('passes_nested_preferred_string_model_config_id_to_generation_payload_when_preferences_are_nested', async () => {
-    vi.doMock('@/api/modules/model.api', () => ({
-      modelApi: {
-        getUserModelPreferences: vi.fn(async () => ({
-          preferences: {
-            mainAgentModelConfigId: 'mcfg-nested-9001',
-            dirtyWorkAgentModelConfigId: 'mcfg-nested-9002',
-          },
-          candidateConfigs: [{ modelConfigId: 'mcfg-nested-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
-        })),
+    modelApiMock.getUserModelPreferences.mockResolvedValue({
+      preferences: {
+        mainAgentModelConfigId: 'mcfg-nested-9001',
+        dirtyWorkAgentModelConfigId: 'mcfg-nested-9002',
+        modelConfigs: [{ modelConfigId: 'mcfg-nested-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
       },
-    }))
+    })
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      wrapper.get('[data-testid="chat-input"]')
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('使用 nested preferences.modelConfigs 生成内容')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createTurn).toHaveBeenCalled()
+    })
+
+    const generationPayload = (agentApiMock.createTurn.mock.calls.at(-1) as unknown[] | undefined)?.[2] as Record<string, unknown> | undefined
+    expect(generationPayload).toEqual(
+      expect.objectContaining({
+        taskRequest: expect.objectContaining({
+          modelConfigId: 'mcfg-nested-9001',
+        }),
+      })
+    )
+    expect(modelApiMock.getUserModelPreferences).toHaveBeenCalled()
   })
 
   it('updates_active_left_tab_in_parent_when_left_panel_emits_tab_change', async () => {

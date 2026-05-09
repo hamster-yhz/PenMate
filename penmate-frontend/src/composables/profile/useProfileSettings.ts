@@ -1,6 +1,7 @@
 import { reactive, ref } from 'vue'
 import { modelApi } from '@/api/modules/model.api'
 import { getSession } from '@/stores/session'
+import { pickBusinessRecord } from '@/utils/apiPayload'
 
 export interface ProfileModel {
   name: string
@@ -52,7 +53,7 @@ const extractPreferenceRecord = (payload: unknown): Record<string, unknown> => {
     return {}
   }
 
-  const record = payload as Record<string, unknown>
+  const record = pickBusinessRecord(payload)
   const nestedPreferences = record.preferences
   if (nestedPreferences && typeof nestedPreferences === 'object') {
     return nestedPreferences as Record<string, unknown>
@@ -182,7 +183,7 @@ export const useProfileSettings = () => {
     }
 
     try {
-      const detail = await modelApi.getUserModelPreferences(session.userId)
+      const detail = pickBusinessRecord(await modelApi.getUserModelPreferences(session.userId))
       const preferenceRecord = extractPreferenceRecord(detail)
       const mainValue = typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId : null
       const dirtyValue = typeof preferenceRecord.dirtyWorkAgentModelConfigId === 'string' ? preferenceRecord.dirtyWorkAgentModelConfigId : null
@@ -191,7 +192,11 @@ export const useProfileSettings = () => {
         ? detail.candidateConfigs
         : Array.isArray(preferenceRecord.candidateConfigs)
           ? preferenceRecord.candidateConfigs
-          : []
+          : Array.isArray((detail as Record<string, unknown>).modelConfigs)
+            ? ((detail as Record<string, unknown>).modelConfigs as unknown[])
+            : Array.isArray(preferenceRecord.modelConfigs)
+              ? (preferenceRecord.modelConfigs as unknown[])
+              : []
       const normalizedOptions: ProfileModelConfigOption[] = []
       for (const item of candidateConfigs) {
         const modelConfigId = typeof item.modelConfigId === 'string' ? item.modelConfigId.trim() : ''

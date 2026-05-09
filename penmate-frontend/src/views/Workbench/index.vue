@@ -174,6 +174,7 @@ import {
 import iconOutline from '@/assets/images/icon-outline.png'
 import iconCharacter from '@/assets/images/icon-character.png'
 import iconWorld from '@/assets/images/icon-world.png'
+import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 const router = useRouter()
 const route = useRoute()
@@ -506,7 +507,7 @@ const extractPreferenceRecord = (payload: unknown): Record<string, unknown> => {
     return {}
   }
 
-  const record = payload as Record<string, unknown>
+  const record = pickBusinessRecord(payload)
   const nestedPreferences = record.preferences
   if (nestedPreferences && typeof nestedPreferences === 'object') {
     return nestedPreferences as Record<string, unknown>
@@ -528,13 +529,17 @@ const refreshActiveModelInfo = async () => {
     return null
   }
   try {
-    const detail = (await modelApi.getUserModelPreferences(userId)) as Record<string, unknown>
+    const detail = pickBusinessRecord(await modelApi.getUserModelPreferences(userId))
     const preferenceRecord = extractPreferenceRecord(detail)
     const configs = Array.isArray(detail.candidateConfigs)
       ? (detail.candidateConfigs as Array<Record<string, unknown>>)
       : Array.isArray(preferenceRecord.candidateConfigs)
         ? (preferenceRecord.candidateConfigs as Array<Record<string, unknown>>)
-        : []
+        : Array.isArray(detail.modelConfigs)
+          ? (detail.modelConfigs as Array<Record<string, unknown>>)
+          : Array.isArray(preferenceRecord.modelConfigs)
+            ? (preferenceRecord.modelConfigs as Array<Record<string, unknown>>)
+            : []
     const preferredId = typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId.trim() : ''
     const preferred = configs.find((item) => pickModelConfigId(item) === preferredId) || configs[0]
     const modelConfigId = preferred ? pickModelConfigId(preferred) : null
@@ -589,7 +594,7 @@ const {
         : 0,
       userMessageLength: String(payload.userMessage || '').length,
     })
-    const result = (await agentApi.createTurn(projectId, sessionId, payload)) as Record<string, unknown>
+    const result = pickBusinessRecord(await agentApi.createTurn(projectId, sessionId, payload)) as Record<string, unknown>
     syncBoundStyleName((result.session as Record<string, unknown> | null | undefined) || null)
     debugChatState('create-turn-created', {
       projectId,
@@ -648,9 +653,10 @@ const sessionRecovery = useWorkbenchSessionRecovery({
   openTurnStream: (projectId, sessionId, turnId) => openAgentTurnStream(projectId, sessionId, turnId),
   resumeRunningTask,
   hydrateStore: (snapshot) => {
-    hydrateFromRecoverySnapshot(snapshot)
-    syncBoundStyleName((snapshot?.session as Record<string, unknown> | null | undefined) || null)
-    const workbenchContext = snapshot?.workbenchContext || {}
+    const normalizedSnapshot = pickBusinessRecord(snapshot)
+    hydrateFromRecoverySnapshot(normalizedSnapshot)
+    syncBoundStyleName((normalizedSnapshot.session as Record<string, unknown> | null | undefined) || null)
+    const workbenchContext = normalizedSnapshot.workbenchContext || {}
     const chapterId = String(workbenchContext.chapterId ?? '').trim()
     if (chapterId && chapterId !== '0') {
       activeChapter.value = chapterId
@@ -676,7 +682,7 @@ const handleCreateSession = async () => {
   const projectId = getAgentProjectId()
   const operatorId = getAgentOperatorId()
   if (!projectId || !operatorId) return
-  const created = (await agentApi.createSession(projectId, {
+  const created = pickBusinessRecord(await agentApi.createSession(projectId, {
     userId: operatorId,
     title: '新会话',
   })) as Record<string, unknown>
@@ -708,6 +714,44 @@ const normalizeBusinessId = (value: unknown) => {
   const normalized = String(value ?? '').trim()
   return normalized || null
 }
+
+const buildFallbackOutlineFromChapters = (chapters: Array<Record<string, unknown>>) => {
+  const volumeNodeId = 'virtual-volume-root'
+  const chapterNodes = chapters
+    .map((chapter) => {
+      const chapterId = normalizeBusinessId(chapter.chapterId)
+      const outlineNodeId = normalizeBusinessId(chapter.outlineNodeId)
+      if (!outlineNodeId || !chapterId) {
+        return null
+      }
+      return {
+        outlineNodeId,
+        chapterId,
+        title: String(chapter.title ?? chapter.chapterTitle ?? '未命名章节'),
+        nodeType: 'CHAPTER',
+        parentId: volumeNodeId,
+      }
+    })
+    .filter((item): item is Record<string, unknown> => item !== null)
+
+  if (chapterNodes.length === 0) {
+    return []
+  }
+
+  return [
+    {
+      outlineNodeId: volumeNodeId,
+      title: '未分卷',
+      nodeType: 'VOLUME',
+    },
+    ...chapterNodes,
+  ]
+}
+
+const hasRenderableVolumeNodes = (nodes: Array<Record<string, unknown>>) => nodes.some((node) => {
+  const nodeType = String(node.nodeType ?? node.type ?? '').toUpperCase()
+  return nodeType.includes('VOLUME')
+})
 
 const tryLoadChapterRemoteContent = async (chapterIdInput: string, requestId: number) => {
   const projectId = getCurrentProjectId()
@@ -775,10 +819,10 @@ const handleOutlineSelectChapter = async (chapter: OutlineChapterNode) => {
 
 const loadWorkbenchData = async (projectId: string) => {
   if (!projectId) return
-  const outlineResp = await outlineApi.listOutlineTree(projectId)
-  const chapterResp = await novelApi.listChapters(projectId)
+  const outlineResp = pickBusinessArray<Record<string, unknown>>(await outlineApi.listOutlineTree(projectId))
+  const chapterResp = pickBusinessArray<Record<string, unknown>>(await novelApi.listChapters(projectId))
   const chapterByOutlineNodeId = Object.fromEntries(
-    (chapterResp || [])
+    chapterResp
       .map((chapter: Record<string, unknown>) => {
         const outlineNodeId = normalizeBusinessId(chapter.outlineNodeId)
         const chapterId = normalizeBusinessId(chapter.chapterId)
@@ -786,8 +830,11 @@ const loadWorkbenchData = async (projectId: string) => {
       })
       .filter((entry): entry is [string, string] => Array.isArray(entry))
   )
+  const outlineNodes = outlineResp.length > 0 && hasRenderableVolumeNodes(outlineResp)
+    ? outlineResp
+    : buildFallbackOutlineFromChapters(chapterResp)
 
-  loadOutline((outlineResp || []) as Array<Record<string, unknown>>, chapterByOutlineNodeId)
+  loadOutline(outlineNodes, chapterByOutlineNodeId)
 
   await Promise.all([
     loadCardsAndRelations(projectId),

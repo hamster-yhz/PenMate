@@ -26,7 +26,8 @@ export const mapOutlineTree = (
       const pKey = String(parentId)
       const parent = volumeMap.get(pKey)
       if (parent) {
-        parent.children.push({ title, key, chapterId: chapterByOutlineNodeId[key] })
+        const chapterId = chapterByOutlineNodeId[key] ?? (node.chapterId == null ? undefined : String(node.chapterId))
+        parent.children.push({ title, key, chapterId })
       }
     }
   })

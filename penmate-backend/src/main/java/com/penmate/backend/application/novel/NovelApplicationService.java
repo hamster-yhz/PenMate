@@ -676,6 +676,7 @@ public class NovelApplicationService {
         log.info("创建大纲节点: projectId={}, title={}, parentId={}, operatorId={}", projectId, command.title(), command.parentId(), operatorId);
         getProject(projectId);
         NovelOutlineNode node = new NovelOutlineNode();
+        node.setOutlineNodeId(businessIdGenerator.nextId());
         node.setProjectId(projectId);
         node.setParentId(command.parentId());
         node.setTitle(command.title());
@@ -688,13 +689,13 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create outline node");
         }
         Map<String, Object> payload = new HashMap<>();
-        payload.put("nodeId", node.getId());
+        payload.put("nodeId", node.getOutlineNodeId());
         payload.put("parentId", node.getParentId());
         payload.put("title", node.getTitle());
         payload.put("nodeType", node.getNodeType());
         realtimeEventService.publishProjectEvent(projectId, "outline.node.created", payload);
          
-        log.info("创建大纲节点成功: projectId={}, nodeId={}", projectId, node.getId());
+        log.info("创建大纲节点成功: projectId={}, nodeId={}", projectId, node.getOutlineNodeId());
         return node;
     }
 

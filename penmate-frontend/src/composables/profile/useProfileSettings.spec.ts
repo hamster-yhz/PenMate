@@ -89,6 +89,58 @@ describe('useProfileSettings', () => {
     expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe('mcfg-nested-9002')
   })
 
+  it('loads_model_candidates_from_nested_preferences_alias_when_candidate_configs_missing', async () => {
+    setSession({ userId: '1001' })
+    getUserModelPreferencesMock.mockResolvedValue({
+      preferences: {
+        mainAgentModelConfigId: 'mcfg-nested-9001',
+        dirtyWorkAgentModelConfigId: 'mcfg-nested-9002',
+        modelConfigs: [
+          { modelConfigId: 'mcfg-nested-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+          { modelConfigId: 'mcfg-nested-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+        ],
+      },
+    })
+
+    const { useProfileSettings } = await import('./useProfileSettings')
+    const settings = useProfileSettings()
+
+    await settings.loadModelPreferences()
+
+    expect(settings.modelPreferences.mainAgentModelConfigId).toBe('mcfg-nested-9001')
+    expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe('mcfg-nested-9002')
+    expect(settings.modelConfigOptions.value).toEqual([
+      { modelConfigId: 'mcfg-nested-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+      { modelConfigId: 'mcfg-nested-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+    ])
+  })
+
+  it('loads_model_preferences_when_backend_keeps_business_payload_under_data_field', async () => {
+    setSession({ userId: '1001' })
+    getUserModelPreferencesMock.mockResolvedValue({
+      data: {
+        mainAgentModelConfigId: 'mcfg-data-9001',
+        dirtyWorkAgentModelConfigId: 'mcfg-data-9002',
+        candidateConfigs: [
+          { modelConfigId: 'mcfg-data-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+          { modelConfigId: 'mcfg-data-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+        ],
+      },
+    })
+
+    const { useProfileSettings } = await import('./useProfileSettings')
+    const settings = useProfileSettings()
+
+    await settings.loadModelPreferences()
+
+    expect(settings.modelPreferences.mainAgentModelConfigId).toBe('mcfg-data-9001')
+    expect(settings.modelPreferences.dirtyWorkAgentModelConfigId).toBe('mcfg-data-9002')
+    expect(settings.modelConfigOptions.value).toEqual([
+      { modelConfigId: 'mcfg-data-9001', modelName: 'gpt-4o-mini', keySourceType: 'USER_KEY' },
+      { modelConfigId: 'mcfg-data-9002', modelName: 'deepseek-chat', keySourceType: 'OFFICIAL_KEY' },
+    ])
+  })
+
   it('clears_model_preference_state_when_loading_fails_after_previous_success', async () => {
     setSession({ userId: '1001' })
     getUserModelPreferencesMock

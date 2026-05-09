@@ -101,12 +101,14 @@ INSERT INTO novel_volumes (id, volume_id, project_id, title, sort_order, descrip
 INSERT INTO novel_outline_nodes (id, outline_node_id, project_id, parent_id, title, node_type, sort_order, content, created_at, updated_at, deleted_at) VALUES
 (920001, 920001, 920001, NULL,   '主线大纲',  'root',    1,  '总纲',   NOW(3), NOW(3), NULL),
 (920002, 920002, 920001, 920001, '第一幕',    'arc',    10, '幕内容', NOW(3), NOW(3), NULL),
-(920003, 920003, 920001, 920002, '第一章节点', 'chapter', 11, '章节点', NOW(3), NOW(3), NULL);
+(920003, 920003, 920001, 920002, '第一章节点', 'chapter', 11, '章节点', NOW(3), NOW(3), NULL),
+(920004, 920004, 920001, 920002, '第二章节点', 'chapter', 12, '章节点', NOW(3), NOW(3), NULL),
+(920005, 920005, 920001, 920002, '孤立章节节点', 'chapter', 99, '章节点', NOW(3), NOW(3), NULL);
 
 INSERT INTO novel_chapters (id, chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count, excerpt, content_object_key, content_etag, content_size, content_checksum, storage_provider, last_generated_at, created_at, updated_at, deleted_at) VALUES
-(920001, 920001, 920001, 920003, NULL, '第1章 雾墙外',   1, 1, 3200, '章节一摘要', 'dbcase/projects/920001/chapters/920001/content.md', 'etag-ch-920001', 4096, 'sha256-ch-920001', 's3', NOW(3), NOW(3), NOW(3), NULL),
-(920002, 920002, 920001, NULL,   NULL, '第2章 失落哨站', 2, 2, 4100, '章节二摘要', 'dbcase/projects/920001/chapters/920002/content.md', 'etag-ch-920002', 5120, 'sha256-ch-920002', 's3', NOW(3), NOW(3), NOW(3), NULL),
-(920003, 920003, 920001, NULL,   NULL, '孤立章节样本',   99, 0, 0, NULL, 'dbcase/projects/920001/chapters/920003/content.md', 'etag-ch-920003', 1024, 'sha256-ch-920003', 's3', NULL, NOW(3), NOW(3), NULL);
+(920001, 920001, 920001, 920003, 920003, '第1章 雾墙外',   1, 1, 3200, '章节一摘要', 'dbcase/projects/920001/chapters/920001/content.md', 'etag-ch-920001', 4096, 'sha256-ch-920001', 's3', NOW(3), NOW(3), NOW(3), NULL),
+(920002, 920002, 920001, NULL,   920004, '第2章 失落哨站', 2, 2, 4100, '章节二摘要', 'dbcase/projects/920001/chapters/920002/content.md', 'etag-ch-920002', 5120, 'sha256-ch-920002', 's3', NOW(3), NOW(3), NOW(3), NULL),
+(920003, 920003, 920001, NULL,   920005, '孤立章节样本',   99, 0, 0, NULL, 'dbcase/projects/920001/chapters/920003/content.md', 'etag-ch-920003', 1024, 'sha256-ch-920003', 's3', NULL, NOW(3), NOW(3), NULL);
 
 INSERT INTO novel_chapter_versions (id, chapter_version_id, chapter_id, version_no, change_type, change_reason, snapshot_object_key, snapshot_etag, snapshot_size, snapshot_checksum, created_by, created_at) VALUES
 (920001, 920001, 920001, 1, 'create',  '初稿',     'dbcase/projects/920001/chapters/920001/v1.json', 'etag-v-920001-1', 2048, 'sha256-v-920001-1', 920002, NOW(3)),

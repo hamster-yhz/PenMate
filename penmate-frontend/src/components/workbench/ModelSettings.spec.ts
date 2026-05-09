@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ModelSettings from './ModelSettings.vue'
 
 const mocks = vi.hoisted(() => ({
+  sessionUserId: '101' as string | number | null,
   messageSuccess: vi.fn(),
   messageWarning: vi.fn(),
   listProviders: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('ant-design-vue', () => ({
 
 vi.mock('@/stores/session', () => ({
   getSession: () => ({
-    userId: '101',
+    userId: mocks.sessionUserId,
   }),
 }))
 
@@ -108,6 +109,7 @@ const mountComponent = async () => {
 describe('ModelSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.sessionUserId = '101'
     mocks.listProviders.mockResolvedValue(providerFixture)
     mocks.listKeys.mockResolvedValue(userKeyFixture)
     mocks.listOfficialKeys.mockResolvedValue(officialKeyFixture)
@@ -161,6 +163,51 @@ describe('ModelSettings', () => {
 
     expect(wrapper.findAll('.config-card').at(0)!.text()).toContain('主 Agent')
     expect(wrapper.findAll('.config-card').at(1)!.text()).toContain('Dirty Work Agent')
+  })
+
+  it('当配置列表接口为空但偏好详情 candidateConfigs 非空时，仍应展示模型配置卡片', async () => {
+    mocks.listUserModelConfigs.mockResolvedValueOnce([])
+    mocks.getUserModelPreferences.mockResolvedValueOnce({
+      data: {
+        preferences: {
+          mainAgentModelConfigId: 'mcfg-1001',
+          dirtyWorkAgentModelConfigId: 'mcfg-1002',
+        },
+        candidateConfigs: configFixture,
+      },
+    })
+
+    const wrapper = await mountComponent()
+
+    expect(wrapper.findAll('.config-card')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('还没有模型配置')
+    expect(wrapper.findAll('.config-card').at(0)!.text()).toContain('主 Agent')
+    expect(wrapper.findAll('.config-card').at(1)!.text()).toContain('Dirty Work Agent')
+  })
+
+  it('当模型配置列表响应包裹在 data 字段时，仍应展示模型池卡片而不是空态', async () => {
+    mocks.listUserModelConfigs.mockResolvedValueOnce({
+      data: configFixture,
+    })
+
+    const wrapper = await mountComponent()
+
+    expect(wrapper.findAll('.config-card')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('还没有模型配置')
+    expect(wrapper.findAll('.config-card').at(0)!.text()).toContain('主 Agent')
+    expect(wrapper.findAll('.config-card').at(1)!.text()).toContain('Dirty Work Agent')
+  })
+
+  it('当会话 userId 为数字时，仍应加载模型配置而不是误判为空会话', async () => {
+    mocks.sessionUserId = 101
+
+    const wrapper = await mountComponent()
+
+    expect(mocks.listUserModelConfigs).toHaveBeenCalledWith('101')
+    expect(mocks.getUserModelPreferences).toHaveBeenCalledWith('101')
+    expect(wrapper.findAll('.config-card')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('还没有模型配置')
+    expect(mocks.messageWarning).not.toHaveBeenCalledWith('缺少用户会话')
   })
 
   it('当模型配置列表返回 modelConfigId 字段时，应根据偏好在卡片上显示主 Agent 与副 Agent 标记', async () => {
@@ -398,5 +445,30 @@ describe('ModelSettings', () => {
     expect(wrapper.text()).not.toContain('OpenAI Legacy')
     expect(wrapper.text()).not.toContain('Invalid Empty')
     expect(wrapper.text()).not.toContain('Invalid Blank')
+  })
+
+  it('providers 加载失败时，仍应展示已存在的模型配置卡片', async () => {
+    mocks.listProviders.mockRejectedValueOnce(new Error('Invalid provider contract'))
+
+    const wrapper = await mountComponent()
+
+    expect(wrapper.findAll('.config-card')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('还没有模型配置')
+    expect(wrapper.text()).toContain('gpt-4o-mini')
+  })
+
+  it('providers 响应仍包裹在 data 字段时，新增表单中仍应展示供应商选项', async () => {
+    mocks.listProviders.mockResolvedValueOnce({
+      data: providerFixture,
+    })
+
+    const wrapper = await mountComponent()
+
+    await wrapper.findAll('button').find((button) => button.text() === '新增模型')!.trigger('click')
+    await flushPromises()
+
+    const providerOptions = wrapper.findAll('.api-form select').at(0)!.findAll('option')
+    expect(providerOptions).toHaveLength(2)
+    expect(providerOptions[1].text()).toBe('OpenAI')
   })
 })
