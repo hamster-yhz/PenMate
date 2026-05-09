@@ -43,7 +43,7 @@ class AgentTurnAppServiceTest {
         AgentTurnCommand command = new AgentTurnCommand(
                 1001L,
                 "请继续写作",
-                new AgentTurnCommand.TaskRequest("WRITE", 3001L, "selected text")
+                new AgentTurnCommand.TaskRequest("WRITE", 3001L, null, "selected text")
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(projectId, sessionId, command, "trace-turn-1");
@@ -82,7 +82,7 @@ class AgentTurnAppServiceTest {
         AgentTurnCommand command = new AgentTurnCommand(
                 1001L,
                 "将风格绑定写入上下文",
-                new AgentTurnCommand.TaskRequest("WRITE", 3003L, "带风格的上下文")
+                new AgentTurnCommand.TaskRequest("WRITE", 3003L, null, "带风格的上下文")
         );
 
         agentTurnAppService.createTurn(920001L, 920002L, command, "trace-turn-style-missing");
@@ -128,7 +128,7 @@ class AgentTurnAppServiceTest {
         AgentTurnCommand command = new AgentTurnCommand(
                 1001L,
                 "继续写作",
-                new AgentTurnCommand.TaskRequest("WRITE", 3001L, null)
+                new AgentTurnCommand.TaskRequest("WRITE", 3001L, null, null)
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(920001L, 920002L, command, "trace-turn-2");
@@ -189,7 +189,7 @@ class AgentTurnAppServiceTest {
         AgentTurnCommand command = new AgentTurnCommand(
                 1001L,
                 "将上下文一起写入",
-                new AgentTurnCommand.TaskRequest("WRITE", 3002L, "片段选择")
+                new AgentTurnCommand.TaskRequest("WRITE", 3002L, null, "片段选择")
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(920001L, 920002L, command, "trace-turn-3");
@@ -210,7 +210,7 @@ class AgentTurnAppServiceTest {
         AgentTurnCommand command = new AgentTurnCommand(
                 1001L,
                 "统一业务 ID",
-                new AgentTurnCommand.TaskRequest("WRITE", 3002L, "片段选择")
+                new AgentTurnCommand.TaskRequest("WRITE", 3002L, null, "片段选择")
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(920001L, 920002L, command, "trace-turn-id-1");

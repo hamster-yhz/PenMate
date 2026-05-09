@@ -1374,6 +1374,87 @@ describe('useWorkbenchChat', () => {
     expect(stream.close).toHaveBeenCalled()
   })
 
+  it('does_not_reuse_assistant_message_with_existing_approval_when_resuming_running_task', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const closeTaskStream = vi.fn()
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureModelConfigId: vi.fn().mockResolvedValue('501'),
+      refreshActiveModelInfo: vi.fn(),
+      listSessions: vi.fn(),
+      createSession: vi.fn(),
+      getSessionRecovery: vi.fn(),
+      createTurn: vi.fn(),
+      getTask: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream,
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.hydrateFromRecoverySnapshot({
+      session: { sessionId: '90001' },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING' },
+      messages: [
+        {
+          messageId: 1,
+          role: 'assistant',
+          contentMd: '',
+          approvalId: 42,
+          approvalType: 'WORLD_SETTING_CREATE',
+          approvalStatus: 'pending',
+        },
+      ],
+    })
+
+    const resumePromise = chat.resumeRunningTask('101', '90001', '50001')
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.token')?.({
+      data: JSON.stringify({ token: '新的恢复续写' }),
+    } as MessageEvent<string>)
+    listeners.get('generation.done')?.({
+      data: JSON.stringify({ status: 'done' }),
+    } as MessageEvent<string>)
+
+    await resumePromise
+
+    expect(chat.messages.value).toEqual([
+      {
+        id: '1',
+        role: 'assistant',
+        text: '',
+        approval: {
+          id: '42',
+          message: '检测到待审批变更（WORLD_SETTING_CREATE）',
+          time: '',
+          resolved: false,
+        },
+      },
+      { id: 2, role: 'assistant', text: '新的恢复续写' },
+    ])
+    expect(chat.streamingAssistantMsgId.value).toBe(null)
+    expect(chat.isGenerating.value).toBe(false)
+    expect(closeTaskStream).toHaveBeenCalled()
+    expect(stream.close).toHaveBeenCalled()
+  })
+
   it('resumes_running_task_with_oversized_string_turn_id_without_precision_loss', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const listeners = new Map<string, (event: MessageEvent<string>) => void>()

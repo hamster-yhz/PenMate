@@ -68,7 +68,7 @@ class AgentTurnPersistenceContractTest {
                     new AgentTurnCommand(
                             1001L,
                             "请继续写作",
-                            new AgentTurnCommand.TaskRequest("WRITE", 3001L, "selected text")
+                            new AgentTurnCommand.TaskRequest("WRITE", 3001L, null, "selected text")
                     ),
                     "trace-turn-persist-1"
             );
@@ -113,7 +113,7 @@ class AgentTurnPersistenceContractTest {
                     new AgentTurnCommand(
                             1001L,
                             "恢复测试消息",
-                            new AgentTurnCommand.TaskRequest("WRITE", 3002L, "恢复测试选中文本")
+                            new AgentTurnCommand.TaskRequest("WRITE", 3002L, null, "恢复测试选中文本")
                     ),
                     "trace-turn-recovery-1"
             );

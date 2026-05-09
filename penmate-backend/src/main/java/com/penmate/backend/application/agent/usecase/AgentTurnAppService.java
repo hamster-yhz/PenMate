@@ -182,6 +182,7 @@ public class AgentTurnAppService {
         task.setProjectId(projectId);
         task.setConversationId(sessionId);
         task.setChapterId(command == null || command.taskRequest() == null ? null : command.taskRequest().chapterId());
+        task.setModelConfigId(command == null || command.taskRequest() == null ? null : command.taskRequest().modelConfigId());
         task.setTaskType(command.taskRequest().taskType());
         task.setPromptSnapshot(userMessage == null ? command.userMessage() : userMessage.getContentMd());
         task.setTraceId(traceId);
@@ -205,6 +206,15 @@ public class AgentTurnAppService {
                 taskRequest == null ? null : taskRequest.selectedText()
         );
         context.setStyleSnapshotJson(sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, sessionId));
+        Long operatorId = command == null ? null : command.operatorId();
+        Long modelConfigId = taskRequest == null ? null : taskRequest.modelConfigId();
+        if (operatorId != null || modelConfigId != null) {
+            setField(context, "modelSnapshotJson", "{\"operatorId\":"
+                    + (operatorId == null ? "null" : operatorId)
+                    + ",\"modelConfigId\":"
+                    + (modelConfigId == null ? "null" : modelConfigId)
+                    + "}");
+        }
         setField(context, "contextHash", contextHash(command, task, context));
         return context;
     }

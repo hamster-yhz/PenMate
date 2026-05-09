@@ -103,7 +103,7 @@
         :current-conversation-id="currentConversationId"
         :bound-style-name="boundStyleName"
         :bind-chat-container="bindChatContainer"
-        :messages="messages"
+        :messages="visibleMessages"
         :streaming-assistant-msg-id="streamingAssistantMsgId"
         :is-approval-busy="isApprovalBusy"
         :chat-input="chatInput"
@@ -135,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import StyleManager from '@/components/workbench/StyleManager.vue'
@@ -620,6 +620,17 @@ const {
   },
   enablePollingFallback: ENABLE_POLLING_FALLBACK,
 })
+
+const visibleMessages = computed(() => messages.value.filter((messageItem) => {
+  if (messageItem.role !== 'assistant') {
+    return true
+  }
+  const hasText = String(messageItem.text || '').trim().length > 0
+  const hasApproval = !!messageItem.approval
+  const isStreamingMessage = streamingAssistantMsgId.value != null
+    && String(messageItem.id) === String(streamingAssistantMsgId.value)
+  return hasText || hasApproval || isStreamingMessage
+}))
 
 const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
   getContext,

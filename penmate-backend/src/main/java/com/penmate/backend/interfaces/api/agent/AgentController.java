@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
+import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
@@ -40,17 +41,20 @@ public class AgentController {
     private final AgentConversationAppService agentConversationAppService;
     private final AgentSessionRecoveryAppService agentSessionRecoveryAppService;
     private final AgentTurnAppService agentTurnAppService;
+    private final AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher;
     private final AgentSessionRepository agentSessionRepository;
     private final GenerationStreamService generationStreamService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentSessionRecoveryAppService agentSessionRecoveryAppService,
                            AgentTurnAppService agentTurnAppService,
+                           AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher,
                            AgentSessionRepository agentSessionRepository,
                            GenerationStreamService generationStreamService) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentSessionRecoveryAppService = agentSessionRecoveryAppService;
         this.agentTurnAppService = agentTurnAppService;
+        this.agentGenerationWorkflowDispatcher = agentGenerationWorkflowDispatcher;
         this.agentSessionRepository = agentSessionRepository;
         this.generationStreamService = generationStreamService;
     }
@@ -137,6 +141,13 @@ public class AgentController {
                 requireLongId(sessionId, "sessionId"),
                 toCommand(dto),
                 traceId);
+        if (result != null && result.activeTask() != null && result.activeTask().taskId() != null) {
+            agentGenerationWorkflowDispatcher.dispatchInitialRun(
+                    requireLongId(projectId, "projectId"),
+                    result.activeTask().taskId(),
+                    traceId
+            );
+        }
         return ApiResponse.success(toTaskDto(result), traceId);
     }
 
@@ -177,6 +188,7 @@ public class AgentController {
                         : new AgentTurnCommand.TaskRequest(
                                 request.getTaskType(),
                                 optionalLongId(request.getChapterId(), "chapterId"),
+                                optionalLongId(request.getModelConfigId(), "modelConfigId"),
                                 request.getSelectedText())
         );
     }

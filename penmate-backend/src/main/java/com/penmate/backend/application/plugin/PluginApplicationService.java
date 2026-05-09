@@ -153,6 +153,9 @@ public class PluginApplicationService {
     }
 
     public void recordToolCall(PluginCallLog callLog) {
+        if (callLog.getPluginCallLogId() == null) {
+            callLog.setPluginCallLogId(businessIdGenerator.nextId());
+        }
         int affected = pluginRepository.insertCallLog(callLog);
         if (affected != 1) {
             log.warn("写入插件调用日志失败: projectId={}, pluginCode={}, toolName={}",

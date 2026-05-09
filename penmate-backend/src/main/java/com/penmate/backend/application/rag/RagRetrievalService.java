@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
 import com.penmate.backend.domain.rag.repository.RagRetrievalRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,11 +14,14 @@ import java.util.List;
 public class RagRetrievalService {
 
     private final RagRetrievalRepository ragRetrievalRepository;
+    private final BusinessIdGenerator businessIdGenerator;
     private final ObjectMapper objectMapper;
 
     public RagRetrievalService(RagRetrievalRepository ragRetrievalRepository,
+                               BusinessIdGenerator businessIdGenerator,
                                ObjectMapper objectMapper) {
         this.ragRetrievalRepository = ragRetrievalRepository;
+        this.businessIdGenerator = businessIdGenerator;
         this.objectMapper = objectMapper;
     }
 
@@ -26,6 +30,7 @@ public class RagRetrievalService {
         List<RagRetrievedChunk> chunks = ragRetrievalRepository.searchChunks(projectId, query, 3);
 
         RagRetrievalLog retrievalLog = new RagRetrievalLog();
+        retrievalLog.setRetrievalLogId(businessIdGenerator.nextId());
         retrievalLog.setProjectId(projectId);
         retrievalLog.setTaskId(taskId);
         retrievalLog.setQueryText(query);

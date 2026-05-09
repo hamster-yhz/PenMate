@@ -26,6 +26,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -257,6 +258,28 @@ class AgentGenerationWorkflowTest {
         verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.RUNNING.value(), null);
         verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.WAITING_APPROVAL.value(), null);
         verify(agentRepository, never()).updateGenerationTaskStatus(eq(1L), eq(999L), any(), any());
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_FAIL_FAST_WHEN_LOADED_TASK_HAS_NULL_TASK_ID() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(501L);
+        task.setTaskId(null);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("触发空 taskId");
+
+        when(agentRepository.findGenerationTask(1L, 51L)).thenReturn(task);
+
+        agentGenerationWorkflow.run(1L, 51L, "trace-null-task-id");
+
+        verify(agentRepository, never()).updateGenerationTaskStatus(eq(1L), any(), any(), any());
+        verify(realtimeEventService, never()).publishGenerationStarted(any(), any());
+        verify(realtimeEventService, never()).publishGenerationFailed(any(), any(), any(), any());
+        verifyNoInteractions(ragRetrievalService, agentToolLoopRunner, agentTaskRuntimeUpdater, agentResultPublisher, agentTaskResultRecorder);
     }
 
     private static void setField(Object target, String fieldName, Object value) {

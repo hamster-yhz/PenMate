@@ -50,6 +50,11 @@ public class CreateAgentTurnDto {
         private String chapterId;
 
         /**
+         * 当前轮次显式模型配置业务 ID。
+         */
+        private String modelConfigId;
+
+        /**
          * 当前选中文本快照。
          */
         private String selectedText;

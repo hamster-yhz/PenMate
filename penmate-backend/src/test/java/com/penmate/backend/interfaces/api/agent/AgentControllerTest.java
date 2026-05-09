@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
@@ -57,6 +58,9 @@ class AgentControllerTest {
 
     @Mock
     private GenerationStreamService generationStreamService;
+
+    @Mock
+    private AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher;
 
     @InjectMocks
     private AgentController agentController;
@@ -175,6 +179,32 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.data.taskType").value("WRITE"));
 
         verify(agentTurnAppService).createTurn(eq(10001L), eq(90001L), any(), eq(traceId));
+    }
+
+    @Test
+    void UT_AGENT_TURN_CREATE_DISPATCHES_GENERATION_WORKFLOW() throws Exception {
+        String traceId = "UT-TRACE-AGENT-TURN-DISPATCH";
+        when(agentTurnAppService.createTurn(eq(10001L), eq(90001L), any(), eq(traceId)))
+                .thenReturn(agentTask(90001L, "PENDING", "WRITE", "继续扩写第三章"));
+
+        mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/turns")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "operatorId", "1001",
+                                "userMessage", "继续扩写第三章",
+                                "taskRequest", Map.of(
+                                        "taskType", "WRITE",
+                                        "chapterId", "301",
+                                        "selectedText", "夜雨中的追踪在巷口停住。"
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.activeTask.turnId").value("50001"))
+                .andExpect(jsonPath("$.data.activeTask.taskId").value("70001"));
+
+        verify(agentTurnAppService).createTurn(eq(10001L), eq(90001L), any(), eq(traceId));
+        verify(agentGenerationWorkflowDispatcher).dispatchInitialRun(10001L, 70001L, traceId);
     }
 
     @Test

@@ -53,7 +53,15 @@ public class AgentGenerationWorkflow {
             log.warn("编排任务不存在: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
             return;
         }
-
+        if (task.getTaskId() == null) {
+            log.error("编排任务缺少 taskId，终止执行: projectId={}, requestedTaskId={}, physicalId={}, traceId={}",
+                    projectId,
+                    taskId,
+                    task.getId(),
+                    traceId);
+            return;
+        }
+ 
         try {
             transitionStatus(projectId, task, AgentTaskStatus.RUNNING, null);
             realtimeEventService.publishGenerationStarted(projectId, taskId);

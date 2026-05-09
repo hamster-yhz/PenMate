@@ -13,6 +13,7 @@ public record AgentTurnCommand(
     public record TaskRequest(
             String taskType,
             Long chapterId,
+            Long modelConfigId,
             String selectedText
     ) {
     }

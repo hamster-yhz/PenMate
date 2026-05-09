@@ -18,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
@@ -71,16 +72,79 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             AgentGenerationTask task = new AgentGenerationTask();
             task.setTaskId(940401L);
             task.setProjectId(920001L);
+            task.setUserId(1001L);
             task.setConversationId(920002L);
             task.setChapterId(3001L);
+            task.setModelConfigId(88001L);
             task.setTaskType("WRITE");
             task.setPromptSnapshot("请继续写作");
+            task.setPluginSnapshot("{\"tools\":[\"search\"]}");
             task.setTraceId("trace-runtime-task-1");
             task.setStatus("pending");
 
             assertThat(repository.insertGenerationTask(task)).isEqualTo(1);
             assertThat(countRows("agent_tasks")).isEqualTo(1);
             assertThat(singleLong("SELECT session_id FROM agent_tasks WHERE task_id = 940401")).isEqualTo(920002L);
+        }
+    }
+
+    @Test
+    void should_read_generation_task_with_user_and_model_config_from_runtime_schema() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940402, 920002, 1, 920001, 'WRITE', 'pending', 950402, NULL, NULL, NULL, 'trace-runtime-task-2')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_contexts(context_id, task_id, chapter_id, selected_text, outline_snapshot_json, cards_snapshot_json, rag_snapshot_json, plugin_bindings_json, style_snapshot_json, model_snapshot_json, context_hash)
+                    VALUES (950402, 940402, 3002, '选中文本', NULL, NULL, NULL, NULL, NULL, '{"operatorId":1001,"modelConfigId":88002}', 'hash-940402')
+                    """);
+
+            assertThat(singleLong("SELECT COUNT(*) FROM agent_tasks WHERE project_id = 920001 AND task_id = 940402")).isEqualTo(1L);
+
+            AgentMapper mapper = sqlSession.getMapper(AgentMapper.class);
+            assertThat(mapper.findGenerationTask(920001L, 940402L)).isNotNull();
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    mapper,
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            AgentGenerationTask loaded = repository.findGenerationTask(920001L, 940402L);
+
+            assertThat(loaded).isNotNull();
+            assertThat(loaded.getTaskId()).isEqualTo(940402L);
+            assertThat(loaded.getUserId()).isEqualTo(1001L);
+            assertThat(loaded.getModelConfigId()).isEqualTo(88002L);
+            assertThat(loaded.getChapterId()).isEqualTo(3002L);
+            assertThat(loaded.getConversationId()).isEqualTo(920002L);
+        }
+    }
+
+    @Test
+    void should_update_generation_task_status_after_loading_task_from_runtime_schema() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940403, 920002, 1, 920001, 'WRITE', 'pending', 950403, NULL, NULL, NULL, 'trace-runtime-task-3')
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            AgentGenerationTask loaded = repository.findGenerationTask(920001L, 940403L);
+
+            assertThat(loaded).isNotNull();
+            assertThat(loaded.getTaskId()).isEqualTo(940403L);
+            assertThat(repository.updateGenerationTaskStatus(920001L, loaded.getTaskId(), "running", null)).isEqualTo(1);
+            assertThat(singleLong("SELECT COUNT(*) FROM agent_tasks WHERE project_id = 920001 AND task_id = 940403 AND task_status = 'running'"))
+                    .isEqualTo(1L);
         }
     }
 
@@ -147,6 +211,7 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
     private static void recreateSchema() throws Exception {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS agent_task_contexts");
             statement.execute("DROP TABLE IF EXISTS agent_tasks");
             statement.execute("DROP TABLE IF EXISTS agent_messages");
             statement.execute("DROP TABLE IF EXISTS agent_sessions");
@@ -205,6 +270,23 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
                         finished_at TIMESTAMP NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE agent_task_contexts (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        context_id BIGINT NOT NULL,
+                        task_id BIGINT NOT NULL,
+                        chapter_id BIGINT NULL,
+                        selected_text VARCHAR(2000) NULL,
+                        outline_snapshot_json VARCHAR(4000) NULL,
+                        cards_snapshot_json VARCHAR(4000) NULL,
+                        rag_snapshot_json VARCHAR(4000) NULL,
+                        plugin_bindings_json VARCHAR(4000) NULL,
+                        style_snapshot_json VARCHAR(4000) NULL,
+                        model_snapshot_json VARCHAR(4000) NULL,
+                        context_hash VARCHAR(128) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                     )
                     """);
         }

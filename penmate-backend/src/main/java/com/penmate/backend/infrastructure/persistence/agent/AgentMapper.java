@@ -115,13 +115,13 @@ public interface AgentMapper {
 
     @Insert("""
             INSERT INTO agent_tasks(
-                task_id, session_id, turn_id, project_id, task_type, task_status,
-                request_context_id, result_id, active_approval_id, stream_channel_key, trace_id,
-                started_at, finished_at
+                task_id, session_id, turn_id, project_id,
+                task_type, task_status, request_context_id, result_id, active_approval_id,
+                stream_channel_key, trace_id, started_at, finished_at
             ) VALUES (
-                #{taskId}, #{conversationId}, 0, #{projectId}, #{taskType}, #{status},
-                NULL, NULL, NULL, NULL, #{traceId},
-                #{startedAt}, #{finishedAt}
+                #{taskId}, #{conversationId}, 0, #{projectId},
+                #{taskType}, #{status}, NULL, NULL, NULL,
+                NULL, #{traceId}, #{startedAt}, #{finishedAt}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -129,28 +129,21 @@ public interface AgentMapper {
 
     @Select("""
             SELECT id,
-                   task_id,
-                   project_id,
-                   session_id AS conversation_id,
-                   NULL AS chapter_id,
-                   NULL AS model_config_id,
-                   task_type,
-                   NULL AS prompt_snapshot,
-                   NULL AS plugin_snapshot,
-                   NULL AS token_usage_json,
-                   NULL AS cost_json,
-                   trace_id,
+                   task_id AS taskId,
+                   project_id AS projectId,
+                   session_id AS conversationId,
+                   task_type AS taskType,
+                   trace_id AS traceId,
                    task_status AS status,
-                   started_at,
-                   finished_at,
-                   NULL AS error_msg,
-                   created_at
+                   started_at AS startedAt,
+                   finished_at AS finishedAt,
+                   created_at AS createdAt
             FROM agent_tasks
             WHERE project_id = #{projectId} AND task_id = #{taskId}
             LIMIT 1
             """)
-    AgentGenerationTask findGenerationTask(@Param("projectId") Long projectId,
-                                           @Param("taskId") Long taskId);
+    java.util.Map<String, Object> findGenerationTask(@Param("projectId") Long projectId,
+                                                     @Param("taskId") Long taskId);
 
     @Update("""
             UPDATE agent_tasks

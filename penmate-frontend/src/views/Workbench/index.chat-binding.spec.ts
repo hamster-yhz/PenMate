@@ -46,7 +46,7 @@ const WorkbenchEditorPanelHarness = {
 
 const WorkbenchRightPanelHarness = {
   name: 'WorkbenchRightPanel',
-  props: ['chatInput', 'generationStatusText', 'isGenerating'],
+  props: ['chatInput', 'generationStatusText', 'isGenerating', 'messages', 'streamingAssistantMsgId'],
   emits: ['update:chat-input', 'send'],
   methods: {
     emitChatInput(this: { $emit: (eventName: string, value: string) => void }, event: Event) {
@@ -455,6 +455,50 @@ describe('Workbench index chat parent binding', () => {
 
     await waitForAssertion(() => {
       expect((wrapper.vm as unknown as { messages: Array<{ text: string }> }).messages.some((item) => item.text.includes('恢复后的续写内容'))).toBe(true)
+    })
+  })
+
+  it('filters_blank_non_streaming_assistant_placeholder_messages_from_chat_binding', async () => {
+    agentApiMock.resumeSession = vi.fn(async () => ({
+      session: {
+        sessionId: '90001',
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
+      },
+      activeTask: null,
+      pendingApproval: null,
+      messages: [
+        {
+          messageId: '1',
+          role: 'assistant',
+          contentMd: '',
+        },
+        {
+          messageId: '2',
+          role: 'user',
+          contentMd: '保留的用户消息',
+        },
+      ],
+      workbenchContext: {
+        chapterId: '301',
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+      },
+    }))
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      const rightPanelMessages = wrapper.findComponent(WorkbenchRightPanelHarness).props('messages') as Array<{
+        id: string
+        role: string
+        text: string
+      }>
+      expect(rightPanelMessages).toEqual([
+        { id: '2', role: 'user', text: '保留的用户消息' },
+      ])
     })
   })
 

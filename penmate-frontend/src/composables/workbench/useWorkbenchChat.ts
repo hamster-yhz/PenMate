@@ -426,7 +426,15 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const resolveAssistantMessageForResume = () => {
-    const existingAssistant = [...messages.value].reverse().find((item) => item.role === 'assistant') || null
+    const existingAssistant = [...messages.value].reverse().find((item) => {
+      if (item.role !== 'assistant') {
+        return false
+      }
+      const hasText = String(item.text || '').trim().length > 0
+      const hasApproval = !!item.approval
+      const hasToolCallBinding = !!item.toolCallId
+      return !hasText && !hasApproval && !hasToolCallBinding
+    }) || null
     if (existingAssistant) {
       return existingAssistant
     }

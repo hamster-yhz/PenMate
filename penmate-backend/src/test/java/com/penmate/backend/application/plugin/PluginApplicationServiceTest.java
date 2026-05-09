@@ -258,8 +258,27 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void UT_APP_PLUGIN_RECORD_TOOL_CALL_ASSIGNS_BUSINESS_ID_WHEN_MISSING() {
+        PluginCallLog callLog = new PluginCallLog();
+        callLog.setProjectId(1L);
+        callLog.setTaskId(2L);
+        callLog.setPluginCode("search-tool");
+        callLog.setToolName("context_enhancer");
+        when(businessIdGenerator.nextId()).thenReturn(30003L);
+        when(pluginRepository.insertCallLog(callLog)).thenReturn(1);
+
+        pluginApplicationService.recordToolCall(callLog);
+
+        assertThat(callLog.getPluginCallLogId()).isEqualTo(30003L);
+        verify(businessIdGenerator).nextId();
+        verify(pluginRepository).insertCallLog(callLog);
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
     void UT_APP_PLUGIN_RECORD_TOOL_CALL_SUCCESS() {
         PluginCallLog callLog = new PluginCallLog();
+        callLog.setPluginCallLogId(30004L);
         callLog.setProjectId(1L);
         callLog.setTaskId(2L);
         callLog.setPluginCode("search-tool");
@@ -268,6 +287,8 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
 
         pluginApplicationService.recordToolCall(callLog);
 
+        assertThat(callLog.getPluginCallLogId()).isEqualTo(30004L);
+        verify(businessIdGenerator, never()).nextId();
         verify(pluginRepository).insertCallLog(callLog);
         verifyNoInteractions(auditService);
     }
