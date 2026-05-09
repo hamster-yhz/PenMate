@@ -7,7 +7,7 @@ import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GeminiProviderChatClient implements ProviderChatClient {
+public class GeminiProviderChatClient extends AbstractOpenAiCompatibleProviderChatClient {
 
     @Override
     public String generate(String prompt, AgentLlmExecutionConfig executionConfig) {
@@ -26,6 +26,19 @@ public class GeminiProviderChatClient implements ProviderChatClient {
                 .modelName(modelName)
                 .build();
         return model.generate(prompt);
+    }
+
+    @Override
+    protected String resolveBaseUrl(String rawBaseUrl) {
+        String baseUrl = super.resolveBaseUrl(rawBaseUrl);
+        if (baseUrl == null) {
+            return null;
+        }
+        String normalized = baseUrl.trim();
+        if (normalized.endsWith("/chat/completions") || normalized.contains("/openai/")) {
+            return normalized;
+        }
+        return ensureSuffixPath(normalized, "/openai");
     }
 
     @Override

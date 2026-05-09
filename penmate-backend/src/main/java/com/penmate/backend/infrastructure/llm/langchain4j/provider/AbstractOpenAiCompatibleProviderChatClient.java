@@ -8,7 +8,7 @@ import dev.langchain4j.model.openai.OpenAiChatModel;
 /**
  * OpenAI 兼容协议供应商基础实现。
  */
-public abstract class AbstractOpenAiCompatibleProviderChatClient implements ProviderChatClient {
+public abstract class AbstractOpenAiCompatibleProviderChatClient extends NativeOpenAiStyleHttpProviderChatClient {
 
     @Override
     public String generate(String prompt, AgentLlmExecutionConfig executionConfig) {
@@ -38,6 +38,22 @@ public abstract class AbstractOpenAiCompatibleProviderChatClient implements Prov
 
     protected String resolveModelName(String rawModelName) {
         return rawModelName == null ? null : rawModelName.trim();
+    }
+
+    @Override
+    protected String resolveChatCompletionsEndpoint(String rawBaseUrl) {
+        String baseUrl = resolveBaseUrl(rawBaseUrl);
+        if (baseUrl == null) {
+            return null;
+        }
+        String normalized = baseUrl.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.endsWith("/chat/completions")) {
+            return normalized;
+        }
+        return super.resolveChatCompletionsEndpoint(normalized);
     }
 
     protected String ensureSuffixPath(String baseUrl, String suffixPath) {

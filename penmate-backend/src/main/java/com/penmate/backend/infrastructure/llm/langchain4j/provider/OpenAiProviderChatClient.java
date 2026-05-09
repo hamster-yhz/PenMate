@@ -7,7 +7,15 @@ public class OpenAiProviderChatClient extends AbstractOpenAiCompatibleProviderCh
 
     @Override
     protected String resolveBaseUrl(String rawBaseUrl) {
-        return ensureSuffixPath(super.resolveBaseUrl(rawBaseUrl), "/v1");
+        String baseUrl = super.resolveBaseUrl(rawBaseUrl);
+        if (baseUrl == null) {
+            return null;
+        }
+        String normalized = baseUrl.trim();
+        if (normalized.endsWith("/chat/completions") || normalized.endsWith("/v1") || normalized.contains("/v1/")) {
+            return normalized;
+        }
+        return ensureSuffixPath(normalized, "/v1");
     }
 
     @Override
