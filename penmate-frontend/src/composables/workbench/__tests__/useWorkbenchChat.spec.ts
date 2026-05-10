@@ -27,6 +27,7 @@ type UseWorkbenchChatFactory = (deps: any) => {
   generationPhase: { value: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed' }
   generationTaskStatus: { value: string }
   generationStatusText: { value: string }
+  agentStatusDetailText: { value: string }
   streamingAssistantMsgId: { value: number | null }
   conversationList: { value: ConversationItem[] }
   currentConversationId: { value: string | null }
@@ -1110,6 +1111,61 @@ describe('useWorkbenchChat', () => {
     expect(chat.generationPhase.value).toBe('waiting_approval')
     expect(chat.generationTaskStatus.value).toBe('waiting_approval')
     expect(chat.generationStatusText.value).toBe('等待审批')
+  })
+
+  it('updates_agent_status_detail_when_generation_status_event_arrives', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['rag.query'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn().mockResolvedValue({ taskId: 9020, status: 'running' }),
+      getGeneration: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '继续写第三章'
+    const sendPromise = chat.sendMessage()
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.status')?.({
+      data: JSON.stringify({
+        taskId: 9020,
+        stage: 'tool_calling',
+        message: '正在调用 RAG 查询工具',
+        status: 'running',
+      }),
+    } as MessageEvent<string>)
+
+    expect(chat.generationStatusText.value).toBe('生成中 · running')
+    expect(chat.agentStatusDetailText.value).toBe('正在调用 RAG 查询工具')
+
+    listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+
+    await sendPromise
   })
 
   it('waits_between_non_terminal_fallback_polls_before_reaching_waiting_approval', async () => {

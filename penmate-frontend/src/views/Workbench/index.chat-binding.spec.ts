@@ -2,6 +2,26 @@ import { shallowMount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+type ModelConfigCandidate = {
+  modelConfigId: string
+  modelName: string
+  keySourceType?: string
+  providerName?: string
+}
+
+type ModelPreferencePayload = {
+  mainAgentModelConfigId?: string | null
+  dirtyWorkAgentModelConfigId?: string | null
+  candidateConfigs?: ModelConfigCandidate[]
+  modelConfigs?: ModelConfigCandidate[]
+  preferences?: {
+    mainAgentModelConfigId?: string | null
+    dirtyWorkAgentModelConfigId?: string | null
+    candidateConfigs?: ModelConfigCandidate[]
+    modelConfigs?: ModelConfigCandidate[]
+  }
+}
+
 const streamListeners = new Map<string, Array<(event: MessageEvent<string>) => void>>()
 
 const emitStreamEvent = (eventName: string, payload: Record<string, unknown> = {}) => {
@@ -68,7 +88,7 @@ const WorkbenchRightPanelHarness = {
 
 const agentApiMock = {
   listSessions: vi.fn(async () => [{ sessionId: '1', title: 'Workbench 会话', updatedAt: '2026-04-26 23:00:00' }]),
-  createSession: vi.fn(async () => ({ sessionId: '90002', title: '新会话', status: 'ACTIVE' })),
+  createSession: vi.fn<(...args: any[]) => Promise<any>>(async () => ({ sessionId: '90002', title: '新会话', status: 'ACTIVE' })),
   getSessionRecovery: vi.fn(async () => null as any),
   resumeSession: vi.fn(async () => null as any),
   createTurn: vi.fn<(...args: any[]) => Promise<any>>(async () => ({
@@ -179,12 +199,15 @@ vi.mock('@/api/modules/plugin.api', () => ({
   },
 }))
 
+const buildModelPreferencePayload = (overrides: ModelPreferencePayload = {}): ModelPreferencePayload => ({
+  mainAgentModelConfigId: 'mcfg-9001',
+  dirtyWorkAgentModelConfigId: 'mcfg-9002',
+  candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
+  ...overrides,
+})
+
 const modelApiMock = {
-  getUserModelPreferences: vi.fn(async () => ({
-    mainAgentModelConfigId: 'mcfg-9001',
-    dirtyWorkAgentModelConfigId: 'mcfg-9002',
-    candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
-  })),
+  getUserModelPreferences: vi.fn<() => Promise<ModelPreferencePayload>>(async () => buildModelPreferencePayload()),
 }
 
 vi.mock('@/api/modules/model.api', () => ({
@@ -290,7 +313,8 @@ vi.mock('@/composables/workbench/useWorkbenchApprovals', () => ({
   }),
 }))
 
-const mountWorkbench = async () => {
+const mountWorkbench = async (_caseKey?: string) => {
+  vi.resetModules()
   const Workbench = (await import('./index.vue')).default
   return shallowMount(Workbench, {
     global: {
@@ -312,11 +336,7 @@ describe('Workbench index chat parent binding', () => {
     agentApiMock.addStreamListener.mockClear()
     agentApiMock.listSessions.mockClear()
     modelApiMock.getUserModelPreferences.mockReset()
-    modelApiMock.getUserModelPreferences.mockResolvedValue({
-      mainAgentModelConfigId: 'mcfg-9001',
-      dirtyWorkAgentModelConfigId: 'mcfg-9002',
-      candidateConfigs: [{ modelConfigId: 'mcfg-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
-    })
+    modelApiMock.getUserModelPreferences.mockResolvedValue(buildModelPreferencePayload())
     agentApiMock.getSessionRecovery = vi.fn(async () => ({
       session: {
         sessionId: '90001',
@@ -457,16 +477,7 @@ describe('Workbench index chat parent binding', () => {
       }),
     }))
 
-    const Workbench = (await import('./index.vue?chapters-data-nested')).default
-    await shallowMount(Workbench, {
-      global: {
-        stubs: {
-          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
-          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
-          WorkbenchRightPanel: WorkbenchRightPanelHarness,
-        },
-      },
-    })
+    await mountWorkbench('chapters-data-nested')
     await waitForAssertion(() => {
       expect(loadOutline).toHaveBeenCalledWith(
         [
@@ -525,16 +536,7 @@ describe('Workbench index chat parent binding', () => {
       }),
     }))
 
-    const Workbench = (await import('./index.vue?outline-empty-chapters-fallback')).default
-    await shallowMount(Workbench, {
-      global: {
-        stubs: {
-          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
-          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
-          WorkbenchRightPanel: WorkbenchRightPanelHarness,
-        },
-      },
-    })
+    await mountWorkbench('outline-empty-chapters-fallback')
 
     await waitForAssertion(() => {
       expect(loadOutline).toHaveBeenCalledWith(
@@ -599,16 +601,7 @@ describe('Workbench index chat parent binding', () => {
       }),
     }))
 
-    const Workbench = (await import('./index.vue?outline-chapter-only-fallback')).default
-    await shallowMount(Workbench, {
-      global: {
-        stubs: {
-          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
-          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
-          WorkbenchRightPanel: WorkbenchRightPanelHarness,
-        },
-      },
-    })
+    await mountWorkbench('outline-chapter-only-fallback')
 
     await waitForAssertion(() => {
       expect(loadOutline).toHaveBeenCalledWith(
@@ -670,16 +663,7 @@ describe('Workbench index chat parent binding', () => {
       }),
     }))
 
-    const Workbench = (await import('./index.vue?chapters-without-real-outline-node-id')).default
-    await shallowMount(Workbench, {
-      global: {
-        stubs: {
-          WorkbenchLeftPanel: WorkbenchLeftPanelHarness,
-          WorkbenchEditorPanel: WorkbenchEditorPanelHarness,
-          WorkbenchRightPanel: WorkbenchRightPanelHarness,
-        },
-      },
-    })
+    await mountWorkbench('chapters-without-real-outline-node-id')
 
     await waitForAssertion(() => {
       expect(loadOutline).toHaveBeenCalledWith([], {})
@@ -1049,13 +1033,14 @@ describe('Workbench index chat parent binding', () => {
   })
 
   it('passes_nested_preferred_string_model_config_id_to_generation_payload_when_preferences_are_nested', async () => {
-    modelApiMock.getUserModelPreferences.mockResolvedValue({
+    modelApiMock.getUserModelPreferences.mockResolvedValue(buildModelPreferencePayload({
       preferences: {
         mainAgentModelConfigId: 'mcfg-nested-9001',
         dirtyWorkAgentModelConfigId: 'mcfg-nested-9002',
         modelConfigs: [{ modelConfigId: 'mcfg-nested-9001', modelName: 'DeepSeek-R1', keySourceType: 'USER_KEY' }],
       },
-    })
+      candidateConfigs: undefined,
+    }))
 
     const wrapper = await mountWorkbench()
 
@@ -1079,6 +1064,52 @@ describe('Workbench index chat parent binding', () => {
       })
     )
     expect(modelApiMock.getUserModelPreferences).toHaveBeenCalled()
+  })
+
+  it('keeps_generation_payload_bound_to_current_preference_after_latest_session_recovery_contains_stale_model_config', async () => {
+    modelApiMock.getUserModelPreferences.mockResolvedValue(buildModelPreferencePayload({
+      mainAgentModelConfigId: 'mcfg-9002',
+      dirtyWorkAgentModelConfigId: 'mcfg-9003',
+      candidateConfigs: [
+        { modelConfigId: 'mcfg-9002', modelName: 'Longcat-Flash-Thinking-202605', keySourceType: 'USER_KEY' },
+        { modelConfigId: 'mcfg-9001', modelName: 'longcat-flash-thinking-2601-platform', keySourceType: 'USER_KEY' },
+      ],
+    }))
+    agentApiMock.listSessions.mockResolvedValue([{ sessionId: 'stale-session-1', title: '旧会话', updatedAt: '2026-04-26 23:00:00' }])
+    agentApiMock.resumeSession.mockResolvedValue({
+      session: { sessionId: 'stale-session-1', title: '旧会话', status: 'ACTIVE', boundStyle: null },
+      activeTask: { turnId: '501', taskId: '601', taskStatus: 'SUCCEEDED', requestContextId: '701' },
+      pendingApproval: null,
+      messages: [],
+      workbenchContext: {
+        chapterId: '1',
+        selectedText: '',
+        activePlugins: [],
+        modelConfigId: 'mcfg-9001',
+      },
+    })
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      wrapper.get('[data-testid="chat-input"]')
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('重启恢复后继续生成')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createTurn).toHaveBeenCalled()
+    })
+
+    const generationPayload = (agentApiMock.createTurn.mock.calls.at(-1) as unknown[] | undefined)?.[2] as Record<string, unknown> | undefined
+    expect(generationPayload).toEqual(
+      expect.objectContaining({
+        taskRequest: expect.objectContaining({
+          modelConfigId: 'mcfg-9002',
+        }),
+      })
+    )
   })
 
   it('updates_active_left_tab_in_parent_when_left_panel_emits_tab_change', async () => {

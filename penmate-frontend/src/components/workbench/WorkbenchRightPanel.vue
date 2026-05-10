@@ -8,6 +8,7 @@
       <AgentSessionHeader
         :current-model-name="currentModelName"
         :generation-status-text="generationStatusText"
+        :agent-status-detail-text="agentStatusDetailText"
         :is-generating="isGenerating"
         :generation-phase="generationPhase"
         :bound-style-name="boundStyleName"
@@ -61,6 +62,7 @@ const props = withDefaults(defineProps<{
   collapsed: boolean
   currentModelName?: string
   generationStatusText?: string
+  agentStatusDetailText?: string
   isGenerating?: boolean
   generationPhase?: GenerationPhase
   boundStyleName?: string
@@ -77,6 +79,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   currentModelName: '',
   generationStatusText: '',
+  agentStatusDetailText: '',
   isGenerating: false,
   generationPhase: 'idle',
   boundStyleName: '',

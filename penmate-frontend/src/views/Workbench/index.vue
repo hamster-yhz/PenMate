@@ -95,6 +95,7 @@
         :collapsed="rightCollapsed"
         :current-model-name="currentModelName"
         :generation-status-text="generationStatusText"
+        :agent-status-detail-text="agentStatusDetailText"
         :is-generating="isGenerating"
         :generation-phase="generationPhase"
         :show-conversation-panel="showConversationPanel"
@@ -565,6 +566,7 @@ const {
   generationPhase,
   generationTaskStatus,
   generationStatusText,
+  agentStatusDetailText,
   streamingAssistantMsgId,
   currentConversationId,
   loadConversationList,

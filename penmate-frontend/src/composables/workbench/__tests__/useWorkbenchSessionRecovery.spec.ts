@@ -34,7 +34,7 @@ describe('useWorkbenchSessionRecovery', () => {
   })
 
   it('hydrates_store_from_recovery_snapshot_and_reconnects_running_task', async () => {
-    const sessionState = createWorkbenchSessionState()
+    const sessionState = createWorkbenchSessionState() as unknown as Record<string, unknown>
     const openTurnStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
     const recovery = {
       session: {
@@ -222,6 +222,31 @@ describe('useWorkbenchSessionRecovery', () => {
     await flushPromises()
 
     expect(openTurnStream).toHaveBeenCalledWith('101', '90001', oversizedTurnId)
+  })
+
+  it('opens_turn_stream_directly_when_nested_business_payload_contains_running_task', async () => {
+    const openTurnStream = vi.fn(() => ({ close: vi.fn() } as unknown as EventSource))
+    const recovery = {
+      session: { sessionId: '90001', title: '第三章', status: 'ACTIVE', boundStyle: null },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING', streamChannelKey: 'agent-turn-50001' },
+      pendingApproval: null,
+      messages: [],
+      workbenchContext: { chapterId: '301', selectedText: '', activePlugins: [], modelConfigId: 'mcfg-001' },
+    }
+
+    const hydrateStore = vi.fn()
+    const recoveryController = useWorkbenchSessionRecovery({
+      getSessionRecovery: vi.fn().mockResolvedValue({ data: recovery }),
+      resumeSession: vi.fn().mockResolvedValue({ data: recovery }),
+      openTurnStream,
+      hydrateStore,
+    })
+
+    await recoveryController.restore('101', '90001')
+    await flushPromises()
+
+    expect(hydrateStore).toHaveBeenCalledWith(recovery)
+    expect(openTurnStream).toHaveBeenCalledWith('101', '90001', '50001')
   })
 
   it('opens_turn_stream_directly_when_resume_running_task_handler_is_not_provided', async () => {

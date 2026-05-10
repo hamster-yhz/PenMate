@@ -1,4 +1,4 @@
-import type { ApprovalCardData } from '@/components/workbench/ApprovalCard.vue'
+import type { ApprovalCardData } from '@/components/workbench/approvalCard.types'
 import type { OutlineChapterNode, OutlineVolumeNode } from '@/composables/workbench/workbenchOutline'
 
 export type WorkbenchCardBase = {

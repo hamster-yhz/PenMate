@@ -7,7 +7,6 @@ import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +16,7 @@ import java.util.List;
 
 /**
  * Agent 生成主工作流。
- * <p>该工作流负责把一次生成任务的完整链路串起来：任务状态推进、RAG 检索、模型执行配置解析、prompt 装配、tool loop、结果发布与失败封口。</p>
+ * <p>该工作流负责把一次生成任务的完整链路串起来：任务状态推进、模型执行配置解析、prompt 装配、tool loop、结果发布与失败封口。</p>
  * <p>它是跨应用服务、领域仓储、外部网关的长流程协调者，因此更偏 orchestration，而不是单一 CRUD 应用服务。</p>
  */
 @Slf4j
@@ -31,7 +30,6 @@ public class AgentGenerationWorkflow {
     private final com.penmate.backend.application.agent.AgentTaskStateMachine taskStateMachine;
     private final RealtimeEventService realtimeEventService;
     private final AgentToolLoopRunner agentToolLoopRunner;
-    private final com.penmate.backend.application.rag.RagRetrievalService ragRetrievalService;
     private final AgentModelRoutingService agentModelRoutingService;
     private final AgentPromptAssembler agentPromptAssembler;
     private final AgentResultPublisher agentResultPublisher;
@@ -65,13 +63,7 @@ public class AgentGenerationWorkflow {
         try {
             transitionStatus(projectId, task, AgentTaskStatus.RUNNING, null);
             realtimeEventService.publishGenerationStarted(projectId, taskId);
-
-            List<RagRetrievedChunk> ragChunks = ragRetrievalService.retrieve(
-                    projectId,
-                    taskId,
-                    task.getPromptSnapshot(),
-                    traceId
-            ).chunks();
+            realtimeEventService.publishGenerationStatus(projectId, taskId, "planning", "正在分析请求并规划工具调用", AgentTaskStatus.RUNNING.value());
 
             AgentTaskContext taskContext = buildTaskContext(projectId, task);
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
@@ -82,7 +74,7 @@ public class AgentGenerationWorkflow {
                     task.getConversationId(),
                     0L,
                     traceId,
-                    agentPromptAssembler.buildInitialMessages(task, taskContext, ragChunks),
+                    agentPromptAssembler.buildInitialMessages(task, taskContext, List.of()),
                     executionConfig
             );
             if (loopResult.waitingApproval()) {

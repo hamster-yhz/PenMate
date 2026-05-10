@@ -63,6 +63,21 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         generationSseEmitterHub.publish(taskId, "generation.started", payload);
     }
 
+    @Override
+    public void publishGenerationStatus(Long projectId,
+                                        Long taskId,
+                                        String stage,
+                                        String message,
+                                        String status) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("taskId", taskId);
+        payload.put("stage", stage == null ? "" : stage);
+        payload.put("message", message == null ? "" : message);
+        payload.put("status", status == null || status.isBlank() ? "running" : status);
+        publishProjectEvent(projectId, "generation.status", payload);
+        generationSseEmitterHub.publish(taskId, "generation.status", payload);
+    }
+
     /**
      * 发布流式 token 事件。
      * <p>流程：构建 token 载荷 -> 同步投递到 WebSocket 与 SSE；若 done=true 则追加发布完成事件。</p>
@@ -116,7 +131,7 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
             payload.put("toolCallId", toolCallId);
         }
         payload.put("pluginCode", pluginCode);
-        payload.put("toolCode", pluginCode);
+        payload.put("toolCode", toolName);
         payload.put("toolName", toolName);
         payload.put("status", status);
         if (approvalId != null) {

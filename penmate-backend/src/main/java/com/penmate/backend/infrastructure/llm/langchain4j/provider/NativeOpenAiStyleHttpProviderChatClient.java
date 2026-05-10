@@ -9,6 +9,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.net.URI;
@@ -24,6 +25,7 @@ import java.util.Map;
 /**
  * 基于原生 HTTP 的 OpenAI 风格聊天调用实现。
  */
+@Slf4j
 public abstract class NativeOpenAiStyleHttpProviderChatClient implements ProviderChatClient {
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -79,6 +81,11 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         }
 
         String requestBody = buildTurnRequestBody(turnRequest, modelName);
+        log.info("llm.turn.request.dispatch: endpoint={}, modelName={}, messageCount={}, toolCount={}",
+                endpoint,
+                modelName,
+                turnRequest == null || turnRequest.messages() == null ? 0 : turnRequest.messages().size(),
+                turnRequest == null || turnRequest.tools() == null ? 0 : turnRequest.tools().size());
         HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
                 .timeout(Duration.ofSeconds(60))
                 .header("Content-Type", "application/json")

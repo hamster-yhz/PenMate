@@ -59,6 +59,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const isGenerating = ref(false)
   const generationPhase = ref<GenerationPhase>('idle')
   const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
+  const agentStatusDetailText = ref('')
   const streamingAssistantMsgId = ref<string | number | null>(null)
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
@@ -160,6 +161,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     getGenerationTaskStatus: () => generationTaskStatus.value,
     setGenerationTaskStatus: (value: GenerationTaskStatus | '') => {
       generationTaskStatus.value = value
+    },
+    setAgentStatusDetailText: (value: string) => {
+      agentStatusDetailText.value = value
     },
     getGenerationPhase: () => generationPhase.value,
     setGenerationPhase: (value: GenerationPhase) => {
@@ -274,6 +278,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     isGenerating.value = true
     generationPhase.value = 'preparing'
     generationTaskStatus.value = ''
+    agentStatusDetailText.value = ''
     debugChatState('user-send-start', { userTextLength: userText.length })
     await scrollChat()
 
@@ -313,7 +318,14 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
           modelConfigId,
           activePlugins: deps.getActivePlugins() || [],
         },
-      })) as ChatRecord & { activeTask?: { taskId?: string; taskStatus?: string } }
+      })) as ChatRecord & {
+        session?: { sessionId?: string | number | null }
+        activeTask?: {
+          turnId?: string | number | null
+          taskId?: string | number | null
+          taskStatus?: string | null
+        }
+      }
 
       const taskId = generation.activeTask?.taskId ?? generation.taskId
       const turnId = generation.activeTask?.turnId
@@ -363,6 +375,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     } catch (error: any) {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
+      agentStatusDetailText.value = runtime.getErrorMessage(error)
       const failureText = `生成失败：${runtime.getErrorMessage(error)}`
       if (assistantMsg) {
         assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
@@ -380,6 +393,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       if (generationPhase.value !== 'failed' && generationPhase.value !== 'waiting_approval') {
         generationPhase.value = 'idle'
         generationTaskStatus.value = ''
+        agentStatusDetailText.value = ''
       }
       debugChatState('send-flow-finished')
       await scrollChat()
@@ -387,7 +401,15 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const hydrateFromRecoverySnapshot = (snapshot: Record<string, any> | null | undefined) => {
-    const normalizedSnapshot = pickBusinessRecord(snapshot)
+    const normalizedSnapshot = pickBusinessRecord(snapshot) as {
+      session?: { sessionId?: string | number | null }
+      activeTask?: {
+        turnId?: string | number | null
+        taskId?: string | number | null
+        taskStatus?: string | null
+      }
+      messages?: Array<Record<string, unknown>>
+    }
     const recoveryMessages = Array.isArray(normalizedSnapshot.messages) ? normalizedSnapshot.messages : []
     const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
     messages.value = mappedMessages
@@ -411,6 +433,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     if (taskStatus === 'waiting_approval') {
       generationPhase.value = 'waiting_approval'
       generationTaskStatus.value = 'waiting_approval'
+      agentStatusDetailText.value = ''
       isGenerating.value = false
       streamingAssistantMsgId.value = null
       return
@@ -418,11 +441,13 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     if (taskStatus === 'running') {
       generationPhase.value = 'streaming'
       generationTaskStatus.value = 'running'
+      agentStatusDetailText.value = ''
       isGenerating.value = true
       return
     }
     generationPhase.value = 'idle'
     generationTaskStatus.value = ''
+    agentStatusDetailText.value = ''
     isGenerating.value = false
     streamingAssistantMsgId.value = null
   }
@@ -450,6 +475,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     isGenerating.value = true
     generationPhase.value = 'streaming'
     generationTaskStatus.value = 'running'
+    agentStatusDetailText.value = ''
     streamingAssistantMsgId.value = assistantMsg.id
     debugChatState('resume-stream-start', { projectId, sessionId, turnId })
     await scrollChat()
@@ -492,6 +518,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     } catch (error: any) {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
+      agentStatusDetailText.value = runtime.getErrorMessage(error)
       const failureText = `生成失败：${runtime.getErrorMessage(error)}`
       assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
     } finally {
@@ -501,6 +528,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       if (generationPhase.value !== 'failed' && generationPhase.value !== 'waiting_approval') {
         generationPhase.value = 'idle'
         generationTaskStatus.value = ''
+        agentStatusDetailText.value = ''
       }
       debugChatState('resume-stream-finished', { projectId, sessionId, turnId })
       await scrollChat()
@@ -517,6 +545,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     generationPhase,
     generationTaskStatus,
     generationStatusText,
+    agentStatusDetailText,
     streamingAssistantMsgId,
     currentConversationId,
     currentModelName,

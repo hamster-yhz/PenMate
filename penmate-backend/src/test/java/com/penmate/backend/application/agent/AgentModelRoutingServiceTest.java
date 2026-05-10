@@ -46,4 +46,24 @@ class AgentModelRoutingServiceTest {
         assertThat(actual.modelName()).isEqualTo("openai-compatible-chat");
         verify(modelRepository).findUserModelConfig(1001L, 920025L);
     }
+
+    @Test
+    void UT_APP_AGENT_MODEL_ROUTING_SERVICE_PRESERVES_LONGCAT_MODEL_NAME_FROM_MODEL_CONFIG_IN_EXECUTION_CONFIG() {
+        when(modelRepository.findUserModelConfig(920001L, 2053134348617666560L)).thenReturn(Map.of(
+                "modelName", "LongCat-Flash-Thinking",
+                "providerId", 3L,
+                "keyStatus", "active",
+                "encryptedApiKey", "cipher-longcat",
+                "baseUrl", "https://api.longcat.chat/openai/v1"
+        ));
+        when(secretCryptoService.decrypt("cipher-longcat")).thenReturn("sk-longcat");
+
+        AgentLlmExecutionConfig actual = agentModelRoutingService.resolveExecutionConfig(920001L, 2053134348617666560L, "trace-longcat");
+
+        assertThat(actual.providerCode()).isEqualTo("longcat");
+        assertThat(actual.baseUrl()).isEqualTo("https://api.longcat.chat/openai/v1");
+        assertThat(actual.apiKey()).isEqualTo("sk-longcat");
+        assertThat(actual.modelName()).isEqualTo("LongCat-Flash-Thinking");
+        verify(modelRepository).findUserModelConfig(920001L, 2053134348617666560L);
+    }
 }

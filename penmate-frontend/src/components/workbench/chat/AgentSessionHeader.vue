@@ -2,12 +2,14 @@
 withDefaults(defineProps<{
   currentModelName?: string
   generationStatusText?: string
+  agentStatusDetailText?: string
   isGenerating?: boolean
   generationPhase?: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
   boundStyleName?: string
 }>(), {
   currentModelName: '',
   generationStatusText: '就绪',
+  agentStatusDetailText: '',
   isGenerating: false,
   generationPhase: 'idle',
 })
@@ -58,7 +60,12 @@ defineEmits<{
       data-testid="agent-status"
     >
       <span class="status-dot"></span>
-      <span>{{ generationStatusText }}</span>
+      <span class="agent-status-text-group">
+        <span>{{ generationStatusText }}</span>
+        <span v-if="agentStatusDetailText" class="agent-status-detail" data-testid="agent-status-detail">
+          {{ agentStatusDetailText }}
+        </span>
+      </span>
     </div>
   </div>
 </template>
@@ -131,6 +138,18 @@ defineEmits<{
   gap: 8px;
   padding: 0 12px;
   color: var(--text-secondary);
+}
+
+.agent-status-text-group {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.15;
+}
+
+.agent-status-detail {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .agent-model {

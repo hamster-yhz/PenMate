@@ -36,6 +36,7 @@ const getErrorMessage = (error: unknown, fallback = '未知错误') => {
 export const createTaskRuntime = (deps: {
   getGenerationTaskStatus: () => GenerationTaskStatus | ''
   setGenerationTaskStatus: (value: GenerationTaskStatus | '') => void
+  setAgentStatusDetailText: (value: string) => void
   getGenerationPhase: () => GenerationPhase
   setGenerationPhase: (value: GenerationPhase) => void
   getGenerationStream: () => EventSource | null
@@ -104,6 +105,15 @@ export const createTaskRuntime = (deps: {
     deps.addStreamListener(generationStream, 'generation.started', () => {
       deps.setGenerationPhase('streaming')
       deps.setGenerationTaskStatus('running')
+      deps.setAgentStatusDetailText('')
+    })
+    deps.addStreamListener(generationStream, 'generation.status', (event) => {
+      const payload = parseSseData(event)
+      const status = normalizeGenerationStatus(payload.status)
+      if (status) {
+        deps.setGenerationTaskStatus(status)
+      }
+      deps.setAgentStatusDetailText(String(payload.message || ''))
     })
     deps.addStreamListener(generationStream, 'generation.token', (event) => {
       const payload = parseSseData(event)
@@ -126,6 +136,7 @@ export const createTaskRuntime = (deps: {
       applyAssistantEventMetadata(assistantMsg, payload)
       deps.setGenerationPhase('waiting_approval')
       deps.setGenerationTaskStatus('waiting_approval')
+      deps.setAgentStatusDetailText(String(payload.message || ''))
       deps.scrollChat()
     })
     deps.addStreamListener(generationStream, 'generation.done', (event) => {
@@ -137,6 +148,7 @@ export const createTaskRuntime = (deps: {
     deps.addStreamListener(generationStream, 'generation.failed', (event) => {
       const payload = parseSseData(event)
       deps.setGenerationTaskStatus('failed')
+      deps.setAgentStatusDetailText(String(payload.errorMsg || payload.errorCode || ''))
       settleReject(new Error(String(payload.errorMsg || payload.errorCode || '生成失败')))
     })
   })

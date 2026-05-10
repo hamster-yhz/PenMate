@@ -8,6 +8,14 @@ public interface RealtimeEventService {
 
     void publishGenerationStarted(Long projectId, Long taskId);
 
+    default void publishGenerationStatus(Long projectId,
+                                         Long taskId,
+                                         String stage,
+                                         String message,
+                                         String status) {
+        // default no-op for backward compatibility
+    }
+
     void publishGenerationToken(Long projectId, Long taskId, String token, boolean done);
 
     default void publishGenerationToolCall(Long projectId,

@@ -1,4 +1,4 @@
-import type { ApprovalCardData } from '@/components/workbench/ApprovalCard.vue'
+import type { ApprovalCardData } from '@/components/workbench/approvalCard.types'
 import type { ChatMessage, ConversationItem } from '@/components/workbench/workbenchTypes'
 
 export type ChatRecord = Record<string, unknown>

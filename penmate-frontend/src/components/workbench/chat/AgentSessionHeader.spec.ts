@@ -20,6 +20,7 @@ const mountAgentSessionHeader = async (
   overrides: Partial<{
     currentModelName: string
     generationStatusText: string
+    agentStatusDetailText: string
     isGenerating: boolean
     generationPhase: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
     boundStyleName: string
@@ -31,6 +32,7 @@ const mountAgentSessionHeader = async (
     props: {
       currentModelName: '',
       generationStatusText: '就绪',
+      agentStatusDetailText: '',
       isGenerating: false,
       generationPhase: 'idle',
       ...overrides,
@@ -95,5 +97,18 @@ describe('AgentSessionHeader', () => {
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
     expect(wrapper.get('[data-testid="agent-status"]').classes()).not.toContain('busy')
     expect(wrapper.get('[data-testid="agent-status"]').classes()).not.toContain('failed')
+  })
+
+  it('renders_agent_status_detail_under_primary_status', async () => {
+    const wrapper = await mountAgentSessionHeader({
+      currentModelName: 'DeepSeek-R1',
+      generationStatusText: '生成中 · running',
+      agentStatusDetailText: '正在调用 RAG 查询工具',
+      isGenerating: true,
+      generationPhase: 'streaming',
+    })
+
+    expect(wrapper.text()).toContain('生成中 · running')
+    expect(wrapper.text()).toContain('正在调用 RAG 查询工具')
   })
 })

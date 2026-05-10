@@ -1,3 +1,5 @@
+import { pickBusinessRecord } from '@/utils/apiPayload'
+
 type RecoverySnapshot = {
   session?: {
     sessionId?: string | null
@@ -36,10 +38,10 @@ export const useWorkbenchSessionRecovery = (deps: {
   resumeRunningTask?: (projectId: string, sessionId: string, turnId: string) => Promise<void>
 }) => {
   const restore = async (projectId: string, sessionId: string, operatorId?: string) => {
-    const snapshot = await deps.resumeSession(projectId, sessionId, {
+    const snapshot = pickBusinessRecord(await deps.resumeSession(projectId, sessionId, {
       trigger: 'WORKBENCH_ENTER',
       ...(operatorId != null ? { operatorId } : {}),
-    })
+    })) as RecoverySnapshot
     deps.hydrateStore(snapshot)
     const turnId = snapshot?.activeTask?.turnId
     const taskStatus = String(snapshot?.activeTask?.taskStatus ?? '').toUpperCase()

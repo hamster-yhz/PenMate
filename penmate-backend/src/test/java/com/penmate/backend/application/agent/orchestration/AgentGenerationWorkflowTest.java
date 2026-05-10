@@ -27,6 +27,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,8 +84,6 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 11L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(11L), any(), any())).thenReturn(1);
-        when(ragRetrievalService.retrieve(eq(1L), eq(11L), any(), eq("trace-1")))
-                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-1")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any()))
@@ -112,8 +111,6 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 21L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(21L), any(), any())).thenReturn(1);
-        when(ragRetrievalService.retrieve(eq(1L), eq(21L), any(), eq("trace-wait")))
-                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-wait")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any()))
@@ -146,8 +143,6 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 31L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(31L), any(), any())).thenReturn(1);
-        when(ragRetrievalService.retrieve(eq(1L), eq(31L), any(), eq("trace-direct")))
-                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-direct")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(31L), eq(9L), eq(0L), eq("trace-direct"), any(), any()))
@@ -180,8 +175,6 @@ class AgentGenerationWorkflowTest {
         when(sessionStyleBindingAppService.getBoundStyleSnapshotJson(1L, 9L)).thenReturn("{\"styleId\":81,\"label\":\"史诗感\"}");
         when(agentRepository.findGenerationTask(1L, 32L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(32L), any(), any())).thenReturn(1);
-        when(ragRetrievalService.retrieve(eq(1L), eq(32L), any(), eq("trace-plain")))
-                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of(
                 "role", "user",
                 "content", "写作风格约束：\n{\"styleId\":81,\"label\":\"史诗感\"}\n\n用户指令：\n补完城市背景"
@@ -212,8 +205,6 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 12L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(12L), any(), any())).thenReturn(1);
-        when(ragRetrievalService.retrieve(eq(1L), eq(12L), any(), eq("trace-2")))
-                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-2")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any()))
@@ -246,8 +237,6 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 41L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(41L), any(), any())).thenReturn(1);
-        when(ragRetrievalService.retrieve(eq(1L), eq(41L), any(), eq("trace-task-id")))
-                .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 1L));
         when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-task-id")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-task-id"), any(), any()))
@@ -258,6 +247,36 @@ class AgentGenerationWorkflowTest {
         verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.RUNNING.value(), null);
         verify(agentRepository).updateGenerationTaskStatus(1L, 41L, AgentTaskStatus.WAITING_APPROVAL.value(), null);
         verify(agentRepository, never()).updateGenerationTaskStatus(eq(1L), eq(999L), any(), any());
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_NOT_FORCE_RAG_RETRIEVAL_BEFORE_TOOL_LOOP() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(61L);
+        task.setTaskId(61L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("仅在 agent 主动决定时再查询知识库");
+
+        when(agentRepository.findGenerationTask(1L, 61L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(61L), any(), any())).thenReturn(1);
+        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), eq(List.of())))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-rag-tool"))
+                .thenReturn(null);
+        when(agentToolLoopRunner.execute(eq(1L), eq(61L), eq(9L), eq(0L), eq("trace-rag-tool"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
+
+        agentGenerationWorkflow.run(1L, 61L, "trace-rag-tool");
+
+        verifyNoInteractions(ragRetrievalService);
+        verify(agentPromptAssembler).buildInitialMessages(eq(task), any(), eq(List.of()));
+        verify(agentToolLoopRunner).execute(eq(1L), eq(61L), eq(9L), eq(0L), eq("trace-rag-tool"), any(), any());
+        verifyNoMoreInteractions(ragRetrievalService);
     }
 
     @Test

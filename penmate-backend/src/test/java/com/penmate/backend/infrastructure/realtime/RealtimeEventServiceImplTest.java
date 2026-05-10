@@ -55,7 +55,7 @@ class RealtimeEventServiceImplTest {
                 Map.entry("taskId", 17L),
                 Map.entry("toolCallId", "call_9"),
                 Map.entry("pluginCode", "book_crud"),
-                Map.entry("toolCode", "book_crud"),
+                Map.entry("toolCode", "delete_book"),
                 Map.entry("toolName", "delete_book"),
                 Map.entry("status", "waiting_approval"),
                 Map.entry("approvalId", 42L),
@@ -118,6 +118,45 @@ class RealtimeEventServiceImplTest {
                 Map.entry("approvalPreview", Map.of("approvalType", "BOOK_DELETE", "target", "project-9")),
                 Map.entry("resumeMode", "RESUME_LOOP"),
                 Map.entry("status", "waiting_approval")
+        ));
+    }
+
+    @Test
+    void UT_INFRA_REALTIME_EVENT_SERVICE_PUBLISHES_AGENT_STATUS_EVENT_WITH_STAGE_AND_MESSAGE() throws Exception {
+        ProjectWebSocketSessionRegistry sessionRegistry = new ProjectWebSocketSessionRegistry();
+        GenerationSseEmitterHub emitterHub = new GenerationSseEmitterHub();
+        RealtimeEventServiceImpl service = new RealtimeEventServiceImpl(sessionRegistry, emitterHub, new ObjectMapper());
+
+        Method method = Arrays.stream(RealtimeEventServiceImpl.class.getMethods())
+                .filter(candidate -> candidate.getName().equals("publishGenerationStatus"))
+                .filter(candidate -> candidate.getParameterCount() == 5)
+                .findFirst()
+                .orElse(null);
+
+        assertThat(method)
+                .as("agent status SSE contract should expose stage and message")
+                .isNotNull();
+        if (method == null) {
+            return;
+        }
+
+        method.invoke(service,
+                9L,
+                17L,
+                "retrieving_context",
+                "检索知识库参考资料",
+                "running");
+
+        Object state = loadTaskState(emitterHub, 17L);
+        List<?> bufferedEvents = loadBufferedEvents(state);
+        Object event = bufferedEvents.get(0);
+
+        assertThat(readField(event, "eventName")).isEqualTo("generation.status");
+        assertThat(readField(event, "data")).isEqualTo(Map.ofEntries(
+                Map.entry("taskId", 17L),
+                Map.entry("stage", "retrieving_context"),
+                Map.entry("message", "检索知识库参考资料"),
+                Map.entry("status", "running")
         ));
     }
 
