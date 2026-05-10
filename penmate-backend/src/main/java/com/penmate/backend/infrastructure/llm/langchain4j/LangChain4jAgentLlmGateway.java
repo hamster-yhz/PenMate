@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.StringJoiner;
 
 /**
  * 基于 LangChain4j 的 Agent 模型网关实现。
@@ -97,16 +98,16 @@ public class LangChain4jAgentLlmGateway implements AgentLlmGateway {
     }
 
     /**
-     * 组装模型提示词。
-     * <p>按“风格约束 -> 知识库参考 -> 工具增强结果 -> 用户指令”顺序拼接，确保模型先读取约束与上下文再处理需求。</p>
+     * 组装结构化模型提示词。
+     * <p>这里只负责上下文块的结构封装，不承载“知识库参考”“用户指令”等语义标题，具体语义由提示词文档解释。</p>
      */
     private String buildPrompt(AgentGenerationTask task, List<RagRetrievedChunk> ragChunks, String toolContext) {
         String prompt = task.getPromptSnapshot() == null ? "" : task.getPromptSnapshot().trim();
-        StringBuilder builder = new StringBuilder();
+        StringJoiner builder = new StringJoiner("\n\n");
         if (ragChunks != null && !ragChunks.isEmpty()) {
-            builder.append("知识库参考：\n");
+            StringBuilder ragBuilder = new StringBuilder();
             for (RagRetrievedChunk chunk : ragChunks) {
-                builder.append("- [")
+                ragBuilder.append("- [")
                         .append(chunk.getDocumentTitle() == null ? "文档" : chunk.getDocumentTitle())
                         .append("#")
                         .append(chunk.getChunkNo() == null ? 0 : chunk.getChunkNo())
@@ -114,13 +115,38 @@ public class LangChain4jAgentLlmGateway implements AgentLlmGateway {
                         .append(chunk.getContentText() == null ? "" : chunk.getContentText())
                         .append("\n");
             }
-            builder.append("\n");
+            builder.add(wrapBlock("context type=\"rag\"", ragBuilder.toString()));
         }
         if (toolContext != null && !toolContext.isBlank()) {
-            builder.append("工具增强结果：\n").append(toolContext).append("\n\n");
+            builder.add(wrapBlock("context type=\"tool\"", toolContext));
         }
-        builder.append("用户指令：\n").append(prompt);
+        builder.add(wrapBlock("user_request", prompt));
         return builder.toString();
+    }
+
+    private String wrapBlock(String tagDeclaration, String content) {
+        return "<" + tagDeclaration + ">\n" + normalizeBlockContent(content) + "\n</" + closingTagName(tagDeclaration) + ">";
+    }
+
+    private String closingTagName(String tagDeclaration) {
+        int separatorIndex = tagDeclaration.indexOf(' ');
+        return separatorIndex < 0 ? tagDeclaration : tagDeclaration.substring(0, separatorIndex);
+    }
+
+    private String normalizeBlockContent(String content) {
+        if (content == null) {
+            return "";
+        }
+        return escapeStructuredContent(content
+                .replaceFirst("^[\\r\\n]+", "")
+                .replaceFirst("[\\r\\n]+$", ""));
+    }
+
+    private String escapeStructuredContent(String content) {
+        return content
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 
 }

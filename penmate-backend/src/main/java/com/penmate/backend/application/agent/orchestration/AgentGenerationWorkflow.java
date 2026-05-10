@@ -54,6 +54,7 @@ public class AgentGenerationWorkflow {
     }
 
     private void runInternal(Long projectId, Long taskId, String traceId) {
+        log.info("Agent 生成工作流开始: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
         AgentGenerationTask task = agentRepository.findGenerationTask(projectId, taskId);
         if (task == null) {
             log.warn("编排任务不存在: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
@@ -88,6 +89,13 @@ public class AgentGenerationWorkflow {
                     taskContext.getStyleSnapshotJson(),
                     preflightDecision
             ));
+            log.info("Agent 路由决策已生效: taskId={}, executionProfile={}, includeStyleContext={}, ragRouteEnabled={}, includeStoryBibleContext={}, storyBibleEnabled={}",
+                    taskId,
+                    preflightDecision.executionPromptProfile(),
+                    preflightDecision.includeStyleContext(),
+                    preflightDecision.includeRagContext(),
+                    preflightDecision.includeStoryBibleContext(),
+                    routingResult.storyBibleContext().enabled());
             taskContext.setStyleSnapshotJson(routingResult.styleSnapshot());
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
             long llmStartAt = System.currentTimeMillis();
@@ -107,6 +115,7 @@ public class AgentGenerationWorkflow {
                     executionConfig
             );
             if (loopResult.waitingApproval()) {
+                log.info("Agent 工作流进入待审批: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
                 transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
                 return;
             }
@@ -125,6 +134,7 @@ public class AgentGenerationWorkflow {
             agentTaskResultRecorder.recordAssistantResult(task, generatedText);
             transitionStatus(projectId, task, AgentTaskStatus.DONE, null);
             realtimeEventService.publishGenerationDone(projectId, taskId, AgentTaskStatus.DONE.value());
+            log.info("Agent 生成工作流完成: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
         } catch (Exception ex) {
             log.error("编排执行失败: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId, ex);
             transitionToFailed(projectId, task, ex);
@@ -133,6 +143,7 @@ public class AgentGenerationWorkflow {
     }
 
     private AgentTaskContext buildTaskContext(Long projectId, AgentGenerationTask task) {
+        // 这里仅恢复任务运行期需要的结构化上下文，不在工作流层拼装任何提示词语义文案。
         AgentTaskContext taskContext = AgentTaskContext.recoveryOf(task.getTaskId(), task.getStatus(), null);
         if (sessionStyleBindingAppService != null) {
             taskContext.setStyleSnapshotJson(sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, task.getConversationId()));

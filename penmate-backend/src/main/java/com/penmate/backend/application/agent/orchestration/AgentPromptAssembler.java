@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 /**
  * Agent 初始提示词装配器。
@@ -39,15 +40,15 @@ public class AgentPromptAssembler {
                 ? ""
                 : taskContext.getStyleSnapshotJson().trim();
         String storyBible = storyBibleContent == null ? "" : storyBibleContent.trim();
-        StringBuilder userBuilder = new StringBuilder();
+        StringJoiner userBuilder = new StringJoiner("\n\n");
 
         if (!style.isEmpty()) {
-            userBuilder.append("写作风格约束：\n").append(style).append("\n\n");
+            userBuilder.add(wrapBlock("context type=\"style\"", style));
         }
         if (ragChunks != null && !ragChunks.isEmpty()) {
-            userBuilder.append("知识库参考：\n");
+            StringBuilder ragBuilder = new StringBuilder();
             for (RagRetrievedChunk chunk : ragChunks) {
-                userBuilder.append("- [")
+                ragBuilder.append("- [")
                         .append(chunk.getDocumentTitle() == null ? "文档" : chunk.getDocumentTitle())
                         .append("#")
                         .append(chunk.getChunkNo() == null ? 0 : chunk.getChunkNo())
@@ -55,12 +56,12 @@ public class AgentPromptAssembler {
                         .append(chunk.getContentText() == null ? "" : chunk.getContentText())
                         .append("\n");
             }
-            userBuilder.append("\n");
+            userBuilder.add(wrapBlock("context type=\"rag\"", ragBuilder.toString()));
         }
         if (!storyBible.isEmpty()) {
-            userBuilder.append("故事圣经参考：\n").append(storyBible).append("\n\n");
+            userBuilder.add(wrapBlock("context type=\"story_bible\"", storyBible));
         }
-        userBuilder.append("用户指令：\n").append(prompt);
+        userBuilder.add(wrapBlock("user_request", prompt));
 
         String profile = executionProfile == null || executionProfile.isBlank() ? resolveProfile(task) : executionProfile.trim();
         SystemPromptBundle promptBundle = systemPromptProvider.loadBundle("execution", profile);
@@ -74,6 +75,31 @@ public class AgentPromptAssembler {
                         "content", userBuilder.toString()
                 )
         );
+    }
+
+    private String wrapBlock(String tagDeclaration, String content) {
+        return "<" + tagDeclaration + ">\n" + normalizeBlockContent(content) + "\n</" + closingTagName(tagDeclaration) + ">";
+    }
+
+    private String normalizeBlockContent(String content) {
+        if (content == null) {
+            return "";
+        }
+        return escapeStructuredContent(content
+                .replaceFirst("^[\\r\\n]+", "")
+                .replaceFirst("[\\r\\n]+$", ""));
+    }
+
+    private String escapeStructuredContent(String content) {
+        return content
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    private String closingTagName(String tagDeclaration) {
+        int separatorIndex = tagDeclaration.indexOf(' ');
+        return separatorIndex < 0 ? tagDeclaration : tagDeclaration.substring(0, separatorIndex);
     }
 
     private String resolveProfile(AgentGenerationTask task) {

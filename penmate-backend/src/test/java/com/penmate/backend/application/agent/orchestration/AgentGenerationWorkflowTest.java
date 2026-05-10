@@ -250,7 +250,7 @@ class AgentGenerationWorkflowTest {
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("rewrite"), eq("")))
                 .thenReturn(List.of(Map.of(
                         "role", "user",
-                        "content", "写作风格约束：\n{\"styleId\":81,\"label\":\"史诗感\"}\n\n用户指令：\n补完城市背景"
+                        "content", "<context type=\"style\">\n{\"styleId\":81,\"label\":\"史诗感\"}\n</context>\n\n<user_request>\n补完城市背景\n</user_request>"
                 )));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-plain")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), any(), any()))

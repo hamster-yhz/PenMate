@@ -88,10 +88,15 @@ class DefaultAgentPreflightCoordinatorTest {
         assertThat(requestCaptor.getValue().messages().get(1))
                 .containsEntry("role", "user");
         assertThat((String) requestCaptor.getValue().messages().get(1).get("content"))
-                .contains("projectId=1001")
-                .contains("conversationId=2002")
-                .contains("chapterId=3003")
-                .contains("请续写主角在雨夜回城后的场景");
+                .contains("<preflight_request>")
+                .contains("<project_id>1001</project_id>")
+                .contains("<conversation_id>2002</conversation_id>")
+                .contains("<chapter_id>3003</chapter_id>")
+                .contains("<user_message>请续写主角在雨夜回城后的场景</user_message>")
+                .doesNotContain("projectId=1001")
+                .doesNotContain("conversationId=2002")
+                .doesNotContain("chapterId=3003")
+                .doesNotContain("userMessage=");
         assertThat(decision.behaviorType()).isEqualTo(AgentBehaviorType.WRITE);
         assertThat(decision.executionPromptProfile()).isEqualTo("default");
         assertThat(decision.includeStyleContext()).isTrue();
