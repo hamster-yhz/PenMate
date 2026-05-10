@@ -53,6 +53,28 @@ class ProviderChatClientStructuredTurnProtocolTest {
     }
 
     @Test
+    void UT_INFRA_LLM_OPENAI_COMPATIBLE_PROVIDER_CHAT_CLIENT_RESOLVES_STRUCTURED_TURN_ENDPOINT_TO_CHAT_COMPLETIONS_WITHOUT_FORCING_V1_SUFFIX() {
+        TestOpenAiCompatibleProviderChatClient client = new TestOpenAiCompatibleProviderChatClient();
+
+        assertThat(client.resolveTurnEndpoint("https://example.com/proxy/openai"))
+                .isEqualTo("https://example.com/proxy/openai/chat/completions");
+        assertThat(client.resolveTurnEndpoint("https://example.com/proxy/openai/"))
+                .isEqualTo("https://example.com/proxy/openai/chat/completions");
+        assertThat(client.resolveTurnEndpoint("https://example.com/proxy/openai/chat/completions"))
+                .isEqualTo("https://example.com/proxy/openai/chat/completions");
+    }
+
+    @Test
+    void UT_INFRA_LLM_OPENAI_COMPATIBLE_PROVIDER_CHAT_CLIENT_NORMALIZES_COMPLETE_CHAT_COMPLETIONS_ENDPOINT_WITH_TRAILING_SLASH_AND_BLANK_INPUT() {
+        TestOpenAiCompatibleProviderChatClient client = new TestOpenAiCompatibleProviderChatClient();
+
+        assertThat(client.resolveTurnEndpoint("https://example.com/proxy/openai/chat/completions/"))
+                .isEqualTo("https://example.com/proxy/openai/chat/completions");
+        assertThat(client.resolveTurnEndpoint("   "))
+                .isNull();
+    }
+
+    @Test
     void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_FAILS_FAST_WHEN_TOOL_RESULT_MESSAGE_CANNOT_BE_BOUND_TO_TOOL_NAME() throws Exception {
         ClaudeProviderChatClient client = new ClaudeProviderChatClient();
         Method method = ClaudeProviderChatClient.class.getDeclaredMethod("toChatMessages", List.class);
@@ -115,6 +137,13 @@ class ProviderChatClientStructuredTurnProtocolTest {
     }
 
     private static final class TestGeminiProviderChatClient extends GeminiProviderChatClient {
+
+        private String resolveTurnEndpoint(String rawBaseUrl) {
+            return resolveChatCompletionsEndpoint(rawBaseUrl);
+        }
+    }
+
+    private static final class TestOpenAiCompatibleProviderChatClient extends OpenAiCompatibleProviderChatClient {
 
         private String resolveTurnEndpoint(String rawBaseUrl) {
             return resolveChatCompletionsEndpoint(rawBaseUrl);

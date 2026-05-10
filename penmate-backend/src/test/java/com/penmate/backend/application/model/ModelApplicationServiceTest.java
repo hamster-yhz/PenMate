@@ -59,7 +59,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         List<ModelProvider> result = modelApplicationService.listProviders();
 
         assertThat(result).hasSize(BuiltinModelProviders.list().size());
-        assertThat(result).extracting(ModelProvider::getCode).contains("openai", "xai", "deepseek");
+        assertThat(result).extracting(ModelProvider::getCode).contains("openai", "xai", "deepseek", "openai-compatible");
         assertThat(result).extracting(ModelProvider::getProviderId)
                 .doesNotContainNull()
                 .doesNotHaveDuplicates();
@@ -271,11 +271,12 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "userKeyId", 8001L,
                 "status", "active"
         ));
+        when(businessIdGenerator.nextId()).thenReturn(9101L);
         when(secretCryptoService.encrypt("sk-direct-official-key")).thenReturn("cipher-official-key");
-        when(modelRepository.insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active")))
+        when(modelRepository.insertOfficialKey(eq(9101L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active")))
                 .thenReturn(1);
-        when(modelRepository.findOfficialKey(9001L)).thenReturn(officialKey(9001L, 1L));
-        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9001L, "active")).thenReturn(1);
+        when(modelRepository.findOfficialKey(9101L)).thenReturn(officialKey(9101L, 1L));
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9101L, "active")).thenReturn(1);
 
         modelApplicationService.updateUserModelConfig(
                 1001L,
@@ -284,8 +285,158 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "trace"
         );
 
-        verify(modelRepository).insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active"));
-        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9001L, "active");
+        verify(modelRepository).insertOfficialKey(eq(9101L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active"));
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9101L, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_WITH_EXISTING_USER_KEY_SHOULD_UPDATE_KEY_INSTEAD_OF_INSERTING_NEW_ONE() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "",
+                "keySourceType", "USER_KEY",
+                "userKeyId", 8001L,
+                "status", "active"
+        ));
+        when(secretCryptoService.encrypt("sk-updated-user-key")).thenReturn("cipher-updated-user-key");
+        when(modelRepository.updateUserKey(eq(1001L), eq(8001L), eq(null), eq("cipher-updated-user-key"), anyString(), eq(null), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "USER_KEY", 8001L, null, "active")).thenReturn(1);
+
+        modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "USER_KEY", "sk-updated-user-key", "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).updateUserKey(eq(1001L), eq(8001L), eq(null), eq("cipher-updated-user-key"), anyString(), eq(null), eq("active"));
+        verify(modelRepository, never()).insertUserKey(anyLong(), eq(1001L), eq(1L), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "USER_KEY", 8001L, null, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_WITH_ONLY_MODEL_NAME_PATCH_SHOULD_KEEP_EXISTING_FIELDS_AND_KEY_BINDING() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "https://api.openai.example",
+                "keySourceType", "USER_KEY",
+                "userKeyId", 8001L,
+                "status", "active"
+        ));
+        when(modelRepository.updateUserModelConfig(
+                1001L,
+                9001L,
+                1L,
+                "gpt-4.1",
+                "https://api.openai.example",
+                "USER_KEY",
+                8001L,
+                null,
+                "active"
+        )).thenReturn(1);
+
+        modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(null, "gpt-4.1", null, null, null, null, 1001L),
+                "trace"
+        );
+
+        verify(modelRepository, never()).updateUserKey(eq(1001L), eq(8001L), eq(null), anyString(), anyString(), eq(null), eq("active"));
+        verify(modelRepository, never()).insertUserKey(anyLong(), eq(1001L), anyLong(), anyString(), anyString(), anyString(), eq(false), anyString());
+        verify(modelRepository).updateUserModelConfig(
+                1001L,
+                9001L,
+                1L,
+                "gpt-4.1",
+                "https://api.openai.example",
+                "USER_KEY",
+                8001L,
+                null,
+                "active"
+        );
+    }
+
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_WITH_EXISTING_OFFICIAL_KEY_SHOULD_UPDATE_KEY_INSTEAD_OF_INSERTING_NEW_ONE() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "",
+                "keySourceType", "OFFICIAL_KEY",
+                "officialKeyId", 7001L,
+                "status", "active"
+        ));
+        when(secretCryptoService.encrypt("sk-updated-official-key")).thenReturn("cipher-updated-official-key");
+        when(modelRepository.updateOfficialKey(eq(7001L), eq(null), eq("cipher-updated-official-key"), anyString(), eq(null), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 7001L, "active")).thenReturn(1);
+
+        modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-updated-official-key", "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).updateOfficialKey(eq(7001L), eq(null), eq("cipher-updated-official-key"), anyString(), eq(null), eq("active"));
+        verify(modelRepository, never()).insertOfficialKey(anyLong(), eq(1L), anyString(), anyString(), anyString(), eq(false), eq("active"));
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 7001L, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_WHEN_PROVIDER_CHANGES_SHOULD_CREATE_NEW_USER_KEY() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "",
+                "keySourceType", "USER_KEY",
+                "userKeyId", 8001L,
+                "status", "active"
+        ));
+        when(businessIdGenerator.nextId()).thenReturn(9201L);
+        when(secretCryptoService.encrypt("sk-provider-changed-key")).thenReturn("cipher-provider-changed-key");
+        when(modelRepository.insertUserKey(eq(9201L), eq(1001L), eq(2L), eq("gpt-4.1 Key"), eq("cipher-provider-changed-key"), anyString(), eq(false), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.findUserKey(9201L)).thenReturn(userKey(9201L, 1001L, 2L, "gpt-4.1 Key", "active"));
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 9201L, null, "active")).thenReturn(1);
+
+        modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(2L, "gpt-4.1", null, "USER_KEY", "sk-provider-changed-key", "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository, never()).updateUserKey(eq(1001L), eq(8001L), eq(null), anyString(), anyString(), eq(null), eq("active"));
+        verify(modelRepository).insertUserKey(eq(9201L), eq(1001L), eq(2L), eq("gpt-4.1 Key"), eq("cipher-provider-changed-key"), anyString(), eq(false), eq("active"));
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 9201L, null, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_WHEN_PROVIDER_CHANGES_WITHOUT_NEW_API_KEY_SHOULD_FAIL() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "",
+                "keySourceType", "USER_KEY",
+                "userKeyId", 8001L,
+                "status", "active"
+        ));
+
+        assertThatThrownBy(() -> modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(2L, "gpt-4.1", null, "USER_KEY", null, "active", 1001L),
+                "trace"
+        )).isExactlyInstanceOf(BusinessException.class)
+                .hasMessage("Api key is required");
+
+        verify(modelRepository, never()).updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 8001L, null, "active");
+        verify(modelRepository, never()).insertUserKey(anyLong(), eq(1001L), eq(2L), anyString(), anyString(), anyString(), eq(false), eq("active"));
     }
 
     @Test

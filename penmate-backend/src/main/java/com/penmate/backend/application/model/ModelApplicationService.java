@@ -468,15 +468,73 @@ public class ModelApplicationService {
                                                   String status,
                                                   Map<String, Object> existing) {
         String effectiveKeySourceType = keySourceType == null ? stringValue(existing.get("keySourceType")) : keySourceType;
+        String existingKeySourceType = stringValue(existing.get("keySourceType"));
+        Long existingProviderId = longValue(existing.get("providerId"));
         String normalizedApiKey = normalizeNullable(apiKey);
         if (normalizedApiKey == null) {
+            if (!Objects.equals(providerId, existingProviderId)
+                    || !Objects.equals(effectiveKeySourceType, existingKeySourceType)) {
+                throw BusinessException.of("Api key is required");
+            }
             return new KeyBinding(
                     effectiveKeySourceType,
                     longValue(existing.get("userKeyId")),
                     longValue(existing.get("officialKeyId"))
             );
         }
-        return resolveKeyBindingForCreate(userId, generatedKeyId, providerId, modelName, effectiveKeySourceType, normalizedApiKey, status);
+
+        Long existingUserKeyId = longValue(existing.get("userKeyId"));
+        Long existingOfficialKeyId = longValue(existing.get("officialKeyId"));
+        String normalizedStatus = normalizeStatus(status);
+        String encryptedApiKey = secretCryptoService.encrypt(normalizedApiKey);
+        String maskedApiKey = mask(normalizedApiKey);
+
+        if (USER_KEY_SOURCE.equals(effectiveKeySourceType)
+                && USER_KEY_SOURCE.equals(existingKeySourceType)
+                && providerId.equals(existingProviderId)
+                && existingUserKeyId != null) {
+            int affected = modelRepository.updateUserKey(
+                    userId,
+                    existingUserKeyId,
+                    null,
+                    encryptedApiKey,
+                    maskedApiKey,
+                    null,
+                    normalizedStatus
+            );
+            if (affected != 1) {
+                throw BusinessException.of("Model key not found");
+            }
+            return new KeyBinding(USER_KEY_SOURCE, existingUserKeyId, null);
+        }
+
+        if (OFFICIAL_KEY_SOURCE.equals(effectiveKeySourceType)
+                && OFFICIAL_KEY_SOURCE.equals(existingKeySourceType)
+                && providerId.equals(existingProviderId)
+                && existingOfficialKeyId != null) {
+            int affected = modelRepository.updateOfficialKey(
+                    existingOfficialKeyId,
+                    null,
+                    encryptedApiKey,
+                    maskedApiKey,
+                    null,
+                    normalizedStatus
+            );
+            if (affected != 1) {
+                throw BusinessException.of("Official model key not found");
+            }
+            return new KeyBinding(OFFICIAL_KEY_SOURCE, null, existingOfficialKeyId);
+        }
+
+        return resolveKeyBindingForCreate(
+                userId,
+                businessIdGenerator.nextId(),
+                providerId,
+                modelName,
+                effectiveKeySourceType,
+                normalizedApiKey,
+                status
+        );
     }
 
     private String normalizeKeySourceType(String value) {

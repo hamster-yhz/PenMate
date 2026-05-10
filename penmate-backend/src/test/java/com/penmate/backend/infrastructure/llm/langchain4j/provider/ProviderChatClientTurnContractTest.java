@@ -57,6 +57,15 @@ class ProviderChatClientTurnContractTest {
                 .hasMessage("LLM execution config is required");
     }
 
+    @Test
+    void UT_INFRA_LLM_OPENAI_COMPATIBLE_PROVIDER_CHAT_CLIENT_GENERATE_TURN_VALIDATES_EXECUTION_CONFIG_INSTEAD_OF_THROWING_UNSUPPORTED() {
+        ProviderChatClient client = new OpenAiCompatibleProviderChatClient();
+
+        assertThatThrownBy(() -> client.generateTurn(TURN_REQUEST, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("LLM execution config is required");
+    }
+
     private static final class UnsupportedTurnProviderChatClient implements ProviderChatClient {
 
         @Override

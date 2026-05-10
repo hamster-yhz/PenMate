@@ -201,6 +201,7 @@ const deriveKeySourceType = (item: AnyRecord): KeySourceType =>
   String(item.keySourceType ?? 'USER_KEY') === 'OFFICIAL_KEY' ? 'OFFICIAL_KEY' : 'USER_KEY'
 
 const formatKeySourceTypeLabel = (keySourceType: KeySourceType) => (keySourceType === 'OFFICIAL_KEY' ? '官方模型' : '用户模型')
+const toModelCategory = (keySourceType: KeySourceType) => (keySourceType === 'OFFICIAL_KEY' ? 'OFFICIAL_MODEL' : 'USER_MODEL')
 const extractPreferenceRecord = (payload: unknown): AnyRecord => {
   if (!payload || typeof payload !== 'object') {
     return {}
@@ -422,18 +423,50 @@ const saveConfig = async () => {
     message.warning('请选择供应商并填写模型名')
     return
   }
-  if (!form.apiKey.trim()) {
+
+  const editingConfig = editingConfigId.value
+    ? userConfigs.value.find((item) => item.modelConfigId === editingConfigId.value) ?? null
+    : null
+  const requiresApiKey = !editingConfig
+    || editingConfig.providerId !== form.providerId
+    || editingConfig.keySourceType !== form.keySourceType
+
+  if (requiresApiKey && !form.apiKey.trim()) {
     message.warning('请填写 Key')
     return
   }
 
-  const payload: AnyRecord = {
-    providerId: form.providerId,
-    modelName: form.modelName,
-    baseUrl: form.baseUrl,
-    modelCategory: form.keySourceType === 'OFFICIAL_KEY' ? 'OFFICIAL_MODEL' : 'USER_MODEL',
-    apiKey: form.apiKey,
-    status: 'active',
+  const payload: AnyRecord = {}
+  if (editingConfig) {
+    const trimmedModelName = form.modelName.trim()
+    const trimmedBaseUrl = form.baseUrl.trim()
+    const nextModelCategory = toModelCategory(form.keySourceType)
+    const previousModelCategory = toModelCategory(editingConfig.keySourceType)
+
+    if (editingConfig.providerId !== form.providerId) {
+      payload.providerId = form.providerId
+    }
+    if (editingConfig.modelName !== trimmedModelName) {
+      payload.modelName = trimmedModelName
+    }
+    if (editingConfig.baseUrl !== trimmedBaseUrl) {
+      payload.baseUrl = trimmedBaseUrl
+    }
+    if (previousModelCategory !== nextModelCategory) {
+      payload.modelCategory = nextModelCategory
+    }
+    if (form.apiKey.trim()) {
+      payload.apiKey = form.apiKey
+    }
+  } else {
+    payload.providerId = form.providerId
+    payload.modelName = form.modelName
+    payload.baseUrl = form.baseUrl
+    payload.modelCategory = toModelCategory(form.keySourceType)
+    payload.status = 'active'
+    if (form.apiKey.trim()) {
+      payload.apiKey = form.apiKey
+    }
   }
 
   try {

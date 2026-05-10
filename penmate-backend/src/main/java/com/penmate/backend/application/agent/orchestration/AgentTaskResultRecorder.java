@@ -3,6 +3,7 @@ package com.penmate.backend.application.agent.orchestration;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +17,11 @@ import org.springframework.stereotype.Component;
 public class AgentTaskResultRecorder {
 
     private final AgentRepository agentRepository;
+    private final BusinessIdGenerator businessIdGenerator;
 
     public void recordAssistantResult(AgentGenerationTask task, String generatedText) {
         AgentMessage assistantMessage = new AgentMessage();
+        assistantMessage.setMessageId(businessIdGenerator.nextId());
         assistantMessage.setConversationId(task.getConversationId());
         assistantMessage.setRole("assistant");
         assistantMessage.setUserMessageType("GENERATION_RESULT");

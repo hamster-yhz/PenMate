@@ -17,7 +17,8 @@ public final class BuiltinModelProviders {
             provider(3L, "longcat", "Longcat", null),
             provider(4L, "claude", "Claude", "https://api.anthropic.com"),
             provider(5L, "gemini", "Gemini", "https://generativelanguage.googleapis.com/v1beta/openai"),
-            provider(6L, "deepseek", "DeepSeek", "https://api.deepseek.com/v1")
+            provider(6L, "deepseek", "DeepSeek", "https://api.deepseek.com/v1"),
+            provider(7L, "openai-compatible", "OpenAI Compatible", null)
     );
 
     private BuiltinModelProviders() {

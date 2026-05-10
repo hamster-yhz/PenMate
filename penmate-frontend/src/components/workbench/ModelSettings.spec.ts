@@ -391,6 +391,45 @@ describe('ModelSettings', () => {
     expect(mocks.updateUserModelConfig.mock.calls[0][3]).not.toHaveProperty('officialKeyId')
   })
 
+  it('编辑配置时若未修改 provider 与模型类别，不应强制要求重新填写 key', async () => {
+    const wrapper = await mountComponent()
+
+    const firstCardButtons = wrapper.findAll('.config-card').at(0)!.findAll('.card-action-btn')
+    await firstCardButtons[2].trigger('click')
+    await flushPromises()
+
+    await wrapper.find('input[placeholder="例如：gpt-4o-mini"]').setValue('gpt-4.1')
+    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.messageWarning).not.toHaveBeenCalledWith('请填写 Key')
+    expect(mocks.updateUserModelConfig).toHaveBeenCalledWith(
+      '101',
+      'mcfg-1001',
+      '101',
+      expect.objectContaining({
+        modelName: 'gpt-4.1',
+      })
+    )
+    expect(mocks.updateUserModelConfig.mock.calls[0][3]).not.toHaveProperty('apiKey')
+  })
+
+  it('编辑配置时若仅修改模型名，应只提交变更字段而不是整张表单', async () => {
+    const wrapper = await mountComponent()
+
+    const firstCardButtons = wrapper.findAll('.config-card').at(0)!.findAll('.card-action-btn')
+    await firstCardButtons[2].trigger('click')
+    await flushPromises()
+
+    await wrapper.find('input[placeholder="例如：gpt-4o-mini"]').setValue('gpt-4.1')
+    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.updateUserModelConfig).toHaveBeenCalledWith('101', 'mcfg-1001', '101', {
+      modelName: 'gpt-4.1',
+    })
+  })
+
   it('加载失败时应提示模型设置加载失败', async () => {
     mocks.listUserModelConfigs.mockRejectedValueOnce(new Error('load fail'))
 

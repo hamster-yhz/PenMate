@@ -67,7 +67,10 @@ class AgentBaseSeedSqlContractTest {
                 .doesNotContain("agent_generation_tasks")
                 .doesNotContain("(920001, 920001, 920001, 920003, NULL,")
                 .doesNotContain("(920002, 920002, 920001, NULL,   NULL,")
-                .doesNotContain("(920003, 920003, 920001, NULL,   NULL,");
+                .doesNotContain("(920003, 920003, 920001, NULL,   NULL,")
+                .contains("DBCASE Owner OpenAI-Compatible Key")
+                .contains("openai-compatible-chat")
+                .contains(", 7,");
 
         executeBlock(sql, "-- 文风", "-- 插件");
         executeBlock(sql, "-- Agent + 审批", "-- RAG + 对象存储");

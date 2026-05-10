@@ -194,13 +194,15 @@ INSERT INTO model_official_api_keys (id, official_api_key_id, provider_id, key_n
 INSERT INTO model_user_api_keys (id, user_api_key_id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at) VALUES
 (920001, 920011, 920002, 1, 'DBCASE Owner OpenAI 主 Key',  'cipher-user-openai-920011',  '****92011', 1, NOW(3), 'active',   NOW(3), NOW(3), NULL),
 (920002, 920012, 920002, 2, 'DBCASE Owner DeepSeek Key',   'cipher-user-deepseek-920012','****92012', 0, NOW(3), 'active',   NOW(3), NOW(3), NULL),
-(920003, 920013, 920001, 1, 'DBCASE Admin OpenAI Key',     'cipher-user-openai-920013',  '****92013', 0, NULL,   'disabled', NOW(3), NOW(3), NULL);
+(920003, 920013, 920001, 1, 'DBCASE Admin OpenAI Key',     'cipher-user-openai-920013',  '****92013', 0, NULL,   'disabled', NOW(3), NOW(3), NULL),
+(920004, 920014, 920002, 7, 'DBCASE Owner OpenAI-Compatible Key', 'cipher-user-openai-compatible-920014', '****92014', 0, NOW(3), 'active', NOW(3), NOW(3), NULL);
 
 INSERT INTO model_user_configurations (id, model_config_id, user_id, provider_id, model_name, base_url, key_source_type, user_key_id, official_key_id, status, created_at, updated_at, deleted_at) VALUES
 (920001, 920021, 920002, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920011, NULL,   'active',   NOW(3), NOW(3), NULL),
 (920002, 920022, 920002, 2, 'deepseek-chat',  'https://api.deepseek.com', 'USER_KEY',  920012, NULL,   'active',   NOW(3), NOW(3), NULL),
 (920003, 920023, 920002, 1, 'gpt-4.1',        NULL,                    'OFFICIAL_KEY', NULL,   920001, 'active',   NOW(3), NOW(3), NULL),
-(920004, 920024, 920001, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920013, NULL,   'disabled', NOW(3), NOW(3), NULL);
+(920004, 920024, 920001, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920013, NULL,   'disabled', NOW(3), NOW(3), NULL),
+(920005, 920025, 920002, 7, 'openai-compatible-chat', 'https://example.internal/openai', 'USER_KEY', 920014, NULL, 'active', NOW(3), NOW(3), NULL);
 
 UPDATE iam_users
 SET main_agent_model_config_id = CASE user_id
