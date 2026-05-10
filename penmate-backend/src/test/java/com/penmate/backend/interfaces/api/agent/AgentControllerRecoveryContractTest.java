@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
@@ -20,6 +21,7 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,6 +42,9 @@ class AgentControllerRecoveryContractTest {
 
     @Mock
     private AgentTurnAppService agentTurnAppService;
+
+    @Mock
+    private AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher;
 
     @InjectMocks
     private AgentController agentController;
@@ -113,6 +118,43 @@ class AgentControllerRecoveryContractTest {
                 .andExpect(jsonPath("$.meta.traceId").value("trace-turn-1"));
 
         verify(agentTurnAppService).createTurn(eq(101L), eq(90001L), any(), eq("trace-turn-1"));
+        verify(agentGenerationWorkflowDispatcher).dispatchInitialRun(101L, 70001L, "trace-turn-1");
+    }
+
+    @Test
+    void should_not_dispatch_generation_when_turn_result_has_no_task_id() throws Exception {
+        when(agentTurnAppService.createTurn(eq(101L), eq(90001L), any(), eq("trace-turn-no-task")))
+                .thenReturn(new AgentTurnResult(
+                        new AgentTurnResult.SessionView(
+                                90001L,
+                                "第三章夜雨追踪",
+                                "ACTIVE",
+                                new AgentTurnResult.BoundStyleView(81L, "冷峻悬疑"),
+                                "RUNNING"
+                        ),
+                        new AgentTurnResult.ActiveTaskView(50001L, null, "RUNNING", 71001L),
+                        "WRITE",
+                        "继续扩写"
+                ));
+
+        mockMvc().perform(post("/api/v1/novels/101/agent/sessions/90001/turns")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", "trace-turn-no-task")
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "operatorId", "201",
+                                "userMessage", "继续扩写",
+                                "taskRequest", Map.of(
+                                        "taskType", "WRITE",
+                                        "chapterId", "301"
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
+                .andExpect(jsonPath("$.data.activeTask.turnId").value("50001"))
+                .andExpect(jsonPath("$.data.activeTask.taskId").doesNotExist())
+                .andExpect(jsonPath("$.meta.traceId").value("trace-turn-no-task"));
+
+        verify(agentGenerationWorkflowDispatcher, never()).dispatchInitialRun(101L, null, "trace-turn-no-task");
     }
 
     @Test
@@ -206,6 +248,8 @@ class AgentControllerRecoveryContractTest {
                 .andExpect(jsonPath("$.data.activeTask.turnId").value("9007199254740990"))
                 .andExpect(jsonPath("$.data.activeTask.taskId").value("9007199254740771"))
                 .andExpect(jsonPath("$.data.activeTask.requestContextId").value("9007199254740661"));
+
+        verify(agentGenerationWorkflowDispatcher).dispatchInitialRun(101L, oversizedTaskId, "trace-oversized-turn");
     }
 
     private AgentSessionRecoveryResult recoverySnapshot(Long sessionId, String taskStatus) {

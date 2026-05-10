@@ -1,6 +1,13 @@
 package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
+import com.penmate.backend.application.agent.context.AgentContextRoutingFacade;
+import com.penmate.backend.application.agent.context.AgentContextRoutingRequest;
+import com.penmate.backend.application.agent.context.AgentContextRoutingResult;
+import com.penmate.backend.application.agent.context.StoryBibleContextResult;
+import com.penmate.backend.application.agent.orchestration.preflight.AgentBehaviorType;
+import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightCoordinator;
+import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightDecision;
 import com.penmate.backend.application.rag.RagRetrievalService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
@@ -55,6 +62,12 @@ class AgentGenerationWorkflowTest {
     private AgentPromptAssembler agentPromptAssembler;
 
     @Mock
+    private AgentPreflightCoordinator agentPreflightCoordinator;
+
+    @Mock
+    private AgentContextRoutingFacade agentContextRoutingFacade;
+
+    @Mock
     private AgentResultPublisher agentResultPublisher;
 
     @Mock
@@ -84,7 +97,22 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 11L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(11L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WORLD_BUILD,
+                "world-build",
+                true,
+                false,
+                false,
+                "需要世界观模式",
+                "{\"profile\":\"world-build\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                "{\"styleId\":81}",
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("world-build"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-1")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
@@ -111,7 +139,22 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 21L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(21L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WORLD_BUILD,
+                "world-build",
+                true,
+                false,
+                false,
+                "需要世界观模式",
+                "{\"profile\":\"world-build\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                "{\"styleId\":81}",
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("world-build"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-wait")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(88L, 1, ""));
@@ -143,7 +186,22 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 31L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(31L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "直接执行",
+                "{\"profile\":\"default\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                null,
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-direct")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(31L), eq(9L), eq(0L), eq("trace-direct"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("这是直接完成的答复", 0, ""));
@@ -175,10 +233,25 @@ class AgentGenerationWorkflowTest {
         when(sessionStyleBindingAppService.getBoundStyleSnapshotJson(1L, 9L)).thenReturn("{\"styleId\":81,\"label\":\"史诗感\"}");
         when(agentRepository.findGenerationTask(1L, 32L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(32L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of(
-                "role", "user",
-                "content", "写作风格约束：\n{\"styleId\":81,\"label\":\"史诗感\"}\n\n用户指令：\n补完城市背景"
-        )));
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WORLD_BUILD,
+                "rewrite",
+                true,
+                false,
+                false,
+                "改写且需要风格",
+                "{\"profile\":\"rewrite\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                "{\"styleId\":81,\"label\":\"史诗感\"}",
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("rewrite"), eq("")))
+                .thenReturn(List.of(Map.of(
+                        "role", "user",
+                        "content", "写作风格约束：\n{\"styleId\":81,\"label\":\"史诗感\"}\n\n用户指令：\n补完城市背景"
+                )));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-plain")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(66L, 1, ""));
@@ -186,7 +259,7 @@ class AgentGenerationWorkflowTest {
         agentGenerationWorkflow.run(1L, 32L, "trace-plain");
 
         ArgumentCaptor<AgentTaskContext> contextCaptor = ArgumentCaptor.forClass(AgentTaskContext.class);
-        verify(agentPromptAssembler).buildInitialMessages(eq(task), contextCaptor.capture(), any());
+        verify(agentPromptAssembler).buildExecutionMessages(eq(task), contextCaptor.capture(), eq(List.of()), eq("rewrite"), eq(""));
         assertThat(contextCaptor.getValue()).isNotNull();
         assertThat(contextCaptor.getValue().getStyleSnapshotJson()).isEqualTo("{\"styleId\":81,\"label\":\"史诗感\"}");
     }
@@ -202,10 +275,26 @@ class AgentGenerationWorkflowTest {
         task.setConversationId(9L);
         task.setTaskType("WRITE");
         task.setStatus("waiting_approval");
+        task.setPromptSnapshot("继续写上一轮批准后的内容");
 
         when(agentRepository.findGenerationTask(1L, 12L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(12L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "恢复执行",
+                "{\"profile\":\"default\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                null,
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-2")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("续写片段", 1, "tool-context"));
@@ -237,7 +326,22 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 41L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(41L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), any())).thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "常规执行",
+                "{\"profile\":\"default\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                null,
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-task-id")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-task-id"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(101L, 1, ""));
@@ -264,7 +368,21 @@ class AgentGenerationWorkflowTest {
 
         when(agentRepository.findGenerationTask(1L, 61L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(61L), any(), any())).thenReturn(1);
-        when(agentPromptAssembler.buildInitialMessages(eq(task), any(), eq(List.of())))
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                true,
+                "开启 story bible 路由",
+                "{\"profile\":\"default\",\"storyBible\":true}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                null,
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
         when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-rag-tool"))
                 .thenReturn(null);
@@ -274,7 +392,8 @@ class AgentGenerationWorkflowTest {
         agentGenerationWorkflow.run(1L, 61L, "trace-rag-tool");
 
         verifyNoInteractions(ragRetrievalService);
-        verify(agentPromptAssembler).buildInitialMessages(eq(task), any(), eq(List.of()));
+        verify(agentContextRoutingFacade).route(any(AgentContextRoutingRequest.class));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq(""));
         verify(agentToolLoopRunner).execute(eq(1L), eq(61L), eq(9L), eq(0L), eq("trace-rag-tool"), any(), any());
         verifyNoMoreInteractions(ragRetrievalService);
     }
@@ -299,6 +418,72 @@ class AgentGenerationWorkflowTest {
         verify(realtimeEventService, never()).publishGenerationStarted(any(), any());
         verify(realtimeEventService, never()).publishGenerationFailed(any(), any(), any(), any());
         verifyNoInteractions(ragRetrievalService, agentToolLoopRunner, agentTaskRuntimeUpdater, agentResultPublisher, agentTaskResultRecorder);
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_RUN_PREFLIGHT_BEFORE_TOOL_LOOP() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(71L);
+        task.setTaskId(71L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("请先判断再执行");
+
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.REWRITE,
+                "rewrite",
+                false,
+                false,
+                false,
+                "先改写模式",
+                "{\"profile\":\"rewrite\"}"
+        );
+
+        when(agentRepository.findGenerationTask(1L, 71L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(71L), any(), any())).thenReturn(1);
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(null, StoryBibleContextResult.noop()));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("rewrite"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentToolLoopRunner.execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.waitingApproval(1L, 1, ""));
+
+        agentGenerationWorkflow.run(1L, 71L, "trace-preflight");
+
+        org.mockito.InOrder inOrder = inOrder(agentPreflightCoordinator, agentContextRoutingFacade, agentPromptAssembler, agentToolLoopRunner);
+        inOrder.verify(agentPreflightCoordinator).coordinate(any());
+        inOrder.verify(agentContextRoutingFacade).route(any());
+        inOrder.verify(agentPromptAssembler).buildExecutionMessages(eq(task), any(), eq(List.of()), eq("rewrite"), eq(""));
+        inOrder.verify(agentToolLoopRunner).execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), any());
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_FAIL_TASK_WHEN_PREFLIGHT_THROWS() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(72L);
+        task.setTaskId(72L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("触发 preflight 失败");
+
+        when(agentRepository.findGenerationTask(1L, 72L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(72L), any(), any())).thenReturn(1);
+        when(agentPreflightCoordinator.coordinate(any())).thenThrow(new IllegalStateException("preflight failed"));
+
+        agentGenerationWorkflow.run(1L, 72L, "trace-preflight-fail");
+
+        verify(agentRepository).updateGenerationTaskStatus(1L, 72L, AgentTaskStatus.RUNNING.value(), null);
+        verify(agentRepository).updateGenerationTaskStatus(1L, 72L, AgentTaskStatus.FAILED.value(), "preflight failed");
+        verify(realtimeEventService).publishGenerationFailed(1L, 72L, "AGENT_MODEL_CALL_FAILED", "preflight failed");
+        verifyNoInteractions(agentToolLoopRunner);
     }
 
     private static void setField(Object target, String fieldName, Object value) {

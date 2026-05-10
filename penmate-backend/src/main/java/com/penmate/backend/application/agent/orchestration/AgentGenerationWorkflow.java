@@ -1,7 +1,13 @@
 package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
+import com.penmate.backend.application.agent.context.AgentContextRoutingFacade;
+import com.penmate.backend.application.agent.context.AgentContextRoutingRequest;
+import com.penmate.backend.application.agent.context.AgentContextRoutingResult;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightCoordinator;
+import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightDecision;
+import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightRequest;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
@@ -32,6 +38,8 @@ public class AgentGenerationWorkflow {
     private final AgentToolLoopRunner agentToolLoopRunner;
     private final AgentModelRoutingService agentModelRoutingService;
     private final AgentPromptAssembler agentPromptAssembler;
+    private final AgentPreflightCoordinator agentPreflightCoordinator;
+    private final AgentContextRoutingFacade agentContextRoutingFacade;
     private final AgentResultPublisher agentResultPublisher;
     private final AgentTaskRuntimeUpdater agentTaskRuntimeUpdater;
     private final AgentTaskResultRecorder agentTaskResultRecorder;
@@ -66,6 +74,21 @@ public class AgentGenerationWorkflow {
             realtimeEventService.publishGenerationStatus(projectId, taskId, "planning", "正在分析请求并规划工具调用", AgentTaskStatus.RUNNING.value());
 
             AgentTaskContext taskContext = buildTaskContext(projectId, task);
+            AgentPreflightDecision preflightDecision = agentPreflightCoordinator.coordinate(new AgentPreflightRequest(
+                    projectId,
+                    task.getConversationId(),
+                    taskContext.getChapterId(),
+                    task.getPromptSnapshot()
+            ));
+            AgentContextRoutingResult routingResult = agentContextRoutingFacade.route(new AgentContextRoutingRequest(
+                    projectId,
+                    task.getConversationId(),
+                    taskContext.getChapterId(),
+                    task.getPromptSnapshot(),
+                    taskContext.getStyleSnapshotJson(),
+                    preflightDecision
+            ));
+            taskContext.setStyleSnapshotJson(routingResult.styleSnapshot());
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
             long llmStartAt = System.currentTimeMillis();
             AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
@@ -74,7 +97,13 @@ public class AgentGenerationWorkflow {
                     task.getConversationId(),
                     0L,
                     traceId,
-                    agentPromptAssembler.buildInitialMessages(task, taskContext, List.of()),
+                    agentPromptAssembler.buildExecutionMessages(
+                            task,
+                            taskContext,
+                            List.of(),
+                            preflightDecision.executionPromptProfile(),
+                            routingResult.storyBibleContext().content()
+                    ),
                     executionConfig
             );
             if (loopResult.waitingApproval()) {

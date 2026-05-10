@@ -1,5 +1,6 @@
 package com.penmate.backend.interfaces.api.model;
 
+import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
@@ -13,6 +14,7 @@ import com.penmate.backend.application.plugin.PluginApplicationService;
 import com.penmate.backend.application.rag.RagApplicationService;
 import com.penmate.backend.application.style.StyleApplicationService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
+import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.shared.service.GenerationStreamService;
 import com.penmate.backend.interfaces.api.agent.AgentController;
 import com.penmate.backend.interfaces.api.approval.ApprovalController;
@@ -38,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(
@@ -88,6 +91,12 @@ class LegacyRouteExposureMvcTest {
     private GenerationStreamService generationStreamService;
 
     @MockBean
+    private AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher;
+
+    @MockBean
+    private AgentSessionRepository agentSessionRepository;
+
+    @MockBean
     private AuthApplicationService authApplicationService;
 
     @MockBean
@@ -115,7 +124,16 @@ class LegacyRouteExposureMvcTest {
     private SessionStyleBindingAppService sessionStyleBindingAppService;
 
     @Test
-    void IT_MVC_LEGACY_MODEL_POLICY_ROUTE_SHOULD_NOT_BE_EXPOSED_ANYWHERE() throws Exception {
+    void should_boot_agent_controller_mvc_context_after_dispatcher_dependency_added() throws Exception {
+        mockMvc.perform(get("/api/v1/novels/920001/agent/sessions")
+                        .header("X-Trace-Id", "trace-agent-mvc-boot"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.meta.traceId").value("trace-agent-mvc-boot"));
+    }
+
+    @Test
+    void should_not_expose_legacy_model_policy_route_anywhere() throws Exception {
         String legacyRoute = "/api/v1/novels/920001/model-policies";
 
         mockMvc.perform(get(legacyRoute))
