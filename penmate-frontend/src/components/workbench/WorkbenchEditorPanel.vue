@@ -94,6 +94,7 @@ const emit = defineEmits<{
 .panel-center {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, rgba(17, 24, 39, 0.68), rgba(11, 17, 32, 0.4));

@@ -149,4 +149,11 @@ describe('Workbench index refactor', () => {
     expect(source).toContain('class="wb-main workbench-shell"')
   })
 
+  it('locks the workbench shell to the viewport so each column can scroll internally', () => {
+    const source = readWorkbenchSource()
+
+    expect(source).toMatch(/\.workbench-page\s*\{[\s\S]*?height:\s*100vh;[\s\S]*?overflow:\s*hidden;/)
+    expect(source).toMatch(/\.workbench-shell\s*\{[\s\S]*?flex:\s*1;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/)
+  })
+
 })

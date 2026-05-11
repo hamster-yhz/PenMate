@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
@@ -130,6 +133,9 @@ const mountControlledWorkbenchLeftPanel = (initialTab = 'outline') => {
   })
 }
 
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const readWorkbenchLeftPanelSource = () => readFileSync(resolve(currentDir, 'WorkbenchLeftPanel.vue'), 'utf-8')
+
 describe('WorkbenchLeftPanel', () => {
   it('renders_tabs_and_forwards_outline_events', async () => {
     const wrapper = mountWorkbenchLeftPanel('outline')
@@ -230,6 +236,13 @@ describe('WorkbenchLeftPanel', () => {
     expect(document.activeElement).toBe(getTabs()[2]?.element)
 
     wrapper.unmount()
+  })
+
+  it('keeps the left column scroll inside the active tab panel instead of the page shell', () => {
+    const source = readWorkbenchLeftPanelSource()
+
+    expect(source).toMatch(/\.panel-left\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?min-height:\s*0;/)
+    expect(source).toMatch(/\.tab-content\s*\{[\s\S]*?flex:\s*1;[\s\S]*?overflow-y:\s*auto;/)
   })
 
   it('forwards_character_and_relation_events_from_nested_shell_content', async () => {

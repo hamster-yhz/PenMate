@@ -242,6 +242,7 @@ const handleTabKeydown = async (tabKey: string, event: KeyboardEvent) => {
 .panel-left {
   width: clamp(248px, 20vw, 320px);
   min-width: 0;
+  min-height: 0;
   border-right: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(11, 17, 32, 0.58));
   box-shadow: var(--shadow-lg), var(--shadow-gold);

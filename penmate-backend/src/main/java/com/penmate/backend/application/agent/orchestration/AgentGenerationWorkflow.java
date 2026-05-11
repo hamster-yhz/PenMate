@@ -104,6 +104,7 @@ public class AgentGenerationWorkflow {
                     routingResult.storyBibleContext().enabled());
             taskContext.setStyleSnapshotJson(routingResult.styleSnapshot());
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
+            realtimeEventService.publishGenerationStatus(projectId, taskId, "executing", "正在生成内容", AgentTaskStatus.RUNNING.value());
             long llmStartAt = System.currentTimeMillis();
             AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
                     projectId,
@@ -123,6 +124,7 @@ public class AgentGenerationWorkflow {
             if (loopResult.waitingApproval()) {
                 log.info("Agent 工作流进入待审批: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
                 transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
+                realtimeEventService.publishGenerationStatus(projectId, taskId, "waiting_approval", "等待审批", AgentTaskStatus.WAITING_APPROVAL.value());
                 return;
             }
             String generatedText = loopResult.finalAssistantText();

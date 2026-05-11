@@ -140,7 +140,7 @@ class AgentGenerationWorkflowTest {
 
         verify(realtimeEventService).publishGenerationStarted(1L, 11L);
         verify(agentToolLoopRunner).execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any());
-        verify(realtimeEventService, never()).publishGenerationWaitingApproval(any(), any(), any(), any());
+        verify(realtimeEventService).publishGenerationStatus(1L, 11L, "waiting_approval", "等待审批", AgentTaskStatus.WAITING_APPROVAL.value());
     }
 
     @Test
@@ -186,7 +186,54 @@ class AgentGenerationWorkflowTest {
         inOrder.verify(agentToolLoopRunner).execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any());
         inOrder.verify(taskStateMachine).assertTransition(AgentTaskStatus.RUNNING.value(), AgentTaskStatus.WAITING_APPROVAL);
         inOrder.verify(agentRepository).updateGenerationTaskStatus(1L, 21L, AgentTaskStatus.WAITING_APPROVAL.value(), null);
+        inOrder.verify(realtimeEventService).publishGenerationStatus(1L, 21L, "waiting_approval", "等待审批", AgentTaskStatus.WAITING_APPROVAL.value());
         verify(realtimeEventService, never()).publishGenerationDone(any(), any(), any());
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_PUBLISH_EXECUTING_STATUS_BEFORE_MODEL_COMPLETES() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(30L);
+        task.setTaskId(30L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("继续写主角穿越雪原后的遭遇");
+
+        when(agentRepository.findGenerationTask(1L, 30L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(30L), any(), any())).thenReturn(1);
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "直接执行",
+                "{\"profile\":\"default\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                null,
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentToolLoopRunner.execute(eq(1L), eq(30L), eq(9L), eq(0L), eq("trace-executing"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.completed("雪原尽头亮起了孤灯", 0, ""));
+        doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any());
+        doAnswer(invocation -> null).when(agentResultPublisher).publishGenerationTokens(any(), any(), any(), any());
+        doAnswer(invocation -> null).when(agentTaskResultRecorder).recordAssistantResult(any(), any());
+
+        agentGenerationWorkflow.run(1L, 30L, "trace-executing");
+
+        org.mockito.InOrder inOrder = inOrder(realtimeEventService, agentToolLoopRunner);
+        inOrder.verify(realtimeEventService).publishGenerationStarted(1L, 30L);
+        inOrder.verify(realtimeEventService).publishGenerationStatus(1L, 30L, "planning", "正在分析请求并规划工具调用", AgentTaskStatus.RUNNING.value());
+        inOrder.verify(realtimeEventService).publishGenerationStatus(1L, 30L, "executing", "正在生成内容", AgentTaskStatus.RUNNING.value());
+        inOrder.verify(agentToolLoopRunner).execute(eq(1L), eq(30L), eq(9L), eq(0L), eq("trace-executing"), any(), any());
     }
 
     @Test
@@ -549,7 +596,7 @@ class AgentGenerationWorkflowTest {
     }
 
     @Test
-    void UT_APP_AGENT_GENERATION_WORKFLOW_RESUME_SHOULD_USE_PERSISTED_TASK_CONTEXT_STYLE_SNAPSHOT_INSTEAD_OF_CURRENT_SESSION_STYLE() {
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_FAIL_TASK_WHEN_DIRTY_WORK_MODEL_CONFIG_IS_MISSING() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(74L);
         task.setTaskId(74L);
@@ -558,15 +605,44 @@ class AgentGenerationWorkflowTest {
         task.setModelConfigId(66L);
         task.setConversationId(9L);
         task.setTaskType("WRITE");
-        task.setStatus("waiting_approval");
-        task.setPromptSnapshot("恢复后继续执行");
+        task.setStatus("pending");
+        task.setPromptSnapshot("继续生成正文");
 
-        AgentTaskContext persistedContext = AgentTaskContext.runningOf(904L, 74L, AgentTaskStatus.WAITING_APPROVAL.value(), 3001L, "冻结的选中文本");
-        persistedContext.setStyleSnapshotJson("{\"styleId\":81,\"label\":\"冻结风格\"}");
+        IamUser iamUser = new IamUser();
+        iamUser.setUserId(1001L);
+        iamUser.setDirtyWorkAgentModelConfigId(null);
 
         when(agentRepository.findGenerationTask(1L, 74L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(74L), any(), any())).thenReturn(1);
-        when(agentRepository.findTaskContext(74L)).thenReturn(persistedContext);
+        when(iamGateway.findUserByUserId(1001L)).thenReturn(iamUser);
+
+        agentGenerationWorkflow.run(1L, 74L, "trace-missing-dirtywork");
+
+        verify(agentRepository).updateGenerationTaskStatus(1L, 74L, AgentTaskStatus.RUNNING.value(), null);
+        verify(agentRepository).updateGenerationTaskStatus(1L, 74L, AgentTaskStatus.FAILED.value(), "dirty work agent model config is required before preflight");
+        verify(realtimeEventService).publishGenerationFailed(1L, 74L, "AGENT_MODEL_CALL_FAILED", "dirty work agent model config is required before preflight");
+        verifyNoInteractions(agentPreflightCoordinator, agentContextRoutingFacade, agentPromptAssembler, agentToolLoopRunner);
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_RESUME_SHOULD_USE_PERSISTED_TASK_CONTEXT_STYLE_SNAPSHOT_INSTEAD_OF_CURRENT_SESSION_STYLE() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(75L);
+        task.setTaskId(75L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("waiting_approval");
+        task.setPromptSnapshot("恢复后继续执行");
+
+        AgentTaskContext persistedContext = AgentTaskContext.runningOf(904L, 75L, AgentTaskStatus.WAITING_APPROVAL.value(), 3001L, "冻结的选中文本");
+        persistedContext.setStyleSnapshotJson("{\"styleId\":81,\"label\":\"冻结风格\"}");
+
+        when(agentRepository.findGenerationTask(1L, 75L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(75L), any(), any())).thenReturn(1);
+        when(agentRepository.findTaskContext(75L)).thenReturn(persistedContext);
         AgentPreflightDecision decision = new AgentPreflightDecision(
                 AgentBehaviorType.WRITE,
                 "default",
@@ -583,10 +659,10 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentToolLoopRunner.execute(eq(1L), eq(74L), eq(9L), eq(0L), eq("trace-resume-style"), any(), any()))
+        when(agentToolLoopRunner.execute(eq(1L), eq(75L), eq(9L), eq(0L), eq("trace-resume-style"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(1L, 1, ""));
 
-        agentGenerationWorkflow.runAfterApproval(1L, 74L, "trace-resume-style");
+        agentGenerationWorkflow.runAfterApproval(1L, 75L, "trace-resume-style");
 
         ArgumentCaptor<AgentTaskContext> contextCaptor = ArgumentCaptor.forClass(AgentTaskContext.class);
         verify(agentPromptAssembler).buildExecutionMessages(eq(task), contextCaptor.capture(), eq(List.of()), eq("default"), eq(""));
@@ -612,13 +688,4 @@ class AgentGenerationWorkflowTest {
                 .build();
     }
 
-    private static void setField(Object target, String fieldName, Object value) {
-        try {
-            Field field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException("failed to set field: " + fieldName, ex);
-        }
-    }
 }

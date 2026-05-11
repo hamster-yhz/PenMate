@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
@@ -31,6 +34,9 @@ const EditorTextareaStub = defineComponent({
 
 const EditorStatusbarStub = defineComponent({ name: 'EditorStatusbar', setup: () => () => h('div', { 'data-testid': 'editor-statusbar-stub' }) })
 const VersionPreviewPaneStub = defineComponent({ name: 'VersionPreviewPane', setup: () => () => h('div', { 'data-testid': 'version-preview-pane-stub' }) })
+
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const readWorkbenchEditorPanelSource = () => readFileSync(resolve(currentDir, 'WorkbenchEditorPanel.vue'), 'utf-8')
 
 describe('WorkbenchEditorPanel', () => {
   it('renders_editor_shell_and_forwards_toolbar_and_textarea_events', async () => {
@@ -80,5 +86,12 @@ describe('WorkbenchEditorPanel', () => {
     expect(wrapper.emitted('update:editor-content')).toEqual([['新正文']])
     expect(wrapper.emitted('input')).toEqual([[]])
     expect(wrapper.emitted('cursor-activity')).toEqual([[]])
+  })
+
+  it('keeps the editor column height-bounded so the textarea can scroll internally', () => {
+    const source = readWorkbenchEditorPanelSource()
+
+    expect(source).toMatch(/\.panel-center\s*\{[\s\S]*?flex:\s*1;[\s\S]*?min-width:\s*0;[\s\S]*?min-height:\s*0;/)
+    expect(source).toMatch(/\.editor-area\s*\{[\s\S]*?flex:\s*1;[\s\S]*?overflow:\s*hidden;/)
   })
 })

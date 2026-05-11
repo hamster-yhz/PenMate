@@ -1154,14 +1154,14 @@ describe('useWorkbenchChat', () => {
     listeners.get('generation.status')?.({
       data: JSON.stringify({
         taskId: 9020,
-        stage: 'tool_calling',
-        message: '正在调用 RAG 查询工具',
+        stage: 'executing',
+        message: '正在生成内容',
         status: 'running',
       }),
     } as MessageEvent<string>)
 
     expect(chat.generationStatusText.value).toBe('生成中 · running')
-    expect(chat.agentStatusDetailText.value).toBe('正在调用 RAG 查询工具')
+    expect(chat.agentStatusDetailText.value).toBe('正在生成内容')
 
     listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
 
