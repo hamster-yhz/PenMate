@@ -78,6 +78,7 @@ public interface AgentSessionRepository {
                           Long projectId,
                           String taskType,
                           String taskStatus,
+                          String promptSnapshot,
                           Long requestContextId,
                           String traceId);
 

@@ -1,10 +1,13 @@
 package com.penmate.backend.application.agent.orchestration.preflight;
 
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+
 public record AgentPreflightRequest(
         Long projectId,
         Long conversationId,
         Long chapterId,
-        String userMessage
+        String userMessage,
+        AgentLlmExecutionConfig executionConfig
 ) {
 
     public AgentPreflightRequest {
@@ -16,6 +19,9 @@ public record AgentPreflightRequest(
         }
         if (userMessage == null || userMessage.isBlank()) {
             throw new IllegalArgumentException("userMessage must not be blank");
+        }
+        if (executionConfig == null) {
+            throw new NullPointerException("executionConfig");
         }
         userMessage = userMessage.trim();
     }

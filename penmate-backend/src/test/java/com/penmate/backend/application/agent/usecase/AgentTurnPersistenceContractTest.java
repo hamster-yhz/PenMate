@@ -84,6 +84,9 @@ class AgentTurnPersistenceContractTest {
             assertThat(singleLong("SELECT turn_id FROM agent_tasks WHERE task_id = 940001"))
                     .as("runtime task should reference the created turn id")
                     .isEqualTo(950001L);
+            assertThat(singleString("SELECT prompt_snapshot FROM agent_tasks WHERE task_id = 940001"))
+                    .as("runtime task should persist prompt snapshot for async workflow recovery")
+                    .isEqualTo("请继续写作");
         }
     }
 
@@ -127,6 +130,10 @@ class AgentTurnPersistenceContractTest {
             assertThat(snapshot.getActiveTask().getTaskId()).isEqualTo(940011L);
             assertThat(snapshot.getActiveTask().getTaskStatus()).isEqualTo("pending");
             assertThat(snapshot.getActiveTask().getSelectedText()).isEqualTo("恢复测试选中文本");
+            assertThat(agentRepository.findGenerationTask(920001L, 940011L))
+                    .as("runtime task repository reload should restore promptSnapshot from agent_tasks")
+                    .extracting(com.penmate.backend.domain.agent.model.AgentGenerationTask::getPromptSnapshot)
+                    .isEqualTo("恢复测试消息");
             assertThat(snapshot.getMessages()).hasSize(1);
         }
     }
@@ -258,6 +265,7 @@ class AgentTurnPersistenceContractTest {
                         project_id BIGINT NOT NULL,
                         task_type VARCHAR(32) NOT NULL,
                         task_status VARCHAR(24) NOT NULL,
+                        prompt_snapshot VARCHAR(4000) NULL,
                         request_context_id BIGINT NULL,
                         result_id BIGINT NULL,
                         active_approval_id BIGINT NULL,
@@ -349,6 +357,15 @@ class AgentTurnPersistenceContractTest {
              ResultSet resultSet = statement.executeQuery(sql)) {
             resultSet.next();
             return resultSet.getLong(1);
+        }
+    }
+
+    private String singleString(String sql) throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            resultSet.next();
+            return resultSet.getString(1);
         }
     }
 }

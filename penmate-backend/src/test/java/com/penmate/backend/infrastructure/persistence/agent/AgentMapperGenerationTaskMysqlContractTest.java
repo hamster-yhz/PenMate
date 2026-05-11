@@ -47,7 +47,7 @@ class AgentMapperGenerationTaskMysqlContractTest {
     void should_define_agent_task_recovery_columns_for_generation_runtime() throws Exception {
         assertThat(columnsOf("agent_tasks"))
                 .contains("task_id", "session_id", "turn_id", "project_id")
-                .contains("request_context_id", "result_id", "active_approval_id", "stream_channel_key")
+                .contains("prompt_snapshot", "request_context_id", "result_id", "active_approval_id", "stream_channel_key")
                 .contains("task_status", "started_at", "finished_at", "trace_id");
 
         assertThat(columnsOf("agent_task_results"))

@@ -26,6 +26,8 @@ public interface AgentRepository {
 
     AgentGenerationTask findGenerationTask(Long projectId, Long taskId);
 
+    com.penmate.backend.domain.agent.model.AgentTaskContext findTaskContext(Long taskId);
+
     int updateGenerationTaskStatus(Long projectId, Long taskId, String status, String errorMsg);
 
     int updateGenerationTaskRuntime(Long projectId, Long taskId, String tokenUsageJson, String costJson, String traceId);

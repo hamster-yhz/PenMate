@@ -39,7 +39,7 @@ class AgentSessionSchemaMysqlContractTest {
         assertThat(columnsOf("agent_turns"))
                 .contains("turn_id", "turn_seq", "resume_token", "turn_status");
         assertThat(columnsOf("agent_tasks"))
-                .contains("request_context_id", "result_id", "active_approval_id", "stream_channel_key");
+                .contains("prompt_snapshot", "request_context_id", "result_id", "active_approval_id", "stream_channel_key");
         assertThat(columnsOf("agent_task_contexts"))
                 .contains("style_snapshot_json", "model_snapshot_json", "context_hash");
         assertThat(columnsOf("agent_task_results"))
@@ -58,6 +58,7 @@ class AgentSessionSchemaMysqlContractTest {
                 .contains("轮次状态：PENDING/RUNNING/WAITING_APPROVAL/COMPLETED/FAILED/CANCELLED")
                 .contains("任务状态：QUEUED/RUNNING/WAITING_APPROVAL/SUCCEEDED/FAILED/CANCELLED/APPLIED")
                 .contains("恢复令牌；显式 resume 时用于校验当前 turn 是否仍对应同一断点")
+                .contains("提交执行前冻结的提示词快照；异步恢复与 preflight 重试必须依赖该字段")
                 .contains("当前挂起审批单业务 ID；WAITING_APPROVAL 恢复时作为唯一断点指针");
         assertThat(v12Sql)
                 .contains("UNIQUE KEY uk_agent_pending_approvals_approval_id (approval_id)")

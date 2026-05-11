@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
@@ -25,9 +26,12 @@ import java.util.StringJoiner;
 public class LangChain4jAgentLlmGateway implements AgentLlmGateway {
 
     private final ProviderChatClientFactory providerChatClientFactory;
+    private final StructuredPromptBlockFormatter structuredPromptBlockFormatter;
 
-    public LangChain4jAgentLlmGateway(ProviderChatClientFactory providerChatClientFactory) {
+    public LangChain4jAgentLlmGateway(ProviderChatClientFactory providerChatClientFactory,
+                                      StructuredPromptBlockFormatter structuredPromptBlockFormatter) {
         this.providerChatClientFactory = providerChatClientFactory;
+        this.structuredPromptBlockFormatter = structuredPromptBlockFormatter;
     }
 
     @Override
@@ -115,38 +119,25 @@ public class LangChain4jAgentLlmGateway implements AgentLlmGateway {
                         .append(chunk.getContentText() == null ? "" : chunk.getContentText())
                         .append("\n");
             }
-            builder.add(wrapBlock("context type=\"rag\"", ragBuilder.toString()));
+            builder.add(wrapEscapedBlock("context type=\"rag\"", ragBuilder.toString()));
         }
         if (toolContext != null && !toolContext.isBlank()) {
-            builder.add(wrapBlock("context type=\"tool\"", toolContext));
+            builder.add(wrapEscapedBlock("context type=\"tool\"", toolContext));
         }
-        builder.add(wrapBlock("user_request", prompt));
+        builder.add(wrapEscapedBlock("user_request", prompt));
         return builder.toString();
     }
 
-    private String wrapBlock(String tagDeclaration, String content) {
-        return "<" + tagDeclaration + ">\n" + normalizeBlockContent(content) + "\n</" + closingTagName(tagDeclaration) + ">";
-    }
-
-    private String closingTagName(String tagDeclaration) {
-        int separatorIndex = tagDeclaration.indexOf(' ');
-        return separatorIndex < 0 ? tagDeclaration : tagDeclaration.substring(0, separatorIndex);
-    }
-
-    private String normalizeBlockContent(String content) {
-        if (content == null) {
-            return "";
-        }
-        return escapeStructuredContent(content
+    private String wrapEscapedBlock(String tagDeclaration, String content) {
+        String normalized = content == null ? "" : content
                 .replaceFirst("^[\\r\\n]+", "")
-                .replaceFirst("[\\r\\n]+$", ""));
-    }
-
-    private String escapeStructuredContent(String content) {
-        return content
+                .replaceFirst("[\\r\\n]+$", "")
                 .replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
+        String closingTag = tagDeclaration.contains(" ")
+                ? tagDeclaration.substring(0, tagDeclaration.indexOf(' '))
+                : tagDeclaration;
+        return "<" + tagDeclaration + ">\n" + normalized + "\n</" + closingTag + ">";
     }
-
 }

@@ -52,7 +52,7 @@ public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinat
                 ),
                 List.of(),
                 "auto"
-        ), request.executionConfig());
+        ), null);
         String decisionJson = response == null ? null : response.assistantText();
         AgentPreflightDecision decision = parseDecision(decisionJson);
         log.info("Agent 前置判定完成: behaviorType={}, executionProfile={}, includeStyleContext={}, includeRagContext={}, includeStoryBibleContext={}",

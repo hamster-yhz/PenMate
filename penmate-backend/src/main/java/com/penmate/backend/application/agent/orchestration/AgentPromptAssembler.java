@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.orchestration;
 
+import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
 import com.penmate.backend.application.agent.prompt.SystemPromptBundle;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
@@ -19,9 +20,12 @@ import java.util.StringJoiner;
 public class AgentPromptAssembler {
 
     private final SystemPromptProvider systemPromptProvider;
+    private final StructuredPromptBlockFormatter structuredPromptBlockFormatter;
 
-    public AgentPromptAssembler(SystemPromptProvider systemPromptProvider) {
+    public AgentPromptAssembler(SystemPromptProvider systemPromptProvider,
+                                StructuredPromptBlockFormatter structuredPromptBlockFormatter) {
         this.systemPromptProvider = systemPromptProvider;
+        this.structuredPromptBlockFormatter = structuredPromptBlockFormatter;
     }
 
     public List<Map<String, Object>> buildInitialMessages(AgentGenerationTask task,
@@ -43,7 +47,7 @@ public class AgentPromptAssembler {
         StringJoiner userBuilder = new StringJoiner("\n\n");
 
         if (!style.isEmpty()) {
-            userBuilder.add(wrapBlock("context type=\"style\"", style));
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", style));
         }
         if (ragChunks != null && !ragChunks.isEmpty()) {
             StringBuilder ragBuilder = new StringBuilder();
@@ -56,12 +60,12 @@ public class AgentPromptAssembler {
                         .append(chunk.getContentText() == null ? "" : chunk.getContentText())
                         .append("\n");
             }
-            userBuilder.add(wrapBlock("context type=\"rag\"", ragBuilder.toString()));
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", ragBuilder.toString()));
         }
         if (!storyBible.isEmpty()) {
-            userBuilder.add(wrapBlock("context type=\"story_bible\"", storyBible));
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", storyBible));
         }
-        userBuilder.add(wrapBlock("user_request", prompt));
+        userBuilder.add(structuredPromptBlockFormatter.wrapBlock("user_request", prompt));
 
         String profile = executionProfile == null || executionProfile.isBlank() ? resolveProfile(task) : executionProfile.trim();
         SystemPromptBundle promptBundle = systemPromptProvider.loadBundle("execution", profile);
@@ -75,31 +79,6 @@ public class AgentPromptAssembler {
                         "content", userBuilder.toString()
                 )
         );
-    }
-
-    private String wrapBlock(String tagDeclaration, String content) {
-        return "<" + tagDeclaration + ">\n" + normalizeBlockContent(content) + "\n</" + closingTagName(tagDeclaration) + ">";
-    }
-
-    private String normalizeBlockContent(String content) {
-        if (content == null) {
-            return "";
-        }
-        return escapeStructuredContent(content
-                .replaceFirst("^[\\r\\n]+", "")
-                .replaceFirst("[\\r\\n]+$", ""));
-    }
-
-    private String escapeStructuredContent(String content) {
-        return content
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
-    }
-
-    private String closingTagName(String tagDeclaration) {
-        int separatorIndex = tagDeclaration.indexOf(' ');
-        return separatorIndex < 0 ? tagDeclaration : tagDeclaration.substring(0, separatorIndex);
     }
 
     private String resolveProfile(AgentGenerationTask task) {

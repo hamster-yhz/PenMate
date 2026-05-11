@@ -3,6 +3,7 @@ package com.penmate.backend.infrastructure.persistence.agent;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import org.springframework.stereotype.Repository;
@@ -94,6 +95,29 @@ public class AgentRepositoryImpl implements AgentRepository {
         return task;
     }
 
+    @Override
+    public AgentTaskContext findTaskContext(Long taskId) {
+        Map<String, Object> contextRow = agentSessionMapper.findTaskContextRow(taskId);
+        if (contextRow == null) {
+            return null;
+        }
+        AgentTaskContext context = AgentTaskContext.runningOf(
+                longValue(mapValue(contextRow, "contextId")),
+                longValue(mapValue(contextRow, "taskId")),
+                null,
+                longValue(mapValue(contextRow, "chapterId")),
+                stringValue(mapValue(contextRow, "selectedText"))
+        );
+        context.setStyleSnapshotJson(stringValue(mapValue(contextRow, "styleSnapshotJson")));
+        setTaskContextField(context, "outlineSnapshotJson", stringValue(mapValue(contextRow, "outlineSnapshotJson")));
+        setTaskContextField(context, "cardsSnapshotJson", stringValue(mapValue(contextRow, "cardsSnapshotJson")));
+        setTaskContextField(context, "ragSnapshotJson", stringValue(mapValue(contextRow, "ragSnapshotJson")));
+        setTaskContextField(context, "pluginBindingsJson", stringValue(mapValue(contextRow, "pluginBindingsJson")));
+        setTaskContextField(context, "modelSnapshotJson", stringValue(mapValue(contextRow, "modelSnapshotJson")));
+        setTaskContextField(context, "contextHash", stringValue(mapValue(contextRow, "contextHash")));
+        return context;
+    }
+
     private void applyTaskRow(AgentGenerationTask task, Map<String, Object> taskRow) {
         if (task == null || taskRow == null) {
             return;
@@ -103,6 +127,7 @@ public class AgentRepositoryImpl implements AgentRepository {
         task.setProjectId(longValue(mapValue(taskRow, "projectId")));
         task.setConversationId(longValue(mapValue(taskRow, "conversationId")));
         task.setTaskType(stringValue(mapValue(taskRow, "taskType")));
+        task.setPromptSnapshot(stringValue(mapValue(taskRow, "promptSnapshot")));
         task.setTraceId(stringValue(mapValue(taskRow, "traceId")));
         task.setStatus(stringValue(mapValue(taskRow, "status")));
         task.setStartedAt(localDateTime(mapValue(taskRow, "startedAt")));
@@ -211,6 +236,19 @@ public class AgentRepositoryImpl implements AgentRepository {
 
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private void setTaskContextField(AgentTaskContext context, String fieldName, Object value) {
+        if (context == null || fieldName == null) {
+            return;
+        }
+        try {
+            java.lang.reflect.Field field = AgentTaskContext.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(context, value);
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("failed to set task context field: " + fieldName, ex);
+        }
     }
 
     @Override

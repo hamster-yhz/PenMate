@@ -126,9 +126,10 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
                                  Long projectId,
                                  String taskType,
                                  String taskStatus,
+                                 String promptSnapshot,
                                  Long requestContextId,
                                  String traceId) {
-        return agentSessionMapper.insertRuntimeTask(taskId, sessionId, turnId, projectId, taskType, taskStatus, requestContextId, traceId);
+        return agentSessionMapper.insertRuntimeTask(taskId, sessionId, turnId, projectId, taskType, taskStatus, promptSnapshot, requestContextId, traceId);
     }
 
     @Override

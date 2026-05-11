@@ -116,11 +116,11 @@ public interface AgentMapper {
     @Insert("""
             INSERT INTO agent_tasks(
                 task_id, session_id, turn_id, project_id,
-                task_type, task_status, request_context_id, result_id, active_approval_id,
+                task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id,
                 stream_channel_key, trace_id, started_at, finished_at
             ) VALUES (
                 #{taskId}, #{conversationId}, 0, #{projectId},
-                #{taskType}, #{status}, NULL, NULL, NULL,
+                #{taskType}, #{status}, #{promptSnapshot}, NULL, NULL, NULL,
                 NULL, #{traceId}, #{startedAt}, #{finishedAt}
             )
             """)
@@ -133,6 +133,7 @@ public interface AgentMapper {
                    project_id AS projectId,
                    session_id AS conversationId,
                    task_type AS taskType,
+                   prompt_snapshot AS promptSnapshot,
                    trace_id AS traceId,
                    task_status AS status,
                    started_at AS startedAt,

@@ -265,6 +265,7 @@ public class AgentTurnAppService {
                 projectId,
                 task.getTaskType(),
                 AgentTaskStatus.PENDING.value(),
+                task.getPromptSnapshot(),
                 taskContext == null ? null : taskContext.getContextId(),
                 task.getTraceId()
         );

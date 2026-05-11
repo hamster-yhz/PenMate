@@ -85,6 +85,9 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             assertThat(repository.insertGenerationTask(task)).isEqualTo(1);
             assertThat(countRows("agent_tasks")).isEqualTo(1);
             assertThat(singleLong("SELECT session_id FROM agent_tasks WHERE task_id = 940401")).isEqualTo(920002L);
+            assertThat(singleString("SELECT prompt_snapshot FROM agent_tasks WHERE task_id = 940401"))
+                    .as("runtime schema insert should persist promptSnapshot")
+                    .isEqualTo("请继续写作");
         }
     }
 
@@ -94,8 +97,8 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
              Statement statement = connection.createStatement();
              SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
             statement.execute("""
-                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
-                    VALUES (940402, 920002, 1, 920001, 'WRITE', 'pending', 950402, NULL, NULL, NULL, 'trace-runtime-task-2')
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940402, 920002, 1, 920001, 'WRITE', 'pending', '恢复后的 prompt', 950402, NULL, NULL, NULL, 'trace-runtime-task-2')
                     """);
             statement.execute("""
                     INSERT INTO agent_task_contexts(context_id, task_id, chapter_id, selected_text, outline_snapshot_json, cards_snapshot_json, rag_snapshot_json, plugin_bindings_json, style_snapshot_json, model_snapshot_json, context_hash)
@@ -120,6 +123,7 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             assertThat(loaded.getModelConfigId()).isEqualTo(88002L);
             assertThat(loaded.getChapterId()).isEqualTo(3002L);
             assertThat(loaded.getConversationId()).isEqualTo(920002L);
+            assertThat(loaded.getPromptSnapshot()).isEqualTo("恢复后的 prompt");
         }
     }
 
@@ -129,8 +133,8 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
              Statement statement = connection.createStatement();
              SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
             statement.execute("""
-                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
-                    VALUES (940403, 920002, 1, 920001, 'WRITE', 'pending', 950403, NULL, NULL, NULL, 'trace-runtime-task-3')
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940403, 920002, 1, 920001, 'WRITE', 'pending', '状态更新 prompt', 950403, NULL, NULL, NULL, 'trace-runtime-task-3')
                     """);
 
             AgentRepositoryImpl repository = new AgentRepositoryImpl(
@@ -145,6 +149,42 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             assertThat(repository.updateGenerationTaskStatus(920001L, loaded.getTaskId(), "running", null)).isEqualTo(1);
             assertThat(singleLong("SELECT COUNT(*) FROM agent_tasks WHERE project_id = 920001 AND task_id = 940403 AND task_status = 'running'"))
                     .isEqualTo(1L);
+        }
+    }
+
+    @Test
+    void should_read_persisted_task_context_snapshot_from_runtime_schema() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940404, 920002, 1, 920001, 'WRITE', 'pending', '上下文恢复 prompt', 950404, NULL, NULL, NULL, 'trace-runtime-task-4')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_contexts(context_id, task_id, chapter_id, selected_text, outline_snapshot_json, cards_snapshot_json, rag_snapshot_json, plugin_bindings_json, style_snapshot_json, model_snapshot_json, context_hash)
+                    VALUES (950404, 940404, 3004, '冻结选中文本', '{"outline":true}', '{"cards":true}', '{"rag":true}', '{"plugins":true}', '{"styleId":81}', '{"modelConfigId":88004}', 'hash-940404')
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            com.penmate.backend.domain.agent.model.AgentTaskContext loaded = repository.findTaskContext(940404L);
+
+            assertThat(loaded).isNotNull();
+            assertThat(loaded.getContextId()).isEqualTo(950404L);
+            assertThat(loaded.getTaskId()).isEqualTo(940404L);
+            assertThat(loaded.getChapterId()).isEqualTo(3004L);
+            assertThat(loaded.getSelectedText()).isEqualTo("冻结选中文本");
+            assertThat(loaded.getStyleSnapshotJson()).isEqualTo("{\"styleId\":81}");
+            assertThat(loaded.getOutlineSnapshotJson()).isEqualTo("{\"outline\":true}");
+            assertThat(loaded.getCardsSnapshotJson()).isEqualTo("{\"cards\":true}");
+            assertThat(loaded.getRagSnapshotJson()).isEqualTo("{\"rag\":true}");
+            assertThat(loaded.getPluginBindingsJson()).isEqualTo("{\"plugins\":true}");
+            assertThat(loaded.getModelSnapshotJson()).isEqualTo("{\"modelConfigId\":88004}");
+            assertThat(loaded.getContextHash()).isEqualTo("hash-940404");
         }
     }
 
@@ -261,6 +301,7 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
                         project_id BIGINT NOT NULL,
                         task_type VARCHAR(32) NOT NULL,
                         task_status VARCHAR(24) NOT NULL,
+                        prompt_snapshot VARCHAR(4000) NULL,
                         request_context_id BIGINT NULL,
                         result_id BIGINT NULL,
                         active_approval_id BIGINT NULL,
@@ -317,6 +358,15 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
              ResultSet resultSet = statement.executeQuery(sql)) {
             resultSet.next();
             return resultSet.getLong(1);
+        }
+    }
+
+    private String singleString(String sql) throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            resultSet.next();
+            return resultSet.getString(1);
         }
     }
 }

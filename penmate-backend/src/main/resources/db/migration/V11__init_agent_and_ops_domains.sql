@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
     project_id BIGINT UNSIGNED NOT NULL COMMENT '所属项目业务 ID',
     task_type VARCHAR(32) NOT NULL COMMENT '任务类型：CHAT/WRITE/REWRITE/SUMMARIZE/TOOL_APPROVAL_RESUME',
     task_status VARCHAR(24) NOT NULL DEFAULT 'QUEUED' COMMENT '任务状态：QUEUED/RUNNING/WAITING_APPROVAL/SUCCEEDED/FAILED/CANCELLED/APPLIED',
+    prompt_snapshot LONGTEXT NULL COMMENT '提交执行前冻结的提示词快照；异步恢复与 preflight 重试必须依赖该字段',
     request_context_id BIGINT UNSIGNED NULL COMMENT '请求上下文业务 ID',
     result_id BIGINT UNSIGNED NULL COMMENT '任务结果业务 ID',
     active_approval_id BIGINT UNSIGNED NULL COMMENT '当前挂起审批单业务 ID；WAITING_APPROVAL 恢复时作为唯一断点指针',

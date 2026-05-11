@@ -2,6 +2,7 @@ package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.context.AgentContextRoutingFacade;
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.context.AgentContextRoutingRequest;
 import com.penmate.backend.application.agent.context.AgentContextRoutingResult;
 import com.penmate.backend.application.agent.context.StoryBibleContextResult;
@@ -11,10 +12,13 @@ import com.penmate.backend.application.agent.orchestration.preflight.AgentPrefli
 import com.penmate.backend.application.rag.RagRetrievalService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.iam.model.IamUser;
+import com.penmate.backend.domain.iam.repository.IamGateway;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,9 +32,12 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -79,8 +86,21 @@ class AgentGenerationWorkflowTest {
     @Mock
     private SessionStyleBindingAppService sessionStyleBindingAppService;
 
+    @Mock
+    private IamGateway iamGateway;
+
     @InjectMocks
     private AgentGenerationWorkflow agentGenerationWorkflow;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(iamGateway.findUserByUserId(anyLong()))
+                .thenAnswer(invocation -> dirtyWorkPreferenceUser(invocation.getArgument(0), 901L));
+        lenient().when(agentModelRoutingService.resolveExecutionConfig(anyLong(), eq(901L), anyString()))
+                .thenReturn(executionConfig(901L, "sk-preflight", "dirtywork-agent"));
+        lenient().when(agentModelRoutingService.resolveExecutionConfig(anyLong(), eq(66L), anyString()))
+                .thenReturn(executionConfig(66L, "sk-exec", "writer-agent"));
+    }
 
     @Test
     void UT_APP_AGENT_GENERATION_WORKFLOW_INITIAL_RUN_SHOULD_USE_TOOL_LOOP_RUNNER() {
@@ -113,7 +133,6 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("world-build"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-1")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
 
@@ -155,7 +174,6 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("world-build"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-wait")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(88L, 1, ""));
 
@@ -202,7 +220,6 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-direct")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(31L), eq(9L), eq(0L), eq("trace-direct"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("这是直接完成的答复", 0, ""));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any());
@@ -252,7 +269,6 @@ class AgentGenerationWorkflowTest {
                         "role", "user",
                         "content", "<context type=\"style\">\n{\"styleId\":81,\"label\":\"史诗感\"}\n</context>\n\n<user_request>\n补完城市背景\n</user_request>"
                 )));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-plain")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(66L, 1, ""));
 
@@ -295,7 +311,6 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-2")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("续写片段", 1, "tool-context"));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any());
@@ -342,7 +357,6 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-task-id")).thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-task-id"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(101L, 1, ""));
 
@@ -384,8 +398,6 @@ class AgentGenerationWorkflowTest {
         ));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-rag-tool"))
-                .thenReturn(null);
         when(agentToolLoopRunner.execute(eq(1L), eq(61L), eq(9L), eq(0L), eq("trace-rag-tool"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
 
@@ -421,7 +433,7 @@ class AgentGenerationWorkflowTest {
     }
 
     @Test
-    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_RUN_PREFLIGHT_BEFORE_TOOL_LOOP() {
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_RESOLVE_PREFLIGHT_EXECUTION_CONFIG_BEFORE_TOOL_LOOP() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(71L);
         task.setTaskId(71L);
@@ -443,22 +455,48 @@ class AgentGenerationWorkflowTest {
                 "{\"profile\":\"rewrite\"}"
         );
 
+        AgentLlmExecutionConfig preflightExecutionConfig = AgentLlmExecutionConfig.builder()
+                .modelConfigId(901L)
+                .providerCode("openai-compatible")
+                .baseUrl("https://example.com/v1")
+                .apiKey("sk-preflight")
+                .modelName("dirtywork-agent")
+                .keySource("MODEL_CONFIG")
+                .build();
+        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
+                .modelConfigId(66L)
+                .providerCode("openai-compatible")
+                .baseUrl("https://example.com/v1")
+                .apiKey("sk-exec")
+                .modelName("writer-agent")
+                .keySource("MODEL_CONFIG")
+                .build();
+
+        IamUser iamUser = new IamUser();
+        iamUser.setUserId(1001L);
+        iamUser.setDirtyWorkAgentModelConfigId(901L);
+
         when(agentRepository.findGenerationTask(1L, 71L)).thenReturn(task);
         when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(71L), any(), any())).thenReturn(1);
+        when(iamGateway.findUserByUserId(1001L)).thenReturn(iamUser);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 901L, "trace-preflight")).thenReturn(preflightExecutionConfig);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 66L, "trace-preflight")).thenReturn(executionConfig);
         when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
         when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(null, StoryBibleContextResult.noop()));
         when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("rewrite"), eq("")))
                 .thenReturn(List.of(Map.of("role", "user", "content", "x")));
-        when(agentToolLoopRunner.execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), any()))
+        when(agentToolLoopRunner.execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), eq(executionConfig)))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(1L, 1, ""));
 
         agentGenerationWorkflow.run(1L, 71L, "trace-preflight");
 
+        ArgumentCaptor<com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightRequest> preflightRequestCaptor = ArgumentCaptor.forClass(com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightRequest.class);
         org.mockito.InOrder inOrder = inOrder(agentPreflightCoordinator, agentContextRoutingFacade, agentPromptAssembler, agentToolLoopRunner);
-        inOrder.verify(agentPreflightCoordinator).coordinate(any());
+        inOrder.verify(agentPreflightCoordinator).coordinate(preflightRequestCaptor.capture());
         inOrder.verify(agentContextRoutingFacade).route(any());
         inOrder.verify(agentPromptAssembler).buildExecutionMessages(eq(task), any(), eq(List.of()), eq("rewrite"), eq(""));
-        inOrder.verify(agentToolLoopRunner).execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), any());
+        inOrder.verify(agentToolLoopRunner).execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), eq(executionConfig));
+        assertThat(preflightRequestCaptor.getValue().executionConfig()).isEqualTo(preflightExecutionConfig);
     }
 
     @Test
@@ -484,6 +522,94 @@ class AgentGenerationWorkflowTest {
         verify(agentRepository).updateGenerationTaskStatus(1L, 72L, AgentTaskStatus.FAILED.value(), "preflight failed");
         verify(realtimeEventService).publishGenerationFailed(1L, 72L, "AGENT_MODEL_CALL_FAILED", "preflight failed");
         verifyNoInteractions(agentToolLoopRunner);
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_FAIL_TASK_WITH_CLEAR_REASON_WHEN_PROMPT_SNAPSHOT_IS_BLANK() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(73L);
+        task.setTaskId(73L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("   \n\t  ");
+
+        when(agentRepository.findGenerationTask(1L, 73L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(73L), any(), any())).thenReturn(1);
+
+        agentGenerationWorkflow.run(1L, 73L, "trace-blank-prompt");
+
+        verify(agentRepository).updateGenerationTaskStatus(1L, 73L, AgentTaskStatus.RUNNING.value(), null);
+        verify(agentRepository).updateGenerationTaskStatus(eq(1L), eq(73L), eq(AgentTaskStatus.FAILED.value()), eq("task promptSnapshot must not be blank before preflight"));
+        verify(realtimeEventService).publishGenerationFailed(1L, 73L, "AGENT_MODEL_CALL_FAILED", "task promptSnapshot must not be blank before preflight");
+        verifyNoInteractions(agentPreflightCoordinator, agentContextRoutingFacade, agentPromptAssembler, agentToolLoopRunner);
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_RESUME_SHOULD_USE_PERSISTED_TASK_CONTEXT_STYLE_SNAPSHOT_INSTEAD_OF_CURRENT_SESSION_STYLE() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(74L);
+        task.setTaskId(74L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("waiting_approval");
+        task.setPromptSnapshot("恢复后继续执行");
+
+        AgentTaskContext persistedContext = AgentTaskContext.runningOf(904L, 74L, AgentTaskStatus.WAITING_APPROVAL.value(), 3001L, "冻结的选中文本");
+        persistedContext.setStyleSnapshotJson("{\"styleId\":81,\"label\":\"冻结风格\"}");
+
+        when(agentRepository.findGenerationTask(1L, 74L)).thenReturn(task);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(74L), any(), any())).thenReturn(1);
+        when(agentRepository.findTaskContext(74L)).thenReturn(persistedContext);
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "恢复执行",
+                "{\"profile\":\"default\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(new AgentContextRoutingResult(
+                "{\"styleId\":81,\"label\":\"冻结风格\"}",
+                StoryBibleContextResult.noop()
+        ));
+        when(agentPromptAssembler.buildExecutionMessages(eq(task), any(), eq(List.of()), eq("default"), eq("")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentToolLoopRunner.execute(eq(1L), eq(74L), eq(9L), eq(0L), eq("trace-resume-style"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.waitingApproval(1L, 1, ""));
+
+        agentGenerationWorkflow.runAfterApproval(1L, 74L, "trace-resume-style");
+
+        ArgumentCaptor<AgentTaskContext> contextCaptor = ArgumentCaptor.forClass(AgentTaskContext.class);
+        verify(agentPromptAssembler).buildExecutionMessages(eq(task), contextCaptor.capture(), eq(List.of()), eq("default"), eq(""));
+        assertThat(contextCaptor.getValue().getStyleSnapshotJson()).isEqualTo("{\"styleId\":81,\"label\":\"冻结风格\"}");
+        verify(sessionStyleBindingAppService, never()).getBoundStyleSnapshotJson(1L, 9L);
+    }
+
+    private static IamUser dirtyWorkPreferenceUser(Long userId, Long dirtyWorkModelConfigId) {
+        IamUser iamUser = new IamUser();
+        iamUser.setUserId(userId);
+        iamUser.setDirtyWorkAgentModelConfigId(dirtyWorkModelConfigId);
+        return iamUser;
+    }
+
+    private static AgentLlmExecutionConfig executionConfig(Long modelConfigId, String apiKey, String modelName) {
+        return AgentLlmExecutionConfig.builder()
+                .modelConfigId(modelConfigId)
+                .providerCode("openai-compatible")
+                .baseUrl("https://example.com/v1")
+                .apiKey(apiKey)
+                .modelName(modelName)
+                .keySource("MODEL_CONFIG")
+                .build();
     }
 
     private static void setField(Object target, String fieldName, Object value) {

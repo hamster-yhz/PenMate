@@ -207,10 +207,10 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_tasks(
                 task_id, session_id, turn_id, project_id, task_type, task_status,
-                request_context_id, result_id, active_approval_id, stream_channel_key, trace_id
+                prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id
             ) VALUES (
                 #{taskId}, #{sessionId}, #{turnId}, #{projectId}, #{taskType}, #{taskStatus},
-                #{requestContextId}, NULL, NULL, NULL, #{traceId}
+                #{promptSnapshot}, #{requestContextId}, NULL, NULL, NULL, #{traceId}
             )
             """)
     int insertRuntimeTask(@Param("taskId") Long taskId,
@@ -219,6 +219,7 @@ public interface AgentSessionMapper {
                           @Param("projectId") Long projectId,
                           @Param("taskType") String taskType,
                           @Param("taskStatus") String taskStatus,
+                          @Param("promptSnapshot") String promptSnapshot,
                           @Param("requestContextId") Long requestContextId,
                           @Param("traceId") String traceId);
 

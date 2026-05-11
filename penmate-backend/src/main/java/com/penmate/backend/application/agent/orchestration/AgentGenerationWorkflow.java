@@ -13,6 +13,8 @@ import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.iam.model.IamUser;
+import com.penmate.backend.domain.iam.repository.IamGateway;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,7 @@ public class AgentGenerationWorkflow {
     private final AgentTaskRuntimeUpdater agentTaskRuntimeUpdater;
     private final AgentTaskResultRecorder agentTaskResultRecorder;
     private final SessionStyleBindingAppService sessionStyleBindingAppService;
+    private final IamGateway iamGateway;
 
     public void run(Long projectId, Long taskId, String traceId) {
         runInternal(projectId, taskId, traceId);
@@ -75,17 +78,20 @@ public class AgentGenerationWorkflow {
             realtimeEventService.publishGenerationStatus(projectId, taskId, "planning", "正在分析请求并规划工具调用", AgentTaskStatus.RUNNING.value());
 
             AgentTaskContext taskContext = buildTaskContext(projectId, task);
+            String promptSnapshot = requirePromptSnapshot(task, traceId);
+            AgentLlmExecutionConfig preflightExecutionConfig = resolvePreflightExecutionConfig(task, traceId);
             AgentPreflightDecision preflightDecision = agentPreflightCoordinator.coordinate(new AgentPreflightRequest(
                     projectId,
                     task.getConversationId(),
                     taskContext.getChapterId(),
-                    task.getPromptSnapshot()
+                    promptSnapshot,
+                    preflightExecutionConfig
             ));
             AgentContextRoutingResult routingResult = agentContextRoutingFacade.route(new AgentContextRoutingRequest(
                     projectId,
                     task.getConversationId(),
                     taskContext.getChapterId(),
-                    task.getPromptSnapshot(),
+                    promptSnapshot,
                     taskContext.getStyleSnapshotJson(),
                     preflightDecision
             ));
@@ -143,7 +149,15 @@ public class AgentGenerationWorkflow {
     }
 
     private AgentTaskContext buildTaskContext(Long projectId, AgentGenerationTask task) {
-        // 这里仅恢复任务运行期需要的结构化上下文，不在工作流层拼装任何提示词语义文案。
+        AgentTaskContext persistedContext = task == null || task.getTaskId() == null
+                ? null
+                : agentRepository.findTaskContext(task.getTaskId());
+        if (persistedContext != null) {
+            if (persistedContext.getTaskStatus() == null && task != null) {
+                persistedContext.setTaskStatus(task.getStatus());
+            }
+            return persistedContext;
+        }
         AgentTaskContext taskContext = AgentTaskContext.recoveryOf(task.getTaskId(), task.getStatus(), null);
         if (sessionStyleBindingAppService != null) {
             taskContext.setStyleSnapshotJson(sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, task.getConversationId()));
@@ -166,6 +180,31 @@ public class AgentGenerationWorkflow {
             throw new IllegalStateException("Failed to update generation task status");
         }
         task.setStatus(targetStatus.value());
+    }
+
+    private String requirePromptSnapshot(AgentGenerationTask task, String traceId) {
+        String promptSnapshot = task == null ? null : task.getPromptSnapshot();
+        if (promptSnapshot == null || promptSnapshot.isBlank()) {
+            log.error("Agent 任务缺少有效 promptSnapshot，无法进入 preflight: taskId={}, physicalId={}, conversationId={}, traceId={}",
+                    task == null ? null : task.getTaskId(),
+                    task == null ? null : task.getId(),
+                    task == null ? null : task.getConversationId(),
+                    traceId);
+            throw new IllegalStateException("task promptSnapshot must not be blank before preflight");
+        }
+        return promptSnapshot.trim();
+    }
+
+    private AgentLlmExecutionConfig resolvePreflightExecutionConfig(AgentGenerationTask task, String traceId) {
+        IamUser iamUser = iamGateway.findUserByUserId(task.getUserId());
+        if (iamUser == null || iamUser.getDirtyWorkAgentModelConfigId() == null) {
+            log.error("Agent preflight 缺少 dirtywork 模型配置: taskId={}, userId={}, traceId={}",
+                    task == null ? null : task.getTaskId(),
+                    task == null ? null : task.getUserId(),
+                    traceId);
+            throw new IllegalStateException("dirty work agent model config is required before preflight");
+        }
+        return agentModelRoutingService.resolveExecutionConfig(task.getUserId(), iamUser.getDirtyWorkAgentModelConfigId(), traceId);
     }
 
     private int safeLength(String text) {
