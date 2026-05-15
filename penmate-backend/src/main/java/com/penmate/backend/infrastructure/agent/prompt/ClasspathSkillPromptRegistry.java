@@ -13,17 +13,18 @@ import java.util.stream.Collectors;
 @Component
 public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
 
-    private static final Map<String, String> DIRECTORY_ALIASES = Map.of(
-            "writer", "writer",
-            "scene-writer", "writer",
-            "planner", "planner",
-            "checker", "checker",
-            "continuity-checker", "checker",
-            "continuity-check", "checker",
-            "editor", "editor",
-            "story-bible", "story-bible",
-            "story-bible-query", "story-bible",
-            "story-bible-guard", "story-bible"
+    private static final Map<String, String> DIRECTORY_ALIASES = Map.ofEntries(
+            Map.entry("writer", "writer"),
+            Map.entry("scene_writer", "writer"),
+            Map.entry("planner", "planner"),
+            Map.entry("checker", "checker"),
+            Map.entry("continuity_checker", "checker"),
+            Map.entry("continuity_check", "checker"),
+            Map.entry("consistency_checker", "checker"),
+            Map.entry("editor", "editor"),
+            Map.entry("story_bible", "story-bible"),
+            Map.entry("story_bible_query", "story-bible"),
+            Map.entry("story_bible_guard", "story-bible")
     );
 
     private final SystemPromptProvider systemPromptProvider;
@@ -35,13 +36,8 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
     @Override
     public SystemPromptDocument load(String skill) {
         String canonicalSkill = canonicalize(skill);
-        String directory = resolveDirectory(canonicalSkill);
-        SystemPromptBundle bundle;
-        try {
-            bundle = systemPromptProvider.loadBundle("skills", directory);
-        } catch (RuntimeException ex) {
-            throw new IllegalArgumentException("Unsupported skill prompt: " + skill + " -> " + directory, ex);
-        }
+        String directory = resolveDirectory(skill, canonicalSkill);
+        SystemPromptBundle bundle = systemPromptProvider.loadBundle("skills", directory);
         if (bundle.documents().isEmpty()) {
             throw new IllegalArgumentException("No prompt documents found for skill: " + skill);
         }
@@ -55,27 +51,12 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
         );
     }
 
-    private String resolveDirectory(String canonicalSkill) {
-        String alias = DIRECTORY_ALIASES.get(canonicalSkill);
-        if (alias != null) {
-            return alias;
+    private String resolveDirectory(String originalSkill, String canonicalSkill) {
+        String directory = DIRECTORY_ALIASES.get(canonicalSkill);
+        if (directory == null) {
+            throw new IllegalArgumentException("Unsupported skill prompt: " + originalSkill);
         }
-        if (canonicalSkill.startsWith("story-bible")) {
-            return "story-bible";
-        }
-        if (canonicalSkill.endsWith("checker") || canonicalSkill.endsWith("check")) {
-            return "checker";
-        }
-        if (canonicalSkill.endsWith("writer")) {
-            return "writer";
-        }
-        if (canonicalSkill.contains("planner")) {
-            return "planner";
-        }
-        if (canonicalSkill.contains("editor")) {
-            return "editor";
-        }
-        return canonicalSkill;
+        return directory;
     }
 
     private String canonicalize(String skill) {
@@ -84,8 +65,8 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
         }
         return skill.trim()
                 .toLowerCase(Locale.ROOT)
-                .replace('_', '-')
-                .replace(' ', '-')
-                .replaceAll("-+", "-");
+                .replace('-', '_')
+                .replace(' ', '_')
+                .replaceAll("_+", "_");
     }
 }

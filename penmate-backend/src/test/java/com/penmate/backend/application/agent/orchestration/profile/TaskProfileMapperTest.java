@@ -40,7 +40,7 @@ class TaskProfileMapperTest {
                 TaskIntentTag.STYLE_ALIGNMENT
         );
         assertThat(profile.executionProfile()).isEqualTo("default");
-        assertThat(profile.skills()).containsExactly("scene-writer", "story-bible-guard");
+        assertThat(profile.skills()).containsExactly("scene_writer", "story_bible_guard");
         assertThat(profile.tools()).containsExactly("draft_generation", "story_bible_lookup");
         assertThat(profile.hardConstraints()).containsExactly("保留第一人称", "不得改写既有设定");
         assertThat(profile.outputExpectation()).isEqualTo("输出一段可直接进入正文的中文续写");

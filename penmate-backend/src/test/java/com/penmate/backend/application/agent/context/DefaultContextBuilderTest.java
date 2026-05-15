@@ -94,6 +94,62 @@ class DefaultContextBuilderTest {
     }
 
     @Test
+    void should_treat_hyphenated_story_bible_skill_same_as_snake_case_after_task_profile_normalization() {
+        Object builder = instantiateBuilder(2);
+        List<Object> entries = List.of(
+                entryView(
+                        "repository",
+                        "hero.identity",
+                        "主角身份",
+                        "林烬是守夜人见习生",
+                        "character",
+                        "CANON",
+                        1,
+                        1,
+                        null,
+                        null
+                ),
+                entryView(
+                        "repository",
+                        "character.secret.knowledge.linjin",
+                        "秘密信息",
+                        "只有林烬知道城主其实是他的生父",
+                        "character",
+                        "CANON",
+                        3,
+                        1,
+                        42L,
+                        44L
+                ),
+                entryView(
+                        "repository",
+                        "world.rule.taxes",
+                        "夜税制度",
+                        "港城实行夜税制度",
+                        "rule",
+                        "CANON",
+                        1,
+                        1,
+                        null,
+                        null
+                )
+        );
+
+        ContextPackage snakeCaseContext = invokeBuild(
+                builder,
+                request(42L, taskProfile(List.of("story_bible_query"))),
+                entries
+        );
+        ContextPackage hyphenatedContext = invokeBuild(
+                builder,
+                request(42L, taskProfile(List.of("story-bible-query"))),
+                entries
+        );
+
+        assertThat(hyphenatedContext).isEqualTo(snakeCaseContext);
+    }
+
+    @Test
     void should_return_noop_source_and_missing_flag_when_story_bible_entries_are_absent() {
         Object builder = instantiateBuilder(2);
 

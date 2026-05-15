@@ -9,6 +9,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ClasspathSkillPromptRegistryTest {
 
@@ -37,6 +38,19 @@ class ClasspathSkillPromptRegistryTest {
             assertThat(storyBibleQueryPrompt.content()).isNotBlank();
             assertThat(storyBibleGuardPrompt.path()).isEqualTo("prompts/agent/system/skills/story-bible/00-base-role.md");
             assertThat(storyBibleGuardPrompt.content()).isNotBlank();
+        }
+    }
+
+    @Test
+    void should_fail_fast_for_unknown_skill_alias_instead_of_falling_back_to_generic_directory() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.register(PromptComponentScanConfig.class);
+            context.refresh();
+
+            SkillPromptRegistry registry = context.getBean(SkillPromptRegistry.class);
+            assertThatThrownBy(() -> registry.load("mystery-planner"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Unsupported skill prompt: mystery-planner");
         }
     }
 

@@ -16,47 +16,62 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
               "type": "object",
               "properties": {
                 "draftText": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": ".*\\S.*"
                 },
                 "userRequirements": {
                   "type": "array",
+                  "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": ".*\\S.*"
                   }
                 },
                 "personaProfile": {
                   "type": "array",
+                  "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": ".*\\S.*"
                   }
                 },
                 "storyOutline": {
                   "type": "array",
+                  "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": ".*\\S.*"
                   }
                 },
                 "timelineConstraints": {
                   "type": "array",
+                  "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": ".*\\S.*"
                   }
                 },
                 "worldRules": {
                   "type": "array",
+                  "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": ".*\\S.*"
                   }
                 },
                 "characterKnowledgeBoundaries": {
                   "type": "array",
+                  "minItems": 1,
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": ".*\\S.*"
                   }
                 },
                 "currentRevisionRound": {
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "description": "must be less than or equal to maxRevisionRounds"
                 },
                 "maxRevisionRounds": {
                   "type": "integer",

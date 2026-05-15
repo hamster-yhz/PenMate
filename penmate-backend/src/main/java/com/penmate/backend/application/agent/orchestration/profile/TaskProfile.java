@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.orchestration.profile;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Stable, immutable task profiler contract consumed by workflow, prompt composition and context building.
@@ -25,7 +26,7 @@ public record TaskProfile(
     public TaskProfile {
         intentTags = List.copyOf(intentTags == null ? List.of() : intentTags);
         executionProfile = normalize(executionProfile);
-        skills = List.copyOf(skills == null ? List.of() : skills);
+        skills = List.copyOf(skills == null ? List.of() : skills.stream().map(TaskProfile::normalizeSkill).toList());
         tools = List.copyOf(tools == null ? List.of() : tools);
         hardConstraints = List.copyOf(hardConstraints == null ? List.of() : hardConstraints);
         outputExpectation = normalize(outputExpectation);
@@ -34,5 +35,16 @@ public record TaskProfile(
 
     private static String normalize(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private static String normalizeSkill(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.trim()
+                .toLowerCase(Locale.ROOT)
+                .replace('-', '_')
+                .replace(' ', '_')
+                .replaceAll("_+", "_");
     }
 }

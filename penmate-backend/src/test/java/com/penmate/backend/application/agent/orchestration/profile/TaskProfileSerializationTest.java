@@ -47,6 +47,7 @@ class TaskProfileSerializationTest {
                 "reasoningSummary"
         );
         assertThat(tree.get("executionProfile")).isEqualTo("default");
+        assertThat(tree.get("skills")).isEqualTo(List.of("scene_writer", "consistency_checker"));
         assertThat(tree.get("needsApproval")).isEqualTo(true);
         assertThat(tree.get("includeStoryBible")).isEqualTo(true);
         assertThat(tree.get("includeRag")).isEqualTo(false);
@@ -97,6 +98,7 @@ class TaskProfileSerializationTest {
 
         assertThat(restored.intentTags()).containsExactly(TaskIntentTag.DRAFT_GENERATION, TaskIntentTag.STORY_BIBLE_QUERY);
         assertThat(restored.executionProfile()).isEqualTo("default");
+        assertThat(restored.skills()).containsExactly("scene_writer");
         assertThat(restored.outputExpectation()).isNull();
         assertThat(restored.reasoningSummary()).isEqualTo("需要核对设定");
         assertThat(restored.skills()).isUnmodifiable();

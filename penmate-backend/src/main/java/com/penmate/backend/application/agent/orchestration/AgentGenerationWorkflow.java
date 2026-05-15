@@ -16,6 +16,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightCoordinator;
 import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightDecision;
 import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightRequest;
+import com.penmate.backend.application.agent.orchestration.profile.TaskIntentTag;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfileMapper;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
@@ -1154,7 +1155,7 @@ public class AgentGenerationWorkflow {
             taskRuntimeStatusPublisher.publishStatus(projectId,
                     buildRuntimeStatusView(task, taskContext, "story_bible_review", "正在整理故事圣经", true, "route_story_bible", null));
         }
-        if (taskProfile.tools().contains("quality_review") || taskProfile.skills().contains("CONTINUITY_CHECK")) {
+        if (taskProfile.tools().contains("quality_review") || taskProfile.intentTags().contains(TaskIntentTag.CONTINUITY_CHECK)) {
             syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "quality_review", "phase:quality_review");
             taskRuntimeStatusPublisher.publishStatus(projectId,
                     buildRuntimeStatusView(task, taskContext, "quality_review", "正在审查质量", true, "plan_quality_review", null));
