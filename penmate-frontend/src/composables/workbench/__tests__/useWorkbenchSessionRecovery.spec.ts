@@ -56,6 +56,9 @@ describe('useWorkbenchSessionRecovery', () => {
         selectedText: '',
         activePlugins: ['outline.search'],
         modelConfigId: 'mcfg-001',
+        taskProfile: { executionProfile: 'default', tools: ['story_bible_lookup'] },
+        promptPlan: { finalProfile: 'default', modules: [{ moduleKey: 'execution:default' }] },
+        contextPackage: { chapterScope: 'chapter:301', storyBibleEntries: ['maid.secret_order=侍从知道密令'] },
       },
     }
 
@@ -84,6 +87,9 @@ describe('useWorkbenchSessionRecovery', () => {
           selectedText: String(snapshot?.workbenchContext?.selectedText ?? ''),
           activePlugins: Array.isArray(snapshot?.workbenchContext?.activePlugins) ? snapshot.workbenchContext.activePlugins : [],
           modelConfigId: String(snapshot?.workbenchContext?.modelConfigId ?? ''),
+          taskProfile: snapshot?.workbenchContext?.taskProfile ?? null,
+          promptPlan: snapshot?.workbenchContext?.promptPlan ?? null,
+          contextPackage: snapshot?.workbenchContext?.contextPackage ?? null,
         }
       },
     })
@@ -106,6 +112,9 @@ describe('useWorkbenchSessionRecovery', () => {
       selectedText: '',
       activePlugins: ['outline.search'],
       modelConfigId: 'mcfg-001',
+      taskProfile: { executionProfile: 'default', tools: ['story_bible_lookup'] },
+      promptPlan: { finalProfile: 'default', modules: [{ moduleKey: 'execution:default' }] },
+      contextPackage: { chapterScope: 'chapter:301', storyBibleEntries: ['maid.secret_order=侍从知道密令'] },
     })
     expect(openTurnStream).toHaveBeenCalledWith('101', '90001', '50001')
   })

@@ -107,6 +107,8 @@ class AgentWorkflowEndToEndContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.workbenchContext.activeTaskRuntime.lastRuntimeStatus").value("todo_review"))
                 .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.planTitle").value("第三章修订待办"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.recommendedNextAction").value("apply_todo_plan"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.nextAction").doesNotExist())
                 .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.items[0].title").value("修复密令来源"))
                 .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.items[0].sessionId").value("90001"))
                 .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.items[1].title").value("补充侍从转述桥段"));
@@ -126,7 +128,9 @@ class AgentWorkflowEndToEndContractTest {
                 .andExpect(jsonPath("$.data.pendingApproval.toolCallId").value("call-story-1"))
                 .andExpect(jsonPath("$.data.workbenchContext.activeTaskRuntime.lastRuntimeStatus").value("story_bible_review"))
                 .andExpect(jsonPath("$.data.workbenchContext.resultSummary.storyBibleProposalSummary.proposalSummary").value("建议补充侍从知晓密令的设定"))
-                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.storyBibleProposalSummary.entryKeys[0]").value("maid.secret_order"));
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.storyBibleProposalSummary.items[0].entryKey").value("maid.secret_order"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.storyBibleProposalSummary.entryKeys").doesNotExist())
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.storyBibleProposalSummary.nextAction").doesNotExist());
     }
 
     @Test
@@ -219,7 +223,7 @@ class AgentWorkflowEndToEndContractTest {
     }
 
     @Test
-    void AT_AGENT_WORKFLOW_CASE_D_SHOULD_FAIL_UNTIL_REAL_RECOVERY_CHAIN_EXPOSES_CONTEXT_FIELDS_FROM_PERSISTED_SNAPSHOT() throws Exception {
+    void AT_AGENT_WORKFLOW_CASE_D_SHOULD_EXPOSE_PERSISTED_STRUCTURED_SNAPSHOTS_FROM_REAL_RECOVERY_CHAIN() throws Exception {
         AgentSessionMapper mapper = org.mockito.Mockito.mock(AgentSessionMapper.class);
         BusinessIdGenerator businessIdGenerator = () -> 990001L;
         AgentSessionRepository repository = new AgentSessionRepositoryImpl(mapper, businessIdGenerator);
@@ -264,7 +268,9 @@ class AgentWorkflowEndToEndContractTest {
         contextRow.put("ragSnapshotJson", "{\"refs\":[\"chapter:42#伏笔-雨夜密令\"]}");
         contextRow.put("pluginBindingsJson", "[\"hybrid.rag\"]");
         contextRow.put("modelSnapshotJson", "{\"modelConfigId\":\"mcfg-9001\"}");
-        contextRow.put("contextPackageJson", "{\"ragRefs\":[\"chapter:42#伏笔-雨夜密令\",\"version:42-v3#侍从转述\"]}");
+        contextRow.put("taskProfileJson", "{\"executionProfile\":\"default\",\"tools\":[\"story_bible_lookup\"],\"includeStoryBible\":true,\"includeRag\":true}");
+        contextRow.put("promptPlanJson", "{\"finalProfile\":\"default\",\"assembledPromptPreview\":\"执行基座\",\"modules\":[{\"moduleKey\":\"execution:default\"}],\"skills\":[\"writer\"]}");
+        contextRow.put("contextPackageJson", "{\"ragRefs\":[\"chapter:42#伏笔-雨夜密令\",\"version:42-v3#侍从转述\"],\"chapterScope\":\"chapter:301\",\"storyBibleEntries\":[\"maid.secret_order=侍从知道密令\"]}");
         contextRow.put("activeToolCallsSnapshot", "[{\"toolCode\":\"draft_generation\",\"status\":\"RUNNING\"}]");
         contextRow.put("lastRuntimeStatus", "DRAFT_GENERATION");
         contextRow.put("recoveryCursor", "tool_call:draft_generation:call-draft-1");
@@ -285,7 +291,13 @@ class AgentWorkflowEndToEndContractTest {
                 .andExpect(jsonPath("$.data.workbenchContext.selectedText").value("沿着旧伏笔续写第 42 章"))
                 .andExpect(jsonPath("$.data.workbenchContext.activePlugins[0]").value("hybrid.rag"))
                 .andExpect(jsonPath("$.data.workbenchContext.modelConfigId").value("mcfg-9001"))
-                .andExpect(jsonPath("$.data.workbenchContext.ragRefs[0]").value("chapter:42#伏笔-雨夜密令"));
+                .andExpect(jsonPath("$.data.workbenchContext.ragRefs[0]").value("chapter:42#伏笔-雨夜密令"))
+                .andExpect(jsonPath("$.data.workbenchContext.taskProfile.executionProfile").value("default"))
+                .andExpect(jsonPath("$.data.workbenchContext.taskProfile.tools[0]").value("story_bible_lookup"))
+                .andExpect(jsonPath("$.data.workbenchContext.promptPlan.finalProfile").value("default"))
+                .andExpect(jsonPath("$.data.workbenchContext.promptPlan.modules[0].moduleKey").value("execution:default"))
+                .andExpect(jsonPath("$.data.workbenchContext.contextPackage.chapterScope").value("chapter:301"))
+                .andExpect(jsonPath("$.data.workbenchContext.contextPackage.storyBibleEntries[0]").value("maid.secret_order=侍从知道密令"));
     }
 
     @Test
@@ -366,7 +378,7 @@ class AgentWorkflowEndToEndContractTest {
         ));
         resultSummary.put("todoSummary", Map.of(
                 "planTitle", "第三章修订待办",
-                "nextAction", "apply_todo_plan",
+                "recommendedNextAction", "apply_todo_plan",
                 "items", List.of(
                         Map.of(
                                 "todoId", "todo-1",
@@ -397,8 +409,16 @@ class AgentWorkflowEndToEndContractTest {
         resultSummary.put("todoSummary", null);
         resultSummary.put("storyBibleProposalSummary", Map.of(
                 "proposalSummary", "建议补充侍从知晓密令的设定",
-                "entryKeys", List.of("maid.secret_order"),
-                "nextAction", "await_approval"
+                "items", List.of(Map.of(
+                        "entryKey", "maid.secret_order",
+                        "entryType", "CHARACTER_KNOWLEDGE",
+                        "proposedContent", "侍从知晓密令并负责转述",
+                        "canonicalStatus", "PROPOSED",
+                        "riskLevel", 2,
+                        "sourceText", "第二段侍从转述密令",
+                        "sourceChapterId", 301,
+                        "inferenceLevel", "DIRECT"
+                ))
         ));
         context.put("resultSummary", resultSummary);
         return context;

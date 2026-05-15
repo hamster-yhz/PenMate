@@ -1,4 +1,9 @@
 import { reactive } from 'vue'
+import type {
+  WorkbenchContextPackageSnapshot,
+  WorkbenchPromptPlanSnapshot,
+  WorkbenchTaskProfileSnapshot,
+} from '@/api/types'
 
 export type WorkbenchSessionState = {
   sessionId: string | null
@@ -13,6 +18,9 @@ export type WorkbenchSessionState = {
     selectedText: string
     activePlugins: string[]
     modelConfigId: string
+    taskProfile: WorkbenchTaskProfileSnapshot | null
+    promptPlan: WorkbenchPromptPlanSnapshot | null
+    contextPackage: WorkbenchContextPackageSnapshot | null
   }
   resumeToken: string
 }
@@ -29,6 +37,14 @@ export const createWorkbenchSessionState = (): WorkbenchSessionState => reactive
   activeTask: { taskId: null, taskStatus: '', streamChannelKey: '' },
   pendingApproval: null,
   messages: [],
-  workbenchContext: { chapterId: null, selectedText: '', activePlugins: [], modelConfigId: '' },
+  workbenchContext: {
+    chapterId: null,
+    selectedText: '',
+    activePlugins: [],
+    modelConfigId: '',
+    taskProfile: null,
+    promptPlan: null,
+    contextPackage: null,
+  },
   resumeToken: '',
 })

@@ -1,4 +1,8 @@
-import type { WorkbenchRuntimeApproval, WorkbenchRuntimeEventSource, WorkbenchRuntimeToolCall } from '@/api/types'
+import type {
+  WorkbenchRuntimeApproval,
+  WorkbenchRuntimeEventSource,
+  WorkbenchRuntimeToolCall,
+} from '@/api/types'
 import type { GenerationPhase } from '@/components/workbench/workbenchTypes'
 import type { ChatRecord } from './useWorkbenchChatTimeline'
 
@@ -41,8 +45,8 @@ const normalizeToolCall = (value: unknown): WorkbenchRuntimeToolCall | null => {
     toolName: record.toolName == null ? null : String(record.toolName),
     status: record.status == null ? null : String(record.status),
     iteration: record.iteration == null ? null : Number(record.iteration),
-    argumentsPreview: record.argumentsPreview == null ? null : String(record.argumentsPreview),
-    output: record.output == null ? null : String(record.output),
+    argumentsPreview: record.argumentsPreview ?? null,
+    output: record.output ?? null,
     errorMessage: record.errorMessage == null ? null : String(record.errorMessage),
   }
 }
@@ -61,6 +65,13 @@ const normalizeApproval = (value: unknown): WorkbenchRuntimeApproval | null => {
   }
 }
 
+const normalizeStructuredRuntimeRecord = (value: unknown) => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  return value as Record<string, unknown>
+}
+
 const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown>): WorkbenchRuntimeEventSource => ({
   eventName,
   sessionId: payload.sessionId == null ? null : String(payload.sessionId),
@@ -74,7 +85,16 @@ const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown
   status: payload.status == null ? null : String(payload.status),
   toolCall: normalizeToolCall(payload.toolCall),
   approval: normalizeApproval(payload.approval),
+  todoPlan: normalizeStructuredRuntimeRecord(payload.todoPlan),
+  storyBibleApproval: normalizeStructuredRuntimeRecord(payload.storyBibleApproval),
 })
+
+const resolveRuntimeFailureMessage = (payload: Record<string, unknown>) => String(
+  payload.errorMsg
+  || payload.message
+  || payload.errorCode
+  || '生成失败',
+)
 
 export const createTaskRuntime = (deps: {
   getGenerationTaskStatus: () => GenerationTaskStatus | ''
@@ -189,8 +209,9 @@ export const createTaskRuntime = (deps: {
       publishRuntimeEventSource('generation.failed', payload)
       deps.setGenerationPhase('failed')
       deps.setGenerationTaskStatus('failed')
-      deps.setAgentStatusDetailText(String(payload.errorMsg || payload.errorCode || payload.message || ''))
-      settleReject(new Error(String(payload.errorMsg || payload.errorCode || '生成失败')))
+      const failureMessage = resolveRuntimeFailureMessage(payload)
+      deps.setAgentStatusDetailText(failureMessage)
+      settleReject(new Error(failureMessage))
     })
   })
 

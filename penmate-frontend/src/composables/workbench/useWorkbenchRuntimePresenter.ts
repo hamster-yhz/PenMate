@@ -1,6 +1,7 @@
 import type {
   WorkbenchRecoverySnapshot,
   WorkbenchRuntimeEventSource,
+  WorkbenchRuntimeStoryBibleApproval,
   WorkbenchRuntimeToolCall,
 } from '@/api/types'
 
@@ -81,6 +82,16 @@ const TOOL_STATUS_PRIORITY: Record<string, number> = {
 }
 
 const normalizeText = (value: unknown) => String(value ?? '').trim()
+
+const normalizeDisplayValue = (value: unknown) => {
+  if (value == null) return ''
+  if (typeof value === 'string') return value.trim()
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value).trim()
+  }
+}
 
 const normalizePhase = (value: unknown) => normalizeText(value).toLowerCase().replace(/-/g, '_')
 
@@ -195,16 +206,46 @@ const resolvePhase = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: W
   return taskStatus
 }
 
+const resolveTodoNextAction = (summary?: Record<string, unknown> | null) => {
+  return normalizeText(summary?.nextAction)
+    || normalizeText(summary?.recommendedNextAction)
+}
+
+const resolveRuntimeTodoSummary = (runtime?: WorkbenchRuntimeEventSource | null) => {
+  return parseJsonRecord(runtime?.todoPlan)
+}
+
+const resolveRuntimeStoryBibleApproval = (runtime?: WorkbenchRuntimeEventSource | null) => {
+  return parseJsonRecord(runtime?.storyBibleApproval) as WorkbenchRuntimeStoryBibleApproval | Record<string, unknown> | null
+}
+
 const resolveNextAction = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: WorkbenchRecoverySnapshot | null) => {
-  return normalizeText(runtime?.nextAction)
-    || normalizeText((runtime?.approval as Record<string, unknown> | null | undefined)?.nextAction)
+  const runtimeNextAction = normalizeText(runtime?.nextAction)
+  if (runtimeNextAction) {
+    return runtimeNextAction
+  }
+
+  const approvalNextAction = normalizeText((runtime?.approval as Record<string, unknown> | null | undefined)?.nextAction)
     || normalizeText((recovery?.pendingApproval as Record<string, unknown> | null | undefined)?.nextAction)
-    || normalizeText(recovery?.workbenchContext?.resultSummary?.storyBibleProposalSummary?.nextAction)
-    || normalizeText(recovery?.workbenchContext?.resultSummary?.todoSummary?.nextAction)
+  const runtimeStoryBibleSummary = resolveRuntimeStoryBibleApproval(runtime)
+  const runtimeTodoSummary = resolveRuntimeTodoSummary(runtime)
+  const storyBibleNextAction = normalizeText(runtimeStoryBibleSummary?.nextAction)
+  const todoNextAction = resolveTodoNextAction(runtimeTodoSummary)
+    || resolveTodoNextAction(recovery?.workbenchContext?.resultSummary?.todoSummary as Record<string, unknown> | null | undefined)
+  const currentPhase = resolvePhase(runtime, recovery)
+
+  if (currentPhase === 'todo_review') {
+    return todoNextAction || approvalNextAction || storyBibleNextAction
+  }
+  if (currentPhase === 'story_bible_review' || currentPhase === 'waiting_approval') {
+    return approvalNextAction || storyBibleNextAction || todoNextAction
+  }
+  return approvalNextAction || storyBibleNextAction || todoNextAction
 }
 
 const resolveFailureReason = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: WorkbenchRecoverySnapshot | null) => {
   return normalizeText(runtime?.errorMsg)
+    || normalizeText(runtime?.message)
     || normalizeText(resolveToolCall(runtime, recovery)?.errorMessage)
 }
 
@@ -217,13 +258,17 @@ const buildToolCallCard = (toolCall: WorkbenchRuntimeToolCall | null): ToolCallS
     title: title || '工具调用',
     toolCode,
     statusText: toolStatusLabel(toolCall.status),
-    argumentsPreview: normalizeText(toolCall.argumentsPreview),
-    outputPreview: normalizeText(toolCall.output),
+    argumentsPreview: normalizeDisplayValue(toolCall.argumentsPreview),
+    outputPreview: normalizeDisplayValue(toolCall.output),
     errorMessage: normalizeText(toolCall.errorMessage),
   }
 }
 
 const resolveTodoSummary = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: WorkbenchRecoverySnapshot | null) => {
+  const runtimeTodoSummary = resolveRuntimeTodoSummary(runtime)
+  if (runtimeTodoSummary) {
+    return runtimeTodoSummary
+  }
   const runtimeToolCall = runtime?.toolCall
   if (normalizePhase(runtimeToolCall?.toolCode) === 'todo_planner') {
     const parsed = parseJsonRecord(runtimeToolCall?.output)
@@ -245,13 +290,31 @@ const buildTodoPlanCard = (runtime?: WorkbenchRuntimeEventSource | null, recover
   return {
     title: title || '待办计划',
     itemCountText: `${items.length} 项待办`,
-    nextActionText: normalizeText(summary?.nextAction),
+    nextActionText: resolveTodoNextAction(summary),
     items,
   }
 }
 
+const resolveStoryBibleEntryKeysFromItems = (summary?: Record<string, unknown> | null) => {
+  const items = Array.isArray(summary?.items) ? summary.items : []
+  return items
+    .map((item) => normalizeText((item as Record<string, unknown> | null | undefined)?.entryKey))
+    .filter(Boolean)
+}
+
 const resolveStoryBibleSummary = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: WorkbenchRecoverySnapshot | null) => {
   const recoverySummary = recovery?.workbenchContext?.resultSummary?.storyBibleProposalSummary as Record<string, unknown> | null | undefined
+  const runtimeStoryBibleSummary = resolveRuntimeStoryBibleApproval(runtime)
+  if (runtimeStoryBibleSummary) {
+    return {
+      ...(recoverySummary || {}),
+      ...runtimeStoryBibleSummary,
+      entryKeys: [
+        ...resolveStoryBibleEntryKeysFromItems(recoverySummary),
+        ...toStringArray(runtimeStoryBibleSummary.entryKeys),
+      ].filter((item, index, array) => array.indexOf(item) === index),
+    }
+  }
   const runtimeToolCall = runtime?.toolCall
   if (normalizePhase(runtimeToolCall?.toolCode) === 'story_bible_update') {
     const parsed = parseJsonRecord(runtimeToolCall?.output)
@@ -260,7 +323,7 @@ const resolveStoryBibleSummary = (runtime?: WorkbenchRuntimeEventSource | null, 
         ...(recoverySummary || {}),
         ...parsed,
         entryKeys: [
-          ...toStringArray(recoverySummary?.entryKeys),
+          ...resolveStoryBibleEntryKeysFromItems(recoverySummary),
           ...toStringArray(parsed.entryKeys),
         ].filter((item, index, array) => array.indexOf(item) === index),
       }
@@ -276,8 +339,8 @@ const buildStoryBibleApprovalCard = (runtime?: WorkbenchRuntimeEventSource | nul
   const approvalType = normalizeText(runtimeApproval?.approvalType || recoveryApproval?.approvalType)
   const proposalSummary = normalizeText(summary?.proposalSummary)
   const entryKeys = [
+    ...resolveStoryBibleEntryKeysFromItems(summary as Record<string, unknown> | null | undefined),
     ...toStringArray(summary?.entryKeys),
-    ...toStringArray((summary as Record<string, unknown> | null | undefined)?.entryKeys),
     ...toStringArray(runtimeApproval?.entryKeys),
     ...toStringArray(recoveryApproval?.entryKeys),
   ].filter((item, index, array) => array.indexOf(item) === index)

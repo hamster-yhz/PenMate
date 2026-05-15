@@ -4,6 +4,8 @@ import com.penmate.backend.domain.agent.model.AgentSessionRecoverySnapshot;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +17,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class AgentSessionRepositoryImplTest {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Test
     void should_define_session_lock_mapper_method_for_turn_sequence_allocation() {
@@ -130,5 +134,62 @@ class AgentSessionRepositoryImplTest {
         assertThat(snapshot.getWorkbenchContext()).contains("\"qualityReportSummary\":{\"reviewSummary\":\"存在剧情逻辑问题，需要修订。\"}");
         assertThat(snapshot.getWorkbenchContext()).contains("\"todoSummary\":{\"planTitle\":\"第三章修订待办\"}");
         assertThat(snapshot.getWorkbenchContext()).contains("\"storyBibleProposalSummary\":{\"proposalSummary\":\"建议补充侍从知晓密令的设定\"}");
+    }
+
+    @Test
+    void should_embed_persisted_task_profile_prompt_plan_and_context_package_into_workbench_context_as_structured_objects() throws Exception {
+        AgentSessionMapper mapper = mock(AgentSessionMapper.class);
+        BusinessIdGenerator businessIdGenerator = mock(BusinessIdGenerator.class);
+        AgentSessionRepositoryImpl repository = new AgentSessionRepositoryImpl(mapper, businessIdGenerator);
+        when(mapper.findSessionRow(101L, 90001L)).thenReturn(Map.of(
+                "id", 1L,
+                "sessionId", 90001L,
+                "projectId", 101L,
+                "ownerUserId", 201L,
+                "title", "第三章夜雨追踪",
+                "sessionStatus", "ACTIVE",
+                "boundStyleId", 81L,
+                "activeContextVersion", 1,
+                "lastTurnId", 60001L,
+                "lastTaskId", 70001L
+        ));
+        when(mapper.findTaskRow(90001L, 70001L)).thenReturn(Map.of(
+                "taskId", 70001L,
+                "turnId", 60001L,
+                "taskStatus", "RUNNING"
+        ));
+        Map<String, Object> contextRow = new LinkedHashMap<>();
+        contextRow.put("contextId", 71001L);
+        contextRow.put("taskId", 70001L);
+        contextRow.put("chapterId", 301L);
+        contextRow.put("selectedText", "沿着旧伏笔续写第 42 章");
+        contextRow.put("outlineSnapshotJson", "{\"chapterTitle\":\"第四十二章 雨夜旧令\"}");
+        contextRow.put("taskProfileJson", "{\"executionProfile\":\"default\",\"tools\":[\"story_bible_lookup\"],\"includeStoryBible\":true}");
+        contextRow.put("promptPlanJson", "{\"finalProfile\":\"default\",\"assembledPromptPreview\":\"执行基座\",\"modules\":[{\"moduleKey\":\"execution:default\"}]}");
+        contextRow.put("contextPackageJson", "{\"chapterScope\":\"chapter:301\",\"ragRefs\":[\"chapter:42#伏笔-雨夜密令\"],\"storyBibleEntries\":[\"maid.secret_order=侍从知道密令\"]}");
+        contextRow.put("activeToolCallsSnapshot", "[{\"toolCode\":\"draft_generation\",\"status\":\"RUNNING\"}]");
+        contextRow.put("lastRuntimeStatus", "RUNNING");
+        contextRow.put("recoveryCursor", "tool_call:draft_generation:call-draft-1");
+        contextRow.put("contextHash", "ctx-structured-1");
+        when(mapper.findTaskContextRow(70001L)).thenReturn(contextRow);
+        Map<String, Object> taskResultRow = new LinkedHashMap<>();
+        taskResultRow.put("draftSummary", "{\"draftText\":\"密令在雨夜的屋檐下被再次提起。\"}");
+        taskResultRow.put("qualityReportSummary", null);
+        taskResultRow.put("todoSummary", null);
+        taskResultRow.put("storyBibleProposalSummary", null);
+        when(mapper.findTaskResultRow(70001L)).thenReturn(taskResultRow);
+        when(mapper.listMessageRows(90001L)).thenReturn(List.of());
+
+        AgentSessionRecoverySnapshot snapshot = repository.findRecoverySnapshot(101L, 90001L);
+
+        Map<?, ?> workbenchContext = OBJECT_MAPPER.readValue(snapshot.getWorkbenchContext(), Map.class);
+        assertThat(workbenchContext.get("taskProfile")).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) workbenchContext.get("taskProfile")).get("executionProfile")).isEqualTo("default");
+        assertThat(((Map<?, ?>) workbenchContext.get("taskProfile")).get("tools")).isEqualTo(List.of("story_bible_lookup"));
+        assertThat(workbenchContext.get("promptPlan")).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) workbenchContext.get("promptPlan")).get("finalProfile")).isEqualTo("default");
+        assertThat(workbenchContext.get("contextPackage")).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) workbenchContext.get("contextPackage")).get("chapterScope")).isEqualTo("chapter:301");
+        assertThat(((Map<?, ?>) workbenchContext.get("contextPackage")).get("ragRefs")).isEqualTo(List.of("chapter:42#伏笔-雨夜密令"));
     }
 }

@@ -1,6 +1,12 @@
 import { shallowMount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createBaseRecoverySnapshot as baseRecoverySnapshot,
+  createRuntimeFailedEvent,
+  createStoryBibleWaitingApprovalRecoverySnapshot,
+  createTodoReviewRecoverySnapshot,
+} from '@/test/workbenchRuntimeContract.fixture'
 
 const streamListeners = new Map<string, Array<(event: MessageEvent<string>) => void>>()
 
@@ -70,52 +76,6 @@ const WorkbenchRightPanelHarness = {
     </aside>
   `,
 }
-
-const baseRecoverySnapshot = () => ({
-  session: {
-    sessionId: '90001',
-    title: '第三章夜雨追踪',
-    status: 'ACTIVE',
-    boundStyle: { styleId: '81', name: '冷峻悬疑' },
-  },
-  activeTask: {
-    turnId: '50001',
-    taskId: '70001',
-    taskStatus: 'running',
-    requestContextId: '71001',
-  },
-  pendingApproval: null,
-  messages: [],
-  workbenchContext: {
-    chapterId: '301',
-    selectedText: '夜雨中的追踪在巷口停住。',
-    activePlugins: ['outline.search'],
-    modelConfigId: 'mcfg-9001',
-    activeTaskRuntime: {
-      lastRuntimeStatus: 'draft_generation',
-      recoveryCursor: 'tool_call:draft_generation:call-draft-1',
-      activeToolCallsSnapshot: [
-        {
-          toolCallId: 'call-draft-1',
-          toolCode: 'draft_generation',
-          toolName: '正文生成',
-          status: 'running',
-          argumentsPreview: '{"chapterId":"301"}',
-          output: '{"draftText":"夜雨中的追踪在巷口停住。"}',
-          errorMessage: '',
-        },
-      ],
-    },
-    resultSummary: {
-      draftSummary: {
-        draftText: '夜雨中的追踪在巷口停住。',
-      },
-      qualityReportSummary: null,
-      todoSummary: null,
-      storyBibleProposalSummary: null,
-    },
-  },
-})
 
 const agentApiMock = {
   listSessions: vi.fn(async () => [{ sessionId: '90001', title: '第三章夜雨追踪', updatedAt: '2026-05-14 23:00:00' }]),
@@ -415,39 +375,7 @@ describe('Workbench runtime acceptance matrix', () => {
   })
 
   it('covers_case_B_showing_todo_plan_from_recovery_without_local_todo_source', async () => {
-    agentApiMock.resumeSession.mockResolvedValue({
-      ...baseRecoverySnapshot(),
-      workbenchContext: {
-        ...baseRecoverySnapshot().workbenchContext,
-        activeTaskRuntime: {
-          lastRuntimeStatus: 'todo_review',
-          recoveryCursor: 'tool_call:todo_planner:call-todo-1',
-          activeToolCallsSnapshot: [
-            {
-              toolCallId: 'call-todo-1',
-              toolCode: 'todo_planner',
-              toolName: 'Todo 规划',
-              status: 'done',
-              output: '{"planTitle":"第三章修订待办"}',
-              errorMessage: '',
-            },
-          ],
-        },
-        resultSummary: {
-          draftSummary: null,
-          qualityReportSummary: { reviewSummary: '存在剧情逻辑问题，需要修订。' },
-          todoSummary: {
-            planTitle: '第三章修订待办',
-            items: [
-              { todoId: 'todo-1', title: '修复密令来源', status: 'pending', priority: 'HIGH' },
-              { todoId: 'todo-2', title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
-            ],
-            nextAction: 'apply_todo_plan',
-          },
-          storyBibleProposalSummary: null,
-        },
-      },
-    })
+    agentApiMock.resumeSession.mockResolvedValue(createTodoReviewRecoverySnapshot() as any)
 
     const wrapper = await mountWorkbench()
 
@@ -456,64 +384,13 @@ describe('Workbench runtime acceptance matrix', () => {
       expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
         title: '第三章修订待办',
         itemCountText: '2 项待办',
+        nextActionText: 'apply_todo_plan',
       }))
     })
   })
 
   it('covers_case_C_showing_story_bible_waiting_approval_card', async () => {
-    agentApiMock.resumeSession.mockResolvedValue({
-      ...baseRecoverySnapshot(),
-      activeTask: {
-        turnId: '50001',
-        taskId: '70001',
-        taskStatus: 'waiting_approval',
-        requestContextId: '71001',
-      },
-      pendingApproval: {
-        approvalId: '88001',
-        approvalType: 'STORY_BIBLE_UPDATE',
-        toolCallId: 'call-story-1',
-        nextAction: 'await_approval',
-        entryKeys: ['maid.secret_order'],
-      },
-      messages: [
-        {
-          messageId: '1',
-          role: 'assistant',
-          contentMd: '故事圣经更新待确认',
-          approvalId: '88001',
-          approvalType: 'STORY_BIBLE_UPDATE',
-          approvalStatus: 'pending',
-        },
-      ],
-      workbenchContext: {
-        ...baseRecoverySnapshot().workbenchContext,
-        activeTaskRuntime: {
-          lastRuntimeStatus: 'story_bible_review',
-          recoveryCursor: 'approval:88001',
-          activeToolCallsSnapshot: [
-            {
-              toolCallId: 'call-story-1',
-              toolCode: 'story_bible_update',
-              toolName: '故事圣经整理',
-              status: 'waiting_approval',
-              output: '{"proposalSummary":"建议补充侍从知晓密令的设定","entryKeys":["maid.secret_order"],"nextAction":"await_approval"}',
-              errorMessage: '',
-            },
-          ],
-        },
-        resultSummary: {
-          draftSummary: null,
-          qualityReportSummary: null,
-          todoSummary: null,
-          storyBibleProposalSummary: {
-            proposalSummary: '建议补充侍从知晓密令的设定',
-            entryKeys: ['maid.secret_order'],
-            nextAction: 'await_approval',
-          },
-        },
-      },
-    })
+    agentApiMock.resumeSession.mockResolvedValue(createStoryBibleWaitingApprovalRecoverySnapshot() as any)
 
     const wrapper = await mountWorkbench()
 
@@ -572,6 +449,22 @@ describe('Workbench runtime acceptance matrix', () => {
       message: '已完成',
       status: 'done',
       nextAction: 'view_result',
+      todoPlan: {
+        planTitle: '第三章修订待办',
+        planSummary: '补齐密令来源链路',
+        recommendedNextAction: 'apply_todo_plan',
+        items: [
+          { title: '修复密令来源', status: 'pending', priority: 'HIGH' },
+          { title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
+        ],
+      },
+      storyBibleApproval: {
+        approvalId: '88001',
+        approvalType: 'STORY_BIBLE_UPDATE',
+        proposalSummary: '建议补充侍从知晓密令的设定',
+        entryKeys: ['maid.secret_order'],
+        nextAction: 'await_approval',
+      },
     })
 
     await waitForAssertion(() => {
@@ -582,6 +475,15 @@ describe('Workbench runtime acceptance matrix', () => {
       expect(rightPanel.props('toolCallCard')).toEqual(expect.objectContaining({
         title: '正文生成',
         toolCode: 'draft_generation',
+      }))
+      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
+        title: '第三章修订待办',
+        itemCountText: '2 项待办',
+        nextActionText: 'apply_todo_plan',
+      }))
+      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
+        title: '故事圣经更新待确认',
+        proposalSummary: '建议补充侍从知晓密令的设定',
       }))
     })
   })
@@ -594,14 +496,7 @@ describe('Workbench runtime acceptance matrix', () => {
     })
 
     emitStreamEvent('generation.failed', {
-      taskId: '70002',
-      sessionId: '90001',
-      turnId: '50002',
-      phase: 'failed',
-      message: '执行失败',
-      errorMsg: '质量审查超时',
-      nextAction: 'retry_generation',
-      recoverable: true,
+      ...createRuntimeFailedEvent(),
     })
 
     await waitForAssertion(() => {
@@ -609,7 +504,7 @@ describe('Workbench runtime acceptance matrix', () => {
       expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
         badgeText: '执行失败',
         failureReasonText: '质量审查超时',
-        nextActionText: 'retry_generation',
+        nextActionText: 'retry_task',
       }))
     })
   })
@@ -642,13 +537,13 @@ describe('Workbench runtime acceptance matrix', () => {
               { todoId: 'todo-1', title: '修复密令来源', status: 'pending', priority: 'HIGH' },
               { todoId: 'todo-2', title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
             ],
-            nextAction: 'apply_todo_plan',
+            recommendedNextAction: 'apply_todo_plan',
           },
           storyBibleProposalSummary: null,
         },
       },
     }
-    agentApiMock.resumeSession.mockResolvedValue(recoveryWithTodos)
+    agentApiMock.resumeSession.mockResolvedValue(recoveryWithTodos as any)
 
     const wrapper = await mountWorkbench()
 

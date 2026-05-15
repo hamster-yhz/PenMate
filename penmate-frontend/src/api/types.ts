@@ -34,8 +34,8 @@ export interface WorkbenchRuntimeToolCall {
   toolName?: string | null
   status?: string | null
   iteration?: number | null
-  argumentsPreview?: string | null
-  output?: string | null
+  argumentsPreview?: unknown
+  output?: unknown
   errorMessage?: string | null
 }
 
@@ -45,6 +45,14 @@ export interface WorkbenchRuntimeApproval {
   toolCallId?: string | null
   nextAction?: string | null
   [key: string]: unknown
+}
+
+export interface WorkbenchRuntimeStoryBibleApproval {
+  approvalId?: string | null
+  approvalType?: string | null
+  proposalSummary?: string | null
+  entryKeys?: string[] | null
+  nextAction?: string | null
 }
 
 export interface WorkbenchRuntimeEventSource {
@@ -60,6 +68,8 @@ export interface WorkbenchRuntimeEventSource {
   status?: string | null
   toolCall?: WorkbenchRuntimeToolCall | null
   approval?: WorkbenchRuntimeApproval | null
+  todoPlan?: WorkbenchTodoSummarySnapshot | Record<string, unknown> | null
+  storyBibleApproval?: WorkbenchRuntimeStoryBibleApproval | Record<string, unknown> | null
 }
 
 export interface WorkbenchActiveTaskRuntimeSnapshot {
@@ -68,16 +78,53 @@ export interface WorkbenchActiveTaskRuntimeSnapshot {
   activeToolCallsSnapshot?: WorkbenchRuntimeToolCall[] | null
 }
 
+export interface WorkbenchTaskProfileSnapshot {
+  intentTags?: string[] | null
+  executionProfile?: string | null
+  skills?: string[] | null
+  tools?: string[] | null
+  hardConstraints?: string[] | null
+  outputExpectation?: string | null
+  needsApproval?: boolean
+  includeStoryBible?: boolean
+  includeRag?: boolean
+  reasoningSummary?: string | null
+}
+
+export interface WorkbenchPromptPlanModuleSnapshot {
+  moduleKey?: string | null
+  source?: string | null
+  enabled?: boolean
+  notes?: string | null
+}
+
+export interface WorkbenchPromptPlanSnapshot {
+  modules?: WorkbenchPromptPlanModuleSnapshot[] | null
+  skills?: string[] | null
+  finalProfile?: string | null
+  assembledPromptPreview?: string | null
+}
+
+export interface WorkbenchContextPackageSnapshot {
+  sources?: string[] | null
+  missingContextFlags?: string[] | null
+  conflicts?: string[] | null
+  storyBibleEntries?: string[] | null
+  ragRefs?: string[] | null
+  styleSnapshot?: string | null
+  chapterScope?: string | null
+}
+
 export interface WorkbenchTodoSummarySnapshot {
   planTitle?: string | null
   items?: Array<Record<string, unknown>> | null
   nextAction?: string | null
+  recommendedNextAction?: string | null
 }
 
 export interface WorkbenchStoryBibleProposalSummarySnapshot {
   proposalSummary?: string | null
-  entryKeys?: string[] | null
-  nextAction?: string | null
+  items?: Array<Record<string, unknown>> | null
 }
 
 export interface WorkbenchResultSummarySnapshot {
@@ -94,6 +141,9 @@ export interface WorkbenchRecoveryContextSnapshot {
   modelConfigId?: string | null
   ragRefs?: string[] | null
   outlineSnapshot?: Record<string, unknown> | null
+  taskProfile?: WorkbenchTaskProfileSnapshot | null
+  promptPlan?: WorkbenchPromptPlanSnapshot | null
+  contextPackage?: WorkbenchContextPackageSnapshot | null
   activeTaskRuntime?: WorkbenchActiveTaskRuntimeSnapshot | null
   resultSummary?: WorkbenchResultSummarySnapshot | null
 }

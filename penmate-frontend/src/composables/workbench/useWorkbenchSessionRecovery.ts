@@ -1,47 +1,22 @@
 import { pickBusinessRecord } from '@/utils/apiPayload'
-
-type RecoverySnapshot = {
-  session?: {
-    sessionId?: string | null
-    title?: string | null
-    status?: string | null
-    boundStyle?: {
-      styleId?: number | string | null
-      name?: string | null
-    } | null
-  } | null
-  activeTask?: {
-    turnId?: string | null
-    taskId?: string | null
-    taskStatus?: string | null
-    streamChannelKey?: string | null
-  } | null
-  pendingApproval?: Record<string, unknown> | null
-  messages?: Array<Record<string, unknown>> | null
-  workbenchContext?: {
-    chapterId?: string | null
-    selectedText?: string | null
-    activePlugins?: string[] | null
-    modelConfigId?: string | null
-  } | null
-}
+import type { WorkbenchRecoverySnapshot } from '@/api/types'
 
 /**
  * 工作台会话恢复编排器。
  * <p>负责调用后端 recovery / resume 接口，并把 snapshot 回填到前端 store；若存在运行中任务，则自动重连任务流。</p>
  */
 export const useWorkbenchSessionRecovery = (deps: {
-  getSessionRecovery: (projectId: string, sessionId: string) => Promise<RecoverySnapshot>
-  resumeSession: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<RecoverySnapshot>
+  getSessionRecovery: (projectId: string, sessionId: string) => Promise<WorkbenchRecoverySnapshot>
+  resumeSession: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<WorkbenchRecoverySnapshot>
   openTurnStream: (projectId: string, sessionId: string, turnId: string) => EventSource
-  hydrateStore: (snapshot: RecoverySnapshot) => void
+  hydrateStore: (snapshot: WorkbenchRecoverySnapshot) => void
   resumeRunningTask?: (projectId: string, sessionId: string, turnId: string) => Promise<void>
 }) => {
   const restore = async (projectId: string, sessionId: string, operatorId?: string) => {
     const snapshot = pickBusinessRecord(await deps.resumeSession(projectId, sessionId, {
       trigger: 'WORKBENCH_ENTER',
       ...(operatorId != null ? { operatorId } : {}),
-    })) as RecoverySnapshot
+    })) as WorkbenchRecoverySnapshot
     deps.hydrateStore(snapshot)
     const turnId = snapshot?.activeTask?.turnId
     const taskStatus = String(snapshot?.activeTask?.taskStatus ?? '').toUpperCase()

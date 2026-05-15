@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.context.AgentContextRoutingFacade;
 import com.penmate.backend.application.agent.runtime.RuntimeStatusView;
+import com.penmate.backend.application.agent.runtime.StoryBibleApprovalView;
 import com.penmate.backend.application.agent.runtime.TaskRuntimeStatusPublisher;
 import com.penmate.backend.application.agent.runtime.ToolCallStatusView;
 import com.penmate.backend.application.agent.context.AgentContextRoutingRequest;
@@ -118,91 +119,31 @@ public class AgentGenerationWorkflow {
             transitionStatus(projectId, task, AgentTaskStatus.RUNNING, null);
             syncRuntimeSnapshot(projectId, task, taskContext, null, null, null, "planning", "phase:planning");
             taskRuntimeStatusPublisher.publishStarted(projectId,
-                    buildRuntimeStatusView(task, taskContext, "planning", "正在分析请求", true, "run_preflight"));
+                    buildRuntimeStatusView(task, taskContext, "planning", "正在分析请求", true, "run_preflight", null));
 
             String promptSnapshot = requirePromptSnapshot(task, traceId);
-            AgentLlmExecutionConfig preflightExecutionConfig = resolvePreflightExecutionConfig(task, traceId);
-            AgentPreflightDecision preflightDecision = agentPreflightCoordinator.coordinate(new AgentPreflightRequest(
-                    projectId,
-                    task.getConversationId(),
-                    taskContext.getChapterId(),
-                    promptSnapshot,
-                    preflightExecutionConfig
-            ));
+            
+            // 1. 预检分析阶段，协调模型确定执行策略和画像
+            AgentPreflightDecision preflightDecision = executePreflightPhase(projectId, task, taskContext, promptSnapshot, traceId);
             TaskProfile taskProfile = TaskProfileMapper.from(preflightDecision);
-            syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "planning", "phase:planning");
-            taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "planning", "正在分析请求", true, "compose_prompt"));
-            publishDerivedReviewPhases(projectId, task, taskContext, taskProfile);
+            
+            // 2. 规划并组装 Prompt 阶段
+            PromptPlan promptPlan = executePromptPlanPhase(projectId, task, taskContext, taskProfile, promptSnapshot);
+            
+            // 3. 收集执行所需的各种上下文资源（如记忆、规则、文档等）阶段
+            ContextPackage contextPackage = executeContextRoutingPhase(projectId, taskId, task, taskContext, taskProfile, preflightDecision, promptPlan, promptSnapshot);
 
-            PromptPlan promptPlan = promptComposer.compose(taskProfile, emptyContextPackage(), promptSnapshot);
-            syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, null, "planning", "phase:planning");
-            taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "planning", "正在规划章节", true, "route_context"));
+            // 4. 执行 Tool Loop 生成主逻辑阶段
+            AgentToolLoopIterationResult loopResult = executeToolLoopPhase(projectId, taskId, task, taskContext, taskProfile, promptPlan, contextPackage, promptSnapshot, traceId);
 
-            AgentContextRoutingResult routingResult = agentContextRoutingFacade.route(new AgentContextRoutingRequest(
-                    projectId,
-                    task.getConversationId(),
-                    task.getConversationId(),
-                    task.getTaskId(),
-                    taskContext.getChapterId(),
-                    null,
-                    extractUserMentionedEntities(promptSnapshot, taskContext.getSelectedText()),
-                    promptSnapshot,
-                    taskContext.getStyleSnapshotJson(),
-                    preflightDecision,
-                    taskProfile
-            ));
-            log.info("Agent 路由决策已生效: taskId={}, executionProfile={}, includeStyleContext={}, ragRouteEnabled={}, includeStoryBibleContext={}, storyBibleEnabled={}",
-                    taskId,
-                    preflightDecision.executionPromptProfile(),
-                    preflightDecision.includeStyleContext(),
-                    preflightDecision.includeRagContext(),
-                    preflightDecision.includeStoryBibleContext(),
-                    routingResult.storyBibleContext().enabled());
-            taskContext.setStyleSnapshotJson(routingResult.styleSnapshot());
-            ContextPackage contextPackage = buildContextPackage(taskContext, routingResult, preflightDecision);
-            persistStructuredSnapshots(projectId, taskId, taskContext, taskProfile, promptPlan, contextPackage);
-            syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "planning", "phase:planning");
-            taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "planning", "正在整理上下文", true, "start_execution"));
-
-            AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
-            syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "executing", "phase:executing");
-            taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "executing", "正在生成正文", true, "run_tool_loop"));
-            long llmStartAt = System.currentTimeMillis();
-            AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
-                    projectId,
-                    taskId,
-                    task.getConversationId(),
-                    0L,
-                    traceId,
-                    agentPromptAssembler.buildExecutionMessages(
-                            promptPlan,
-                            contextPackage,
-                            promptSnapshot
-                    ),
-                    executionConfig
-            );
             if (loopResult.waitingApproval()) {
-                log.info("Agent 工作流进入待审批: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
-                transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
-                ensureWaitingApprovalToolSnapshot(taskContext, loopResult);
-                syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "waiting_approval", "approval:" + loopResult.approvalId());
-                taskRuntimeStatusPublisher.publishWaitingApproval(projectId,
-                        buildRuntimeStatusView(task, taskContext, "waiting_approval", "等待审批", true, "await_approval"));
+                handleWaitingApproval(projectId, taskId, task, taskContext, taskProfile, promptPlan, contextPackage,
+                        loopResult.approvalId(), loopResult, loopResult.toolContext(), traceId);
                 return;
             }
+            
             String generatedText = loopResult.finalAssistantText();
-            long llmCostMs = System.currentTimeMillis() - llmStartAt;
-            log.info("agent.llm.generate.finished: projectId={}, taskId={}, traceId={}, costMs={}, outputLength={}",
-                    projectId,
-                    taskId,
-                    traceId,
-                    llmCostMs,
-                    safeLength(generatedText));
-
+            // 5. 检查并应用改写逻辑
             RevisionDecision revisionDecision = applyControlledRevisionIfNeeded(
                     projectId,
                     task,
@@ -213,7 +154,11 @@ public class AgentGenerationWorkflow {
             );
             String finalText = revisionDecision.generatedText();
             String effectiveToolTrace = revisionDecision.toolTraceJson();
+            
+            // 6. 如果有 TODO 计划则落库
             persistTodoPlanIfPresent(projectId, task, taskProfile, effectiveToolTrace, traceId);
+            
+            // 7. 处理故事设定集的提案和审批
             StoryBibleDecision storyBibleDecision = handleStoryBibleProposals(
                     projectId,
                     task,
@@ -224,43 +169,167 @@ public class AgentGenerationWorkflow {
                     traceId,
                     resumedFromWaitingApproval
             );
+            
             if (storyBibleDecision.waitingApproval()) {
                 agentTaskResultRecorder.recordAssistantResult(task, finalText, storyBibleDecision.toolTraceJson());
-                transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
                 agentRepository.updateGenerationTaskActiveApproval(projectId, task.getTaskId(), storyBibleDecision.approvalId());
                 taskContext.setActiveApprovalId(storyBibleDecision.approvalId());
-                ensureWaitingApprovalToolSnapshot(taskContext, AgentToolLoopIterationResult.waitingApproval(storyBibleDecision.approvalId(), loopResult.toolCallCount(), storyBibleDecision.toolTraceJson()));
-                syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "waiting_approval", "approval:" + storyBibleDecision.approvalId());
-                taskRuntimeStatusPublisher.publishWaitingApproval(projectId,
-                        buildRuntimeStatusView(task, taskContext, "waiting_approval", "等待审批", true, "await_approval"));
+                AgentToolLoopIterationResult approvalSnapshot = AgentToolLoopIterationResult.waitingApproval(
+                        storyBibleDecision.approvalId(), loopResult.toolCallCount(), storyBibleDecision.toolTraceJson());
+                handleWaitingApproval(projectId, taskId, task, taskContext, taskProfile, promptPlan, contextPackage,
+                        storyBibleDecision.approvalId(), approvalSnapshot, storyBibleDecision.toolTraceJson(), traceId);
                 return;
             }
 
-            agentTaskResultRecorder.recordAssistantResult(task, finalText, storyBibleDecision.toolTraceJson());
+            // 8. 记录结果、更新状态并收尾
+            finalizeTask(projectId, taskId, task, taskContext, taskProfile, promptPlan, contextPackage, finalText, storyBibleDecision.toolTraceJson(), traceId);
+        } catch (Exception ex) {
+            handleTaskFailure(projectId, taskId, task, taskContext, traceId, ex);
+        }
+    }
 
-            agentTaskRuntimeUpdater.updateGenerationRuntime(
+    /**
+     * 执行预检分析阶段，协调模型确定执行策略和画像。
+     */
+    private AgentPreflightDecision executePreflightPhase(Long projectId, AgentGenerationTask task, AgentTaskContext taskContext, String promptSnapshot, String traceId) {
+        AgentLlmExecutionConfig preflightExecutionConfig = resolvePreflightExecutionConfig(task, traceId);
+        AgentPreflightDecision preflightDecision = agentPreflightCoordinator.coordinate(new AgentPreflightRequest(
+                projectId,
+                task.getConversationId(),
+                taskContext.getChapterId(),
+                promptSnapshot,
+                preflightExecutionConfig
+        ));
+        TaskProfile taskProfile = TaskProfileMapper.from(preflightDecision);
+        syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "planning", "phase:planning");
+        taskRuntimeStatusPublisher.publishStatus(projectId,
+                buildRuntimeStatusView(task, taskContext, "planning", "正在分析请求", true, "compose_prompt", null));
+        publishDerivedReviewPhases(projectId, task, taskContext, taskProfile);
+        return preflightDecision;
+    }
+
+    /**
+     * 规划并组装 Prompt。
+     */
+    private PromptPlan executePromptPlanPhase(Long projectId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, String promptSnapshot) {
+        PromptPlan promptPlan = promptComposer.compose(taskProfile, emptyContextPackage(), promptSnapshot);
+        syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, null, "planning", "phase:planning");
+        taskRuntimeStatusPublisher.publishStatus(projectId,
+                buildRuntimeStatusView(task, taskContext, "planning", "正在规划章节", true, "route_context", null));
+        return promptPlan;
+    }
+
+    /**
+     * 收集执行所需的各种上下文资源（如记忆、规则、文档等）。
+     */
+    private ContextPackage executeContextRoutingPhase(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, AgentPreflightDecision preflightDecision, PromptPlan promptPlan, String promptSnapshot) {
+        AgentContextRoutingResult routingResult = agentContextRoutingFacade.route(new AgentContextRoutingRequest(
+                projectId,
+                task.getConversationId(),
+                task.getConversationId(),
+                task.getTaskId(),
+                taskContext.getChapterId(),
+                null,
+                extractUserMentionedEntities(promptSnapshot, taskContext.getSelectedText()),
+                promptSnapshot,
+                taskContext.getStyleSnapshotJson(),
+                preflightDecision,
+                taskProfile
+        ));
+        log.info("Agent 路由决策已生效: taskId={}, executionProfile={}, includeStyleContext={}, ragRouteEnabled={}, includeStoryBibleContext={}, storyBibleEnabled={}",
+                taskId,
+                preflightDecision.executionPromptProfile(),
+                preflightDecision.includeStyleContext(),
+                preflightDecision.includeRagContext(),
+                preflightDecision.includeStoryBibleContext(),
+                routingResult.storyBibleContext().enabled());
+        taskContext.setStyleSnapshotJson(routingResult.styleSnapshot());
+        ContextPackage contextPackage = buildContextPackage(taskContext, routingResult, preflightDecision);
+        persistStructuredSnapshots(projectId, taskId, taskContext, taskProfile, promptPlan, contextPackage);
+        syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "planning", "phase:planning");
+        taskRuntimeStatusPublisher.publishStatus(projectId,
+                buildRuntimeStatusView(task, taskContext, "planning", "正在整理上下文", true, "start_execution", null));
+        return contextPackage;
+    }
+
+    /**
+     * 执行 Tool Loop 生成主逻辑。
+     */
+    private AgentToolLoopIterationResult executeToolLoopPhase(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, PromptPlan promptPlan, ContextPackage contextPackage, String promptSnapshot, String traceId) {
+        AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
+        syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "executing", "phase:executing");
+        taskRuntimeStatusPublisher.publishStatus(projectId,
+                buildRuntimeStatusView(task, taskContext, "executing", "正在生成正文", true, "run_tool_loop", null));
+        long llmStartAt = System.currentTimeMillis();
+        AgentToolLoopIterationResult loopResult = agentToolLoopRunner.execute(
+                projectId,
+                taskId,
+                task.getConversationId(),
+                0L,
+                traceId,
+                agentPromptAssembler.buildExecutionMessages(
+                        promptPlan,
+                        contextPackage,
+                        promptSnapshot
+                ),
+                executionConfig
+        );
+        if (!loopResult.waitingApproval()) {
+            long llmCostMs = System.currentTimeMillis() - llmStartAt;
+            log.info("agent.llm.generate.finished: projectId={}, taskId={}, traceId={}, costMs={}, outputLength={}",
                     projectId,
                     taskId,
-                    task.getPromptSnapshot(),
-                    finalText,
                     traceId,
-                    taskProfile,
-                    promptPlan,
-                    contextPackage
-            );
-            agentResultPublisher.publishGenerationTokens(projectId, taskId, finalText, traceId);
-            transitionStatus(projectId, task, AgentTaskStatus.DONE, null);
-            syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "done", "done");
-            taskRuntimeStatusPublisher.publishDone(projectId,
-                    buildRuntimeStatusView(task, taskContext, "done", "已完成", false, "show_result"));
-            log.info("Agent 生成工作流完成: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
-        } catch (Exception ex) {
-            log.error("编排执行失败: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId, ex);
-            transitionToFailed(projectId, task, ex);
-            syncRuntimeSnapshot(projectId, task, taskContext, null, null, null, "failed", "failed");
-            taskRuntimeStatusPublisher.publishFailed(projectId,
-                    buildRuntimeStatusView(task, taskContext, "failed", safeErrorMessage(ex), true, "retry_task"));
+                    llmCostMs,
+                    safeLength(loopResult.finalAssistantText()));
         }
+        return loopResult;
+    }
+
+    /**
+     * 处理任务待审批状态。
+     */
+    private void handleWaitingApproval(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, PromptPlan promptPlan, ContextPackage contextPackage, Long approvalId, AgentToolLoopIterationResult snapshotResult, String toolTraceJson, String traceId) {
+        log.info("Agent 工作流进入待审批: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
+        transitionStatus(projectId, task, AgentTaskStatus.WAITING_APPROVAL, null);
+        ensureWaitingApprovalToolSnapshot(taskContext, snapshotResult);
+        syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "waiting_approval", "approval:" + approvalId);
+        taskRuntimeStatusPublisher.publishWaitingApproval(projectId,
+                buildRuntimeStatusView(task, taskContext, "waiting_approval", "等待审批", true, "await_approval", toolTraceJson));
+    }
+
+    /**
+     * 完成任务记录并发布状态。
+     */
+    private void finalizeTask(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, PromptPlan promptPlan, ContextPackage contextPackage, String finalText, String toolTraceJson, String traceId) {
+        agentTaskResultRecorder.recordAssistantResult(task, finalText, toolTraceJson);
+        agentTaskRuntimeUpdater.updateGenerationRuntime(
+                projectId,
+                taskId,
+                task.getPromptSnapshot(),
+                finalText,
+                traceId,
+                taskProfile,
+                promptPlan,
+                contextPackage
+        );
+        agentResultPublisher.publishGenerationTokens(projectId, taskId, finalText, traceId);
+        transitionStatus(projectId, task, AgentTaskStatus.DONE, null);
+        syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "done", "done");
+        taskRuntimeStatusPublisher.publishDone(projectId,
+                buildRuntimeStatusView(task, taskContext, "done", "已完成", false, "show_result", toolTraceJson));
+        log.info("Agent 生成工作流完成: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
+    }
+
+    /**
+     * 处理任务失败状态。
+     */
+    private void handleTaskFailure(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, String traceId, Exception ex) {
+        log.error("编排执行失败: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId, ex);
+        transitionToFailed(projectId, task, ex);
+        syncRuntimeSnapshot(projectId, task, taskContext, null, null, null, "failed", "failed");
+        taskRuntimeStatusPublisher.publishFailed(projectId,
+                buildRuntimeStatusView(task, taskContext, "failed", safeErrorMessage(ex), true, "retry_task", null));
     }
 
     private AgentTaskContext buildTaskContext(Long projectId, AgentGenerationTask task) {
@@ -824,8 +893,11 @@ public class AgentGenerationWorkflow {
                                                      String phase,
                                                      String message,
                                                      boolean recoverable,
-                                                     String nextAction) {
+                                                     String nextAction,
+                                                     String toolTraceJson) {
         ToolCallStatusView toolCallStatusView = resolveToolCallStatus(taskContext);
+        StoryBibleApprovalView storyBibleApprovalView = resolveStoryBibleApproval(taskContext, toolTraceJson);
+        TodoPlanView todoPlanView = resolveTodoPlan(taskContext, toolCallStatusView, toolTraceJson);
         return new RuntimeStatusView(
                 task == null ? null : task.getTaskId(),
                 task == null ? null : task.getConversationId(),
@@ -834,8 +906,8 @@ public class AgentGenerationWorkflow {
                 message,
                 toolCallStatusView,
                 resolveApprovalStatus(taskContext),
-                null,
-                null,
+                storyBibleApprovalView,
+                todoPlanView,
                 recoverable,
                 nextAction
         );
@@ -922,6 +994,111 @@ public class AgentGenerationWorkflow {
         return approval.isEmpty() ? null : approval;
     }
 
+    private StoryBibleApprovalView resolveStoryBibleApproval(AgentTaskContext taskContext, String toolTraceJson) {
+        Map<String, Object> approval = resolveApprovalStatus(taskContext);
+        Long approvalId = approval == null ? null : longValue(approval.get("approvalId"));
+        String approvalType = approval == null ? null : stringValue(approval.get("approvalType"));
+        Map<String, Object> persistedSummaryMap = approval == null ? null : mapValue(approval.get("approvalSummary"));
+        Map<String, Object> traceSummaryMap = extractStoryBibleApprovalSummary(toolTraceJson);
+        Map<String, Object> summaryMap = new LinkedHashMap<>();
+        if (persistedSummaryMap != null) {
+            summaryMap.putAll(persistedSummaryMap);
+        }
+        if (traceSummaryMap != null) {
+            summaryMap.putAll(traceSummaryMap);
+        }
+        if (summaryMap.isEmpty()) {
+            return null;
+        }
+        String proposalSummary = stringValue(summaryMap.get("proposalSummary"));
+        List<String> entryKeys = stringList(summaryMap.get("entryKeys"));
+        String nextAction = stringValue(summaryMap.get("nextAction"));
+        if (approvalType == null) {
+            approvalType = stringValue(summaryMap.get("approvalType"));
+        }
+        if (approvalId == null && approvalType == null && proposalSummary == null && entryKeys.isEmpty() && nextAction == null) {
+            return null;
+        }
+        return new StoryBibleApprovalView(
+                approvalId,
+                approvalType,
+                proposalSummary,
+                entryKeys,
+                nextAction
+        );
+    }
+
+    private TodoPlanView resolveTodoPlan(AgentTaskContext taskContext, ToolCallStatusView toolCallStatusView, String toolTraceJson) {
+        TodoPlanView todoPlanFromTrace = extractTodoPlan(toolTraceJson);
+        if (todoPlanFromTrace != null) {
+            return todoPlanFromTrace;
+        }
+        if (normalizeToolCode(toolCallStatusView) != null && !"todo_planner".equals(normalizeToolCode(toolCallStatusView))) {
+            return null;
+        }
+        TodoPlanView todoPlanFromOutput = extractTodoPlan(toolCallStatusView == null ? null : stringValue(toolCallStatusView.output()));
+        if (todoPlanFromOutput != null) {
+            return todoPlanFromOutput;
+        }
+        if (taskContext == null || taskContext.getRecoveryCursor() == null || !taskContext.getRecoveryCursor().startsWith("tool_call:todo_planner:")) {
+            return null;
+        }
+        return extractTodoPlan(taskContext.getActiveToolCallsSnapshot());
+    }
+
+    private String normalizeToolCode(ToolCallStatusView toolCallStatusView) {
+        if (toolCallStatusView == null || toolCallStatusView.toolCode() == null) {
+            return null;
+        }
+        return toolCallStatusView.toolCode().trim().toLowerCase();
+    }
+
+    private Map<String, Object> extractStoryBibleApprovalSummary(String toolTraceJson) {
+        String normalized = normalizeToolTraceJson(toolTraceJson);
+        if (normalized == null) {
+            return null;
+        }
+        String[] fragments = normalized.split("\\r?\\n+");
+        for (String fragment : fragments) {
+            Map<String, Object> candidate = parseStoryBibleApprovalSummary(fragment);
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+        return parseStoryBibleApprovalSummary(normalized);
+    }
+
+    private Map<String, Object> parseStoryBibleApprovalSummary(String rawJson) {
+        String normalized = normalizeToolTraceJson(rawJson);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> json = OBJECT_MAPPER.readValue(normalized, new TypeReference<Map<String, Object>>() {
+            });
+            if (!json.containsKey("approvalType")
+                    || !json.containsKey("proposalSummary")
+                    || !json.containsKey("entryKeys")
+                    || !json.containsKey("nextAction")) {
+                return null;
+            }
+            return json;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private Map<String, Object> mapValue(Object value) {
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            return null;
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            normalized.put(String.valueOf(entry.getKey()), entry.getValue());
+        }
+        return normalized;
+    }
+
     private Object parseJsonOrRaw(String json) {
         if (json == null || json.isBlank()) {
             return null;
@@ -975,17 +1152,17 @@ public class AgentGenerationWorkflow {
         if (taskProfile.includeStoryBible()) {
             syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "story_bible_review", "phase:story_bible_review");
             taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "story_bible_review", "正在整理故事圣经", true, "route_story_bible"));
+                    buildRuntimeStatusView(task, taskContext, "story_bible_review", "正在整理故事圣经", true, "route_story_bible", null));
         }
         if (taskProfile.tools().contains("quality_review") || taskProfile.skills().contains("CONTINUITY_CHECK")) {
             syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "quality_review", "phase:quality_review");
             taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "quality_review", "正在审查质量", true, "plan_quality_review"));
+                    buildRuntimeStatusView(task, taskContext, "quality_review", "正在审查质量", true, "plan_quality_review", null));
         }
         if (taskProfile.tools().contains("todo_planner")) {
             syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "todo_review", "phase:todo_review");
             taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "todo_review", "正在整理待办", true, "plan_todo_review"));
+                    buildRuntimeStatusView(task, taskContext, "todo_review", "正在整理待办", true, "plan_todo_review", null));
         }
     }
 

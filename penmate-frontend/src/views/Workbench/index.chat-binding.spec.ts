@@ -1,6 +1,10 @@
 import { shallowMount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createRuntimeWaitingApprovalEvent,
+  createStoryBibleWaitingApprovalRecoverySnapshot,
+} from '@/test/workbenchRuntimeContract.fixture'
 
 type ModelConfigCandidate = {
   modelConfigId: string
@@ -441,84 +445,7 @@ describe('Workbench index chat parent binding', () => {
   })
 
   it('passes_structured_runtime_presenter_cards_to_right_panel_after_resume_recovery', async () => {
-    agentApiMock.resumeSession = vi.fn(async () => ({
-      session: {
-        sessionId: '90001',
-        title: '第三章夜雨追踪',
-        status: 'ACTIVE',
-        boundStyle: { styleId: '81', name: '冷峻悬疑' },
-      },
-      activeTask: {
-        turnId: '50001',
-        taskId: '70001',
-        taskStatus: 'waiting_approval',
-        streamChannelKey: 'agent-turn-50001',
-      },
-      pendingApproval: {
-        approvalId: '88001',
-        approvalType: 'STORY_BIBLE_UPDATE',
-        toolCallId: 'call-story-1',
-        nextAction: 'await_approval',
-      },
-      messages: [
-        {
-          messageId: '1',
-          role: 'assistant',
-          contentMd: '',
-          approvalId: '88001',
-          approvalType: 'STORY_BIBLE_UPDATE',
-          approvalMessage: '故事圣经更新待确认',
-          approvalStatus: 'pending',
-        },
-      ],
-      workbenchContext: {
-        chapterId: '301',
-        selectedText: '',
-        activePlugins: ['outline.search'],
-        modelConfigId: 'mcfg-9001',
-        activeTaskRuntime: {
-          lastRuntimeStatus: 'story_bible_review',
-          recoveryCursor: 'approval:88001',
-          activeToolCallsSnapshot: [
-            {
-              toolCallId: 'call-story-1',
-              toolCode: 'story_bible_update',
-              toolName: '故事圣经整理',
-              status: 'waiting_approval',
-              iteration: 2,
-              argumentsPreview: '{"chapterId":"301"}',
-              output: '{"proposalSummary":"建议补充侍从知晓密令的设定"}',
-              errorMessage: '',
-            },
-            {
-              toolCallId: 'call-todo-1',
-              toolCode: 'todo_planner',
-              toolName: 'Todo 规划',
-              status: 'done',
-              iteration: 1,
-              argumentsPreview: '{"planningMode":"FOLLOW_UP_MODIFICATION"}',
-              output: '{"planTitle":"第三章修订待办"}',
-              errorMessage: '',
-            },
-          ],
-        },
-        resultSummary: {
-          todoSummary: {
-            planTitle: '第三章修订待办',
-            items: [
-              { title: '修正文脉络跳跃', status: 'pending', priority: 'HIGH' },
-              { title: '补充侍从知晓密令的设定', status: 'pending', priority: 'MEDIUM' },
-            ],
-            nextAction: 'apply_todo_plan',
-          },
-          storyBibleProposalSummary: {
-            proposalSummary: '建议补充侍从知晓密令的设定',
-            entryKeys: ['maid.secret_order'],
-            nextAction: 'await_approval',
-          },
-        },
-      },
-    }))
+    agentApiMock.resumeSession = vi.fn(async () => createStoryBibleWaitingApprovalRecoverySnapshot() as any)
 
     const wrapper = await mountWorkbench()
 
@@ -532,10 +459,7 @@ describe('Workbench index chat parent binding', () => {
         title: '故事圣经整理',
         toolCode: 'story_bible_update',
       }))
-      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
-        title: '第三章修订待办',
-        itemCountText: '2 项待办',
-      }))
+      expect(rightPanel.props('todoPlanCard')).toBeNull()
       expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
         title: '故事圣经更新待确认',
         proposalSummary: '建议补充侍从知晓密令的设定',
@@ -1095,11 +1019,7 @@ describe('Workbench index chat parent binding', () => {
 
     emitStreamEvent('generation.started')
     emitStreamEvent('generation.waiting_approval', {
-      approvalId: 45,
-      approvalType: 'chapter_patch',
-      approvalMessage: '请先审批改写方案',
-      approvalTime: '2026-04-26 23:10:00',
-      approvalStatus: 'pending',
+      ...createRuntimeWaitingApprovalEvent(),
     })
     emitStreamEvent('generation.done', {
       status: 'done',
@@ -1119,6 +1039,39 @@ describe('Workbench index chat parent binding', () => {
 
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
     expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes_live_runtime_todo_and_story_bible_cards_to_right_panel_after_stream_events', async () => {
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      wrapper.get('[data-testid="chat-input"]')
+    })
+
+    await wrapper.get('[data-testid="chat-input"]').setValue('请输出实时运行态卡片')
+    await wrapper.get('[data-testid="chat-send"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.createTurn).toHaveBeenCalledTimes(1)
+      expect(streamListeners.get('generation.status')?.length || 0).toBeGreaterThan(0)
+      expect(streamListeners.get('generation.waiting_approval')?.length || 0).toBeGreaterThan(0)
+    })
+
+    emitStreamEvent('generation.waiting_approval', {
+      ...createRuntimeWaitingApprovalEvent(),
+    })
+
+    await waitForAssertion(() => {
+      const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
+      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
+        title: '第三章修订待办',
+        itemCountText: '2 项待办',
+      }))
+      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
+        title: '故事圣经更新待确认',
+        proposalSummary: '建议补充侍从知晓密令的设定',
+      }))
+    })
   })
 
   it('passes_string_model_config_id_to_generation_payload_when_loading_preferred_model', async () => {

@@ -255,6 +255,9 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
         payload.put("modelConfigId", resolveModelConfigId(activeTask.getModelSnapshotJson()));
         payload.put("ragRefs", resolveRagRefs(activeTask));
         payload.put("outlineSnapshot", parseJsonOrRaw(activeTask.getOutlineSnapshotJson()));
+        payload.put("taskProfile", parseJsonOrRaw(activeTask.getTaskProfileJson()));
+        payload.put("promptPlan", parseJsonOrRaw(activeTask.getPromptPlanJson()));
+        payload.put("contextPackage", parseJsonOrRaw(activeTask.getContextPackageJson()));
         payload.put("activeTaskRuntime", buildActiveTaskRuntime(activeTask));
         payload.put("resultSummary", buildResultSummary(activeTask.getTaskId()));
         try {

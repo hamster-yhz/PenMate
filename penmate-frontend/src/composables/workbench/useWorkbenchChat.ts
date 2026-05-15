@@ -370,16 +370,31 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     } catch (error: any) {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
-      agentStatusDetailText.value = runtime.getErrorMessage(error)
-      runtimeEventSource.value = {
-        eventName: 'generation.failed',
-        phase: 'failed',
-        message: '执行失败',
-        errorMsg: runtime.getErrorMessage(error),
-        nextAction: 'retry_generation',
-        recoverable: true,
-      }
-      const failureText = `生成失败：${runtime.getErrorMessage(error)}`
+      const resolvedErrorMessage = runtime.getErrorMessage(error)
+      agentStatusDetailText.value = resolvedErrorMessage
+      const currentRuntimeEvent = runtimeEventSource.value as WorkbenchRuntimeEventSource | null
+      const existingFailedRuntime: WorkbenchRuntimeEventSource | null = currentRuntimeEvent && currentRuntimeEvent.eventName === 'generation.failed'
+        ? currentRuntimeEvent
+        : null
+      runtimeEventSource.value = existingFailedRuntime
+        ? {
+            ...existingFailedRuntime,
+            phase: existingFailedRuntime.phase || 'failed',
+            recoverable: existingFailedRuntime.recoverable ?? true,
+            errorMsg: existingFailedRuntime.errorMsg == null
+              ? resolvedErrorMessage
+              : existingFailedRuntime.errorMsg,
+            message: existingFailedRuntime.message || resolvedErrorMessage,
+          }
+        : {
+            eventName: 'generation.failed',
+            phase: 'failed',
+            message: '执行失败',
+            errorMsg: resolvedErrorMessage,
+            nextAction: 'retry_generation',
+            recoverable: true,
+          }
+      const failureText = `生成失败：${resolvedErrorMessage}`
       if (assistantMsg) {
         assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
       } else {
@@ -507,16 +522,31 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     } catch (error: any) {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
-      agentStatusDetailText.value = runtime.getErrorMessage(error)
-      runtimeEventSource.value = {
-        eventName: 'generation.failed',
-        phase: 'failed',
-        message: '执行失败',
-        errorMsg: runtime.getErrorMessage(error),
-        nextAction: 'retry_generation',
-        recoverable: true,
-      }
-      const failureText = `生成失败：${runtime.getErrorMessage(error)}`
+      const resolvedErrorMessage = runtime.getErrorMessage(error)
+      agentStatusDetailText.value = resolvedErrorMessage
+      const currentRuntimeEvent = runtimeEventSource.value as WorkbenchRuntimeEventSource | null
+      const existingFailedRuntime: WorkbenchRuntimeEventSource | null = currentRuntimeEvent && currentRuntimeEvent.eventName === 'generation.failed'
+        ? currentRuntimeEvent
+        : null
+      runtimeEventSource.value = existingFailedRuntime
+        ? {
+            ...existingFailedRuntime,
+            phase: existingFailedRuntime.phase || 'failed',
+            recoverable: existingFailedRuntime.recoverable ?? true,
+            errorMsg: existingFailedRuntime.errorMsg == null
+              ? resolvedErrorMessage
+              : existingFailedRuntime.errorMsg,
+            message: existingFailedRuntime.message || resolvedErrorMessage,
+          }
+        : {
+            eventName: 'generation.failed',
+            phase: 'failed',
+            message: '执行失败',
+            errorMsg: resolvedErrorMessage,
+            nextAction: 'retry_generation',
+            recoverable: true,
+          }
+      const failureText = `生成失败：${resolvedErrorMessage}`
       assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
     } finally {
       runtime.closeGenerationStream()

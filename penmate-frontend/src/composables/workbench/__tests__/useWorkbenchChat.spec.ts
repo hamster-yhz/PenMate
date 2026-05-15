@@ -1410,6 +1410,63 @@ describe('useWorkbenchChat', () => {
     expect(stream.close).toHaveBeenCalled()
   })
 
+  it('reuses_placeholder_assistant_message_when_generation_failed_event_only_has_message', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const closeTaskStream = vi.fn()
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn().mockResolvedValue({ taskId: 9009, status: 'running' }),
+      getGeneration: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream,
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '继续生成'
+    const sendPromise = chat.sendMessage()
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.failed')?.({
+      data: JSON.stringify({ message: '质量审查超时' }),
+    } as MessageEvent<string>)
+
+    await sendPromise
+
+    expect(chat.messages.value).toEqual([
+      { id: 1, role: 'user', text: '继续生成' },
+      { id: 2, role: 'assistant', text: '生成失败：质量审查超时' },
+    ])
+    expect(chat.generationPhase.value).toBe('failed')
+    expect(chat.generationTaskStatus.value).toBe('failed')
+    expect(chat.streamingAssistantMsgId.value).toBe(null)
+    expect(chat.isGenerating.value).toBe(false)
+    expect(closeTaskStream).toHaveBeenCalled()
+    expect(stream.close).toHaveBeenCalled()
+  })
+
   it('surfaces_string_stream_errors_in_failure_message', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
 

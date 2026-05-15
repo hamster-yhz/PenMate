@@ -1,61 +1,32 @@
 import { describe, expect, it } from 'vitest'
+import {
+  createFailedRecoverySnapshot,
+  createRuntimeFailedEvent,
+  createRuntimeWaitingApprovalEvent,
+  createStoryBibleWaitingApprovalRecoverySnapshot,
+  createTodoReviewRecoverySnapshot,
+} from '@/test/workbenchRuntimeContract.fixture'
 import { createWorkbenchRuntimePresenter } from './useWorkbenchRuntimePresenter'
 
 describe('createWorkbenchRuntimePresenter', () => {
   it('maps_runtime_phases_into_user_facing_status_copy_and_cards', () => {
     const presenter = createWorkbenchRuntimePresenter()
+    const runtime = createRuntimeWaitingApprovalEvent()
 
     const viewModel = presenter.present({
       runtime: {
+        ...runtime,
         eventName: 'generation.status',
         phase: 'story_bible_review',
         message: '正在整理故事圣经',
-        recoverable: true,
         nextAction: 'review_story_bible',
         toolCall: {
-          toolCallId: 'call-story-1',
-          toolCode: 'story_bible_update',
-          toolName: '故事圣经整理',
+          ...(runtime.toolCall || {}),
           status: 'running',
           iteration: 2,
-          argumentsPreview: '{"chapterId":"301"}',
-          output: '{"proposalSummary":"建议补充侍从知晓密令的设定"}',
-          errorMessage: '',
         },
       },
-      recovery: {
-        pendingApproval: {
-          approvalId: '88001',
-          approvalType: 'STORY_BIBLE_UPDATE',
-          toolCallId: 'call-story-1',
-          nextAction: 'await_approval',
-        },
-        workbenchContext: {
-          activeTaskRuntime: {
-            lastRuntimeStatus: 'story_bible_review',
-            recoveryCursor: 'approval:88001',
-            activeToolCallsSnapshot: [
-              {
-                toolCallId: 'call-story-1',
-                toolCode: 'story_bible_update',
-                toolName: '故事圣经整理',
-                status: 'waiting_approval',
-                iteration: 2,
-                argumentsPreview: '{"chapterId":"301"}',
-                output: '{"proposalSummary":"建议补充侍从知晓密令的设定"}',
-                errorMessage: '',
-              },
-            ],
-          },
-          resultSummary: {
-            storyBibleProposalSummary: {
-              proposalSummary: '建议补充侍从知晓密令的设定',
-              entryKeys: ['maid.secret_order'],
-              nextAction: 'await_approval',
-            },
-          },
-        },
-      },
+      recovery: createStoryBibleWaitingApprovalRecoverySnapshot(),
     })
 
     expect(viewModel.status.badgeText).toBe('正在整理故事圣经')
@@ -75,18 +46,69 @@ describe('createWorkbenchRuntimePresenter', () => {
     })
   })
 
-  it('restores_todo_plan_and_failure_guidance_from_recovery_snapshot_without_local_fallback', () => {
+  it('restores_todo_plan_and_failure_guidance_from_recovery_snapshot_without_top_level_error_msg', () => {
+    const presenter = createWorkbenchRuntimePresenter()
+    const failedRecovery = createFailedRecoverySnapshot()
+    const todoRecovery = createTodoReviewRecoverySnapshot()
+
+    const viewModel = presenter.present({
+      runtime: createRuntimeFailedEvent(),
+      recovery: {
+        ...failedRecovery,
+        workbenchContext: {
+          ...failedRecovery.workbenchContext,
+          resultSummary: todoRecovery.workbenchContext?.resultSummary,
+        },
+      },
+    })
+
+    expect(viewModel.status.badgeText).toBe('执行失败')
+    expect(viewModel.status.failureReasonText).toBe('质量审查超时')
+    expect(viewModel.status.nextActionText).toBe('retry_task')
+    expect(viewModel.todoPlanCard).toMatchObject({
+      title: '第三章修订待办',
+      itemCountText: '2 项待办',
+      nextActionText: 'apply_todo_plan',
+    })
+    expect(viewModel.todoPlanCard?.items).toEqual([
+      { title: '修复密令来源', statusText: 'pending', priorityText: 'HIGH' },
+      { title: '补充侍从转述桥段', statusText: 'pending', priorityText: 'MEDIUM' },
+    ])
+    expect(viewModel.toolCallCard).toMatchObject({
+      title: '质量审查',
+      toolCode: 'quality_review',
+      statusText: '执行失败',
+    })
+  })
+
+  it('restores_story_bible_entry_keys_from_persisted_proposal_items_without_fake_summary_entry_keys', () => {
+    const presenter = createWorkbenchRuntimePresenter()
+    const recovery = createStoryBibleWaitingApprovalRecoverySnapshot()
+
+    const viewModel = presenter.present({
+      recovery: {
+        ...recovery,
+        pendingApproval: {
+          approvalId: '88001',
+          approvalType: 'STORY_BIBLE_UPDATE',
+          toolCallId: 'call-story-1',
+          nextAction: 'await_approval',
+        },
+      },
+    })
+
+    expect(viewModel.storyBibleApprovalCard).toMatchObject({
+      title: '故事圣经更新待确认',
+      proposalSummary: '建议补充侍从知晓密令的设定',
+      entryKeys: ['maid.secret_order'],
+      nextActionText: 'await_approval',
+    })
+  })
+
+  it('restores_todo_next_action_from_recommended_next_action_alias_in_recovery_summary', () => {
     const presenter = createWorkbenchRuntimePresenter()
 
     const viewModel = presenter.present({
-      runtime: {
-        eventName: 'generation.failed',
-        phase: 'failed',
-        message: '执行失败',
-        errorMsg: '质量审查超时',
-        recoverable: true,
-        nextAction: 'retry_generation',
-      },
       recovery: {
         pendingApproval: null,
         workbenchContext: {
@@ -99,8 +121,6 @@ describe('createWorkbenchRuntimePresenter', () => {
                 toolCode: 'todo_planner',
                 toolName: 'Todo 规划',
                 status: 'done',
-                iteration: 1,
-                argumentsPreview: '{"planningMode":"FOLLOW_UP_MODIFICATION"}',
                 output: '{"planTitle":"第三章修订待办"}',
                 errorMessage: '',
               },
@@ -113,33 +133,87 @@ describe('createWorkbenchRuntimePresenter', () => {
                 { title: '修正文脉络跳跃', status: 'pending', priority: 'HIGH' },
                 { title: '补充侍从知晓密令的设定', status: 'pending', priority: 'MEDIUM' },
               ],
-              nextAction: 'apply_todo_plan',
+              recommendedNextAction: 'apply_todo_plan',
             },
           },
         },
       },
     })
 
-    expect(viewModel.status.badgeText).toBe('执行失败')
-    expect(viewModel.status.failureReasonText).toBe('质量审查超时')
-    expect(viewModel.status.nextActionText).toBe('retry_generation')
     expect(viewModel.todoPlanCard).toMatchObject({
       title: '第三章修订待办',
       itemCountText: '2 项待办',
       nextActionText: 'apply_todo_plan',
     })
-    expect(viewModel.todoPlanCard?.items).toEqual([
-      { title: '修正文脉络跳跃', statusText: 'pending', priorityText: 'HIGH' },
-      { title: '补充侍从知晓密令的设定', statusText: 'pending', priorityText: 'MEDIUM' },
-    ])
-    expect(viewModel.toolCallCard).toMatchObject({
-      title: 'Todo 规划',
-      toolCode: 'todo_planner',
-      statusText: '已完成',
-    })
   })
 
-  it('builds_todo_and_story_bible_cards_directly_from_live_runtime_events', () => {
+  it('prefers_todo_next_action_over_stale_story_bible_summary_when_phase_is_todo_review', () => {
+    const presenter = createWorkbenchRuntimePresenter()
+
+    const viewModel = presenter.present({
+      recovery: {
+        pendingApproval: null,
+        workbenchContext: {
+          activeTaskRuntime: {
+            lastRuntimeStatus: 'todo_review',
+            recoveryCursor: 'tool_call:todo_planner:call-todo-1',
+            activeToolCallsSnapshot: [
+              {
+                toolCallId: 'call-todo-1',
+                toolCode: 'todo_planner',
+                toolName: 'Todo 规划',
+                status: 'done',
+                output: '{"planTitle":"第三章修订待办"}',
+                errorMessage: '',
+              },
+            ],
+          },
+          resultSummary: {
+            storyBibleProposalSummary: {
+              proposalSummary: '旧的故事圣经审批残留',
+              items: [
+                {
+                  entryKey: 'maid.secret_order',
+                  entryType: 'CHARACTER_KNOWLEDGE',
+                },
+              ],
+            },
+            todoSummary: {
+              planTitle: '第三章修订待办',
+              items: [
+                { title: '修正文脉络跳跃', status: 'pending', priority: 'HIGH' },
+              ],
+              recommendedNextAction: 'apply_todo_plan',
+            },
+          },
+        },
+      },
+    })
+
+    expect(viewModel.status.badgeText).toBe('正在整理待办')
+    expect(viewModel.status.nextActionText).toBe('apply_todo_plan')
+    expect(viewModel.todoPlanCard?.nextActionText).toBe('apply_todo_plan')
+  })
+
+  it('uses_message_as_failure_reason_when_failed_runtime_has_no_error_msg', () => {
+    const presenter = createWorkbenchRuntimePresenter()
+
+    const viewModel = presenter.present({
+      runtime: {
+        eventName: 'generation.failed',
+        phase: 'failed',
+        message: '质量审查超时',
+        recoverable: true,
+        nextAction: 'retry_generation',
+      },
+    })
+
+    expect(viewModel.status.badgeText).toBe('执行失败')
+    expect(viewModel.status.failureReasonText).toBe('质量审查超时')
+    expect(viewModel.status.nextActionText).toBe('retry_generation')
+  })
+
+  it('prefers_runtime_todo_plan_and_story_bible_approval_over_tool_call_output', () => {
     const presenter = createWorkbenchRuntimePresenter()
 
     const todoViewModel = presenter.present({
@@ -148,21 +222,28 @@ describe('createWorkbenchRuntimePresenter', () => {
         phase: 'todo_review',
         message: '正在整理待办',
         nextAction: 'review_todo_plan',
+        todoPlan: {
+          planTitle: '第三章修订待办',
+          items: [
+            { title: '修正文脉络跳跃', status: 'pending', priority: 'HIGH' },
+            { title: '补充侍从知晓密令的设定', status: 'pending', priority: 'MEDIUM' },
+          ],
+          recommendedNextAction: 'apply_todo_plan',
+        },
         toolCall: {
           toolCallId: 'call-todo-1',
           toolCode: 'todo_planner',
           toolName: 'Todo 规划',
           status: 'running',
           output: JSON.stringify({
-            planTitle: '第三章修订待办',
+            planTitle: '错误的旧待办',
             items: [
-              { title: '修正文脉络跳跃', status: 'pending', priority: 'HIGH' },
-              { title: '补充侍从知晓密令的设定', status: 'pending', priority: 'MEDIUM' },
+              { title: '不应再消费 toolCall.output', status: 'pending', priority: 'LOW' },
             ],
-            nextAction: 'apply_todo_plan',
+            recommendedNextAction: 'stale_todo_action',
           }),
         },
-      },
+      } as any,
     })
 
     expect(todoViewModel.todoPlanCard).toMatchObject({
@@ -170,6 +251,10 @@ describe('createWorkbenchRuntimePresenter', () => {
       itemCountText: '2 项待办',
       nextActionText: 'apply_todo_plan',
     })
+    expect(todoViewModel.todoPlanCard?.items).toEqual([
+      { title: '修正文脉络跳跃', statusText: 'pending', priorityText: 'HIGH' },
+      { title: '补充侍从知晓密令的设定', statusText: 'pending', priorityText: 'MEDIUM' },
+    ])
 
     const storyBibleViewModel = presenter.present({
       runtime: {
@@ -184,18 +269,25 @@ describe('createWorkbenchRuntimePresenter', () => {
           nextAction: 'await_approval',
           entryKeys: ['maid.secret_order'],
         },
+        storyBibleApproval: {
+          approvalId: '88001',
+          approvalType: 'STORY_BIBLE_UPDATE',
+          proposalSummary: '建议补充侍从知晓密令的设定',
+          entryKeys: ['maid.secret_order'],
+          nextAction: 'await_approval',
+        },
         toolCall: {
           toolCallId: 'call-story-1',
           toolCode: 'story_bible_update',
           toolName: '故事圣经整理',
           status: 'waiting_approval',
           output: JSON.stringify({
-            proposalSummary: '建议补充侍从知晓密令的设定',
-            entryKeys: ['maid.secret_order'],
-            nextAction: 'await_approval',
+            proposalSummary: '旧的错误提案摘要',
+            entryKeys: ['stale.entry'],
+            nextAction: 'stale_story_action',
           }),
         },
-      },
+      } as any,
     })
 
     expect(storyBibleViewModel.storyBibleApprovalCard).toMatchObject({
@@ -244,8 +336,12 @@ describe('createWorkbenchRuntimePresenter', () => {
           resultSummary: {
             storyBibleProposalSummary: {
               proposalSummary: '建议补充侍从知晓密令的设定',
-              entryKeys: ['maid.secret_order'],
-              nextAction: 'await_approval',
+              items: [
+                {
+                  entryKey: 'maid.secret_order',
+                  entryType: 'CHARACTER_KNOWLEDGE',
+                },
+              ],
             },
           },
         },
