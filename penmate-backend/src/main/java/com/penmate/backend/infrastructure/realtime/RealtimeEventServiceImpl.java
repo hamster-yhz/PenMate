@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.realtime;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
@@ -230,6 +231,24 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         generationSseEmitterHub.complete(taskId);
     }
 
+    @Override
+    public void publishTaskRuntimeStatus(Long projectId, String eventType, Object runtimeStatusView) {
+        if (runtimeStatusView == null || eventType == null || eventType.isBlank()) {
+            return;
+        }
+        Map<String, Object> payload = objectMapper.convertValue(runtimeStatusView, new TypeReference<>() {
+        });
+        Long taskId = toLong(payload.get("taskId"));
+        if (taskId == null) {
+            return;
+        }
+        publishProjectEvent(projectId, eventType, payload);
+        generationSseEmitterHub.publish(taskId, eventType, payload);
+        if ("generation.done".equals(eventType) || "generation.failed".equals(eventType)) {
+            generationSseEmitterHub.complete(taskId);
+        }
+    }
+
     /**
      * 广播 WebSocket 消息到项目所有在线会话。
      * <p>流程：清理失效连接 -> 序列化 payload -> 安全发送并剔除发送失败会话。</p>
@@ -265,6 +284,20 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         } catch (IOException ex) {
             return false;
         }
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text.trim());
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
     }
 }
 

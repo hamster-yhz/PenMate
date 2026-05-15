@@ -4,6 +4,7 @@ import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import com.penmate.backend.domain.agent.model.AgentTaskResult;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import org.springframework.stereotype.Repository;
@@ -114,6 +115,12 @@ public class AgentRepositoryImpl implements AgentRepository {
         setTaskContextField(context, "ragSnapshotJson", stringValue(mapValue(contextRow, "ragSnapshotJson")));
         setTaskContextField(context, "pluginBindingsJson", stringValue(mapValue(contextRow, "pluginBindingsJson")));
         setTaskContextField(context, "modelSnapshotJson", stringValue(mapValue(contextRow, "modelSnapshotJson")));
+        setTaskContextField(context, "taskProfileJson", stringValue(mapValue(contextRow, "taskProfileJson")));
+        setTaskContextField(context, "promptPlanJson", stringValue(mapValue(contextRow, "promptPlanJson")));
+        setTaskContextField(context, "contextPackageJson", stringValue(mapValue(contextRow, "contextPackageJson")));
+        setTaskContextField(context, "activeToolCallsSnapshot", stringValue(mapValue(contextRow, "activeToolCallsSnapshot")));
+        setTaskContextField(context, "lastRuntimeStatus", stringValue(mapValue(contextRow, "lastRuntimeStatus")));
+        setTaskContextField(context, "recoveryCursor", stringValue(mapValue(contextRow, "recoveryCursor")));
         setTaskContextField(context, "contextHash", stringValue(mapValue(contextRow, "contextHash")));
         return context;
     }
@@ -257,7 +264,43 @@ public class AgentRepositoryImpl implements AgentRepository {
     }
 
     @Override
+    public int updateGenerationTaskActiveApproval(Long projectId, Long taskId, Long approvalId) {
+        return agentMapper.updateGenerationTaskActiveApproval(projectId, taskId, approvalId);
+    }
+
+    @Override
     public int updateGenerationTaskRuntime(Long projectId, Long taskId, String tokenUsageJson, String costJson, String traceId) {
         return agentMapper.updateGenerationTaskRuntime(projectId, taskId, tokenUsageJson, costJson, traceId);
+    }
+
+    @Override
+    public int updateGenerationTaskSnapshots(Long projectId,
+                                             Long taskId,
+                                             String taskProfileJson,
+                                             String promptPlanJson,
+                                             String contextPackageJson,
+                                             String activeToolCallsSnapshot,
+                                             String lastRuntimeStatus,
+                                             String recoveryCursor) {
+        return agentMapper.updateGenerationTaskSnapshots(
+                projectId,
+                taskId,
+                taskProfileJson,
+                promptPlanJson,
+                contextPackageJson,
+                activeToolCallsSnapshot,
+                lastRuntimeStatus,
+                recoveryCursor
+        );
+    }
+
+    @Override
+    public int insertTaskResult(AgentTaskResult taskResult) {
+        return agentMapper.insertTaskResult(taskResult);
+    }
+
+    @Override
+    public int updateGenerationTaskResultLink(Long projectId, Long taskId, Long resultId) {
+        return agentMapper.updateGenerationTaskResultLink(projectId, taskId, resultId);
     }
 }

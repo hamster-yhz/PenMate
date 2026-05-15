@@ -68,4 +68,8 @@ public interface RealtimeEventService {
     void publishGenerationDone(Long projectId, Long taskId, String status);
 
     void publishGenerationFailed(Long projectId, Long taskId, String errorCode, String errorMsg);
+
+    default void publishTaskRuntimeStatus(Long projectId, String eventType, Object runtimeStatusView) {
+        // default no-op for backward compatibility
+    }
 }

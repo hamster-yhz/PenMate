@@ -31,6 +31,18 @@ public class AgentTaskContext {
     private String styleSnapshotJson;
     /** 模型快照 JSON。 */
     private String modelSnapshotJson;
+    /** TaskProfile 快照 JSON。 */
+    private String taskProfileJson;
+    /** PromptPlan 快照 JSON。 */
+    private String promptPlanJson;
+    /** ContextPackage 快照 JSON。 */
+    private String contextPackageJson;
+    /** 当前运行中的工具调用快照 JSON。 */
+    private String activeToolCallsSnapshot;
+    /** 最近一次运行态状态。 */
+    private String lastRuntimeStatus;
+    /** 恢复游标；用于标记从哪个运行态断点恢复。 */
+    private String recoveryCursor;
     /** 上下文哈希，用于恢复一致性校验。 */
     private String contextHash;
 
@@ -52,6 +64,12 @@ public class AgentTaskContext {
         copied.pluginBindingsJson = source.pluginBindingsJson;
         copied.styleSnapshotJson = source.styleSnapshotJson;
         copied.modelSnapshotJson = source.modelSnapshotJson;
+        copied.taskProfileJson = source.taskProfileJson;
+        copied.promptPlanJson = source.promptPlanJson;
+        copied.contextPackageJson = source.contextPackageJson;
+        copied.activeToolCallsSnapshot = source.activeToolCallsSnapshot;
+        copied.lastRuntimeStatus = source.lastRuntimeStatus;
+        copied.recoveryCursor = source.recoveryCursor;
         copied.contextHash = source.contextHash;
         return copied;
     }
@@ -130,6 +148,30 @@ public class AgentTaskContext {
         return modelSnapshotJson;
     }
 
+    public String getTaskProfileJson() {
+        return taskProfileJson;
+    }
+
+    public String getPromptPlanJson() {
+        return promptPlanJson;
+    }
+
+    public String getContextPackageJson() {
+        return contextPackageJson;
+    }
+
+    public String getActiveToolCallsSnapshot() {
+        return activeToolCallsSnapshot;
+    }
+
+    public String getLastRuntimeStatus() {
+        return lastRuntimeStatus;
+    }
+
+    public String getRecoveryCursor() {
+        return recoveryCursor;
+    }
+
     public String getContextHash() {
         return contextHash;
     }
@@ -140,6 +182,30 @@ public class AgentTaskContext {
      */
     public void setStyleSnapshotJson(String styleSnapshotJson) {
         this.styleSnapshotJson = styleSnapshotJson;
+    }
+
+    public void setTaskProfileJson(String taskProfileJson) {
+        this.taskProfileJson = taskProfileJson;
+    }
+
+    public void setPromptPlanJson(String promptPlanJson) {
+        this.promptPlanJson = promptPlanJson;
+    }
+
+    public void setContextPackageJson(String contextPackageJson) {
+        this.contextPackageJson = contextPackageJson;
+    }
+
+    public void setActiveToolCallsSnapshot(String activeToolCallsSnapshot) {
+        this.activeToolCallsSnapshot = activeToolCallsSnapshot;
+    }
+
+    public void setLastRuntimeStatus(String lastRuntimeStatus) {
+        this.lastRuntimeStatus = lastRuntimeStatus;
+    }
+
+    public void setRecoveryCursor(String recoveryCursor) {
+        this.recoveryCursor = recoveryCursor;
     }
 
     public void setContextId(Long contextId) {

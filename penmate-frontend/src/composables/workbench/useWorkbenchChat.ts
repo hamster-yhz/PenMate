@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import type { WorkbenchRuntimeEventSource } from '@/api/types'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
 import {
   applyAssistantEventMetadata,
@@ -24,6 +25,7 @@ type UseWorkbenchChatDeps = {
   getContext: () => ContextProfile
   getCurrentProjectId: () => string
   getActiveChapterKey: () => string
+  getSelectedText: () => string
   getActivePlugins: () => string[]
   ensureModelConfigId: (projectId: string) => Promise<string | null>
   refreshActiveModelInfo?: (projectId: string) => Promise<string | null | void>
@@ -31,26 +33,18 @@ type UseWorkbenchChatDeps = {
   createSession: (projectId: string, payload: Record<string, unknown>) => Promise<unknown>
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
-  getTask: (projectId: string, taskId: string) => Promise<unknown>
   openTurnStream: (projectId: string, sessionId: string, turnId: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeTaskStream?: (stream: EventSource | null) => void
   revealAssistantText?: (assistantMsg: ChatMessage, rawText: string) => Promise<void>
   scrollChat: () => void
   nextTick: () => Promise<void>
-  waitForPolling?: () => Promise<void>
   notifyWarning?: (message: string) => void
   debugChatState?: (stage: string, extra?: Record<string, unknown>) => void
   onRequireModelSelection?: () => void
-  enablePollingFallback?: boolean
 }
 
 export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
-  /**
-   * Chat shell 的单一状态源。
-   * <p>这里统一承载消息列表、历史会话面板、输入框和运行时状态，
-   * 避免父组件再额外拼装一层“派生 chat 状态”导致恢复/续流错位。</p>
-   */
   const messages = ref<ChatMessage[]>([])
   const showConversationPanel = ref(false)
   const conversationLoading = ref(false)
@@ -61,6 +55,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
   const agentStatusDetailText = ref('')
   const streamingAssistantMsgId = ref<string | number | null>(null)
+  const runtimeEventSource = ref<WorkbenchRuntimeEventSource | null>(null)
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
@@ -69,6 +64,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     turnId: null,
     taskId: null,
   })
+  const recoveredSelectedText = ref('')
 
   let msgIdCounter = 1
   let generationStream: EventSource | null = null
@@ -107,8 +103,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
   const createTurn = (projectId: string, sessionId: string, payload: Record<string, unknown>) => deps.createTurn(projectId, sessionId, payload)
 
-  const getTask = (projectId: string, taskId: string) => deps.getTask(projectId, taskId)
-
   const openTurnStream = (projectId: string, sessionId: string, turnId: string) => deps.openTurnStream(projectId, sessionId, turnId)
 
   const closeTaskStream = deps.closeTaskStream
@@ -120,10 +114,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     updatedAt: String(item.updatedAt ?? item.resumedAt ?? item.createdAt ?? ''),
   })
 
-  /**
-   * timeline 只负责“消息/历史列表”投影，不直接接触任务流状态。
-   * 这样可以把列表恢复与流式任务恢复拆开，降低 WAITING_APPROVAL / RUNNING 切换时的耦合复杂度。
-   */
   const timeline = createChatTimeline({
     getMessages: () => messages.value,
     setMessages: (value) => {
@@ -152,11 +142,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     scrollChat,
   })
 
-  /**
-   * runtime 负责当前 task 的单流生命周期管理。
-   * <p>恢复会话、重新发送消息、审批继续执行最终都会汇聚到这里，
-   * 从而避免同一会话被重复订阅造成双流输出。</p>
-   */
   const runtime = createTaskRuntime({
     getGenerationTaskStatus: () => generationTaskStatus.value,
     setGenerationTaskStatus: (value: GenerationTaskStatus | '') => {
@@ -176,9 +161,25 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     openGenerationStream: openTurnStream,
     addStreamListener: deps.addStreamListener,
     closeGenerationStream: closeTaskStream,
-    getGeneration: getTask,
-    waitForPolling: deps.waitForPolling,
     scrollChat: deps.scrollChat,
+    setRuntimeEventSource: (value) => {
+      runtimeEventSource.value = value
+    },
+    onToken: (token) => {
+      const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
+      if (!assistantMsg) return
+      assistantMsg.text += escapeHtml(token)
+    },
+    onToolCall: (payload) => {
+      const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
+      if (!assistantMsg) return
+      applyAssistantEventMetadata(assistantMsg, payload as ChatRecord)
+    },
+    onWaitingApproval: (payload) => {
+      const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
+      if (!assistantMsg) return
+      applyAssistantEventMetadata(assistantMsg, payload as ChatRecord)
+    },
   })
 
   const loadConversationList = async (projectId: string) => {
@@ -279,6 +280,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     generationPhase.value = 'preparing'
     generationTaskStatus.value = ''
     agentStatusDetailText.value = ''
+    runtimeEventSource.value = null
     debugChatState('user-send-start', { userTextLength: userText.length })
     await scrollChat()
 
@@ -308,13 +310,14 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         throw new Error('未选择可用模型，请先在模型设置中保存并切换模型')
       }
 
+      const selectedText = String(deps.getSelectedText?.() ?? '').trim() || recoveredSelectedText.value
       const generation = pickBusinessRecord(await createTurn(projectId, conversationId, {
         operatorId,
         userMessage: userText,
         taskRequest: {
           taskType: 'WRITE',
           chapterId: deps.getActiveChapterKey() || null,
-          selectedText: '',
+          selectedText,
           modelConfigId,
           activePlugins: deps.getActivePlugins() || [],
         },
@@ -349,15 +352,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       streamingAssistantMsgId.value = assistantMsg.id
       await scrollChat()
 
-      let finalStatus: GenerationTaskStatus | ''
-      try {
-        finalStatus = await runtime.consumeGenerationStream(projectId, conversationId, String(turnId), assistantMsg)
-      } catch (streamError: any) {
-        if (!deps.enablePollingFallback) {
-          throw streamError
-        }
-        finalStatus = await runtime.pollGenerationAsFallback(projectId, String(taskId), assistantMsg)
-      }
+      const finalStatus = await runtime.consumeGenerationStream(projectId, conversationId, String(turnId))
 
       if (finalStatus === 'failed' || finalStatus === 'cancelled') {
         throw new Error(`生成任务结束：${finalStatus}`)
@@ -376,6 +371,14 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       agentStatusDetailText.value = runtime.getErrorMessage(error)
+      runtimeEventSource.value = {
+        eventName: 'generation.failed',
+        phase: 'failed',
+        message: '执行失败',
+        errorMsg: runtime.getErrorMessage(error),
+        nextAction: 'retry_generation',
+        recoverable: true,
+      }
       const failureText = `生成失败：${runtime.getErrorMessage(error)}`
       if (assistantMsg) {
         assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
@@ -401,6 +404,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const hydrateFromRecoverySnapshot = (snapshot: Record<string, any> | null | undefined) => {
+    runtimeEventSource.value = null
     const normalizedSnapshot = pickBusinessRecord(snapshot) as {
       session?: { sessionId?: string | number | null }
       activeTask?: {
@@ -408,6 +412,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         taskId?: string | number | null
         taskStatus?: string | null
       }
+      workbenchContext?: {
+        selectedText?: string | null
+      } | null
       messages?: Array<Record<string, unknown>>
     }
     const recoveryMessages = Array.isArray(normalizedSnapshot.messages) ? normalizedSnapshot.messages : []
@@ -423,6 +430,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
     currentConversationId.value = normalizedSnapshot?.session?.sessionId == null ? null : String(normalizedSnapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
+    recoveredSelectedText.value = String(normalizedSnapshot?.workbenchContext?.selectedText ?? '')
     currentActiveTask.value = {
       sessionId: currentConversationId.value,
       turnId: normalizedSnapshot?.activeTask?.turnId == null ? null : String(normalizedSnapshot.activeTask.turnId),
@@ -481,26 +489,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     await scrollChat()
 
     try {
-      let finalStatus: GenerationTaskStatus | ''
-      try {
-        finalStatus = await runtime.consumeGenerationStream(projectId, sessionId, turnId, assistantMsg)
-      } catch (streamError: any) {
-        debugChatState('resume-stream-error', {
-          projectId,
-          sessionId,
-          turnId,
-          errorMessage: runtime.getErrorMessage(streamError),
-          fallbackEnabled: !!deps.enablePollingFallback,
-        })
-        if (!deps.enablePollingFallback) {
-          throw streamError
-        }
-        const recoveryTaskId = String(currentActiveTask.value.taskId ?? '')
-        if (!recoveryTaskId || recoveryTaskId === '0') {
-          throw new Error('恢复续流失败，缺少 taskId 用于轮询兜底')
-        }
-        finalStatus = await runtime.pollGenerationAsFallback(projectId, recoveryTaskId, assistantMsg)
-      }
+      const finalStatus = await runtime.consumeGenerationStream(projectId, sessionId, turnId)
 
       if (finalStatus === 'failed' || finalStatus === 'cancelled') {
         throw new Error(`生成任务结束：${finalStatus}`)
@@ -519,6 +508,14 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       agentStatusDetailText.value = runtime.getErrorMessage(error)
+      runtimeEventSource.value = {
+        eventName: 'generation.failed',
+        phase: 'failed',
+        message: '执行失败',
+        errorMsg: runtime.getErrorMessage(error),
+        nextAction: 'retry_generation',
+        recoverable: true,
+      }
       const failureText = `生成失败：${runtime.getErrorMessage(error)}`
       assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
     } finally {
@@ -547,6 +544,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     generationStatusText,
     agentStatusDetailText,
     streamingAssistantMsgId,
+    runtimeEventSource,
     currentConversationId,
     currentModelName,
     loadConversationList,
@@ -555,7 +553,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     toggleConversationPanel,
     sendMessage,
     resumeRunningTask,
-    pollGenerationAsFallback: runtime.pollGenerationAsFallback,
     consumeGenerationStream: runtime.consumeGenerationStream,
     scrollChat,
     applyAssistantEventMetadata,

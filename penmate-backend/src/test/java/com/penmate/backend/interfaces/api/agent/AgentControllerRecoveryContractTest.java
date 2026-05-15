@@ -60,14 +60,22 @@ class AgentControllerRecoveryContractTest {
     @Test
     void should_return_recovery_snapshot() throws Exception {
         when(agentSessionRecoveryAppService.getRecovery(101L, 90001L, "trace-recovery-1"))
-                .thenReturn(recoverySnapshot(90001L, "WAITING_APPROVAL"));
+                .thenReturn(recoverySnapshot(90001L, "waiting_approval"));
 
         mockMvc().perform(get("/api/v1/novels/101/agent/sessions/90001/recovery")
                         .header("X-Trace-Id", "trace-recovery-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
                 .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("81"))
-                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("WAITING_APPROVAL"))
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("waiting_approval"))
+                .andExpect(jsonPath("$.data.workbenchContext.activeTaskRuntime.lastRuntimeStatus").value("waiting_approval"))
+                .andExpect(jsonPath("$.data.workbenchContext.activeTaskRuntime.recoveryCursor").value("approval:88001"))
+                .andExpect(jsonPath("$.data.workbenchContext.activeTaskRuntime.activeToolCallsSnapshot[0].toolCode").value("quality_review"))
+                .andExpect(jsonPath("$.data.workbenchContext.activeTaskRuntime.activeToolCallsSnapshot[0].status").value("waiting_approval"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.draftSummary.draftText").value("第三章初稿正文"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.qualityReportSummary.reviewSummary").value("存在剧情逻辑问题，需要修订。"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.todoSummary.planTitle").value("第三章修订待办"))
+                .andExpect(jsonPath("$.data.workbenchContext.resultSummary.storyBibleProposalSummary.proposalSummary").value("建议补充侍从知晓密令的设定"))
                 .andExpect(jsonPath("$.meta.traceId").value("trace-recovery-1"));
 
         verify(agentSessionRecoveryAppService).getRecovery(101L, 90001L, "trace-recovery-1");
@@ -76,7 +84,7 @@ class AgentControllerRecoveryContractTest {
     @Test
     void should_resume_session_and_return_latest_recovery_snapshot() throws Exception {
         when(agentSessionRecoveryAppService.resumeSession(eq(101L), eq(90001L), eq(201L), eq("WORKBENCH_ENTER"), eq("trace-resume-1")))
-                .thenReturn(recoverySnapshot(90001L, "RUNNING"));
+                .thenReturn(recoverySnapshot(90001L, "running"));
 
         mockMvc().perform(post("/api/v1/novels/101/agent/sessions/90001/resume")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +96,7 @@ class AgentControllerRecoveryContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
                 .andExpect(jsonPath("$.data.session.boundStyle.styleId").value("81"))
-                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"))
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("running"))
                 .andExpect(jsonPath("$.meta.traceId").value("trace-resume-1"));
 
         verify(agentSessionRecoveryAppService).resumeSession(101L, 90001L, 201L, "WORKBENCH_ENTER", "trace-resume-1");
@@ -264,7 +272,23 @@ class AgentControllerRecoveryContractTest {
                 new AgentSessionRecoveryResult.ActiveTaskView(50001L, 70001L, taskStatus, 71001L),
                 null,
                 java.util.List.of(),
-                null
+                Map.of(
+                        "activeTaskRuntime", Map.of(
+                                "lastRuntimeStatus", taskStatus,
+                                "recoveryCursor", "approval:88001",
+                                "activeToolCallsSnapshot", java.util.List.of(Map.of(
+                                        "toolCallId", "tool-1",
+                                        "toolCode", "quality_review",
+                                        "status", "waiting_approval"
+                                ))
+                        ),
+                        "resultSummary", Map.of(
+                                "draftSummary", Map.of("draftText", "第三章初稿正文"),
+                                "qualityReportSummary", Map.of("reviewSummary", "存在剧情逻辑问题，需要修订。"),
+                                "todoSummary", Map.of("planTitle", "第三章修订待办"),
+                                "storyBibleProposalSummary", Map.of("proposalSummary", "建议补充侍从知晓密令的设定")
+                        )
+                )
         );
     }
 

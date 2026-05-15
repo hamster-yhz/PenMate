@@ -130,6 +130,9 @@ class AgentTurnPersistenceContractTest {
             assertThat(snapshot.getActiveTask().getTaskId()).isEqualTo(940011L);
             assertThat(snapshot.getActiveTask().getTaskStatus()).isEqualTo("pending");
             assertThat(snapshot.getActiveTask().getSelectedText()).isEqualTo("恢复测试选中文本");
+            assertThat(snapshot.getActiveTask().getActiveToolCallsSnapshot()).isNull();
+            assertThat(snapshot.getActiveTask().getLastRuntimeStatus()).isNull();
+            assertThat(snapshot.getActiveTask().getRecoveryCursor()).isNull();
             assertThat(agentRepository.findGenerationTask(920001L, 940011L))
                     .as("runtime task repository reload should restore promptSnapshot from agent_tasks")
                     .extracting(com.penmate.backend.domain.agent.model.AgentGenerationTask::getPromptSnapshot)
@@ -157,6 +160,7 @@ class AgentTurnPersistenceContractTest {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
             statement.execute("DROP TABLE IF EXISTS agent_task_contexts");
+            statement.execute("DROP TABLE IF EXISTS agent_task_results");
             statement.execute("DROP TABLE IF EXISTS agent_tasks");
             statement.execute("DROP TABLE IF EXISTS agent_generation_tasks");
             statement.execute("DROP TABLE IF EXISTS agent_turns");
@@ -290,8 +294,25 @@ class AgentTurnPersistenceContractTest {
                         plugin_bindings_json VARCHAR(2000) NULL,
                         style_snapshot_json VARCHAR(2000) NULL,
                         model_snapshot_json VARCHAR(2000) NULL,
+                        task_profile_json VARCHAR(2000) NULL,
+                        prompt_plan_json VARCHAR(2000) NULL,
+                        context_package_json VARCHAR(2000) NULL,
+                        active_tool_calls_snapshot VARCHAR(2000) NULL,
+                        last_runtime_status VARCHAR(64) NULL,
+                        recovery_cursor VARCHAR(255) NULL,
                         context_hash VARCHAR(128) NOT NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE agent_task_results (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        result_id BIGINT NULL,
+                        task_id BIGINT NOT NULL,
+                        draft_summary VARCHAR(2000) NULL,
+                        quality_report_summary VARCHAR(2000) NULL,
+                        todo_summary VARCHAR(2000) NULL,
+                        story_bible_proposal_summary VARCHAR(2000) NULL
                     )
                     """);
             statement.execute("""

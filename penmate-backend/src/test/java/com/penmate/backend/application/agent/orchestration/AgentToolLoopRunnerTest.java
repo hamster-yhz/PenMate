@@ -2,6 +2,8 @@ package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.runtime.RuntimeStatusView;
+import com.penmate.backend.application.agent.runtime.TaskRuntimeStatusPublisher;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
@@ -12,7 +14,9 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResumeService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallSnapshotMapper;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
+import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +53,12 @@ class AgentToolLoopRunnerTest {
 
     @Mock
     private ToolCallResumeService toolCallResumeService;
+
+    @Mock
+    private AgentRepository agentRepository;
+
+    @Mock
+    private TaskRuntimeStatusPublisher taskRuntimeStatusPublisher;
 
     @Spy
     private ToolCallSnapshotMapper toolCallSnapshotMapper;
@@ -251,6 +261,61 @@ class AgentToolLoopRunnerTest {
     }
 
     @Test
+    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_PUBLISH_STRUCTURED_TOOL_RUNTIME_STATUS_ON_WAITING_APPROVAL() {
+        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
+                .providerCode("openai-compatible")
+                .modelName("gpt-test")
+                .build();
+        List<Map<String, Object>> initialMessages = List.of(Map.of(
+                "role", "user",
+                "content", "删除书籍"
+        ));
+
+        AgentTaskContext persistedContext = AgentTaskContext.runningOf(901L, 11L, "RUNNING", 3001L, "片段");
+        persistedContext.setTurnId(50011L);
+
+        when(agentRepository.findTaskContext(11L)).thenReturn(persistedContext);
+        when(agentRepository.updateGenerationTaskSnapshots(eq(1L), eq(11L), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+        when(toolDefinitionSource.listLlmSchemas())
+                .thenReturn(List.of(new AgentLlmToolSchema("book_crud", "书籍 CRUD", "{\"type\":\"object\"}")));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "tool_calls",
+                        "",
+                        List.of(new AgentLlmToolCall("call_9", "book_crud", "{\"operation\":\"delete\",\"projectId\":9001}")),
+                        "{\"finish_reason\":\"tool_calls\"}"
+                ));
+        when(toolCallApplicationService.executeToolCall(any()))
+                .thenReturn(ToolCallResult.waitingApproval(99L));
+
+        AgentToolLoopIterationResult result = agentToolLoopRunner.execute(
+                1L,
+                11L,
+                9L,
+                0L,
+                "trace-runtime-tool",
+                initialMessages,
+                executionConfig
+        );
+
+        assertThat(result.waitingApproval()).isTrue();
+        ArgumentCaptor<RuntimeStatusView> toolCallCaptor = ArgumentCaptor.forClass(RuntimeStatusView.class);
+        verify(taskRuntimeStatusPublisher).publishToolCall(eq(1L), toolCallCaptor.capture());
+
+        assertThat(toolCallCaptor.getValue().taskId()).isEqualTo(11L);
+        assertThat(toolCallCaptor.getValue().sessionId()).isEqualTo(9L);
+        assertThat(toolCallCaptor.getValue().phase()).isEqualTo("tool_call");
+        assertThat(toolCallCaptor.getValue().toolCall()).isNotNull();
+        assertThat(toolCallCaptor.getValue().toolCall().toolCode()).isEqualTo("book_crud");
+        assertThat(toolCallCaptor.getValue().toolCall().status()).isEqualTo("waiting_approval");
+        assertThat(toolCallCaptor.getValue().recoverable()).isTrue();
+        assertThat(persistedContext.getLastRuntimeStatus()).isEqualTo("tool_call");
+        assertThat(persistedContext.getRecoveryCursor()).isEqualTo("approval:99");
+        assertThat(persistedContext.getActiveToolCallsSnapshot()).contains("\"toolCallId\":\"call_9\"");
+    }
+
+    @Test
     void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_CARRY_TOOL_CONTEXT_ACROSS_MULTIPLE_TOOL_CALLS_BEFORE_APPROVAL() {
         AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
                 .providerCode("openai-compatible")
@@ -294,6 +359,146 @@ class AgentToolLoopRunnerTest {
 
         assertThat(secondRequest.assistantToolCallsJson()).contains("call_1").contains("call_2");
         assertThat(result.toolContext()).isEqualTo("{\"context\":\"补充背景设定\"}");
+    }
+
+    @Test
+    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_FEED_STRUCTURED_DRAFT_TOOL_OUTPUT_BACK_TO_NEXT_TURN_MESSAGES() {
+        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
+                .providerCode("openai-compatible")
+                .modelName("gpt-test")
+                .build();
+        List<Map<String, Object>> initialMessages = List.of(Map.of(
+                "role", "user",
+                "content", "请先生成第三章正文初稿"
+        ));
+        AgentLlmToolSchema draftGenerationSchema = new AgentLlmToolSchema(
+                "draft_generation",
+                "生成正文、改写正文或套用修订",
+                "{\"type\":\"object\"}"
+        );
+        String draftResultJson = "{\"draftText\":\"第三章初稿正文\",\"operation\":\"generate\",\"preservedConstraints\":[\"保留第一人称\",\"保留女主冷静口吻\"],\"sourceSummary\":\"第三章冲突提纲\"}";
+
+        when(toolDefinitionSource.listLlmSchemas())
+                .thenReturn(List.of(draftGenerationSchema));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "tool_calls",
+                        "",
+                        List.of(new AgentLlmToolCall(
+                                "call_draft_1",
+                                "draft_generation",
+                                "{\"operation\":\"generate\",\"prompt\":\"请先生成第三章正文初稿\",\"preservedConstraints\":[\"保留第一人称\",\"保留女主冷静口吻\"],\"sourceSummary\":\"第三章冲突提纲\"}"
+                        )),
+                        "{\"finish_reason\":\"tool_calls\"}"
+                ))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "stop",
+                        "这是基于初稿整理后的最终答复",
+                        List.of(),
+                        "{\"finish_reason\":\"stop\"}"
+                ));
+        when(toolCallApplicationService.executeToolCall(any()))
+                .thenReturn(ToolCallResult.success(draftResultJson));
+
+        AgentToolLoopIterationResult result = agentToolLoopRunner.execute(
+                1L,
+                11L,
+                9L,
+                0L,
+                "trace-draft-1",
+                initialMessages,
+                executionConfig
+        );
+
+        assertThat(result.waitingApproval()).isFalse();
+        assertThat(result.finalAssistantText()).isEqualTo("这是基于初稿整理后的最终答复");
+        assertThat(result.toolCallCount()).isEqualTo(1);
+        assertThat(result.toolContext()).isEqualTo(draftResultJson);
+
+        ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway, times(2)).generateTurn(requestCaptor.capture(), eq(executionConfig));
+        AgentLlmTurnRequest secondRequest = requestCaptor.getAllValues().get(1);
+
+        assertThat(secondRequest.messages()).hasSize(3);
+        assertThat(secondRequest.messages().get(2))
+                .containsEntry("role", "tool")
+                .containsEntry("tool_call_id", "call_draft_1")
+                .containsEntry("content", draftResultJson);
+        assertThat(String.valueOf(secondRequest.messages().get(2).get("content")))
+                .contains("\"draftText\":\"第三章初稿正文\"")
+                .contains("\"operation\":\"generate\"")
+                .contains("\"preservedConstraints\":[\"保留第一人称\",\"保留女主冷静口吻\"]")
+                .contains("\"sourceSummary\":\"第三章冲突提纲\"");
+    }
+
+    @Test
+    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_FEED_STRUCTURED_TODO_PLAN_TOOL_OUTPUT_BACK_TO_NEXT_TURN_MESSAGES() {
+        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
+                .providerCode("openai-compatible")
+                .modelName("gpt-test")
+                .build();
+        List<Map<String, Object>> initialMessages = List.of(Map.of(
+                "role", "user",
+                "content", "请先整理第三章修订待办"
+        ));
+        AgentLlmToolSchema todoPlannerSchema = new AgentLlmToolSchema(
+                "todo_planner",
+                "将用户请求、质量问题与后续规划整理为结构化 Todo 规划建议",
+                "{\"type\":\"object\"}"
+        );
+        String todoPlanJson = "{\"planTitle\":\"第三章修订待办\",\"planSummary\":\"整理修订动作\",\"recommendedNextAction\":\"先修复 P0 问题\",\"items\":[{\"title\":\"修复主角提前知情\",\"description\":\"删除越界知情描写并补充情报来源\",\"priority\":\"P0\",\"sourceType\":\"QUALITY_REVIEW\",\"recommendedStatus\":\"TODO\",\"suggestedAutoCreate\":true,\"rationale\":\"高风险剧情逻辑问题\",\"acceptanceCriteria\":[\"情报来源合理\"],\"dependsOn\":[]}]}";
+
+        when(toolDefinitionSource.listLlmSchemas())
+                .thenReturn(List.of(todoPlannerSchema));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "tool_calls",
+                        "",
+                        List.of(new AgentLlmToolCall(
+                                "call_todo_1",
+                                "todo_planner",
+                                "{\"planningMode\":\"FOLLOW_UP_MODIFICATION\",\"userRequest\":\"请先整理第三章修订待办\"}"
+                        )),
+                        "{\"finish_reason\":\"tool_calls\"}"
+                ))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "stop",
+                        "这是基于 todo 规划整理后的最终答复",
+                        List.of(),
+                        "{\"finish_reason\":\"stop\"}"
+                ));
+        when(toolCallApplicationService.executeToolCall(any()))
+                .thenReturn(ToolCallResult.success(todoPlanJson));
+
+        AgentToolLoopIterationResult result = agentToolLoopRunner.execute(
+                1L,
+                11L,
+                9L,
+                0L,
+                "trace-todo-1",
+                initialMessages,
+                executionConfig
+        );
+
+        assertThat(result.waitingApproval()).isFalse();
+        assertThat(result.finalAssistantText()).isEqualTo("这是基于 todo 规划整理后的最终答复");
+        assertThat(result.toolCallCount()).isEqualTo(1);
+        assertThat(result.toolContext()).isEqualTo(todoPlanJson);
+
+        ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway, times(2)).generateTurn(requestCaptor.capture(), eq(executionConfig));
+        AgentLlmTurnRequest secondRequest = requestCaptor.getAllValues().get(1);
+
+        assertThat(secondRequest.messages()).hasSize(3);
+        assertThat(secondRequest.messages().get(2))
+                .containsEntry("role", "tool")
+                .containsEntry("tool_call_id", "call_todo_1")
+                .containsEntry("content", todoPlanJson);
+        assertThat(String.valueOf(secondRequest.messages().get(2).get("content")))
+                .contains("\"planTitle\":\"第三章修订待办\"")
+                .contains("\"recommendedNextAction\":\"先修复 P0 问题\"")
+                .contains("\"sourceType\":\"QUALITY_REVIEW\"")
+                .contains("\"recommendedStatus\":\"TODO\"");
     }
 
     @Test

@@ -4,10 +4,12 @@ import java.util.Objects;
 
 public record AgentContextRoutingResult(
         String styleSnapshot,
-        StoryBibleContextResult storyBibleContext
+        StoryBibleContextResult storyBibleContext,
+        ContextPackage contextPackage
 ) {
 
     public AgentContextRoutingResult {
         storyBibleContext = storyBibleContext == null ? StoryBibleContextResult.noop() : storyBibleContext;
+        contextPackage = Objects.requireNonNull(contextPackage, "contextPackage");
     }
 }

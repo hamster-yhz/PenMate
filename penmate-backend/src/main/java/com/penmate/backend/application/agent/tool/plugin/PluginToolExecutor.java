@@ -3,7 +3,6 @@ package com.penmate.backend.application.agent.tool.plugin;
 import com.penmate.backend.application.plugin.PluginApplicationService;
 import com.penmate.backend.domain.plugin.model.PluginCallLog;
 import com.penmate.backend.domain.plugin.model.PluginProjectInstall;
-import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -16,12 +15,9 @@ import java.util.List;
 public class PluginToolExecutor {
 
     private final PluginApplicationService pluginApplicationService;
-    private final RealtimeEventService realtimeEventService;
 
-    public PluginToolExecutor(PluginApplicationService pluginApplicationService,
-                              RealtimeEventService realtimeEventService) {
+    public PluginToolExecutor(PluginApplicationService pluginApplicationService) {
         this.pluginApplicationService = pluginApplicationService;
-        this.realtimeEventService = realtimeEventService;
     }
 
     public PluginToolExecuteResult execute(PluginToolExecuteCommand request) {
@@ -53,15 +49,6 @@ public class PluginToolExecutor {
             callLog.setStatus("success");
             pluginApplicationService.recordToolCall(callLog);
 
-            realtimeEventService.publishGenerationToolCall(
-                    request.projectId(),
-                    request.taskId(),
-                    pluginCode,
-                    toolName,
-                    "success",
-                    null,
-                    output
-            );
             return PluginToolExecuteResult.success(pluginCode, toolName, output);
         } catch (Exception ex) {
             int latencyMs = (int) (System.currentTimeMillis() - startAt);
@@ -77,15 +64,6 @@ public class PluginToolExecutor {
             callLog.setErrorMsg(ex.getMessage());
             pluginApplicationService.recordToolCall(callLog);
 
-            realtimeEventService.publishGenerationToolCall(
-                    request.projectId(),
-                    request.taskId(),
-                    pluginCode,
-                    toolName,
-                    "failed",
-                    ex.getMessage(),
-                    null
-            );
             return PluginToolExecuteResult.failed(pluginCode, toolName, ex.getMessage());
         }
     }

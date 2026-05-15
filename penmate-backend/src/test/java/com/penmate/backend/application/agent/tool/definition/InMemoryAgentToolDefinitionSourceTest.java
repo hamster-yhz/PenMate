@@ -168,6 +168,38 @@ class InMemoryAgentToolDefinitionSourceTest {
     }
 
     @Test
+    void UT_APP_AGENT_TOOL_DEFINITION_SOURCE_LIST_LLM_SCHEMAS_SHOULD_EXPOSE_REAL_DRAFT_GENERATION_TOOL_DEFINITION() {
+        InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
+                new DraftGenerationToolDefinition()
+        ));
+
+        AgentToolDescriptor descriptor = source.getRequired("draft_generation");
+        Map<String, AgentLlmToolSchema> schemasByToolCode = source.listLlmSchemas().stream()
+                .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
+
+        assertThat(descriptor.presentation().displayName()).isEqualTo("正文生成");
+        assertThat(schemasByToolCode).containsKey("draft_generation");
+        assertThat(schemasByToolCode.get("draft_generation").description()).contains("生成正文");
+        assertThat(schemasByToolCode.get("draft_generation").parametersJsonSchema()).contains("\"oneOf\"");
+    }
+
+    @Test
+    void UT_APP_AGENT_TOOL_DEFINITION_SOURCE_LIST_LLM_SCHEMAS_SHOULD_EXPOSE_REAL_TODO_PLANNER_TOOL_DEFINITION() {
+        InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
+                new TodoPlannerToolDefinition()
+        ));
+
+        AgentToolDescriptor descriptor = source.getRequired("todo_planner");
+        Map<String, AgentLlmToolSchema> schemasByToolCode = source.listLlmSchemas().stream()
+                .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
+
+        assertThat(descriptor.presentation().displayName()).isEqualTo("Todo 规划");
+        assertThat(schemasByToolCode).containsKey("todo_planner");
+        assertThat(schemasByToolCode.get("todo_planner").description()).contains("Todo");
+        assertThat(schemasByToolCode.get("todo_planner").parametersJsonSchema()).contains("\"planningMode\"");
+    }
+
+    @Test
     void UT_APP_AGENT_TOOL_DEFINITION_SOURCE_GET_REQUIRED_SHOULD_EXPOSE_OPERATION_POLICY_DECLARED_BY_TOOL_DEFINITION() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
                 new TestToolDefinition(

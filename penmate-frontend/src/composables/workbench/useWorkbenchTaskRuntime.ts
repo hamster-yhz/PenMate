@@ -1,13 +1,10 @@
-import type { ChatMessage, GenerationPhase } from '@/components/workbench/workbenchTypes'
+import type { WorkbenchRuntimeApproval, WorkbenchRuntimeEventSource, WorkbenchRuntimeToolCall } from '@/api/types'
+import type { GenerationPhase } from '@/components/workbench/workbenchTypes'
 import type { ChatRecord } from './useWorkbenchChatTimeline'
-import { applyAssistantEventMetadata, escapeHtml } from './useWorkbenchChatTimeline'
 
 export type GenerationTaskStatus = 'pending' | 'running' | 'waiting_approval' | 'done' | 'applied' | 'failed' | 'cancelled'
 
 type StreamListener = (event: MessageEvent<string>) => void
-
-const TERMINAL_GENERATION_STATUSES: GenerationTaskStatus[] = ['done', 'applied', 'failed', 'cancelled']
-const DEFAULT_POLLING_INTERVAL_MS = 200
 
 export const normalizeGenerationStatus = (raw: unknown): GenerationTaskStatus | '' => {
   const status = String(raw || '').trim().toLowerCase()
@@ -33,6 +30,52 @@ const getErrorMessage = (error: unknown, fallback = '未知错误') => {
   return fallback
 }
 
+const normalizeToolCall = (value: unknown): WorkbenchRuntimeToolCall | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const record = value as Record<string, unknown>
+  return {
+    toolCallId: record.toolCallId == null ? null : String(record.toolCallId),
+    toolCode: record.toolCode == null ? null : String(record.toolCode),
+    toolName: record.toolName == null ? null : String(record.toolName),
+    status: record.status == null ? null : String(record.status),
+    iteration: record.iteration == null ? null : Number(record.iteration),
+    argumentsPreview: record.argumentsPreview == null ? null : String(record.argumentsPreview),
+    output: record.output == null ? null : String(record.output),
+    errorMessage: record.errorMessage == null ? null : String(record.errorMessage),
+  }
+}
+
+const normalizeApproval = (value: unknown): WorkbenchRuntimeApproval | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const record = value as Record<string, unknown>
+  return {
+    ...record,
+    approvalId: record.approvalId == null ? null : String(record.approvalId),
+    approvalType: record.approvalType == null ? null : String(record.approvalType),
+    toolCallId: record.toolCallId == null ? null : String(record.toolCallId),
+    nextAction: record.nextAction == null ? null : String(record.nextAction),
+  }
+}
+
+const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown>): WorkbenchRuntimeEventSource => ({
+  eventName,
+  sessionId: payload.sessionId == null ? null : String(payload.sessionId),
+  turnId: payload.turnId == null ? null : String(payload.turnId),
+  taskId: payload.taskId == null ? null : String(payload.taskId),
+  phase: payload.phase == null ? null : String(payload.phase),
+  message: payload.message == null ? null : String(payload.message),
+  errorMsg: payload.errorMsg == null ? null : String(payload.errorMsg),
+  recoverable: typeof payload.recoverable === 'boolean' ? payload.recoverable : undefined,
+  nextAction: payload.nextAction == null ? null : String(payload.nextAction),
+  status: payload.status == null ? null : String(payload.status),
+  toolCall: normalizeToolCall(payload.toolCall),
+  approval: normalizeApproval(payload.approval),
+})
+
 export const createTaskRuntime = (deps: {
   getGenerationTaskStatus: () => GenerationTaskStatus | ''
   setGenerationTaskStatus: (value: GenerationTaskStatus | '') => void
@@ -44,9 +87,11 @@ export const createTaskRuntime = (deps: {
   openGenerationStream: (projectId: string, sessionId: string, turnId: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeGenerationStream?: (stream: EventSource | null) => void
-  getGeneration: (projectId: string, taskId: string) => Promise<unknown>
-  waitForPolling?: () => Promise<void>
   scrollChat: () => void
+  setRuntimeEventSource?: (value: WorkbenchRuntimeEventSource | null) => void
+  onToken?: (token: string) => void
+  onToolCall?: (payload: Record<string, unknown>) => void
+  onWaitingApproval?: (payload: Record<string, unknown>) => void
 }) => {
   const closeGenerationStream = () => {
     const generationStream = deps.getGenerationStream()
@@ -57,32 +102,11 @@ export const createTaskRuntime = (deps: {
     }
   }
 
-  const waitForPolling = () => deps.waitForPolling?.() ?? new Promise<void>((resolve) => {
-    setTimeout(resolve, DEFAULT_POLLING_INTERVAL_MS)
-  })
-
-  const pollGenerationAsFallback = async (projectId: string, taskId: string, assistantMsg?: ChatMessage) => {
-    let status: GenerationTaskStatus | '' = ''
-    for (let i = 0; i < 12; i += 1) {
-      const latest = (await deps.getGeneration(projectId, taskId)) as ChatRecord
-      status = normalizeGenerationStatus(latest?.status)
-      if (status) deps.setGenerationTaskStatus(status)
-      if (status === 'waiting_approval') {
-        if (assistantMsg) applyAssistantEventMetadata(assistantMsg, latest)
-        deps.setGenerationPhase('waiting_approval')
-        return status
-      }
-      if (status && TERMINAL_GENERATION_STATUSES.includes(status)) {
-        return status
-      }
-      if (i < 11) {
-        await waitForPolling()
-      }
-    }
-    throw new Error(`生成任务轮询超时，状态：${status || 'unknown'}`)
+  const publishRuntimeEventSource = (eventName: string, payload: Record<string, unknown>) => {
+    deps.setRuntimeEventSource?.(toRuntimeEventSource(eventName, payload))
   }
 
-  const consumeGenerationStream = (projectId: string, sessionId: string, turnId: string, assistantMsg: ChatMessage) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
+  const consumeGenerationStream = (projectId: string, sessionId: string, turnId: string) => new Promise<GenerationTaskStatus | ''>((resolve, reject) => {
     closeGenerationStream()
     const generationStream = deps.openGenerationStream(projectId, sessionId, turnId)
     deps.setGenerationStream(generationStream)
@@ -102,16 +126,24 @@ export const createTaskRuntime = (deps: {
       reject(error)
     }
 
-    deps.addStreamListener(generationStream, 'generation.started', () => {
+    deps.addStreamListener(generationStream, 'generation.started', (event) => {
+      const payload = parseSseData(event) as Record<string, unknown>
+      publishRuntimeEventSource('generation.started', payload)
       deps.setGenerationPhase('streaming')
       deps.setGenerationTaskStatus('running')
-      deps.setAgentStatusDetailText('')
+      deps.setAgentStatusDetailText(String(payload.message || ''))
     })
     deps.addStreamListener(generationStream, 'generation.status', (event) => {
-      const payload = parseSseData(event)
+      const payload = parseSseData(event) as Record<string, unknown>
+      publishRuntimeEventSource('generation.status', payload)
       const status = normalizeGenerationStatus(payload.status)
       if (status) {
         deps.setGenerationTaskStatus(status)
+      }
+      if (String(payload.phase || '').trim().toLowerCase() === 'waiting_approval') {
+        deps.setGenerationPhase('waiting_approval')
+      } else {
+        deps.setGenerationPhase('streaming')
       }
       deps.setAgentStatusDetailText(String(payload.message || ''))
     })
@@ -119,43 +151,51 @@ export const createTaskRuntime = (deps: {
       const payload = parseSseData(event)
       const token = String(payload.token || '')
       if (!token) return
-      assistantMsg.text += escapeHtml(token)
+      deps.onToken?.(token)
       deps.scrollChat()
     })
     deps.addStreamListener(generationStream, 'generation.tool_call', (event) => {
-      const payload = parseSseData(event)
-      applyAssistantEventMetadata(assistantMsg, payload)
+      const payload = parseSseData(event) as Record<string, unknown>
+      publishRuntimeEventSource('generation.tool_call', payload)
+      deps.onToolCall?.(payload)
       if (normalizeGenerationStatus(payload.status) === 'waiting_approval') {
         deps.setGenerationPhase('waiting_approval')
         deps.setGenerationTaskStatus('waiting_approval')
+      } else {
+        deps.setGenerationPhase('streaming')
       }
+      deps.setAgentStatusDetailText(String(payload.message || ''))
       deps.scrollChat()
     })
     deps.addStreamListener(generationStream, 'generation.waiting_approval', (event) => {
-      const payload = parseSseData(event)
-      applyAssistantEventMetadata(assistantMsg, payload)
+      const payload = parseSseData(event) as Record<string, unknown>
+      publishRuntimeEventSource('generation.waiting_approval', payload)
+      deps.onWaitingApproval?.(payload)
       deps.setGenerationPhase('waiting_approval')
       deps.setGenerationTaskStatus('waiting_approval')
       deps.setAgentStatusDetailText(String(payload.message || ''))
       deps.scrollChat()
     })
     deps.addStreamListener(generationStream, 'generation.done', (event) => {
-      const payload = parseSseData(event)
+      const payload = parseSseData(event) as Record<string, unknown>
+      publishRuntimeEventSource('generation.done', payload)
       const status = normalizeGenerationStatus(payload.status) || 'done'
       deps.setGenerationTaskStatus(status)
+      deps.setAgentStatusDetailText(String(payload.message || ''))
       settleResolve(status)
     })
     deps.addStreamListener(generationStream, 'generation.failed', (event) => {
-      const payload = parseSseData(event)
+      const payload = parseSseData(event) as Record<string, unknown>
+      publishRuntimeEventSource('generation.failed', payload)
+      deps.setGenerationPhase('failed')
       deps.setGenerationTaskStatus('failed')
-      deps.setAgentStatusDetailText(String(payload.errorMsg || payload.errorCode || ''))
+      deps.setAgentStatusDetailText(String(payload.errorMsg || payload.errorCode || payload.message || ''))
       settleReject(new Error(String(payload.errorMsg || payload.errorCode || '生成失败')))
     })
   })
 
   return {
     closeGenerationStream,
-    pollGenerationAsFallback,
     consumeGenerationStream,
     getErrorMessage,
   }

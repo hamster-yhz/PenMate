@@ -79,7 +79,6 @@ class ToolCallApplicationServiceTest {
                 approvalApplicationService,
                 pendingToolInvocationRepository,
                 agentRepository,
-                realtimeEventService,
                 toolCallExecutionService
         );
     }
@@ -145,16 +144,7 @@ class ToolCallApplicationServiceTest {
         verify(toolDefinitionSource).getRequired("book_crud");
         verify(toolApprovalViewFactory).create(descriptor, decision);
         verify(agentRepository).updateGenerationTaskStatus(1L, 11L, "waiting_approval", null);
-        verify(realtimeEventService).publishGenerationWaitingApproval(
-                1L,
-                11L,
-                "call-1",
-                99L,
-                "BOOK_DELETE",
-                approvalView,
-                "RESUME_LOOP",
-                new ApprovalView("book_crud", "书籍 CRUD", 5, "BOOK_DELETE", "delete")
-        );
+        verify(agentRepository).updateGenerationTaskActiveApproval(1L, 11L, 99L);
     }
 
     @Test
@@ -274,6 +264,5 @@ class ToolCallApplicationServiceTest {
         verify(handler).validate(request);
         verify(handler).execute(request);
         verify(approvalApplicationService, never()).create(any(), any());
-        verify(realtimeEventService, never()).publishGenerationWaitingApproval(any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

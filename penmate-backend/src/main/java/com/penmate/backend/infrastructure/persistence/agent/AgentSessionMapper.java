@@ -244,6 +244,12 @@ public interface AgentSessionMapper {
                    plugin_bindings_json AS pluginBindingsJson,
                    style_snapshot_json AS styleSnapshotJson,
                    model_snapshot_json AS modelSnapshotJson,
+                   task_profile_json AS taskProfileJson,
+                   prompt_plan_json AS promptPlanJson,
+                   context_package_json AS contextPackageJson,
+                   active_tool_calls_snapshot AS activeToolCallsSnapshot,
+                   last_runtime_status AS lastRuntimeStatus,
+                   recovery_cursor AS recoveryCursor,
                    context_hash AS contextHash
             FROM agent_task_contexts
             WHERE task_id = #{taskId}
@@ -255,14 +261,27 @@ public interface AgentSessionMapper {
             INSERT INTO agent_task_contexts(
                 context_id, task_id, chapter_id, selected_text,
                 outline_snapshot_json, cards_snapshot_json, rag_snapshot_json,
-                plugin_bindings_json, style_snapshot_json, model_snapshot_json, context_hash
+                plugin_bindings_json, style_snapshot_json, model_snapshot_json,
+                active_tool_calls_snapshot, last_runtime_status, recovery_cursor, context_hash
             ) VALUES (
                 #{contextId}, #{taskId}, #{chapterId}, #{selectedText},
                 #{outlineSnapshotJson}, #{cardsSnapshotJson}, #{ragSnapshotJson},
-                #{pluginBindingsJson}, #{styleSnapshotJson}, #{modelSnapshotJson}, #{contextHash}
+                #{pluginBindingsJson}, #{styleSnapshotJson}, #{modelSnapshotJson},
+                #{activeToolCallsSnapshot}, #{lastRuntimeStatus}, #{recoveryCursor}, #{contextHash}
             )
             """)
     int insertTaskContext(AgentTaskContext taskContext);
+
+    @Select("""
+            SELECT draft_summary AS draftSummary,
+                   quality_report_summary AS qualityReportSummary,
+                   todo_summary AS todoSummary,
+                   story_bible_proposal_summary AS storyBibleProposalSummary
+            FROM agent_task_results
+            WHERE task_id = #{taskId}
+            LIMIT 1
+            """)
+    Map<String, Object> findTaskResultRow(@Param("taskId") Long taskId);
 
     @Select("""
             SELECT message_id AS messageId,

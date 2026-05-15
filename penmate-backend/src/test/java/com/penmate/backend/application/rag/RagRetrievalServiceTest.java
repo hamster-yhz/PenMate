@@ -64,4 +64,60 @@ class RagRetrievalServiceTest extends BaseApplicationServiceTest {
         verify(ragRetrievalRepository).searchChunks(1L, "hero", 3);
         verify(businessIdGenerator).nextId();
     }
+
+    @Test
+    void UT_APP_RAG_RETRIEVE_HYBRID_QUERY_SHOULD_PROPAGATE_STRUCTURED_FILTERS_TO_REPOSITORY() {
+        RagRetrievedChunk chunk = new RagRetrievedChunk();
+        chunk.setDocumentId(901L);
+        chunk.setDocumentTitle("story_bible::hero.identity");
+        chunk.setChunkNo(1);
+        chunk.setContentText("content");
+
+        when(businessIdGenerator.nextId()).thenReturn(910002L);
+        when(ragRetrievalRepository.searchChunks(
+                eq(1L),
+                eq("核对林烬与苏砚的当前设定"),
+                eq(5),
+                eq(42L),
+                eq(3),
+                eq("林烬|苏砚"),
+                eq("story_bible_query,continuity_checker"),
+                eq("CONTINUITY_CHECK,STORY_BIBLE_QUERY"),
+                eq("AGENT_CONTEXT")
+        )).thenReturn(List.of(chunk));
+        when(ragRetrievalRepository.insertRetrievalLog(any(RagRetrievalLog.class))).thenAnswer(invocation -> {
+            RagRetrievalLog log = invocation.getArgument(0);
+            log.setId(88L);
+            return 1;
+        });
+
+        RagRetrievalService service = new RagRetrievalService(ragRetrievalRepository, businessIdGenerator, new ObjectMapper());
+
+        RagRetrievalService.RetrievalResult result = service.retrieve(new HybridRagQuery(
+                1L,
+                2L,
+                11L,
+                42L,
+                3,
+                List.of("story_bible_query", "continuity_checker"),
+                List.of("CONTINUITY_CHECK", "STORY_BIBLE_QUERY"),
+                List.of("林烬", "苏砚"),
+                5,
+                "核对林烬与苏砚的当前设定",
+                RagSearchScope.AGENT_CONTEXT
+        ), "trace-rag-2");
+
+        assertThat(result.logId()).isEqualTo(88L);
+        verify(ragRetrievalRepository).searchChunks(
+                1L,
+                "核对林烬与苏砚的当前设定",
+                5,
+                42L,
+                3,
+                "林烬|苏砚",
+                "story_bible_query,continuity_checker",
+                "CONTINUITY_CHECK,STORY_BIBLE_QUERY",
+                "AGENT_CONTEXT"
+        );
+    }
 }

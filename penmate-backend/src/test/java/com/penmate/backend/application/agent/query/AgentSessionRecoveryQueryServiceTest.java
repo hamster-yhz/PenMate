@@ -84,6 +84,107 @@ class AgentSessionRecoveryQueryServiceTest {
         assertThat(((Map<?, ?>) snapshot.getPendingApproval()).get("taskId")).isEqualTo(70001L);
     }
 
+    @Test
+    void should_restore_pending_approval_from_recovery_cursor_when_active_approval_id_is_missing() {
+        AgentSession session = AgentSession.active(90001L, 101L, 201L, "第三章夜雨追踪");
+        session.bindStyle(81L);
+        session.markLastTaskStatus("WAITING_APPROVAL");
+
+        AgentTaskContext activeTask = AgentTaskContext.recoveryOf(70001L, "WAITING_APPROVAL", null);
+        setField(activeTask, "contextId", 61001L);
+        setField(activeTask, "recoveryCursor", "approval:88001");
+        setField(activeTask, "lastRuntimeStatus", "waiting_approval");
+
+        AgentSessionRecoverySnapshot storedSnapshot = AgentSessionRecoverySnapshot.of(
+                session,
+                activeTask,
+                null,
+                List.of(),
+                null
+        );
+
+        PendingToolInvocationSnapshot pendingSnapshot = new PendingToolInvocationSnapshot(
+                88001L,
+                101L,
+                70001L,
+                90001L,
+                "quality_review",
+                "{\"chapterId\":301}",
+                "{}",
+                201L,
+                "trace-recovery-cursor-1",
+                "idem-cursor-1",
+                "pending",
+                "loop-1",
+                2,
+                "tool-call-2",
+                "[]",
+                "[]",
+                "RESUME_LOOP",
+                "{\"approvalId\":88001,\"approvalType\":\"QUALITY_REVIEW\"}"
+        );
+
+        when(agentSessionRepository.findRecoverySnapshot(101L, 90001L)).thenReturn(storedSnapshot);
+        when(pendingToolInvocationRepository.findByApprovalId(88001L)).thenReturn(pendingSnapshot);
+
+        AgentSessionRecoverySnapshot snapshot = agentSessionRecoveryQueryService.getRecoverySnapshot(101L, 90001L, "trace-recovery-cursor-1");
+
+        assertThat(snapshot.getPendingApproval()).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) snapshot.getPendingApproval()).get("approvalId")).isEqualTo(88001L);
+        assertThat(((Map<?, ?>) snapshot.getPendingApproval()).get("toolCallId")).isEqualTo("tool-call-2");
+    }
+
+    @Test
+    void should_promote_approval_type_and_next_action_from_approval_summary_to_top_level_pending_approval() {
+        AgentSession session = AgentSession.active(90001L, 101L, 201L, "第三章夜雨追踪");
+        session.bindStyle(81L);
+        session.markLastTaskStatus("WAITING_APPROVAL");
+
+        AgentTaskContext activeTask = AgentTaskContext.recoveryOf(70001L, "WAITING_APPROVAL", null);
+        setField(activeTask, "contextId", 61001L);
+        setField(activeTask, "recoveryCursor", "approval:88001");
+        setField(activeTask, "lastRuntimeStatus", "waiting_approval");
+
+        AgentSessionRecoverySnapshot storedSnapshot = AgentSessionRecoverySnapshot.of(
+                session,
+                activeTask,
+                null,
+                List.of(),
+                null
+        );
+
+        PendingToolInvocationSnapshot pendingSnapshot = new PendingToolInvocationSnapshot(
+                88001L,
+                101L,
+                70001L,
+                90001L,
+                "story_bible_update",
+                "{\"chapterId\":301}",
+                "{}",
+                201L,
+                "trace-recovery-summary-1",
+                "idem-summary-1",
+                "pending",
+                "loop-1",
+                2,
+                "tool-call-2",
+                "[]",
+                "[]",
+                "RESUME_LOOP",
+                "{\"approvalId\":88001,\"approvalType\":\"STORY_BIBLE_UPDATE\",\"nextAction\":\"await_approval\",\"entryKeys\":[\"maid.secret_order\"]}"
+        );
+
+        when(agentSessionRepository.findRecoverySnapshot(101L, 90001L)).thenReturn(storedSnapshot);
+        when(pendingToolInvocationRepository.findByApprovalId(88001L)).thenReturn(pendingSnapshot);
+
+        AgentSessionRecoverySnapshot snapshot = agentSessionRecoveryQueryService.getRecoverySnapshot(101L, 90001L, "trace-recovery-summary-1");
+
+        assertThat(snapshot.getPendingApproval()).isInstanceOf(Map.class);
+        assertThat(((Map<?, ?>) snapshot.getPendingApproval()).get("approvalType")).isEqualTo("STORY_BIBLE_UPDATE");
+        assertThat(((Map<?, ?>) snapshot.getPendingApproval()).get("nextAction")).isEqualTo("await_approval");
+        assertThat(((Map<?, ?>) snapshot.getPendingApproval()).get("toolCallId")).isEqualTo("tool-call-2");
+    }
+
     private void setField(Object target, String fieldName, Object value) {
         try {
             Field field = target.getClass().getDeclaredField(fieldName);

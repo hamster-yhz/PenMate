@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent.orchestration;
 
+import com.penmate.backend.application.agent.context.ContextPackage;
+import com.penmate.backend.application.agent.prompt.PromptPlan;
 import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
 import com.penmate.backend.application.agent.prompt.SystemPromptBundle;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.StringJoiner;
 
 /**
@@ -73,6 +76,41 @@ public class AgentPromptAssembler {
                 Map.of(
                         "role", "system",
                         "content", promptBundle.assembledPrompt()
+                ),
+                Map.of(
+                        "role", "user",
+                        "content", userBuilder.toString()
+                )
+        );
+    }
+
+    public List<Map<String, Object>> buildExecutionMessages(PromptPlan promptPlan,
+                                                            ContextPackage contextPackage,
+                                                            String userRequest) {
+        StringJoiner userBuilder = new StringJoiner("\n\n");
+        ContextPackage resolvedContext = Objects.requireNonNull(contextPackage, "contextPackage");
+
+        if (!resolvedContext.styleSnapshot().isBlank()) {
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", resolvedContext.styleSnapshot()));
+        }
+        if (!resolvedContext.ragRefs().isEmpty()) {
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", String.join("\n", resolvedContext.ragRefs())));
+        }
+        if (!resolvedContext.storyBibleEntries().isEmpty()) {
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", String.join("\n", resolvedContext.storyBibleEntries())));
+        }
+        if (!resolvedContext.conflicts().isEmpty()) {
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"conflict\"", String.join("\n", resolvedContext.conflicts())));
+        }
+        if (!resolvedContext.missingContextFlags().isEmpty()) {
+            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"missing\"", String.join("\n", resolvedContext.missingContextFlags())));
+        }
+        userBuilder.add(structuredPromptBlockFormatter.wrapBlock("user_request", userRequest == null ? "" : userRequest.trim()));
+
+        return List.of(
+                Map.of(
+                        "role", "system",
+                        "content", promptPlan == null ? "" : promptPlan.assembledPromptPreview()
                 ),
                 Map.of(
                         "role", "user",

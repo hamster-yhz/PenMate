@@ -71,7 +71,8 @@ public class AgentSessionRecoveryQueryService {
             return snapshot;
         }
         AgentTaskContext activeTask = snapshot.getActiveTask();
-        if (activeTask == null || activeTask.getActiveApprovalId() == null) {
+        Long approvalId = resolveApprovalId(activeTask);
+        if (activeTask == null || approvalId == null) {
             log.info("Agent recovery snapshot has no active approval to enrich: projectId={}, sessionId={}, traceId={}, activeTaskId={}",
                     projectId,
                     sessionId,
@@ -79,14 +80,14 @@ public class AgentSessionRecoveryQueryService {
                     activeTask == null ? null : activeTask.getTaskId());
             return snapshot;
         }
-        PendingToolInvocationSnapshot pendingSnapshot = pendingToolInvocationRepository.findByApprovalId(activeTask.getActiveApprovalId());
+        PendingToolInvocationSnapshot pendingSnapshot = pendingToolInvocationRepository.findByApprovalId(approvalId);
         if (pendingSnapshot == null) {
             log.warn("Agent recovery pending approval snapshot missing: projectId={}, sessionId={}, traceId={}, activeTaskId={}, approvalId={}",
                     projectId,
                     sessionId,
                     traceId,
                     activeTask.getTaskId(),
-                    activeTask.getActiveApprovalId());
+                    approvalId);
             return snapshot;
         }
         log.info("Agent recovery pending approval enriched: projectId={}, sessionId={}, traceId={}, activeTaskId={}, approvalId={}, pendingStatus={}",
@@ -94,7 +95,7 @@ public class AgentSessionRecoveryQueryService {
                 sessionId,
                 traceId,
                 activeTask.getTaskId(),
-                activeTask.getActiveApprovalId(),
+                approvalId,
                 pendingSnapshot.status());
         return AgentSessionRecoverySnapshot.of(
                 snapshot.getSession(),
@@ -131,9 +132,60 @@ public class AgentSessionRecoveryQueryService {
         approval.put("toolCallId", snapshot.toolCallId());
         approval.put("pendingStatus", snapshot.status());
         approval.put("resumeMode", snapshot.resumeMode());
-        approval.put("approvalSummary", snapshot.approvalSummaryJson());
+        Object approvalSummary = parseJsonOrRaw(snapshot.approvalSummaryJson());
+        approval.put("approvalSummary", approvalSummary);
+        if (approvalSummary instanceof Map<?, ?> summaryMap) {
+            Object approvalType = summaryMap.get("approvalType");
+            if (approvalType != null) {
+                approval.put("approvalType", String.valueOf(approvalType));
+            }
+            Object nextAction = summaryMap.get("nextAction");
+            if (nextAction != null) {
+                approval.put("nextAction", String.valueOf(nextAction));
+            }
+            Object entryKeys = summaryMap.get("entryKeys");
+            if (entryKeys != null) {
+                approval.put("entryKeys", entryKeys);
+            }
+        }
         approval.put("traceId", traceId == null || traceId.isBlank() ? snapshot.traceId() : traceId);
         return approval;
+    }
+
+    private Object parseJsonOrRaw(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Object.class);
+        } catch (Exception ex) {
+            return json;
+        }
+    }
+
+    private Long resolveApprovalId(AgentTaskContext activeTask) {
+        if (activeTask == null) {
+            return null;
+        }
+        if (activeTask.getActiveApprovalId() != null) {
+            return activeTask.getActiveApprovalId();
+        }
+        return extractApprovalId(activeTask.getRecoveryCursor());
+    }
+
+    private Long extractApprovalId(String recoveryCursor) {
+        if (recoveryCursor == null || !recoveryCursor.startsWith("approval:")) {
+            return null;
+        }
+        String approvalIdToken = recoveryCursor.substring("approval:".length()).trim();
+        if (approvalIdToken.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(approvalIdToken);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
 }

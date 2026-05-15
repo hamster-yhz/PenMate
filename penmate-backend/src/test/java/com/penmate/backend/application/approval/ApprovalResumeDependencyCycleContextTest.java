@@ -3,6 +3,8 @@ package com.penmate.backend.application.approval;
 import com.penmate.backend.application.agent.AgentTaskStateMachine;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
+import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
+import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalViewFactory;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
@@ -92,6 +94,15 @@ class ApprovalResumeDependencyCycleContextTest {
             AgentTaskStateMachine.class
     })
     static class TestConfig {
+
+        @Bean
+        SkillPromptRegistry skillPromptRegistry() {
+            return skill -> new SystemPromptDocument(
+                    skill == null ? "test-skill.md" : skill + ".md",
+                    "test://" + (skill == null ? "default" : skill),
+                    "test skill prompt"
+            );
+        }
 
         @Bean
         AgentToolHandler testAgentToolHandler() {

@@ -13,14 +13,14 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
-import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
-import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import cn.hutool.json.JSONObject;
 
 import java.util.List;
 
@@ -46,7 +46,6 @@ public class ToolCallApplicationService {
     private final ApprovalApplicationService approvalApplicationService;
     private final PendingToolInvocationRepository pendingToolInvocationRepository;
     private final AgentRepository agentRepository;
-    private final RealtimeEventService realtimeEventService;
     private final ToolCallExecutionService toolCallExecutionService;
 
     public ToolCallApplicationService(AgentToolDefinitionSource toolDefinitionSource,
@@ -55,7 +54,6 @@ public class ToolCallApplicationService {
                                       ApprovalApplicationService approvalApplicationService,
                                       PendingToolInvocationRepository pendingToolInvocationRepository,
                                       AgentRepository agentRepository,
-                                      RealtimeEventService realtimeEventService,
                                       ToolCallExecutionService toolCallExecutionService) {
         this.toolDefinitionSource = toolDefinitionSource;
         this.approvalPolicyEngine = approvalPolicyEngine;
@@ -63,7 +61,6 @@ public class ToolCallApplicationService {
         this.approvalApplicationService = approvalApplicationService;
         this.pendingToolInvocationRepository = pendingToolInvocationRepository;
         this.agentRepository = agentRepository;
-        this.realtimeEventService = realtimeEventService;
         this.toolCallExecutionService = toolCallExecutionService;
     }
 
@@ -74,6 +71,7 @@ public class ToolCallApplicationService {
         ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         log.info("tool 审批决策完成: toolCode={}, approvalRequired={}, approvalType={}, traceId={}",
                 request.toolCode(), decision.approvalRequired(), decision.approvalType(), request.traceId());
+        String operationCode = extractOperationCode(request);
         if (decision.approvalRequired()) {
             ToolApprovalView approvalView = toolApprovalViewFactory.create(descriptor, decision);
             ApprovalRequest approvalRequest = approvalApplicationService.create(new CreateApprovalCommand(
@@ -111,25 +109,52 @@ public class ToolCallApplicationService {
                     approvalSummaryJson
             ));
             agentRepository.updateGenerationTaskStatus(request.projectId(), request.taskId(), "waiting_approval", null);
-            ApprovalView realtimeApprovalView = new ApprovalView(
-                    approvalView.toolCode(),
-                    approvalView.toolDisplayName(),
-                    approvalView.riskLevel(),
-                    approvalView.approvalType(),
-                    approvalView.operationCode()
-            );
-            realtimeEventService.publishGenerationWaitingApproval(
-                    request.projectId(),
-                    request.taskId(),
-                    request.toolCallId(),
-                    approvalRequest.getId(),
-                    decision.approvalType(),
-                    approvalView,
-                    resumeMode,
-                    realtimeApprovalView
-            );
+            agentRepository.updateGenerationTaskActiveApproval(request.projectId(), request.taskId(), approvalRequest.getId());
+            log.info("tool 调用进入待审批: toolCode={}, operationCode={}, approvalId={}, taskId={}, traceId={}",
+                    request.toolCode(), operationCode, approvalRequest.getId(), request.taskId(), request.traceId());
             return ToolCallResult.waitingApproval(approvalRequest.getId());
         }
-        return toolCallExecutionService.execute(request);
+        ToolCallResult result = toolCallExecutionService.execute(request);
+        if (result != null && "SUCCESS".equals(result.status())) {
+            log.info("tool 调用成功: toolCode={}, operationCode={}, taskId={}, traceId={}",
+                    request.toolCode(), operationCode, request.taskId(), request.traceId());
+        } else {
+            log.warn("tool 调用失败: toolCode={}, operationCode={}, status={}, errorCode={}, taskId={}, traceId={}",
+                    request.toolCode(), operationCode,
+                    result == null ? null : result.status(),
+                    result == null ? null : result.errorCode(),
+                    request.taskId(), request.traceId());
+        }
+        return result;
+    }
+
+    private String extractOperationCode(ToolCallRequest request) {
+        try {
+            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
+            String operation = args.getStr("operation", null);
+            return operation == null || operation.isBlank() ? null : operation.trim();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String resolveToolEventName(ToolCallRequest request,
+                                        AgentToolDescriptor descriptor,
+                                        String operationCode) {
+        if ("draft_generation".equals(request.toolCode())) {
+            if ("rewrite".equals(operationCode)) {
+                return "改写正文";
+            }
+            if ("revise".equals(operationCode)) {
+                return "套用修订";
+            }
+            return "生成正文";
+        }
+        if (descriptor != null && descriptor.presentation() != null
+                && descriptor.presentation().displayName() != null
+                && !descriptor.presentation().displayName().isBlank()) {
+            return descriptor.presentation().displayName();
+        }
+        return request.toolCode();
     }
 }

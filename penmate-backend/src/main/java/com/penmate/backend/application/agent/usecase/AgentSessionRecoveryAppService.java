@@ -1,9 +1,11 @@
 package com.penmate.backend.application.agent.usecase;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.query.AgentSessionRecoveryQueryService;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.model.AgentSessionRecoverySnapshot;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,8 @@ import java.util.List;
 @Service
 @Slf4j
 public class AgentSessionRecoveryAppService {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AgentSessionRecoveryQueryService agentSessionRecoveryQueryService;
 
@@ -81,17 +85,33 @@ public class AgentSessionRecoveryAppService {
                         session.getBoundStyleId() == null
                                 ? null
                                 : new AgentSessionRecoveryResult.BoundStyleView(session.getBoundStyleId(), null),
-                        session.getLastTaskStatus()
+                        normalizeTaskStatus(session.getLastTaskStatus())
                 ),
                 activeTask == null ? null : new AgentSessionRecoveryResult.ActiveTaskView(
                         activeTask.getTurnId(),
                         activeTask.getTaskId(),
-                        activeTask.getTaskStatus(),
+                        normalizeTaskStatus(activeTask.getTaskStatus()),
                         activeTask.getContextId()
                 ),
                 snapshot.getPendingApproval(),
                 messages,
-                snapshot.getWorkbenchContext()
+                parseJsonOrRaw(snapshot.getWorkbenchContext())
         );
+    }
+
+    private Object parseJsonOrRaw(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return OBJECT_MAPPER.readValue(json, Object.class);
+        } catch (Exception ex) {
+            return json;
+        }
+    }
+
+    private String normalizeTaskStatus(String rawStatus) {
+        AgentTaskStatus taskStatus = AgentTaskStatus.fromValue(rawStatus);
+        return taskStatus == null ? rawStatus : taskStatus.value();
     }
 }

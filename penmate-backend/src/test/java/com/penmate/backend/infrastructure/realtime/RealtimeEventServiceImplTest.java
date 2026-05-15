@@ -160,6 +160,97 @@ class RealtimeEventServiceImplTest {
         ));
     }
 
+    @Test
+    void UT_INFRA_REALTIME_EVENT_SERVICE_PUBLISHES_STRUCTURED_RUNTIME_STATUS_EVENT_WITH_RECOVERY_ALIGNED_PAYLOAD() throws Exception {
+        ProjectWebSocketSessionRegistry sessionRegistry = new ProjectWebSocketSessionRegistry();
+        GenerationSseEmitterHub emitterHub = new GenerationSseEmitterHub();
+        RealtimeEventServiceImpl service = new RealtimeEventServiceImpl(sessionRegistry, emitterHub, new ObjectMapper());
+
+        Class<?> runtimeStatusViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.RuntimeStatusView");
+        Class<?> toolCallStatusViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.ToolCallStatusView");
+        Method method = Arrays.stream(RealtimeEventServiceImpl.class.getMethods())
+                .filter(candidate -> candidate.getName().equals("publishTaskRuntimeStatus"))
+                .filter(candidate -> candidate.getParameterCount() == 3)
+                .findFirst()
+                .orElse(null);
+
+        assertThat(runtimeStatusViewType)
+                .as("RuntimeStatusView should exist for structured runtime events")
+                .isNotNull();
+        assertThat(toolCallStatusViewType)
+                .as("ToolCallStatusView should exist for structured runtime events")
+                .isNotNull();
+        assertThat(method)
+                .as("RealtimeEventServiceImpl should expose publishTaskRuntimeStatus(Long, String, RuntimeStatusView)")
+                .isNotNull();
+        if (runtimeStatusViewType == null || toolCallStatusViewType == null || method == null) {
+            return;
+        }
+
+        Object toolCall = instantiateRecord(toolCallStatusViewType, Map.of(
+                "toolCallId", "call_quality_1",
+                "toolCode", "quality_review",
+                "toolName", "质量审查",
+                "status", "running",
+                "iteration", 2,
+                "argumentsPreview", Map.of("draftId", "draft-17"),
+                "output", Map.of("score", 82),
+                "errorMessage", ""
+        ));
+
+        Map<String, Object> approval = new java.util.LinkedHashMap<>();
+        approval.put("approvalId", 42L);
+        approval.put("approvalType", "STORY_BIBLE_REVIEW");
+
+        Map<String, Object> valuesByName = new java.util.LinkedHashMap<>();
+        valuesByName.put("taskId", 17L);
+        valuesByName.put("sessionId", 90001L);
+        valuesByName.put("turnId", 50001L);
+        valuesByName.put("phase", "story_bible_review");
+        valuesByName.put("message", "正在整理故事圣经");
+        valuesByName.put("toolCall", toolCall);
+        valuesByName.put("approval", approval);
+        valuesByName.put("storyBibleApproval", null);
+        valuesByName.put("todoPlan", null);
+        valuesByName.put("recoverable", true);
+        valuesByName.put("nextAction", "review_story_bible");
+        Object runtimeStatus = instantiateRecord(runtimeStatusViewType, valuesByName);
+
+        method.invoke(service, 9L, "generation.status", runtimeStatus);
+
+        Object state = loadTaskState(emitterHub, 17L);
+        List<?> bufferedEvents = loadBufferedEvents(state);
+        Object event = bufferedEvents.get(0);
+
+        Map<String, Object> expectedPayload = new java.util.LinkedHashMap<>();
+        expectedPayload.put("taskId", 17L);
+        expectedPayload.put("sessionId", 90001L);
+        expectedPayload.put("turnId", 50001L);
+        expectedPayload.put("phase", "story_bible_review");
+        expectedPayload.put("message", "正在整理故事圣经");
+        expectedPayload.put("toolCall", Map.ofEntries(
+                Map.entry("toolCallId", "call_quality_1"),
+                Map.entry("toolCode", "quality_review"),
+                Map.entry("toolName", "质量审查"),
+                Map.entry("status", "running"),
+                Map.entry("iteration", 2),
+                Map.entry("argumentsPreview", Map.of("draftId", "draft-17")),
+                Map.entry("output", Map.of("score", 82)),
+                Map.entry("errorMessage", "")
+        ));
+        expectedPayload.put("approval", Map.ofEntries(
+                Map.entry("approvalId", 42L),
+                Map.entry("approvalType", "STORY_BIBLE_REVIEW")
+        ));
+        expectedPayload.put("storyBibleApproval", null);
+        expectedPayload.put("todoPlan", null);
+        expectedPayload.put("recoverable", true);
+        expectedPayload.put("nextAction", "review_story_bible");
+
+        assertThat(readField(event, "eventName")).isEqualTo("generation.status");
+        assertThat(readField(event, "data")).isEqualTo(expectedPayload);
+    }
+
     private static Object loadTaskState(GenerationSseEmitterHub emitterHub, Long taskId) throws Exception {
         Field statesField = GenerationSseEmitterHub.class.getDeclaredField("statesByTask");
         statesField.setAccessible(true);
@@ -177,5 +268,26 @@ class RealtimeEventServiceImplTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         return field.get(target);
+    }
+
+    private static Class<?> tryLoadClass(String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException ex) {
+            return null;
+        }
+    }
+
+    private static Object instantiateRecord(Class<?> type, Map<String, Object> valuesByName) throws Exception {
+        java.lang.reflect.RecordComponent[] components = type.getRecordComponents();
+        Class<?>[] parameterTypes = Arrays.stream(components)
+                .map(java.lang.reflect.RecordComponent::getType)
+                .toArray(Class<?>[]::new);
+        Object[] arguments = Arrays.stream(components)
+                .map(component -> valuesByName.get(component.getName()))
+                .toArray();
+        java.lang.reflect.Constructor<?> constructor = type.getDeclaredConstructor(parameterTypes);
+        constructor.setAccessible(true);
+        return constructor.newInstance(arguments);
     }
 }

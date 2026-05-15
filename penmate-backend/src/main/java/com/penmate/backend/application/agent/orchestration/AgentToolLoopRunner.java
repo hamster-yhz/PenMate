@@ -6,13 +6,19 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.runtime.RuntimeStatusView;
+import com.penmate.backend.application.agent.runtime.TaskRuntimeStatusPublisher;
+import com.penmate.backend.application.agent.runtime.ToolCallStatusView;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResumeService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallSnapshotMapper;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
+import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +50,8 @@ public class AgentToolLoopRunner {
     private final AgentToolDefinitionSource toolDefinitionSource;
     private final ToolCallResumeService toolCallResumeService;
     private final ToolCallSnapshotMapper toolCallSnapshotMapper;
+    private final AgentRepository agentRepository;
+    private final TaskRuntimeStatusPublisher taskRuntimeStatusPublisher;
 
     public AgentToolLoopIterationResult execute(Long projectId,
                                                 Long taskId,
@@ -56,6 +64,8 @@ public class AgentToolLoopRunner {
         List<AgentLlmToolSchema> tools = toolDefinitionSource.listLlmSchemas();
         StringBuilder toolContextBuilder = new StringBuilder();
         int totalToolCalls = 0;
+        AgentTaskContext taskContext = loadTaskContext(taskId);
+        Long turnId = taskContext == null ? null : taskContext.getTurnId();
 
         for (int turnIndex = 0; turnIndex < MAX_TOOL_TURNS; turnIndex++) {
             AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
@@ -97,6 +107,7 @@ public class AgentToolLoopRunner {
                         "RESUME_LOOP",
                         null
                 ));
+                publishToolCallStatus(projectId, taskId, conversationId, taskContext, turnId, toolCall, turnIndex, toolResult);
                 if ("WAITING_APPROVAL".equals(toolResult.status())) {
                     if (toolResult.approvalId() == null) {
                         throw new IllegalStateException("WAITING_APPROVAL result missing approvalId");
@@ -173,5 +184,116 @@ public class AgentToolLoopRunner {
             return traceId + "-loop";
         }
         return "task-" + (taskId == null ? "unknown" : taskId) + "-loop";
+    }
+
+    private AgentTaskContext loadTaskContext(Long taskId) {
+        if (taskId == null || agentRepository == null) {
+            return null;
+        }
+        return agentRepository.findTaskContext(taskId);
+    }
+
+    private void publishToolCallStatus(Long projectId,
+                                       Long taskId,
+                                       Long conversationId,
+                                       AgentTaskContext taskContext,
+                                       Long turnId,
+                                       AgentLlmToolCall toolCall,
+                                       int turnIndex,
+                                       ToolCallResult toolResult) {
+        if (taskRuntimeStatusPublisher == null) {
+            return;
+        }
+        String status = toolResult == null || toolResult.status() == null
+                ? "failed"
+                : toolResult.status().toLowerCase();
+        String toolName = resolveToolDisplayName(toolCall);
+        String recoveryCursor = toolResult != null && toolResult.approvalId() != null
+                ? "approval:" + toolResult.approvalId()
+                : "tool_call:" + (toolCall == null ? "tool" : toolCall.toolCode()) + ":" + (toolCall == null ? "call" : toolCall.id());
+        ToolCallStatusView toolCallStatusView = new ToolCallStatusView(
+                toolCall == null ? null : toolCall.id(),
+                toolCall == null ? null : toolCall.toolCode(),
+                toolName,
+                status,
+                turnIndex,
+                toolCall == null ? null : toolCall.argumentsJson(),
+                toolResult == null ? null : toolResult.toolOutput(),
+                toolResult == null ? null : toolResult.errorMessage()
+        );
+        syncToolRuntimeSnapshot(projectId, taskId, taskContext, toolCallStatusView, recoveryCursor);
+        RuntimeStatusView runtimeStatusView = new RuntimeStatusView(
+                taskId,
+                conversationId,
+                turnId,
+                "tool_call",
+                toolName,
+                toolCallStatusView,
+                toolResult == null || toolResult.approvalId() == null ? null : Map.of("approvalId", toolResult.approvalId()),
+                null,
+                null,
+                true,
+                "WAITING_APPROVAL".equals(toolResult == null ? null : toolResult.status()) ? "await_approval" : "continue_tool_loop"
+        );
+        taskRuntimeStatusPublisher.publishToolCall(projectId, runtimeStatusView);
+    }
+
+    private void syncToolRuntimeSnapshot(Long projectId,
+                                         Long taskId,
+                                         AgentTaskContext taskContext,
+                                         ToolCallStatusView toolCallStatusView,
+                                         String recoveryCursor) {
+        if (projectId == null || taskId == null || taskContext == null) {
+            return;
+        }
+        taskContext.setLastRuntimeStatus("tool_call");
+        taskContext.setRecoveryCursor(recoveryCursor);
+        Map<String, Object> toolCallSnapshot = new LinkedHashMap<>();
+        toolCallSnapshot.put("toolCallId", toolCallStatusView.toolCallId());
+        toolCallSnapshot.put("toolCode", toolCallStatusView.toolCode());
+        toolCallSnapshot.put("toolName", toolCallStatusView.toolName());
+        toolCallSnapshot.put("status", toolCallStatusView.status());
+        toolCallSnapshot.put("iteration", toolCallStatusView.iteration());
+        toolCallSnapshot.put("argumentsPreview", toolCallStatusView.argumentsPreview());
+        toolCallSnapshot.put("output", toolCallStatusView.output());
+        toolCallSnapshot.put("errorMessage", toolCallStatusView.errorMessage());
+        taskContext.setActiveToolCallsSnapshot(AgentTaskRuntimeUpdater.toSnapshotJson(List.of(toolCallSnapshot)));
+        int affected = agentRepository.updateGenerationTaskSnapshots(
+                projectId,
+                taskId,
+                taskContext.getTaskProfileJson(),
+                taskContext.getPromptPlanJson(),
+                taskContext.getContextPackageJson(),
+                taskContext.getActiveToolCallsSnapshot(),
+                taskContext.getLastRuntimeStatus(),
+                taskContext.getRecoveryCursor()
+        );
+        if (affected != 1) {
+            throw new IllegalStateException("Failed to update generation task snapshots");
+        }
+    }
+
+    private String resolveToolDisplayName(AgentLlmToolCall toolCall) {
+        if (toolCall == null || toolCall.toolCode() == null || toolCall.toolCode().isBlank()) {
+            return "tool call";
+        }
+        String toolCode = toolCall.toolCode().trim();
+        if ("draft_generation".equals(toolCode)) {
+            String argumentsJson = toolCall.argumentsJson();
+            if (argumentsJson != null && argumentsJson.contains("\"operation\":\"rewrite\"")) {
+                return "改写正文";
+            }
+            if (argumentsJson != null && argumentsJson.contains("\"operation\":\"revise\"")) {
+                return "套用修订";
+            }
+            return "生成正文";
+        }
+        AgentToolDescriptor descriptor = toolDefinitionSource == null ? null : toolDefinitionSource.getRequired(toolCode);
+        if (descriptor != null && descriptor.presentation() != null
+                && descriptor.presentation().displayName() != null
+                && !descriptor.presentation().displayName().isBlank()) {
+            return descriptor.presentation().displayName();
+        }
+        return toolCode;
     }
 }

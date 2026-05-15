@@ -3,6 +3,7 @@ package com.penmate.backend.infrastructure.persistence.agent;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
+import com.penmate.backend.domain.agent.model.AgentTaskResult;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -160,13 +161,79 @@ public interface AgentMapper {
 
     @Update("""
             UPDATE agent_tasks
-            SET trace_id = COALESCE(#{traceId}, trace_id),
+            SET active_approval_id = #{approvalId},
                 updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND task_id = #{taskId}
+            WHERE project_id = #{projectId}
+              AND task_id = #{taskId}
+            """)
+    int updateGenerationTaskActiveApproval(@Param("projectId") Long projectId,
+                                           @Param("taskId") Long taskId,
+                                           @Param("approvalId") Long approvalId);
+
+    @Update("""
+            UPDATE agent_task_results
+            SET token_usage_json = #{tokenUsageJson},
+                cost_usage_json = #{costJson}
+            WHERE result_id = (
+                SELECT result_id
+                FROM agent_tasks
+                WHERE project_id = #{projectId}
+                  AND task_id = #{taskId}
+            )
             """)
     int updateGenerationTaskRuntime(@Param("projectId") Long projectId,
                                     @Param("taskId") Long taskId,
                                     @Param("tokenUsageJson") String tokenUsageJson,
                                     @Param("costJson") String costJson,
                                     @Param("traceId") String traceId);
+
+    @Insert("""
+            INSERT INTO agent_task_results(
+                result_id, task_id, result_status, assistant_message_id,
+                output_markdown, output_structured_json, tool_trace_json,
+                draft_summary, quality_report_summary, todo_summary, story_bible_proposal_summary,
+                token_usage_json, cost_usage_json, error_code, error_message
+            ) VALUES (
+                #{resultId}, #{taskId}, #{resultStatus}, #{assistantMessageId},
+                #{outputMarkdown}, #{outputStructuredJson}, #{toolTraceJson},
+                #{draftSummary}, #{qualityReportSummary}, #{todoSummary}, #{storyBibleProposalSummary},
+                #{tokenUsageJson}, #{costUsageJson}, #{errorCode}, #{errorMessage}
+            )
+            """)
+    int insertTaskResult(AgentTaskResult taskResult);
+
+    @Update("""
+            UPDATE agent_tasks
+            SET result_id = #{resultId}
+            WHERE project_id = #{projectId}
+              AND task_id = #{taskId}
+            """)
+    int updateGenerationTaskResultLink(@Param("projectId") Long projectId,
+                                       @Param("taskId") Long taskId,
+                                       @Param("resultId") Long resultId);
+
+    @Update("""
+            UPDATE agent_task_contexts
+            SET task_profile_json = #{taskProfileJson},
+                prompt_plan_json = #{promptPlanJson},
+                context_package_json = #{contextPackageJson},
+                active_tool_calls_snapshot = #{activeToolCallsSnapshot},
+                last_runtime_status = #{lastRuntimeStatus},
+                recovery_cursor = #{recoveryCursor}
+            WHERE task_id = #{taskId}
+              AND EXISTS (
+                  SELECT 1
+                  FROM agent_tasks
+                  WHERE project_id = #{projectId}
+                    AND task_id = #{taskId}
+              )
+            """)
+    int updateGenerationTaskSnapshots(@Param("projectId") Long projectId,
+                                      @Param("taskId") Long taskId,
+                                      @Param("taskProfileJson") String taskProfileJson,
+                                      @Param("promptPlanJson") String promptPlanJson,
+                                      @Param("contextPackageJson") String contextPackageJson,
+                                      @Param("activeToolCallsSnapshot") String activeToolCallsSnapshot,
+                                      @Param("lastRuntimeStatus") String lastRuntimeStatus,
+                                      @Param("recoveryCursor") String recoveryCursor);
 }

@@ -41,9 +41,26 @@ class AgentSessionSchemaMysqlContractTest {
         assertThat(columnsOf("agent_tasks"))
                 .contains("prompt_snapshot", "request_context_id", "result_id", "active_approval_id", "stream_channel_key");
         assertThat(columnsOf("agent_task_contexts"))
-                .contains("style_snapshot_json", "model_snapshot_json", "context_hash");
+                .contains(
+                        "style_snapshot_json",
+                        "model_snapshot_json",
+                        "context_hash",
+                        "task_profile_json",
+                        "prompt_plan_json",
+                        "context_package_json",
+                        "active_tool_calls_snapshot",
+                        "last_runtime_status",
+                        "recovery_cursor"
+                );
         assertThat(columnsOf("agent_task_results"))
-                .contains("output_structured_json", "tool_trace_json");
+                .contains(
+                        "output_structured_json",
+                        "tool_trace_json",
+                        "draft_summary",
+                        "quality_report_summary",
+                        "todo_summary",
+                        "story_bible_proposal_summary"
+                );
         assertThat(columnsOf("agent_pending_approvals"))
                 .contains("resume_payload_json", "pending_status");
 

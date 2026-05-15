@@ -111,13 +111,13 @@ class AgentControllerTest {
     void UT_AGENT_RECOVERY_GET_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-AGENT-RECOVERY-GET";
         when(agentSessionRecoveryAppService.getRecovery(10001L, 90001L, traceId))
-                .thenReturn(recoverySnapshot(90001L, "WAITING_APPROVAL"));
+                .thenReturn(recoverySnapshot(90001L, "waiting_approval"));
 
         mockMvc().perform(get("/api/v1/novels/10001/agent/sessions/90001/recovery")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
-                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("WAITING_APPROVAL"))
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("waiting_approval"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
 
         verify(agentSessionRecoveryAppService).getRecovery(10001L, 90001L, traceId);
@@ -127,7 +127,7 @@ class AgentControllerTest {
     void UT_AGENT_RESUME_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-AGENT-RESUME";
         when(agentSessionRecoveryAppService.resumeSession(eq(10001L), eq(90001L), eq(1001L), eq("WORKBENCH_ENTER"), eq(traceId)))
-                .thenReturn(recoverySnapshot(90001L, "RUNNING"));
+                .thenReturn(recoverySnapshot(90001L, "running"));
 
         mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/resume")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -138,7 +138,7 @@ class AgentControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.sessionId").value("90001"))
-                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("RUNNING"));
+                .andExpect(jsonPath("$.data.activeTask.taskStatus").value("running"));
 
         verify(agentSessionRecoveryAppService).resumeSession(10001L, 90001L, 1001L, "WORKBENCH_ENTER", traceId);
     }

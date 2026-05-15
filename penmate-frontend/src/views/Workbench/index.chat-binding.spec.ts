@@ -66,7 +66,17 @@ const WorkbenchEditorPanelHarness = {
 
 const WorkbenchRightPanelHarness = {
   name: 'WorkbenchRightPanel',
-  props: ['chatInput', 'generationStatusText', 'isGenerating', 'messages', 'streamingAssistantMsgId'],
+  props: [
+    'chatInput',
+    'generationStatusText',
+    'isGenerating',
+    'messages',
+    'streamingAssistantMsgId',
+    'runtimeStatusCard',
+    'toolCallCard',
+    'todoPlanCard',
+    'storyBibleApprovalCard',
+  ],
   emits: ['update:chat-input', 'send'],
   methods: {
     emitChatInput(this: { $emit: (eventName: string, value: string) => void }, event: Event) {
@@ -428,6 +438,109 @@ describe('Workbench index chat parent binding', () => {
       operatorId: '201',
     }))
     expect(agentApiMock.getSessionRecovery).not.toHaveBeenCalled()
+  })
+
+  it('passes_structured_runtime_presenter_cards_to_right_panel_after_resume_recovery', async () => {
+    agentApiMock.resumeSession = vi.fn(async () => ({
+      session: {
+        sessionId: '90001',
+        title: '第三章夜雨追踪',
+        status: 'ACTIVE',
+        boundStyle: { styleId: '81', name: '冷峻悬疑' },
+      },
+      activeTask: {
+        turnId: '50001',
+        taskId: '70001',
+        taskStatus: 'waiting_approval',
+        streamChannelKey: 'agent-turn-50001',
+      },
+      pendingApproval: {
+        approvalId: '88001',
+        approvalType: 'STORY_BIBLE_UPDATE',
+        toolCallId: 'call-story-1',
+        nextAction: 'await_approval',
+      },
+      messages: [
+        {
+          messageId: '1',
+          role: 'assistant',
+          contentMd: '',
+          approvalId: '88001',
+          approvalType: 'STORY_BIBLE_UPDATE',
+          approvalMessage: '故事圣经更新待确认',
+          approvalStatus: 'pending',
+        },
+      ],
+      workbenchContext: {
+        chapterId: '301',
+        selectedText: '',
+        activePlugins: ['outline.search'],
+        modelConfigId: 'mcfg-9001',
+        activeTaskRuntime: {
+          lastRuntimeStatus: 'story_bible_review',
+          recoveryCursor: 'approval:88001',
+          activeToolCallsSnapshot: [
+            {
+              toolCallId: 'call-story-1',
+              toolCode: 'story_bible_update',
+              toolName: '故事圣经整理',
+              status: 'waiting_approval',
+              iteration: 2,
+              argumentsPreview: '{"chapterId":"301"}',
+              output: '{"proposalSummary":"建议补充侍从知晓密令的设定"}',
+              errorMessage: '',
+            },
+            {
+              toolCallId: 'call-todo-1',
+              toolCode: 'todo_planner',
+              toolName: 'Todo 规划',
+              status: 'done',
+              iteration: 1,
+              argumentsPreview: '{"planningMode":"FOLLOW_UP_MODIFICATION"}',
+              output: '{"planTitle":"第三章修订待办"}',
+              errorMessage: '',
+            },
+          ],
+        },
+        resultSummary: {
+          todoSummary: {
+            planTitle: '第三章修订待办',
+            items: [
+              { title: '修正文脉络跳跃', status: 'pending', priority: 'HIGH' },
+              { title: '补充侍从知晓密令的设定', status: 'pending', priority: 'MEDIUM' },
+            ],
+            nextAction: 'apply_todo_plan',
+          },
+          storyBibleProposalSummary: {
+            proposalSummary: '建议补充侍从知晓密令的设定',
+            entryKeys: ['maid.secret_order'],
+            nextAction: 'await_approval',
+          },
+        },
+      },
+    }))
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
+      expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
+        badgeText: '正在整理故事圣经',
+        nextActionText: 'await_approval',
+      }))
+      expect(rightPanel.props('toolCallCard')).toEqual(expect.objectContaining({
+        title: '故事圣经整理',
+        toolCode: 'story_bible_update',
+      }))
+      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
+        title: '第三章修订待办',
+        itemCountText: '2 项待办',
+      }))
+      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
+        title: '故事圣经更新待确认',
+        proposalSummary: '建议补充侍从知晓密令的设定',
+      }))
+    })
   })
 
   it('bridges_chapters_when_list_chapters_payload_is_still_nested_under_data_field', async () => {

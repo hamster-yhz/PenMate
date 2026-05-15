@@ -59,8 +59,8 @@ class AgentSessionRecoveryAppServiceTest {
                 .as("active task should exist in recovery snapshot")
                 .isNotNull();
         assertThat(snapshot.activeTask().taskStatus())
-                .as("recovery snapshot should expose WAITING_APPROVAL task status")
-                .isEqualTo("WAITING_APPROVAL");
+                .as("recovery snapshot should expose canonical lowercase waiting_approval task status")
+                .isEqualTo("waiting_approval");
     }
 
     private AgentTaskContext taskContext(Long taskId, String taskStatus) {

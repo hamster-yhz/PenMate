@@ -13,9 +13,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -189,6 +191,213 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
     }
 
     @Test
+    void should_read_structured_task_snapshots_from_runtime_task_context_schema() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940405, 920002, 1, 920001, 'WRITE', 'pending', '快照恢复 prompt', 950405, NULL, NULL, NULL, 'trace-runtime-task-5')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_contexts(
+                        context_id, task_id, chapter_id, selected_text,
+                        outline_snapshot_json, cards_snapshot_json, rag_snapshot_json,
+                        plugin_bindings_json, style_snapshot_json, model_snapshot_json,
+                        task_profile_json, prompt_plan_json, context_package_json,
+                        active_tool_calls_snapshot, last_runtime_status, recovery_cursor, context_hash
+                    ) VALUES (
+                        950405, 940405, 3005, '冻结快照文本',
+                        NULL, NULL, NULL,
+                        NULL, '{"styleId":82}', '{"modelConfigId":88005}',
+                        '{"executionProfile":"default"}',
+                        '{"finalProfile":"default"}',
+                        '{"missingContextFlags":["story_bible_missing"]}',
+                        '[{"toolCode":"quality_review","status":"WAITING_APPROVAL"}]',
+                        'WAITING_APPROVAL',
+                        'approval:950405',
+                        'hash-940405'
+                    )
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            com.penmate.backend.domain.agent.model.AgentTaskContext loaded = repository.findTaskContext(940405L);
+
+            assertThat(readField(loaded, "taskProfileJson")).isEqualTo("{\"executionProfile\":\"default\"}");
+            assertThat(readField(loaded, "promptPlanJson")).isEqualTo("{\"finalProfile\":\"default\"}");
+            assertThat(readField(loaded, "contextPackageJson")).isEqualTo("{\"missingContextFlags\":[\"story_bible_missing\"]}");
+            assertThat(loaded.getActiveToolCallsSnapshot()).isEqualTo("[{\"toolCode\":\"quality_review\",\"status\":\"WAITING_APPROVAL\"}]");
+            assertThat(loaded.getLastRuntimeStatus()).isEqualTo("WAITING_APPROVAL");
+            assertThat(loaded.getRecoveryCursor()).isEqualTo("approval:950405");
+        }
+    }
+
+    @Test
+    void should_update_structured_task_snapshots_into_runtime_task_context_schema() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940406, 920002, 1, 920001, 'WRITE', 'pending', '快照写回 prompt', 950406, NULL, NULL, NULL, 'trace-runtime-task-6')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_contexts(
+                        context_id, task_id, chapter_id, selected_text,
+                        outline_snapshot_json, cards_snapshot_json, rag_snapshot_json,
+                        plugin_bindings_json, style_snapshot_json, model_snapshot_json,
+                        task_profile_json, prompt_plan_json, context_package_json, context_hash
+                    ) VALUES (
+                        950406, 940406, 3006, '待写回快照文本',
+                        NULL, NULL, NULL,
+                        NULL, '{"styleId":83}', '{"modelConfigId":88006}',
+                        NULL, NULL, NULL,
+                        'hash-940406'
+                    )
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            assertThat(repository.updateGenerationTaskSnapshots(
+                    920001L,
+                    940406L,
+                    "{\"executionProfile\":\"default\"}",
+                    "{\"finalProfile\":\"default\"}",
+                    "{\"chapterScope\":\"chapter:3006\"}",
+                    "[{\"toolCode\":\"quality_review\",\"status\":\"RUNNING\"}]",
+                    "QUALITY_REVIEW",
+                    "tool_call:quality_review:1"
+            )).isEqualTo(1);
+            assertThat(singleString("SELECT task_profile_json FROM agent_task_contexts WHERE task_id = 940406"))
+                    .isEqualTo("{\"executionProfile\":\"default\"}");
+            assertThat(singleString("SELECT prompt_plan_json FROM agent_task_contexts WHERE task_id = 940406"))
+                    .isEqualTo("{\"finalProfile\":\"default\"}");
+            assertThat(singleString("SELECT context_package_json FROM agent_task_contexts WHERE task_id = 940406"))
+                    .isEqualTo("{\"chapterScope\":\"chapter:3006\"}");
+            assertThat(singleString("SELECT active_tool_calls_snapshot FROM agent_task_contexts WHERE task_id = 940406"))
+                    .isEqualTo("[{\"toolCode\":\"quality_review\",\"status\":\"RUNNING\"}]");
+            assertThat(singleString("SELECT last_runtime_status FROM agent_task_contexts WHERE task_id = 940406"))
+                    .isEqualTo("QUALITY_REVIEW");
+            assertThat(singleString("SELECT recovery_cursor FROM agent_task_contexts WHERE task_id = 940406"))
+                    .isEqualTo("tool_call:quality_review:1");
+        }
+    }
+
+    @Test
+    void should_persist_runtime_token_and_cost_json_into_agent_task_results() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940407, 920002, 1, 920001, 'WRITE', 'done', 'runtime 写回 prompt', NULL, 960407, NULL, NULL, 'trace-runtime-task-7')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_results(result_id, task_id, result_status, assistant_message_id, output_markdown, output_structured_json, tool_trace_json, token_usage_json, cost_usage_json, error_code, error_message)
+                    VALUES (960407, 940407, 'SUCCEEDED', NULL, '正文', NULL, NULL, NULL, NULL, NULL, NULL)
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            assertThat(repository.updateGenerationTaskRuntime(
+                    920001L,
+                    940407L,
+                    "{\"inputTokens\":11,\"outputTokens\":10}",
+                    "{\"currency\":\"USD\",\"estimated\":0.000020}",
+                    "trace-runtime-task-7-updated"
+            )).isEqualTo(1);
+            assertThat(singleString("SELECT token_usage_json FROM agent_task_results WHERE result_id = 960407"))
+                    .isEqualTo("{\"inputTokens\":11,\"outputTokens\":10}");
+            assertThat(singleString("SELECT cost_usage_json FROM agent_task_results WHERE result_id = 960407"))
+                    .isEqualTo("{\"currency\":\"USD\",\"estimated\":0.000020}");
+        }
+    }
+
+    @Test
+    void should_persist_result_summaries_and_recover_them_from_runtime_snapshot() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    UPDATE agent_sessions
+                    SET last_turn_id = 1,
+                        last_task_id = 940408
+                    WHERE session_id = 920002
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940408, 920002, 1, 920001, 'WRITE', 'WAITING_APPROVAL', '恢复摘要 prompt', 950408, NULL, 980408, NULL, 'trace-runtime-task-8')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_contexts(
+                        context_id, task_id, chapter_id, selected_text,
+                        outline_snapshot_json, cards_snapshot_json, rag_snapshot_json,
+                        plugin_bindings_json, style_snapshot_json, model_snapshot_json,
+                        task_profile_json, prompt_plan_json, context_package_json,
+                        active_tool_calls_snapshot, last_runtime_status, recovery_cursor, context_hash
+                    ) VALUES (
+                        950408, 940408, 3008, '恢复摘要文本',
+                        '{"chapter":"第八章"}', NULL, NULL,
+                        NULL, '{"styleId":88}', '{"modelConfigId":88008}',
+                        '{"executionProfile":"default"}',
+                        '{"finalProfile":"default"}',
+                        '{"chapterScope":"chapter:3008"}',
+                        '[{"toolCode":"quality_review","status":"WAITING_APPROVAL"}]',
+                        'WAITING_APPROVAL',
+                        'approval:980408',
+                        'hash-940408'
+                    )
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+            com.penmate.backend.domain.agent.model.AgentTaskResult result = new com.penmate.backend.domain.agent.model.AgentTaskResult();
+            result.setResultId(960408L);
+            result.setTaskId(940408L);
+            result.setResultStatus("SUCCEEDED");
+            result.setOutputMarkdown("最终答复");
+            result.setDraftSummary("{\"draftText\":\"第三章初稿正文\"}");
+            result.setQualityReportSummary("{\"reviewSummary\":\"存在剧情逻辑问题，需要修订。\"}");
+            result.setTodoSummary("{\"planTitle\":\"第三章修订待办\"}");
+            result.setStoryBibleProposalSummary("{\"proposalSummary\":\"建议补充侍从知晓密令的设定\"}");
+
+            assertThat(repository.insertTaskResult(result)).isEqualTo(1);
+            assertThat(singleString("SELECT draft_summary FROM agent_task_results WHERE task_id = 940408"))
+                    .isEqualTo("{\"draftText\":\"第三章初稿正文\"}");
+            assertThat(singleString("SELECT quality_report_summary FROM agent_task_results WHERE task_id = 940408"))
+                    .isEqualTo("{\"reviewSummary\":\"存在剧情逻辑问题，需要修订。\"}");
+            assertThat(singleString("SELECT todo_summary FROM agent_task_results WHERE task_id = 940408"))
+                    .isEqualTo("{\"planTitle\":\"第三章修订待办\"}");
+            assertThat(singleString("SELECT story_bible_proposal_summary FROM agent_task_results WHERE task_id = 940408"))
+                    .isEqualTo("{\"proposalSummary\":\"建议补充侍从知晓密令的设定\"}");
+
+            com.penmate.backend.domain.shared.service.BusinessIdGenerator businessIdGenerator = () -> 990408L;
+            AgentSessionRepositoryImpl sessionRepository = new AgentSessionRepositoryImpl(
+                    sqlSession.getMapper(AgentSessionMapper.class),
+                    businessIdGenerator
+            );
+            com.penmate.backend.domain.agent.model.AgentSessionRecoverySnapshot snapshot = sessionRepository.findRecoverySnapshot(920001L, 920002L);
+
+            assertThat(snapshot.getWorkbenchContext()).contains("\"draftSummary\":{\"draftText\":\"第三章初稿正文\"}");
+            assertThat(snapshot.getWorkbenchContext()).contains("\"qualityReportSummary\":{\"reviewSummary\":\"存在剧情逻辑问题，需要修订。\"}");
+            assertThat(snapshot.getWorkbenchContext()).contains("\"todoSummary\":{\"planTitle\":\"第三章修订待办\"}");
+            assertThat(snapshot.getWorkbenchContext()).contains("\"storyBibleProposalSummary\":{\"proposalSummary\":\"建议补充侍从知晓密令的设定\"}");
+        }
+    }
+
+    @Test
     void should_lock_session_before_reading_max_message_sequence() {
         AgentMapper agentMapper = org.mockito.Mockito.mock(AgentMapper.class);
         AgentSessionMapper agentSessionMapper = org.mockito.Mockito.mock(AgentSessionMapper.class);
@@ -251,6 +460,7 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
     private static void recreateSchema() throws Exception {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS agent_task_results");
             statement.execute("DROP TABLE IF EXISTS agent_task_contexts");
             statement.execute("DROP TABLE IF EXISTS agent_tasks");
             statement.execute("DROP TABLE IF EXISTS agent_messages");
@@ -326,8 +536,36 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
                         plugin_bindings_json VARCHAR(4000) NULL,
                         style_snapshot_json VARCHAR(4000) NULL,
                         model_snapshot_json VARCHAR(4000) NULL,
+                        task_profile_json VARCHAR(4000) NULL,
+                        prompt_plan_json VARCHAR(4000) NULL,
+                        context_package_json VARCHAR(4000) NULL,
+                        active_tool_calls_snapshot VARCHAR(4000) NULL,
+                        last_runtime_status VARCHAR(64) NULL,
+                        recovery_cursor VARCHAR(128) NULL,
                         context_hash VARCHAR(128) NOT NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE agent_task_results (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        result_id BIGINT NOT NULL,
+                        task_id BIGINT NOT NULL,
+                        result_status VARCHAR(24) NOT NULL,
+                        assistant_message_id BIGINT NULL,
+                        output_markdown VARCHAR(4000) NULL,
+                        output_structured_json VARCHAR(4000) NULL,
+                        tool_trace_json VARCHAR(4000) NULL,
+                        draft_summary VARCHAR(4000) NULL,
+                        quality_report_summary VARCHAR(4000) NULL,
+                        todo_summary VARCHAR(4000) NULL,
+                        story_bible_proposal_summary VARCHAR(4000) NULL,
+                        token_usage_json VARCHAR(4000) NULL,
+                        cost_usage_json VARCHAR(4000) NULL,
+                        error_code VARCHAR(64) NULL,
+                        error_message VARCHAR(500) NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                     )
                     """);
         }
@@ -368,5 +606,11 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             resultSet.next();
             return resultSet.getString(1);
         }
+    }
+
+    private Object readField(Object target, String fieldName) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 }

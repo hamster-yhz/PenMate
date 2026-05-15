@@ -1168,17 +1168,10 @@ describe('useWorkbenchChat', () => {
     await sendPromise
   })
 
-  it('waits_between_non_terminal_fallback_polls_before_reaching_waiting_approval', async () => {
+  it('fails_fast_when_stream_is_unavailable_instead_of_using_removed_polling_fallback', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const waitForPolling = vi.fn().mockResolvedValue(undefined)
     const getGeneration = vi.fn()
-      .mockResolvedValueOnce({ status: 'running' })
-      .mockResolvedValueOnce({ status: 'running' })
-      .mockResolvedValueOnce({
-        status: 'waiting_approval',
-        approvalId: 42,
-        approvalType: 'WORLD_SETTING_CREATE',
-      })
 
     const chat = useWorkbenchChat({
       getContext: () => ({ projectId: 101, operatorId: 201 }),
@@ -1211,18 +1204,14 @@ describe('useWorkbenchChat', () => {
     chat.chatInput.value = '创建新的世界观设定'
     await chat.sendMessage()
 
-    expect(getGeneration).toHaveBeenCalledTimes(3)
-    expect(waitForPolling).toHaveBeenCalledTimes(2)
-    expect(chat.messages.value[1]).toMatchObject({
-      id: 2,
-      role: 'assistant',
-      approval: {
-        id: '42',
-        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
-        time: '',
-        resolved: false,
-      },
-    })
+    expect(getGeneration).not.toHaveBeenCalled()
+    expect(waitForPolling).not.toHaveBeenCalled()
+    expect(chat.messages.value).toEqual([
+      { id: 1, role: 'user', text: '创建新的世界观设定' },
+      { id: 2, role: 'assistant', text: '生成失败：stream unavailable' },
+    ])
+    expect(chat.generationPhase.value).toBe('failed')
+    expect(chat.generationTaskStatus.value).toBe('failed')
   })
 
   it('restores_waiting_approval_message_from_recovery_snapshot_without_manual_listMessages', async () => {
@@ -1272,7 +1261,7 @@ describe('useWorkbenchChat', () => {
     expect(listMessages).not.toHaveBeenCalled()
   })
 
-  it('restores_approval_card_from_polling_fallback_without_faking_completion_text', async () => {
+  it('does_not_restore_approval_card_from_removed_polling_fallback_path', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const getGeneration = vi.fn().mockResolvedValue({
       status: 'waiting_approval',
@@ -1310,24 +1299,16 @@ describe('useWorkbenchChat', () => {
     chat.chatInput.value = '创建新的世界观设定'
     await chat.sendMessage()
 
-    expect(getGeneration).toHaveBeenCalledWith(101, '9002')
-    expect(chat.messages.value).toHaveLength(2)
-    expect(chat.messages.value[1]).toMatchObject({
-      id: 2,
-      role: 'assistant',
-      approval: {
-        id: '42',
-        message: '检测到待审批变更（WORLD_SETTING_CREATE）',
-        time: '',
-        resolved: false,
-      },
-    })
-    expect(chat.messages.value[1].text).not.toContain('生成任务已完成')
+    expect(getGeneration).not.toHaveBeenCalled()
+    expect(chat.messages.value).toEqual([
+      { id: 1, role: 'user', text: '创建新的世界观设定' },
+      { id: 2, role: 'assistant', text: '生成失败：stream unavailable' },
+    ])
     expect(chat.isGenerating.value).toBe(false)
     expect(chat.streamingAssistantMsgId.value).toBe(null)
   })
 
-  it('fails_instead_of_faking_completion_when_polling_fallback_never_reaches_terminal_status', async () => {
+  it('fails_without_removed_polling_timeout_path_when_stream_is_unavailable', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const getGeneration = vi.fn().mockResolvedValue({ status: 'running' })
 
@@ -1361,10 +1342,10 @@ describe('useWorkbenchChat', () => {
     chat.chatInput.value = '继续生成'
     await chat.sendMessage()
 
-    expect(getGeneration).toHaveBeenCalledTimes(12)
+    expect(getGeneration).not.toHaveBeenCalled()
     expect(chat.messages.value).toEqual([
       { id: 1, role: 'user', text: '继续生成' },
-      { id: 2, role: 'assistant', text: '生成失败：生成任务轮询超时，状态：running' },
+      { id: 2, role: 'assistant', text: '生成失败：stream unavailable' },
     ])
     expect(chat.generationPhase.value).toBe('failed')
     expect(chat.generationTaskStatus.value).toBe('failed')
@@ -1729,7 +1710,7 @@ describe('useWorkbenchChat', () => {
     expect(openGenerationStream).toHaveBeenCalledWith('101', '90001', oversizedTurnId)
   })
 
-  it('resumes_running_task_and_falls_back_to_polling_when_stream_fails', async () => {
+  it('fails_running_task_resume_when_stream_is_unavailable_without_polling_fallback', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const getGeneration = vi.fn()
       .mockResolvedValueOnce({ status: 'running' })
@@ -1772,13 +1753,13 @@ describe('useWorkbenchChat', () => {
 
     await chat.resumeRunningTask('101', '90001', '50001')
 
-    expect(getGeneration).toHaveBeenCalledWith('101', '70001')
+    expect(getGeneration).not.toHaveBeenCalled()
     expect(chat.messages.value).toEqual([
-      { id: '1', role: 'assistant', text: '生成任务已完成，状态：done' },
+      { id: '1', role: 'assistant', text: '生成失败：stream unavailable' },
     ])
     expect(chat.streamingAssistantMsgId.value).toBe(null)
     expect(chat.isGenerating.value).toBe(false)
-    expect(chat.generationPhase.value).toBe('idle')
-    expect(chat.generationTaskStatus.value).toBe('')
+    expect(chat.generationPhase.value).toBe('failed')
+    expect(chat.generationTaskStatus.value).toBe('failed')
   })
 })

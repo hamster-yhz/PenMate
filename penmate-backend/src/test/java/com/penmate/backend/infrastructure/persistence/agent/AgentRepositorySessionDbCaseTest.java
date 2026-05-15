@@ -185,8 +185,20 @@ class AgentRepositorySessionDbCaseTest {
                     VALUES (930501, 930201, 930301, 920001, 'WRITE', 'WAITING_APPROVAL', 930601, 930701, 930801, 'stream-1', 'trace-session-restore')
                     """);
             statement("""
-                    INSERT INTO agent_task_contexts(context_id, task_id, chapter_id, selected_text, outline_snapshot_json, cards_snapshot_json, rag_snapshot_json, plugin_bindings_json, style_snapshot_json, model_snapshot_json, context_hash)
-                    VALUES (930601, 930501, 3001, '夜雨中的追踪', '{"chapter":"第三章"}', '[{"cardId":1}]', '{"chunks":[]}', '[{"plugin":"rag"}]', '{"styleId":81}', '{"model":"gpt-4.1"}', 'ctx-hash-1')
+                    INSERT INTO agent_task_contexts(
+                        context_id, task_id, chapter_id, selected_text,
+                        outline_snapshot_json, cards_snapshot_json, rag_snapshot_json,
+                        plugin_bindings_json, style_snapshot_json, model_snapshot_json,
+                        task_profile_json, prompt_plan_json, context_package_json,
+                        active_tool_calls_snapshot, last_runtime_status, recovery_cursor, context_hash
+                    )
+                    VALUES (
+                        930601, 930501, 3001, '夜雨中的追踪',
+                        '{"chapter":"第三章"}', '[{"cardId":1}]', '{"chunks":[]}',
+                        '[{"plugin":"rag"}]', '{"styleId":81}', '{"model":"gpt-4.1"}',
+                        '{"executionProfile":"default"}', '{"finalProfile":"quality_review"}', '{"chapterScope":"chapter:3001"}',
+                        '[{"toolCode":"quality_review","status":"WAITING_APPROVAL"}]', 'WAITING_APPROVAL', 'approval:930801', 'ctx-hash-1'
+                    )
                     """);
             statement("""
                     UPDATE agent_sessions
@@ -221,7 +233,20 @@ class AgentRepositorySessionDbCaseTest {
             assertThat(snapshot.getActiveTask().getChapterId()).isEqualTo(3001L);
             assertThat(snapshot.getActiveTask().getSelectedText()).isEqualTo("夜雨中的追踪");
             assertThat(snapshot.getActiveTask().getStyleSnapshotJson()).isEqualTo("{\"styleId\":81}");
-            assertThat(snapshot.getWorkbenchContext()).isEqualTo("{\"chapter\":\"第三章\"}");
+            assertThat(snapshot.getActiveTask().getTaskProfileJson()).isEqualTo("{\"executionProfile\":\"default\"}");
+            assertThat(snapshot.getActiveTask().getPromptPlanJson()).isEqualTo("{\"finalProfile\":\"quality_review\"}");
+            assertThat(snapshot.getActiveTask().getContextPackageJson()).isEqualTo("{\"chapterScope\":\"chapter:3001\"}");
+            assertThat(snapshot.getActiveTask().getActiveToolCallsSnapshot()).isEqualTo("[{\"toolCode\":\"quality_review\",\"status\":\"WAITING_APPROVAL\"}]");
+            assertThat(snapshot.getActiveTask().getLastRuntimeStatus()).isEqualTo("WAITING_APPROVAL");
+            assertThat(snapshot.getActiveTask().getRecoveryCursor()).isEqualTo("approval:930801");
+            assertThat(snapshot.getWorkbenchContext())
+                    .contains("\"chapterId\":\"3001\"")
+                    .contains("\"selectedText\":\"夜雨中的追踪\"")
+                    .contains("\"outlineSnapshot\":{\"chapter\":\"第三章\"}")
+                    .contains("\"lastRuntimeStatus\":\"waiting_approval\"")
+                    .contains("\"recoveryCursor\":\"approval:930801\"")
+                    .contains("\"activeToolCallsSnapshot\":[{\"toolCode\":\"quality_review\",\"status\":\"waiting_approval\"}]")
+                    .contains("\"resultSummary\":{\"draftSummary\":null,\"qualityReportSummary\":null,\"todoSummary\":null,\"storyBibleProposalSummary\":null}");
             assertThat(snapshot.getMessages()).hasSize(2);
         }
     }
@@ -276,6 +301,7 @@ class AgentRepositorySessionDbCaseTest {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
             statement.execute("DROP TABLE IF EXISTS agent_task_contexts");
+            statement.execute("DROP TABLE IF EXISTS agent_task_results");
             statement.execute("DROP TABLE IF EXISTS agent_turns");
             statement.execute("DROP TABLE IF EXISTS agent_session_style_bindings");
             statement.execute("DROP TABLE IF EXISTS agent_sessions");
@@ -366,8 +392,25 @@ class AgentRepositorySessionDbCaseTest {
                         plugin_bindings_json CLOB NULL,
                         style_snapshot_json CLOB NULL,
                         model_snapshot_json CLOB NULL,
+                        task_profile_json CLOB NULL,
+                        prompt_plan_json CLOB NULL,
+                        context_package_json CLOB NULL,
+                        active_tool_calls_snapshot CLOB NULL,
+                        last_runtime_status VARCHAR(64) NULL,
+                        recovery_cursor VARCHAR(255) NULL,
                         context_hash VARCHAR(128) NOT NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE agent_task_results (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        result_id BIGINT NULL,
+                        task_id BIGINT NOT NULL,
+                        draft_summary CLOB NULL,
+                        quality_report_summary CLOB NULL,
+                        todo_summary CLOB NULL,
+                        story_bible_proposal_summary CLOB NULL
                     )
                     """);
             statement.execute("""
