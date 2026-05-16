@@ -356,6 +356,94 @@ describe('createWorkbenchRuntimePresenter', () => {
     })
   })
 
+  it('merges_todo_crud_runtime_output_into_existing_todo_plan_card_items', () => {
+    const presenter = createWorkbenchRuntimePresenter()
+
+    const viewModel = presenter.present({
+      runtime: {
+        eventName: 'generation.tool_call',
+        phase: 'tool_call',
+        message: '待办 CRUD',
+        toolCall: {
+          toolCallId: 'call-todo-crud-1',
+          toolCode: 'todo_crud',
+          toolName: '待办 CRUD',
+          status: 'done',
+          output: {
+            operation: 'update',
+            todoId: 'todo-1',
+            sessionId: '90001',
+            taskId: '70001',
+            title: '修复密令来源',
+            sourceType: 'PLANNING',
+            todoStatus: 'BLOCKED',
+          },
+        },
+      } as any,
+      recovery: createTodoReviewRecoverySnapshot(),
+    })
+
+    expect(viewModel.todoPlanCard).toMatchObject({
+      title: '第三章修订待办',
+      itemCountText: '2 项待办',
+    })
+    expect(viewModel.todoPlanCard?.items).toEqual([
+      { title: '修复密令来源', statusText: 'BLOCKED', priorityText: 'HIGH' },
+      { title: '补充侍从转述桥段', statusText: 'pending', priorityText: 'MEDIUM' },
+    ])
+  })
+
+  it('restores_preflight_seeded_todo_plan_from_recovery_tool_snapshot_without_result_summary', () => {
+    const presenter = createWorkbenchRuntimePresenter()
+
+    const viewModel = presenter.present({
+      recovery: {
+        pendingApproval: null,
+        activeTask: {
+          taskStatus: 'RUNNING',
+        },
+        workbenchContext: {
+          activeTaskRuntime: {
+            lastRuntimeStatus: 'todo_review',
+            recoveryCursor: 'phase:todo_review',
+            activeToolCallsSnapshot: [
+              {
+                toolCallId: 'preflight:todo_planner',
+                toolCode: 'todo_planner',
+                toolName: 'Todo 规划',
+                status: 'done',
+                output: {
+                  planTitle: '第三章修订待办',
+                  planSummary: '先补齐密令来源链路',
+                  recommendedNextAction: 'apply_todo_plan',
+                  items: [
+                    { todoId: 'todo-1', title: '修复密令来源', status: 'pending', priority: 'HIGH' },
+                    { todoId: 'todo-2', title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
+                  ],
+                },
+                errorMessage: '',
+              },
+            ],
+          },
+          resultSummary: {
+            todoSummary: null,
+          },
+        },
+      } as any,
+    })
+
+    expect(viewModel.status.badgeText).toBe('正在整理待办')
+    expect(viewModel.todoPlanCard).toMatchObject({
+      title: '第三章修订待办',
+      itemCountText: '2 项待办',
+      nextActionText: 'apply_todo_plan',
+    })
+    expect(viewModel.todoPlanCard?.items).toEqual([
+      { title: '修复密令来源', statusText: 'pending', priorityText: 'HIGH' },
+      { title: '补充侍从转述桥段', statusText: 'pending', priorityText: 'MEDIUM' },
+    ])
+  })
+
   it('maps_real_backend_executing_and_tool_call_phases_into_user_facing_copy', () => {
     const presenter = createWorkbenchRuntimePresenter()
 

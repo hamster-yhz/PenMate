@@ -573,6 +573,25 @@ public class NovelApplicationService {
     }
 
     /**
+     * 服务端直接读取章节正文文本。
+     *
+     * @param projectId 入参：projectId
+     * @param chapterId 入参：chapterId
+     * @return 出参：章节正文文本
+     */
+    public String getChapterContentText(Long projectId, Long chapterId) {
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(chapterId, "chapterId must not be null");
+        NovelChapter chapter = getChapter(projectId, chapterId);
+        if (chapter.getContentObjectKey() == null || chapter.getContentObjectKey().isBlank()) {
+            log.warn("章节正文对象键为空，返回空文本: projectId={}, chapterId={}", projectId, chapterId);
+            return "";
+        }
+        log.info("服务端读取章节正文文本: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, chapter.getContentObjectKey());
+        return objectStorageService.readText(chapter.getContentObjectKey());
+    }
+
+    /**
      * 获取章节正文上传地址。
      *
      * @param projectId 入参：projectId

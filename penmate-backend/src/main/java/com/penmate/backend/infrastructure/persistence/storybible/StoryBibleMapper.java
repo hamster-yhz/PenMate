@@ -3,13 +3,17 @@ package com.penmate.backend.infrastructure.persistence.storybible;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleEntry;
 import com.penmate.backend.domain.storybible.model.StoryBibleSourceRef;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 
@@ -26,7 +30,123 @@ import java.util.List;
  */
 @Mapper
 public interface StoryBibleMapper {
+ 
+    @Insert("""
+            INSERT INTO story_bible_entries(
+                entry_id,
+                story_bible_id,
+                project_id,
+                entry_type,
+                entry_key,
+                title,
+                content,
+                canonical_status,
+                risk_level,
+                source_refs_json,
+                valid_from_chapter_id,
+                valid_to_chapter_id,
+                version_no
+            ) VALUES (
+                #{entryId},
+                #{storyBibleId},
+                #{projectId},
+                #{entryType},
+                #{entryKey},
+                #{title},
+                #{content},
+                #{canonicalStatus},
+                #{riskLevel},
+                #{sourceRefs, typeHandler=com.penmate.backend.infrastructure.persistence.storybible.StoryBibleMapper$StoryBibleSourceRefListTypeHandler},
+                #{validFromChapterId},
+                #{validToChapterId},
+                #{versionNo}
+            )
+            """)
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insert(StoryBibleEntry entry);
 
+    @Update("""
+            UPDATE story_bible_entries
+            SET story_bible_id = #{storyBibleId},
+                entry_type = #{entryType},
+                entry_key = #{entryKey},
+                title = #{title},
+                content = #{content},
+                canonical_status = #{canonicalStatus},
+                risk_level = #{riskLevel},
+                source_refs_json = #{sourceRefs, typeHandler=com.penmate.backend.infrastructure.persistence.storybible.StoryBibleMapper$StoryBibleSourceRefListTypeHandler},
+                valid_from_chapter_id = #{validFromChapterId},
+                valid_to_chapter_id = #{validToChapterId},
+                version_no = #{versionNo}
+            WHERE project_id = #{projectId}
+              AND entry_id = #{entryId}
+              AND deleted_at IS NULL
+            """)
+    int update(StoryBibleEntry entry);
+
+    @Select("""
+            SELECT id,
+                   story_bible_id AS storyBibleId,
+                   project_id AS projectId,
+                   title,
+                   description,
+                   active_version_no AS activeVersionNo,
+                   created_at AS createdAt,
+                   updated_at AS updatedAt,
+                   deleted_at AS deletedAt
+            FROM story_bibles
+            WHERE project_id = #{projectId}
+              AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    StoryBible findByProjectId(@Param("projectId") Long projectId);
+
+    @Select("""
+            SELECT id,
+                   entry_id,
+                   story_bible_id,
+                   project_id,
+                   entry_type,
+                   entry_key,
+                   title,
+                   content,
+                   canonical_status,
+                   risk_level,
+                   CAST(source_refs_json AS VARCHAR) AS source_refs_json_text,
+                   valid_from_chapter_id,
+                   valid_to_chapter_id,
+                   version_no,
+                   created_at,
+                   updated_at,
+                   deleted_at
+            FROM story_bible_entries
+            WHERE project_id = #{projectId}
+              AND entry_id = #{entryId}
+              AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    @Results(id = "storyBibleEntrySingleResultMap", value = {
+            @Result(column = "id", property = "id"),
+            @Result(column = "entry_id", property = "entryId"),
+            @Result(column = "story_bible_id", property = "storyBibleId"),
+            @Result(column = "project_id", property = "projectId"),
+            @Result(column = "entry_type", property = "entryType"),
+            @Result(column = "entry_key", property = "entryKey"),
+            @Result(column = "title", property = "title"),
+            @Result(column = "content", property = "content"),
+            @Result(column = "canonical_status", property = "canonicalStatus"),
+            @Result(column = "risk_level", property = "riskLevel"),
+            @Result(column = "source_refs_json_text", property = "sourceRefs", javaType = List.class, typeHandler = StoryBibleSourceRefListTypeHandler.class),
+            @Result(column = "valid_from_chapter_id", property = "validFromChapterId", jdbcType = JdbcType.BIGINT),
+            @Result(column = "valid_to_chapter_id", property = "validToChapterId", jdbcType = JdbcType.BIGINT),
+            @Result(column = "version_no", property = "versionNo"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt"),
+            @Result(column = "deleted_at", property = "deletedAt")
+    })
+    StoryBibleEntry findByEntryId(@Param("projectId") Long projectId,
+                                  @Param("entryId") Long entryId);
+ 
     @Select("""
             SELECT entry.id,
                    entry.entry_id,
@@ -80,6 +200,16 @@ public interface StoryBibleMapper {
             @Result(column = "deleted_at", property = "deletedAt")
     })
     List<StoryBibleEntry> findActiveEntries(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId);
+
+    @Update("""
+            UPDATE story_bible_entries
+            SET deleted_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId}
+              AND entry_id = #{entryId}
+              AND deleted_at IS NULL
+            """)
+    int softDelete(@Param("projectId") Long projectId,
+                   @Param("entryId") Long entryId);
 
     /**
      * Story Bible 来源引用 JSON 列表类型处理器。

@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.persistence.storybible;
 
+import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleEntry;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import org.slf4j.Logger;
@@ -33,5 +34,30 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
         List<StoryBibleEntry> entries = storyBibleMapper.findActiveEntries(projectId, chapterId);
         log.debug("Loaded {} active story bible entries for projectId={} chapterId={}", entries.size(), projectId, chapterId);
         return entries;
+    }
+
+    @Override
+    public StoryBible findByProjectId(Long projectId) {
+        return storyBibleMapper.findByProjectId(projectId);
+    }
+
+    @Override
+    public StoryBibleEntry findByEntryId(Long projectId, Long entryId) {
+        return storyBibleMapper.findByEntryId(projectId, entryId);
+    }
+
+    @Override
+    public int insert(StoryBibleEntry entry) {
+        return storyBibleMapper.insert(entry);
+    }
+
+    @Override
+    public int update(StoryBibleEntry entry) {
+        return storyBibleMapper.update(entry);
+    }
+
+    @Override
+    public int softDelete(Long projectId, Long entryId) {
+        return storyBibleMapper.softDelete(projectId, entryId);
     }
 }

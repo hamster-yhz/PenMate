@@ -174,7 +174,7 @@ const resolvePhaseFromToolCode = (toolCode: unknown, fallback: string) => {
   const normalizedToolCode = normalizePhase(toolCode)
   if (normalizedToolCode === 'draft_generation') return 'draft_generation'
   if (normalizedToolCode === 'quality_review') return 'quality_review'
-  if (normalizedToolCode === 'todo_planner') return 'todo_review'
+  if (normalizedToolCode === 'todo_planner' || normalizedToolCode === 'todo_crud') return 'todo_review'
   if (normalizedToolCode === 'story_bible_update') return 'story_bible_review'
   return fallback
 }
@@ -264,6 +264,63 @@ const buildToolCallCard = (toolCall: WorkbenchRuntimeToolCall | null): ToolCallS
   }
 }
 
+const mergeTodoCrudOutputIntoSummary = (
+  baseSummary: Record<string, unknown> | null | undefined,
+  toolOutput: Record<string, unknown> | null,
+) => {
+  if (!baseSummary || !toolOutput) return baseSummary
+  const operation = normalizePhase(toolOutput.operation)
+  if (!operation) return baseSummary
+
+  const rawItems = Array.isArray(baseSummary.items) ? baseSummary.items : []
+  const nextItems = rawItems.map((item) => ({ ...(item as Record<string, unknown>) }))
+  const targetTodoId = normalizeText(toolOutput.todoId)
+  const targetTitle = normalizeText(toolOutput.title)
+  const targetIndex = nextItems.findIndex((item) => {
+    const itemTodoId = normalizeText(item.todoId)
+    const itemTitle = normalizeText(item.title)
+    return (targetTodoId && itemTodoId === targetTodoId) || (!targetTodoId && !!targetTitle && itemTitle === targetTitle)
+  })
+
+  if ((operation === 'update' || operation === 'complete') && targetIndex >= 0) {
+    nextItems[targetIndex] = {
+      ...nextItems[targetIndex],
+      ...toolOutput,
+      status: normalizeText(toolOutput.todoStatus) || normalizeText(toolOutput.status) || normalizeText(nextItems[targetIndex].status),
+    }
+  }
+
+  if (operation === 'delete' && targetIndex >= 0) {
+    nextItems.splice(targetIndex, 1)
+  }
+
+  if (operation === 'create' && targetIndex < 0 && (targetTodoId || targetTitle)) {
+    nextItems.push({
+      ...toolOutput,
+      status: normalizeText(toolOutput.todoStatus) || normalizeText(toolOutput.status),
+    })
+  }
+
+  if (operation === 'list' && Array.isArray(toolOutput.items)) {
+    return {
+      ...baseSummary,
+      items: toolOutput.items,
+    }
+  }
+
+  return {
+    ...baseSummary,
+    items: nextItems,
+  }
+}
+
+const resolveRecoveryTodoSummaryFromToolSnapshot = (recovery?: WorkbenchRecoverySnapshot | null) => {
+  const snapshots = recovery?.workbenchContext?.activeTaskRuntime?.activeToolCallsSnapshot
+  if (!Array.isArray(snapshots)) return null
+  const plannerSnapshot = snapshots.find((item) => normalizePhase(item?.toolCode) === 'todo_planner')
+  return parseJsonRecord(plannerSnapshot?.output)
+}
+
 const resolveTodoSummary = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: WorkbenchRecoverySnapshot | null) => {
   const runtimeTodoSummary = resolveRuntimeTodoSummary(runtime)
   if (runtimeTodoSummary) {
@@ -274,7 +331,12 @@ const resolveTodoSummary = (runtime?: WorkbenchRuntimeEventSource | null, recove
     const parsed = parseJsonRecord(runtimeToolCall?.output)
     if (parsed) return parsed
   }
-  return recovery?.workbenchContext?.resultSummary?.todoSummary as Record<string, unknown> | null | undefined
+  const recoveryTodoSummary = (recovery?.workbenchContext?.resultSummary?.todoSummary as Record<string, unknown> | null | undefined)
+    || resolveRecoveryTodoSummaryFromToolSnapshot(recovery)
+  if (normalizePhase(runtimeToolCall?.toolCode) === 'todo_crud') {
+    return mergeTodoCrudOutputIntoSummary(recoveryTodoSummary, parseJsonRecord(runtimeToolCall?.output))
+  }
+  return recoveryTodoSummary
 }
 
 const buildTodoPlanCard = (runtime?: WorkbenchRuntimeEventSource | null, recovery?: WorkbenchRecoverySnapshot | null): TodoPlanCardViewModel | undefined => {

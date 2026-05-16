@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createRuntimeWaitingApprovalEvent,
   createStoryBibleWaitingApprovalRecoverySnapshot,
+  createTodoReviewRecoverySnapshot,
 } from '@/test/workbenchRuntimeContract.fixture'
 
 type ModelConfigCandidate = {
@@ -1070,6 +1071,54 @@ describe('Workbench index chat parent binding', () => {
       expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
         title: '故事圣经更新待确认',
         proposalSummary: '建议补充侍从知晓密令的设定',
+      }))
+    })
+  })
+
+  it('updates_right_panel_todo_plan_card_when_todo_crud_stream_event_mutates_existing_item', async () => {
+    agentApiMock.resumeSession = vi.fn(async () => createTodoReviewRecoverySnapshot())
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      expect(streamListeners.get('generation.tool_call')?.length || 0).toBeGreaterThan(0)
+    })
+
+    emitStreamEvent('generation.tool_call', {
+      eventName: 'generation.tool_call',
+      taskId: '70001',
+      sessionId: '90001',
+      turnId: '50001',
+      phase: 'tool_call',
+      message: '待办 CRUD',
+      nextAction: 'continue_tool_loop',
+      toolCall: {
+        toolCallId: 'call-todo-crud-1',
+        toolCode: 'todo_crud',
+        toolName: '待办 CRUD',
+        status: 'done',
+        output: {
+          operation: 'update',
+          todoId: 'todo-1',
+          sessionId: '90001',
+          taskId: '70001',
+          title: '修复密令来源',
+          sourceType: 'PLANNING',
+          todoStatus: 'BLOCKED',
+        },
+      },
+      recoverable: true,
+    })
+
+    await waitForAssertion(() => {
+      const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
+      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
+        title: '第三章修订待办',
+        itemCountText: '2 项待办',
+        items: [
+          { title: '修复密令来源', statusText: 'BLOCKED', priorityText: 'HIGH' },
+          { title: '补充侍从转述桥段', statusText: 'pending', priorityText: 'MEDIUM' },
+        ],
       }))
     })
   })

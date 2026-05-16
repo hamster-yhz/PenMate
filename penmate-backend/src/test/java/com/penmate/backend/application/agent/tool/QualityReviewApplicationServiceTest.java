@@ -4,10 +4,12 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.application.agent.tool.support.QualityReviewCommandParser;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -299,6 +302,105 @@ class QualityReviewApplicationServiceTest {
                 .hasMessageContaining("userRequirements must contain at least one non-blank item");
     }
 
+    @Test
+    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_ACCEPT_IDENTIFIER_ONLY_ARGS_AND_LOAD_REVIEW_SOURCE_IN_SERVICE_LAYER() throws Exception {
+        AgentRepository agentRepository = mock(AgentRepository.class);
+        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
+        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
+        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
+        AgentGenerationTask task = generationTask();
+        AgentLlmExecutionConfig executionConfig = executionConfig();
+        java.util.concurrent.atomic.AtomicReference<ToolCallResult> resultRef = new java.util.concurrent.atomic.AtomicReference<>();
+
+        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-identifiers-only")).thenReturn(executionConfig);
+        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
+                .thenReturn("""
+                        {
+                          "score": 88,
+                          "passes": ["正文已成功装载"],
+                          "issues": [],
+                          "riskFlags": [],
+                          "needsRevision": false,
+                          "revisionSuggestions": [],
+                          "reviewSummary": "已按业务标识读取正文并完成质量审查。"
+                        }
+                        """);
+
+        assertThatCode(() -> resultRef.set(review(service, request("call-quality-identifiers-only", """
+                {
+                  "chapterId": 5001,
+                  "draftId": 3001,
+                  "currentRevisionRound": 1,
+                  "maxRevisionRounds": 2
+                }
+                """))))
+                .doesNotThrowAnyException();
+        assertThat(resultRef.get()).isNotNull();
+        assertThat(resultRef.get().status()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_WHEN_TASK_DOES_NOT_BELONG_TO_CURRENT_OPERATOR() throws Exception {
+        AgentRepository agentRepository = mock(AgentRepository.class);
+        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
+        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
+        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
+        AgentGenerationTask task = generationTask();
+
+        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
+
+        assertThatThrownBy(() -> review(service, requestWithOperator("call-quality-operator-mismatch", validArgsJson(), 2002L)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("operator")
+                .hasMessageContaining("generation task");
+    }
+
+    @Test
+    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_LOAD_REAL_CHAPTER_CONTENT_FROM_NOVEL_SERVICE_WHEN_ONLY_CHAPTER_IDENTIFIER_PROVIDED() throws Exception {
+        AgentRepository agentRepository = mock(AgentRepository.class);
+        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
+        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
+        NovelApplicationService novelApplicationService = mock(NovelApplicationService.class);
+        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway, novelApplicationService);
+        AgentGenerationTask task = generationTask();
+        AgentTaskContext taskContext = AgentTaskContext.runningOf(71001L, 8001L, "running", 5001L, "局部选中文本，不应作为整章正文");
+        AgentLlmExecutionConfig executionConfig = executionConfig();
+
+        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
+        when(agentRepository.findTaskContext(8001L)).thenReturn(taskContext);
+        when(novelApplicationService.getChapterContentText(9001L, 5001L)).thenReturn("真实章节正文：夜雨中的追踪在巷口停住。");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-chapter-content")).thenReturn(executionConfig);
+        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
+                .thenReturn("""
+                        {
+                          "score": 91,
+                          "passes": ["章节正文已通过服务层装载"],
+                          "issues": [],
+                          "riskFlags": [],
+                          "needsRevision": false,
+                          "revisionSuggestions": [],
+                          "reviewSummary": "已使用真实章节正文完成质量审查。"
+                        }
+                        """);
+
+        ToolCallResult result = review(service, request("call-quality-chapter-content", """
+                {
+                  "chapterId": 5001,
+                  "currentRevisionRound": 0,
+                  "maxRevisionRounds": 2
+                }
+                """));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
+        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
+        verify(novelApplicationService).getChapterContentText(9001L, 5001L);
+        assertThat(taskCaptor.getValue().getPromptSnapshot())
+                .contains("真实章节正文：夜雨中的追踪在巷口停住。")
+                .doesNotContain("局部选中文本，不应作为整章正文");
+    }
+
     private static Object instantiateQualityReviewApplicationService(AgentRepository agentRepository,
                                                                      AgentModelRoutingService agentModelRoutingService,
                                                                      AgentLlmGateway agentLlmGateway) throws Exception {
@@ -311,6 +413,22 @@ class QualityReviewApplicationServiceTest {
         );
         constructor.setAccessible(true);
         return constructor.newInstance(agentRepository, agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser());
+    }
+
+    private static Object instantiateQualityReviewApplicationService(AgentRepository agentRepository,
+                                                                     AgentModelRoutingService agentModelRoutingService,
+                                                                     AgentLlmGateway agentLlmGateway,
+                                                                     NovelApplicationService novelApplicationService) throws Exception {
+        Class<?> clazz = loadClass("com.penmate.backend.application.agent.tool.DefaultQualityReviewApplicationService");
+        Constructor<?> constructor = clazz.getDeclaredConstructor(
+                AgentRepository.class,
+                AgentModelRoutingService.class,
+                AgentLlmGateway.class,
+                QualityReviewCommandParser.class,
+                NovelApplicationService.class
+        );
+        constructor.setAccessible(true);
+        return constructor.newInstance(agentRepository, agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser(), novelApplicationService);
     }
 
     private static Class<?> loadClass(String fqcn) {
@@ -336,13 +454,17 @@ class QualityReviewApplicationServiceTest {
     }
 
     private static ToolCallRequest request(String toolCallId, String toolArgsJson) {
+        return requestWithOperator(toolCallId, toolArgsJson, 1001L);
+    }
+
+    private static ToolCallRequest requestWithOperator(String toolCallId, String toolArgsJson, Long operatorId) {
         return new ToolCallRequest(
                 9001L,
                 8001L,
                 6001L,
                 "quality_review",
                 toolArgsJson,
-                1001L,
+                operatorId,
                 "trace-" + toolCallId,
                 "{}",
                 toolCallId + "-8001",

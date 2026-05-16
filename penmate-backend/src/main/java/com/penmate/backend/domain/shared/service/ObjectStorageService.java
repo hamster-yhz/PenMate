@@ -42,5 +42,13 @@ public interface ObjectStorageService {
      * @return 上传结果
      */
     PutObjectResult putText(String objectKey, String content, String contentType);
+
+    /**
+     * 服务端读取文本对象内容。
+     *
+     * @param objectKey 对象键
+     * @return 文本内容
+     */
+    String readText(String objectKey);
 }
 

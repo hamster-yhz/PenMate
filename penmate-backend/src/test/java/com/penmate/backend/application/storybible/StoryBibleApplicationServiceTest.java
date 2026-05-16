@@ -1,6 +1,8 @@
 package com.penmate.backend.application.storybible;
 
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
+import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleEntry;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import org.junit.jupiter.api.Test;
@@ -18,7 +20,9 @@ import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -166,6 +170,304 @@ class StoryBibleApplicationServiceTest extends BaseApplicationServiceTest {
                         .contains("林烬与苏砚都知道城主其实是林烬的生父"));
     }
 
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_SUPPORT_UPDATING_EXISTING_ENTRY_WITH_STABLE_CORE_FIELDS() {
+        StoryBibleEntry existing = entry(
+                "maid.secret_order",
+                "character",
+                "侍从只负责送茶，不知密令。",
+                "CANON",
+                1,
+                40L,
+                null,
+                1
+        );
+        existing.setEntryId(88001L);
+        existing.setProjectId(1001L);
+
+        Object service = newApplicationService(List.of(existing));
+        StoryBibleEntry candidate = entry(
+                "maid.secret_order",
+                "character",
+                "侍从负责转述密令，并知晓部分内情。",
+                "PROPOSED",
+                3,
+                45L,
+                null,
+                2
+        );
+        candidate.setEntryId(88001L);
+        candidate.setProjectId(1001L);
+
+        Object updated = invokeSingleMethod(
+                service,
+                "updateEntry",
+                1001L,
+                88001L,
+                candidate,
+                2001L,
+                "trace-story-bible-update"
+        );
+
+        assertThat(updated).isNotNull();
+        assertThat(stringProperty(updated, "entryKey")).isEqualTo("maid.secret_order");
+        assertThat(stringProperty(updated, "canonicalStatus")).isEqualTo("PROPOSED");
+        assertThat(integerProperty(updated, "riskLevel")).isEqualTo(3);
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_CREATE_ENTRY_WITH_STRUCTURED_CORE_FIELDS() {
+        Object service = newApplicationService(List.of());
+        StoryBibleEntry candidate = entry(
+                "maid.secret_order",
+                "character",
+                "侍从负责转述密令，并知晓部分内情。",
+                "PROPOSED",
+                2,
+                45L,
+                null,
+                1
+        );
+        candidate.setTitle("侍从密令");
+
+        Object created = invokeSingleMethod(
+                service,
+                "createEntry",
+                1001L,
+                candidate,
+                2001L,
+                "trace-story-bible-create"
+        );
+
+        assertThat(created).isNotNull();
+        assertThat(stringProperty(created, "projectId")).isEqualTo("1001");
+        assertThat(stringProperty(created, "entryKey")).isEqualTo("maid.secret_order");
+        assertThat(stringProperty(created, "title")).isEqualTo("侍从密令");
+        assertThat(stringProperty(created, "canonicalStatus")).isEqualTo("PROPOSED");
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_FILL_WRITE_REQUIRED_FIELDS_FROM_ACTIVE_STORY_BIBLE_ON_CREATE() {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        StoryBible storyBible = new StoryBible();
+        storyBible.setStoryBibleId(99001L);
+        storyBible.setProjectId(1001L);
+        storyBible.setActiveVersionNo(7);
+        when(repository.findByProjectId(1001L)).thenReturn(storyBible);
+        when(repository.insert(org.mockito.ArgumentMatchers.any(StoryBibleEntry.class)))
+                .thenAnswer(invocation -> {
+                    StoryBibleEntry persisted = invocation.getArgument(0);
+                    assertThat(persisted.getStoryBibleId()).isEqualTo(99001L);
+                    assertThat(persisted.getVersionNo()).isEqualTo(7);
+                    assertThat(persisted.getEntryId()).isNotNull();
+                    assertThat(persisted.getSourceRefs()).isNotNull();
+                    persisted.setEntryId(88003L);
+                    return 1;
+                });
+        Object service = instantiate(APPLICATION_SERVICE, Map.of(StoryBibleRepository.class, repository));
+        StoryBibleEntry candidate = entry(
+                "maid.secret_order",
+                "character",
+                "侍从负责转述密令，并知晓部分内情。",
+                "PROPOSED",
+                2,
+                45L,
+                null,
+                null
+        );
+        candidate.setTitle("侍从密令");
+
+        Object created = invokeSingleMethod(
+                service,
+                "createEntry",
+                1001L,
+                candidate,
+                2001L,
+                "trace-story-bible-create-required-fields"
+        );
+
+        assertThat(created).isNotNull();
+        assertThat(longProperty(created, "entryId")).isEqualTo(88003L);
+        assertThat(longProperty(created, "storyBibleId")).isEqualTo(99001L);
+        assertThat(integerProperty(created, "versionNo")).isEqualTo(7);
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_PERSIST_CREATED_ENTRY_VIA_REPOSITORY_PORT() {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        when(repository.insert(org.mockito.ArgumentMatchers.any(StoryBibleEntry.class)))
+                .thenAnswer(invocation -> {
+                    StoryBibleEntry persisted = invocation.getArgument(0);
+                    persisted.setEntryId(88002L);
+                    return 1;
+                });
+        Object service = instantiate(APPLICATION_SERVICE, Map.of(StoryBibleRepository.class, repository));
+        StoryBibleEntry candidate = entry(
+                "maid.secret_order",
+                "character",
+                "侍从负责转述密令，并知晓部分内情。",
+                "PROPOSED",
+                2,
+                45L,
+                null,
+                1
+        );
+        candidate.setTitle("侍从密令");
+
+        Object created = invokeSingleMethod(
+                service,
+                "createEntry",
+                1001L,
+                candidate,
+                2001L,
+                "trace-story-bible-create-persist"
+        );
+
+        assertThat(created).isNotNull();
+        assertThat(longProperty(created, "entryId")).isEqualTo(88002L);
+        assertThat(stringProperty(created, "entryKey")).isEqualTo("maid.secret_order");
+        assertThat(stringProperty(created, "canonicalStatus")).isEqualTo("PROPOSED");
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_PRESERVE_STABLE_FIELDS_FROM_EXISTING_ENTRY_ON_UPDATE() {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        StoryBibleEntry existing = entry(
+                "maid.secret_order",
+                "character",
+                "侍从只负责送茶，不知密令。",
+                "CANON",
+                1,
+                40L,
+                null,
+                5
+        );
+        existing.setEntryId(88001L);
+        existing.setProjectId(1001L);
+        existing.setStoryBibleId(99001L);
+        existing.setSourceRefs(List.of());
+        when(repository.findByEntryId(1001L, 88001L)).thenReturn(existing);
+        when(repository.update(org.mockito.ArgumentMatchers.any(StoryBibleEntry.class)))
+                .thenAnswer(invocation -> {
+                    StoryBibleEntry persisted = invocation.getArgument(0);
+                    assertThat(persisted.getStoryBibleId()).isEqualTo(99001L);
+                    assertThat(persisted.getVersionNo()).isEqualTo(5);
+                    assertThat(persisted.getSourceRefs()).isNotNull();
+                    return 1;
+                });
+        Object service = instantiate(APPLICATION_SERVICE, Map.of(StoryBibleRepository.class, repository));
+        StoryBibleEntry candidate = entry(
+                "maid.secret_order",
+                "character",
+                "侍从负责转述密令，并知晓部分内情。",
+                "PROPOSED",
+                3,
+                45L,
+                null,
+                null
+        );
+        candidate.setTitle("侍从密令");
+
+        Object updated = invokeSingleMethod(
+                service,
+                "updateEntry",
+                1001L,
+                88001L,
+                candidate,
+                2001L,
+                "trace-story-bible-update-preserve"
+        );
+
+        assertThat(updated).isNotNull();
+        assertThat(longProperty(updated, "storyBibleId")).isEqualTo(99001L);
+        assertThat(integerProperty(updated, "versionNo")).isEqualTo(5);
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_FAIL_WHEN_UPDATE_AFFECTS_NO_ROWS() throws Exception {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        StoryBibleEntry existing = entry(
+                "maid.secret_order",
+                "character",
+                "侍从只负责送茶，不知密令。",
+                "CANON",
+                1,
+                40L,
+                null,
+                5
+        );
+        existing.setEntryId(88001L);
+        existing.setProjectId(1001L);
+        existing.setStoryBibleId(99001L);
+        existing.setSourceRefs(List.of());
+        when(repository.findByEntryId(1001L, 88001L)).thenReturn(existing);
+        when(repository.update(org.mockito.ArgumentMatchers.any(StoryBibleEntry.class))).thenReturn(0);
+        Object service = instantiate(APPLICATION_SERVICE, Map.of(StoryBibleRepository.class, repository));
+        StoryBibleEntry candidate = entry(
+                "maid.secret_order",
+                "character",
+                "侍从负责转述密令，并知晓部分内情。",
+                "PROPOSED",
+                3,
+                45L,
+                null,
+                null
+        );
+        candidate.setTitle("侍从密令");
+        Method updateMethod = loadClass(APPLICATION_SERVICE).getMethod(
+                "updateEntry",
+                Long.class,
+                Long.class,
+                StoryBibleEntry.class,
+                Long.class,
+                String.class
+        );
+        Object finalService = service;
+        assertThatThrownBy(() -> updateMethod.invoke(finalService, 1001L, 88001L, candidate, 2001L, "trace-story-bible-update-zero"))
+                .hasRootCauseInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_MANAGER_SHOULD_FAIL_WHEN_DELETE_AFFECTS_NO_ROWS() throws Exception {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        when(repository.softDelete(1001L, 88001L)).thenReturn(0);
+        Object service = instantiate(APPLICATION_SERVICE, Map.of(StoryBibleRepository.class, repository));
+        Method deleteMethod = loadClass(APPLICATION_SERVICE).getMethod(
+                "deleteEntry",
+                Long.class,
+                Long.class,
+                Long.class,
+                String.class
+        );
+        Object finalService = service;
+        assertThatThrownBy(() -> deleteMethod.invoke(finalService, 1001L, 88001L, 2001L, "trace-story-bible-delete-zero"))
+                .hasRootCauseInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_REPOSITORY_SHOULD_EXPOSE_PERSISTENCE_PORTS_FOR_CREATE_UPDATE_DELETE() {
+        Class<?> repositoryType = loadClass("com.penmate.backend.domain.storybible.repository.StoryBibleRepository");
+        try {
+            assertThat(repositoryType.getMethod("insert", StoryBibleEntry.class)).isNotNull();
+            assertThat(repositoryType.getMethod("update", StoryBibleEntry.class)).isNotNull();
+            assertThat(repositoryType.getMethod("softDelete", Long.class, Long.class)).isNotNull();
+        } catch (NoSuchMethodException ex) {
+            fail("Expected story bible repository persistence ports to exist: %s".formatted(ex.getMessage()));
+        }
+    }
+
+    @Test
+    void UT_APP_STORY_BIBLE_REPOSITORY_SHOULD_EXPOSE_LOOKUP_PORTS_FOR_ACTIVE_STORY_BIBLE_AND_EXISTING_ENTRY() {
+        Class<?> repositoryType = loadClass("com.penmate.backend.domain.storybible.repository.StoryBibleRepository");
+        Class<?> storyBibleType = loadClass("com.penmate.backend.domain.storybible.model.StoryBible");
+        try {
+            assertThat(repositoryType.getMethod("findByProjectId", Long.class).getReturnType()).isEqualTo(storyBibleType);
+            assertThat(repositoryType.getMethod("findByEntryId", Long.class, Long.class).getReturnType()).isEqualTo(StoryBibleEntry.class);
+        } catch (NoSuchMethodException ex) {
+            fail("Expected story bible repository lookup ports to exist: %s".formatted(ex.getMessage()));
+        }
+    }
+
     private StoryBibleEntry entry(String entryKey,
                                   String entryType,
                                   String content,
@@ -188,10 +490,35 @@ class StoryBibleApplicationServiceTest extends BaseApplicationServiceTest {
 
     private Object newApplicationService(List<StoryBibleEntry> repositoryEntries) {
         StoryBibleRepository repository = mock(StoryBibleRepository.class);
-        if (!repositoryEntries.isEmpty()) {
-            when(repository.findActiveEntries(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
-                    .thenReturn(repositoryEntries);
-        }
+        StoryBible storyBible = new StoryBible();
+        storyBible.setStoryBibleId(99001L);
+        storyBible.setProjectId(1001L);
+        storyBible.setActiveVersionNo(7);
+        lenient().when(repository.findByProjectId(org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(storyBible);
+        lenient().when(repository.insert(org.mockito.ArgumentMatchers.any(StoryBibleEntry.class)))
+                .thenAnswer(invocation -> {
+                    StoryBibleEntry entry = invocation.getArgument(0);
+                    if (entry.getEntryId() == null) {
+                        entry.setEntryId(88099L);
+                    }
+                    return 1;
+                });
+        lenient().when(repository.update(org.mockito.ArgumentMatchers.any(StoryBibleEntry.class)))
+                .thenReturn(1);
+        lenient().when(repository.softDelete(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(1);
+        lenient().when(repository.findActiveEntries(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(repositoryEntries);
+        lenient().when(repository.findByEntryId(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+                .thenAnswer(invocation -> {
+                    Long projectId = invocation.getArgument(0);
+                    Long entryId = invocation.getArgument(1);
+                    return repositoryEntries.stream()
+                            .filter(entry -> Objects.equals(entry.getProjectId(), projectId) && Objects.equals(entry.getEntryId(), entryId))
+                            .findFirst()
+                            .orElse(null);
+                });
         return instantiate(APPLICATION_SERVICE, Map.of(StoryBibleRepository.class, repository));
     }
 
@@ -266,6 +593,20 @@ class StoryBibleApplicationServiceTest extends BaseApplicationServiceTest {
         } catch (Exception ex) {
             fail("Failed to invoke %s on %s: %s".formatted(methodName, target.getClass().getName(), ex.getMessage()));
             return List.of();
+        }
+    }
+
+    private Object invokeSingleMethod(Object target, String methodName, Object... args) {
+        if (target == null) {
+            fail("Target service must not be null when invoking %s".formatted(methodName));
+        }
+        Method method = findMethod(target.getClass(), methodName, args.length);
+        try {
+            method.setAccessible(true);
+            return method.invoke(target, args);
+        } catch (Exception ex) {
+            fail("Failed to invoke %s on %s: %s".formatted(methodName, target.getClass().getName(), ex.getMessage()));
+            return null;
         }
     }
 

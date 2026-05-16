@@ -496,6 +496,75 @@ class AgentGenerationWorkflowTest {
     }
 
     @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_SEED_TODO_PLAN_IN_RUNTIME_STATUS_AND_SNAPSHOT_BEFORE_TOOL_LOOP() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(40L);
+        task.setTaskId(40L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("先规划本章修订待办再执行");
+
+        AgentTaskContext persistedContext = AgentTaskContext.runningOf(940L, 40L, AgentTaskStatus.RUNNING.value(), 301L, "主角提前知道密令，需先规划修订待办");
+        persistedContext.setTurnId(50040L);
+
+        when(agentRepository.findGenerationTask(1L, 40L)).thenReturn(task);
+        when(agentRepository.findTaskContext(40L)).thenReturn(persistedContext);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(40L), any(), any())).thenReturn(1);
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "先生成待办计划再执行",
+                "{\"profile\":\"default\",\"todoPlan\":{\"planTitle\":\"第三章修订待办\",\"planSummary\":\"先补齐密令来源链路\",\"recommendedNextAction\":\"apply_todo_plan\",\"items\":[{\"title\":\"修复密令来源\",\"description\":\"补充侍从转述桥段\",\"priority\":\"P0\",\"sourceType\":\"QUALITY_REVIEW\",\"recommendedStatus\":\"TODO\",\"suggestedAutoCreate\":true,\"rationale\":\"避免剧情漏洞\",\"acceptanceCriteria\":[\"密令来源明确\"],\"dependsOn\":[]}]}}",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of("todo_planner"),
+                "输出待办后继续生成",
+                false,
+                false,
+                false
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(routingResult((String) null));
+        PromptPlan promptPlan = promptPlan("default");
+        when(promptComposer.compose(any(), any(), eq("先规划本章修订待办再执行")))
+                .thenReturn(promptPlan);
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("先规划本章修订待办再执行")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentToolLoopRunner.execute(eq(1L), eq(40L), eq(9L), eq(0L), eq("trace-seeded-todo-plan"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.waitingApproval(90L, 1, ""));
+
+        agentGenerationWorkflow.run(1L, 40L, "trace-seeded-todo-plan");
+
+        ArgumentCaptor<RuntimeStatusView> runtimeStatusCaptor = ArgumentCaptor.forClass(RuntimeStatusView.class);
+        verify(taskRuntimeStatusPublisher, org.mockito.Mockito.atLeastOnce()).publishStatus(eq(1L), runtimeStatusCaptor.capture());
+        RuntimeStatusView todoReviewStatus = runtimeStatusCaptor.getAllValues().stream()
+                .filter(view -> "todo_review".equals(view.phase()))
+                .findFirst()
+                .orElse(null);
+
+        assertThat(todoReviewStatus).isNotNull();
+        assertThat(todoReviewStatus.todoPlan()).isNotNull();
+        assertThat(todoReviewStatus.todoPlan().planTitle()).isEqualTo("第三章修订待办");
+        assertThat(todoReviewStatus.todoPlan().recommendedNextAction()).isEqualTo("apply_todo_plan");
+        assertThat(todoReviewStatus.todoPlan().items())
+                .singleElement()
+                .extracting("title", "priority")
+                .containsExactly("修复密令来源", "P0");
+        assertThat(persistedContext.getActiveToolCallsSnapshot())
+                .contains("\"toolCode\":\"todo_planner\"")
+                .contains("\"planTitle\":\"第三章修订待办\"")
+                .contains("\"recommendedNextAction\":\"apply_todo_plan\"");
+    }
+
+    @Test
     void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_PERSIST_AUTO_CREATABLE_TODOS_VIA_APPLICATION_SERVICE_WHEN_TOOL_TRACE_CONTAINS_TODO_PLAN() {
         AgentGenerationTask task = new AgentGenerationTask();
         task.setId(41L);
@@ -822,6 +891,9 @@ class AgentGenerationWorkflowTest {
         verify(approvalApplicationService).create(any(com.penmate.backend.application.approval.command.CreateApprovalCommand.class), eq("trace-story-bible-approval"));
         verify(pendingToolInvocationRepository).save(any(PendingToolInvocationSnapshot.class));
         verify(taskRuntimeStatusPublisher).publishWaitingApproval(eq(1L), runtimeStatusCaptor.capture());
+        assertThat(runtimeStatusCaptor.getValue().toolCall()).isNotNull();
+        assertThat(runtimeStatusCaptor.getValue().toolCall().toolCode()).isEqualTo("story_bible_update");
+        assertThat(runtimeStatusCaptor.getValue().toolCall().toolCallId()).isEqualTo("story-bible-call-1");
         assertThat(runtimeStatusCaptor.getValue().storyBibleApproval()).isNotNull();
         assertThat(runtimeStatusCaptor.getValue().storyBibleApproval().approvalId()).isEqualTo(9901L);
         assertThat(runtimeStatusCaptor.getValue().storyBibleApproval().approvalType()).isEqualTo("STORY_BIBLE_UPDATE");
@@ -1122,6 +1194,103 @@ class AgentGenerationWorkflowTest {
         verify(agentResultPublisher).publishGenerationTokens(eq(1L), eq(12L), eq("续写片段"), eq("trace-2"));
         verify(taskRuntimeStatusPublisher).publishDone(eq(1L), any(RuntimeStatusView.class));
         verify(agentToolLoopRunner).execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any());
+    }
+
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_REQUIRE_NEW_STORY_BIBLE_APPROVAL_AFTER_RESUMING_FROM_NON_STORY_BIBLE_APPROVAL() {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(121L);
+        task.setTaskId(121L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("waiting_approval");
+        task.setPromptSnapshot("恢复后继续整理设定");
+
+        AgentTaskContext persistedContext = AgentTaskContext.runningOf(9121L, 121L, AgentTaskStatus.WAITING_APPROVAL.value(), 301L, "恢复自质量审查审批后的正文");
+        persistedContext.setRecoveryCursor("approval:88011");
+        persistedContext.setActiveToolCallsSnapshot("[{\"toolCallId\":\"call-quality-1\",\"toolCode\":\"quality_review\",\"toolName\":\"质量审查\",\"status\":\"waiting_approval\",\"iteration\":1}]");
+
+        when(agentRepository.findGenerationTask(1L, 121L)).thenReturn(task);
+        when(agentRepository.findTaskContext(121L)).thenReturn(persistedContext);
+        when(agentRepository.updateGenerationTaskStatus(eq(1L), eq(121L), any(), any())).thenReturn(1);
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                true,
+                "恢复后仍需故事圣经审批",
+                "{\"profile\":\"default\"}",
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of("todo_planner"),
+                "继续输出",
+                false,
+                true,
+                false
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(routingResult((String) null));
+        PromptPlan promptPlan = promptPlan("default");
+        when(promptComposer.compose(any(), any(), eq("恢复后继续整理设定"))).thenReturn(promptPlan);
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("恢复后继续整理设定")))
+                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentToolLoopRunner.execute(eq(1L), eq(121L), eq(9L), eq(0L), eq("trace-resume-non-story-approval"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.completed(
+                        "恢复后的正文建议",
+                        1,
+                        "{\"planTitle\":\"第三章修订待办\",\"planSummary\":\"补齐密令来源\",\"recommendedNextAction\":\"apply_todo_plan\",\"items\":[{\"title\":\"修复密令来源\",\"description\":\"补充侍从转述桥段\",\"priority\":\"P0\",\"sourceType\":\"QUALITY_REVIEW\",\"recommendedStatus\":\"TODO\",\"suggestedAutoCreate\":true,\"rationale\":\"避免剧情漏洞\",\"acceptanceCriteria\":[\"密令来源明确\"],\"dependsOn\":[]}]}"
+                ));
+        when(storyBibleUpdateProposalService.proposeUpdatesFromChapter(eq(1L), eq(301L), eq("恢复后的正文建议")))
+                .thenReturn(List.of(new com.penmate.backend.application.storybible.StoryBibleProposalItem(
+                        "information_boundary.linjin.secret",
+                        "information_boundary",
+                        "林烬与苏砚都知道城主其实是林烬的生父。",
+                        "PROPOSED",
+                        3,
+                        "恢复后新增的设定变更",
+                        301L,
+                        "BOUNDARY_UPDATE"
+                )));
+        com.penmate.backend.domain.approval.model.ApprovalRequest approvalRequest = new com.penmate.backend.domain.approval.model.ApprovalRequest();
+        approvalRequest.setId(9902L);
+        approvalRequest.setProjectId(1L);
+        approvalRequest.setTaskId(121L);
+        approvalRequest.setApprovalType("STORY_BIBLE_UPDATE");
+        approvalRequest.setStatus("pending");
+        when(approvalApplicationService.create(any(com.penmate.backend.application.approval.command.CreateApprovalCommand.class), eq("trace-resume-non-story-approval")))
+                .thenReturn(approvalRequest);
+        when(pendingToolInvocationRepository.findByApprovalId(9902L)).thenReturn(new PendingToolInvocationSnapshot(
+                9902L,
+                1L,
+                121L,
+                9L,
+                "story_bible_update",
+                "{\"chapterId\":301}",
+                "{}",
+                1001L,
+                "trace-resume-non-story-approval",
+                "idem-story-9902",
+                "pending",
+                "story-loop-9902",
+                0,
+                "story-bible-call-9902",
+                "[]",
+                "[]",
+                "RESUME_LOOP",
+                "{\"approvalType\":\"STORY_BIBLE_UPDATE\",\"proposalSummary\":\"故事圣经更新待确认\"}"
+        ));
+        doAnswer(invocation -> null).when(agentTaskResultRecorder).recordAssistantResult(any(), any(), any());
+
+        agentGenerationWorkflow.runAfterApproval(1L, 121L, "trace-resume-non-story-approval");
+
+        verify(approvalApplicationService).create(any(com.penmate.backend.application.approval.command.CreateApprovalCommand.class), eq("trace-resume-non-story-approval"));
+        verify(taskRuntimeStatusPublisher).publishWaitingApproval(eq(1L), any(RuntimeStatusView.class));
+        verify(taskRuntimeStatusPublisher, never()).publishDone(eq(1L), any(RuntimeStatusView.class));
     }
 
     @Test

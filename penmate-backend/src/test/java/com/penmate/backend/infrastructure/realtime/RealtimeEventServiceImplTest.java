@@ -307,6 +307,98 @@ class RealtimeEventServiceImplTest {
         assertThat(readField(event, "data")).isEqualTo(expectedPayload);
     }
 
+    @Test
+    void UT_INFRA_REALTIME_EVENT_SERVICE_SHOULD_PARSE_TODO_CRUD_TOOL_OUTPUT_JSON_IN_STRUCTURED_RUNTIME_EVENT() throws Exception {
+        ProjectWebSocketSessionRegistry sessionRegistry = new ProjectWebSocketSessionRegistry();
+        GenerationSseEmitterHub emitterHub = new GenerationSseEmitterHub();
+        RealtimeEventServiceImpl service = new RealtimeEventServiceImpl(sessionRegistry, emitterHub, new ObjectMapper());
+
+        Class<?> runtimeStatusViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.RuntimeStatusView");
+        Class<?> toolCallStatusViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.ToolCallStatusView");
+        Method method = Arrays.stream(RealtimeEventServiceImpl.class.getMethods())
+                .filter(candidate -> candidate.getName().equals("publishTaskRuntimeStatus"))
+                .filter(candidate -> candidate.getParameterCount() == 3)
+                .findFirst()
+                .orElse(null);
+
+        assertThat(runtimeStatusViewType)
+                .as("RuntimeStatusView should exist for structured runtime events")
+                .isNotNull();
+        assertThat(toolCallStatusViewType)
+                .as("ToolCallStatusView should exist for structured runtime events")
+                .isNotNull();
+        assertThat(method)
+                .as("RealtimeEventServiceImpl should expose publishTaskRuntimeStatus(Long, String, RuntimeStatusView)")
+                .isNotNull();
+        if (runtimeStatusViewType == null || toolCallStatusViewType == null || method == null) {
+            return;
+        }
+
+        Object toolCall = instantiateRecord(toolCallStatusViewType, Map.of(
+                "toolCallId", "call_todo_1",
+                "toolCode", "todo_crud",
+                "toolName", "待办 CRUD",
+                "status", "done",
+                "iteration", 1,
+                "argumentsPreview", Map.of("operation", "update", "todoId", "20031"),
+                "output", "{\"operation\":\"update\",\"todoId\":\"20031\",\"sessionId\":\"9\",\"taskId\":\"77\",\"title\":\"修订第三章开场\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"BLOCKED\"}",
+                "errorMessage", ""
+        ));
+
+        Map<String, Object> runtimeStatusValues = new java.util.LinkedHashMap<>();
+        runtimeStatusValues.put("taskId", 17L);
+        runtimeStatusValues.put("sessionId", 90001L);
+        runtimeStatusValues.put("turnId", 50001L);
+        runtimeStatusValues.put("phase", "tool_call");
+        runtimeStatusValues.put("message", "待办 CRUD");
+        runtimeStatusValues.put("toolCall", toolCall);
+        runtimeStatusValues.put("approval", null);
+        runtimeStatusValues.put("storyBibleApproval", null);
+        runtimeStatusValues.put("todoPlan", null);
+        runtimeStatusValues.put("recoverable", true);
+        runtimeStatusValues.put("nextAction", "continue_tool_loop");
+        Object runtimeStatus = instantiateRecord(runtimeStatusViewType, runtimeStatusValues);
+
+        method.invoke(service, 9L, "generation.tool_call", runtimeStatus);
+
+        Object state = loadTaskState(emitterHub, 17L);
+        List<?> bufferedEvents = loadBufferedEvents(state);
+        Object event = bufferedEvents.get(0);
+
+        Map<String, Object> expectedPayload = new java.util.LinkedHashMap<>();
+        expectedPayload.put("taskId", 17L);
+        expectedPayload.put("sessionId", 90001L);
+        expectedPayload.put("turnId", 50001L);
+        expectedPayload.put("phase", "tool_call");
+        expectedPayload.put("message", "待办 CRUD");
+        expectedPayload.put("toolCall", Map.ofEntries(
+                Map.entry("toolCallId", "call_todo_1"),
+                Map.entry("toolCode", "todo_crud"),
+                Map.entry("toolName", "待办 CRUD"),
+                Map.entry("status", "done"),
+                Map.entry("iteration", 1),
+                Map.entry("argumentsPreview", Map.of("operation", "update", "todoId", "20031")),
+                Map.entry("output", Map.ofEntries(
+                        Map.entry("operation", "update"),
+                        Map.entry("todoId", "20031"),
+                        Map.entry("sessionId", "9"),
+                        Map.entry("taskId", "77"),
+                        Map.entry("title", "修订第三章开场"),
+                        Map.entry("sourceType", "PLANNING"),
+                        Map.entry("todoStatus", "BLOCKED")
+                )),
+                Map.entry("errorMessage", "")
+        ));
+        expectedPayload.put("approval", null);
+        expectedPayload.put("storyBibleApproval", null);
+        expectedPayload.put("todoPlan", null);
+        expectedPayload.put("recoverable", true);
+        expectedPayload.put("nextAction", "continue_tool_loop");
+
+        assertThat(readField(event, "eventName")).isEqualTo("generation.tool_call");
+        assertThat(readField(event, "data")).isEqualTo(expectedPayload);
+    }
+
     private static Object loadTaskState(GenerationSseEmitterHub emitterHub, Long taskId) throws Exception {
         Field statesField = GenerationSseEmitterHub.class.getDeclaredField("statesByTask");
         statesField.setAccessible(true);

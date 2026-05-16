@@ -236,8 +236,8 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         if (runtimeStatusView == null || eventType == null || eventType.isBlank()) {
             return;
         }
-        Map<String, Object> payload = objectMapper.convertValue(runtimeStatusView, new TypeReference<>() {
-        });
+        Map<String, Object> payload = normalizeRuntimePayload(objectMapper.convertValue(runtimeStatusView, new TypeReference<>() {
+        }));
         Long taskId = toLong(payload.get("taskId"));
         if (taskId == null) {
             return;
@@ -246,6 +246,38 @@ public class RealtimeEventServiceImpl implements RealtimeEventService {
         generationSseEmitterHub.publish(taskId, eventType, payload);
         if ("generation.done".equals(eventType) || "generation.failed".equals(eventType)) {
             generationSseEmitterHub.complete(taskId);
+        }
+    }
+
+    private Map<String, Object> normalizeRuntimePayload(Map<String, Object> payload) {
+        if (payload == null) {
+            return null;
+        }
+        Object toolCall = payload.get("toolCall");
+        if (toolCall instanceof Map<?, ?> rawToolCall) {
+            Map<String, Object> normalizedToolCall = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : rawToolCall.entrySet()) {
+                String key = entry.getKey() == null ? null : String.valueOf(entry.getKey());
+                Object value = entry.getValue();
+                if ("output".equals(key)) {
+                    normalizedToolCall.put(key, parseJsonOrRaw(value));
+                } else {
+                    normalizedToolCall.put(key, value);
+                }
+            }
+            payload.put("toolCall", normalizedToolCall);
+        }
+        return payload;
+    }
+
+    private Object parseJsonOrRaw(Object value) {
+        if (!(value instanceof String raw) || raw.isBlank()) {
+            return value;
+        }
+        try {
+            return objectMapper.readValue(raw, Object.class);
+        } catch (Exception ex) {
+            return value;
         }
     }
 

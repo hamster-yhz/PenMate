@@ -5,6 +5,7 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.support.QualityReviewCommand;
@@ -12,9 +13,11 @@ import com.penmate.backend.application.agent.tool.support.QualityReviewCommandPa
 import com.penmate.backend.application.agent.tool.support.QualityReportView;
 import com.penmate.backend.application.agent.tool.support.RevisionSuggestionView;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -30,20 +33,40 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
     private final AgentModelRoutingService agentModelRoutingService;
     private final AgentLlmGateway agentLlmGateway;
     private final QualityReviewCommandParser qualityReviewCommandParser;
+    private final NovelApplicationService novelApplicationService;
 
     public DefaultQualityReviewApplicationService(AgentRepository agentRepository,
                                                   AgentModelRoutingService agentModelRoutingService,
                                                   AgentLlmGateway agentLlmGateway,
                                                   QualityReviewCommandParser qualityReviewCommandParser) {
+        this(agentRepository, agentModelRoutingService, agentLlmGateway, qualityReviewCommandParser, null);
+    }
+
+    @Autowired
+    public DefaultQualityReviewApplicationService(AgentRepository agentRepository,
+                                                  AgentModelRoutingService agentModelRoutingService,
+                                                  AgentLlmGateway agentLlmGateway,
+                                                  QualityReviewCommandParser qualityReviewCommandParser,
+                                                  NovelApplicationService novelApplicationService) {
         this.agentRepository = agentRepository;
         this.agentModelRoutingService = agentModelRoutingService;
         this.agentLlmGateway = agentLlmGateway;
         this.qualityReviewCommandParser = qualityReviewCommandParser;
+        this.novelApplicationService = novelApplicationService;
     }
 
     @Override
     public ToolCallResult review(ToolCallRequest request) {
-        QualityReviewCommand command = qualityReviewCommandParser.parseAndValidate(request.toolArgsJson());
+        QualityReviewCommand parsedCommand = qualityReviewCommandParser.parse(request.toolArgsJson());
+        QualityReviewCommand command = parsedCommand;
+        if (isSparseIdentifierOnlyRequest(parsedCommand)) {
+            AgentGenerationTask task = requireGenerationTask(request);
+            AgentTaskContext taskContext = agentRepository.findTaskContext(request.taskId());
+            command = enrichCommand(parsedCommand, task, taskContext);
+            qualityReviewCommandParser.validate(command);
+        } else {
+            qualityReviewCommandParser.validate(command);
+        }
         AgentGenerationTask task = requireGenerationTask(request);
         AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(
                 task.getUserId(),
@@ -172,10 +195,85 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
         if (task.getUserId() == null) {
             throw new IllegalStateException("generation task userId is required");
         }
+        if (request != null && request.operatorId() != null && !request.operatorId().equals(task.getUserId())) {
+            throw new IllegalStateException("operator does not match generation task user");
+        }
         if (task.getModelConfigId() == null) {
             throw new IllegalStateException("generation task modelConfigId is required");
         }
         return task;
+    }
+
+    private boolean isSparseIdentifierOnlyRequest(QualityReviewCommand command) {
+        return command != null
+                && command.draftText().isBlank()
+                && isBlankList(command.userRequirements())
+                && isBlankList(command.personaProfile())
+                && isBlankList(command.storyOutline())
+                && isBlankList(command.timelineConstraints())
+                && isBlankList(command.worldRules())
+                && isBlankList(command.characterKnowledgeBoundaries());
+    }
+
+    private boolean isBlankList(List<String> values) {
+        return values == null || values.stream().noneMatch(value -> value != null && !value.isBlank());
+    }
+
+    private QualityReviewCommand enrichCommand(QualityReviewCommand command,
+                                               AgentGenerationTask task,
+                                               AgentTaskContext taskContext) {
+        String resolvedDraftText = resolveDraftText(command, task, taskContext);
+        return new QualityReviewCommand(
+                resolvedDraftText,
+                defaultIfEmpty(command == null ? null : command.userRequirements(), firstNonBlank(task == null ? null : task.getPromptSnapshot(), "按当前任务要求审查正文")),
+                defaultIfEmpty(command == null ? null : command.personaProfile(), "按当前人物设定与会话上下文审查"),
+                defaultIfEmpty(command == null ? null : command.storyOutline(), "按当前章节目标与剧情走向审查"),
+                defaultIfEmpty(command == null ? null : command.timelineConstraints(), "按当前章节时间线约束审查"),
+                defaultIfEmpty(command == null ? null : command.worldRules(), "按当前世界观规则审查"),
+                defaultIfEmpty(command == null ? null : command.characterKnowledgeBoundaries(), "按当前角色知识边界审查"),
+                command == null ? 0 : command.currentRevisionRound(),
+                command == null ? 0 : command.maxRevisionRounds()
+        );
+    }
+
+    private String resolveDraftText(QualityReviewCommand command,
+                                    AgentGenerationTask task,
+                                    AgentTaskContext taskContext) {
+        String draftText = command == null ? null : command.draftText();
+        if (draftText != null && !draftText.isBlank()) {
+            return draftText.trim();
+        }
+        Long projectId = task == null ? null : task.getProjectId();
+        Long chapterId = taskContext == null ? null : taskContext.getChapterId();
+        if (projectId != null && chapterId != null && novelApplicationService != null) {
+            String chapterContent = novelApplicationService.getChapterContentText(projectId, chapterId);
+            if (chapterContent != null && !chapterContent.isBlank()) {
+                return chapterContent.trim();
+            }
+        }
+        return firstNonBlank(
+                taskContext == null ? null : taskContext.getSelectedText(),
+                task == null ? null : task.getPromptSnapshot()
+        );
+    }
+
+    private List<String> defaultIfEmpty(List<String> values, String fallback) {
+        if (values != null && values.stream().anyMatch(value -> value != null && !value.isBlank())) {
+            return values;
+        }
+        return List.of(firstNonBlank(fallback, "未提供"));
+    }
+
+    private String firstNonBlank(String... candidates) {
+        if (candidates == null) {
+            return "";
+        }
+        for (String candidate : candidates) {
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate.trim();
+            }
+        }
+        return "";
     }
 
     private AgentGenerationTask buildToolGenerationTask(AgentGenerationTask source,

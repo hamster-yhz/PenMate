@@ -115,11 +115,9 @@ class QualityReviewToolHandlerTest {
         assertThat(readAccessor(exposure, "exposedToLlm")).isEqualTo(true);
         String schema = String.valueOf(readAccessor(exposure, "parametersJsonSchema"));
         assertThat(schema)
-                .contains("\"draftText\"")
-                .contains("\"minLength\": 1")
-                .contains("\\S")
+                .contains("\"chapterId\"")
+                .contains("\"draftId\"")
                 .contains("\"userRequirements\"")
-                .contains("\"minItems\": 1")
                 .contains("\"personaProfile\"")
                 .contains("\"storyOutline\"")
                 .contains("\"timelineConstraints\"")
@@ -128,7 +126,7 @@ class QualityReviewToolHandlerTest {
                 .contains("\"currentRevisionRound\"")
                 .contains("\"maxRevisionRounds\"")
                 .contains("must be less than or equal to maxRevisionRounds")
-                .contains("\"required\": [\"draftText\"")
+                .doesNotContain("\"required\": [\"draftText\"")
                 .contains("\"additionalProperties\": false");
 
         Object governancePolicy = readAccessor(descriptor, "governancePolicy");

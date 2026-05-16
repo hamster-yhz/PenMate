@@ -104,6 +104,29 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
         }
     }
 
+    @Override
+    public String readText(String objectKey) {
+        String endpoint = normalizedStorageEndpoint();
+        URI endpointUri = URI.create(endpoint);
+        boolean pathStyle = shouldUsePathStyle(endpointUri);
+        try (S3Client client = S3Client.builder()
+                .endpointOverride(endpointUri)
+                .region(Region.of(storageRegion))
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(storageAccessKey, storageSecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(pathStyle)
+                        .chunkedEncodingEnabled(false)
+                        .checksumValidationEnabled(false)
+                        .build())
+                .build()) {
+            return client.getObjectAsBytes(GetObjectRequest.builder()
+                            .bucket(storageBucket)
+                            .key(objectKey)
+                            .build())
+                    .asUtf8String();
+        }
+    }
+
     private S3Presigner buildS3Presigner() {
         String endpoint = normalizedStorageEndpoint();
         URI endpointUri = URI.create(endpoint);

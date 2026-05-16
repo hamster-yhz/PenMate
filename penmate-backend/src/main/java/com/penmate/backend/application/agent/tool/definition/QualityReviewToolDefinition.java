@@ -15,6 +15,14 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
             {
               "type": "object",
               "properties": {
+                "chapterId": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "draftId": {
+                  "type": "integer",
+                  "minimum": 1
+                },
                 "draftText": {
                   "type": "string",
                   "minLength": 1,
@@ -78,7 +86,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                   "minimum": 0
                 }
               },
-              "required": ["draftText", "userRequirements", "personaProfile", "storyOutline", "timelineConstraints", "worldRules", "characterKnowledgeBoundaries", "currentRevisionRound", "maxRevisionRounds"],
+              "required": ["currentRevisionRound", "maxRevisionRounds"],
               "additionalProperties": false
             }
             """;

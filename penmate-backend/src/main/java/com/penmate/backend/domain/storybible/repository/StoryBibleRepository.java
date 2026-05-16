@@ -1,5 +1,6 @@
 package com.penmate.backend.domain.storybible.repository;
 
+import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleEntry;
 
 import java.util.List;
@@ -15,4 +16,14 @@ public interface StoryBibleRepository {
      * <p>仅返回可进入上下文构建的 CANON 与 PROPOSED 条目。</p>
      */
     List<StoryBibleEntry> findActiveEntries(Long projectId, Long chapterId);
+
+    StoryBible findByProjectId(Long projectId);
+
+    StoryBibleEntry findByEntryId(Long projectId, Long entryId);
+
+    int insert(StoryBibleEntry entry);
+
+    int update(StoryBibleEntry entry);
+
+    int softDelete(Long projectId, Long entryId);
 }

@@ -444,6 +444,20 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_TEXT_SUCCESS() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        chapter.setContentObjectKey("novels/920002/chapters/920101/content.md");
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(objectStorageService.readText("novels/920002/chapters/920101/content.md"))
+                .thenReturn("夜雨中的追踪在巷口停住。");
+
+        assertThat(novelApplicationService.getChapterContentText(920002L, 920101L))
+                .isEqualTo("夜雨中的追踪在巷口停住。");
+    }
+
+    @Test
     void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_DEFAULT_STORAGE_PROVIDER() {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(920002L);

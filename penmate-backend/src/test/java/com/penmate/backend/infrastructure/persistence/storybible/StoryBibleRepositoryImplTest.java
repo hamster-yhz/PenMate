@@ -86,6 +86,99 @@ class StoryBibleRepositoryImplTest {
         }
     }
 
+    @Test
+    void should_persist_created_story_bible_entry_and_allow_reload() throws Exception {
+        try (SqlSession session = sqlSessionFactory.openSession(false)) {
+            StoryBibleMapper mapper = session.getMapper(StoryBibleMapper.class);
+
+            StoryBibleEntry created = new StoryBibleEntry();
+            created.setEntryId(930108L);
+            created.setStoryBibleId(930001L);
+            created.setProjectId(920001L);
+            created.setEntryType("character");
+            created.setEntryKey("maid.secret_order");
+            created.setTitle("侍从密令");
+            created.setContent("侍从负责转述密令，并知晓部分内情。");
+            created.setCanonicalStatus("PROPOSED");
+            created.setRiskLevel(2);
+            created.setSourceRefs(List.of(sourceRef("chapter", 920002L, "chapter-2")));
+            created.setValidFromChapterId(920002L);
+            created.setValidToChapterId(null);
+            created.setVersionNo(2);
+
+            try {
+                java.lang.reflect.Method insertMethod = mapper.getClass().getMethod("insert", StoryBibleEntry.class);
+                Object affected = insertMethod.invoke(mapper, created);
+                assertThat(affected).isEqualTo(1);
+            } catch (NoSuchMethodException ex) {
+                throw new AssertionError("Expected StoryBibleMapper.insert(StoryBibleEntry) to exist", ex);
+            }
+
+            StoryBibleRepositoryImpl repository = new StoryBibleRepositoryImpl(mapper);
+            List<StoryBibleEntry> entries = repository.findActiveEntries(920001L, 920002L);
+
+            assertThat(entries)
+                    .extracting(StoryBibleEntry::getEntryKey)
+                    .contains("maid.secret_order");
+            assertThat(entries)
+                    .filteredOn(entry -> "maid.secret_order".equals(entry.getEntryKey()))
+                    .singleElement()
+                    .satisfies(entry -> {
+                        assertThat(entry.getTitle()).isEqualTo("侍从密令");
+                        assertThat(entry.getCanonicalStatus()).isEqualTo("PROPOSED");
+                        assertThat(entry.getSourceRefs()).hasSize(1);
+                    });
+            session.rollback();
+        }
+    }
+
+    @Test
+    void should_soft_delete_story_bible_entry_and_exclude_from_reload() throws Exception {
+        try (SqlSession session = sqlSessionFactory.openSession(false)) {
+            StoryBibleMapper mapper = session.getMapper(StoryBibleMapper.class);
+
+            StoryBibleEntry created = new StoryBibleEntry();
+            created.setEntryId(930109L);
+            created.setStoryBibleId(930001L);
+            created.setProjectId(920001L);
+            created.setEntryType("world");
+            created.setEntryKey("temporary.delete.case");
+            created.setTitle("临时删除条目");
+            created.setContent("用于验证软删除不会污染其他断言。");
+            created.setCanonicalStatus("PROPOSED");
+            created.setRiskLevel(1);
+            created.setSourceRefs(List.of(sourceRef("chapter", 920002L, "delete-case")));
+            created.setValidFromChapterId(920002L);
+            created.setValidToChapterId(null);
+            created.setVersionNo(2);
+
+            try {
+                java.lang.reflect.Method insertMethod = mapper.getClass().getMethod("insert", StoryBibleEntry.class);
+                Object inserted = insertMethod.invoke(mapper, created);
+                assertThat(inserted).isEqualTo(1);
+            } catch (NoSuchMethodException ex) {
+                throw new AssertionError("Expected StoryBibleMapper.insert(StoryBibleEntry) to exist", ex);
+            }
+
+            try {
+                java.lang.reflect.Method softDeleteMethod = mapper.getClass().getMethod("softDelete", Long.class, Long.class);
+                Object affected = softDeleteMethod.invoke(mapper, 920001L, 930109L);
+                assertThat(affected).isEqualTo(1);
+            } catch (NoSuchMethodException ex) {
+                throw new AssertionError("Expected StoryBibleMapper.softDelete(Long, Long) to exist", ex);
+            }
+
+            StoryBibleRepositoryImpl repository = new StoryBibleRepositoryImpl(mapper);
+            List<StoryBibleEntry> entries = repository.findActiveEntries(920001L, 920002L);
+
+            assertThat(entries)
+                    .extracting(StoryBibleEntry::getEntryKey)
+                    .doesNotContain("temporary.delete.case")
+                    .contains("city.rule");
+            session.rollback();
+        }
+    }
+
     private static SqlSessionFactory buildSqlSessionFactory() {
         DataSource dataSource = new UnpooledDataSource(
                 "org.h2.Driver",
@@ -162,5 +255,13 @@ class StoryBibleRepositoryImplTest {
                 migrationDir.resolve("V12__init_story_bible_domain.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
+    }
+
+    private static com.penmate.backend.domain.storybible.model.StoryBibleSourceRef sourceRef(String refType, Long refId, String note) {
+        com.penmate.backend.domain.storybible.model.StoryBibleSourceRef ref = new com.penmate.backend.domain.storybible.model.StoryBibleSourceRef();
+        ref.setRefType(refType);
+        ref.setRefId(refId);
+        ref.setNote(note);
+        return ref;
     }
 }

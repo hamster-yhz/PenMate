@@ -202,6 +202,7 @@ public class AgentGenerationWorkflow {
                 preflightExecutionConfig
         ));
         TaskProfile taskProfile = TaskProfileMapper.from(preflightDecision);
+        seedTodoPlanSnapshotFromPreflight(taskContext, preflightDecision);
         syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "planning", "phase:planning");
         taskRuntimeStatusPublisher.publishStatus(projectId,
                 buildRuntimeStatusView(task, taskContext, "planning", "正在分析请求", true, "compose_prompt", null));
@@ -512,7 +513,9 @@ public class AgentGenerationWorkflow {
             return StoryBibleDecision.completed(preservedToolTrace);
         }
         String proposalSummaryJson = proposalSummaryJson(proposals);
-        if (resumedFromWaitingApproval || maxRiskLevel(proposals) < 3 || approvalApplicationService == null) {
+        if (resumedFromStoryBibleApproval(taskContext, resumedFromWaitingApproval)
+                || maxRiskLevel(proposals) < 3
+                || approvalApplicationService == null) {
             return StoryBibleDecision.completed(appendToolTrace(preservedToolTrace, proposalSummaryJson));
         }
         String approvalSummaryJson = storyBibleApprovalSummaryJson(proposals);
@@ -589,6 +592,30 @@ public class AgentGenerationWorkflow {
             }
         }
         return maxRiskLevel;
+    }
+
+    private boolean resumedFromStoryBibleApproval(AgentTaskContext taskContext, boolean resumedFromWaitingApproval) {
+        if (!resumedFromWaitingApproval || taskContext == null) {
+            return false;
+        }
+        Long approvalId = taskContext.getActiveApprovalId();
+        if (approvalId == null && taskContext.getRecoveryCursor() != null && taskContext.getRecoveryCursor().startsWith("approval:")) {
+            String approvalIdToken = taskContext.getRecoveryCursor().substring("approval:".length()).trim();
+            approvalId = longValue(approvalIdToken);
+        }
+        if (approvalId == null) {
+            return false;
+        }
+        PendingToolInvocationSnapshot pendingSnapshot = pendingToolInvocationRepository.findByApprovalId(approvalId);
+        if (pendingSnapshot == null) {
+            return false;
+        }
+        if ("story_bible_update".equalsIgnoreCase(stringValue(pendingSnapshot.toolCode()))) {
+            return true;
+        }
+        Map<String, Object> approvalSummary = mapValue(parseJsonOrRaw(pendingSnapshot.approvalSummaryJson()));
+        return approvalSummary != null
+                && "STORY_BIBLE_UPDATE".equalsIgnoreCase(stringValue(approvalSummary.get("approvalType")));
     }
 
     private Map<String, Object> extractQualityReport(String toolTraceJson) {
@@ -919,19 +946,64 @@ public class AgentGenerationWorkflow {
         if (taskContext == null || loopResult == null) {
             return;
         }
-        if (taskContext.getActiveToolCallsSnapshot() != null && !taskContext.getActiveToolCallsSnapshot().isBlank()) {
-            return;
+        List<Map<String, Object>> snapshots = parseToolSnapshots(taskContext.getActiveToolCallsSnapshot());
+        Map<String, Object> waitingSnapshot = buildWaitingApprovalToolSnapshot(loopResult);
+        String currentToolCallId = stringValue(waitingSnapshot.get("toolCallId"));
+        if (currentToolCallId != null && !currentToolCallId.isBlank()) {
+            snapshots.removeIf(snapshot -> currentToolCallId.equals(stringValue(snapshot.get("toolCallId"))));
         }
+        snapshots.add(0, waitingSnapshot);
+        taskContext.setActiveToolCallsSnapshot(AgentTaskRuntimeUpdater.toSnapshotJson(snapshots));
+    }
+
+    private Map<String, Object> buildWaitingApprovalToolSnapshot(AgentToolLoopIterationResult loopResult) {
+        PendingToolInvocationSnapshot pendingSnapshot = loopResult == null || loopResult.approvalId() == null
+                ? null
+                : pendingToolInvocationRepository.findByApprovalId(loopResult.approvalId());
         Map<String, Object> toolCallSnapshot = new LinkedHashMap<>();
-        toolCallSnapshot.put("toolCallId", loopResult.approvalId() == null ? null : "approval:" + loopResult.approvalId());
-        toolCallSnapshot.put("toolCode", "approval");
-        toolCallSnapshot.put("toolName", "approval");
+        toolCallSnapshot.put("toolCallId", pendingSnapshot != null && pendingSnapshot.toolCallId() != null && !pendingSnapshot.toolCallId().isBlank()
+                ? pendingSnapshot.toolCallId()
+                : loopResult.approvalId() == null ? null : "approval:" + loopResult.approvalId());
+        String toolCode = pendingSnapshot == null ? "approval" : stringValue(pendingSnapshot.toolCode());
+        toolCallSnapshot.put("toolCode", toolCode == null || toolCode.isBlank() ? "approval" : toolCode);
+        toolCallSnapshot.put("toolName", resolveWaitingApprovalToolName(pendingSnapshot, toolCode));
         toolCallSnapshot.put("status", "waiting_approval");
         toolCallSnapshot.put("iteration", loopResult.toolCallCount());
-        toolCallSnapshot.put("argumentsPreview", null);
+        toolCallSnapshot.put("argumentsPreview", pendingSnapshot == null ? null : parseJsonOrRaw(pendingSnapshot.toolArgsJson()));
         toolCallSnapshot.put("output", null);
         toolCallSnapshot.put("errorMessage", null);
-        taskContext.setActiveToolCallsSnapshot(AgentTaskRuntimeUpdater.toSnapshotJson(List.of(toolCallSnapshot)));
+        return toolCallSnapshot;
+    }
+
+    private String resolveWaitingApprovalToolName(PendingToolInvocationSnapshot pendingSnapshot, String toolCode) {
+        if (pendingSnapshot != null) {
+            Map<String, Object> summary = mapValue(parseJsonOrRaw(pendingSnapshot.approvalSummaryJson()));
+            String displayName = summary == null ? null : stringValue(summary.get("toolDisplayName"));
+            if (displayName != null && !displayName.isBlank()) {
+                return displayName;
+            }
+        }
+        String normalized = toolCode == null ? "" : toolCode.trim().toLowerCase();
+        return switch (normalized) {
+            case "quality_review" -> "质量审查";
+            case "story_bible_update" -> "故事圣经更新";
+            case "todo_crud" -> "待办 CRUD";
+            case "todo_planner" -> "Todo 规划";
+            default -> normalized.isBlank() ? "approval" : normalized;
+        };
+    }
+
+    private List<Map<String, Object>> parseToolSnapshots(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return new java.util.ArrayList<>();
+        }
+        try {
+            List<Map<String, Object>> snapshots = OBJECT_MAPPER.readValue(rawJson, new TypeReference<List<Map<String, Object>>>() {
+            });
+            return snapshots == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(snapshots);
+        } catch (Exception ex) {
+            return new java.util.ArrayList<>();
+        }
     }
 
     private ToolCallStatusView resolveToolCallStatus(AgentTaskContext taskContext) {
@@ -1037,7 +1109,7 @@ public class AgentGenerationWorkflow {
         if (normalizeToolCode(toolCallStatusView) != null && !"todo_planner".equals(normalizeToolCode(toolCallStatusView))) {
             return null;
         }
-        TodoPlanView todoPlanFromOutput = extractTodoPlan(toolCallStatusView == null ? null : stringValue(toolCallStatusView.output()));
+        TodoPlanView todoPlanFromOutput = extractTodoPlanPayload(toolCallStatusView == null ? null : toolCallStatusView.output());
         if (todoPlanFromOutput != null) {
             return todoPlanFromOutput;
         }
@@ -1045,6 +1117,57 @@ public class AgentGenerationWorkflow {
             return null;
         }
         return extractTodoPlan(taskContext.getActiveToolCallsSnapshot());
+    }
+
+    private void seedTodoPlanSnapshotFromPreflight(AgentTaskContext taskContext, AgentPreflightDecision preflightDecision) {
+        if (taskContext == null
+                || preflightDecision == null
+                || preflightDecision.enabledTools() == null
+                || !preflightDecision.enabledTools().contains("todo_planner")) {
+            return;
+        }
+        TodoPlanView todoPlanView = extractPreflightTodoPlan(preflightDecision.decisionTraceJson());
+        if (todoPlanView == null) {
+            return;
+        }
+        Map<String, Object> todoPlannerSnapshot = new LinkedHashMap<>();
+        todoPlannerSnapshot.put("toolCallId", "preflight:todo_planner");
+        todoPlannerSnapshot.put("toolCode", "todo_planner");
+        todoPlannerSnapshot.put("toolName", "Todo 规划");
+        todoPlannerSnapshot.put("status", "done");
+        todoPlannerSnapshot.put("iteration", 0);
+        todoPlannerSnapshot.put("argumentsPreview", Map.of("source", "preflight"));
+        todoPlannerSnapshot.put("output", parseJsonOrRaw(AgentTaskRuntimeUpdater.toSnapshotJson(todoPlanView)));
+        todoPlannerSnapshot.put("errorMessage", "");
+        taskContext.setActiveToolCallsSnapshot(AgentTaskRuntimeUpdater.toSnapshotJson(List.of(todoPlannerSnapshot)));
+    }
+
+    private TodoPlanView extractPreflightTodoPlan(String decisionTraceJson) {
+        String normalized = normalizeToolTraceJson(decisionTraceJson);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> json = OBJECT_MAPPER.readValue(normalized, new TypeReference<Map<String, Object>>() {
+            });
+            return extractTodoPlanPayload(json.get("todoPlan"));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private TodoPlanView extractTodoPlanPayload(Object payload) {
+        if (payload == null) {
+            return null;
+        }
+        if (payload instanceof String rawJson) {
+            return extractTodoPlan(rawJson);
+        }
+        try {
+            return extractTodoPlan(OBJECT_MAPPER.writeValueAsString(payload));
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private String normalizeToolCode(ToolCallStatusView toolCallStatusView) {
