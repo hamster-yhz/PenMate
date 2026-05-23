@@ -8,6 +8,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
@@ -18,7 +19,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -89,8 +89,8 @@ class ToolCallResumeServiceTest {
                 "{\"approvalType\":\"BOOK_DELETE\"}"
         );
 
-        when(toolCallSnapshotMapper.parseMessages(snapshot.conversationMessagesJson()))
-                .thenReturn(List.of(Map.of("role", "user", "content", "delete")));
+        when(toolCallSnapshotMapper.parseMessagesToTyped(snapshot.conversationMessagesJson()))
+                .thenReturn(List.of(AgentLlmMessage.user("delete")));
         when(toolCallExecutionService.execute(any()))
                 .thenReturn(ToolCallResult.waitingApproval(99L));
 
@@ -138,8 +138,8 @@ class ToolCallResumeServiceTest {
                 .keySource("USER_KEY")
                 .build();
 
-        when(toolCallSnapshotMapper.parseMessages(snapshot.conversationMessagesJson()))
-                .thenReturn(new ArrayList<>(List.of(Map.of("role", "user", "content", "list books"))));
+        when(toolCallSnapshotMapper.parseMessagesToTyped(snapshot.conversationMessagesJson()))
+                .thenReturn(List.of(AgentLlmMessage.user("list books")));
         when(toolCallSnapshotMapper.parseToolCallPayloads(snapshot.assistantToolCallsJson()))
                 .thenReturn(List.of(Map.of(
                         "id", "call-1",

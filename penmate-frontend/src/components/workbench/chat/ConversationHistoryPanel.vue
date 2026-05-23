@@ -15,6 +15,7 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'select-conversation': [conversationId: string]
+  close: []
 }>()
 
 const handleSelect = (conversationId: string) => {
@@ -23,45 +24,84 @@ const handleSelect = (conversationId: string) => {
 </script>
 
 <template>
-  <div v-if="visible" class="conversation-panel">
-    <div class="conversation-panel-title">会话历史</div>
-
-    <div v-if="loading" class="conversation-empty" data-testid="conversation-loading">
-      加载中...
+  <div v-if="visible" class="conversation-panel" data-testid="conversation-panel">
+    <div class="conversation-panel-header">
+      <button
+        type="button"
+        class="conversation-back"
+        data-testid="conversation-back"
+        @click="emit('close')"
+      >
+        ← 返回
+      </button>
+      <div class="conversation-panel-title">会话历史</div>
     </div>
 
-    <div
-      v-else-if="!conversations.length"
-      class="conversation-empty"
-      data-testid="conversation-empty"
-    >
-      暂无历史会话
-    </div>
+    <div class="conversation-panel-body">
+      <div v-if="loading" class="conversation-empty" data-testid="conversation-loading">
+        加载中...
+      </div>
 
-    <button
-      v-for="conversation in conversations"
-      v-else
-      :key="String(conversation.conversationId)"
-      type="button"
-      class="conversation-item"
-      data-testid="conversation-item"
-      :class="{ active: currentConversationId === conversation.conversationId }"
-      @click="handleSelect(conversation.conversationId)"
-    >
-      <div class="conversation-name">{{ conversation.title || `会话#${conversation.conversationId}` }}</div>
-      <div class="conversation-meta">{{ conversation.updatedAt }}</div>
-    </button>
+      <div
+        v-else-if="!conversations.length"
+        class="conversation-empty"
+        data-testid="conversation-empty"
+      >
+        暂无历史会话
+      </div>
+
+      <button
+        v-for="conversation in conversations"
+        v-else
+        :key="String(conversation.conversationId)"
+        type="button"
+        class="conversation-item"
+        data-testid="conversation-item"
+        :class="{ active: currentConversationId === conversation.conversationId }"
+        @click="handleSelect(conversation.conversationId)"
+      >
+        <div class="conversation-name">{{ conversation.title || `会话#${conversation.conversationId}` }}</div>
+        <div class="conversation-meta">{{ conversation.updatedAt }}</div>
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped lang="less">
 .conversation-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  background: rgba(8, 12, 24, 0.96);
+  backdrop-filter: blur(16px);
+}
+
+.conversation-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 14px;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(11, 17, 32, 0.42);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(11, 17, 32, 0.82));
+}
+
+.conversation-back {
+  padding: 0 12px;
+  min-height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(11, 17, 32, 0.56);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-silk);
+}
+
+.conversation-back:hover {
+  color: var(--amber-gold);
+  border-color: var(--border-gold);
+  box-shadow: var(--shadow-gold);
 }
 
 .conversation-panel-title {
@@ -69,6 +109,15 @@ const handleSelect = (conversationId: string) => {
   font-size: 0.82rem;
   color: var(--amber-gold);
   letter-spacing: 0.08em;
+}
+
+.conversation-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
 }
 
 .conversation-empty {

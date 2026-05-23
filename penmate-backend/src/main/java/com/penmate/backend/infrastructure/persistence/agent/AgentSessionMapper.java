@@ -77,6 +77,9 @@ public interface AgentSessionMapper {
                    last_turn_id,
                    last_task_id,
                    resumed_at,
+                   total_prompt_tokens,
+                   total_completion_tokens,
+                   total_tokens,
                    created_at,
                    updated_at
             FROM agent_sessions
@@ -98,6 +101,9 @@ public interface AgentSessionMapper {
                    last_turn_id AS lastTurnId,
                    last_task_id AS lastTaskId,
                    resumed_at AS resumedAt,
+                   total_prompt_tokens AS totalPromptTokens,
+                   total_completion_tokens AS totalCompletionTokens,
+                   total_tokens AS totalTokens,
                    created_at AS createdAt,
                    updated_at AS updatedAt
             FROM agent_sessions
@@ -257,6 +263,18 @@ public interface AgentSessionMapper {
             """)
     Map<String, Object> findTaskContextRow(@Param("taskId") Long taskId);
 
+    @Select("""
+            SELECT model_name AS modelName,
+                   max_context_tokens AS maxContextTokens
+            FROM model_user_configurations
+            WHERE user_id = #{userId}
+              AND model_config_id = #{modelConfigId}
+              AND deleted_at IS NULL
+            LIMIT 1
+            """)
+    Map<String, Object> findModelConfigSummary(@Param("userId") Long userId,
+                                               @Param("modelConfigId") Long modelConfigId);
+ 
     @Insert("""
             INSERT INTO agent_task_contexts(
                 context_id, task_id, chapter_id, selected_text,
@@ -334,6 +352,20 @@ public interface AgentSessionMapper {
     int updateBoundStyle(@Param("projectId") Long projectId,
                          @Param("sessionId") Long sessionId,
                          @Param("styleId") Long styleId);
+
+    @Update("""
+            UPDATE agent_sessions
+            SET total_prompt_tokens = total_prompt_tokens + #{promptTokens},
+                total_completion_tokens = total_completion_tokens + #{completionTokens},
+                total_tokens = total_tokens + #{totalTokens},
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId} AND session_id = #{sessionId} AND deleted_at IS NULL
+            """)
+    int incrementSessionTokenUsage(@Param("projectId") Long projectId,
+                                   @Param("sessionId") Long sessionId,
+                                   @Param("promptTokens") Integer promptTokens,
+                                   @Param("completionTokens") Integer completionTokens,
+                                   @Param("totalTokens") Integer totalTokens);
 
     @Insert("""
             INSERT INTO agent_session_style_bindings(binding_id, session_id, style_id, source)

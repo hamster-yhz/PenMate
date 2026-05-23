@@ -34,7 +34,7 @@ public class StoryBibleUpdateToolDefinition implements AgentToolDefinition {
                 "entryKey": {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": ".*\\S.*"
+                  "pattern": ".*\\\\S.*"
                 },
                 "entryType": {
                   "type": "string"

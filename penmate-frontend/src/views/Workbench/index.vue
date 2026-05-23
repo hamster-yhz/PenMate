@@ -109,10 +109,6 @@
         :is-approval-busy="isApprovalBusy"
         :chat-input="chatInput"
         :active-plugins="activePlugins"
-        :runtime-status-card="runtimePresenterView.status"
-        :tool-call-card="runtimePresenterView.toolCallCard || null"
-        :todo-plan-card="runtimePresenterView.todoPlanCard || null"
-        :story-bible-approval-card="runtimePresenterView.storyBibleApprovalCard || null"
         @toggle-collapse="rightCollapsed = !rightCollapsed"
         @toggle-history="toggleConversationPanel"
         @create-session="handleCreateSession"
@@ -150,7 +146,6 @@ import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import WorkbenchLeftPanel from '@/components/workbench/WorkbenchLeftPanel.vue'
 import WorkbenchEditorPanel from '@/components/workbench/WorkbenchEditorPanel.vue'
 import WorkbenchRightPanel from '@/components/workbench/WorkbenchRightPanel.vue'
-import type { WorkbenchRecoverySnapshot } from '@/api/types'
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
@@ -172,7 +167,6 @@ import { useWorkbenchVersions } from '@/composables/workbench/useWorkbenchVersio
 import { useWorkbenchChat } from '@/composables/workbench/useWorkbenchChat'
 import { useWorkbenchApprovals } from '@/composables/workbench/useWorkbenchApprovals'
 import { useWorkbenchSessionRecovery } from '@/composables/workbench/useWorkbenchSessionRecovery'
-import { createWorkbenchRuntimePresenter } from '@/composables/workbench/useWorkbenchRuntimePresenter'
 import {
   hasObjectKeyInStorageUrl,
   normalizeObjectStorageUrl,
@@ -441,8 +435,6 @@ const {
 const activePlugins = ref<string[]>([])
 const activeModelConfigId = ref<string | null>(null)
 const boundStyleName = ref('')
-const recoverySnapshot = ref<WorkbenchRecoverySnapshot | null>(null)
-const runtimePresenter = createWorkbenchRuntimePresenter()
 const pickModelConfigId = (item: Record<string, unknown>) => {
   if (typeof item.modelConfigId !== 'string') {
     return null
@@ -635,11 +627,6 @@ const {
   },
 })
 
-const runtimePresenterView = computed(() => runtimePresenter.present({
-  runtime: runtimeEventSource.value,
-  recovery: recoverySnapshot.value,
-}))
-
 const visibleMessages = computed(() => messages.value.filter((messageItem) => {
   if (messageItem.role !== 'assistant') {
     return true
@@ -668,7 +655,6 @@ const sessionRecovery = useWorkbenchSessionRecovery({
   resumeRunningTask,
   hydrateStore: (snapshot) => {
     const normalizedSnapshot = pickBusinessRecord(snapshot)
-    recoverySnapshot.value = normalizedSnapshot as WorkbenchRecoverySnapshot
     hydrateFromRecoverySnapshot(normalizedSnapshot)
     syncBoundStyleName((normalizedSnapshot.session as Record<string, unknown> | null | undefined) || null)
     const workbenchContext = (normalizedSnapshot.workbenchContext || {}) as Record<string, unknown>
@@ -691,6 +677,7 @@ const resumeWorkbenchSession = async (sessionId: string) => {
 const handleSelectConversation = async (conversationId: string) => {
   if (!conversationId) return
   await resumeWorkbenchSession(conversationId)
+  showConversationPanel.value = false
 }
 
 const handleCreateSession = async () => {
@@ -706,7 +693,6 @@ const handleCreateSession = async () => {
   currentConversationId.value = sessionId
   messages.value = []
   boundStyleName.value = ''
-  recoverySnapshot.value = null
   if (showConversationPanel.value) {
     await loadConversationList(projectId)
   }

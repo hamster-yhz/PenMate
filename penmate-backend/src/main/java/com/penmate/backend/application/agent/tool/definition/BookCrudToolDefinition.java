@@ -18,7 +18,8 @@ public class BookCrudToolDefinition implements AgentToolDefinition {
               \"properties\": {
                 \"operation\": {
                   \"type\": \"string\",
-                  \"enum\": [\"create\", \"list\", \"update\", \"delete\"]
+                  \"enum\": [\"create\", \"list\", \"update\", \"delete\"],
+                  \"description\": \"create 需要 ownerUserId 和 title；update/delete 需要 projectId；list 仅需 operation\"
                 },
                 \"ownerUserId\": {
                   \"type\": \"integer\"
@@ -37,75 +38,7 @@ public class BookCrudToolDefinition implements AgentToolDefinition {
                 }
               },
               \"required\": [\"operation\"],
-              \"oneOf\": [
-                {
-                  \"type\": \"object\",
-                  \"properties\": {
-                    \"operation\": {
-                      \"const\": \"create\"
-                    },
-                    \"ownerUserId\": {
-                      \"type\": \"integer\"
-                    },
-                    \"title\": {
-                      \"type\": \"string\"
-                    },
-                    \"summary\": {
-                      \"type\": \"string\"
-                    },
-                    \"status\": {
-                      \"type\": \"integer\"
-                    }
-                  },
-                  \"required\": [\"operation\", \"ownerUserId\", \"title\"],
-                  \"additionalProperties\": false
-                },
-                {
-                  \"type\": \"object\",
-                  \"properties\": {
-                    \"operation\": {
-                      \"const\": \"list\"
-                    }
-                  },
-                  \"required\": [\"operation\"],
-                  \"additionalProperties\": false
-                },
-                {
-                  \"type\": \"object\",
-                  \"properties\": {
-                    \"operation\": {
-                      \"const\": \"update\"
-                    },
-                    \"projectId\": {
-                      \"type\": \"integer\"
-                    },
-                    \"title\": {
-                      \"type\": \"string\"
-                    },
-                    \"summary\": {
-                      \"type\": \"string\"
-                    },
-                    \"status\": {
-                      \"type\": \"integer\"
-                    }
-                  },
-                  \"required\": [\"operation\", \"projectId\"],
-                  \"additionalProperties\": false
-                },
-                {
-                  \"type\": \"object\",
-                  \"properties\": {
-                    \"operation\": {
-                      \"const\": \"delete\"
-                    },
-                    \"projectId\": {
-                      \"type\": \"integer\"
-                    }
-                  },
-                  \"required\": [\"operation\", \"projectId\"],
-                  \"additionalProperties\": false
-                }
-              ]
+              \"additionalProperties\": false
             }
             """;
 

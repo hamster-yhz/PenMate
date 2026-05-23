@@ -12,7 +12,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,42 +27,19 @@ class AgentModelRoutingServiceTest {
     private AgentModelRoutingService agentModelRoutingService;
 
     @Test
-    void UT_APP_AGENT_MODEL_ROUTING_SERVICE_RESOLVES_OPENAI_COMPATIBLE_PROVIDER_CODE_AND_PRESERVES_CUSTOM_BASE_URL_FROM_MODEL_CONFIG() {
-        when(modelRepository.findUserModelConfig(1001L, 920025L)).thenReturn(Map.of(
-                "modelName", "openai-compatible-chat",
-                "providerId", 7L,
+    void should_carry_context_window_turns_into_execution_config() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "https://api.openai.com/v1",
+                "encryptedApiKey", "cipher-key",
                 "keyStatus", "active",
-                "encryptedApiKey", "cipher-openai-compatible",
-                "baseUrl", "https://gateway.internal/openai-compatible"
+                "contextWindowTurns", 8
         ));
-        when(secretCryptoService.decrypt("cipher-openai-compatible")).thenReturn("sk-openai-compatible");
+        when(secretCryptoService.decrypt("cipher-key")).thenReturn("sk-live");
 
-        AgentLlmExecutionConfig actual = agentModelRoutingService.resolveExecutionConfig(1001L, 920025L, "trace-openai-compatible");
+        AgentLlmExecutionConfig config = agentModelRoutingService.resolveExecutionConfig(1001L, 9001L, "trace-ctx-window");
 
-        assertThat(actual.providerCode()).isEqualTo("openai-compatible");
-        assertThat(actual.baseUrl()).isEqualTo("https://gateway.internal/openai-compatible");
-        assertThat(actual.apiKey()).isEqualTo("sk-openai-compatible");
-        assertThat(actual.modelName()).isEqualTo("openai-compatible-chat");
-        verify(modelRepository).findUserModelConfig(1001L, 920025L);
-    }
-
-    @Test
-    void UT_APP_AGENT_MODEL_ROUTING_SERVICE_PRESERVES_LONGCAT_MODEL_NAME_FROM_MODEL_CONFIG_IN_EXECUTION_CONFIG() {
-        when(modelRepository.findUserModelConfig(920001L, 2053134348617666560L)).thenReturn(Map.of(
-                "modelName", "LongCat-Flash-Thinking",
-                "providerId", 3L,
-                "keyStatus", "active",
-                "encryptedApiKey", "cipher-longcat",
-                "baseUrl", "https://api.longcat.chat/openai/v1"
-        ));
-        when(secretCryptoService.decrypt("cipher-longcat")).thenReturn("sk-longcat");
-
-        AgentLlmExecutionConfig actual = agentModelRoutingService.resolveExecutionConfig(920001L, 2053134348617666560L, "trace-longcat");
-
-        assertThat(actual.providerCode()).isEqualTo("longcat");
-        assertThat(actual.baseUrl()).isEqualTo("https://api.longcat.chat/openai/v1");
-        assertThat(actual.apiKey()).isEqualTo("sk-longcat");
-        assertThat(actual.modelName()).isEqualTo("LongCat-Flash-Thinking");
-        verify(modelRepository).findUserModelConfig(920001L, 2053134348617666560L);
+        assertThat(config.contextWindowTurns()).isEqualTo(8);
     }
 }

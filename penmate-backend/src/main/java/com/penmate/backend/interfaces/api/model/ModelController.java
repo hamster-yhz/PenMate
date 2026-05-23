@@ -213,6 +213,8 @@ public class ModelController {
                         dto.getBaseUrl(),
                         mapModelCategoryToKeySourceType(dto.getModelCategory()),
                         dto.getApiKey(),
+                        dto.getContextWindowTurns(),
+                        dto.getMaxContextTokens(),
                         dto.getStatus(),
                         requirePositiveLongId(operatorId, "operatorId")
                 ),
@@ -237,6 +239,8 @@ public class ModelController {
                         dto.getBaseUrl(),
                         mapModelCategoryToKeySourceType(dto.getModelCategory()),
                         dto.getApiKey(),
+                        dto.getContextWindowTurns(),
+                        dto.getMaxContextTokens(),
                         dto.getStatus(),
                         requirePositiveLongId(operatorId, "operatorId")
                 ),

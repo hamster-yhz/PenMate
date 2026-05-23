@@ -317,6 +317,87 @@ describe('useWorkbenchChat', () => {
     ])
   })
 
+  it('keeps_streaming_tokens_bound_to_new_assistant_message_after_hydrating_oversized_message_ids', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const stream = { close: vi.fn() } as unknown as EventSource
+    const createTurn = vi.fn().mockResolvedValue({
+      session: { sessionId: 'session-88', title: '当前会话', status: 'ACTIVE', boundStyle: null },
+      activeTask: { turnId: 'turn-9001', taskId: 'task-9001', taskStatus: 'RUNNING' },
+      taskType: 'WRITE',
+      userMessage: '继续写第三章',
+    })
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      getCurrentProjectId: () => '101',
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureModelConfigId: vi.fn().mockResolvedValue('mcfg-9001'),
+      refreshActiveModelInfo: vi.fn(),
+      listSessions: vi.fn().mockResolvedValue([]),
+      createSession: vi.fn(),
+      getSessionRecovery: vi.fn(),
+      createTurn,
+      getTask: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.hydrateFromRecoverySnapshot({
+      session: { sessionId: 'session-88' },
+      messages: [
+        {
+          messageId: '2056652062258876416',
+          role: 'user',
+          contentMd: '第一次用户消息',
+        },
+        {
+          messageId: '2056652091694501888',
+          role: 'assistant',
+          contentMd: '第一次助手回复',
+        },
+      ],
+    })
+
+    chat.chatInput.value = '第二次用户消息'
+    const sendPromise = chat.sendMessage()
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.token')?.({
+      data: JSON.stringify({ token: '第二次助手回复' }),
+    } as MessageEvent<string>)
+    listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+
+    await sendPromise
+
+    expect(chat.messages.value.slice(-2)).toEqual([
+      {
+        id: expect.anything(),
+        role: 'user',
+        text: '第二次用户消息',
+      },
+      {
+        id: expect.anything(),
+        role: 'assistant',
+        text: '第二次助手回复',
+      },
+    ])
+    expect(String(chat.messages.value.at(-2)?.id)).not.toBe(String(chat.messages.value.at(-1)?.id))
+  })
+
   it('maps_recovery_messages_when_backend_uses_message_content_aliases', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const getSessionRecovery = vi.fn().mockResolvedValue({
@@ -1062,6 +1143,108 @@ describe('useWorkbenchChat', () => {
     expect(chat.messages.value[1].text).not.toContain('生成任务已完成')
   })
 
+  it('does_not_append_done_fallback_text_when_stream_finishes_without_any_assistant_content', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn().mockResolvedValue({ taskId: 9050, status: 'running' }),
+      getGeneration: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '继续写第三章'
+    const sendPromise = chat.sendMessage()
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+
+    await sendPromise
+
+    expect(chat.messages.value[1]).toMatchObject({
+      id: 2,
+      role: 'assistant',
+    })
+    expect(chat.messages.value[1].text).not.toContain('生成任务已完成')
+    expect(chat.messages.value[1].text).not.toContain('done')
+  })
+
+  it('renders_streamed_assistant_text_from_content_alias_before_done_fallback', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn().mockResolvedValue({ taskId: 9016, status: 'running' }),
+      getGeneration: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream: vi.fn(),
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.chatInput.value = '继续写第三章'
+    const sendPromise = chat.sendMessage()
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.token')?.({
+      data: JSON.stringify({ content: '第一段流式正文' }),
+    } as MessageEvent<string>)
+    listeners.get('generation.done')?.({ data: JSON.stringify({ status: 'done' }) } as MessageEvent<string>)
+
+    await sendPromise
+
+    expect(chat.messages.value).toEqual([
+      { id: 1, role: 'user', text: '继续写第三章' },
+      { id: 2, role: 'assistant', text: '第一段流式正文' },
+    ])
+    expect(chat.messages.value[1].text).not.toContain('生成任务已完成')
+  })
+
   it('keeps_waiting_approval_status_visible_after_stream_finishes_with_pending_approval', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const listeners = new Map<string, (event: MessageEvent<string>) => void>()
@@ -1113,7 +1296,7 @@ describe('useWorkbenchChat', () => {
     expect(chat.generationStatusText.value).toBe('等待审批')
   })
 
-  it('updates_agent_status_detail_when_generation_status_event_arrives', async () => {
+  it('defers_agent_status_detail_until_generation_status_event_arrives', async () => {
     const useWorkbenchChat = await loadUseWorkbenchChat()
     const listeners = new Map<string, (event: MessageEvent<string>) => void>()
     const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
@@ -1149,6 +1332,9 @@ describe('useWorkbenchChat', () => {
     chat.chatInput.value = '继续写第三章'
     const sendPromise = chat.sendMessage()
     await flushPromises(20)
+
+    expect(chat.generationStatusText.value).toBe('就绪')
+    expect(chat.agentStatusDetailText.value).toBe('')
 
     listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
     listeners.get('generation.status')?.({
@@ -1627,6 +1813,67 @@ describe('useWorkbenchChat', () => {
     expect(chat.isGenerating.value).toBe(false)
     expect(chat.generationPhase.value).toBe('idle')
     expect(chat.generationTaskStatus.value).toBe('')
+    expect(closeTaskStream).toHaveBeenCalled()
+    expect(stream.close).toHaveBeenCalled()
+  })
+
+  it('does_not_append_done_fallback_text_when_resumed_stream_finishes_without_any_assistant_content', async () => {
+    const useWorkbenchChat = await loadUseWorkbenchChat()
+    const listeners = new Map<string, (event: MessageEvent<string>) => void>()
+    const addStreamListener = vi.fn((_: EventSource, eventName: string, listener: (event: MessageEvent<string>) => void) => {
+      listeners.set(eventName, listener)
+    })
+    const closeTaskStream = vi.fn()
+    const stream = { close: vi.fn() } as unknown as EventSource
+
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: 101, operatorId: 201 }),
+      getCurrentProjectId: () => 101,
+      getActiveChapterKey: () => '301',
+      getActivePlugins: () => ['outline.search'],
+      ensureConversationId: vi.fn().mockResolvedValue(77),
+      ensureModelConfigId: vi.fn().mockResolvedValue(501),
+      refreshActiveModelInfo: vi.fn(),
+      listConversations: vi.fn(),
+      listMessages: vi.fn(),
+      createMessage: vi.fn().mockResolvedValue({}),
+      createGeneration: vi.fn(),
+      getGeneration: vi.fn(),
+      openTurnStream: vi.fn().mockReturnValue(stream),
+      addStreamListener,
+      closeTaskStream,
+      revealAssistantText: vi.fn(),
+      scrollChat: vi.fn(),
+      nextTick: async () => undefined,
+      notifyWarning: vi.fn(),
+      debugChatState: vi.fn(),
+      onRequireModelSelection: vi.fn(),
+      enablePollingFallback: false,
+    })
+
+    chat.hydrateFromRecoverySnapshot({
+      session: { sessionId: '90001' },
+      activeTask: { turnId: '50001', taskId: '70001', taskStatus: 'RUNNING' },
+      messages: [
+        { messageId: 1, role: 'assistant', contentMd: '' },
+      ],
+    })
+
+    const resumePromise = chat.resumeRunningTask('101', '90001', '50001')
+    await flushPromises(20)
+
+    listeners.get('generation.started')?.({ data: '{}' } as MessageEvent<string>)
+    listeners.get('generation.done')?.({
+      data: JSON.stringify({ status: 'done' }),
+    } as MessageEvent<string>)
+
+    await resumePromise
+
+    expect(chat.messages.value).toEqual([
+      { id: '1', role: 'assistant', text: '' },
+    ])
+    expect(chat.messages.value[0].text).not.toContain('生成任务已完成')
+    expect(chat.messages.value[0].text).not.toContain('done')
     expect(closeTaskStream).toHaveBeenCalled()
     expect(stream.close).toHaveBeenCalled()
   })

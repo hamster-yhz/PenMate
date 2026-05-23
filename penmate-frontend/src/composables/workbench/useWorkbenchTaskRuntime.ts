@@ -169,7 +169,7 @@ export const createTaskRuntime = (deps: {
     })
     deps.addStreamListener(generationStream, 'generation.token', (event) => {
       const payload = parseSseData(event)
-      const token = String(payload.token || '')
+      const token = String(payload.token ?? payload.content ?? '')
       if (!token) return
       deps.onToken?.(token)
       deps.scrollChat()

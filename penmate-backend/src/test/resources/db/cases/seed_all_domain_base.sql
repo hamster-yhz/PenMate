@@ -197,12 +197,16 @@ INSERT INTO model_user_api_keys (id, user_api_key_id, user_id, provider_id, key_
 (920003, 920013, 920001, 1, 'DBCASE Admin OpenAI Key',     'cipher-user-openai-920013',  '****92013', 0, NULL,   'disabled', NOW(3), NOW(3), NULL),
 (920004, 920014, 920002, 7, 'DBCASE Owner OpenAI-Compatible Key', 'cipher-user-openai-compatible-920014', '****92014', 0, NOW(3), 'active', NOW(3), NOW(3), NULL);
 
-INSERT INTO model_user_configurations (id, model_config_id, user_id, provider_id, model_name, base_url, key_source_type, user_key_id, official_key_id, status, created_at, updated_at, deleted_at) VALUES
-(920001, 920021, 920002, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920011, NULL,   'active',   NOW(3), NOW(3), NULL),
-(920002, 920022, 920002, 2, 'deepseek-chat',  'https://api.deepseek.com', 'USER_KEY',  920012, NULL,   'active',   NOW(3), NOW(3), NULL),
-(920003, 920023, 920002, 1, 'gpt-4.1',        NULL,                    'OFFICIAL_KEY', NULL,   920001, 'active',   NOW(3), NOW(3), NULL),
-(920004, 920024, 920001, 1, 'gpt-4o-mini',    NULL,                    'USER_KEY',     920013, NULL,   'disabled', NOW(3), NOW(3), NULL),
-(920005, 920025, 920002, 7, 'openai-compatible-chat', 'https://example.internal/openai', 'USER_KEY', 920014, NULL, 'active', NOW(3), NOW(3), NULL);
+INSERT INTO model_user_configurations (
+    id, model_config_id, user_id, provider_id, model_name, base_url,
+    key_source_type, user_key_id, official_key_id, context_window_turns,
+    status, created_at, updated_at, deleted_at
+) VALUES
+(920001, 920021, 920002, 1, 'gpt-4o-mini',              NULL,                             'USER_KEY',     920011, NULL,   6, 'active',   NOW(3), NOW(3), NULL),
+(920002, 920022, 920002, 2, 'deepseek-chat',            'https://api.deepseek.com',      'USER_KEY',     920012, NULL,   4, 'active',   NOW(3), NOW(3), NULL),
+(920003, 920023, 920002, 1, 'gpt-4.1',                  NULL,                             'OFFICIAL_KEY', NULL,   920001, 8, 'active',   NOW(3), NOW(3), NULL),
+(920004, 920024, 920001, 1, 'gpt-4o-mini',              NULL,                             'USER_KEY',     920013, NULL,   0, 'disabled', NOW(3), NOW(3), NULL),
+(920005, 920025, 920002, 7, 'openai-compatible-chat',   'https://example.internal/openai', 'USER_KEY',   920014, NULL,   6, 'active',   NOW(3), NOW(3), NULL);
 
 UPDATE iam_users
 SET main_agent_model_config_id = CASE user_id

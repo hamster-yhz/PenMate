@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.llm.LlmTokenUsage;
 import com.penmate.backend.application.agent.runtime.RuntimeStatusView;
 import com.penmate.backend.application.agent.runtime.TaskRuntimeStatusPublisher;
 import com.penmate.backend.application.agent.runtime.ToolCallStatusView;
@@ -16,6 +17,7 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResumeService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallSnapshotMapper;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
@@ -58,12 +60,13 @@ public class AgentToolLoopRunner {
                                                 Long conversationId,
                                                 Long operatorId,
                                                 String traceId,
-                                                List<Map<String, Object>> initialMessages,
+                                                List<AgentLlmMessage> initialMessages,
                                                 AgentLlmExecutionConfig executionConfig) {
-        List<Map<String, Object>> messages = new ArrayList<>(initialMessages == null ? List.of() : initialMessages);
+        List<AgentLlmMessage> messages = new ArrayList<>(initialMessages == null ? List.of() : initialMessages);
         List<AgentLlmToolSchema> tools = toolDefinitionSource.listLlmSchemas();
         StringBuilder toolContextBuilder = new StringBuilder();
         int totalToolCalls = 0;
+        LlmTokenUsage totalTokenUsage = LlmTokenUsage.ZERO;
         AgentTaskContext taskContext = loadTaskContext(taskId);
         Long turnId = taskContext == null ? null : taskContext.getTurnId();
 
@@ -72,6 +75,7 @@ public class AgentToolLoopRunner {
                     new AgentLlmTurnRequest(messages, tools, "auto"),
                     executionConfig
             );
+            totalTokenUsage = totalTokenUsage.add(response.tokenUsage());
             if ("tool_calls".equalsIgnoreCase(response.finishReason()) && response.toolCalls().isEmpty()) {
                 throw new IllegalStateException("LLM finishReason=tool_calls but toolCalls is empty");
             }
@@ -79,7 +83,8 @@ public class AgentToolLoopRunner {
                 return AgentToolLoopIterationResult.completed(
                         response.assistantText(),
                         totalToolCalls,
-                        toolContextBuilder.toString()
+                        toolContextBuilder.toString(),
+                        totalTokenUsage
                 );
             }
             ensureToolCallsPerTurnWithinLimit(response.toolCalls());
@@ -115,13 +120,14 @@ public class AgentToolLoopRunner {
                     return AgentToolLoopIterationResult.waitingApproval(
                             toolResult.approvalId(),
                             totalToolCalls,
-                            toolContextBuilder.toString()
+                            toolContextBuilder.toString(),
+                            totalTokenUsage
                     );
                 }
 
                 String toolOutput = extractToolOutput(toolResult, toolCall);
                 appendToolContext(toolContextBuilder, toolOutput);
-                messages.add(buildToolResultMessage(toolCall.id(), toolOutput));
+                messages.add(AgentLlmMessage.tool(toolCall.id(), toolOutput));
             }
         }
 
@@ -139,13 +145,6 @@ public class AgentToolLoopRunner {
         }
     }
 
-    private Map<String, Object> buildToolResultMessage(String toolCallId, String toolOutput) {
-        Map<String, Object> message = new LinkedHashMap<>();
-        message.put("role", "tool");
-        message.put("tool_call_id", toolCallId);
-        message.put("content", toolOutput == null ? "" : toolOutput);
-        return message;
-    }
 
     private String extractToolOutput(ToolCallResult toolResult, AgentLlmToolCall toolCall) {
         if (toolResult == null) {

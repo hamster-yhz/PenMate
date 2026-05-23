@@ -172,8 +172,8 @@ public interface AgentMapper {
 
     @Update("""
             UPDATE agent_task_results
-            SET token_usage_json = #{tokenUsageJson},
-                cost_usage_json = #{costJson}
+            SET token_usage_json = COALESCE(#{tokenUsageJson}, token_usage_json),
+                cost_usage_json = COALESCE(#{costJson}, cost_usage_json)
             WHERE result_id = (
                 SELECT result_id
                 FROM agent_tasks

@@ -2,9 +2,11 @@ package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
+import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
+import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
@@ -40,6 +42,7 @@ public class AgentController {
 
     private final AgentConversationAppService agentConversationAppService;
     private final AgentSessionRecoveryAppService agentSessionRecoveryAppService;
+    private final AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
     private final AgentTurnAppService agentTurnAppService;
     private final AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher;
     private final AgentSessionRepository agentSessionRepository;
@@ -47,12 +50,14 @@ public class AgentController {
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentSessionRecoveryAppService agentSessionRecoveryAppService,
+                           AgentSessionTokenUsageAppService agentSessionTokenUsageAppService,
                            AgentTurnAppService agentTurnAppService,
                            AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher,
                            AgentSessionRepository agentSessionRepository,
                            GenerationStreamService generationStreamService) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentSessionRecoveryAppService = agentSessionRecoveryAppService;
+        this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
         this.agentTurnAppService = agentTurnAppService;
         this.agentGenerationWorkflowDispatcher = agentGenerationWorkflowDispatcher;
         this.agentSessionRepository = agentSessionRepository;
@@ -103,6 +108,20 @@ public class AgentController {
                 traceId)), traceId);
     }
 
+    @GetMapping("/sessions/{sessionId}/token-usage")
+    public ApiResponse<SessionTokenUsageView> getTokenUsage(@PathVariable String projectId,
+                                                            @PathVariable String sessionId,
+                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(
+                agentSessionTokenUsageAppService.getTokenUsage(
+                        requireLongId(projectId, "projectId"),
+                        requireLongId(sessionId, "sessionId"),
+                        traceId
+                ),
+                traceId
+        );
+    }
+ 
     /**
      * 恢复一个会话并返回最新恢复快照�?
      * <p>控制器不拼装恢复快照，只�?DTO 到用例入参的转换�?/p>

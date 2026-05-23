@@ -80,6 +80,33 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
     }
 
     @Override
+    public Map<String, Object> findSessionTokenUsageSummary(Long projectId, Long sessionId) {
+        Map<String, Object> sessionRow = agentSessionMapper.findSessionRow(projectId, sessionId);
+        if (sessionRow == null) {
+            return null;
+        }
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("promptTokens", intValue(valueOf(sessionRow, "totalPromptTokens")));
+        summary.put("completionTokens", intValue(valueOf(sessionRow, "totalCompletionTokens")));
+        summary.put("totalTokens", intValue(valueOf(sessionRow, "totalTokens")));
+
+        Long lastTaskId = longValue(valueOf(sessionRow, "lastTaskId"));
+        if (lastTaskId == null) {
+            return summary;
+        }
+        Map<String, Object> contextRow = agentSessionMapper.findTaskContextRow(lastTaskId);
+        Long modelConfigId = safeLongValue(resolveModelConfigId(stringValue(valueOf(contextRow, "modelSnapshotJson"))));
+        Long ownerUserId = longValue(valueOf(sessionRow, "ownerUserId"));
+        if (ownerUserId == null || modelConfigId == null) {
+            return summary;
+        }
+        Map<String, Object> modelSummary = agentSessionMapper.findModelConfigSummary(ownerUserId, modelConfigId);
+        summary.put("maxContextTokens", intValue(valueOf(modelSummary, "maxContextTokens")));
+        summary.put("modelName", stringValue(valueOf(modelSummary, "modelName")));
+        return summary;
+    }
+ 
+    @Override
     public int insertSession(AgentSession session) {
         AgentConversation conversation = new AgentConversation();
         conversation.setConversationId(session.getSessionId());
@@ -439,6 +466,17 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
             }
         }
         return String.valueOf(value);
+    }
+
+    private Long safeLongValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private LocalDateTime localDateTime(Object value) {

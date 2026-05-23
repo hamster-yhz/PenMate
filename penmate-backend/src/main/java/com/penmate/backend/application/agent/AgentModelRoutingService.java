@@ -69,6 +69,7 @@ public class AgentModelRoutingService {
         if (resolvedBaseUrl == null || resolvedBaseUrl.isBlank()) {
             resolvedBaseUrl = provider.getBaseUrl();
         }
+        Integer contextWindowTurns = intValue(config.get("contextWindowTurns"), 6);
         return AgentLlmExecutionConfig.builder()
                 .modelConfigId(modelConfigId)
                 .providerCode(provider.getCode())
@@ -76,11 +77,22 @@ public class AgentModelRoutingService {
                 .apiKey(plainApiKey)
                 .modelName(resolvedModelName.trim())
                 .keySource("MODEL_CONFIG")
+                .contextWindowTurns(contextWindowTurns)
                 .build();
     }
 
     private boolean isInactive(String status) {
         return status != null && "disabled".equalsIgnoreCase(status.trim());
+    }
+
+    private Integer intValue(Object value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.parseInt(String.valueOf(value));
     }
 
     private Long longValue(Object value) {

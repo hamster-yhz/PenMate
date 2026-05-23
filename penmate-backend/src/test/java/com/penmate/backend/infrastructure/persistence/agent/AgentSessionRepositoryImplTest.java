@@ -137,6 +137,35 @@ class AgentSessionRepositoryImplTest {
     }
 
     @Test
+    void should_ignore_non_numeric_model_config_id_when_building_session_token_usage_summary() {
+        AgentSessionMapper mapper = mock(AgentSessionMapper.class);
+        BusinessIdGenerator businessIdGenerator = mock(BusinessIdGenerator.class);
+        AgentSessionRepositoryImpl repository = new AgentSessionRepositoryImpl(mapper, businessIdGenerator);
+        when(mapper.findSessionRow(101L, 90001L)).thenReturn(Map.of(
+                "id", 1L,
+                "sessionId", 90001L,
+                "projectId", 101L,
+                "ownerUserId", 201L,
+                "title", "第三章夜雨追踪",
+                "sessionStatus", "ACTIVE",
+                "lastTaskId", 70001L,
+                "totalPromptTokens", 11,
+                "totalCompletionTokens", 7,
+                "totalTokens", 18
+        ));
+        when(mapper.findTaskContextRow(70001L)).thenReturn(Map.of(
+                "modelSnapshotJson", "{\"modelConfigId\":\"mcfg-9001\"}"
+        ));
+
+        Map<String, Object> summary = repository.findSessionTokenUsageSummary(101L, 90001L);
+
+        assertThat(summary).containsEntry("promptTokens", 11);
+        assertThat(summary).containsEntry("completionTokens", 7);
+        assertThat(summary).containsEntry("totalTokens", 18);
+        assertThat(summary).doesNotContainKeys("maxContextTokens", "modelName");
+    }
+
+    @Test
     void should_embed_persisted_task_profile_prompt_plan_and_context_package_into_workbench_context_as_structured_objects() throws Exception {
         AgentSessionMapper mapper = mock(AgentSessionMapper.class);
         BusinessIdGenerator businessIdGenerator = mock(BusinessIdGenerator.class);

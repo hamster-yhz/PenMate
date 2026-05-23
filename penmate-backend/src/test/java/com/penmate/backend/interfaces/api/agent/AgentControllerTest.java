@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkfl
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
+import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
@@ -49,6 +50,9 @@ class AgentControllerTest {
 
     @Mock
     private AgentSessionRecoveryAppService agentSessionRecoveryAppService;
+
+    @Mock
+    private AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
 
     @Mock
     private AgentTurnAppService agentTurnAppService;

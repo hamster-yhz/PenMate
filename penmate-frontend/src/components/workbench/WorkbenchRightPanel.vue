@@ -21,42 +21,9 @@
         :loading="conversationLoading"
         :conversations="conversationList"
         :current-conversation-id="currentConversationId"
+        @close="emit('toggle-history')"
         @select-conversation="emit('select-conversation', $event)"
       />
-
-      <div v-if="runtimeStatusCard || toolCallCard || todoPlanCard || storyBibleApprovalCard" class="runtime-card-stack">
-        <RuntimeStatusCard
-          v-if="runtimeStatusCard"
-          :title="runtimeStatusCard.title"
-          :badge-text="runtimeStatusCard.badgeText"
-          :description="runtimeStatusCard.description"
-          :next-action-text="runtimeStatusCard.nextActionText"
-          :failure-reason-text="runtimeStatusCard.failureReasonText"
-        />
-        <ToolCallStatusCard
-          v-if="toolCallCard"
-          :title="toolCallCard.title"
-          :tool-code="toolCallCard.toolCode"
-          :status-text="toolCallCard.statusText"
-          :arguments-preview="toolCallCard.argumentsPreview"
-          :output-preview="toolCallCard.outputPreview"
-          :error-message="toolCallCard.errorMessage"
-        />
-        <TodoPlanCard
-          v-if="todoPlanCard"
-          :title="todoPlanCard.title"
-          :item-count-text="todoPlanCard.itemCountText"
-          :next-action-text="todoPlanCard.nextActionText"
-          :items="todoPlanCard.items"
-        />
-        <StoryBibleApprovalCard
-          v-if="storyBibleApprovalCard"
-          :title="storyBibleApprovalCard.title"
-          :proposal-summary="storyBibleApprovalCard.proposalSummary"
-          :entry-keys="storyBibleApprovalCard.entryKeys"
-          :next-action-text="storyBibleApprovalCard.nextActionText"
-        />
-      </div>
 
       <div ref="chatContainerRef" class="chat-messages">
         <ChatMessageList
@@ -90,17 +57,7 @@ import AgentSessionHeader from '@/components/workbench/chat/AgentSessionHeader.v
 import ConversationHistoryPanel from '@/components/workbench/chat/ConversationHistoryPanel.vue'
 import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
 import ChatComposer from '@/components/workbench/chat/ChatComposer.vue'
-import RuntimeStatusCard from '@/components/workbench/RuntimeStatusCard.vue'
-import ToolCallStatusCard from '@/components/workbench/ToolCallStatusCard.vue'
-import TodoPlanCard from '@/components/workbench/TodoPlanCard.vue'
-import StoryBibleApprovalCard from '@/components/workbench/StoryBibleApprovalCard.vue'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
-import type {
-  RuntimeStatusCardViewModel,
-  StoryBibleApprovalCardViewModel,
-  TodoPlanCardViewModel,
-  ToolCallStatusCardViewModel,
-} from '@/composables/workbench/useWorkbenchRuntimePresenter'
 
 const props = withDefaults(defineProps<{
   collapsed: boolean
@@ -120,10 +77,6 @@ const props = withDefaults(defineProps<{
   isApprovalBusy: (approvalId: string) => boolean
   chatInput?: string
   activePlugins?: string[]
-  runtimeStatusCard?: RuntimeStatusCardViewModel | null
-  toolCallCard?: ToolCallStatusCardViewModel | null
-  todoPlanCard?: TodoPlanCardViewModel | null
-  storyBibleApprovalCard?: StoryBibleApprovalCardViewModel | null
 }>(), {
   currentModelName: '',
   generationStatusText: '',
@@ -139,10 +92,6 @@ const props = withDefaults(defineProps<{
   streamingAssistantMsgId: null,
   chatInput: '',
   activePlugins: () => [],
-  runtimeStatusCard: null,
-  toolCallCard: null,
-  todoPlanCard: null,
-  storyBibleApprovalCard: null,
 })
 
 const emit = defineEmits<{
@@ -231,16 +180,6 @@ watch(
     border-radius: 4px 0 0 4px;
     border-right: none;
   }
-}
-
-.runtime-card-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-  overflow-y: auto;
-  max-height: 38%;
 }
 
 .chat-messages {

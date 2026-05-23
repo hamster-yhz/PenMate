@@ -321,6 +321,9 @@ class AgentRepositorySessionDbCaseTest {
                         last_task_id BIGINT NULL,
                         last_message_at TIMESTAMP NULL,
                         resumed_at TIMESTAMP NULL,
+                        total_prompt_tokens INT NOT NULL DEFAULT 0,
+                        total_completion_tokens INT NOT NULL DEFAULT 0,
+                        total_tokens INT NOT NULL DEFAULT 0,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         deleted_at TIMESTAMP NULL

@@ -6,6 +6,7 @@ import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTurn;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 智能体会话恢复相关仓储端口。
@@ -31,6 +32,11 @@ public interface AgentSessionRepository {
      * 通过 session + turn 查询运行中任务。
      */
     AgentTaskContext findTaskByTurnId(Long projectId, Long sessionId, Long turnId);
+
+    /**
+     * 查询会话累计 token 与模型上下文窗口摘要。
+     */
+    Map<String, Object> findSessionTokenUsageSummary(Long projectId, Long sessionId);
 
     /**
      * 新增会话。

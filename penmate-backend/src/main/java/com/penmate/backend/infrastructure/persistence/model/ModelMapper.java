@@ -175,6 +175,8 @@ public interface ModelMapper {
                    muc.key_source_type AS keySourceType,
                    muc.user_key_id AS userKeyId,
                    muc.official_key_id AS officialKeyId,
+                   muc.context_window_turns AS contextWindowTurns,
+                   muc.max_context_tokens AS maxContextTokens,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
                    muc.status AS status
@@ -200,6 +202,8 @@ public interface ModelMapper {
                    muc.key_source_type AS keySourceType,
                    muc.user_key_id AS userKeyId,
                    muc.official_key_id AS officialKeyId,
+                   muc.context_window_turns AS contextWindowTurns,
+                   muc.max_context_tokens AS maxContextTokens,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.encrypted_api_key ELSE mok.encrypted_api_key END AS encryptedApiKey,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
@@ -221,8 +225,14 @@ public interface ModelMapper {
                                             @Param("modelConfigId") Long modelConfigId);
 
     @Insert("""
-            INSERT INTO model_user_configurations(model_config_id, user_id, provider_id, model_name, base_url, key_source_type, user_key_id, official_key_id, status)
-            VALUES (#{modelConfigId}, #{userId}, #{providerId}, #{modelName}, #{baseUrl}, #{keySourceType}, #{userKeyId}, #{officialKeyId}, #{status})
+            INSERT INTO model_user_configurations(
+                model_config_id, user_id, provider_id, model_name, base_url,
+                key_source_type, user_key_id, official_key_id, context_window_turns, max_context_tokens, status
+            )
+            VALUES (
+                #{modelConfigId}, #{userId}, #{providerId}, #{modelName}, #{baseUrl},
+                #{keySourceType}, #{userKeyId}, #{officialKeyId}, #{contextWindowTurns}, #{maxContextTokens}, #{status}
+            )
             """)
     int insertUserModelConfig(@Param("modelConfigId") Long modelConfigId,
                               @Param("userId") Long userId,
@@ -232,6 +242,8 @@ public interface ModelMapper {
                               @Param("keySourceType") String keySourceType,
                               @Param("userKeyId") Long userKeyId,
                               @Param("officialKeyId") Long officialKeyId,
+                              @Param("contextWindowTurns") Integer contextWindowTurns,
+                              @Param("maxContextTokens") Integer maxContextTokens,
                               @Param("status") String status);
 
     @Update("""
@@ -242,6 +254,8 @@ public interface ModelMapper {
                 key_source_type = COALESCE(#{keySourceType}, key_source_type),
                 user_key_id = #{userKeyId},
                 official_key_id = #{officialKeyId},
+                context_window_turns = COALESCE(#{contextWindowTurns}, context_window_turns),
+                max_context_tokens = COALESCE(#{maxContextTokens}, max_context_tokens),
                 status = COALESCE(#{status}, status),
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE user_id = #{userId} AND model_config_id = #{modelConfigId} AND deleted_at IS NULL
@@ -254,6 +268,8 @@ public interface ModelMapper {
                               @Param("keySourceType") String keySourceType,
                               @Param("userKeyId") Long userKeyId,
                               @Param("officialKeyId") Long officialKeyId,
+                              @Param("contextWindowTurns") Integer contextWindowTurns,
+                              @Param("maxContextTokens") Integer maxContextTokens,
                               @Param("status") String status);
 
     @Update("""

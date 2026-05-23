@@ -52,5 +52,7 @@ describe('Home index refactor', () => {
     expect(wrapper.text()).toContain('BYOK模型管理')
     expect(wrapper.text()).toContain('配置基础设施')
     expect(wrapper.text()).toContain('审批设定落库')
+    expect(wrapper.text()).not.toContain('AI会话')
+    expect(wrapper.text()).not.toContain('AI 会话')
   })
 })

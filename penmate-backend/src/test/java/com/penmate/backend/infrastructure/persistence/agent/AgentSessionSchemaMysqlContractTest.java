@@ -35,7 +35,15 @@ class AgentSessionSchemaMysqlContractTest {
     @Test
     void should_define_agent_session_recovery_tables() throws Exception {
         assertThat(columnsOf("agent_sessions"))
-                .contains("session_id", "bound_style_id", "active_context_version", "resumed_at");
+                .contains(
+                        "session_id",
+                        "bound_style_id",
+                        "active_context_version",
+                        "resumed_at",
+                        "total_prompt_tokens",
+                        "total_completion_tokens",
+                        "total_tokens"
+                );
         assertThat(columnsOf("agent_turns"))
                 .contains("turn_id", "turn_seq", "resume_token", "turn_status");
         assertThat(columnsOf("agent_tasks"))

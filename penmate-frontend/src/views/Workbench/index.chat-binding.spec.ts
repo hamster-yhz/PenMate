@@ -77,12 +77,8 @@ const WorkbenchRightPanelHarness = {
     'isGenerating',
     'messages',
     'streamingAssistantMsgId',
-    'runtimeStatusCard',
-    'toolCallCard',
-    'todoPlanCard',
-    'storyBibleApprovalCard',
   ],
-  emits: ['update:chat-input', 'send'],
+  emits: ['update:chat-input', 'send', 'toggle-history', 'select-conversation'],
   methods: {
     emitChatInput(this: { $emit: (eventName: string, value: string) => void }, event: Event) {
       this.$emit('update:chat-input', (event.target as HTMLTextAreaElement | null)?.value || '')
@@ -96,6 +92,8 @@ const WorkbenchRightPanelHarness = {
         :value="chatInput"
         @input="emitChatInput"
       ></textarea>
+      <button data-testid="toggle-history" type="button" @click="$emit('toggle-history')">history</button>
+      <button data-testid="select-conversation" type="button" @click="$emit('select-conversation', '90001')">resume</button>
       <button data-testid="chat-send" type="button" :disabled="isGenerating" @click="$emit('send')">send</button>
     </aside>
   `,
@@ -445,26 +443,41 @@ describe('Workbench index chat parent binding', () => {
     expect(agentApiMock.getSessionRecovery).not.toHaveBeenCalled()
   })
 
-  it('passes_structured_runtime_presenter_cards_to_right_panel_after_resume_recovery', async () => {
+  it('does_not_pass_runtime_cards_to_right_panel_after_resume_recovery', async () => {
     agentApiMock.resumeSession = vi.fn(async () => createStoryBibleWaitingApprovalRecoverySnapshot() as any)
 
     const wrapper = await mountWorkbench()
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
-        badgeText: '正在整理故事圣经',
-        nextActionText: 'await_approval',
+      expect(WorkbenchRightPanelHarness.props).not.toContain('runtimeStatusCard')
+      expect(WorkbenchRightPanelHarness.props).not.toContain('toolCallCard')
+      expect(WorkbenchRightPanelHarness.props).not.toContain('todoPlanCard')
+      expect(WorkbenchRightPanelHarness.props).not.toContain('storyBibleApprovalCard')
+      expect(rightPanel.props('runtimeStatusCard')).toBeUndefined()
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
+      expect(rightPanel.props('generationStatusText')).toBe('等待审批')
+    })
+  })
+
+  it('closes_history_overlay_after_selecting_a_conversation', async () => {
+    const wrapper = await mountWorkbench()
+    const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
+
+    await rightPanel.get('[data-testid="toggle-history"]').trigger('click')
+    await nextTick()
+    expect((wrapper.vm as unknown as { showConversationPanel: boolean }).showConversationPanel).toBe(true)
+
+    await rightPanel.get('[data-testid="select-conversation"]').trigger('click')
+
+    await waitForAssertion(() => {
+      expect(agentApiMock.resumeSession).toHaveBeenCalledWith('101', '90001', expect.objectContaining({
+        trigger: 'WORKBENCH_ENTER',
+        operatorId: '201',
       }))
-      expect(rightPanel.props('toolCallCard')).toEqual(expect.objectContaining({
-        title: '故事圣经整理',
-        toolCode: 'story_bible_update',
-      }))
-      expect(rightPanel.props('todoPlanCard')).toBeNull()
-      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
-        title: '故事圣经更新待确认',
-        proposalSummary: '建议补充侍从知晓密令的设定',
-      }))
+      expect((wrapper.vm as unknown as { showConversationPanel: boolean }).showConversationPanel).toBe(false)
     })
   })
 
@@ -1064,14 +1077,9 @@ describe('Workbench index chat parent binding', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
-        title: '第三章修订待办',
-        itemCountText: '2 项待办',
-      }))
-      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
-        title: '故事圣经更新待确认',
-        proposalSummary: '建议补充侍从知晓密令的设定',
-      }))
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
+      expect(rightPanel.props('generationStatusText')).toBe('等待审批')
     })
   })
 
@@ -1112,14 +1120,8 @@ describe('Workbench index chat parent binding', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
-        title: '第三章修订待办',
-        itemCountText: '2 项待办',
-        items: [
-          { title: '修复密令来源', statusText: 'BLOCKED', priorityText: 'HIGH' },
-          { title: '补充侍从转述桥段', statusText: 'pending', priorityText: 'MEDIUM' },
-        ],
-      }))
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
     })
   })
 
@@ -1225,6 +1227,25 @@ describe('Workbench index chat parent binding', () => {
         }),
       })
     )
+  })
+
+  it('does_not_pass_runtime_cards_to_right_panel_when_latest_recovery_session_is_not_running', async () => {
+    agentApiMock.listSessions.mockResolvedValue([{ sessionId: 'stale-session-1', title: '旧会话', updatedAt: '2026-04-26 23:00:00' }])
+    agentApiMock.resumeSession.mockResolvedValue({
+      ...createTodoReviewRecoverySnapshot(),
+      session: { sessionId: 'stale-session-1', title: '旧会话', status: 'ACTIVE', boundStyle: null },
+      activeTask: { turnId: '501', taskId: '601', taskStatus: 'SUCCEEDED', requestContextId: '701' },
+    })
+
+    const wrapper = await mountWorkbench()
+
+    await waitForAssertion(() => {
+      const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
+    })
   })
 
   it('updates_active_left_tab_in_parent_when_left_panel_emits_tab_change', async () => {

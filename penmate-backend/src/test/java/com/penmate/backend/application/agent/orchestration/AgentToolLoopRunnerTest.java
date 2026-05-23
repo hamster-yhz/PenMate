@@ -8,6 +8,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.llm.LlmTokenUsage;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
@@ -25,6 +26,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 
 import java.util.List;
 import java.util.Map;
@@ -72,10 +75,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "请补充这个场景需要的上下文"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请补充这个场景需要的上下文"));
         AgentLlmToolSchema contextEnhancerSchema = new AgentLlmToolSchema(
                 "context_enhancer",
                 "补充上下文",
@@ -133,31 +133,90 @@ class AgentToolLoopRunnerTest {
         AgentLlmTurnRequest firstRequest = requests.get(0);
         AgentLlmTurnRequest secondRequest = requests.get(1);
 
-        assertThat(firstRequest.messages()).containsExactlyElementsOf(initialMessages);
+        assertThat(firstRequest.messages()).containsExactly(
+                com.penmate.backend.domain.agent.model.AgentLlmMessage.user("请补充这个场景需要的上下文")
+        );
         assertThat(firstRequest.tools()).containsExactly(contextEnhancerSchema);
         assertThat(firstRequest.toolChoice()).isEqualTo("auto");
 
         assertThat(secondRequest.messages()).hasSize(3);
-        assertThat(secondRequest.messages().get(0))
-                .containsEntry("role", "user")
-                .containsEntry("content", "请补充这个场景需要的上下文");
-        assertThat(secondRequest.messages().get(1))
-                .containsEntry("role", "assistant")
-                .containsEntry("content", "")
-                .containsEntry("tool_calls", List.of(Map.of(
-                        "id", "call_1",
-                        "type", "function",
-                        "function", Map.of(
-                                "name", "context_enhancer",
-                                "arguments", "{\"prompt\":\"请补充这个场景需要的上下文\"}"
-                        )
-                )));
-        assertThat(secondRequest.messages().get(2))
-                .containsEntry("role", "tool")
-                .containsEntry("tool_call_id", "call_1")
-                .containsEntry("content", "{\"context\":\"补充背景设定\"}");
+        assertThat(secondRequest.messages().get(0).role())
+                .isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.USER);
+        assertThat(secondRequest.messages().get(0).content())
+                .isEqualTo("请补充这个场景需要的上下文");
+        assertThat(secondRequest.messages().get(1).role())
+                .isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.ASSISTANT);
+        assertThat(secondRequest.messages().get(1).content()).isEqualTo("");
+        assertThat(secondRequest.messages().get(1).toolCalls()).containsExactly(
+                new com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload(
+                        "call_1",
+                        "function",
+                        "context_enhancer",
+                        "{\"prompt\":\"请补充这个场景需要的上下文\"}"
+                )
+        );
+        assertThat(secondRequest.messages().get(2).role())
+                .isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.TOOL);
+        assertThat(secondRequest.messages().get(2).toolCallId()).isEqualTo("call_1");
+        assertThat(secondRequest.messages().get(2).content()).isEqualTo("{\"context\":\"补充背景设定\"}");
         assertThat(secondRequest.tools()).containsExactly(contextEnhancerSchema);
         assertThat(secondRequest.toolChoice()).isEqualTo("auto");
+    }
+
+    @Test
+    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_ACCUMULATE_TOKEN_USAGE_ACROSS_MULTIPLE_LLM_TURNS() {
+        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
+                .providerCode("openai-compatible")
+                .modelName("gpt-test")
+                .build();
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请补充这个场景需要的上下文"));
+        AgentLlmToolSchema contextEnhancerSchema = new AgentLlmToolSchema(
+                "context_enhancer",
+                "补充上下文",
+                """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "prompt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["prompt"]
+                        }
+                        """
+        );
+
+        when(toolDefinitionSource.listLlmSchemas())
+                .thenReturn(List.of(contextEnhancerSchema));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "tool_calls",
+                        "",
+                        List.of(new AgentLlmToolCall("call_1", "context_enhancer", "{\"prompt\":\"请补充这个场景需要的上下文\"}")),
+                        "{\"finish_reason\":\"tool_calls\"}",
+                        new LlmTokenUsage(11, 7, 18)
+                ))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "stop",
+                        "这是补充上下文后的最终答案",
+                        List.of(),
+                        "{\"finish_reason\":\"stop\"}",
+                        new LlmTokenUsage(5, 13, 18)
+                ));
+        when(toolCallApplicationService.executeToolCall(any()))
+                .thenReturn(ToolCallResult.success("{\"context\":\"补充背景设定\"}"));
+
+        AgentToolLoopIterationResult result = agentToolLoopRunner.execute(
+                1L,
+                11L,
+                9L,
+                0L,
+                "trace-token-usage",
+                initialMessages,
+                executionConfig
+        );
+
+        assertThat(result.tokenUsage()).isEqualTo(new LlmTokenUsage(16, 20, 36));
     }
 
     @Test
@@ -166,10 +225,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "请先查上下文再回答"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请先查上下文再回答"));
         AgentLlmToolSchema contextEnhancerSchema = new AgentLlmToolSchema(
                 "context_enhancer",
                 "补充上下文",
@@ -227,10 +283,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "删除书籍"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("删除书籍"));
 
         when(toolDefinitionSource.listLlmSchemas())
                 .thenReturn(List.of(new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")));
@@ -257,6 +310,45 @@ class AgentToolLoopRunnerTest {
         assertThat(result.waitingApproval()).isTrue();
         assertThat(result.approvalId()).isEqualTo(99L);
         assertThat(result.toolCallCount()).isEqualTo(1);
+        assertThat(result.tokenUsage()).isEqualTo(LlmTokenUsage.ZERO);
+        verify(agentLlmGateway, times(1)).generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig));
+    }
+
+    @Test
+    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_RETURN_ACCUMULATED_TOKEN_USAGE_WHEN_WAITING_APPROVAL() {
+        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
+                .providerCode("openai-compatible")
+                .modelName("gpt-test")
+                .build();
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("删除书籍"));
+
+        when(toolDefinitionSource.listLlmSchemas())
+                .thenReturn(List.of(new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse(
+                        "tool_calls",
+                        "",
+                        List.of(new AgentLlmToolCall("call_9", "book_crud", "{\"operation\":\"delete\",\"projectId\":9001}")),
+                        "{\"finish_reason\":\"tool_calls\"}",
+                        new LlmTokenUsage(12, 4, 16)
+                ));
+        when(toolCallApplicationService.executeToolCall(any()))
+                .thenReturn(ToolCallResult.waitingApproval(99L));
+
+        AgentToolLoopIterationResult result = agentToolLoopRunner.execute(
+                1L,
+                11L,
+                9L,
+                0L,
+                "trace-4-usage",
+                initialMessages,
+                executionConfig
+        );
+
+        assertThat(result.waitingApproval()).isTrue();
+        assertThat(result.approvalId()).isEqualTo(99L);
+        assertThat(result.toolCallCount()).isEqualTo(1);
+        assertThat(result.tokenUsage()).isEqualTo(new LlmTokenUsage(12, 4, 16));
         verify(agentLlmGateway, times(1)).generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig));
     }
 
@@ -266,10 +358,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "删除书籍"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("删除书籍"));
 
         AgentTaskContext persistedContext = AgentTaskContext.runningOf(901L, 11L, "RUNNING", 3001L, "片段");
         persistedContext.setTurnId(50011L);
@@ -321,10 +410,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "先补充上下文再删除"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("先补充上下文再删除"));
 
         when(toolDefinitionSource.listLlmSchemas())
                 .thenReturn(List.of(new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")));
@@ -367,10 +453,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "请先生成第三章正文初稿"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请先生成第三章正文初稿"));
         AgentLlmToolSchema draftGenerationSchema = new AgentLlmToolSchema(
                 "draft_generation",
                 "生成正文、改写正文或套用修订",
@@ -420,11 +503,11 @@ class AgentToolLoopRunnerTest {
         AgentLlmTurnRequest secondRequest = requestCaptor.getAllValues().get(1);
 
         assertThat(secondRequest.messages()).hasSize(3);
-        assertThat(secondRequest.messages().get(2))
-                .containsEntry("role", "tool")
-                .containsEntry("tool_call_id", "call_draft_1")
-                .containsEntry("content", draftResultJson);
-        assertThat(String.valueOf(secondRequest.messages().get(2).get("content")))
+        assertThat(secondRequest.messages().get(2).role())
+                .isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.TOOL);
+        assertThat(secondRequest.messages().get(2).toolCallId()).isEqualTo("call_draft_1");
+        assertThat(secondRequest.messages().get(2).content()).isEqualTo(draftResultJson);
+        assertThat(secondRequest.messages().get(2).content())
                 .contains("\"draftText\":\"第三章初稿正文\"")
                 .contains("\"operation\":\"generate\"")
                 .contains("\"preservedConstraints\":[\"保留第一人称\",\"保留女主冷静口吻\"]")
@@ -437,10 +520,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "请先整理第三章修订待办"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请先整理第三章修订待办"));
         AgentLlmToolSchema todoPlannerSchema = new AgentLlmToolSchema(
                 "todo_planner",
                 "将用户请求、质量问题与后续规划整理为结构化 Todo 规划建议",
@@ -490,11 +570,11 @@ class AgentToolLoopRunnerTest {
         AgentLlmTurnRequest secondRequest = requestCaptor.getAllValues().get(1);
 
         assertThat(secondRequest.messages()).hasSize(3);
-        assertThat(secondRequest.messages().get(2))
-                .containsEntry("role", "tool")
-                .containsEntry("tool_call_id", "call_todo_1")
-                .containsEntry("content", todoPlanJson);
-        assertThat(String.valueOf(secondRequest.messages().get(2).get("content")))
+        assertThat(secondRequest.messages().get(2).role())
+                .isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.TOOL);
+        assertThat(secondRequest.messages().get(2).toolCallId()).isEqualTo("call_todo_1");
+        assertThat(secondRequest.messages().get(2).content()).isEqualTo(todoPlanJson);
+        assertThat(secondRequest.messages().get(2).content())
                 .contains("\"planTitle\":\"第三章修订待办\"")
                 .contains("\"recommendedNextAction\":\"先修复 P0 问题\"")
                 .contains("\"sourceType\":\"QUALITY_REVIEW\"")
@@ -541,10 +621,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "请依次执行四个工具"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请依次执行四个工具"));
 
         when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of(
                 new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")
@@ -578,10 +655,7 @@ class AgentToolLoopRunnerTest {
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
-        List<Map<String, Object>> initialMessages = List.of(Map.of(
-                "role", "user",
-                "content", "不停调用工具"
-        ));
+        List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("不停调用工具"));
 
         when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of(
                 new AgentLlmToolSchema("context_enhancer", "补充上下文", "{\"type\":\"object\"}")

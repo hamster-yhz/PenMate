@@ -274,6 +274,15 @@ public class AgentRepositoryImpl implements AgentRepository {
     }
 
     @Override
+    public int incrementSessionTokenUsage(Long projectId,
+                                          Long sessionId,
+                                          Integer promptTokens,
+                                          Integer completionTokens,
+                                          Integer totalTokens) {
+        return agentSessionMapper.incrementSessionTokenUsage(projectId, sessionId, promptTokens, completionTokens, totalTokens);
+    }
+
+    @Override
     public int updateGenerationTaskSnapshots(Long projectId,
                                              Long taskId,
                                              String taskProfileJson,

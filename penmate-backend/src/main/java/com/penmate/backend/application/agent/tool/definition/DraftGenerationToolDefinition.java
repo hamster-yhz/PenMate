@@ -17,7 +17,8 @@ public class DraftGenerationToolDefinition implements AgentToolDefinition {
               "properties": {
                 "operation": {
                   "type": "string",
-                  "enum": ["generate", "rewrite", "revise"]
+                  "enum": ["generate", "rewrite", "revise"],
+                  "description": "generate 需要 prompt；rewrite/revise 需要 sourceText 和 instruction"
                 },
                 "prompt": {
                   "type": "string"
@@ -41,78 +42,31 @@ public class DraftGenerationToolDefinition implements AgentToolDefinition {
               "required": ["operation"],
               "oneOf": [
                 {
-                  "type": "object",
                   "properties": {
                     "operation": {
                       "const": "generate"
-                    },
-                    "prompt": {
-                      "type": "string"
-                    },
-                    "preservedConstraints": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "sourceSummary": {
-                      "type": "string"
                     }
                   },
-                  "required": ["operation", "prompt"],
-                  "additionalProperties": false
+                  "required": ["operation", "prompt"]
                 },
                 {
-                  "type": "object",
                   "properties": {
                     "operation": {
                       "const": "rewrite"
-                    },
-                    "sourceText": {
-                      "type": "string"
-                    },
-                    "instruction": {
-                      "type": "string"
-                    },
-                    "preservedConstraints": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "sourceSummary": {
-                      "type": "string"
                     }
                   },
-                  "required": ["operation", "sourceText", "instruction"],
-                  "additionalProperties": false
+                  "required": ["operation", "sourceText", "instruction"]
                 },
                 {
-                  "type": "object",
                   "properties": {
                     "operation": {
                       "const": "revise"
-                    },
-                    "sourceText": {
-                      "type": "string"
-                    },
-                    "instruction": {
-                      "type": "string"
-                    },
-                    "preservedConstraints": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "sourceSummary": {
-                      "type": "string"
                     }
                   },
-                  "required": ["operation", "sourceText", "instruction"],
-                  "additionalProperties": false
+                  "required": ["operation", "sourceText", "instruction"]
                 }
-              ]
+              ],
+              "additionalProperties": false
             }
             """;
 

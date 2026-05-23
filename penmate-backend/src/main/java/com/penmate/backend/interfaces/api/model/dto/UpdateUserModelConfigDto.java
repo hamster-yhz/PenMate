@@ -2,6 +2,8 @@ package com.penmate.backend.interfaces.api.model.dto;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
 /**
@@ -21,6 +23,12 @@ public class UpdateUserModelConfigDto {
     private String modelCategory;
 
     private String apiKey;
+
+    @PositiveOrZero
+    private Integer contextWindowTurns;
+
+    @Positive
+    private Integer maxContextTokens;
 
     private String status;
 }

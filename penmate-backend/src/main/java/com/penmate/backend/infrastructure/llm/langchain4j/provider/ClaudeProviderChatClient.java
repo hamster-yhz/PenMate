@@ -7,6 +7,8 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolParameters;
@@ -89,53 +91,45 @@ public class ClaudeProviderChatClient implements ProviderChatClient {
         return "claude".equalsIgnoreCase(providerCode);
     }
 
-    private List<ChatMessage> toChatMessages(List<Map<String, Object>> rawMessages) {
+    private List<ChatMessage> toChatMessages(List<AgentLlmMessage> rawMessages) {
         List<ChatMessage> messages = new ArrayList<>();
         Map<String, String> toolNamesById = new LinkedHashMap<>();
-        for (Map<String, Object> rawMessage : rawMessages) {
-            if (rawMessage == null) {
+        for (AgentLlmMessage rawMessage : rawMessages) {
+            if (rawMessage == null || rawMessage.role() == null) {
                 continue;
             }
-            String role = stringValue(rawMessage.get("role"));
-            if ("system".equalsIgnoreCase(role)) {
-                messages.add(SystemMessage.from(stringValue(rawMessage.get("content"))));
-                continue;
-            }
-            if ("user".equalsIgnoreCase(role)) {
-                messages.add(UserMessage.from(stringValue(rawMessage.get("content"))));
-                continue;
-            }
-            if ("assistant".equalsIgnoreCase(role)) {
-                List<ToolExecutionRequest> requests = toToolExecutionRequests(rawMessage.get("tool_calls"));
-                requests.forEach(request -> toolNamesById.put(request.id(), request.name()));
-                messages.add(AiMessage.from(stringValue(rawMessage.get("content")), requests));
-                continue;
-            }
-            if ("tool".equalsIgnoreCase(role)) {
-                String toolCallId = stringValue(rawMessage.get("tool_call_id"));
-                String toolName = toolNamesById.get(toolCallId);
-                if (toolName == null || toolName.isBlank()) {
-                    throw BusinessException.of("Claude tool result message is missing matching assistant tool call");
+            switch (rawMessage.role()) {
+                case SYSTEM -> messages.add(SystemMessage.from(rawMessage.content()));
+                case USER -> messages.add(UserMessage.from(rawMessage.content()));
+                case ASSISTANT -> {
+                    List<ToolExecutionRequest> requests = toToolExecutionRequests(rawMessage.toolCalls());
+                    requests.forEach(request -> toolNamesById.put(request.id(), request.name()));
+                    messages.add(AiMessage.from(rawMessage.content(), requests));
                 }
-                messages.add(ToolExecutionResultMessage.from(
-                        toolCallId,
-                        toolName,
-                        stringValue(rawMessage.get("content"))
-                ));
+                case TOOL -> {
+                    String toolCallId = rawMessage.toolCallId();
+                    String toolName = toolNamesById.get(toolCallId);
+                    if (toolName == null || toolName.isBlank()) {
+                        throw BusinessException.of("Claude tool result message is missing matching assistant tool call");
+                    }
+                    messages.add(ToolExecutionResultMessage.from(
+                            toolCallId,
+                            toolName,
+                            rawMessage.content()
+                    ));
+                }
             }
         }
         return messages;
     }
 
-    private List<ToolExecutionRequest> toToolExecutionRequests(Object toolCallsValue) {
+    private List<ToolExecutionRequest> toToolExecutionRequests(List<AgentLlmToolCallPayload> toolCalls) {
         List<ToolExecutionRequest> requests = new ArrayList<>();
-        for (Object item : toList(toolCallsValue)) {
-            Map<String, Object> payload = mapValue(item);
-            Map<String, Object> function = mapValue(payload.get("function"));
+        for (AgentLlmToolCallPayload payload : toolCalls == null ? List.<AgentLlmToolCallPayload>of() : toolCalls) {
             requests.add(ToolExecutionRequest.builder()
-                    .id(stringValue(payload.get("id")))
-                    .name(stringValue(function.get("name")))
-                    .arguments(stringValue(function.get("arguments")))
+                    .id(payload.id())
+                    .name(payload.functionName())
+                    .arguments(payload.argumentsJson())
                     .build());
         }
         return requests;

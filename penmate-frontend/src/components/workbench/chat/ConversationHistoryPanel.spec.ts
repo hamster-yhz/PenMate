@@ -80,4 +80,19 @@ describe('ConversationHistoryPanel', () => {
 
     expect(wrapper.emitted('select-conversation')).toEqual([['81']])
   })
+
+  it('renders_back_button_and_emits_close_for_full_panel_exit', async () => {
+    const wrapper = await mountConversationHistoryPanel({
+      visible: true,
+      conversations: [
+        { conversationId: '81', title: '第一轮', updatedAt: '2026-04-26 20:00:00' },
+      ],
+    })
+
+    expect(wrapper.get('[data-testid="conversation-back"]').text()).toContain('返回')
+
+    await wrapper.get('[data-testid="conversation-back"]').trigger('click')
+
+    expect(wrapper.emitted('close')).toEqual([[]])
+  })
 })

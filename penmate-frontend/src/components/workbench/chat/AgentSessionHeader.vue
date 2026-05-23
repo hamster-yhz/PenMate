@@ -22,8 +22,6 @@ defineEmits<{
 
 <template>
   <div class="agent-header">
-    <span class="agent-icon" aria-hidden="true">🤖</span>
-    <span class="agent-title" data-testid="agent-title">AI会话</span>
     <button
       type="button"
       class="agent-history-btn"
@@ -73,29 +71,12 @@ defineEmits<{
 <style scoped lang="less">
 .agent-header {
   display: grid;
-  grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 32, 0.68));
-}
-
-.agent-icon {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(201, 169, 110, 0.1);
-  box-shadow: inset 0 0 12px rgba(201, 169, 110, 0.08);
-}
-
-.agent-title {
-  font-family: var(--font-heading);
-  color: var(--amber-gold);
-  letter-spacing: 0.08em;
 }
 
 .agent-history-btn,
@@ -189,7 +170,7 @@ defineEmits<{
 
 @media (max-width: 1280px) {
   .agent-header {
-    grid-template-columns: auto auto auto 1fr;
+    grid-template-columns: auto auto 1fr;
   }
 
   .agent-model,

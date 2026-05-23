@@ -16,7 +16,7 @@ import java.util.Map;
 
 /**
  * Agent 任务运行时统计更新器。
- * <p>负责在生成完成后回写近似 token 使用量与估算成本，供任务运行时信息展示与后续审计使用。</p>
+ * <p>负责在生成完成后回写估算成本与结构化快照，不覆盖 tool loop 已持久化的真实 token 使用量。</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -31,10 +31,9 @@ public class AgentTaskRuntimeUpdater {
                                         String promptSnapshot,
                                         String generatedText,
                                         String traceId) {
-        String tokenUsageJson = "{\"inputTokens\":" + safeLength(promptSnapshot) + ",\"outputTokens\":" + safeLength(generatedText) + "}";
         String costJson = "{\"currency\":\"USD\",\"estimated\":"
                 + String.format(Locale.ROOT, "%.6f", estimateCost(generatedText)) + "}";
-        int affected = agentRepository.updateGenerationTaskRuntime(projectId, taskId, tokenUsageJson, costJson, traceId);
+        int affected = agentRepository.updateGenerationTaskRuntime(projectId, taskId, null, costJson, traceId);
         if (affected != 1) {
             throw new IllegalStateException("Failed to update generation task runtime");
         }

@@ -3,8 +3,11 @@ package com.penmate.backend.application.agent.orchestration.preflight;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.orchestration.profile.TaskIntentTag;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
 import com.penmate.backend.application.agent.prompt.SystemPromptBundle;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
@@ -12,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +27,9 @@ import java.util.Objects;
 @Slf4j
 @Component
 public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinator {
+
+    private static final String PREFLIGHT_DECISION_TOOL_CODE = "submit_preflight_decision";
+    private static final String PREFLIGHT_DECISION_TOOL_DESCRIPTION = "Return the preflight decision as structured Json only.";
 
     private final AgentLlmGateway agentLlmGateway;
     private final SystemPromptProvider systemPromptProvider;
@@ -48,13 +56,13 @@ public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinat
         SystemPromptBundle promptBundle = systemPromptProvider.loadBundle("preflight", "default");
         AgentLlmTurnResponse response = agentLlmGateway.generateTurn(new AgentLlmTurnRequest(
                 List.of(
-                        Map.of("role", "system", "content", promptBundle.assembledPrompt()),
-                        Map.of("role", "user", "content", buildUserMessage(request))
+                        AgentLlmMessage.system(promptBundle.assembledPrompt()),
+                        AgentLlmMessage.user(buildUserMessage(request))
                 ),
-                List.of(),
-                "auto"
+                List.of(buildPreflightDecisionToolSchema()),
+                "required"
         ), request.executionConfig());
-        String decisionJson = response == null ? null : response.assistantText();
+        String decisionJson = extractDecisionJson(response);
         AgentPreflightDecision decision = parseDecision(decisionJson);
         log.info("Agent 前置判定完成: behaviorType={}, executionProfile={}, includeStyleContext={}, includeRagContext={}, includeStoryBibleContext={}, storyBibleFlag={}, ragFlag={}, approvalFlag={}",
                 decision.behaviorType(),
@@ -77,6 +85,88 @@ public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinat
                 + structuredPromptBlockFormatter.wrapBlock("user_request", request.userMessage());
     }
 
+    private String extractDecisionJson(AgentLlmTurnResponse response) {
+        if (response == null) {
+            return null;
+        }
+        if (response.requestsToolCalls()) {
+            return response.toolCalls().stream()
+                    .filter(toolCall -> PREFLIGHT_DECISION_TOOL_CODE.equals(toolCall.toolCode()))
+                    .map(toolCall -> requiredText(toolCall.argumentsJson(), PREFLIGHT_DECISION_TOOL_CODE + ".argumentsJson"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Structured preflight decision tool call is required: " + PREFLIGHT_DECISION_TOOL_CODE
+                    ));
+        }
+        return response.assistantText();
+    }
+
+    private AgentLlmToolSchema buildPreflightDecisionToolSchema() {
+        try {
+            LinkedHashMap<String, Object> schema = new LinkedHashMap<>();
+            schema.put("type", "object");
+
+            LinkedHashMap<String, Object> properties = new LinkedHashMap<>();
+            properties.put("behaviorType", Map.of(
+                    "type", "string",
+                    "enum", Arrays.stream(AgentBehaviorType.values()).map(Enum::name).toList()
+            ));
+            properties.put("executionPromptProfile", Map.of("type", "string"));
+            properties.put("includeStyleContext", Map.of("type", "boolean"));
+            properties.put("includeRagContext", Map.of("type", "boolean"));
+            properties.put("includeStoryBibleContext", Map.of("type", "boolean"));
+            properties.put("intentTags", Map.of(
+                    "type", "array",
+                    "items", Map.of(
+                            "type", "string",
+                            "enum", Arrays.stream(TaskIntentTag.values()).map(Enum::name).toList()
+                    )
+            ));
+            properties.put("hardConstraints", Map.of(
+                    "type", "array",
+                    "items", Map.of("type", "string")
+            ));
+            properties.put("enabledSkills", Map.of(
+                    "type", "array",
+                    "items", Map.of("type", "string")
+            ));
+            properties.put("enabledTools", Map.of(
+                    "type", "array",
+                    "items", Map.of("type", "string")
+            ));
+            properties.put("outputExpectation", Map.of("type", List.of("string", "null")));
+            properties.put("needsApproval", Map.of("type", "boolean"));
+            properties.put("needsStoryBibleUpdate", Map.of("type", "boolean"));
+            properties.put("needsClarification", Map.of("type", "boolean"));
+            properties.put("reasoningSummary", Map.of("type", "string"));
+            schema.put("properties", properties);
+            schema.put("required", List.of(
+                    "behaviorType",
+                    "executionPromptProfile",
+                    "includeStyleContext",
+                    "includeRagContext",
+                    "includeStoryBibleContext",
+                    "intentTags",
+                    "hardConstraints",
+                    "enabledSkills",
+                    "enabledTools",
+                    "outputExpectation",
+                    "needsApproval",
+                    "needsStoryBibleUpdate",
+                    "needsClarification",
+                    "reasoningSummary"
+            ));
+            schema.put("additionalProperties", false);
+            return new AgentLlmToolSchema(
+                    PREFLIGHT_DECISION_TOOL_CODE,
+                    PREFLIGHT_DECISION_TOOL_DESCRIPTION,
+                    objectMapper.writeValueAsString(schema)
+            );
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to build preflight decision schema", ex);
+        }
+    }
+
     private AgentPreflightDecision parseDecision(String decisionJson) {
         try {
             JsonNode root = objectMapper.readTree(requiredText(decisionJson, "decisionJson"));
@@ -88,14 +178,14 @@ public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinat
             boolean includeStyleContext = requiredBooleanField(root, "includeStyleContext");
             boolean includeRagContext = requiredBooleanField(root, "includeRagContext");
             boolean includeStoryBibleContext = requiredBooleanField(root, "includeStoryBibleContext");
-            List<String> intentTags = optionalStringList(root, "intentTags");
-            List<String> hardConstraints = optionalStringList(root, "hardConstraints");
-            List<String> enabledSkills = optionalStringList(root, "enabledSkills");
-            List<String> enabledTools = optionalStringList(root, "enabledTools");
-            String outputExpectation = optionalField(root, "outputExpectation");
-            boolean needsApproval = optionalBooleanField(root, "needsApproval");
-            boolean needsStoryBibleUpdate = optionalBooleanField(root, "needsStoryBibleUpdate");
-            boolean needsClarification = optionalBooleanField(root, "needsClarification");
+            List<String> intentTags = normalizeIntentTags(requiredStringList(root, "intentTags"));
+            List<String> hardConstraints = requiredStringList(root, "hardConstraints");
+            List<String> enabledSkills = requiredStringList(root, "enabledSkills");
+            List<String> enabledTools = requiredStringList(root, "enabledTools");
+            String outputExpectation = requiredNullableStringField(root, "outputExpectation");
+            boolean needsApproval = requiredBooleanField(root, "needsApproval");
+            boolean needsStoryBibleUpdate = requiredBooleanField(root, "needsStoryBibleUpdate");
+            boolean needsClarification = requiredBooleanField(root, "needsClarification");
             if (behaviorType == AgentBehaviorType.STORY_BIBLE_QUERY_CANDIDATE) {
                 includeStoryBibleContext = true;
             }
@@ -151,10 +241,10 @@ public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinat
         }
     }
 
-    private List<String> optionalStringList(JsonNode root, String fieldName) {
+    private List<String> requiredStringList(JsonNode root, String fieldName) {
         JsonNode field = root == null ? null : root.get(fieldName);
         if (field == null || field.isNull()) {
-            return List.of();
+            throw new IllegalArgumentException(fieldName + " is required");
         }
         if (!field.isArray()) {
             throw new IllegalArgumentException(fieldName + " must be array");
@@ -169,26 +259,48 @@ public class DefaultAgentPreflightCoordinator implements AgentPreflightCoordinat
         return List.copyOf(values);
     }
 
-    private String optionalField(JsonNode root, String fieldName) {
-        JsonNode field = root == null ? null : root.get(fieldName);
-        if (field == null || field.isNull()) {
-            return null;
+    private List<String> normalizeIntentTags(List<String> rawIntentTags) {
+        if (rawIntentTags == null || rawIntentTags.isEmpty()) {
+            return List.of();
         }
-        if (field.asText().isBlank()) {
-            throw new IllegalArgumentException(fieldName + " must not be blank");
+        List<String> normalized = new ArrayList<>();
+        for (String rawIntentTag : rawIntentTags) {
+            String candidate = rawIntentTag == null ? null : rawIntentTag.trim().toUpperCase();
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            if (isSupportedIntentTag(candidate)) {
+                if (!normalized.contains(candidate)) {
+                    normalized.add(candidate);
+                }
+                continue;
+            }
+            log.warn("Agent preflight returned unsupported intent tag, ignored: {}", rawIntentTag);
         }
-        return field.asText().trim();
+        return List.copyOf(normalized);
     }
 
-    private boolean optionalBooleanField(JsonNode root, String fieldName) {
-        JsonNode field = root == null ? null : root.get(fieldName);
-        if (field == null || field.isNull()) {
+    private boolean isSupportedIntentTag(String candidate) {
+        try {
+            TaskIntentTag.valueOf(candidate);
+            return true;
+        } catch (IllegalArgumentException ex) {
             return false;
         }
-        if (!field.isBoolean()) {
-            throw new IllegalArgumentException(fieldName + " must be boolean");
+    }
+
+    private String requiredNullableStringField(JsonNode root, String fieldName) {
+        JsonNode field = root == null ? null : root.get(fieldName);
+        if (field == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
         }
-        return field.booleanValue();
+        if (field.isNull()) {
+            return null;
+        }
+        if (!field.isTextual() || field.asText().isBlank()) {
+            throw new IllegalArgumentException(fieldName + " must be string or null");
+        }
+        return field.asText().trim();
     }
 
     private boolean requiredBooleanField(JsonNode root, String fieldName) {

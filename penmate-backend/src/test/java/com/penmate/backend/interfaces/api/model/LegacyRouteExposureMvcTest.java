@@ -3,6 +3,7 @@ package com.penmate.backend.interfaces.api.model;
 import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
+import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.auth.AuthApplicationService;
@@ -86,6 +87,9 @@ class LegacyRouteExposureMvcTest {
 
     @MockBean
     private AgentTurnAppService agentTurnAppService;
+
+    @MockBean
+    private AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
 
     @MockBean
     private GenerationStreamService generationStreamService;

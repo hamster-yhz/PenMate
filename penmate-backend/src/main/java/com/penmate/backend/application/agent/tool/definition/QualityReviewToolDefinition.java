@@ -26,14 +26,14 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                 "draftText": {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": ".*\\S.*"
+                  "pattern": ".*\\\\S.*"
                 },
                 "userRequirements": {
                   "type": "array",
                   "minItems": 1,
                   "items": {
                     "type": "string",
-                    "pattern": ".*\\S.*"
+                    "pattern": ".*\\\\S.*"
                   }
                 },
                 "personaProfile": {
@@ -41,7 +41,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                   "minItems": 1,
                   "items": {
                     "type": "string",
-                    "pattern": ".*\\S.*"
+                    "pattern": ".*\\\\S.*"
                   }
                 },
                 "storyOutline": {
@@ -49,7 +49,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                   "minItems": 1,
                   "items": {
                     "type": "string",
-                    "pattern": ".*\\S.*"
+                    "pattern": ".*\\\\S.*"
                   }
                 },
                 "timelineConstraints": {
@@ -57,7 +57,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                   "minItems": 1,
                   "items": {
                     "type": "string",
-                    "pattern": ".*\\S.*"
+                    "pattern": ".*\\\\S.*"
                   }
                 },
                 "worldRules": {
@@ -65,7 +65,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                   "minItems": 1,
                   "items": {
                     "type": "string",
-                    "pattern": ".*\\S.*"
+                    "pattern": ".*\\\\S.*"
                   }
                 },
                 "characterKnowledgeBoundaries": {
@@ -73,7 +73,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                   "minItems": 1,
                   "items": {
                     "type": "string",
-                    "pattern": ".*\\S.*"
+                    "pattern": ".*\\\\S.*"
                   }
                 },
                 "currentRevisionRound": {

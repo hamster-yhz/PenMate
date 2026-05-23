@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ProviderChatClientTurnContractTest {
 
     private static final AgentLlmTurnRequest TURN_REQUEST = new AgentLlmTurnRequest(
-            List.of(Map.of("role", "user", "content", "hello")),
+            List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("hello")),
             List.of(),
             "auto"
     );
@@ -24,7 +24,7 @@ class ProviderChatClientTurnContractTest {
 
         assertThatThrownBy(() -> client.generateTurn(
                 TURN_REQUEST,
-                new AgentLlmExecutionConfig(1L, "gemini", "https://example.com", "sk", "model", "USER_KEY")
+                new AgentLlmExecutionConfig(1L, "gemini", "https://example.com", "sk", "model", "USER_KEY", 6)
         ))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("LLM provider does not support structured turn generation");

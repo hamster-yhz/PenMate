@@ -19,9 +19,12 @@ const AgentSessionHeaderStub = defineComponent({
 
 const ConversationHistoryPanelStub = defineComponent({
   name: 'ConversationHistoryPanel',
-  emits: ['select-conversation'],
+  emits: ['select-conversation', 'close'],
   setup(_, { emit }) {
-    return () => h('button', { 'data-testid': 'select-conversation', onClick: () => emit('select-conversation', '77') })
+    return () => h('div', [
+      h('button', { 'data-testid': 'select-conversation', onClick: () => emit('select-conversation', '77') }),
+      h('button', { 'data-testid': 'close-history', onClick: () => emit('close') }),
+    ])
   },
 })
 
@@ -52,6 +55,7 @@ const ChatComposerStub = defineComponent({
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const readWorkbenchRightPanelSource = () => readFileSync(resolve(currentDir, 'WorkbenchRightPanel.vue'), 'utf-8')
+const readConversationHistoryPanelSource = () => readFileSync(resolve(currentDir, './chat/ConversationHistoryPanel.vue'), 'utf-8')
 
 describe('WorkbenchRightPanel', () => {
   it('forwards_chat_shell_events_and_accepts_nullable_chat_ref', async () => {
@@ -90,6 +94,7 @@ describe('WorkbenchRightPanel', () => {
     await wrapper.get('[data-testid="toggle-history"]').trigger('click')
     await wrapper.get('[data-testid="create-session"]').trigger('click')
     await wrapper.get('[data-testid="select-conversation"]').trigger('click')
+    await wrapper.get('[data-testid="close-history"]').trigger('click')
     await wrapper.get('[data-testid="merge-to-editor"]').trigger('click')
     await wrapper.get('[data-testid="approve-message"]').trigger('click')
     await wrapper.get('[data-testid="chat-input-update"]').trigger('click')
@@ -97,7 +102,7 @@ describe('WorkbenchRightPanel', () => {
     await wrapper.get('[data-testid="open-model-settings"]').trigger('click')
 
     expect(wrapper.emitted('toggle-collapse')).toEqual([[]])
-    expect(wrapper.emitted('toggle-history')).toEqual([[]])
+    expect(wrapper.emitted('toggle-history')).toEqual([[], []])
     expect(wrapper.emitted('create-session')).toEqual([[]])
     expect(wrapper.emitted('select-conversation')).toEqual([['77']])
     expect(wrapper.emitted('merge-to-editor')).toEqual([[{ messageId: 9 }]])
@@ -109,8 +114,10 @@ describe('WorkbenchRightPanel', () => {
 
   it('keeps the right column scroll confined to the internal chat message region', () => {
     const source = readWorkbenchRightPanelSource()
+    const historySource = readConversationHistoryPanelSource()
 
     expect(source).toMatch(/\.panel-content\s*\{[\s\S]*?overflow:\s*hidden;/)
     expect(source).toMatch(/\.chat-messages\s*\{[\s\S]*?flex:\s*1;[\s\S]*?overflow-y:\s*auto;/)
+    expect(historySource).toMatch(/\.conversation-panel\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?inset:\s*0;/)
   })
 })

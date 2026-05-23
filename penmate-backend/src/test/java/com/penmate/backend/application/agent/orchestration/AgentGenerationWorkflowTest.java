@@ -119,6 +119,9 @@ class AgentGenerationWorkflowTest {
     private SessionStyleBindingAppService sessionStyleBindingAppService;
 
     @Mock
+    private ConversationWindowBuilder conversationWindowBuilder;
+
+    @Mock
     private IamGateway iamGateway;
 
     @InjectMocks
@@ -204,12 +207,12 @@ class AgentGenerationWorkflowTest {
 
         agentGenerationWorkflow.run(1L, 10L, "trace-real-chain");
 
-        ArgumentCaptor<List<Map<String, Object>>> messagesCaptor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<com.penmate.backend.domain.agent.model.AgentLlmMessage>> messagesCaptor = ArgumentCaptor.forClass(List.class);
         verify(agentToolLoopRunner).execute(eq(1L), eq(10L), eq(9L), eq(0L), eq("trace-real-chain"), messagesCaptor.capture(), any());
         assertThat(messagesCaptor.getValue()).hasSize(2);
-        assertThat(messagesCaptor.getValue().get(0)).containsEntry("role", "system");
-        assertThat(messagesCaptor.getValue().get(0).get("content").toString()).contains("你是执行代理");
-        assertThat(messagesCaptor.getValue().get(1).get("content").toString())
+        assertThat(messagesCaptor.getValue().get(0).role()).isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.SYSTEM);
+        assertThat(messagesCaptor.getValue().get(0).content()).contains("你是执行代理");
+        assertThat(messagesCaptor.getValue().get(1).content())
                 .contains("<context type=\"style\">\n{\"styleId\":81,\"tone\":\"克制\"}\n</context>")
                 .contains("<context type=\"story_bible\">\n角色年龄：17（canon）\n不得违背既有设定\n</context>")
                 .contains("<user_request>\n核对设定后继续写作\n</user_request>");
@@ -249,8 +252,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("请先分析后等待审批")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("请先分析后等待审批")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("请先分析后等待审批"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(15L), eq(9L), eq(0L), eq("trace-structured-runtime"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(91L, 1, ""));
         when(pendingToolInvocationRepository.findByApprovalId(91L)).thenReturn(new PendingToolInvocationSnapshot(
@@ -332,8 +335,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("world-build");
         when(promptComposer.compose(any(), any(), eq("新增世界设定：帝国地理")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("新增世界设定：帝国地理")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("新增世界设定：帝国地理"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(11L), eq(9L), eq(0L), eq("trace-1"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
 
@@ -373,8 +376,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("world-build");
         when(promptComposer.compose(any(), any(), eq("新增世界设定：边境地图")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("新增世界设定：边境地图")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("新增世界设定：边境地图"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(21L), eq(9L), eq(0L), eq("trace-wait"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(88L, 1, ""));
 
@@ -420,8 +423,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("继续写主角穿越雪原后的遭遇")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("继续写主角穿越雪原后的遭遇")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("继续写主角穿越雪原后的遭遇"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(30L), eq(9L), eq(0L), eq("trace-executing"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("雪原尽头亮起了孤灯", 0, ""));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any(), any(), any(), any());
@@ -465,8 +468,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("直接总结剧情冲突")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("直接总结剧情冲突")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("直接总结剧情冲突"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(31L), eq(9L), eq(0L), eq("trace-direct"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("这是直接完成的答复", 0, ""));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any(), any(), any(), any());
@@ -495,6 +498,73 @@ class AgentGenerationWorkflowTest {
         completionOrder.verify(agentResultPublisher).publishGenerationTokens(eq(1L), eq(31L), eq("这是直接完成的答复"), eq("trace-direct"));
     }
 
+    @Test
+    void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_PERSIST_LOOP_TOKEN_USAGE_AND_ACCUMULATE_SESSION_TOKEN_USAGE_ON_DIRECT_COMPLETION() throws Exception {
+        AgentGenerationTask task = new AgentGenerationTask();
+        task.setId(32L);
+        task.setTaskId(32L);
+        task.setProjectId(1L);
+        task.setUserId(1001L);
+        task.setModelConfigId(66L);
+        task.setConversationId(9L);
+        task.setTaskType("WRITE");
+        task.setStatus("pending");
+        task.setPromptSnapshot("完成时需要回写 token 使用量");
+
+        TrackingAgentRepository trackingRepository = new TrackingAgentRepository(task);
+        AgentTaskResultRecorder realResultRecorder = new AgentTaskResultRecorder(
+                trackingRepository,
+                new com.penmate.backend.domain.shared.service.BusinessIdGenerator() {
+                    private long currentId = 970320L;
+
+                    @Override
+                    public Long nextId() {
+                        currentId += 1;
+                        return currentId;
+                    }
+                }
+        );
+        AgentTaskRuntimeUpdater realRuntimeUpdater = new AgentTaskRuntimeUpdater(trackingRepository);
+        setField(agentGenerationWorkflow, "agentRepository", trackingRepository);
+        setField(agentGenerationWorkflow, "agentTaskResultRecorder", realResultRecorder);
+        setField(agentGenerationWorkflow, "agentTaskRuntimeUpdater", realRuntimeUpdater);
+
+        AgentPreflightDecision decision = new AgentPreflightDecision(
+                AgentBehaviorType.WRITE,
+                "default",
+                false,
+                false,
+                false,
+                "直接执行并回写 token",
+                "{\"profile\":\"default\"}"
+        );
+        when(agentPreflightCoordinator.coordinate(any())).thenReturn(decision);
+        when(agentContextRoutingFacade.route(any())).thenReturn(routingResult((String) null));
+        PromptPlan promptPlan = promptPlan("default");
+        when(promptComposer.compose(any(), any(), eq("完成时需要回写 token 使用量")))
+                .thenReturn(promptPlan);
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("完成时需要回写 token 使用量"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
+        when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-token-usage"), any(), any()))
+                .thenReturn(AgentToolLoopIterationResult.completed(
+                        "这是带 token 用量的完成答复",
+                        0,
+                        "",
+                        new com.penmate.backend.application.agent.llm.LlmTokenUsage(11, 7, 18)
+                ));
+        doAnswer(invocation -> null).when(agentResultPublisher).publishGenerationTokens(any(), any(), any(), any());
+
+        agentGenerationWorkflow.run(1L, 32L, "trace-token-usage");
+
+        assertThat(trackingRepository.insertedTaskResult).isNotNull();
+        assertThat(trackingRepository.updatedTokenUsageJson)
+                .isEqualTo("{\"promptTokens\":11,\"completionTokens\":7,\"totalTokens\":18}");
+        assertThat(trackingRepository.accumulatedPromptTokens).isEqualTo(11);
+        assertThat(trackingRepository.accumulatedCompletionTokens).isEqualTo(7);
+        assertThat(trackingRepository.accumulatedTotalTokens).isEqualTo(18);
+        verify(taskRuntimeStatusPublisher).publishDone(eq(1L), any(RuntimeStatusView.class));
+    }
+ 
     @Test
     void UT_APP_AGENT_GENERATION_WORKFLOW_SHOULD_SEED_TODO_PLAN_IN_RUNTIME_STATUS_AND_SNAPSHOT_BEFORE_TOOL_LOOP() {
         AgentGenerationTask task = new AgentGenerationTask();
@@ -536,8 +606,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("先规划本章修订待办再执行")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("先规划本章修订待办再执行")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("先规划本章修订待办再执行"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(40L), eq(9L), eq(0L), eq("trace-seeded-todo-plan"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(90L, 1, ""));
 
@@ -601,8 +671,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("把质量问题整理成待办")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("把质量问题整理成待办")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("把质量问题整理成待办"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         String todoPlanJson = "{\"planTitle\":\"第三章修订待办\",\"planSummary\":\"先修复逻辑漏洞\",\"recommendedNextAction\":\"创建第一项\",\"items\":[{\"title\":\"修复密令来源\",\"description\":\"补充侍从转述桥段\",\"priority\":\"P0\",\"sourceType\":\"QUALITY_REVIEW\",\"recommendedStatus\":\"TODO\",\"suggestedAutoCreate\":true,\"rationale\":\"避免剧情漏洞\",\"acceptanceCriteria\":[\"密令来源明确\"]}]}";
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-todo-plan"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("待办规划完成", 1, todoPlanJson));
@@ -665,8 +735,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("整理这一章新增设定")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("整理这一章新增设定")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("整理这一章新增设定"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(42L), eq(9L), eq(0L), eq("trace-story-bible-proposal"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("设定建议已整理", 0, ""));
         when(storyBibleUpdateProposalService.proposeUpdatesFromChapter(eq(1L), eq(301L), eq("设定建议已整理")))
@@ -727,8 +797,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("续写并检查质量")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("续写并检查质量")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("续写并检查质量"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         String qualityReportJson = "{\"score\":61,\"passes\":[\"主冲突已出现\"],\"issues\":[{\"dimension\":\"PLOT_LOGIC\",\"severity\":\"HIGH\",\"summary\":\"主角提前知道密令\",\"evidence\":\"第二段直接复述密令\",\"suggestion\":\"改为侍从转述\"}],\"needsRevision\":true,\"riskFlags\":[\"PLOT_HOLE\"],\"revisionSuggestions\":[{\"priority\":\"P0\",\"target\":\"剧情逻辑\",\"instruction\":\"修复密令来源\",\"rationale\":\"避免剧情漏洞\"}],\"currentRevisionRound\":0,\"maxRevisionRounds\":1,\"revisionAllowed\":true,\"reviewSummary\":\"存在剧情逻辑问题，需要修订。\"}";
         when(agentToolLoopRunner.execute(eq(1L), eq(43L), eq(9L), eq(0L), eq("trace-quality-revise"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("初稿正文", 1, qualityReportJson));
@@ -782,8 +852,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("续写并检查质量但不得超限修订")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("续写并检查质量但不得超限修订")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("续写并检查质量但不得超限修订"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         String qualityReportJson = "{\"score\":61,\"passes\":[\"主冲突已出现\"],\"issues\":[{\"dimension\":\"PLOT_LOGIC\",\"severity\":\"HIGH\",\"summary\":\"主角提前知道密令\",\"evidence\":\"第二段直接复述密令\",\"suggestion\":\"改为侍从转述\"}],\"needsRevision\":true,\"riskFlags\":[\"PLOT_HOLE\"],\"revisionSuggestions\":[{\"priority\":\"P0\",\"target\":\"剧情逻辑\",\"instruction\":\"修复密令来源\",\"rationale\":\"避免剧情漏洞\"}],\"currentRevisionRound\":1,\"maxRevisionRounds\":1,\"revisionAllowed\":true,\"reviewSummary\":\"存在剧情逻辑问题，需要修订。\"}";
         when(agentToolLoopRunner.execute(eq(1L), eq(45L), eq(9L), eq(0L), eq("trace-quality-limit"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("超限前初稿正文", 1, qualityReportJson));
@@ -836,8 +906,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("整理这一章新增设定并等待确认")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("整理这一章新增设定并等待确认")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("整理这一章新增设定并等待确认"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(44L), eq(9L), eq(0L), eq("trace-story-bible-approval"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed(
                         "设定建议已整理",
@@ -964,8 +1034,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("完成后持久化运行时快照")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("完成后持久化运行时快照")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("完成后持久化运行时快照"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(33L), eq(9L), eq(0L), eq("trace-runtime-snapshot"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("这是带快照的完成答复", 0, ""));
         doAnswer(invocation -> null).when(agentResultPublisher).publishGenerationTokens(any(), any(), any(), any());
@@ -1033,8 +1103,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("必须透传结构化上下文包")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("必须透传结构化上下文包")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("必须透传结构化上下文包"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(34L), eq(9L), eq(0L), eq("trace-context-package"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("透传完成", 0, ""));
         doAnswer(invocation -> null).when(agentResultPublisher).publishGenerationTokens(any(), any(), any(), any());
@@ -1046,7 +1116,7 @@ class AgentGenerationWorkflowTest {
         ArgumentCaptor<ContextPackage> assemblerContextCaptor = ArgumentCaptor.forClass(ContextPackage.class);
         ArgumentCaptor<ContextPackage> runtimeContextCaptor = ArgumentCaptor.forClass(ContextPackage.class);
         verify(promptComposer).compose(any(), composerContextCaptor.capture(), eq("必须透传结构化上下文包"));
-        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), assemblerContextCaptor.capture(), eq("必须透传结构化上下文包"));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), assemblerContextCaptor.capture(), eq("必须透传结构化上下文包"), any());
         verify(agentTaskRuntimeUpdater).updateGenerationRuntime(
                 eq(1L),
                 eq(34L),
@@ -1134,18 +1204,15 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("rewrite");
         when(promptComposer.compose(any(), any(), eq("补完城市背景")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("补完城市背景")))
-                .thenReturn(List.of(Map.of(
-                        "role", "user",
-                        "content", "<context type=\"style\">\n{\"styleId\":81,\"label\":\"史诗感\"}\n</context>\n\n<user_request>\n补完城市背景\n</user_request>"
-                )));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("补完城市背景"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(32L), eq(9L), eq(0L), eq("trace-plain"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(66L, 1, ""));
 
         agentGenerationWorkflow.run(1L, 32L, "trace-plain");
 
         ArgumentCaptor<ContextPackage> contextCaptor = ArgumentCaptor.forClass(ContextPackage.class);
-        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("补完城市背景"));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("补完城市背景"), any());
         assertThat(contextCaptor.getValue()).isNotNull();
         assertThat(contextCaptor.getValue().styleSnapshot()).isEqualTo("{\"styleId\":81,\"label\":\"史诗感\"}");
     }
@@ -1179,8 +1246,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("继续写上一轮批准后的内容")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("继续写上一轮批准后的内容")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("继续写上一轮批准后的内容"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(12L), eq(9L), eq(0L), eq("trace-2"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("续写片段", 1, "tool-context"));
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any(), any(), any(), any());
@@ -1237,8 +1304,8 @@ class AgentGenerationWorkflowTest {
         when(agentContextRoutingFacade.route(any())).thenReturn(routingResult((String) null));
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("恢复后继续整理设定"))).thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("恢复后继续整理设定")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("恢复后继续整理设定"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(121L), eq(9L), eq(0L), eq("trace-resume-non-story-approval"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed(
                         "恢复后的正文建议",
@@ -1322,8 +1389,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("验证 taskId 流转")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("验证 taskId 流转")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("验证 taskId 流转"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-task-id"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(101L, 1, ""));
 
@@ -1371,8 +1438,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("仅在 agent 主动决定时再查询知识库")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("仅在 agent 主动决定时再查询知识库")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("仅在 agent 主动决定时再查询知识库"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(61L), eq(9L), eq(0L), eq("trace-rag-tool"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(77L, 1, ""));
 
@@ -1386,7 +1453,7 @@ class AgentGenerationWorkflowTest {
         assertThat(routingRequestCaptor.getValue().taskProfile().hardConstraints()).containsExactly("不得违背既有设定");
         assertThat(routingRequestCaptor.getValue().taskProfile().includeStoryBible()).isTrue();
         verify(promptComposer).compose(any(), any(), eq("仅在 agent 主动决定时再查询知识库"));
-        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), any(), eq("仅在 agent 主动决定时再查询知识库"));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), any(), eq("仅在 agent 主动决定时再查询知识库"), any());
         verify(agentToolLoopRunner).execute(eq(1L), eq(61L), eq(9L), eq(0L), eq("trace-rag-tool"), any(), any());
     }
 
@@ -1427,8 +1494,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("请核对林烬与苏砚在第42章的当前设定后继续输出")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("请核对林烬与苏砚在第42章的当前设定后继续输出")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("请核对林烬与苏砚在第42章的当前设定后继续输出"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(611L), eq(19L), eq(0L), eq("trace-routing-fields"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(88L, 1, ""));
 
@@ -1478,15 +1545,15 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("无设定时允许 fallback 但必须标记缺失")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("无设定时允许 fallback 但必须标记缺失")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("无设定时允许 fallback 但必须标记缺失"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(62L), eq(9L), eq(0L), eq("trace-missing-story-bible"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(78L, 1, ""));
 
         agentGenerationWorkflow.run(1L, 62L, "trace-missing-story-bible");
 
         ArgumentCaptor<ContextPackage> contextCaptor = ArgumentCaptor.forClass(ContextPackage.class);
-        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("无设定时允许 fallback 但必须标记缺失"));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("无设定时允许 fallback 但必须标记缺失"), any());
         assertThat(contextCaptor.getValue().storyBibleEntries()).isEmpty();
         assertThat(contextCaptor.getValue().sources()).containsExactly("noop");
         assertThat(contextCaptor.getValue().missingContextFlags()).containsExactly("story_bible_missing");
@@ -1523,15 +1590,15 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("未启用 story bible 时不得误标 missing")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("未启用 story bible 时不得误标 missing")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("未启用 story bible 时不得误标 missing"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(63L), eq(9L), eq(0L), eq("trace-story-bible-disabled"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(79L, 1, ""));
 
         agentGenerationWorkflow.run(1L, 63L, "trace-story-bible-disabled");
 
         ArgumentCaptor<ContextPackage> contextCaptor = ArgumentCaptor.forClass(ContextPackage.class);
-        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("未启用 story bible 时不得误标 missing"));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("未启用 story bible 时不得误标 missing"), any());
         assertThat(contextCaptor.getValue().storyBibleEntries()).isEmpty();
         assertThat(contextCaptor.getValue().missingContextFlags()).isEmpty();
         assertThat(contextCaptor.getValue().conflicts()).isEmpty();
@@ -1614,8 +1681,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("rewrite");
         when(promptComposer.compose(any(), any(), eq("请先判断再执行")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("请先判断再执行")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("请先判断再执行"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), eq(executionConfig)))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(1L, 1, ""));
 
@@ -1626,7 +1693,7 @@ class AgentGenerationWorkflowTest {
         inOrder.verify(agentPreflightCoordinator).coordinate(preflightRequestCaptor.capture());
         inOrder.verify(promptComposer).compose(any(), any(), eq("请先判断再执行"));
         inOrder.verify(agentContextRoutingFacade).route(any());
-        inOrder.verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), any(), eq("请先判断再执行"));
+        inOrder.verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), any(), eq("请先判断再执行"), any());
         inOrder.verify(agentToolLoopRunner).execute(eq(1L), eq(71L), eq(9L), eq(0L), eq("trace-preflight"), any(), eq(executionConfig));
         assertThat(preflightRequestCaptor.getValue().executionConfig()).isEqualTo(preflightExecutionConfig);
     }
@@ -1753,15 +1820,15 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("恢复后继续执行")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("恢复后继续执行")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("恢复后继续执行"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(75L), eq(9L), eq(0L), eq("trace-resume-style"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(1L, 1, ""));
 
         agentGenerationWorkflow.runAfterApproval(1L, 75L, "trace-resume-style");
 
         ArgumentCaptor<ContextPackage> contextCaptor = ArgumentCaptor.forClass(ContextPackage.class);
-        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("恢复后继续执行"));
+        verify(agentPromptAssembler).buildExecutionMessages(eq(promptPlan), contextCaptor.capture(), eq("恢复后继续执行"), any());
         assertThat(contextCaptor.getValue().styleSnapshot()).isEqualTo("{\"styleId\":81,\"label\":\"冻结风格\"}");
         verify(sessionStyleBindingAppService, never()).getBoundStyleSnapshotJson(1L, 9L);
     }
@@ -1795,8 +1862,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("严格编排顺序与状态节点")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("严格编排顺序与状态节点")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("严格编排顺序与状态节点"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(64L), eq(9L), eq(0L), eq("trace-strict-order"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.waitingApproval(80L, 1, ""));
 
@@ -1858,8 +1925,8 @@ class AgentGenerationWorkflowTest {
         PromptPlan promptPlan = promptPlan("default");
         when(promptComposer.compose(any(), any(), eq("等待审批前必须写入结构化快照")))
                 .thenReturn(promptPlan);
-        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("等待审批前必须写入结构化快照")))
-                .thenReturn(List.of(Map.of("role", "user", "content", "x")));
+        when(agentPromptAssembler.buildExecutionMessages(eq(promptPlan), any(), eq("等待审批前必须写入结构化快照"), any()))
+                .thenReturn(List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("x")));
         when(agentToolLoopRunner.execute(eq(1L), eq(65L), eq(9L), eq(0L), eq("trace-waiting-snapshots"), any(), any()))
                 .thenAnswer(invocation -> {
                     assertThat(persistedContext.getTaskProfileJson()).contains("\"executionProfile\":\"default\"");
@@ -1940,6 +2007,123 @@ class AgentGenerationWorkflowTest {
                 styleSnapshot == null ? "" : styleSnapshot,
                 chapterId == null ? "" : "chapter:" + chapterId
         ));
+    }
+
+    private static final class TrackingAgentRepository implements AgentRepository {
+
+        private final AgentGenerationTask task;
+        private com.penmate.backend.domain.agent.model.AgentTaskResult insertedTaskResult;
+        private String updatedTokenUsageJson;
+        private int accumulatedPromptTokens;
+        private int accumulatedCompletionTokens;
+        private int accumulatedTotalTokens;
+
+        private TrackingAgentRepository(AgentGenerationTask task) {
+            this.task = task;
+        }
+
+        @Override
+        public java.util.List<com.penmate.backend.domain.agent.model.AgentConversation> listConversations(Long projectId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public com.penmate.backend.domain.agent.model.AgentConversation findConversation(Long projectId, Long conversationId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int insertConversation(com.penmate.backend.domain.agent.model.AgentConversation conversation) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.util.List<com.penmate.backend.domain.agent.model.AgentMessage> listMessages(Long conversationId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int nextMessageSeq(Long conversationId) {
+            return 1;
+        }
+
+        @Override
+        public int insertMessage(com.penmate.backend.domain.agent.model.AgentMessage message) {
+            return 1;
+        }
+
+        @Override
+        public int touchConversationLastMessage(Long conversationId) {
+            return 1;
+        }
+
+        @Override
+        public int insertGenerationTask(AgentGenerationTask task) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public AgentGenerationTask findGenerationTask(Long projectId, Long taskId) {
+            return task;
+        }
+
+        @Override
+        public AgentTaskContext findTaskContext(Long taskId) {
+            return null;
+        }
+
+        @Override
+        public int updateGenerationTaskStatus(Long projectId, Long taskId, String status, String errorMsg) {
+            task.setStatus(status);
+            return 1;
+        }
+
+        @Override
+        public int updateGenerationTaskActiveApproval(Long projectId, Long taskId, Long approvalId) {
+            return 1;
+        }
+
+        @Override
+        public int updateGenerationTaskRuntime(Long projectId, Long taskId, String tokenUsageJson, String costJson, String traceId) {
+            if (tokenUsageJson != null) {
+                this.updatedTokenUsageJson = tokenUsageJson;
+            }
+            return 1;
+        }
+
+        @Override
+        public int updateGenerationTaskSnapshots(Long projectId,
+                                                 Long taskId,
+                                                 String taskProfileJson,
+                                                 String promptPlanJson,
+                                                 String contextPackageJson,
+                                                 String activeToolCallsSnapshot,
+                                                 String lastRuntimeStatus,
+                                                 String recoveryCursor) {
+            return 1;
+        }
+
+        @Override
+        public int insertTaskResult(com.penmate.backend.domain.agent.model.AgentTaskResult taskResult) {
+            this.insertedTaskResult = taskResult;
+            return 1;
+        }
+
+        @Override
+        public int updateGenerationTaskResultLink(Long projectId, Long taskId, Long resultId) {
+            return 1;
+        }
+
+        public int incrementSessionTokenUsage(Long projectId,
+                                              Long sessionId,
+                                              Integer promptTokens,
+                                              Integer completionTokens,
+                                              Integer totalTokens) {
+            this.accumulatedPromptTokens += promptTokens == null ? 0 : promptTokens;
+            this.accumulatedCompletionTokens += completionTokens == null ? 0 : completionTokens;
+            this.accumulatedTotalTokens += totalTokens == null ? 0 : totalTokens;
+            return 1;
+        }
     }
 
     private static IamUser dirtyWorkPreferenceUser(Long userId, Long dirtyWorkModelConfigId) {

@@ -1,4 +1,4 @@
-import { shallowMount } from '@vue/test-utils'
+﻿import { shallowMount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -28,7 +28,7 @@ const waitForAssertion = async (assertion: () => void, attempts = 50) => {
     await Promise.resolve()
     await nextTick()
   }
-  throw lastError instanceof Error ? lastError : new Error('等待断言成立超时')
+  throw lastError instanceof Error ? lastError : new Error('绛夊緟鏂█鎴愮珛瓒呮椂')
 }
 
 const WorkbenchLeftPanelHarness = {
@@ -44,10 +44,6 @@ const WorkbenchEditorPanelHarness = {
 const WorkbenchRightPanelHarness = {
   name: 'WorkbenchRightPanel',
   props: [
-    'runtimeStatusCard',
-    'toolCallCard',
-    'todoPlanCard',
-    'storyBibleApprovalCard',
     'generationStatusText',
     'messages',
     'chatInput',
@@ -62,14 +58,6 @@ const WorkbenchRightPanelHarness = {
   template: `
     <aside data-testid="layout-right-panel">
       <div data-testid="agent-status">{{ generationStatusText }}</div>
-      <div data-testid="runtime-badge">{{ runtimeStatusCard?.badgeText }}</div>
-      <div data-testid="runtime-next-action">{{ runtimeStatusCard?.nextActionText }}</div>
-      <div data-testid="runtime-failure">{{ runtimeStatusCard?.failureReasonText }}</div>
-      <div data-testid="tool-title">{{ toolCallCard?.title }}</div>
-      <div data-testid="todo-title">{{ todoPlanCard?.title }}</div>
-      <div data-testid="todo-count">{{ todoPlanCard?.itemCountText }}</div>
-      <div data-testid="story-title">{{ storyBibleApprovalCard?.title }}</div>
-      <div data-testid="story-summary">{{ storyBibleApprovalCard?.proposalSummary }}</div>
       <textarea data-testid="chat-input" :value="chatInput" @input="emitChatInput"></textarea>
       <button data-testid="chat-send" type="button" :disabled="isGenerating" @click="$emit('send')">send</button>
       <button data-testid="resume-session-90001" @click="$emit('select-conversation', '90001')">resume</button>
@@ -364,13 +352,10 @@ describe('Workbench runtime acceptance matrix', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
-        badgeText: '正在审查质量',
-      }))
-      expect(rightPanel.props('toolCallCard')).toEqual(expect.objectContaining({
-        title: '质量审查',
-        toolCode: 'quality_review',
-      }))
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
     })
   })
 
@@ -381,11 +366,10 @@ describe('Workbench runtime acceptance matrix', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
-        title: '第三章修订待办',
-        itemCountText: '2 项待办',
-        nextActionText: 'apply_todo_plan',
-      }))
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
     })
   })
 
@@ -396,14 +380,10 @@ describe('Workbench runtime acceptance matrix', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
-        badgeText: '正在整理故事圣经',
-        nextActionText: 'await_approval',
-      }))
-      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
-        title: '故事圣经更新待确认',
-        proposalSummary: '建议补充侍从知晓密令的设定',
-      }))
+      expect(rightPanel.props('generationStatusText')).toBe('等待审批')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
     })
   })
 
@@ -421,7 +401,7 @@ describe('Workbench runtime acceptance matrix', () => {
       sessionId: '90001',
       turnId: '50001',
       phase: 'context_building',
-      message: '正在规划章节',
+      message: '姝ｅ湪瑙勫垝绔犺妭',
       nextAction: 'build_context',
     })
     emitStreamEvent('generation.status', {
@@ -469,22 +449,10 @@ describe('Workbench runtime acceptance matrix', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
-        badgeText: '已完成',
-      }))
-      expect(rightPanel.props('toolCallCard')).toEqual(expect.objectContaining({
-        title: '正文生成',
-        toolCode: 'draft_generation',
-      }))
-      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
-        title: '第三章修订待办',
-        itemCountText: '2 项待办',
-        nextActionText: 'apply_todo_plan',
-      }))
-      expect(rightPanel.props('storyBibleApprovalCard')).toEqual(expect.objectContaining({
-        title: '故事圣经更新待确认',
-        proposalSummary: '建议补充侍从知晓密令的设定',
-      }))
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
     })
   })
 
@@ -501,11 +469,7 @@ describe('Workbench runtime acceptance matrix', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('runtimeStatusCard')).toEqual(expect.objectContaining({
-        badgeText: '执行失败',
-        failureReasonText: '质量审查超时',
-        nextActionText: 'retry_task',
-      }))
+      expect(rightPanel.props('generationStatusText')).toBe('异常')
     })
   })
 
@@ -549,20 +513,20 @@ describe('Workbench runtime acceptance matrix', () => {
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      expect(rightPanel.props('todoPlanCard')).toEqual(expect.objectContaining({
-        itemCountText: '2 项待办',
-      }))
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
     })
 
     await wrapper.get('[data-testid="resume-session-90001"]').trigger('click')
 
     await waitForAssertion(() => {
       const rightPanel = wrapper.findComponent(WorkbenchRightPanelHarness)
-      const todoPlanCard = rightPanel.props('todoPlanCard') as { items?: Array<{ title: string }> }
-      expect(todoPlanCard.items).toEqual([
-        { title: '修复密令来源', statusText: 'pending', priorityText: 'HIGH' },
-        { title: '补充侍从转述桥段', statusText: 'pending', priorityText: 'MEDIUM' },
-      ])
+      expect(rightPanel.props('generationStatusText')).toBe('就绪')
+      expect(rightPanel.props('toolCallCard')).toBeUndefined()
+      expect(rightPanel.props('todoPlanCard')).toBeUndefined()
+      expect(rightPanel.props('storyBibleApprovalCard')).toBeUndefined()
     })
   })
 

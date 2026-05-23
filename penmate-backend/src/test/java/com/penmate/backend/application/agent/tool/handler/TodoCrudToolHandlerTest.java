@@ -9,11 +9,12 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TodoCrudToolHandlerTest {
 
     @Test
-    void UT_APP_AGENT_TODO_CRUD_TOOL_DEFINITION_SHOULD_EXPOSE_COMPOSITE_SCHEMA_AND_NON_APPROVAL_GOVERNANCE() throws Exception {
+    void UT_APP_AGENT_TODO_CRUD_TOOL_DEFINITION_SHOULD_EXPOSE_PROVIDER_COMPATIBLE_TOP_LEVEL_SCHEMA_AND_NON_APPROVAL_GOVERNANCE() throws Exception {
         Object definition = instantiateNoArgsClass(
                 "com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition"
         );
@@ -27,6 +28,7 @@ class TodoCrudToolHandlerTest {
         Object exposure = readAccessor(descriptor, "exposure");
         String schema = String.valueOf(readAccessor(exposure, "parametersJsonSchema"));
         assertThat(schema)
+                .contains("\"type\": \"object\"")
                 .contains("\"operation\"")
                 .contains("\"list\"")
                 .contains("\"create\"")
@@ -37,10 +39,12 @@ class TodoCrudToolHandlerTest {
                 .contains("\"todoId\"")
                 .contains("\"title\"")
                 .contains("\"todoStatus\"")
-                .contains("\"oneOf\"")
-                .contains("\"required\":[\"operation\",\"sessionId\",\"title\",\"sourceType\",\"todoStatus\"]")
-                .contains("\"required\":[\"operation\",\"sessionId\",\"todoId\",\"title\",\"sourceType\",\"todoStatus\"]")
-                .contains("\"required\":[\"operation\",\"sessionId\",\"todoId\"]");
+                .contains("\"required\": [\"operation\", \"sessionId\"]")
+                .contains("\"additionalProperties\": false")
+                .doesNotContain("\"oneOf\"")
+                .doesNotContain("\"anyOf\"")
+                .doesNotContain("\"allOf\"")
+                .doesNotContain("\"not\"");
 
         Object governancePolicy = readAccessor(descriptor, "governancePolicy");
         Object defaultDecision = readAccessor(governancePolicy, "defaultDecision");
@@ -59,6 +63,76 @@ class TodoCrudToolHandlerTest {
     }
 
     @Test
+    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_CREATE_WITHOUT_REQUIRED_FIELDS() throws Exception {
+        Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
+        Class<?> requestClass = loadClass("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
+        Object handler = instantiateTodoCrudHandler(org.mockito.Mockito.mock(serviceClass));
+        Object request = newShortToolRequest(requestClass,
+                "{\"operation\":\"create\",\"sessionId\":\"9\"}",
+                "trace-todo-validate-create");
+
+        assertThatThrownBy(() -> handler.getClass().getMethod("validate", requestClass).invoke(handler, request))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("title is required");
+    }
+
+    @Test
+    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_LIST_WITH_WRITE_FIELDS() throws Exception {
+        Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
+        Class<?> requestClass = loadClass("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
+        Object handler = instantiateTodoCrudHandler(org.mockito.Mockito.mock(serviceClass));
+        Object request = newShortToolRequest(requestClass,
+                "{\"operation\":\"list\",\"sessionId\":\"9\",\"title\":\"不应出现\"}",
+                "trace-todo-validate-list");
+
+        assertThatThrownBy(() -> handler.getClass().getMethod("validate", requestClass).invoke(handler, request))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("Unexpected field for operation list: title");
+    }
+
+    @Test
+    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_SESSION_ID_LESS_THAN_ONE() throws Exception {
+        Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
+        Class<?> requestClass = loadClass("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
+        Object handler = instantiateTodoCrudHandler(org.mockito.Mockito.mock(serviceClass));
+        Object request = newShortToolRequest(requestClass,
+                "{\"operation\":\"list\",\"sessionId\":\"0\"}",
+                "trace-todo-validate-session-id");
+
+        assertThatThrownBy(() -> handler.getClass().getMethod("validate", requestClass).invoke(handler, request))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("sessionId must be greater than or equal to 1");
+    }
+
+    @Test
+    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_TODO_ID_LESS_THAN_ONE() throws Exception {
+        Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
+        Class<?> requestClass = loadClass("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
+        Object handler = instantiateTodoCrudHandler(org.mockito.Mockito.mock(serviceClass));
+        Object request = newShortToolRequest(requestClass,
+                "{\"operation\":\"complete\",\"sessionId\":\"9\",\"todoId\":\"-1\"}",
+                "trace-todo-validate-todo-id");
+
+        assertThatThrownBy(() -> handler.getClass().getMethod("validate", requestClass).invoke(handler, request))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("todoId must be greater than or equal to 1");
+    }
+
+    @Test
+    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_TASK_ID_LESS_THAN_ONE_WHEN_PRESENT() throws Exception {
+        Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
+        Class<?> requestClass = loadClass("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
+        Object handler = instantiateTodoCrudHandler(org.mockito.Mockito.mock(serviceClass));
+        Object request = newShortToolRequest(requestClass,
+                "{\"operation\":\"create\",\"sessionId\":\"9\",\"taskId\":\"0\",\"title\":\"新增待办\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}",
+                "trace-todo-validate-task-id");
+
+        assertThatThrownBy(() -> handler.getClass().getMethod("validate", requestClass).invoke(handler, request))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("taskId must be greater than or equal to 1");
+    }
+
+    @Test
     void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_SHOULD_UPDATE_TODO_AND_RETURN_STRUCTURED_OUTPUT() throws Exception {
         Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
         Class<?> sessionTodoClass = loadClass("com.penmate.backend.domain.todo.model.SessionTodo");
@@ -69,7 +143,7 @@ class TodoCrudToolHandlerTest {
         writeField(updatedTodo, "todoId", 20031L);
         writeField(updatedTodo, "projectId", 1L);
         writeField(updatedTodo, "sessionId", 9L);
-        writeField(updatedTodo, "taskId", 77L);
+        writeField(updatedTodo, "taskId", 88L);
         writeField(updatedTodo, "title", "修订第三章开场");
         writeField(updatedTodo, "description", "补齐密令来源桥段");
         writeField(updatedTodo, "sourceType", "PLANNING");
@@ -92,7 +166,7 @@ class TodoCrudToolHandlerTest {
                 1L,
                 9L,
                 20031L,
-                77L,
+                88L,
                 buildTodoCandidate(),
                 1001L,
                 "trace-todo-update"
@@ -115,7 +189,7 @@ class TodoCrudToolHandlerTest {
                         77L,
                         9L,
                         "todo_crud",
-                        "{\"operation\":\"update\",\"sessionId\":\"9\",\"todoId\":\"20031\",\"title\":\"修订第三章开场\",\"description\":\"补齐密令来源桥段\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"BLOCKED\"}",
+                        "{\"operation\":\"update\",\"sessionId\":\"9\",\"todoId\":\"20031\",\"taskId\":\"88\",\"title\":\"修订第三章开场\",\"description\":\"补齐密令来源桥段\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"BLOCKED\"}",
                         1001L,
                         "trace-todo-update",
                         "{}",
@@ -128,7 +202,7 @@ class TodoCrudToolHandlerTest {
         assertThat(String.valueOf(resultClass.getMethod("toolOutput").invoke(result)))
                 .contains("\"todoId\":\"20031\"")
                 .contains("\"sessionId\":\"9\"")
-                .contains("\"taskId\":\"77\"")
+                .contains("\"taskId\":\"88\"")
                 .contains("\"title\":\"修订第三章开场\"")
                 .contains("\"sourceType\":\"PLANNING\"")
                 .contains("\"todoStatus\":\"BLOCKED\"");

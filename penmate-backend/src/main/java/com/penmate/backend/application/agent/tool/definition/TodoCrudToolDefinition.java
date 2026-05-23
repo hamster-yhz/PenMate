@@ -17,7 +17,8 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
               "properties": {
                 "operation": {
                   "type": "string",
-                  "enum": ["list", "create", "update", "complete", "delete"]
+                  "enum": ["list", "create", "update", "complete", "delete"],
+                  "description": "list 可选 todoStatus；create 需要 title/sourceType/todoStatus；update 需要 todoId/title/sourceType/todoStatus；complete/delete 需要 todoId"
                 },
                 "sessionId": {
                   "type": "integer",
@@ -34,7 +35,7 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
                 "title": {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": ".*\\S.*"
+                  "pattern": ".*\\\\S.*"
                 },
                 "description": {
                   "type": "string"
@@ -47,129 +48,6 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
                 }
               },
               "required": ["operation", "sessionId"],
-              "oneOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "operation": {
-                      "const": "list"
-                    },
-                    "sessionId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "todoStatus": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["operation", "sessionId"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "operation": {
-                      "const": "create"
-                    },
-                    "sessionId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "taskId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "title": {
-                      "type": "string",
-                      "minLength": 1,
-                      "pattern": ".*\\S.*"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "sourceType": {
-                      "type": "string"
-                    },
-                    "todoStatus": {
-                      "type": "string"
-                    }
-                  },
-                  "required":["operation","sessionId","title","sourceType","todoStatus"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "operation": {
-                      "const": "update"
-                    },
-                    "sessionId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "todoId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "taskId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "title": {
-                      "type": "string",
-                      "minLength": 1,
-                      "pattern": ".*\\S.*"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "sourceType": {
-                      "type": "string"
-                    },
-                    "todoStatus": {
-                      "type": "string"
-                    }
-                  },
-                  "required":["operation","sessionId","todoId","title","sourceType","todoStatus"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "operation": {
-                      "const": "complete"
-                    },
-                    "sessionId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "todoId": {
-                      "type": "integer",
-                      "minimum": 1
-                    }
-                  },
-                  "required":["operation","sessionId","todoId"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "operation": {
-                      "const": "delete"
-                    },
-                    "sessionId": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "todoId": {
-                      "type": "integer",
-                      "minimum": 1
-                    }
-                  },
-                  "required":["operation","sessionId","todoId"],
-                  "additionalProperties": false
-                }
-              ],
               "additionalProperties": false
             }
             """;

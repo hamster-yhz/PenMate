@@ -425,6 +425,38 @@ class ModelControllerTest {
     }
 
     @Test
+    void UT_MODEL_USER_CONFIG_CREATE_ACCEPTS_MAX_CONTEXT_TOKENS() throws Exception {
+        String traceId = "UT-TRACE-MODEL-CONFIG-CREATE-MAX-CONTEXT";
+        doNothing().when(modelApplicationService).createUserModelConfig(eq(1001L), any(), eq(traceId));
+
+        mockMvc().perform(post("/api/v1/model/configs")
+                        .param("userId", "1001")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "providerId", "1",
+                                "modelName", "gpt-4.1",
+                                "modelCategory", "USER_MODEL",
+                                "apiKey", "sk-context-200k",
+                                "contextWindowTurns", 6,
+                                "maxContextTokens", 200000,
+                                "status", "active"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("created"));
+
+        verify(modelApplicationService).createUserModelConfig(
+                eq(1001L),
+                argThat(command -> command.providerId().equals(1L)
+                        && command.modelName().equals("gpt-4.1")
+                        && command.contextWindowTurns().equals(6)
+                        && command.maxContextTokens().equals(200000)
+                        && command.operatorId().equals(1001L)),
+                eq(traceId));
+    }
+
+    @Test
     void UT_MODEL_USER_CONFIG_CREATE_NON_POSITIVE_PROVIDER_ID_INVALID_PARAM() throws Exception {
         String traceId = "UT-TRACE-MODEL-CONFIG-CREATE-NON-POSITIVE-PROVIDER";
 
@@ -494,6 +526,31 @@ class ModelControllerTest {
                         && command.keySourceType().equals("OFFICIAL_KEY")
                         && command.apiKey().equals("sk-direct-official-key")
                         && command.status().equals("active")
+                        && command.operatorId().equals(1001L)),
+                eq(traceId));
+    }
+
+    @Test
+    void UT_MODEL_USER_CONFIG_UPDATE_ACCEPTS_MAX_CONTEXT_TOKENS() throws Exception {
+        String traceId = "UT-TRACE-MODEL-CONFIG-UPDATE-MAX-CONTEXT";
+        doNothing().when(modelApplicationService).updateUserModelConfig(eq(1001L), eq(9001L), any(), eq(traceId));
+
+        mockMvc().perform(put("/api/v1/model/configs/{modelConfigId}", "9001")
+                        .param("userId", "1001")
+                        .param("operatorId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Trace-Id", traceId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "maxContextTokens", 32000,
+                                "status", "active"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("updated"));
+
+        verify(modelApplicationService).updateUserModelConfig(
+                eq(1001L),
+                eq(9001L),
+                argThat(command -> command.maxContextTokens().equals(32000)
                         && command.operatorId().equals(1001L)),
                 eq(traceId));
     }

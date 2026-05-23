@@ -209,16 +209,16 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.insertUserKey(eq(9001L), eq(userId), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-user-key"), anyString(), eq(false), eq("active")))
                 .thenReturn(1);
         when(modelRepository.findUserKey(9001L)).thenReturn(userKey(9001L, userId, 1L, "gpt-4o-mini Key", "active"));
-        when(modelRepository.insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "USER_KEY", 9001L, null, "active")).thenReturn(1);
+        when(modelRepository.insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "USER_KEY", 9001L, null, 6, 128000, "active")).thenReturn(1);
 
         modelApplicationService.createUserModelConfig(
                 userId,
-                new CreateUserModelConfigCommand(1L, "gpt-4o-mini", null, "USER_KEY", "sk-direct-user-key", "active", 1001L),
+                new CreateUserModelConfigCommand(1L, "gpt-4o-mini", null, "USER_KEY", "sk-direct-user-key", null, null, "active", 1001L),
                 "trace"
         );
 
         verify(modelRepository).insertUserKey(eq(9001L), eq(userId), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-user-key"), anyString(), eq(false), eq("active"));
-        verify(modelRepository).insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "USER_KEY", 9001L, null, "active");
+        verify(modelRepository).insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "USER_KEY", 9001L, null, 6, 128000, "active");
     }
 
     @Test
@@ -229,16 +229,36 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active")))
                 .thenReturn(1);
         when(modelRepository.findOfficialKey(9001L)).thenReturn(officialKey(9001L, 1L));
-        when(modelRepository.insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "OFFICIAL_KEY", null, 9001L, "active")).thenReturn(1);
+        when(modelRepository.insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "OFFICIAL_KEY", null, 9001L, 6, 128000, "active")).thenReturn(1);
 
         modelApplicationService.createUserModelConfig(
                 userId,
-                new CreateUserModelConfigCommand(1L, "gpt-4o-mini", null, "OFFICIAL_KEY", "sk-direct-official-key", "active", 1001L),
+                new CreateUserModelConfigCommand(1L, "gpt-4o-mini", null, "OFFICIAL_KEY", "sk-direct-official-key", null, null, "active", 1001L),
                 "trace"
         );
 
         verify(modelRepository).insertOfficialKey(eq(9001L), eq(1L), eq("gpt-4o-mini Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active"));
-        verify(modelRepository).insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "OFFICIAL_KEY", null, 9001L, "active");
+        verify(modelRepository).insertUserModelConfig(9001L, userId, 1L, "gpt-4o-mini", null, "OFFICIAL_KEY", null, 9001L, 6, 128000, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_CREATE_USER_MODEL_CONFIG_WITH_EXPLICIT_MAX_CONTEXT_TOKENS_SUCCESS() {
+        Long userId = 1001L;
+        when(businessIdGenerator.nextId()).thenReturn(9002L);
+        when(secretCryptoService.encrypt("sk-context-200k")).thenReturn("cipher-context-200k");
+        when(modelRepository.insertUserKey(eq(9002L), eq(userId), eq(1L), eq("gpt-4.1 Key"), eq("cipher-context-200k"), anyString(), eq(false), eq("active")))
+                .thenReturn(1);
+        when(modelRepository.findUserKey(9002L)).thenReturn(userKey(9002L, userId, 1L, "gpt-4.1 Key", "active"));
+        when(modelRepository.insertUserModelConfig(9002L, userId, 1L, "gpt-4.1", null, "USER_KEY", 9002L, null, 6, 200000, "active"))
+                .thenReturn(1);
+
+        modelApplicationService.createUserModelConfig(
+                userId,
+                new CreateUserModelConfigCommand(1L, "gpt-4.1", null, "USER_KEY", "sk-context-200k", 6, 200000, "active", 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).insertUserModelConfig(9002L, userId, 1L, "gpt-4.1", null, "USER_KEY", 9002L, null, 6, 200000, "active");
     }
 
     @Test
@@ -255,7 +275,7 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-direct-official-key", "active", 1001L),
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-direct-official-key", null, null, "active", 1001L),
                 "trace"
         )).isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("User model config not found");
@@ -276,17 +296,42 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.insertOfficialKey(eq(9101L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active")))
                 .thenReturn(1);
         when(modelRepository.findOfficialKey(9101L)).thenReturn(officialKey(9101L, 1L));
-        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9101L, "active")).thenReturn(1);
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9101L, 6, 128000, "active")).thenReturn(1);
 
         modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-direct-official-key", "active", 1001L),
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-direct-official-key", null, null, "active", 1001L),
                 "trace"
         );
 
         verify(modelRepository).insertOfficialKey(eq(9101L), eq(1L), eq("gpt-4.1 Key"), eq("cipher-official-key"), anyString(), eq(false), eq("active"));
-        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9101L, "active");
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 9101L, 6, 128000, "active");
+    }
+
+    @Test
+    void UT_APP_MODEL_UPDATE_USER_MODEL_CONFIG_SHOULD_PERSIST_EXPLICIT_MAX_CONTEXT_TOKENS() {
+        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
+                "providerId", 1L,
+                "modelName", "gpt-4o-mini",
+                "baseUrl", "",
+                "keySourceType", "USER_KEY",
+                "userKeyId", 8001L,
+                "contextWindowTurns", 6,
+                "maxContextTokens", 128000,
+                "status", "active"
+        ));
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4o-mini", null, "USER_KEY", 8001L, null, 6, 200000, "active"))
+                .thenReturn(1);
+
+        modelApplicationService.updateUserModelConfig(
+                1001L,
+                9001L,
+                new UpdateUserModelConfigCommand(null, null, null, null, null, null, 200000, null, 1001L),
+                "trace"
+        );
+
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4o-mini", null, "USER_KEY", 8001L, null, 6, 200000, "active");
     }
 
     @Test
@@ -302,18 +347,18 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(secretCryptoService.encrypt("sk-updated-user-key")).thenReturn("cipher-updated-user-key");
         when(modelRepository.updateUserKey(eq(1001L), eq(8001L), eq(null), eq("cipher-updated-user-key"), anyString(), eq(null), eq("active")))
                 .thenReturn(1);
-        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "USER_KEY", 8001L, null, "active")).thenReturn(1);
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "USER_KEY", 8001L, null, 6, 128000, "active")).thenReturn(1);
 
         modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "USER_KEY", "sk-updated-user-key", "active", 1001L),
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "USER_KEY", "sk-updated-user-key", null, null, "active", 1001L),
                 "trace"
         );
 
         verify(modelRepository).updateUserKey(eq(1001L), eq(8001L), eq(null), eq("cipher-updated-user-key"), anyString(), eq(null), eq("active"));
         verify(modelRepository, never()).insertUserKey(anyLong(), eq(1001L), eq(1L), anyString(), anyString(), anyString(), eq(false), eq("active"));
-        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "USER_KEY", 8001L, null, "active");
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "USER_KEY", 8001L, null, 6, 128000, "active");
     }
 
     @Test
@@ -335,13 +380,15 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "USER_KEY",
                 8001L,
                 null,
+                6,
+                128000,
                 "active"
         )).thenReturn(1);
 
         modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(null, "gpt-4.1", null, null, null, null, 1001L),
+                new UpdateUserModelConfigCommand(null, "gpt-4.1", null, null, null, null, null, null, 1001L),
                 "trace"
         );
 
@@ -356,6 +403,8 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
                 "USER_KEY",
                 8001L,
                 null,
+                6,
+                128000,
                 "active"
         );
     }
@@ -373,18 +422,18 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(secretCryptoService.encrypt("sk-updated-official-key")).thenReturn("cipher-updated-official-key");
         when(modelRepository.updateOfficialKey(eq(7001L), eq(null), eq("cipher-updated-official-key"), anyString(), eq(null), eq("active")))
                 .thenReturn(1);
-        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 7001L, "active")).thenReturn(1);
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 7001L, 6, 128000, "active")).thenReturn(1);
 
         modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-updated-official-key", "active", 1001L),
+                new UpdateUserModelConfigCommand(1L, "gpt-4.1", null, "OFFICIAL_KEY", "sk-updated-official-key", null, null, "active", 1001L),
                 "trace"
         );
 
         verify(modelRepository).updateOfficialKey(eq(7001L), eq(null), eq("cipher-updated-official-key"), anyString(), eq(null), eq("active"));
         verify(modelRepository, never()).insertOfficialKey(anyLong(), eq(1L), anyString(), anyString(), anyString(), eq(false), eq("active"));
-        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 7001L, "active");
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 1L, "gpt-4.1", null, "OFFICIAL_KEY", null, 7001L, 6, 128000, "active");
     }
 
     @Test
@@ -402,18 +451,18 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         when(modelRepository.insertUserKey(eq(9201L), eq(1001L), eq(2L), eq("gpt-4.1 Key"), eq("cipher-provider-changed-key"), anyString(), eq(false), eq("active")))
                 .thenReturn(1);
         when(modelRepository.findUserKey(9201L)).thenReturn(userKey(9201L, 1001L, 2L, "gpt-4.1 Key", "active"));
-        when(modelRepository.updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 9201L, null, "active")).thenReturn(1);
+        when(modelRepository.updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 9201L, null, 6, 128000, "active")).thenReturn(1);
 
         modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(2L, "gpt-4.1", null, "USER_KEY", "sk-provider-changed-key", "active", 1001L),
+                new UpdateUserModelConfigCommand(2L, "gpt-4.1", null, "USER_KEY", "sk-provider-changed-key", null, null, "active", 1001L),
                 "trace"
         );
 
         verify(modelRepository, never()).updateUserKey(eq(1001L), eq(8001L), eq(null), anyString(), anyString(), eq(null), eq("active"));
         verify(modelRepository).insertUserKey(eq(9201L), eq(1001L), eq(2L), eq("gpt-4.1 Key"), eq("cipher-provider-changed-key"), anyString(), eq(false), eq("active"));
-        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 9201L, null, "active");
+        verify(modelRepository).updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 9201L, null, 6, 128000, "active");
     }
 
     @Test
@@ -430,12 +479,12 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> modelApplicationService.updateUserModelConfig(
                 1001L,
                 9001L,
-                new UpdateUserModelConfigCommand(2L, "gpt-4.1", null, "USER_KEY", null, "active", 1001L),
+                new UpdateUserModelConfigCommand(2L, "gpt-4.1", null, "USER_KEY", null, null, null, "active", 1001L),
                 "trace"
         )).isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("Api key is required");
 
-        verify(modelRepository, never()).updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 8001L, null, "active");
+        verify(modelRepository, never()).updateUserModelConfig(1001L, 9001L, 2L, "gpt-4.1", null, "USER_KEY", 8001L, null, 6, 128000, "active");
         verify(modelRepository, never()).insertUserKey(anyLong(), eq(1001L), eq(2L), anyString(), anyString(), anyString(), eq(false), eq("active"));
     }
 
@@ -573,6 +622,26 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(result).isEqualTo(expected);
         verify(modelRepository).listUserModelConfigs(userId);
         verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void UT_APP_MODEL_LIST_USER_MODEL_CONFIGS_SHOULD_EXPOSE_CONTEXT_WINDOW_TURNS() {
+        Long userId = 1001L;
+        List<Map<String, Object>> expected = List.of(Map.of(
+                "modelConfigId", 9001L,
+                "modelName", "gpt-4o-mini",
+                "providerId", 1L,
+                "keySourceType", "USER_KEY",
+                "keyName", "OpenAI User Key",
+                "maskedApiKey", "****1234",
+                "contextWindowTurns", 6
+        ));
+        when(modelRepository.listUserModelConfigs(userId)).thenReturn(expected);
+
+        List<Map<String, Object>> result = modelApplicationService.listUserModelConfigs(userId);
+
+        assertThat(result).isEqualTo(expected);
+        assertThat(result.get(0)).containsEntry("contextWindowTurns", 6);
     }
 
     @Test

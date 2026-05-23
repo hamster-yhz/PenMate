@@ -8,12 +8,14 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,8 +42,7 @@ public class ToolCallResumeService {
     private final ToolCallSnapshotMapper toolCallSnapshotMapper;
 
     public ToolCallResult resumeFromPending(ApprovalRequest request, PendingToolInvocationSnapshot snapshot) {
-        List<Map<String, Object>> messages = toolCallSnapshotMapper.parseMessages(snapshot.conversationMessagesJson());
-        StringBuilder toolContextBuilder = new StringBuilder();
+        List<AgentLlmMessage> messages = new ArrayList<>(toolCallSnapshotMapper.parseMessagesToTyped(snapshot.conversationMessagesJson()));
 
         ToolCallResult approvedToolResult = toolCallExecutionService.execute(new ToolCallRequest(
                 snapshot.projectId(),
@@ -67,7 +68,7 @@ public class ToolCallResumeService {
         if (!"SUCCESS".equals(approvedToolResult.status())) {
             return approvedToolResult;
         }
-        appendToolResultMessage(messages, toolContextBuilder, snapshot.toolCallId(), approvedToolResult.toolOutput());
+        appendToolResultMessage(messages, snapshot.toolCallId(), approvedToolResult.toolOutput());
 
         List<Map<String, Object>> pendingToolCalls = toolCallSnapshotMapper.parseToolCallPayloads(snapshot.assistantToolCallsJson());
         int approvedCallIndex = resolveToolCallIndex(pendingToolCalls, snapshot.toolCallId());
@@ -88,13 +89,17 @@ public class ToolCallResumeService {
             if (!"SUCCESS".equals(toolResult.status())) {
                 return toolResult;
             }
-            appendToolResultMessage(messages, toolContextBuilder, toolCallId, toolResult.toolOutput());
+            appendToolResultMessage(messages, toolCallId, toolResult.toolOutput());
         }
 
         AgentLlmExecutionConfig executionConfig = resolveExecutionConfig(snapshot);
         for (int turnIndex = 0; turnIndex < MAX_TOOL_TURNS; turnIndex++) {
             AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
-                    new AgentLlmTurnRequest(messages, toolDefinitionSource.listLlmSchemas(), "auto"),
+                    new AgentLlmTurnRequest(
+                            messages,
+                            toolDefinitionSource.listLlmSchemas(),
+                            "auto"
+                    ),
                     executionConfig
             );
             if ("tool_calls".equalsIgnoreCase(response.finishReason()) && response.toolCalls().isEmpty()) {
@@ -131,7 +136,7 @@ public class ToolCallResumeService {
                 if (!"SUCCESS".equals(toolResult.status())) {
                     return toolResult;
                 }
-                appendToolResultMessage(messages, toolContextBuilder, toolCall.id(), toolResult.toolOutput());
+                appendToolResultMessage(messages, toolCall.id(), toolResult.toolOutput());
             }
         }
         throw new IllegalStateException("Agent tool loop exceeded max turns: " + MAX_TOOL_TURNS);
@@ -144,31 +149,11 @@ public class ToolCallResumeService {
         }
     }
 
-    private void appendToolResultMessage(List<Map<String, Object>> messages,
-                                         StringBuilder toolContextBuilder,
+    private void appendToolResultMessage(List<AgentLlmMessage> messages,
                                          String toolCallId,
                                          String toolOutput) {
         String safeOutput = toolOutput == null ? "" : toolOutput;
-        appendToolContext(toolContextBuilder, safeOutput);
-        messages.add(buildToolResultMessage(toolCallId, safeOutput));
-    }
-
-    private void appendToolContext(StringBuilder toolContextBuilder, String toolOutput) {
-        if (toolOutput == null || toolOutput.isBlank()) {
-            return;
-        }
-        if (!toolContextBuilder.isEmpty()) {
-            toolContextBuilder.append("\n");
-        }
-        toolContextBuilder.append(toolOutput);
-    }
-
-    private Map<String, Object> buildToolResultMessage(String toolCallId, String toolOutput) {
-        Map<String, Object> message = new LinkedHashMap<>();
-        message.put("role", "tool");
-        message.put("tool_call_id", toolCallId);
-        message.put("content", toolOutput == null ? "" : toolOutput);
-        return message;
+        messages.add(AgentLlmMessage.tool(toolCallId, safeOutput));
     }
 
     private int resolveToolCallIndex(List<Map<String, Object>> pendingToolCalls, String toolCallId) {

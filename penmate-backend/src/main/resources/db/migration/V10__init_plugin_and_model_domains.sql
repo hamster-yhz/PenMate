@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS model_user_configurations (
     key_source_type VARCHAR(20) NOT NULL,
     user_key_id BIGINT UNSIGNED NULL,
     official_key_id BIGINT UNSIGNED NULL,
+    context_window_turns INT UNSIGNED NOT NULL DEFAULT 6 COMMENT '发送给 LLM 的历史对话轮数，0 表示禁用历史窗口',
+    max_context_tokens INT UNSIGNED NOT NULL DEFAULT 128000 COMMENT '模型最大上下文窗口 token 数，用户可按实际模型设置',
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),

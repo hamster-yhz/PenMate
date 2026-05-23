@@ -87,7 +87,7 @@ const featureItems = [
     img: featureStyle,
     icon: '阁',
     title: 'IDE多面板工作区',
-    desc: '类IDE三栏布局：大纲树、富文本编辑区、AI会话板，多维信息展示与高效创作协同。',
+    desc: '类IDE三栏布局：大纲树、富文本编辑区、智能协作侧栏，多维信息展示与高效创作协同。',
     tags: ['三栏布局', '拖拽排序', '实时同步'],
   },
   {

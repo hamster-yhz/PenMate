@@ -1,13 +1,14 @@
 package com.penmate.backend.application.agent.llm;
 
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+
 import java.util.List;
-import java.util.Map;
 
 /**
  * LLM 单轮对话请求。
  */
 public record AgentLlmTurnRequest(
-        List<Map<String, Object>> messages,
+        List<AgentLlmMessage> messages,
         List<AgentLlmToolSchema> tools,
         String toolChoice
 ) {

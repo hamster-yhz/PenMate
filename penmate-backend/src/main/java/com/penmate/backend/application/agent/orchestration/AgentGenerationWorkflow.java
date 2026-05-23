@@ -33,6 +33,7 @@ import com.penmate.backend.application.todo.TodoCrudApplicationService;
 import com.penmate.backend.application.todo.TodoPlanItemView;
 import com.penmate.backend.application.todo.TodoPlanView;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import com.penmate.backend.domain.agent.model.AgentTaskStatus;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
@@ -88,6 +89,7 @@ public class AgentGenerationWorkflow {
     private final PendingToolInvocationRepository pendingToolInvocationRepository;
     private final SessionStyleBindingAppService sessionStyleBindingAppService;
     private final IamGateway iamGateway;
+    private final ConversationWindowBuilder conversationWindowBuilder;
 
     public void run(Long projectId, Long taskId, String traceId) {
         runInternal(projectId, taskId, traceId);
@@ -183,7 +185,7 @@ public class AgentGenerationWorkflow {
             }
 
             // 8. 记录结果、更新状态并收尾
-            finalizeTask(projectId, taskId, task, taskContext, taskProfile, promptPlan, contextPackage, finalText, storyBibleDecision.toolTraceJson(), traceId);
+            finalizeTask(projectId, taskId, task, taskContext, taskProfile, promptPlan, contextPackage, finalText, storyBibleDecision.toolTraceJson(), loopResult, traceId);
         } catch (Exception ex) {
             handleTaskFailure(projectId, taskId, task, taskContext, traceId, ex);
         }
@@ -259,6 +261,13 @@ public class AgentGenerationWorkflow {
      */
     private AgentToolLoopIterationResult executeToolLoopPhase(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, PromptPlan promptPlan, ContextPackage contextPackage, String promptSnapshot, String traceId) {
         AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(task.getUserId(), task.getModelConfigId(), traceId);
+        List<AgentLlmMessage> conversationWindow = conversationWindowBuilder == null
+                ? List.of()
+                : conversationWindowBuilder.build(
+                        task.getConversationId(),
+                        promptSnapshot,
+                        executionConfig.contextWindowTurns()
+                );
         syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, promptPlan, contextPackage, "executing", "phase:executing");
         taskRuntimeStatusPublisher.publishStatus(projectId,
                 buildRuntimeStatusView(task, taskContext, "executing", "正在生成正文", true, "run_tool_loop", null));
@@ -272,7 +281,8 @@ public class AgentGenerationWorkflow {
                 agentPromptAssembler.buildExecutionMessages(
                         promptPlan,
                         contextPackage,
-                        promptSnapshot
+                        promptSnapshot,
+                        conversationWindow
                 ),
                 executionConfig
         );
@@ -303,8 +313,20 @@ public class AgentGenerationWorkflow {
     /**
      * 完成任务记录并发布状态。
      */
-    private void finalizeTask(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, PromptPlan promptPlan, ContextPackage contextPackage, String finalText, String toolTraceJson, String traceId) {
+    private void finalizeTask(Long projectId, Long taskId, AgentGenerationTask task, AgentTaskContext taskContext, TaskProfile taskProfile, PromptPlan promptPlan, ContextPackage contextPackage, String finalText, String toolTraceJson, AgentToolLoopIterationResult loopResult, String traceId) {
         agentTaskResultRecorder.recordAssistantResult(task, finalText, toolTraceJson);
+        String tokenUsageJson = toTokenUsageJson(loopResult == null ? null : loopResult.tokenUsage());
+        agentRepository.updateGenerationTaskRuntime(projectId, taskId, tokenUsageJson, null, traceId);
+        if (task != null && task.getConversationId() != null) {
+            com.penmate.backend.application.agent.llm.LlmTokenUsage tokenUsage = loopResult == null ? null : loopResult.tokenUsage();
+            agentRepository.incrementSessionTokenUsage(
+                    projectId,
+                    task.getConversationId(),
+                    tokenUsage == null ? 0 : tokenUsage.promptTokens(),
+                    tokenUsage == null ? 0 : tokenUsage.completionTokens(),
+                    tokenUsage == null ? 0 : tokenUsage.totalTokens()
+            );
+        }
         agentTaskRuntimeUpdater.updateGenerationRuntime(
                 projectId,
                 taskId,
@@ -321,6 +343,21 @@ public class AgentGenerationWorkflow {
         taskRuntimeStatusPublisher.publishDone(projectId,
                 buildRuntimeStatusView(task, taskContext, "done", "已完成", false, "show_result", toolTraceJson));
         log.info("Agent 生成工作流完成: projectId={}, taskId={}, traceId={}", projectId, taskId, traceId);
+    }
+
+    private String toTokenUsageJson(com.penmate.backend.application.agent.llm.LlmTokenUsage tokenUsage) {
+        com.penmate.backend.application.agent.llm.LlmTokenUsage safeTokenUsage = tokenUsage == null
+                ? com.penmate.backend.application.agent.llm.LlmTokenUsage.ZERO
+                : tokenUsage;
+        try {
+            Map<String, Integer> payload = new LinkedHashMap<>();
+            payload.put("promptTokens", safeTokenUsage.promptTokens());
+            payload.put("completionTokens", safeTokenUsage.completionTokens());
+            payload.put("totalTokens", safeTokenUsage.totalTokens());
+            return OBJECT_MAPPER.writeValueAsString(payload);
+        } catch (Exception ex) {
+            throw new IllegalStateException("failed to serialize token usage json", ex);
+        }
     }
 
     /**

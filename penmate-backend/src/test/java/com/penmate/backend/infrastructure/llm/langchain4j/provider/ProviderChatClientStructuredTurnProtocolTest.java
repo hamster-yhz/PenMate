@@ -1,6 +1,8 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ChatMessageType;
@@ -9,7 +11,6 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,16 +76,26 @@ class ProviderChatClientStructuredTurnProtocolTest {
     }
 
     @Test
+    void UT_INFRA_LLM_OPENAI_PROVIDER_CHAT_CLIENT_DISABLES_JSON_SCHEMA_RESPONSE_FORMAT_ONLY_FOR_KNOWN_INCOMPATIBLE_HOSTS() {
+        TestOpenAiProviderChatClient client = new TestOpenAiProviderChatClient();
+
+        assertThat(client.supportsJsonSchemaAt("https://api.longcat.chat/openai/v1/chat/completions"))
+                .isFalse();
+        assertThat(client.supportsJsonSchemaAt("https://api.openai.com/v1/chat/completions?via=api.longcat.chat"))
+                .isTrue();
+        assertThat(client.supportsJsonSchemaAt("https://example.com/proxy/api.longcat.chat/chat/completions"))
+                .isTrue();
+    }
+
+    @Test
     void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_FAILS_FAST_WHEN_TOOL_RESULT_MESSAGE_CANNOT_BE_BOUND_TO_TOOL_NAME() throws Exception {
         ClaudeProviderChatClient client = new ClaudeProviderChatClient();
         Method method = ClaudeProviderChatClient.class.getDeclaredMethod("toChatMessages", List.class);
         method.setAccessible(true);
 
-        assertThatThrownBy(() -> method.invoke(client, List.of(Map.of(
-                "role", "tool",
-                "tool_call_id", "call_missing",
-                "content", "done"
-        ))))
+        assertThatThrownBy(() -> method.invoke(client, List.of(
+                AgentLlmMessage.tool("call_missing", "done")
+        )))
                 .hasRootCauseInstanceOf(BusinessException.class)
                 .rootCause()
                 .hasMessage("Claude tool result message is missing matching assistant tool call");
@@ -98,23 +109,16 @@ class ProviderChatClientStructuredTurnProtocolTest {
 
         @SuppressWarnings("unchecked")
         List<ChatMessage> messages = (List<ChatMessage>) method.invoke(client, List.of(
-                Map.of(
-                        "role", "assistant",
-                        "content", "need tool",
-                        "tool_calls", List.of(Map.of(
-                                "id", "call_1",
-                                "type", "function",
-                                "function", Map.of(
-                                        "name", "context_enhancer",
-                                        "arguments", "{\"prompt\":\"hello\"}"
-                                )
+                AgentLlmMessage.assistant(
+                        "need tool",
+                        List.of(new AgentLlmToolCallPayload(
+                                "call_1",
+                                "function",
+                                "context_enhancer",
+                                "{\"prompt\":\"hello\"}"
                         ))
                 ),
-                Map.of(
-                        "role", "tool",
-                        "tool_call_id", "call_1",
-                        "content", "tool output"
-                )
+                AgentLlmMessage.tool("call_1", "tool output")
         ));
 
         assertThat(messages).hasSize(2);
@@ -133,6 +137,10 @@ class ProviderChatClientStructuredTurnProtocolTest {
 
         private String resolveTurnEndpoint(String rawBaseUrl) {
             return resolveChatCompletionsEndpoint(rawBaseUrl);
+        }
+
+        private boolean supportsJsonSchemaAt(String endpoint) {
+            return supportsJsonSchemaResponseFormat(endpoint);
         }
     }
 

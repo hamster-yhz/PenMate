@@ -73,6 +73,8 @@ public interface ModelRepository {
                               String keySourceType,
                               Long userKeyId,
                               Long officialKeyId,
+                              Integer contextWindowTurns,
+                              Integer maxContextTokens,
                               String status);
 
     int updateUserModelConfig(Long userId,
@@ -83,6 +85,8 @@ public interface ModelRepository {
                               String keySourceType,
                               Long userKeyId,
                               Long officialKeyId,
+                              Integer contextWindowTurns,
+                              Integer maxContextTokens,
                               String status);
 
     int softDeleteUserModelConfig(Long userId, Long modelConfigId);

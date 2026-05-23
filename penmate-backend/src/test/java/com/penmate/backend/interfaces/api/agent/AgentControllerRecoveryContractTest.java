@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
+import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
@@ -39,6 +40,9 @@ class AgentControllerRecoveryContractTest {
 
     @Mock
     private AgentSessionRecoveryAppService agentSessionRecoveryAppService;
+
+    @Mock
+    private AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
 
     @Mock
     private AgentTurnAppService agentTurnAppService;

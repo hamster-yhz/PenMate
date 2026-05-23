@@ -74,7 +74,7 @@ describe('AgentSessionHeader', () => {
       generationPhase: 'failed',
     })
 
-    expect(wrapper.get('[data-testid="agent-title"]').text()).toContain('AI会话')
+    expect(wrapper.find('[data-testid="agent-title"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="current-model"]').text()).toContain('未选择模型')
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('等待审批')
     expect(wrapper.get('[data-testid="agent-status"]').classes()).toContain('busy')
@@ -110,5 +110,13 @@ describe('AgentSessionHeader', () => {
 
     expect(wrapper.text()).toContain('生成中 · running')
     expect(wrapper.text()).toContain('正在调用 RAG 查询工具')
+  })
+
+  it('does_not_render_agent_title_or_avatar_icon_in_title_area', async () => {
+    const wrapper = await mountAgentSessionHeader()
+
+    expect(wrapper.find('[data-testid="agent-title"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('AI会话')
+    expect(wrapper.find('.agent-icon').exists()).toBe(false)
   })
 })

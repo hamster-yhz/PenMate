@@ -78,6 +78,18 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return '就绪'
   })
 
+  const resolveSafeLocalMessageCounterSeed = (messageId: ChatMessage['id']) => {
+    if (typeof messageId === 'number') {
+      return Number.isSafeInteger(messageId) && messageId >= 0 ? messageId : null
+    }
+    const rawId = String(messageId ?? '').trim()
+    if (!rawId || !/^\d+$/.test(rawId)) {
+      return null
+    }
+    const numericId = Number(rawId)
+    return Number.isSafeInteger(numericId) ? numericId : null
+  }
+
   const scrollChat = async () => {
     await deps.nextTick()
     deps.scrollChat()
@@ -270,6 +282,23 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     }
   }
 
+  const recoverAssistantTextFromSession = async (projectId: string, sessionId: string) => {
+    try {
+      const snapshot = await getSessionRecovery(projectId, sessionId)
+      const normalizedSnapshot = pickBusinessRecord(snapshot) as {
+        messages?: Array<Record<string, unknown>>
+      }
+      const recoveryMessages = Array.isArray(normalizedSnapshot?.messages) ? normalizedSnapshot.messages : []
+      const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
+      const latestAssistantText = [...mappedMessages]
+        .reverse()
+        .find((item) => item.role === 'assistant' && String(item.text || '').trim().length > 0)
+      return latestAssistantText?.text || ''
+    } catch {
+      return ''
+    }
+  }
+
   const sendMessage = async () => {
     if (!chatInput.value.trim() || isGenerating.value) return
 
@@ -277,7 +306,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     messages.value.push({ id: msgIdCounter++, role: 'user', text: escapeHtml(userText) })
     chatInput.value = ''
     isGenerating.value = true
-    generationPhase.value = 'preparing'
+    generationPhase.value = 'idle'
     generationTaskStatus.value = ''
     agentStatusDetailText.value = ''
     runtimeEventSource.value = null
@@ -344,9 +373,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         taskId: String(taskId),
       }
 
-      generationTaskStatus.value = normalizeGenerationStatus(generation.activeTask?.taskStatus ?? generation.status) || 'pending'
-      generationPhase.value = 'streaming'
-
       assistantMsg = { id: msgIdCounter++, role: 'assistant', text: '' }
       messages.value.push(assistantMsg)
       streamingAssistantMsgId.value = assistantMsg.id
@@ -365,7 +391,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         generationTaskStatus.value = 'waiting_approval'
       }
       if (!assistantMsg.text && !hasPendingApproval) {
-        assistantMsg.text = `生成任务已完成，状态：${finalStatus || generationTaskStatus.value || 'unknown'}`
+        assistantMsg.text = await recoverAssistantTextFromSession(projectId, conversationId)
       }
     } catch (error: any) {
       generationPhase.value = 'failed'
@@ -436,8 +462,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
     messages.value = mappedMessages
     const maxId = mappedMessages.reduce((max, item) => {
-      const numericId = Number(item.id)
-      return Number.isFinite(numericId) && numericId > max ? numericId : max
+      const numericId = resolveSafeLocalMessageCounterSeed(item.id)
+      return numericId != null && numericId > max ? numericId : max
     }, 0)
     if (maxId >= msgIdCounter) {
       msgIdCounter = maxId + 1
@@ -462,8 +488,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       return
     }
     if (taskStatus === 'running') {
-      generationPhase.value = 'streaming'
-      generationTaskStatus.value = 'running'
+      generationPhase.value = 'idle'
+      generationTaskStatus.value = ''
       agentStatusDetailText.value = ''
       isGenerating.value = true
       return
@@ -496,8 +522,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const resumeRunningTask = async (projectId: string, sessionId: string, turnId: string) => {
     const assistantMsg = resolveAssistantMessageForResume()
     isGenerating.value = true
-    generationPhase.value = 'streaming'
-    generationTaskStatus.value = 'running'
+    generationPhase.value = 'idle'
+    generationTaskStatus.value = ''
     agentStatusDetailText.value = ''
     streamingAssistantMsgId.value = assistantMsg.id
     debugChatState('resume-stream-start', { projectId, sessionId, turnId })
@@ -517,7 +543,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         generationTaskStatus.value = 'waiting_approval'
       }
       if (!assistantMsg.text && !hasPendingApproval) {
-        assistantMsg.text = `生成任务已完成，状态：${finalStatus || generationTaskStatus.value || 'unknown'}`
+        assistantMsg.text = await recoverAssistantTextFromSession(projectId, sessionId)
       }
     } catch (error: any) {
       generationPhase.value = 'failed'

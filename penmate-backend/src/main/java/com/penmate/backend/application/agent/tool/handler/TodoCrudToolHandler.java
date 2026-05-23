@@ -1,16 +1,19 @@
 package com.penmate.backend.application.agent.tool.handler;
 
+import cn.hutool.json.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.orchestration.AgentTaskRuntimeUpdater;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.todo.TodoCrudApplicationService;
 import com.penmate.backend.domain.todo.model.SessionTodo;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Todo CRUD tool 处理器。
@@ -33,6 +36,57 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
+        try {
+            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
+            String operation = AgentJsonCodec.getString(args, "operation");
+            if (operation == null || operation.isBlank()) {
+                throw new IllegalArgumentException("operation is required");
+            }
+            Long sessionId = args.getLong("sessionId");
+            if (sessionId == null) {
+                throw new IllegalArgumentException("sessionId is required");
+            }
+            if (sessionId < 1) {
+                throw new IllegalArgumentException("sessionId must be greater than or equal to 1");
+            }
+            if (!("list".equalsIgnoreCase(operation)
+                    || "create".equalsIgnoreCase(operation)
+                    || "update".equalsIgnoreCase(operation)
+                    || "complete".equalsIgnoreCase(operation)
+                    || "delete".equalsIgnoreCase(operation))) {
+                throw new IllegalArgumentException("Unsupported operation: " + operation);
+            }
+            if ("list".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoStatus"));
+            }
+            if ("create".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "taskId", "title", "description", "sourceType", "todoStatus"));
+                validateOptionalLong(args, "taskId");
+                requireNonBlank(args, "title");
+                requireNonBlank(args, "sourceType");
+                requireNonBlank(args, "todoStatus");
+            }
+            if ("update".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId", "taskId", "title", "description", "sourceType", "todoStatus"));
+                requireLong(args, "todoId");
+                validateOptionalLong(args, "taskId");
+                requireNonBlank(args, "title");
+                requireNonBlank(args, "sourceType");
+                requireNonBlank(args, "todoStatus");
+            }
+            if ("complete".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId"));
+                requireLong(args, "todoId");
+            }
+            if ("delete".equalsIgnoreCase(operation)) {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId"));
+                requireLong(args, "todoId");
+            }
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("invalid tool args", ex);
+        }
     }
 
     @Override
@@ -41,6 +95,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
             return new ToolCallResult("FAILED", null, null, "TODO_CRUD_FAILED", "request must not be null");
         }
         try {
+            validate(request);
             Map<String, Object> args = OBJECT_MAPPER.readValue(request.toolArgsJson(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
             });
             String operation = stringValue(args.get("operation")).toLowerCase();
@@ -71,11 +126,12 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(output));
             }
             if ("update".equals(operation)) {
+                Long taskId = longValue(args.get("taskId")) != null ? longValue(args.get("taskId")) : request.taskId();
                 SessionTodo updated = todoCrudApplicationService.updateTodo(
                         request.projectId(),
                         sessionId,
                         todoId,
-                        request.taskId(),
+                        taskId,
                         candidate,
                         request.operatorId(),
                         request.traceId()
@@ -164,5 +220,42 @@ public class TodoCrudToolHandler implements AgentToolHandler {
 
     private String stringifyBusinessId(Long value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private void requireLong(JSONObject args, String fieldName) {
+        Long value = args.getLong(fieldName);
+        if (value == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        requireMinimumOne(value, fieldName);
+    }
+
+    private void validateOptionalLong(JSONObject args, String fieldName) {
+        Long value = args.getLong(fieldName);
+        if (value == null) {
+            return;
+        }
+        requireMinimumOne(value, fieldName);
+    }
+
+    private void requireNonBlank(JSONObject args, String fieldName) {
+        String value = args.getStr(fieldName);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+    }
+
+    private void requireMinimumOne(Long value, String fieldName) {
+        if (value < 1) {
+            throw new IllegalArgumentException(fieldName + " must be greater than or equal to 1");
+        }
+    }
+
+    private void rejectUnexpectedFields(JSONObject args, String operation, Set<String> allowedFields) {
+        for (String fieldName : args.keySet()) {
+            if (!allowedFields.contains(fieldName)) {
+                throw new IllegalArgumentException("Unexpected field for operation " + operation + ": " + fieldName);
+            }
+        }
     }
 }

@@ -46,6 +46,12 @@ public interface AgentRepository {
 
     int insertTaskResult(AgentTaskResult taskResult);
 
+    int incrementSessionTokenUsage(Long projectId,
+                                   Long sessionId,
+                                   Integer promptTokens,
+                                   Integer completionTokens,
+                                   Integer totalTokens);
+ 
     int updateGenerationTaskResultLink(Long projectId, Long taskId, Long resultId);
 }
 

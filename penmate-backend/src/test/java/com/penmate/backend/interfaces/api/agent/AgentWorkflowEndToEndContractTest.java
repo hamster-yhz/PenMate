@@ -3,8 +3,10 @@ package com.penmate.backend.interfaces.api.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
 import com.penmate.backend.application.agent.query.AgentSessionRecoveryQueryService;
+import com.penmate.backend.application.agent.query.AgentSessionTokenUsageQueryService;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
+import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
@@ -233,6 +235,7 @@ class AgentWorkflowEndToEndContractTest {
         AgentController controller = new AgentController(
                 agentConversationAppService,
                 recoveryAppService,
+                new AgentSessionTokenUsageAppService(new AgentSessionTokenUsageQueryService(repository)),
                 agentTurnAppService,
                 agentGenerationWorkflowDispatcher,
                 repository,

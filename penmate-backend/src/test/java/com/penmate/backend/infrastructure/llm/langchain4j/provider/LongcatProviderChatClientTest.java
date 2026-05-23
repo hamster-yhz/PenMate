@@ -2,6 +2,7 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
@@ -54,7 +55,7 @@ class LongcatProviderChatClientTest {
 
         AgentLlmTurnResponse actual = client.generateTurn(
                 new AgentLlmTurnRequest(
-                        List.of(Map.of("role", "user", "content", "hello")),
+                        List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("hello")),
                         List.of(),
                         null
                 ),
@@ -64,7 +65,8 @@ class LongcatProviderChatClientTest {
                         "https://api.longcat.chat/openai/v1",
                         "sk-test",
                         "LongCat-Flash-Thinking",
-                        "MODEL_CONFIG"
+                        "MODEL_CONFIG",
+                        6
                 )
         );
 
@@ -73,7 +75,138 @@ class LongcatProviderChatClientTest {
         assertThat(root.getStr("model")).isEqualTo("LongCat-Flash-Thinking");
     }
 
-    private void injectHttpClient(LongcatProviderChatClient client, HttpClient httpClient) throws Exception {
+    @Test
+    void UT_INFRA_LLM_LONGCAT_PROVIDER_CHAT_CLIENT_SHOULD_SEND_PROVIDER_COMPATIBLE_TOOL_SCHEMAS_WITHOUT_TOP_LEVEL_COMBINATORS() throws Exception {
+        LongcatProviderChatClient client = new LongcatProviderChatClient();
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        String[] capturedRequestBody = new String[1];
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    HttpRequest request = invocation.getArgument(0);
+                    capturedRequestBody[0] = readBody(request);
+                    return response;
+                });
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("""
+                {
+                  "choices": [{
+                    "finish_reason": "stop",
+                    "message": {
+                      "content": "ok"
+                    }
+                  }]
+                }
+                """);
+        injectHttpClient(client, httpClient);
+
+        AgentLlmTurnResponse actual = client.generateTurn(
+                new AgentLlmTurnRequest(
+                        List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("继续写第 3 章")),
+                        new com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource(List.of(
+                                new com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition(),
+                                new com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition(),
+                                new com.penmate.backend.application.agent.tool.definition.DraftGenerationToolDefinition(),
+                                new com.penmate.backend.application.agent.tool.definition.TodoPlannerToolDefinition()
+                        )).listLlmSchemas(),
+                        "auto"
+                ),
+                new AgentLlmExecutionConfig(
+                        2053134348617666560L,
+                        "longcat",
+                        "https://api.longcat.chat/openai/v1",
+                        "sk-test",
+                        "LongCat-Flash-Thinking",
+                        "MODEL_CONFIG",
+                        6
+                )
+        );
+
+        assertThat(actual.assistantText()).isEqualTo("ok");
+        JSONObject root = AgentJsonCodec.parseObj(capturedRequestBody[0]);
+        assertThat(root.getJSONArray("tools")).hasSize(4);
+        for (Object toolObject : root.getJSONArray("tools")) {
+            JSONObject parameters = ((JSONObject) toolObject)
+                    .getJSONObject("function")
+                    .getJSONObject("parameters");
+            assertThat(parameters.getStr("type")).isEqualTo("object");
+            assertThat(parameters.containsKey("oneOf")).isFalse();
+            assertThat(parameters.containsKey("anyOf")).isFalse();
+            assertThat(parameters.containsKey("allOf")).isFalse();
+            assertThat(parameters.containsKey("enum")).isFalse();
+            assertThat(parameters.containsKey("not")).isFalse();
+        }
+    }
+
+    @Test
+    void UT_INFRA_LLM_OPENAI_PROVIDER_CHAT_CLIENT_SHOULD_FALL_BACK_TO_TOOL_MODE_FOR_LONGCAT_ENDPOINT_DURING_STRUCTURED_PREFLIGHT() throws Exception {
+        OpenAiProviderChatClient client = new OpenAiProviderChatClient();
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        String[] capturedRequestBody = new String[1];
+
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    HttpRequest request = invocation.getArgument(0);
+                    capturedRequestBody[0] = readBody(request);
+                    return response;
+                });
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("""
+                {
+                  "choices": [{
+                    "finish_reason": "stop",
+                    "message": {
+                      "content": "ok"
+                    }
+                  }]
+                }
+                """);
+        injectHttpClient(client, httpClient);
+
+        AgentLlmTurnResponse actual = client.generateTurn(
+                new AgentLlmTurnRequest(
+                        List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("请分析请求")),
+                        List.of(new AgentLlmToolSchema(
+                                "submit_preflight_decision",
+                                "Return the preflight decision as structured Json only.",
+                                """
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "behaviorType": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["behaviorType"],
+                                          "additionalProperties": false
+                                        }
+                                        """
+                        )),
+                        "required"
+                ),
+                new AgentLlmExecutionConfig(
+                        2053134348617666560L,
+                        "openai",
+                        "https://api.longcat.chat/openai/v1",
+                        "sk-test",
+                        "LongCat-Flash-Thinking",
+                        "MODEL_CONFIG",
+                        6
+                )
+        );
+
+        assertThat(actual.assistantText()).isEqualTo("ok");
+        JSONObject root = AgentJsonCodec.parseObj(capturedRequestBody[0]);
+        assertThat(root.get("response_format")).isNull();
+        assertThat(root.getJSONArray("tools")).hasSize(1);
+        assertThat(root.getJSONObject("tool_choice").getStr("type")).isEqualTo("function");
+        assertThat(root.getJSONObject("tool_choice").getJSONObject("function").getStr("name"))
+                .isEqualTo("submit_preflight_decision");
+    }
+
+    private void injectHttpClient(NativeOpenAiStyleHttpProviderChatClient client, HttpClient httpClient) throws Exception {
         Field field = NativeOpenAiStyleHttpProviderChatClient.class.getDeclaredField("httpClient");
         field.setAccessible(true);
         field.set(client, httpClient);

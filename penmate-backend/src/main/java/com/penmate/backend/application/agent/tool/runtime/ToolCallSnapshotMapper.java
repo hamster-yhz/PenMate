@@ -4,6 +4,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.springframework.stereotype.Component;
@@ -20,20 +22,66 @@ import java.util.Map;
 @Component
 public class ToolCallSnapshotMapper {
 
-    public Map<String, Object> buildAssistantToolCallMessage(AgentLlmTurnResponse response) {
-        Map<String, Object> message = new LinkedHashMap<>();
-        message.put("role", "assistant");
-        message.put("content", response.assistantText());
-        message.put("tool_calls", buildToolCallPayloads(response.toolCalls()));
-        return message;
+    public AgentLlmMessage buildAssistantToolCallMessage(AgentLlmTurnResponse response) {
+        return AgentLlmMessage.assistant(
+                response.assistantText(),
+                response.toolCalls().stream()
+                        .map(toolCall -> new AgentLlmToolCallPayload(
+                                toolCall.id(),
+                                "function",
+                                toolCall.toolCode(),
+                                toolCall.argumentsJson()
+                        ))
+                        .toList()
+        );
     }
 
     public String toAssistantToolCallsJson(List<AgentLlmToolCall> toolCalls) {
         return AgentJsonCodec.toJson(buildToolCallPayloads(toolCalls));
     }
 
-    public String toConversationMessagesJson(List<Map<String, Object>> messages) {
-        return AgentJsonCodec.toJson(messages);
+    public String toConversationMessagesJson(List<AgentLlmMessage> messages) {
+        return AgentJsonCodec.toJson(messages.stream().map(this::toMessagePayload).toList());
+    }
+
+    private Map<String, Object> toMessagePayload(AgentLlmMessage message) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("role", message.role().wireValue());
+        payload.put("content", message.content());
+        if (!message.toolCalls().isEmpty()) {
+            payload.put("tool_calls", message.toolCalls().stream().map(toolCall -> {
+                Map<String, Object> function = new LinkedHashMap<>();
+                function.put("name", toolCall.functionName());
+                function.put("arguments", toolCall.argumentsJson());
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("id", toolCall.id());
+                item.put("type", toolCall.type());
+                item.put("function", function);
+                return item;
+            }).toList());
+        }
+        if (message.toolCallId() != null) {
+            payload.put("tool_call_id", message.toolCallId());
+        }
+        return payload;
+    }
+
+    public List<AgentLlmMessage> parseMessagesToTyped(String raw) {
+        JSONArray array = AgentJsonCodec.parseArray(raw);
+        List<AgentLlmMessage> messages = new ArrayList<>();
+        for (Object item : array) {
+            Map<String, Object> payload;
+            if (item instanceof JSONObject object) {
+                payload = new LinkedHashMap<>(object);
+            } else if (item instanceof Map<?, ?> map) {
+                payload = new LinkedHashMap<>();
+                map.forEach((key, value) -> payload.put(String.valueOf(key), value));
+            } else {
+                continue;
+            }
+            messages.add(toAgentLlmMessage(payload));
+        }
+        return messages;
     }
 
     public List<Map<String, Object>> parseMessages(String raw) {
@@ -66,9 +114,35 @@ public class ToolCallSnapshotMapper {
         return payloads;
     }
 
+    public List<AgentLlmMessage> toAgentLlmMessages(List<Map<String, Object>> rawMessages) {
+        List<AgentLlmMessage> messages = new ArrayList<>();
+        for (Map<String, Object> rawMessage : rawMessages == null ? List.<Map<String, Object>>of() : rawMessages) {
+            messages.add(toAgentLlmMessage(rawMessage));
+        }
+        return messages;
+    }
+
+    public AgentLlmMessage toAgentLlmMessage(Map<String, Object> rawMessage) {
+        String role = stringValue(rawMessage.get("role"));
+        String content = stringValue(rawMessage.get("content"));
+        if ("system".equalsIgnoreCase(role)) {
+            return AgentLlmMessage.system(content);
+        }
+        if ("user".equalsIgnoreCase(role)) {
+            return AgentLlmMessage.user(content);
+        }
+        if ("assistant".equalsIgnoreCase(role)) {
+            return AgentLlmMessage.assistant(content, toToolCallPayloadModels(rawMessage.get("tool_calls")));
+        }
+        if ("tool".equalsIgnoreCase(role)) {
+            return AgentLlmMessage.tool(stringValue(rawMessage.get("tool_call_id")), content);
+        }
+        throw new IllegalArgumentException("Unsupported llm message role: " + role);
+    }
+
     public ToolCallRequest buildLoopResumeRequest(PendingToolInvocationSnapshot snapshot,
                                                         Map<String, Object> toolCallPayload,
-                                                        List<Map<String, Object>> messages,
+                                                        List<AgentLlmMessage> messages,
                                                         String idempotencyKey) {
         Map<String, Object> functionPayload = mapValue(toolCallPayload.get("function"));
         String toolCallId = stringValue(toolCallPayload.get("id"));
@@ -108,6 +182,23 @@ public class ToolCallSnapshotMapper {
         payload.put("type", "function");
         payload.put("function", function);
         return payload;
+    }
+
+    private List<AgentLlmToolCallPayload> toToolCallPayloadModels(Object value) {
+        List<AgentLlmToolCallPayload> payloads = new ArrayList<>();
+        if (value instanceof List<?> items) {
+            for (Object item : items) {
+                Map<String, Object> payload = mapValue(item);
+                Map<String, Object> function = mapValue(payload.get("function"));
+                payloads.add(new AgentLlmToolCallPayload(
+                        stringValue(payload.get("id")),
+                        stringValue(payload.get("type")),
+                        stringValue(function.get("name")),
+                        stringValue(function.get("arguments"))
+                ));
+            }
+        }
+        return payloads;
     }
 
     private Map<String, Object> mapValue(Object value) {

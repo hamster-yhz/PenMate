@@ -134,8 +134,22 @@ public class ModelRepositoryImpl implements ModelRepository {
                                      String keySourceType,
                                      Long userKeyId,
                                      Long officialKeyId,
+                                     Integer contextWindowTurns,
+                                     Integer maxContextTokens,
                                      String status) {
-        return modelMapper.insertUserModelConfig(modelConfigId, userId, providerId, modelName, baseUrl, keySourceType, userKeyId, officialKeyId, status);
+        return modelMapper.insertUserModelConfig(
+                modelConfigId,
+                userId,
+                providerId,
+                modelName,
+                baseUrl,
+                keySourceType,
+                userKeyId,
+                officialKeyId,
+                contextWindowTurns,
+                maxContextTokens,
+                status
+        );
     }
 
     @Override
@@ -147,8 +161,22 @@ public class ModelRepositoryImpl implements ModelRepository {
                                      String keySourceType,
                                      Long userKeyId,
                                      Long officialKeyId,
+                                     Integer contextWindowTurns,
+                                     Integer maxContextTokens,
                                      String status) {
-        return modelMapper.updateUserModelConfig(userId, modelConfigId, providerId, modelName, baseUrl, keySourceType, userKeyId, officialKeyId, status);
+        return modelMapper.updateUserModelConfig(
+                userId,
+                modelConfigId,
+                providerId,
+                modelName,
+                baseUrl,
+                keySourceType,
+                userKeyId,
+                officialKeyId,
+                contextWindowTurns,
+                maxContextTokens,
+                status
+        );
     }
 
     @Override

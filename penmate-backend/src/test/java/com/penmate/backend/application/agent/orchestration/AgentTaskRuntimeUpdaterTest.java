@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,7 +66,7 @@ class AgentTaskRuntimeUpdaterTest {
         AgentTaskContext taskContext = AgentTaskContext.runningOf(71001L, 33L, "RUNNING", 3005L, "夜雨中的追踪在巷口停住。");
         String activeToolCallsSnapshot = "[{\"toolCallId\":\"tool-1\",\"toolCode\":\"quality_review\",\"status\":\"RUNNING\"}]";
 
-        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(33L), anyString(), anyString(), eq("trace-runtime")))
+        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(33L), nullable(String.class), anyString(), eq("trace-runtime")))
                 .thenReturn(1);
         when(agentRepository.updateGenerationTaskSnapshots(eq(1L), eq(33L), anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1);
@@ -111,8 +112,34 @@ class AgentTaskRuntimeUpdaterTest {
     }
 
     @Test
+    void UT_APP_AGENT_TASK_RUNTIME_UPDATER_SHOULD_NOT_OVERWRITE_EXISTING_TOKEN_USAGE_JSON_WHEN_UPDATING_COST() {
+        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(36L), nullable(String.class), anyString(), eq("trace-keep-token")))
+                .thenReturn(1);
+
+        agentTaskRuntimeUpdater.updateGenerationRuntime(
+                1L,
+                36L,
+                "完成后持久化运行时快照",
+                "这是带快照的完成答复",
+                "trace-keep-token"
+        );
+
+        ArgumentCaptor<String> tokenUsageCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> costJsonCaptor = ArgumentCaptor.forClass(String.class);
+        verify(agentRepository).updateGenerationTaskRuntime(
+                eq(1L),
+                eq(36L),
+                tokenUsageCaptor.capture(),
+                costJsonCaptor.capture(),
+                eq("trace-keep-token")
+        );
+        assertThat(tokenUsageCaptor.getValue()).isNull();
+        assertThat(costJsonCaptor.getValue()).contains("\"currency\":\"USD\"");
+    }
+
+    @Test
     void UT_APP_AGENT_TASK_RUNTIME_UPDATER_SHOULD_FAIL_WHEN_RUNTIME_ROW_UPDATE_AFFECTS_ZERO_ROWS() {
-        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(34L), anyString(), anyString(), eq("trace-runtime-zero")))
+        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(34L), nullable(String.class), anyString(), eq("trace-runtime-zero")))
                 .thenReturn(0);
 
         assertThatThrownBy(() -> agentTaskRuntimeUpdater.updateGenerationRuntime(
@@ -155,7 +182,7 @@ class AgentTaskRuntimeUpdaterTest {
                 "chapter:3005"
         );
 
-        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(35L), anyString(), anyString(), eq("trace-snapshot-zero")))
+        when(agentRepository.updateGenerationTaskRuntime(eq(1L), eq(35L), nullable(String.class), anyString(), eq("trace-snapshot-zero")))
                 .thenReturn(1);
         when(agentRepository.updateGenerationTaskSnapshots(eq(1L), eq(35L), anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(0);

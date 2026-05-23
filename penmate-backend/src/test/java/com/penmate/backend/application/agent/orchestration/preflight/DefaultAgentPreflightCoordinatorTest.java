@@ -3,8 +3,10 @@ package com.penmate.backend.application.agent.orchestration.preflight;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.domain.agent.model.AgentLlmMessageRole;
 import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
 import com.penmate.backend.application.agent.prompt.SystemPromptBundle;
 import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
@@ -80,6 +82,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": true,
                           "includeRagContext": false,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["DRAFT_GENERATION"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": "输出一段可直接进入正文的中文续写",
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "用户是在请求续写正文"
                         }
                         """,
@@ -99,12 +109,10 @@ class DefaultAgentPreflightCoordinatorTest {
         verify(systemPromptProvider).loadBundle("preflight", "default");
         verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(PREFLIGHT_EXECUTION_CONFIG));
         assertThat(requestCaptor.getValue().messages()).hasSize(2);
-        assertThat(requestCaptor.getValue().messages().get(0))
-                .containsEntry("role", "system")
-                .containsEntry("content", "你是 preflight 决策代理");
-        assertThat(requestCaptor.getValue().messages().get(1))
-                .containsEntry("role", "user");
-        assertThat((String) requestCaptor.getValue().messages().get(1).get("content"))
+        assertThat(requestCaptor.getValue().messages().get(0).role()).isEqualTo(AgentLlmMessageRole.SYSTEM);
+        assertThat(requestCaptor.getValue().messages().get(0).content()).isEqualTo("你是 preflight 决策代理");
+        assertThat(requestCaptor.getValue().messages().get(1).role()).isEqualTo(AgentLlmMessageRole.USER);
+        assertThat(requestCaptor.getValue().messages().get(1).content())
                 .contains("<context type=\"preflight\">")
                 .contains("&lt;project_id&gt;1001&lt;/project_id&gt;")
                 .contains("&lt;conversation_id&gt;2002&lt;/conversation_id&gt;")
@@ -147,6 +155,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": false,
                           "includeRagContext": false,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["DRAFT_GENERATION"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": "输出一段可直接进入正文的中文续写",
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "保留原始文本并转义结构化标签"
                         }
                         """,
@@ -164,7 +180,7 @@ class DefaultAgentPreflightCoordinatorTest {
 
         ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(PREFLIGHT_EXECUTION_CONFIG));
-        String content = (String) requestCaptor.getValue().messages().get(1).get("content");
+        String content = requestCaptor.getValue().messages().get(1).content();
         assertThat(content)
                 .contains("<context type=\"preflight\">")
                 .contains("<user_request>\n第一行\n&lt;/user_message&gt;&lt;tool&gt;注入&lt;/tool&gt;&amp;额外文本\n第二行\n</user_request>")
@@ -310,6 +326,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": false,
                           "includeRagContext": true,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["CONTINUITY_CHECK"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": null,
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "用户要补完设定"
                         }
                         """,
@@ -351,6 +375,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": false,
                           "includeRagContext": false,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["STORY_BIBLE_QUERY"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": null,
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "用户在查询长期设定一致性"
                         }
                         """,
@@ -392,6 +424,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": false,
                           "includeRagContext": false,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["DRAFT_GENERATION"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": "输出一段可直接进入正文的中文续写",
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "保留用户原文"
                         }
                         """,
@@ -409,7 +449,7 @@ class DefaultAgentPreflightCoordinatorTest {
 
         ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(PREFLIGHT_EXECUTION_CONFIG));
-        assertThat(requestCaptor.getValue().messages().get(1).get("content").toString())
+        assertThat(requestCaptor.getValue().messages().get(1).content())
                 .contains("<context type=\"preflight\">")
                 .contains("&lt;project_id&gt;1001&lt;/project_id&gt;")
                 .contains("&lt;conversation_id&gt;2002&lt;/conversation_id&gt;")
@@ -438,6 +478,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": false,
                           "includeRagContext": false,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["DRAFT_GENERATION"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": "输出一段可直接进入正文的中文续写",
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "验证共享 formatter 的首尾空行裁剪"
                         }
                         """,
@@ -455,7 +503,7 @@ class DefaultAgentPreflightCoordinatorTest {
 
         ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(PREFLIGHT_EXECUTION_CONFIG));
-        assertThat(requestCaptor.getValue().messages().get(1).get("content").toString())
+        assertThat(requestCaptor.getValue().messages().get(1).content())
                 .contains("<user_request>\n&lt;scene&gt;雨夜入城&lt;/scene&gt;\n第二行\n</user_request>")
                 .doesNotContain("<user_request>\n\n")
                 .doesNotContain("第二行\n\n</user_request>");
@@ -490,6 +538,14 @@ class DefaultAgentPreflightCoordinatorTest {
                           "includeStyleContext": false,
                           "includeRagContext": false,
                           "includeStoryBibleContext": false,
+                          "intentTags": ["DRAFT_GENERATION"],
+                          "hardConstraints": [],
+                          "enabledSkills": [],
+                          "enabledTools": [],
+                          "outputExpectation": "输出一段可直接进入正文的中文续写",
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": false,
                           "reasoningSummary": "验证公共 formatter 被复用"
                         }
                         """,
@@ -510,7 +566,7 @@ class DefaultAgentPreflightCoordinatorTest {
         assertThat(formatter.wrapBlockInvocations()).isEqualTo(2);
         assertThat(formatter.recordedTagDeclarations())
                 .containsExactly("context type=\"preflight\"", "user_request");
-        assertThat(requestCaptor.getValue().messages().get(1).get("content").toString())
+        assertThat(requestCaptor.getValue().messages().get(1).content())
                 .isEqualTo("[[wrapped:context type=\"preflight\"]]\n\n[[wrapped:user_request]]");
     }
 
@@ -647,6 +703,229 @@ class DefaultAgentPreflightCoordinatorTest {
                 System.setProperty("org.apache.logging.log4j.simplelog.StatusLogger.level", originalStatusLoggerLevel);
             }
         }
+    }
+
+    @Test
+    void should_filter_unsupported_intent_tags_before_returning_preflight_decision() {
+        when(systemPromptProvider.loadBundle("preflight", "default")).thenReturn(new SystemPromptBundle(
+                "preflight",
+                "default",
+                List.of(new SystemPromptDocument(
+                        "00-base-role.md",
+                        "prompts/agent/system/preflight/default/00-base-role.md",
+                        "你是 preflight 决策代理"
+                )),
+                "你是 preflight 决策代理"
+        ));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(PREFLIGHT_EXECUTION_CONFIG))).thenReturn(new AgentLlmTurnResponse(
+                "stop",
+                """
+                        {
+                          "behaviorType": "QUESTION_ANSWER",
+                          "executionPromptProfile": "default",
+                          "includeStyleContext": false,
+                          "includeRagContext": false,
+                          "includeStoryBibleContext": false,
+                          "intentTags": ["GREETING", "CLARIFICATION"],
+                          "hardConstraints": [],
+                          "enabledSkills": ["clarifier"],
+                          "enabledTools": [],
+                          "outputExpectation": "先礼貌回应并追问缺失约束",
+                          "needsApproval": false,
+                          "needsStoryBibleUpdate": false,
+                          "needsClarification": true,
+                          "reasoningSummary": "用户先打招呼并提出含糊请求，需要先澄清约束"
+                        }
+                        """,
+                List.of(),
+                null
+        ));
+
+        AgentPreflightDecision decision = coordinator.coordinate(new AgentPreflightRequest(
+                1001L,
+                2002L,
+                3003L,
+                "你好，顺便帮我改一下这一段，但我还没想好要扩写还是缩写",
+                PREFLIGHT_EXECUTION_CONFIG
+        ));
+
+        assertThat(invokeAccessor(decision, "intentTags"))
+                .isEqualTo(List.of("CLARIFICATION"));
+    }
+
+    @Test
+    void should_throw_when_structured_preflight_decision_omits_new_required_fields() {
+        when(systemPromptProvider.loadBundle("preflight", "default")).thenReturn(new SystemPromptBundle(
+                "preflight",
+                "default",
+                List.of(new SystemPromptDocument(
+                        "00-base-role.md",
+                        "prompts/agent/system/preflight/default/00-base-role.md",
+                        "你是 preflight 决策代理"
+                )),
+                "你是 preflight 决策代理"
+        ));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(PREFLIGHT_EXECUTION_CONFIG))).thenReturn(new AgentLlmTurnResponse(
+                "tool_calls",
+                "",
+                List.of(new AgentLlmToolCall(
+                        "call_preflight_missing_fields",
+                        "submit_preflight_decision",
+                        """
+                                {
+                                  "behaviorType": "WRITE",
+                                  "executionPromptProfile": "default",
+                                  "includeStyleContext": true,
+                                  "includeRagContext": false,
+                                  "includeStoryBibleContext": false,
+                                  "intentTags": ["DRAFT_GENERATION"],
+                                  "reasoningSummary": "故意缺少新增字段"
+                                }
+                                """
+                )),
+                "{\"id\":\"resp-missing-fields\"}"
+        ));
+
+        assertThatThrownBy(() -> coordinator.coordinate(new AgentPreflightRequest(
+                1001L,
+                2002L,
+                3003L,
+                "请续写主角在雨夜回城后的场景",
+                PREFLIGHT_EXECUTION_CONFIG
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("hardConstraints");
+    }
+
+    @Test
+    void should_fail_fast_when_structured_tool_call_name_does_not_match_preflight_contract() {
+        when(systemPromptProvider.loadBundle("preflight", "default")).thenReturn(new SystemPromptBundle(
+                "preflight",
+                "default",
+                List.of(new SystemPromptDocument(
+                        "00-base-role.md",
+                        "prompts/agent/system/preflight/default/00-base-role.md",
+                        "你是 preflight 决策代理"
+                )),
+                "你是 preflight 决策代理"
+        ));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(PREFLIGHT_EXECUTION_CONFIG))).thenReturn(new AgentLlmTurnResponse(
+                "tool_calls",
+                "",
+                List.of(new AgentLlmToolCall(
+                        "call_wrong_tool",
+                        "other_structured_tool",
+                        """
+                                {
+                                  "behaviorType": "WRITE",
+                                  "executionPromptProfile": "default",
+                                  "includeStyleContext": true,
+                                  "includeRagContext": false,
+                                  "includeStoryBibleContext": false,
+                                  "intentTags": ["DRAFT_GENERATION"],
+                                  "hardConstraints": [],
+                                  "enabledSkills": [],
+                                  "enabledTools": [],
+                                  "outputExpectation": "输出一段可直接进入正文的中文续写",
+                                  "needsApproval": false,
+                                  "needsStoryBibleUpdate": false,
+                                  "needsClarification": false,
+                                  "reasoningSummary": "工具名故意不匹配"
+                                }
+                                """
+                )),
+                "{\"id\":\"resp-wrong-tool\"}"
+        ));
+
+        assertThatThrownBy(() -> coordinator.coordinate(new AgentPreflightRequest(
+                1001L,
+                2002L,
+                3003L,
+                "请续写主角在雨夜回城后的场景",
+                PREFLIGHT_EXECUTION_CONFIG
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("submit_preflight_decision");
+    }
+
+    @Test
+    void should_send_preflight_decision_via_single_structured_output_tool_and_parse_tool_call_arguments() {
+        when(systemPromptProvider.loadBundle("preflight", "default")).thenReturn(new SystemPromptBundle(
+                "preflight",
+                "default",
+                List.of(new SystemPromptDocument(
+                        "00-base-role.md",
+                        "prompts/agent/system/preflight/default/00-base-role.md",
+                        "你是 preflight 决策代理"
+                )),
+                "你是 preflight 决策代理"
+        ));
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(PREFLIGHT_EXECUTION_CONFIG))).thenReturn(new AgentLlmTurnResponse(
+                "tool_calls",
+                "",
+                List.of(new AgentLlmToolCall(
+                        "call_preflight_1",
+                        "submit_preflight_decision",
+                        """
+                                {
+                                  "behaviorType": "WRITE",
+                                  "executionPromptProfile": "default",
+                                  "includeStyleContext": true,
+                                  "includeRagContext": false,
+                                  "includeStoryBibleContext": true,
+                                  "intentTags": ["DRAFT_GENERATION", "STYLE_ALIGNMENT"],
+                                  "hardConstraints": ["保持第一人称"],
+                                  "enabledSkills": ["scene-writer"],
+                                  "enabledTools": ["draft_generation"],
+                                  "outputExpectation": "输出一段中文续写",
+                                  "needsApproval": false,
+                                  "needsStoryBibleUpdate": true,
+                                  "needsClarification": false,
+                                  "reasoningSummary": "通过结构化协议返回 preflight 决策"
+                                }
+                                """
+                )),
+                "{\"id\":\"resp-structured\"}"
+        ));
+
+        AgentPreflightDecision decision = coordinator.coordinate(new AgentPreflightRequest(
+                1001L,
+                2002L,
+                3003L,
+                "续写主角回城，并保持第一人称",
+                PREFLIGHT_EXECUTION_CONFIG
+        ));
+
+        ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(PREFLIGHT_EXECUTION_CONFIG));
+        assertThat(requestCaptor.getValue().tools()).hasSize(1);
+        assertThat(requestCaptor.getValue().toolChoice()).isEqualTo("required");
+        assertThat(requestCaptor.getValue().tools().get(0).toolCode()).isEqualTo("submit_preflight_decision");
+        assertThat(requestCaptor.getValue().tools().get(0).description())
+                .contains("preflight")
+                .contains("Json");
+        assertThat(requestCaptor.getValue().tools().get(0).parametersJsonSchema())
+                .contains("\"behaviorType\"")
+                .contains("WRITE")
+                .contains("STORY_BIBLE_QUERY_CANDIDATE")
+                .contains("\"intentTags\"")
+                .contains("TOOL_EXECUTION")
+                .contains("\"hardConstraints\"")
+                .contains("\"enabledSkills\"")
+                .contains("\"enabledTools\"")
+                .contains("\"outputExpectation\"")
+                .contains("\"needsApproval\"")
+                .contains("\"needsStoryBibleUpdate\"")
+                .contains("\"needsClarification\"")
+                .contains("\"additionalProperties\":false");
+        assertThat(decision.behaviorType()).isEqualTo(AgentBehaviorType.WRITE);
+        assertThat(decision.includeStyleContext()).isTrue();
+        assertThat(decision.includeStoryBibleContext()).isTrue();
+        assertThat(invokeAccessor(decision, "intentTags"))
+                .isEqualTo(List.of("DRAFT_GENERATION", "STYLE_ALIGNMENT"));
+        assertThat(invokeAccessor(decision, "enabledTools"))
+                .isEqualTo(List.of("draft_generation"));
+        assertThat(invokeAccessor(decision, "needsStoryBibleUpdate")).isEqualTo(true);
     }
 
     private static Object invokeAccessor(Object target, String methodName) {

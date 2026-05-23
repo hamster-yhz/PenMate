@@ -40,6 +40,8 @@ public final class ModelCommands {
                                                String baseUrl,
                                                String keySourceType,
                                                String apiKey,
+                                               Integer contextWindowTurns,
+                                               Integer maxContextTokens,
                                                String status,
                                                Long operatorId) {
     }
@@ -49,6 +51,8 @@ public final class ModelCommands {
                                                String baseUrl,
                                                String keySourceType,
                                                String apiKey,
+                                               Integer contextWindowTurns,
+                                               Integer maxContextTokens,
                                                String status,
                                                Long operatorId) {
     }

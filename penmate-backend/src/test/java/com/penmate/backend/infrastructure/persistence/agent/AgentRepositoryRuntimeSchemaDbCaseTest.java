@@ -17,6 +17,8 @@ import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -312,13 +314,79 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             assertThat(repository.updateGenerationTaskRuntime(
                     920001L,
                     940407L,
-                    "{\"inputTokens\":11,\"outputTokens\":10}",
+                    "{\"promptTokens\":11,\"completionTokens\":7,\"totalTokens\":18}",
                     "{\"currency\":\"USD\",\"estimated\":0.000020}",
                     "trace-runtime-task-7-updated"
             )).isEqualTo(1);
             assertThat(singleString("SELECT token_usage_json FROM agent_task_results WHERE result_id = 960407"))
-                    .isEqualTo("{\"inputTokens\":11,\"outputTokens\":10}");
+                    .isEqualTo("{\"promptTokens\":11,\"completionTokens\":7,\"totalTokens\":18}");
             assertThat(singleString("SELECT cost_usage_json FROM agent_task_results WHERE result_id = 960407"))
+                    .isEqualTo("{\"currency\":\"USD\",\"estimated\":0.000020}");
+        }
+    }
+
+    @Test
+    void should_preserve_existing_token_usage_json_when_runtime_update_only_writes_cost() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940417, 920002, 1, 920001, 'WRITE', 'done', 'runtime 仅写 cost', NULL, 960417, NULL, NULL, 'trace-runtime-task-17')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_results(result_id, task_id, result_status, assistant_message_id, output_markdown, output_structured_json, tool_trace_json, token_usage_json, cost_usage_json, error_code, error_message)
+                    VALUES (960417, 940417, 'SUCCEEDED', NULL, '正文', NULL, NULL, '{"promptTokens":11,"completionTokens":7,"totalTokens":18}', NULL, NULL, NULL)
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            assertThat(repository.updateGenerationTaskRuntime(
+                    920001L,
+                    940417L,
+                    null,
+                    "{\"currency\":\"USD\",\"estimated\":0.000020}",
+                    "trace-runtime-task-17-updated"
+            )).isEqualTo(1);
+            assertThat(singleString("SELECT token_usage_json FROM agent_task_results WHERE result_id = 960417"))
+                    .isEqualTo("{\"promptTokens\":11,\"completionTokens\":7,\"totalTokens\":18}");
+            assertThat(singleString("SELECT cost_usage_json FROM agent_task_results WHERE result_id = 960417"))
+                    .isEqualTo("{\"currency\":\"USD\",\"estimated\":0.000020}");
+        }
+    }
+
+    @Test
+    void should_preserve_existing_cost_json_when_runtime_update_only_writes_token_usage() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940418, 920002, 1, 920001, 'WRITE', 'done', 'runtime 仅写 token', NULL, 960418, NULL, NULL, 'trace-runtime-task-18')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_results(result_id, task_id, result_status, assistant_message_id, output_markdown, output_structured_json, tool_trace_json, token_usage_json, cost_usage_json, error_code, error_message)
+                    VALUES (960418, 940418, 'SUCCEEDED', NULL, '正文', NULL, NULL, NULL, '{"currency":"USD","estimated":0.000020}', NULL, NULL)
+                    """);
+
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            assertThat(repository.updateGenerationTaskRuntime(
+                    920001L,
+                    940418L,
+                    "{\"promptTokens\":11,\"completionTokens\":7,\"totalTokens\":18}",
+                    null,
+                    "trace-runtime-task-18-updated"
+            )).isEqualTo(1);
+            assertThat(singleString("SELECT token_usage_json FROM agent_task_results WHERE result_id = 960418"))
+                    .isEqualTo("{\"promptTokens\":11,\"completionTokens\":7,\"totalTokens\":18}");
+            assertThat(singleString("SELECT cost_usage_json FROM agent_task_results WHERE result_id = 960418"))
                     .isEqualTo("{\"currency\":\"USD\",\"estimated\":0.000020}");
         }
     }
@@ -442,6 +510,113 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
         }
     }
 
+    @Test
+    void should_increment_and_expose_session_token_usage_on_runtime_schema() throws Exception {
+        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            AgentSessionMapper mapper = sqlSession.getMapper(AgentSessionMapper.class);
+
+            assertThat(mapper.incrementSessionTokenUsage(920001L, 920002L, 11, 7, 18)).isEqualTo(1);
+            assertThat(singleLong("SELECT total_prompt_tokens FROM agent_sessions WHERE session_id = 920002")).isEqualTo(11L);
+            assertThat(singleLong("SELECT total_completion_tokens FROM agent_sessions WHERE session_id = 920002")).isEqualTo(7L);
+            assertThat(singleLong("SELECT total_tokens FROM agent_sessions WHERE session_id = 920002")).isEqualTo(18L);
+            assertThat(normalizeKeys(mapper.findSessionRow(920001L, 920002L)))
+                    .containsKeys("totalprompttokens", "totalcompletiontokens", "totaltokens");
+        }
+    }
+
+    @Test
+    void should_increment_session_token_usage_through_agent_repository_runtime_schema() throws Exception {
+        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            AgentRepositoryImpl repository = new AgentRepositoryImpl(
+                    sqlSession.getMapper(AgentMapper.class),
+                    sqlSession.getMapper(AgentSessionMapper.class)
+            );
+
+            java.lang.reflect.Method method = AgentRepositoryImpl.class.getMethod(
+                    "incrementSessionTokenUsage",
+                    Long.class,
+                    Long.class,
+                    Integer.class,
+                    Integer.class,
+                    Integer.class
+            );
+
+            Object affectedRows = method.invoke(repository, 920001L, 920002L, 5, 3, 8);
+
+            assertThat(affectedRows).isEqualTo(1);
+            assertThat(singleLong("SELECT total_prompt_tokens FROM agent_sessions WHERE session_id = 920002")).isEqualTo(5L);
+            assertThat(singleLong("SELECT total_completion_tokens FROM agent_sessions WHERE session_id = 920002")).isEqualTo(3L);
+            assertThat(singleLong("SELECT total_tokens FROM agent_sessions WHERE session_id = 920002")).isEqualTo(8L);
+        }
+    }
+
+    @Test
+    void should_read_session_token_usage_summary_with_model_context_limit_from_runtime_schema() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement();
+             SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            statement.execute("""
+                    CREATE TABLE model_user_configurations (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        model_config_id BIGINT NOT NULL,
+                        user_id BIGINT NOT NULL,
+                        provider_id BIGINT NOT NULL,
+                        model_name VARCHAR(100) NOT NULL,
+                        base_url VARCHAR(500) NULL,
+                        key_source_type VARCHAR(20) NOT NULL,
+                        user_key_id BIGINT NULL,
+                        official_key_id BIGINT NULL,
+                        context_window_turns INT NOT NULL,
+                        max_context_tokens INT NOT NULL,
+                        status VARCHAR(20) NOT NULL,
+                        deleted_at TIMESTAMP NULL
+                    )
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_tasks(task_id, session_id, turn_id, project_id, task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id)
+                    VALUES (940499, 920002, 1, 920001, 'WRITE', 'SUCCEEDED', NULL, 950499, NULL, NULL, NULL, 'trace-runtime-token-usage-1')
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_task_contexts(context_id, task_id, chapter_id, selected_text, outline_snapshot_json, cards_snapshot_json, rag_snapshot_json, plugin_bindings_json, style_snapshot_json, model_snapshot_json, context_hash)
+                    VALUES (950499, 940499, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{"modelConfigId":88002}', 'hash-940499')
+                    """);
+            statement.execute("""
+                    UPDATE agent_sessions
+                    SET last_task_id = 940499,
+                        total_prompt_tokens = 48000,
+                        total_completion_tokens = 16000,
+                        total_tokens = 64000
+                    WHERE session_id = 920002
+                    """);
+            statement.execute("""
+                    INSERT INTO model_user_configurations(
+                        model_config_id, user_id, provider_id, model_name, base_url,
+                        key_source_type, user_key_id, official_key_id, context_window_turns, max_context_tokens, status, deleted_at
+                    )
+                    VALUES (88002, 1001, 1, 'gpt-4.1', NULL, 'USER_KEY', NULL, NULL, 6, 128000, 'ACTIVE', NULL)
+                    """);
+
+            AgentSessionRepositoryImpl repository = new AgentSessionRepositoryImpl(
+                    sqlSession.getMapper(AgentSessionMapper.class),
+                    () -> 990499L
+            );
+            java.lang.reflect.Method method = AgentSessionRepositoryImpl.class.getMethod(
+                    "findSessionTokenUsageSummary",
+                    Long.class,
+                    Long.class
+            );
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> summary = (Map<String, Object>) method.invoke(repository, 920001L, 920002L);
+            Map<String, Object> normalized = normalizeKeys(summary);
+
+            assertThat(normalized).containsEntry("prompttokens", 48000);
+            assertThat(normalized).containsEntry("completiontokens", 16000);
+            assertThat(normalized).containsEntry("maxcontexttokens", 128000);
+            assertThat(normalized).containsEntry("modelname", "gpt-4.1");
+        }
+    }
+
     private static SqlSessionFactory buildSqlSessionFactory() {
         DataSource dataSource = new org.apache.ibatis.datasource.unpooled.UnpooledDataSource(
                 "org.h2.Driver",
@@ -464,6 +639,7 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
             statement.execute("DROP TABLE IF EXISTS agent_task_contexts");
             statement.execute("DROP TABLE IF EXISTS agent_tasks");
             statement.execute("DROP TABLE IF EXISTS agent_messages");
+            statement.execute("DROP TABLE IF EXISTS model_user_configurations");
             statement.execute("DROP TABLE IF EXISTS agent_sessions");
             statement.execute("""
                     CREATE TABLE agent_sessions (
@@ -479,6 +655,9 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
                         last_task_id BIGINT NULL,
                         last_message_at TIMESTAMP NULL,
                         resumed_at TIMESTAMP NULL,
+                        total_prompt_tokens INT NOT NULL DEFAULT 0,
+                        total_completion_tokens INT NOT NULL DEFAULT 0,
+                        total_tokens INT NOT NULL DEFAULT 0,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         deleted_at TIMESTAMP NULL
@@ -575,10 +754,20 @@ class AgentRepositoryRuntimeSchemaDbCaseTest {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
             statement.execute("""
-                    INSERT INTO agent_sessions(session_id, project_id, owner_user_id, title, session_status, bound_style_id, active_context_version, last_turn_id, last_task_id, last_message_at, resumed_at)
-                    VALUES (920002, 920001, 1001, 'Session-A', 'ACTIVE', 81, 1, NULL, NULL, NULL, NULL)
+                    INSERT INTO agent_sessions(
+                        session_id, project_id, owner_user_id, title, session_status,
+                        bound_style_id, active_context_version, last_turn_id, last_task_id, last_message_at, resumed_at,
+                        total_prompt_tokens, total_completion_tokens, total_tokens
+                    )
+                    VALUES (920002, 920001, 1001, 'Session-A', 'ACTIVE', 81, 1, NULL, NULL, NULL, NULL, 0, 0, 0)
                     """);
         }
+    }
+
+    private Map<String, Object> normalizeKeys(Map<String, Object> source) {
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        source.forEach((key, value) -> normalized.put(key.toLowerCase(Locale.ROOT), value));
+        return normalized;
     }
 
     private long countRows(String tableName) throws Exception {

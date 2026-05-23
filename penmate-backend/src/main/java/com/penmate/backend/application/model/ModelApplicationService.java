@@ -35,6 +35,8 @@ public class ModelApplicationService {
 
     private static final String USER_KEY_SOURCE = "USER_KEY";
     private static final String OFFICIAL_KEY_SOURCE = "OFFICIAL_KEY";
+    private static final int DEFAULT_CONTEXT_WINDOW_TURNS = 6;
+    private static final int DEFAULT_MAX_CONTEXT_TOKENS = 128000;
 
     private final ModelRepository modelRepository;
     private final BusinessIdGenerator businessIdGenerator;
@@ -121,6 +123,8 @@ public class ModelApplicationService {
                 keyBinding.keySourceType(),
                 keyBinding.userKeyId(),
                 keyBinding.officialKeyId(),
+                normalizeContextWindowTurns(command.contextWindowTurns()),
+                normalizeMaxContextTokens(command.maxContextTokens()),
                 normalizeStatus(command.status())
         );
         if (affected != 1) {
@@ -148,6 +152,12 @@ public class ModelApplicationService {
                 ? normalizeKeySourceType(command.keySourceType())
                 : stringValue(existing.get("keySourceType"));
         String mergedStatus = command.status() != null ? normalizeStatus(command.status()) : stringValue(existing.get("status"));
+        Integer mergedContextWindowTurns = command.contextWindowTurns() != null
+                ? normalizeContextWindowTurns(command.contextWindowTurns())
+                : intValue(existing.get("contextWindowTurns"), DEFAULT_CONTEXT_WINDOW_TURNS);
+        Integer mergedMaxContextTokens = command.maxContextTokens() != null
+                ? normalizeMaxContextTokens(command.maxContextTokens())
+                : intValue(existing.get("maxContextTokens"), DEFAULT_MAX_CONTEXT_TOKENS);
 
         validateProviderAndModelName(mergedProviderId, mergedModelName);
         KeyBinding keyBinding = resolveKeyBindingForUpdate(
@@ -170,10 +180,12 @@ public class ModelApplicationService {
                 keyBinding.keySourceType(),
                 keyBinding.userKeyId(),
                 keyBinding.officialKeyId(),
+                mergedContextWindowTurns,
+                mergedMaxContextTokens,
                 mergedStatus
         );
         if (affected != 1) {
-            throw BusinessException.of("User model config not found");
+            throw BusinessException.of("Failed to update user model config");
         }
         writeAudit(traceId, command.operatorId(), "model", "update-user-model-config", "model_user_configurations", modelConfigId.toString(), null, 200);
     }
@@ -576,6 +588,36 @@ public class ModelApplicationService {
     private String normalizeStatus(String status) {
         String normalized = normalizeNullable(status);
         return normalized == null ? "active" : normalized;
+    }
+
+    private Integer normalizeContextWindowTurns(Integer value) {
+        if (value == null) {
+            return DEFAULT_CONTEXT_WINDOW_TURNS;
+        }
+        if (value < 0) {
+            throw BusinessException.of("contextWindowTurns must be greater than or equal to 0");
+        }
+        return value;
+    }
+
+    private Integer normalizeMaxContextTokens(Integer value) {
+        if (value == null) {
+            return DEFAULT_MAX_CONTEXT_TOKENS;
+        }
+        if (value <= 0) {
+            throw BusinessException.of("maxContextTokens must be greater than 0");
+        }
+        return value;
+    }
+
+    private Integer intValue(Object value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.parseInt(String.valueOf(value));
     }
 
     private Long longValue(Object value) {

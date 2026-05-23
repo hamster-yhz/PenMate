@@ -17,7 +17,8 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
               "properties": {
                 "planningMode": {
                   "type": "string",
-                  "enum": ["TASK_BREAKDOWN", "QUALITY_REMEDIATION", "FOLLOW_UP_MODIFICATION"]
+                  "enum": ["TASK_BREAKDOWN", "QUALITY_REMEDIATION", "FOLLOW_UP_MODIFICATION"],
+                  "description": "TASK_BREAKDOWN 需要 userRequest；QUALITY_REMEDIATION 需要 qualityIssues；FOLLOW_UP_MODIFICATION 至少应提供 userRequest、qualityIssues、storyBibleUpdates、planningContext、existingTodos 之一"
                 },
                 "userRequest": {
                   "type": "string"
@@ -63,153 +64,27 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
               "required": ["planningMode"],
               "oneOf": [
                 {
-                  "type": "object",
                   "properties": {
                     "planningMode": {
                       "const": "TASK_BREAKDOWN"
-                    },
-                    "userRequest": {
-                      "type": "string"
-                    },
-                    "qualityIssues": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "severity": {
-                            "type": "string"
-                          },
-                          "summary": {
-                            "type": "string"
-                          },
-                          "suggestion": {
-                            "type": "string"
-                          }
-                        },
-                        "required": ["severity", "summary", "suggestion"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "storyBibleUpdates": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "planningContext": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "existingTodos": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
                     }
                   },
-                  "required": ["planningMode", "userRequest"],
-                  "additionalProperties": false
+                  "required": ["planningMode", "userRequest"]
                 },
                 {
-                  "type": "object",
                   "properties": {
                     "planningMode": {
                       "const": "QUALITY_REMEDIATION"
-                    },
-                    "userRequest": {
-                      "type": "string"
-                    },
-                    "qualityIssues": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "severity": {
-                            "type": "string"
-                          },
-                          "summary": {
-                            "type": "string"
-                          },
-                          "suggestion": {
-                            "type": "string"
-                          }
-                        },
-                        "required": ["severity", "summary", "suggestion"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "storyBibleUpdates": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "planningContext": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "existingTodos": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
                     }
                   },
-                  "required": ["planningMode", "qualityIssues"],
-                  "additionalProperties": false
+                  "required": ["planningMode", "qualityIssues"]
                 },
                 {
-                  "type": "object",
                   "properties": {
                     "planningMode": {
                       "const": "FOLLOW_UP_MODIFICATION"
-                    },
-                    "userRequest": {
-                      "type": "string"
-                    },
-                    "qualityIssues": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "severity": {
-                            "type": "string"
-                          },
-                          "summary": {
-                            "type": "string"
-                          },
-                          "suggestion": {
-                            "type": "string"
-                          }
-                        },
-                        "required": ["severity", "summary", "suggestion"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "storyBibleUpdates": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "planningContext": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "existingTodos": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
                     }
                   },
-                  "required": ["planningMode"],
                   "anyOf": [
                     {
                       "required": ["userRequest"]
@@ -226,10 +101,10 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
                     {
                       "required": ["existingTodos"]
                     }
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
-              ]
+              ],
+              "additionalProperties": false
             }
             """;
 
