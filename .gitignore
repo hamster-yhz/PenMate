@@ -109,3 +109,5 @@ penmate-frontend/coverage/
 ### Workspace tooling ###
 .roo/
 .roomodes
+.agents/
+.codex-runtime/
