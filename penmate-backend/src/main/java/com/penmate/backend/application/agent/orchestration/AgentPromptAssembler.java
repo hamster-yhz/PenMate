@@ -19,10 +19,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
 
-/**
- * Agent 初始提示词装配器。
- * <p>负责把系统提示词、任务 prompt、任务上下文中的风格快照与 RAG 检索片段拼装成首轮发送给 LLM 的消息列表。</p>
- */
 @Component
 public class AgentPromptAssembler {
 
@@ -60,37 +56,26 @@ public class AgentPromptAssembler {
                 ? ""
                 : taskContext.getStyleSnapshotJson().trim();
         String storyBible = storyBibleContent == null ? "" : storyBibleContent.trim();
-        StringJoiner userBuilder = new StringJoiner("\n\n");
-
-        if (!style.isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", style));
-        }
-        if (ragChunks != null && !ragChunks.isEmpty()) {
-            StringBuilder ragBuilder = new StringBuilder();
-            for (RagRetrievedChunk chunk : ragChunks) {
-                ragBuilder.append("- [")
-                        .append(chunk.getDocumentTitle() == null ? "文档" : chunk.getDocumentTitle())
-                        .append("#")
-                        .append(chunk.getChunkNo() == null ? 0 : chunk.getChunkNo())
-                        .append("] ")
-                        .append(chunk.getContentText() == null ? "" : chunk.getContentText())
-                        .append("\n");
-            }
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", ragBuilder.toString()));
-        }
-        if (!storyBible.isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", storyBible));
-        }
-        userBuilder.add(structuredPromptBlockFormatter.wrapBlock("user_request", prompt));
+        String contextSystemMessage = buildExecutionContextSystemMessage(
+                style,
+                storyBible.isEmpty() ? List.of() : List.of(storyBible),
+                List.of(),
+                List.of(),
+                formatTaskPathRagRefs(ragChunks)
+        );
+        String userRequestBlock = structuredPromptBlockFormatter.wrapBlock("user_request", prompt);
 
         String profile = executionProfile == null || executionProfile.isBlank() ? resolveProfile(task) : executionProfile.trim();
         SystemPromptBundle promptBundle = systemPromptProvider.loadBundle("execution", profile);
         List<AgentLlmMessage> result = new ArrayList<>();
         result.add(AgentLlmMessage.system(promptBundle.assembledPrompt()));
+        if (!contextSystemMessage.isBlank()) {
+            result.add(AgentLlmMessage.system(contextSystemMessage));
+        }
         if (conversationWindow != null && !conversationWindow.isEmpty()) {
             result.addAll(conversationWindow);
         }
-        result.add(AgentLlmMessage.user(userBuilder.toString()));
+        result.add(AgentLlmMessage.user(userRequestBlock));
         return List.copyOf(result);
     }
 
@@ -104,33 +89,66 @@ public class AgentPromptAssembler {
                                                         ContextPackage contextPackage,
                                                         String userRequest,
                                                         List<AgentLlmMessage> conversationWindow) {
-        StringJoiner userBuilder = new StringJoiner("\n\n");
         ContextPackage resolvedContext = Objects.requireNonNull(contextPackage, "contextPackage");
-
-        if (!resolvedContext.styleSnapshot().isBlank()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", resolvedContext.styleSnapshot()));
-        }
-        if (!resolvedContext.ragRefs().isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", String.join("\n", resolvedContext.ragRefs())));
-        }
-        if (!resolvedContext.storyBibleEntries().isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", String.join("\n", resolvedContext.storyBibleEntries())));
-        }
-        if (!resolvedContext.conflicts().isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"conflict\"", String.join("\n", resolvedContext.conflicts())));
-        }
-        if (!resolvedContext.missingContextFlags().isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"missing\"", String.join("\n", resolvedContext.missingContextFlags())));
-        }
-        userBuilder.add(structuredPromptBlockFormatter.wrapBlock("user_request", userRequest == null ? "" : userRequest.trim()));
+        String contextSystemMessage = buildExecutionContextSystemMessage(
+                resolvedContext.styleSnapshot(),
+                resolvedContext.storyBibleEntries(),
+                resolvedContext.conflicts(),
+                resolvedContext.missingContextFlags(),
+                resolvedContext.ragRefs()
+        );
+        String userRequestBlock = structuredPromptBlockFormatter.wrapBlock("user_request", userRequest == null ? "" : userRequest.trim());
 
         List<AgentLlmMessage> result = new ArrayList<>();
         result.add(AgentLlmMessage.system(promptPlan == null ? "" : promptPlan.assembledPromptPreview()));
+        if (!contextSystemMessage.isBlank()) {
+            result.add(AgentLlmMessage.system(contextSystemMessage));
+        }
         if (conversationWindow != null && !conversationWindow.isEmpty()) {
             result.addAll(conversationWindow);
         }
-        result.add(AgentLlmMessage.user(userBuilder.toString()));
+        result.add(AgentLlmMessage.user(userRequestBlock));
         return List.copyOf(result);
+    }
+
+    private String buildExecutionContextSystemMessage(String style,
+                                                      List<String> storyBibleEntries,
+                                                      List<String> conflicts,
+                                                      List<String> missingFlags,
+                                                      List<String> ragRefs) {
+        StringJoiner contextBuilder = new StringJoiner("\n\n");
+        if (style != null && !style.isBlank()) {
+            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", style));
+        }
+        if (storyBibleEntries != null && !storyBibleEntries.isEmpty()) {
+            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", String.join("\n", storyBibleEntries)));
+        }
+        if (conflicts != null && !conflicts.isEmpty()) {
+            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"conflict\"", String.join("\n", conflicts)));
+        }
+        if (missingFlags != null && !missingFlags.isEmpty()) {
+            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"missing\"", String.join("\n", missingFlags)));
+        }
+        if (ragRefs != null && !ragRefs.isEmpty()) {
+            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", String.join("\n", ragRefs)));
+        }
+        return contextBuilder.toString();
+    }
+
+    private List<String> formatTaskPathRagRefs(List<RagRetrievedChunk> ragChunks) {
+        if (ragChunks == null || ragChunks.isEmpty()) {
+            return List.of();
+        }
+        List<String> ragRefs = new ArrayList<>();
+        for (RagRetrievedChunk chunk : ragChunks) {
+            ragRefs.add("- ["
+                    + (chunk.getDocumentTitle() == null ? "document" : chunk.getDocumentTitle())
+                    + "#"
+                    + (chunk.getChunkNo() == null ? 0 : chunk.getChunkNo())
+                    + "] "
+                    + (chunk.getContentText() == null ? "" : chunk.getContentText()));
+        }
+        return List.copyOf(ragRefs);
     }
 
     private List<Map<String, Object>> toWireMessages(List<AgentLlmMessage> messages) {

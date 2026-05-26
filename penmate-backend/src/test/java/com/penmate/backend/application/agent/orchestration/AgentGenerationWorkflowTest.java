@@ -209,13 +209,19 @@ class AgentGenerationWorkflowTest {
 
         ArgumentCaptor<List<com.penmate.backend.domain.agent.model.AgentLlmMessage>> messagesCaptor = ArgumentCaptor.forClass(List.class);
         verify(agentToolLoopRunner).execute(eq(1L), eq(10L), eq(9L), eq(0L), eq("trace-real-chain"), messagesCaptor.capture(), any());
-        assertThat(messagesCaptor.getValue()).hasSize(2);
+        assertThat(messagesCaptor.getValue()).hasSize(3);
         assertThat(messagesCaptor.getValue().get(0).role()).isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.SYSTEM);
-        assertThat(messagesCaptor.getValue().get(0).content()).contains("你是执行代理");
+        assertThat(messagesCaptor.getValue().get(0).content()).contains("执行代理");
+        assertThat(messagesCaptor.getValue().get(1).role()).isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.SYSTEM);
         assertThat(messagesCaptor.getValue().get(1).content())
-                .contains("<context type=\"style\">\n{\"styleId\":81,\"tone\":\"克制\"}\n</context>")
-                .contains("<context type=\"story_bible\">\n角色年龄：17（canon）\n不得违背既有设定\n</context>")
-                .contains("<user_request>\n核对设定后继续写作\n</user_request>");
+                .contains("<context type=\"style\">")
+                .contains("<context type=\"story_bible\">")
+                .doesNotContain("<user_request>");
+        assertThat(messagesCaptor.getValue().get(2).role()).isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.USER);
+        assertThat(messagesCaptor.getValue().get(2).content())
+                .contains("<user_request>")
+                .doesNotContain("<context type=\"style\">")
+                .doesNotContain("<context type=\"story_bible\">");
         verifyNoInteractions(promptComposer, agentPromptAssembler);
     }
 
