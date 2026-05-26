@@ -111,3 +111,4 @@ penmate-frontend/coverage/
 .roomodes
 .agents/
 .codex-runtime/
+.worktrees/
