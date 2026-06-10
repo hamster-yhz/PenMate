@@ -4,11 +4,8 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
-import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.storybible.model.StoryBibleEntry;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -22,22 +19,14 @@ import java.util.Map;
 public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpdateApplicationService {
 
     private final StoryBibleApplicationService storyBibleApplicationService;
-    private final AgentRepository agentRepository;
 
     public DefaultStoryBibleUpdateApplicationService(StoryBibleApplicationService storyBibleApplicationService) {
-        this(storyBibleApplicationService, null);
-    }
-
-    @Autowired
-    public DefaultStoryBibleUpdateApplicationService(StoryBibleApplicationService storyBibleApplicationService,
-                                                     AgentRepository agentRepository) {
         this.storyBibleApplicationService = storyBibleApplicationService;
-        this.agentRepository = agentRepository;
     }
 
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
-        assertTaskOwnership(request);
+        assertRunIdentity(request);
         JSONObject args = AgentJsonCodec.parseObj(request == null ? null : request.toolArgsJson());
         String operation = AgentJsonCodec.getString(args, "operation").trim();
         if ("list".equalsIgnoreCase(operation)) {
@@ -99,22 +88,9 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return new ToolCallResult("FAILED", null, null, "STORY_BIBLE_UPDATE_UNSUPPORTED", "Unsupported operation: " + operation);
     }
 
-    private void assertTaskOwnership(ToolCallRequest request) {
-        if (request == null || request.projectId() == null || request.taskId() == null || request.operatorId() == null) {
-            throw new IllegalStateException("task context is required for story bible updates");
-        }
-        if (agentRepository == null) {
-            throw new IllegalStateException("agent repository is required for story bible ownership validation");
-        }
-        AgentGenerationTask task = agentRepository.findGenerationTask(request.projectId(), request.taskId());
-        if (task == null) {
-            throw new IllegalStateException("generation task not found");
-        }
-        if (task.getUserId() == null) {
-            throw new IllegalStateException("generation task userId is required");
-        }
-        if (!request.operatorId().equals(task.getUserId())) {
-            throw new IllegalStateException("operator does not match generation task user");
+    private void assertRunIdentity(ToolCallRequest request) {
+        if (request == null || request.projectId() == null || request.runId() == null || request.operatorId() == null) {
+            throw new IllegalStateException("run context is required for story bible updates");
         }
     }
 

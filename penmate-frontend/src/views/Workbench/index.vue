@@ -463,13 +463,13 @@ const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
   })
 }
 
-const openAgentTurnStream = (projectId: string, sessionId: string, turnId: string) => {
-  console.info('[agent-ui] turn-stream-open', {
+const openAgentRunStream = (projectId: string, runId: string, after = '0') => {
+  console.info('[agent-ui] run-stream-open', {
     projectId,
-    sessionId,
-    turnId,
+    runId,
+    after,
   })
-  return agentApi.openTurnStream(projectId, sessionId, turnId)
+  return agentApi.openRunStream(projectId, runId, after)
 }
 
 const bindChatContainer = (element: HTMLElement | null) => {
@@ -567,12 +567,11 @@ const {
   generationStatusText,
   agentStatusDetailText,
   streamingAssistantMsgId,
-  runtimeEventSource,
   currentConversationId,
   loadConversationList,
   toggleConversationPanel,
   sendMessage,
-  resumeRunningTask,
+  resumeRunningRun,
   hydrateFromRecoverySnapshot,
 } = useWorkbenchChat({
   getContext: getAgentContext,
@@ -602,18 +601,18 @@ const {
     debugChatState('create-turn-created', {
       projectId,
       sessionId,
-      taskId: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskId ?? ''),
-      taskStatus: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskStatus ?? ''),
+      runId: String((result.activeRun as Record<string, unknown> | null | undefined)?.runId ?? ''),
+      runStatus: String((result.activeRun as Record<string, unknown> | null | undefined)?.runStatus ?? ''),
       sessionStatus: String((result.session as Record<string, unknown> | null | undefined)?.status ?? ''),
     })
     return result
   },
-  openTurnStream: (projectId, sessionId, turnId) => {
-    const resolvedSessionId = String(sessionId ?? '').trim() || String(currentConversationId.value ?? '').trim()
-    if (!resolvedSessionId) {
+  openRunStream: (projectId, runId, after) => {
+    const resolvedRunId = String(runId ?? '').trim()
+    if (!resolvedRunId) {
       throw new Error('缺少 sessionId，无法打开 turn stream')
     }
-    return openAgentTurnStream(projectId, resolvedSessionId, turnId)
+    return openAgentRunStream(projectId, resolvedRunId, after)
   },
   addStreamListener: agentApi.addStreamListener,
   scrollChat,
@@ -651,8 +650,8 @@ const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
 const sessionRecovery = useWorkbenchSessionRecovery({
   getSessionRecovery: (projectId, sessionId) => agentApi.getSessionRecovery(projectId, sessionId),
   resumeSession: (projectId, sessionId, payload) => agentApi.resumeSession(projectId, sessionId, payload),
-  openTurnStream: (projectId, sessionId, turnId) => openAgentTurnStream(projectId, sessionId, turnId),
-  resumeRunningTask,
+  openRunStream: (projectId, runId, after) => openAgentRunStream(projectId, runId, after),
+  resumeRunningRun,
   hydrateStore: (snapshot) => {
     const normalizedSnapshot = pickBusinessRecord(snapshot)
     hydrateFromRecoverySnapshot(normalizedSnapshot)

@@ -42,7 +42,7 @@ public class ContextEnhancerToolHandler implements AgentToolHandler {
             String prompt = AgentJsonCodec.getString(args, "prompt");
             PluginToolExecuteResult result = pluginToolExecutor.execute(new PluginToolExecuteCommand(
                     request.projectId(),
-                    request.taskId(),
+                    request.runId(),
                     prompt,
                     request.traceId()
             ));

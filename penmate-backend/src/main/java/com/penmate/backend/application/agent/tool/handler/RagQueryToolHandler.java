@@ -46,7 +46,7 @@ public class RagQueryToolHandler implements AgentToolHandler {
             String query = AgentJsonCodec.getString(args, "query");
             List<RagRetrievedChunk> chunks = ragRetrievalService.retrieve(
                     request.projectId(),
-                    request.taskId(),
+                    request.runId(),
                     query,
                     request.traceId()
             ).chunks();

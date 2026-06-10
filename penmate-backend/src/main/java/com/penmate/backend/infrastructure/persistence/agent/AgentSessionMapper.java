@@ -2,7 +2,6 @@ package com.penmate.backend.infrastructure.persistence.agent;
 
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentSession;
-import com.penmate.backend.domain.agent.model.AgentTaskContext;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -56,7 +55,7 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, active_context_version, last_turn_id, last_task_id, last_message_at, resumed_at
+                bound_style_id, active_context_version, last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{conversationId}, #{projectId}, #{userId}, #{title}, #{status},
                 NULL, 1, NULL, NULL, NULL, NULL
@@ -75,7 +74,7 @@ public interface AgentSessionMapper {
                    bound_style_id,
                    active_context_version,
                    last_turn_id,
-                   last_task_id,
+                   last_run_id,
                    resumed_at,
                    total_prompt_tokens,
                    total_completion_tokens,
@@ -99,7 +98,7 @@ public interface AgentSessionMapper {
                    bound_style_id AS boundStyleId,
                    active_context_version AS activeContextVersion,
                    last_turn_id AS lastTurnId,
-                   last_task_id AS lastTaskId,
+                   last_run_id AS lastRunId,
                    resumed_at AS resumedAt,
                    total_prompt_tokens AS totalPromptTokens,
                    total_completion_tokens AS totalCompletionTokens,
@@ -138,7 +137,7 @@ public interface AgentSessionMapper {
                    turn_seq AS turnSeq,
                    user_message_id AS userMessageId,
                    assistant_message_id AS assistantMessageId,
-                   task_id AS taskId,
+                   run_id AS runId,
                    turn_status AS turnStatus,
                    resume_token AS resumeToken,
                    created_at AS createdAt
@@ -150,16 +149,16 @@ public interface AgentSessionMapper {
 
     @Insert("""
             INSERT INTO agent_turns(
-                turn_id, session_id, turn_seq, user_message_id, assistant_message_id, task_id, turn_status, resume_token
+                turn_id, session_id, turn_seq, user_message_id, assistant_message_id, run_id, turn_status, resume_token
             ) VALUES (
-                #{turnId}, #{sessionId}, #{turnSeq}, #{userMessageId}, NULL, #{taskId}, #{turnStatus}, #{resumeToken}
+                #{turnId}, #{sessionId}, #{turnSeq}, #{userMessageId}, NULL, #{runId}, #{turnStatus}, #{resumeToken}
             )
             """)
     int insertTurn(@Param("sessionId") Long sessionId,
                    @Param("turnId") Long turnId,
                    @Param("turnSeq") Integer turnSeq,
                    @Param("userMessageId") Long userMessageId,
-                   @Param("taskId") Long taskId,
+                   @Param("runId") Long runId,
                    @Param("turnStatus") String turnStatus,
                    @Param("resumeToken") String resumeToken);
 
@@ -181,89 +180,6 @@ public interface AgentSessionMapper {
                              @Param("seqNo") Integer seqNo);
 
     @Select("""
-            SELECT turn_id AS turnId,
-                   task_id AS taskId,
-                   task_status AS taskStatus,
-                   request_context_id AS requestContextId,
-                   active_approval_id AS activeApprovalId
-            FROM agent_tasks
-            WHERE session_id = #{sessionId}
-              AND task_id = #{taskId}
-            LIMIT 1
-            """)
-    Map<String, Object> findTaskRow(@Param("sessionId") Long sessionId,
-                                    @Param("taskId") Long taskId);
-
-    @Select("""
-            SELECT turn_id AS turnId,
-                   task_id AS taskId,
-                   task_status AS taskStatus,
-                   request_context_id AS requestContextId,
-                   active_approval_id AS activeApprovalId
-            FROM agent_tasks
-            WHERE project_id = #{projectId}
-              AND session_id = #{sessionId}
-              AND turn_id = #{turnId}
-            LIMIT 1
-            """)
-    Map<String, Object> findTaskRowByTurnId(@Param("projectId") Long projectId,
-                                            @Param("sessionId") Long sessionId,
-                                            @Param("turnId") Long turnId);
-
-    @Insert("""
-            INSERT INTO agent_tasks(
-                task_id, session_id, turn_id, project_id, task_type, task_status,
-                prompt_snapshot, request_context_id, result_id, active_approval_id, stream_channel_key, trace_id
-            ) VALUES (
-                #{taskId}, #{sessionId}, #{turnId}, #{projectId}, #{taskType}, #{taskStatus},
-                #{promptSnapshot}, #{requestContextId}, NULL, NULL, NULL, #{traceId}
-            )
-            """)
-    int insertRuntimeTask(@Param("taskId") Long taskId,
-                          @Param("sessionId") Long sessionId,
-                          @Param("turnId") Long turnId,
-                          @Param("projectId") Long projectId,
-                          @Param("taskType") String taskType,
-                          @Param("taskStatus") String taskStatus,
-                          @Param("promptSnapshot") String promptSnapshot,
-                          @Param("requestContextId") Long requestContextId,
-                          @Param("traceId") String traceId);
-
-    @Update("""
-            UPDATE agent_tasks
-            SET turn_id = #{turnId},
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND task_id = #{taskId}
-            """)
-    int updateRuntimeTaskTurnLink(@Param("projectId") Long projectId,
-                                  @Param("taskId") Long taskId,
-                                  @Param("turnId") Long turnId);
-
-    @Select("""
-            SELECT context_id AS contextId,
-                   task_id AS taskId,
-                   chapter_id AS chapterId,
-                   selected_text AS selectedText,
-                   outline_snapshot_json AS outlineSnapshotJson,
-                   cards_snapshot_json AS cardsSnapshotJson,
-                   rag_snapshot_json AS ragSnapshotJson,
-                   plugin_bindings_json AS pluginBindingsJson,
-                   style_snapshot_json AS styleSnapshotJson,
-                   model_snapshot_json AS modelSnapshotJson,
-                   task_profile_json AS taskProfileJson,
-                   prompt_plan_json AS promptPlanJson,
-                   context_package_json AS contextPackageJson,
-                   active_tool_calls_snapshot AS activeToolCallsSnapshot,
-                   last_runtime_status AS lastRuntimeStatus,
-                   recovery_cursor AS recoveryCursor,
-                   context_hash AS contextHash
-            FROM agent_task_contexts
-            WHERE task_id = #{taskId}
-            LIMIT 1
-            """)
-    Map<String, Object> findTaskContextRow(@Param("taskId") Long taskId);
-
-    @Select("""
             SELECT model_name AS modelName,
                    max_context_tokens AS maxContextTokens
             FROM model_user_configurations
@@ -274,32 +190,6 @@ public interface AgentSessionMapper {
             """)
     Map<String, Object> findModelConfigSummary(@Param("userId") Long userId,
                                                @Param("modelConfigId") Long modelConfigId);
- 
-    @Insert("""
-            INSERT INTO agent_task_contexts(
-                context_id, task_id, chapter_id, selected_text,
-                outline_snapshot_json, cards_snapshot_json, rag_snapshot_json,
-                plugin_bindings_json, style_snapshot_json, model_snapshot_json,
-                active_tool_calls_snapshot, last_runtime_status, recovery_cursor, context_hash
-            ) VALUES (
-                #{contextId}, #{taskId}, #{chapterId}, #{selectedText},
-                #{outlineSnapshotJson}, #{cardsSnapshotJson}, #{ragSnapshotJson},
-                #{pluginBindingsJson}, #{styleSnapshotJson}, #{modelSnapshotJson},
-                #{activeToolCallsSnapshot}, #{lastRuntimeStatus}, #{recoveryCursor}, #{contextHash}
-            )
-            """)
-    int insertTaskContext(AgentTaskContext taskContext);
-
-    @Select("""
-            SELECT draft_summary AS draftSummary,
-                   quality_report_summary AS qualityReportSummary,
-                   todo_summary AS todoSummary,
-                   story_bible_proposal_summary AS storyBibleProposalSummary
-            FROM agent_task_results
-            WHERE task_id = #{taskId}
-            LIMIT 1
-            """)
-    Map<String, Object> findTaskResultRow(@Param("taskId") Long taskId);
 
     @Select("""
             SELECT message_id AS messageId,
@@ -318,10 +208,10 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, active_context_version, last_turn_id, last_task_id, last_message_at, resumed_at
+                bound_style_id, active_context_version, last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{sessionId}, #{projectId}, #{ownerUserId}, #{title}, #{sessionStatus},
-                #{boundStyleId}, 1, #{lastTurnId}, #{lastTaskId}, NULL, #{resumedAt}
+                #{boundStyleId}, 1, #{lastTurnId}, #{lastRunId}, NULL, #{resumedAt}
             )
             """)
     int insertSession(AgentSession session);
@@ -337,12 +227,12 @@ public interface AgentSessionMapper {
 
     @Update("""
             UPDATE agent_sessions
-            SET last_task_id = #{taskId}
+            SET last_run_id = #{runId}
             WHERE project_id = #{projectId} AND session_id = #{sessionId} AND deleted_at IS NULL
             """)
-    int updateLastRunningTask(@Param("projectId") Long projectId,
-                              @Param("sessionId") Long sessionId,
-                              @Param("taskId") Long taskId);
+    int updateLastRun(@Param("projectId") Long projectId,
+                      @Param("sessionId") Long sessionId,
+                      @Param("runId") Long runId);
 
     @Update("""
             UPDATE agent_sessions

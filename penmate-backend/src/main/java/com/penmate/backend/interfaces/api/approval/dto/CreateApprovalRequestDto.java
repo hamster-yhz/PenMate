@@ -11,7 +11,7 @@ public class CreateApprovalRequestDto {
     @NotBlank
     private String projectId;
 
-    private String taskId;
+    private String runId;
 
     @NotBlank
     private String approvalType;

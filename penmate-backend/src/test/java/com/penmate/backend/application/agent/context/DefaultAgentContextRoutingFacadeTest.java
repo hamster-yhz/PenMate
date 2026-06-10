@@ -164,7 +164,7 @@ class DefaultAgentContextRoutingFacadeTest {
         assertThat(capturedQuery.get()).isNotNull();
         assertThat(capturedQuery.get().projectId()).isEqualTo(1001L);
         assertThat(capturedQuery.get().sessionId()).isEqualTo(9009L);
-        assertThat(capturedQuery.get().taskId()).isEqualTo(8008L);
+        assertThat(capturedQuery.get().runId()).isEqualTo(8008L);
         assertThat(capturedQuery.get().chapterId()).isEqualTo(42L);
         assertThat(capturedQuery.get().storyBibleVersion()).isEqualTo(3);
         assertThat(capturedQuery.get().activatedSkills()).containsExactly("story_bible_query", "continuity_checker");

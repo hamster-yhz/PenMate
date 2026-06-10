@@ -6,7 +6,7 @@ package com.penmate.backend.application.approval.command;
  */
 public record CreateApprovalCommand(
         Long projectId,
-        Long taskId,
+        Long runId,
         String approvalType,
         String payloadJson,
         Integer riskLevel,

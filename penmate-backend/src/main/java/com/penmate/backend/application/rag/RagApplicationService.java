@@ -228,10 +228,10 @@ public class RagApplicationService {
         if (query == null) {
             return List.of();
         }
-        log.info("Hybrid RAG 检索开始: projectId={}, sessionId={}, taskId={}, chapterId={}, storyBibleVersion={}, topK={}, scope={}, skills={}, intentTags={}, entities={}",
+        log.info("Hybrid RAG 检索开始: projectId={}, sessionId={}, runId={}, chapterId={}, storyBibleVersion={}, topK={}, scope={}, skills={}, intentTags={}, entities={}",
                 query.projectId(),
                 query.sessionId(),
-                query.taskId(),
+                query.runId(),
                 query.chapterId(),
                 query.storyBibleVersion(),
                 query.topK(),
@@ -253,9 +253,9 @@ public class RagApplicationService {
         Set<String> sources = rankedResults.stream()
                 .map(HybridRagResultView::sourceType)
                 .collect(LinkedHashSet::new, Set::add, Set::addAll);
-        log.info("Hybrid RAG 检索完成: projectId={}, taskId={}, logId={}, hitCount={}, staleCount={}, topK={}, sources={}, filters=chapterId:{}|storyBibleVersion:{}|scope:{}",
+        log.info("Hybrid RAG 检索完成: projectId={}, runId={}, logId={}, hitCount={}, staleCount={}, topK={}, sources={}, filters=chapterId:{}|storyBibleVersion:{}|scope:{}",
                 query.projectId(),
-                query.taskId(),
+                query.runId(),
                 retrievalResult.logId(),
                 rankedResults.size(),
                 staleCount,
@@ -286,7 +286,7 @@ public class RagApplicationService {
         return Map.of(
                 "id", log.getRetrievalLogId(),
                 "projectId", log.getProjectId(),
-                "taskId", log.getTaskId(),
+                "runId", log.getRunId(),
                 "queryText", log.getQueryText() == null ? "" : log.getQueryText(),
                 "hitCount", log.getHitCount() == null ? 0 : log.getHitCount(),
                 "sourcesJson", log.getSourcesJson() == null ? "[]" : log.getSourcesJson(),

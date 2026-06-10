@@ -1,10 +1,11 @@
 package com.penmate.backend.application.agent.usecase;
 
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
+import com.penmate.backend.application.agent.run.AgentRunAppService;
+import com.penmate.backend.application.agent.run.AgentRunCommand;
+import com.penmate.backend.application.agent.run.AgentRunResult;
 import com.penmate.backend.domain.agent.model.AgentMessage;
-import com.penmate.backend.domain.agent.model.AgentTaskContext;
-import com.penmate.backend.domain.agent.model.AgentTaskStatus;
+import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -12,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -29,15 +29,25 @@ public class AgentTurnAppService {
     private final AgentRepository agentRepository;
     private final AgentSessionRepository agentSessionRepository;
     private final BusinessIdGenerator businessIdGenerator;
+    private final AgentRunAppService agentRunAppService;
 
     public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
                                AgentRepository agentRepository,
                                AgentSessionRepository agentSessionRepository,
                                BusinessIdGenerator businessIdGenerator) {
+        this(sessionStyleBindingAppService, agentRepository, agentSessionRepository, businessIdGenerator, null);
+    }
+
+    public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
+                               AgentRepository agentRepository,
+                               AgentSessionRepository agentSessionRepository,
+                               BusinessIdGenerator businessIdGenerator,
+                               AgentRunAppService agentRunAppService) {
         this.sessionStyleBindingAppService = sessionStyleBindingAppService;
         this.agentRepository = agentRepository;
         this.agentSessionRepository = agentSessionRepository;
         this.businessIdGenerator = businessIdGenerator;
+        this.agentRunAppService = agentRunAppService;
     }
 
     @Transactional
@@ -69,50 +79,17 @@ public class AgentTurnAppService {
                 traceId,
                 userMessage == null ? null : userMessage.getMessageId());
 
-        AgentGenerationTask task = createGenerationTask(projectId, sessionId, command, userMessage, traceId);
         Long turnId = businessIdGenerator.nextId();
+        Long runId = businessIdGenerator.nextId();
         int turnSeq = agentSessionRepository.nextTurnSeq(sessionId);
-        log.debug("Agent turn runtime task prepared: projectId={}, sessionId={}, traceId={}, taskId={}, turnId={}, turnSeq={}, taskStatus={}",
-                projectId,
-                sessionId,
-                traceId,
-                task == null ? null : task.getTaskId(),
-                turnId,
-                turnSeq,
-                task == null ? null : task.getStatus());
-        persistTurn(sessionId, userMessage, task, turnId, turnSeq);
-        log.info("Agent turn persisted: projectId={}, sessionId={}, traceId={}, turnId={}, turnSeq={}, taskId={}",
+        persistTurn(sessionId, userMessage, runId, turnId, turnSeq);
+        log.info("Agent turn persisted: projectId={}, sessionId={}, traceId={}, turnId={}, turnSeq={}, runId={}",
                 projectId,
                 sessionId,
                 traceId,
                 turnId,
                 turnSeq,
-                task == null ? null : task.getTaskId());
-
-        AgentTaskContext taskContext = createTaskContext(projectId, sessionId, command, userMessage, task, traceId);
-        log.debug("Agent task context prepared: projectId={}, sessionId={}, traceId={}, taskId={}, contextId={}, styleSnapshotPresent={}",
-                projectId,
-                sessionId,
-                traceId,
-                task == null ? null : task.getTaskId(),
-                taskContext == null ? null : taskContext.getContextId(),
-                taskContext != null && taskContext.getStyleSnapshotJson() != null && !taskContext.getStyleSnapshotJson().isBlank());
-        persistTaskContext(taskContext);
-        log.info("Agent task context persisted: projectId={}, sessionId={}, traceId={}, taskId={}, contextId={}",
-                projectId,
-                sessionId,
-                traceId,
-                task == null ? null : task.getTaskId(),
-                taskContext == null ? null : taskContext.getContextId());
-        persistRuntimeTask(projectId, sessionId, turnId, task, taskContext);
-        log.info("Agent runtime task persisted: projectId={}, sessionId={}, traceId={}, taskId={}, turnId={}, contextId={}, taskStatus={}",
-                projectId,
-                sessionId,
-                traceId,
-                task == null ? null : task.getTaskId(),
-                turnId,
-                taskContext == null ? null : taskContext.getContextId(),
-                task == null ? null : task.getStatus());
+                runId);
 
         int updatedTurn = agentSessionRepository.updateLastTurn(projectId, sessionId, turnId);
         if (updatedTurn != 1) {
@@ -124,24 +101,18 @@ public class AgentTurnAppService {
                 traceId,
                 turnId,
                 updatedTurn);
-        int updatedTask = agentSessionRepository.updateLastRunningTask(projectId, sessionId, task.getTaskId());
-        if (updatedTask != 1) {
-            throw new IllegalStateException("failed to update session last task");
+        int updatedRun = agentSessionRepository.updateLastRun(projectId, sessionId, runId);
+        if (updatedRun != 1) {
+            throw new IllegalStateException("failed to update session last run");
         }
-        log.debug("Agent session last running task updated: projectId={}, sessionId={}, traceId={}, taskId={}, affected={}",
-                projectId,
-                sessionId,
-                traceId,
-                task.getTaskId(),
-                updatedTask);
+        AgentRunResult run = createRun(projectId, sessionId, turnId, runId, command, userMessage, traceId);
 
         Long boundStyleId = sessionStyleBindingAppService.getBoundStyleId(projectId, sessionId);
-        log.info("Agent turn created: projectId={}, sessionId={}, taskId={}, turnId={}, contextId={}, taskType={}, chapterId={}, selectedTextLength={}, boundStyleId={}, traceId={}",
+        log.info("Agent turn created: projectId={}, sessionId={}, runId={}, turnId={}, taskType={}, chapterId={}, selectedTextLength={}, boundStyleId={}, traceId={}",
                 projectId,
                 sessionId,
-                task.getTaskId(),
+                runId,
                 turnId,
-                taskContext == null ? null : taskContext.getContextId(),
                 command == null || command.taskRequest() == null ? null : command.taskRequest().taskType(),
                 command == null || command.taskRequest() == null ? null : command.taskRequest().chapterId(),
                 command == null || command.taskRequest() == null || command.taskRequest().selectedText() == null ? 0 : command.taskRequest().selectedText().length(),
@@ -151,11 +122,49 @@ public class AgentTurnAppService {
                 ? null
                 : new AgentTurnResult.BoundStyleView(boundStyleId, null);
         return new AgentTurnResult(
-                new AgentTurnResult.SessionView(sessionId, "Session-" + sessionId, "ACTIVE", boundStyle, AgentTaskStatus.PENDING.value()),
-                new AgentTurnResult.ActiveTaskView(turnId, task.getTaskId(), AgentTaskStatus.PENDING.value(), taskContext == null ? null : taskContext.getContextId()),
-                task.getTaskType(),
+                new AgentTurnResult.SessionView(sessionId, "Session-" + sessionId, "ACTIVE", boundStyle, run.runStatus()),
+                new AgentTurnResult.ActiveRunView(turnId, run.runId(), run.runStatus(), run.runPhase(), run.latestSequence()),
+                command.taskRequest().taskType(),
                 userMessage.getContentMd()
         );
+    }
+
+    private AgentRunResult createRun(Long projectId,
+                                     Long sessionId,
+                                     Long turnId,
+                                     Long runId,
+                                     AgentTurnCommand command,
+                                     AgentMessage userMessage,
+                                     String traceId) {
+        if (agentRunAppService == null) {
+            return new AgentRunResult(runId, "pending", "created", 0L);
+        }
+        AgentSession session = agentSessionRepository.findSession(projectId, sessionId);
+        Long ownerUserId = command == null || command.operatorId() == null
+                ? session == null ? null : session.getOwnerUserId()
+                : command.operatorId();
+        AgentTurnCommand.TaskRequest taskRequest = command == null ? null : command.taskRequest();
+        String modelSnapshotJson = "{\"operatorId\":"
+                + (ownerUserId == null ? "null" : ownerUserId)
+                + ",\"modelConfigId\":"
+                + (taskRequest == null || taskRequest.modelConfigId() == null ? "null" : taskRequest.modelConfigId())
+                + "}";
+        return agentRunAppService.createRun(new AgentRunCommand(
+                projectId,
+                sessionId,
+                turnId,
+                ownerUserId,
+                runId,
+                taskRequest == null ? "CHAT" : taskRequest.taskType(),
+                userMessage == null ? command.userMessage() : userMessage.getContentMd(),
+                taskRequest == null ? null : taskRequest.chapterId(),
+                taskRequest == null ? null : taskRequest.selectedText(),
+                sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, sessionId),
+                modelSnapshotJson,
+                null,
+                contextHash(command),
+                traceId
+        ));
     }
 
     protected AgentMessage createUserMessage(Long projectId,
@@ -172,53 +181,6 @@ public class AgentTurnAppService {
         return message;
     }
 
-    protected AgentGenerationTask createGenerationTask(Long projectId,
-                                                       Long sessionId,
-                                                       AgentTurnCommand command,
-                                                       AgentMessage userMessage,
-                                                       String traceId) {
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setTaskId(businessIdGenerator.nextId());
-        task.setProjectId(projectId);
-        task.setConversationId(sessionId);
-        task.setChapterId(command == null || command.taskRequest() == null ? null : command.taskRequest().chapterId());
-        task.setModelConfigId(command == null || command.taskRequest() == null ? null : command.taskRequest().modelConfigId());
-        task.setTaskType(command.taskRequest().taskType());
-        task.setPromptSnapshot(userMessage == null ? command.userMessage() : userMessage.getContentMd());
-        task.setTraceId(traceId);
-        task.setStatus(AgentTaskStatus.PENDING.value());
-        return task;
-    }
-
-    protected AgentTaskContext createTaskContext(Long projectId,
-                                                 Long sessionId,
-                                                 AgentTurnCommand command,
-                                                 AgentMessage userMessage,
-                                                 AgentGenerationTask task,
-                                                 String traceId) {
-        Long contextId = task == null || task.getTaskId() == null ? null : businessIdGenerator.nextId();
-        AgentTurnCommand.TaskRequest taskRequest = command.taskRequest();
-        AgentTaskContext context = AgentTaskContext.runningOf(
-                contextId,
-                task == null ? null : task.getTaskId(),
-                AgentTaskStatus.PENDING.value(),
-                taskRequest == null ? null : taskRequest.chapterId(),
-                taskRequest == null ? null : taskRequest.selectedText()
-        );
-        context.setStyleSnapshotJson(sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, sessionId));
-        Long operatorId = command == null ? null : command.operatorId();
-        Long modelConfigId = taskRequest == null ? null : taskRequest.modelConfigId();
-        if (operatorId != null || modelConfigId != null) {
-            setField(context, "modelSnapshotJson", "{\"operatorId\":"
-                    + (operatorId == null ? "null" : operatorId)
-                    + ",\"modelConfigId\":"
-                    + (modelConfigId == null ? "null" : modelConfigId)
-                    + "}");
-        }
-        setField(context, "contextHash", contextHash(command, task, context));
-        return context;
-    }
-
     private void persistUserMessage(Long sessionId, AgentMessage userMessage) {
         int affected = agentRepository.insertMessage(userMessage);
         if (affected != 1) {
@@ -229,7 +191,7 @@ public class AgentTurnAppService {
 
     private void persistTurn(Long sessionId,
                              AgentMessage userMessage,
-                             AgentGenerationTask task,
+                             Long runId,
                              Long turnId,
                              int turnSeq) {
         int affected = agentSessionRepository.insertTurn(
@@ -237,8 +199,8 @@ public class AgentTurnAppService {
                 turnId,
                 turnSeq,
                 userMessage == null ? null : userMessage.getMessageId(),
-                task == null ? null : task.getTaskId(),
-                AgentTaskStatus.PENDING.value(),
+                runId,
+                "pending",
                 null
         );
         if (affected != 1) {
@@ -246,43 +208,13 @@ public class AgentTurnAppService {
         }
     }
 
-    private void persistTaskContext(AgentTaskContext taskContext) {
-        int affected = agentSessionRepository.insertTaskContext(taskContext);
-        if (affected != 1) {
-            throw new IllegalStateException("failed to insert task context");
-        }
-    }
-
-    private void persistRuntimeTask(Long projectId,
-                                    Long sessionId,
-                                    Long turnId,
-                                    AgentGenerationTask task,
-                                    AgentTaskContext taskContext) {
-        int affected = agentSessionRepository.insertRuntimeTask(
-                task.getTaskId(),
-                sessionId,
-                turnId,
-                projectId,
-                task.getTaskType(),
-                AgentTaskStatus.PENDING.value(),
-                task.getPromptSnapshot(),
-                taskContext == null ? null : taskContext.getContextId(),
-                task.getTraceId()
-        );
-        if (affected != 1) {
-            throw new IllegalStateException("failed to insert runtime task");
-        }
-    }
-
-    private String contextHash(AgentTurnCommand command,
-                               AgentGenerationTask task,
-                               AgentTaskContext context) {
+    private String contextHash(AgentTurnCommand command) {
+        AgentTurnCommand.TaskRequest taskRequest = command == null ? null : command.taskRequest();
         String seed = String.join("|",
                 command == null || command.userMessage() == null ? "" : command.userMessage(),
-                task == null || task.getTaskId() == null ? "" : String.valueOf(task.getTaskId()),
-                context == null || context.getChapterId() == null ? "" : String.valueOf(context.getChapterId()),
-                context == null || context.getSelectedText() == null ? "" : context.getSelectedText(),
-                context == null || context.getStyleSnapshotJson() == null ? "" : context.getStyleSnapshotJson()
+                taskRequest == null || taskRequest.taskType() == null ? "" : taskRequest.taskType(),
+                taskRequest == null || taskRequest.chapterId() == null ? "" : String.valueOf(taskRequest.chapterId()),
+                taskRequest == null || taskRequest.selectedText() == null ? "" : taskRequest.selectedText()
         );
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -297,13 +229,4 @@ public class AgentTurnAppService {
         }
     }
 
-    private void setField(Object target, String fieldName, Object value) {
-        try {
-            Field field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException("failed to set field: " + fieldName, ex);
-        }
-    }
 }

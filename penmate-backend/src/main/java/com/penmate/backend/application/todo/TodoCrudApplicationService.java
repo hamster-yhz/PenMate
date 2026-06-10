@@ -42,7 +42,7 @@ public class TodoCrudApplicationService {
 
     public SessionTodo createTodo(Long projectId,
                                   Long sessionId,
-                                  Long taskId,
+                                  Long sourceRunId,
                                   SessionTodo candidate,
                                   Long operatorId,
                                   String traceId) {
@@ -50,7 +50,7 @@ public class TodoCrudApplicationService {
         sessionTodo.setTodoId(businessIdGenerator.nextId());
         sessionTodo.setProjectId(projectId);
         sessionTodo.setSessionId(sessionId);
-        sessionTodo.setTaskId(taskId);
+        sessionTodo.setSourceRunId(sourceRunId);
         sessionTodo.setTitle(normalize(candidate == null ? null : candidate.getTitle()));
         sessionTodo.setDescription(normalizeNullable(candidate == null ? null : candidate.getDescription()));
         sessionTodo.setSourceType(normalize(candidate == null ? null : candidate.getSourceType()));
@@ -62,18 +62,18 @@ public class TodoCrudApplicationService {
         try {
             int affected = sessionTodoRepository.insert(sessionTodo);
             if (affected != 1) {
-                log.error("创建会话待办失败: projectId={}, sessionId={}, taskId={}, operatorId={}, traceId={}, reason=insert_failed",
-                        projectId, sessionId, taskId, operatorId, traceId);
+                log.error("创建会话待办失败: projectId={}, sessionId={}, sourceRunId={}, operatorId={}, traceId={}, reason=insert_failed",
+                        projectId, sessionId, sourceRunId, operatorId, traceId);
                 throw BusinessException.of("todo persistence failed");
             }
-            log.info("创建会话待办成功: projectId={}, sessionId={}, todoId={}, taskId={}, sourceType={}, todoStatus={}, operatorId={}, traceId={}",
-                    projectId, sessionId, sessionTodo.getTodoId(), taskId, sessionTodo.getSourceType(), sessionTodo.getTodoStatus(), operatorId, traceId);
+            log.info("创建会话待办成功: projectId={}, sessionId={}, todoId={}, sourceRunId={}, sourceType={}, todoStatus={}, operatorId={}, traceId={}",
+                    projectId, sessionId, sessionTodo.getTodoId(), sourceRunId, sessionTodo.getSourceType(), sessionTodo.getTodoStatus(), operatorId, traceId);
             return sessionTodo;
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("创建会话待办异常: projectId={}, sessionId={}, taskId={}, operatorId={}, traceId={}",
-                    projectId, sessionId, taskId, operatorId, traceId, ex);
+            log.error("创建会话待办异常: projectId={}, sessionId={}, sourceRunId={}, operatorId={}, traceId={}",
+                    projectId, sessionId, sourceRunId, operatorId, traceId, ex);
             throw BusinessException.of("todo persistence failed");
         }
     }
@@ -81,23 +81,23 @@ public class TodoCrudApplicationService {
     @Transactional
     public List<SessionTodo> batchCreateTodos(Long projectId,
                                               Long sessionId,
-                                              Long taskId,
+                                              Long sourceRunId,
                                               List<SessionTodo> todos,
                                               Long operatorId,
                                               String traceId) {
         List<SessionTodo> created = new ArrayList<>();
         for (SessionTodo todo : todos == null ? List.<SessionTodo>of() : todos) {
-            created.add(createTodo(projectId, sessionId, taskId, todo, operatorId, traceId));
+            created.add(createTodo(projectId, sessionId, sourceRunId, todo, operatorId, traceId));
         }
-        log.info("批量创建会话待办成功: projectId={}, sessionId={}, taskId={}, createdCount={}, operatorId={}, traceId={}",
-                projectId, sessionId, taskId, created.size(), operatorId, traceId);
+        log.info("批量创建会话待办成功: projectId={}, sessionId={}, sourceRunId={}, createdCount={}, operatorId={}, traceId={}",
+                projectId, sessionId, sourceRunId, created.size(), operatorId, traceId);
         return created;
     }
 
     @Transactional
     public List<SessionTodo> persistTodoPlan(Long projectId,
                                              Long sessionId,
-                                             Long taskId,
+                                             Long sourceRunId,
                                              TodoPlanView todoPlan,
                                              Long operatorId,
                                              String traceId) {
@@ -115,18 +115,18 @@ public class TodoCrudApplicationService {
                 candidates.add(todo);
             }
         }
-        return batchCreateTodos(projectId, sessionId, taskId, candidates, operatorId, traceId);
+        return batchCreateTodos(projectId, sessionId, sourceRunId, candidates, operatorId, traceId);
     }
 
     public SessionTodo updateTodo(Long projectId,
                                   Long sessionId,
                                   Long todoId,
-                                  Long taskId,
+                                  Long sourceRunId,
                                   SessionTodo candidate,
                                   Long operatorId,
                                   String traceId) {
         SessionTodo existing = requireTodo(projectId, sessionId, todoId);
-        existing.setTaskId(taskId);
+        existing.setSourceRunId(sourceRunId);
         existing.setTitle(normalize(candidate == null ? null : candidate.getTitle()));
         existing.setDescription(normalizeNullable(candidate == null ? null : candidate.getDescription()));
         existing.setSourceType(normalize(candidate == null ? null : candidate.getSourceType()));

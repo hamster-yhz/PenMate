@@ -8,9 +8,9 @@ import type { WorkbenchRecoverySnapshot } from '@/api/types'
 export const useWorkbenchSessionRecovery = (deps: {
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<WorkbenchRecoverySnapshot>
   resumeSession: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<WorkbenchRecoverySnapshot>
-  openTurnStream: (projectId: string, sessionId: string, turnId: string) => EventSource
+  openRunStream: (projectId: string, runId: string, after?: string) => EventSource
   hydrateStore: (snapshot: WorkbenchRecoverySnapshot) => void
-  resumeRunningTask?: (projectId: string, sessionId: string, turnId: string) => Promise<void>
+  resumeRunningRun?: (projectId: string, runId: string, after?: string) => Promise<void>
 }) => {
   const restore = async (projectId: string, sessionId: string, operatorId?: string) => {
     const snapshot = pickBusinessRecord(await deps.resumeSession(projectId, sessionId, {
@@ -18,13 +18,14 @@ export const useWorkbenchSessionRecovery = (deps: {
       ...(operatorId != null ? { operatorId } : {}),
     })) as WorkbenchRecoverySnapshot
     deps.hydrateStore(snapshot)
-    const turnId = snapshot?.activeTask?.turnId
-    const taskStatus = String(snapshot?.activeTask?.taskStatus ?? '').toUpperCase()
-    if (turnId != null && String(turnId).trim() !== '' && String(turnId) !== '0' && taskStatus === 'RUNNING') {
-      if (deps.resumeRunningTask) {
-        await deps.resumeRunningTask(projectId, sessionId, turnId)
+    const runId = snapshot?.activeRun?.runId
+    const runStatus = String(snapshot?.activeRun?.runStatus ?? '').toUpperCase()
+    const latestSequence = String(snapshot?.activeRun?.latestSequence ?? '0')
+    if (runId != null && String(runId).trim() !== '' && String(runId) !== '0' && runStatus === 'RUNNING') {
+      if (deps.resumeRunningRun) {
+        await deps.resumeRunningRun(projectId, runId, latestSequence)
       } else {
-        deps.openTurnStream(projectId, sessionId, turnId)
+        deps.openRunStream(projectId, runId, latestSequence)
       }
     }
     return snapshot

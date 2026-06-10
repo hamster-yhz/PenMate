@@ -41,6 +41,7 @@ class TodoCrudToolHandlerTest {
                 .contains("\"todoStatus\"")
                 .contains("\"required\": [\"operation\", \"sessionId\"]")
                 .contains("\"additionalProperties\": false")
+                .doesNotContain("\"taskId\"")
                 .doesNotContain("\"oneOf\"")
                 .doesNotContain("\"anyOf\"")
                 .doesNotContain("\"allOf\"")
@@ -119,17 +120,17 @@ class TodoCrudToolHandlerTest {
     }
 
     @Test
-    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_TASK_ID_LESS_THAN_ONE_WHEN_PRESENT() throws Exception {
+    void UT_APP_AGENT_TODO_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_SOURCE_RUN_ID_LESS_THAN_ONE_WHEN_PRESENT() throws Exception {
         Class<?> serviceClass = loadClass("com.penmate.backend.application.todo.TodoCrudApplicationService");
         Class<?> requestClass = loadClass("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
         Object handler = instantiateTodoCrudHandler(org.mockito.Mockito.mock(serviceClass));
         Object request = newShortToolRequest(requestClass,
-                "{\"operation\":\"create\",\"sessionId\":\"9\",\"taskId\":\"0\",\"title\":\"新增待办\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}",
-                "trace-todo-validate-task-id");
+                "{\"operation\":\"create\",\"sessionId\":\"9\",\"sourceRunId\":\"0\",\"title\":\"新增待办\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}",
+                "trace-todo-validate-source-run-id");
 
         assertThatThrownBy(() -> handler.getClass().getMethod("validate", requestClass).invoke(handler, request))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .hasRootCauseMessage("taskId must be greater than or equal to 1");
+                .hasRootCauseMessage("sourceRunId must be greater than or equal to 1");
     }
 
     @Test
@@ -143,7 +144,7 @@ class TodoCrudToolHandlerTest {
         writeField(updatedTodo, "todoId", 20031L);
         writeField(updatedTodo, "projectId", 1L);
         writeField(updatedTodo, "sessionId", 9L);
-        writeField(updatedTodo, "taskId", 88L);
+        writeField(updatedTodo, "sourceRunId", 88L);
         writeField(updatedTodo, "title", "修订第三章开场");
         writeField(updatedTodo, "description", "补齐密令来源桥段");
         writeField(updatedTodo, "sourceType", "PLANNING");
@@ -189,7 +190,7 @@ class TodoCrudToolHandlerTest {
                         77L,
                         9L,
                         "todo_crud",
-                        "{\"operation\":\"update\",\"sessionId\":\"9\",\"todoId\":\"20031\",\"taskId\":\"88\",\"title\":\"修订第三章开场\",\"description\":\"补齐密令来源桥段\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"BLOCKED\"}",
+                        "{\"operation\":\"update\",\"sessionId\":\"9\",\"todoId\":\"20031\",\"sourceRunId\":\"88\",\"title\":\"修订第三章开场\",\"description\":\"补齐密令来源桥段\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"BLOCKED\"}",
                         1001L,
                         "trace-todo-update",
                         "{}",
@@ -202,7 +203,8 @@ class TodoCrudToolHandlerTest {
         assertThat(String.valueOf(resultClass.getMethod("toolOutput").invoke(result)))
                 .contains("\"todoId\":\"20031\"")
                 .contains("\"sessionId\":\"9\"")
-                .contains("\"taskId\":\"88\"")
+                .contains("\"sourceRunId\":\"88\"")
+                .doesNotContain("\"taskId\"")
                 .contains("\"title\":\"修订第三章开场\"")
                 .contains("\"sourceType\":\"PLANNING\"")
                 .contains("\"todoStatus\":\"BLOCKED\"");
@@ -219,7 +221,7 @@ class TodoCrudToolHandlerTest {
         writeField(createdTodo, "todoId", 20041L);
         writeField(createdTodo, "projectId", 1L);
         writeField(createdTodo, "sessionId", 9L);
-        writeField(createdTodo, "taskId", 77L);
+        writeField(createdTodo, "sourceRunId", 77L);
         writeField(createdTodo, "title", "新增侍从转述桥段");
         writeField(createdTodo, "description", "补齐密令传递链路");
         writeField(createdTodo, "sourceType", "PLANNING");
@@ -239,7 +241,7 @@ class TodoCrudToolHandlerTest {
 
         Object handler = instantiateTodoCrudHandler(serviceMock);
         Object request = newShortToolRequest(requestClass,
-                "{\"operation\":\"create\",\"sessionId\":\"9\",\"taskId\":\"77\",\"title\":\"新增侍从转述桥段\",\"description\":\"补齐密令传递链路\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}",
+                "{\"operation\":\"create\",\"sessionId\":\"9\",\"sourceRunId\":\"77\",\"title\":\"新增侍从转述桥段\",\"description\":\"补齐密令传递链路\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}",
                 "trace-todo-create");
 
         Object result = handler.getClass().getMethod("execute", requestClass).invoke(handler, request);
@@ -300,7 +302,7 @@ class TodoCrudToolHandlerTest {
         writeField(completedTodo, "todoId", 20031L);
         writeField(completedTodo, "projectId", 1L);
         writeField(completedTodo, "sessionId", 9L);
-        writeField(completedTodo, "taskId", 77L);
+        writeField(completedTodo, "sourceRunId", 77L);
         writeField(completedTodo, "title", "修复密令来源");
         writeField(completedTodo, "sourceType", "QUALITY_REVIEW");
         writeField(completedTodo, "todoStatus", "DONE");

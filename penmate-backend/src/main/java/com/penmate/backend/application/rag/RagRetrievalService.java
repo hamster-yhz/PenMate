@@ -25,10 +25,10 @@ public class RagRetrievalService {
         this.objectMapper = objectMapper;
     }
 
-    public RetrievalResult retrieve(Long projectId, Long taskId, String query, String traceId) {
+    public RetrievalResult retrieve(Long projectId, Long runId, String query, String traceId) {
         long startAt = System.currentTimeMillis();
         List<RagRetrievedChunk> chunks = ragRetrievalRepository.searchChunks(projectId, query, 3);
-        return persistRetrievalLog(projectId, taskId, query, traceId, startAt, chunks);
+        return persistRetrievalLog(projectId, runId, query, traceId, startAt, chunks);
     }
 
     public RetrievalResult retrieve(HybridRagQuery query, String traceId) {
@@ -44,7 +44,7 @@ public class RagRetrievalService {
                 joinCsv(query.intentTags()),
                 query.searchScope() == null ? null : query.searchScope().name()
         );
-        return persistRetrievalLog(query.projectId(), query.taskId(), query.queryText(), traceId, startAt, chunks);
+        return persistRetrievalLog(query.projectId(), query.runId(), query.queryText(), traceId, startAt, chunks);
     }
 
     public List<RagRetrievalLog> listRetrievalLogs(Long projectId) {
@@ -52,7 +52,7 @@ public class RagRetrievalService {
     }
 
     private RetrievalResult persistRetrievalLog(Long projectId,
-                                                Long taskId,
+                                                Long runId,
                                                 String query,
                                                 String traceId,
                                                 long startAt,
@@ -60,7 +60,7 @@ public class RagRetrievalService {
         RagRetrievalLog retrievalLog = new RagRetrievalLog();
         retrievalLog.setRetrievalLogId(businessIdGenerator.nextId());
         retrievalLog.setProjectId(projectId);
-        retrievalLog.setTaskId(taskId);
+        retrievalLog.setRunId(runId);
         retrievalLog.setQueryText(query);
         retrievalLog.setHitCount(chunks.size());
         retrievalLog.setSourcesJson(toSourcesJson(chunks));

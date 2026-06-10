@@ -51,13 +51,13 @@ public class TodoController {
                                                        @PathVariable String sessionId,
                                                        @Valid @RequestBody CreateTodoDto dto,
                                                        @RequestParam("operatorId") String operatorId,
-                                                       @RequestParam(value = "taskId", required = false) String taskId,
+                                                       @RequestParam(value = "sourceRunId", required = false) String sourceRunId,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         SessionTodo candidate = toSessionTodo(dto);
         SessionTodo created = todoCrudApplicationService.createTodo(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
-                optionalLongId(taskId, "taskId"),
+                optionalLongId(sourceRunId, "sourceRunId"),
                 candidate,
                 requireLongId(operatorId, "operatorId"),
                 traceId
@@ -70,13 +70,13 @@ public class TodoController {
                                                                    @PathVariable String sessionId,
                                                                    @Valid @RequestBody List<CreateTodoDto> dtos,
                                                                    @RequestParam("operatorId") String operatorId,
-                                                                   @RequestParam(value = "taskId", required = false) String taskId,
+                                                                   @RequestParam(value = "sourceRunId", required = false) String sourceRunId,
                                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         List<SessionTodo> todos = dtos == null ? List.of() : dtos.stream().map(this::toSessionTodo).toList();
         return ApiResponse.success(todoCrudApplicationService.batchCreateTodos(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
-                optionalLongId(taskId, "taskId"),
+                optionalLongId(sourceRunId, "sourceRunId"),
                 todos,
                 requireLongId(operatorId, "operatorId"),
                 traceId
@@ -89,14 +89,14 @@ public class TodoController {
                                                        @PathVariable String todoId,
                                                        @Valid @RequestBody UpdateTodoDto dto,
                                                        @RequestParam("operatorId") String operatorId,
-                                                       @RequestParam(value = "taskId", required = false) String taskId,
+                                                       @RequestParam(value = "sourceRunId", required = false) String sourceRunId,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         SessionTodo candidate = toSessionTodo(dto);
         SessionTodo updated = todoCrudApplicationService.updateTodo(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
                 requireLongId(todoId, "todoId"),
-                optionalLongId(taskId, "taskId"),
+                optionalLongId(sourceRunId, "sourceRunId"),
                 candidate,
                 requireLongId(operatorId, "operatorId"),
                 traceId
@@ -159,7 +159,7 @@ public class TodoController {
         data.put("todoId", stringifyBusinessId(todo == null ? null : todo.getTodoId()));
         data.put("projectId", stringifyBusinessId(todo == null ? null : todo.getProjectId()));
         data.put("sessionId", stringifyBusinessId(todo == null ? null : todo.getSessionId()));
-        data.put("taskId", stringifyBusinessId(todo == null ? null : todo.getTaskId()));
+        data.put("sourceRunId", stringifyBusinessId(todo == null ? null : todo.getSourceRunId()));
         data.put("title", todo == null ? null : todo.getTitle());
         data.put("description", todo == null ? null : todo.getDescription());
         data.put("sourceType", todo == null ? null : todo.getSourceType());

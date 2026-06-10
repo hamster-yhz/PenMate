@@ -2,7 +2,6 @@ package com.penmate.backend.application.agent.tool.handler;
 
 import cn.hutool.json.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.application.agent.orchestration.AgentTaskRuntimeUpdater;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.todo.TodoCrudApplicationService;
@@ -60,16 +59,16 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoStatus"));
             }
             if ("create".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "taskId", "title", "description", "sourceType", "todoStatus"));
-                validateOptionalLong(args, "taskId");
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "sourceRunId", "title", "description", "sourceType", "todoStatus"));
+                validateOptionalLong(args, "sourceRunId");
                 requireNonBlank(args, "title");
                 requireNonBlank(args, "sourceType");
                 requireNonBlank(args, "todoStatus");
             }
             if ("update".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId", "taskId", "title", "description", "sourceType", "todoStatus"));
+                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId", "sourceRunId", "title", "description", "sourceType", "todoStatus"));
                 requireLong(args, "todoId");
-                validateOptionalLong(args, "taskId");
+                validateOptionalLong(args, "sourceRunId");
                 requireNonBlank(args, "title");
                 requireNonBlank(args, "sourceType");
                 requireNonBlank(args, "todoStatus");
@@ -106,12 +105,12 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 SessionTodo created = todoCrudApplicationService.createTodo(
                         request.projectId(),
                         sessionId,
-                        longValue(args.get("taskId")) != null ? longValue(args.get("taskId")) : request.taskId(),
+                        longValue(args.get("sourceRunId")) != null ? longValue(args.get("sourceRunId")) : request.runId(),
                         candidate,
                         request.operatorId(),
                         request.traceId()
                 );
-                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("create", created)));
+                return ToolCallResult.success(AgentJsonCodec.toJson(buildTodoOutput("create", created)));
             }
             if ("list".equals(operation)) {
                 java.util.List<SessionTodo> todos = todoCrudApplicationService.listSessionTodos(
@@ -123,20 +122,20 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 output.put("operation", "list");
                 output.put("sessionId", stringifyBusinessId(sessionId));
                 output.put("items", todos == null ? java.util.List.of() : todos.stream().map(todo -> buildTodoOutput(null, todo)).toList());
-                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(output));
+                return ToolCallResult.success(AgentJsonCodec.toJson(output));
             }
             if ("update".equals(operation)) {
-                Long taskId = longValue(args.get("taskId")) != null ? longValue(args.get("taskId")) : request.taskId();
+                Long sourceRunId = longValue(args.get("sourceRunId")) != null ? longValue(args.get("sourceRunId")) : request.runId();
                 SessionTodo updated = todoCrudApplicationService.updateTodo(
                         request.projectId(),
                         sessionId,
                         todoId,
-                        taskId,
+                        sourceRunId,
                         candidate,
                         request.operatorId(),
                         request.traceId()
                 );
-                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("update", updated)));
+                return ToolCallResult.success(AgentJsonCodec.toJson(buildTodoOutput("update", updated)));
             }
             if ("complete".equals(operation)) {
                 SessionTodo completed = todoCrudApplicationService.completeTodo(
@@ -146,7 +145,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                         request.operatorId(),
                         request.traceId()
                 );
-                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("complete", completed)));
+                return ToolCallResult.success(AgentJsonCodec.toJson(buildTodoOutput("complete", completed)));
             }
             if ("delete".equals(operation)) {
                 todoCrudApplicationService.deleteTodo(
@@ -161,7 +160,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 output.put("todoId", stringifyBusinessId(todoId));
                 output.put("sessionId", stringifyBusinessId(sessionId));
                 output.put("deleted", true);
-                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(output));
+                return ToolCallResult.success(AgentJsonCodec.toJson(output));
             }
             return new ToolCallResult("FAILED", null, null, "TODO_CRUD_FAILED", "unsupported todo crud operation: " + operation);
         } catch (Exception ex) {
@@ -189,7 +188,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         output.put("todoId", stringifyBusinessId(todo == null ? null : todo.getTodoId()));
         output.put("projectId", stringifyBusinessId(todo == null ? null : todo.getProjectId()));
         output.put("sessionId", stringifyBusinessId(todo == null ? null : todo.getSessionId()));
-        output.put("taskId", stringifyBusinessId(todo == null ? null : todo.getTaskId()));
+        output.put("sourceRunId", stringifyBusinessId(todo == null ? null : todo.getSourceRunId()));
         output.put("title", todo == null ? null : todo.getTitle());
         output.put("description", todo == null ? null : todo.getDescription());
         output.put("sourceType", todo == null ? null : todo.getSourceType());

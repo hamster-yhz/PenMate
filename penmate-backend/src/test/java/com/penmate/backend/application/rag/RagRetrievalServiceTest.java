@@ -58,7 +58,7 @@ class RagRetrievalServiceTest extends BaseApplicationServiceTest {
         RagRetrievalLog inserted = captor.getValue();
         assertThat(inserted.getRetrievalLogId()).isEqualTo(910001L);
         assertThat(inserted.getProjectId()).isEqualTo(1L);
-        assertThat(inserted.getTaskId()).isEqualTo(11L);
+        assertThat(inserted.getRunId()).isEqualTo(11L);
         assertThat(inserted.getTraceId()).isEqualTo("trace-rag-1");
         assertThat(result.logId()).isEqualTo(77L);
         verify(ragRetrievalRepository).searchChunks(1L, "hero", 3);

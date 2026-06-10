@@ -41,8 +41,8 @@ public class QualityReviewToolHandler implements AgentToolHandler {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "quality review execution failed"
                     : ex.getMessage();
-            log.warn("quality_review 参数非法: taskId={}, traceId={}, message={}",
-                    request == null ? null : request.taskId(),
+            log.warn("quality_review 参数非法: runId={}, traceId={}, message={}",
+                    request == null ? null : request.runId(),
                     request == null ? null : request.traceId(),
                     message);
             return new ToolCallResult("FAILED", null, null, "QUALITY_REVIEW_FAILED", message);
@@ -54,8 +54,8 @@ public class QualityReviewToolHandler implements AgentToolHandler {
             String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "quality review execution failed"
                     : ex.getMessage();
-            log.warn("quality_review 执行失败: projectId={}, taskId={}, traceId={}, message={}",
-                    request.projectId(), request.taskId(), request.traceId(), errorMessage);
+            log.warn("quality_review 执行失败: projectId={}, runId={}, traceId={}, message={}",
+                    request.projectId(), request.runId(), request.traceId(), errorMessage);
             return new ToolCallResult("FAILED", null, null, "QUALITY_REVIEW_FAILED", errorMessage);
         }
     }

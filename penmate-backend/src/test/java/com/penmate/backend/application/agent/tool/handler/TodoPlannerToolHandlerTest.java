@@ -5,9 +5,10 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class TodoPlannerToolHandlerTest {
@@ -72,76 +73,75 @@ class TodoPlannerToolHandlerTest {
     }
 
     @Test
-    void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_RETURN_CARD_READY_TODO_PLAN_WITH_ALL_SOURCE_TYPES_AND_WITHOUT_PERSISTING() throws Exception {
+    void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_RETURN_CARD_READY_TODO_PLAN_WITH_RUN_SHAPED_CONTEXT() throws Exception {
         AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-todo-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-todo-1"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", """
                         {
-                          "planTitle": "第三章修订与待办规划",
-                          "planSummary": "将用户任务拆解、质量问题修复、设定更新和后续规划统一整理为可执行 Todo 卡片。",
-                          "recommendedNextAction": "先处理 P0 逻辑漏洞，再同步设定卡，最后安排润色与复审。",
+                          "planTitle": "Chapter 3 revision plan",
+                          "planSummary": "Group user requests, quality fixes, story bible updates, and planning work into todo cards.",
+                          "recommendedNextAction": "Fix P0 continuity issues first, then sync story bible updates.",
                           "items": [
                             {
-                              "title": "拆解第三章修订主任务",
-                              "description": "把用户要求的第三章修订拆成逻辑修复、节奏优化和语言润色三个子任务。",
+                              "title": "Break down chapter 3 revision",
+                              "description": "Split the requested rewrite into continuity, pacing, and prose tasks.",
                               "priority": "P0",
                               "sourceType": "USER_REQUEST",
                               "recommendedStatus": "TODO",
                               "suggestedAutoCreate": true,
-                              "rationale": "这是用户直接提出的核心交付。",
-                              "acceptanceCriteria": ["形成 3 个子步骤", "每步有明确产出"],
+                              "rationale": "This is the user's direct delivery request.",
+                              "acceptanceCriteria": ["Three subtasks exist", "Each subtask has a concrete output"],
                               "dependsOn": []
                             },
                             {
-                              "title": "修复密令提前知情漏洞",
-                              "description": "根据质量审查结果，删除主角提前得知密令全文的描写并补足情报来源。",
+                              "title": "Fix early secret knowledge",
+                              "description": "Remove character knowledge that should not be available yet.",
                               "priority": "P0",
                               "sourceType": "QUALITY_REVIEW",
                               "recommendedStatus": "TODO",
                               "suggestedAutoCreate": true,
-                              "rationale": "高风险剧情逻辑问题会直接影响章节可信度。",
-                              "acceptanceCriteria": ["删除越界知情描写", "补充合理情报来源"],
-                              "dependsOn": ["拆解第三章修订主任务"]
+                              "rationale": "The issue breaks story continuity.",
+                              "acceptanceCriteria": ["Invalid knowledge is removed", "A valid source is added"],
+                              "dependsOn": ["Break down chapter 3 revision"]
                             },
                             {
-                              "title": "同步密道设定到故事圣经",
-                              "description": "将密道仅女主知晓的边界规则补入后续设定更新清单，避免配角越界知情。",
+                              "title": "Sync tunnel boundary rule",
+                              "description": "Add the tunnel knowledge boundary to the story bible update list.",
                               "priority": "P1",
                               "sourceType": "STORY_BIBLE_UPDATE",
                               "recommendedStatus": "TODO",
                               "suggestedAutoCreate": false,
-                              "rationale": "设定未同步会在后续章节持续复发。",
-                              "acceptanceCriteria": ["新增知识边界条目", "与现有设定不冲突"],
-                              "dependsOn": ["修复密令提前知情漏洞"]
+                              "rationale": "The setting must remain consistent in later chapters.",
+                              "acceptanceCriteria": ["Boundary rule is captured", "No existing rule conflicts"],
+                              "dependsOn": ["Fix early secret knowledge"]
                             },
                             {
-                              "title": "安排修订后复审与下一轮规划",
-                              "description": "在修复完成后执行一次质量复审，并决定是否进入下一轮改写。",
+                              "title": "Schedule review after revision",
+                              "description": "Run another review after the blocking fixes are complete.",
                               "priority": "P2",
                               "sourceType": "PLANNING",
                               "recommendedStatus": "BLOCKED",
                               "suggestedAutoCreate": false,
-                              "rationale": "依赖前置修复完成后才能执行。",
-                              "acceptanceCriteria": ["复审输入齐备", "明确下一轮是否继续改写"],
-                              "dependsOn": ["修复密令提前知情漏洞", "同步密道设定到故事圣经"]
+                              "rationale": "The review depends on earlier fixes.",
+                              "acceptanceCriteria": ["Review input is ready"],
+                              "dependsOn": ["Fix early secret knowledge", "Sync tunnel boundary rule"]
                             }
                           ]
                         }
-                        """);
+                        """, List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-todo-1", validArgsJson()));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         JSONObject output = AgentJsonCodec.parseObj(result.toolOutput());
-        assertThat(output.getStr("planTitle")).isEqualTo("第三章修订与待办规划");
+        assertThat(output.getStr("planTitle")).isEqualTo("Chapter 3 revision plan");
         assertThat(output.getStr("planSummary")).isNotBlank();
         assertThat(output.getStr("recommendedNextAction")).isNotBlank();
 
@@ -164,33 +164,30 @@ class TodoPlannerToolHandlerTest {
         assertThat(firstItem.getJSONArray("acceptanceCriteria").toList(String.class)).isNotEmpty();
         assertThat(firstItem.getJSONArray("dependsOn").toList(String.class)).isEmpty();
 
-        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
-        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
-        assertThat(taskCaptor.getValue().getPromptSnapshot())
+        ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(executionConfig));
+        assertThat(requestCaptor.getValue().messages().get(0).content())
                 .contains("FOLLOW_UP_MODIFICATION")
-                .contains("重写第三章并修复夜宴逻辑")
-                .contains("主角提前得知密令全文")
-                .contains("密道位置仅女主知晓")
-                .contains("当前还有角色关系待校对")
+                .contains("rewrite chapter 3 and fix night banquet continuity")
+                .contains("protagonist knows the secret command too early")
+                .contains("tunnel location is known only by the heroine")
+                .contains("current todos include relationship consistency checks")
                 .contains("只输出 Todo 规划建议")
                 .contains("不要直接创建或持久化 todo");
 
-        verify(agentRepository).findGenerationTask(9001L, 8001L);
-        verifyNoMoreInteractions(agentRepository);
+        verifyNoInteractions(agentRepository);
     }
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_MAP_PROVIDER_EXCEPTION_TO_STABLE_FAILED_RESULT() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-todo-provider-failed")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-todo-provider-failed"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenThrow(new RuntimeException("provider timeout"));
 
         ToolCallResult result = execute(handler, request("call-todo-provider-failed", validArgsJson()));
@@ -202,17 +199,15 @@ class TodoPlannerToolHandlerTest {
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_REJECT_BULLET_STRING_RESPONSE_WITHOUT_STRUCTURED_ITEMS() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-todo-bullets")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("- 修第三章逻辑\n- 更新故事圣经\n- 安排复审");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-todo-bullets"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "- Fix chapter 3\n- Update story bible", List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-todo-bullets", validArgsJson()));
 
@@ -223,10 +218,9 @@ class TodoPlannerToolHandlerTest {
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_UNSUPPORTED_PLANNING_MODE() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         Method validateMethod = handler.getClass().getMethod("validate", ToolCallRequest.class);
 
         assertThatThrownBy(() -> {
@@ -234,17 +228,17 @@ class TodoPlannerToolHandlerTest {
                 validateMethod.invoke(handler, request("call-todo-invalid-mode", """
                         {
                           "planningMode": "RETROFIT",
-                          "userRequest": "重写第三章并修复夜宴逻辑",
+                          "userRequest": "rewrite chapter 3",
                           "qualityIssues": [
                             {
                               "severity": "HIGH",
-                              "summary": "主角提前得知密令全文",
-                              "suggestion": "补充情报来源"
+                              "summary": "protagonist knows the secret command too early",
+                              "suggestion": "add a valid intelligence source"
                             }
                           ],
-                          "storyBibleUpdates": ["密道位置仅女主知晓"],
-                          "planningContext": ["当前已有第三章初稿"],
-                          "existingTodos": ["当前还有角色关系待校对"]
+                          "storyBibleUpdates": ["tunnel location is known only by the heroine"],
+                          "planningContext": ["chapter 3 draft exists"],
+                          "existingTodos": ["current todos include relationship consistency checks"]
                         }
                         """));
             } catch (InvocationTargetException ex) {
@@ -257,36 +251,19 @@ class TodoPlannerToolHandlerTest {
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_REJECT_INVALID_PRIORITY_VALUE() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-todo-invalid-priority")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "planTitle": "第三章修订待办",
-                          "planSummary": "整理修订动作。",
-                          "recommendedNextAction": "先修复高风险问题。",
-                          "items": [
-                            {
-                              "title": "修复主角提前知情",
-                              "description": "修补剧情逻辑。",
-                              "priority": "URGENT",
-                              "sourceType": "QUALITY_REVIEW",
-                              "recommendedStatus": "TODO",
-                              "suggestedAutoCreate": true,
-                              "rationale": "这是高风险问题。",
-                              "acceptanceCriteria": ["情报来源合理"],
-                              "dependsOn": []
-                            }
-                          ]
-                        }
-                        """);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-todo-invalid-priority"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", invalidPlanJson("""
+                        "priority": "URGENT",
+                        "sourceType": "QUALITY_REVIEW",
+                        "recommendedStatus": "TODO"
+                        """), List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-todo-invalid-priority", validArgsJson()));
 
@@ -297,36 +274,19 @@ class TodoPlannerToolHandlerTest {
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_REJECT_INVALID_RECOMMENDED_STATUS_VALUE() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-todo-invalid-status")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "planTitle": "第三章修订待办",
-                          "planSummary": "整理修订动作。",
-                          "recommendedNextAction": "先修复高风险问题。",
-                          "items": [
-                            {
-                              "title": "修复主角提前知情",
-                              "description": "修补剧情逻辑。",
-                              "priority": "P0",
-                              "sourceType": "QUALITY_REVIEW",
-                              "recommendedStatus": "LATER",
-                              "suggestedAutoCreate": true,
-                              "rationale": "这是高风险问题。",
-                              "acceptanceCriteria": ["情报来源合理"],
-                              "dependsOn": []
-                            }
-                          ]
-                        }
-                        """);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-todo-invalid-status"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", invalidPlanJson("""
+                        "priority": "P0",
+                        "sourceType": "QUALITY_REVIEW",
+                        "recommendedStatus": "LATER"
+                        """), List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-todo-invalid-status", validArgsJson()));
 
@@ -337,10 +297,9 @@ class TodoPlannerToolHandlerTest {
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_MAP_NULL_REQUEST_TO_STABLE_FAILED_RESULT() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
 
         ToolCallResult result = execute(handler, null);
 
@@ -351,10 +310,9 @@ class TodoPlannerToolHandlerTest {
 
     @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_VALIDATE_SHOULD_ALLOW_QUALITY_REMEDIATION_WITHOUT_USER_REQUEST() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
+        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
         Method validateMethod = handler.getClass().getMethod("validate", ToolCallRequest.class);
 
         try {
@@ -364,11 +322,11 @@ class TodoPlannerToolHandlerTest {
                       "qualityIssues": [
                         {
                           "severity": "HIGH",
-                          "summary": "主角提前得知密令全文",
-                          "suggestion": "删除提前知情描写并补充情报来源"
+                          "summary": "protagonist knows the secret command too early",
+                          "suggestion": "remove the early knowledge and add a valid source"
                         }
                       ],
-                      "planningContext": ["修复后需要复审"]
+                      "planningContext": ["needs another review after fix"]
                     }
                     """));
         } catch (InvocationTargetException ex) {
@@ -389,17 +347,15 @@ class TodoPlannerToolHandlerTest {
         );
     }
 
-    private static Object instantiateTodoPlannerToolHandler(AgentRepository agentRepository,
-                                                            AgentModelRoutingService agentModelRoutingService,
+    private static Object instantiateTodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
                                                             AgentLlmGateway agentLlmGateway) throws Exception {
         Class<?> clazz = loadClass("com.penmate.backend.application.agent.tool.handler.TodoPlannerToolHandler");
         Constructor<?> constructor = clazz.getDeclaredConstructor(
-                AgentRepository.class,
                 AgentModelRoutingService.class,
                 AgentLlmGateway.class
         );
         constructor.setAccessible(true);
-        return constructor.newInstance(agentRepository, agentModelRoutingService, agentLlmGateway);
+        return constructor.newInstance(agentModelRoutingService, agentLlmGateway);
     }
 
     private static Object instantiateNoArgsClass(String fqcn) throws Exception {
@@ -455,52 +411,57 @@ class TodoPlannerToolHandlerTest {
         );
     }
 
-    private static AgentGenerationTask generationTask() {
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(1L);
-        task.setTaskId(8001L);
-        task.setProjectId(9001L);
-        task.setUserId(1001L);
-        task.setConversationId(6001L);
-        task.setChapterId(5001L);
-        task.setModelConfigId(7001L);
-        task.setTaskType("CHAPTER_DRAFT");
-        task.setTraceId("trace-todo-seed");
-        task.setPromptSnapshot("请修订第三章草稿");
-        task.setPluginSnapshot("[]");
-        return task;
-    }
-
     private static String validArgsJson() {
         return """
                 {
                   "planningMode": "FOLLOW_UP_MODIFICATION",
-                  "userRequest": "重写第三章并修复夜宴逻辑",
+                  "userRequest": "rewrite chapter 3 and fix night banquet continuity",
                   "qualityIssues": [
                     {
                       "severity": "HIGH",
-                      "summary": "主角提前得知密令全文",
-                      "suggestion": "删除提前知情描写并补充情报来源"
+                      "summary": "protagonist knows the secret command too early",
+                      "suggestion": "remove early knowledge and add a valid intelligence source"
                     },
                     {
                       "severity": "MEDIUM",
-                      "summary": "夜宴结束后又出现黄昏景象",
-                      "suggestion": "统一为夜间灯火场景"
+                      "summary": "the scene switches from night to dawn unexpectedly",
+                      "suggestion": "keep the scene during the night lantern sequence"
                     }
                   ],
                   "storyBibleUpdates": [
-                    "密道位置仅女主知晓",
-                    "凡人不可直接施放禁术"
+                    "tunnel location is known only by the heroine",
+                    "ordinary characters cannot cast forbidden techniques directly"
                   ],
                   "planningContext": [
-                    "当前已有第三章初稿",
-                    "本轮修订后需要安排复审"
+                    "chapter 3 draft already exists",
+                    "another review is needed after this revision"
                   ],
                   "existingTodos": [
-                    "当前还有角色关系待校对"
+                    "current todos include relationship consistency checks"
                   ]
                 }
                 """;
+    }
+
+    private static String invalidPlanJson(String invalidFields) {
+        return """
+                {
+                  "planTitle": "Chapter 3 todo plan",
+                  "planSummary": "Plan revision work.",
+                  "recommendedNextAction": "Fix high risk issues first.",
+                  "items": [
+                    {
+                      "title": "Fix continuity",
+                      "description": "Repair the invalid knowledge chain.",
+                %s,
+                      "suggestedAutoCreate": true,
+                      "rationale": "The issue blocks the chapter.",
+                      "acceptanceCriteria": ["Continuity is valid"],
+                      "dependsOn": []
+                    }
+                  ]
+                }
+                """.formatted(invalidFields.stripIndent().trim());
     }
 
     private static AgentLlmExecutionConfig executionConfig() {

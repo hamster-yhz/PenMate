@@ -41,7 +41,7 @@ public class DefaultAgentContextRoutingFacade implements AgentContextRoutingFaca
         Objects.requireNonNull(request, "request");
         log.info("Agent 上下文路由开始: projectId={}, conversationId={}, chapterId={}, includeStyleContext={}, includeRagContext={}, includeStoryBibleContext={}",
                 request.projectId(),
-                request.conversationId(),
+                request.sessionId(),
                 request.chapterId(),
                 request.decision().includeStyleContext(),
                 request.decision().includeRagContext(),
@@ -50,7 +50,7 @@ public class DefaultAgentContextRoutingFacade implements AgentContextRoutingFaca
         List<StoryBibleContextEntryView> storyBibleEntries = request.decision().includeStoryBibleContext()
                 ? storyBibleContextProvider.loadContext(
                 request.projectId(),
-                request.conversationId(),
+                request.sessionId(),
                 request.chapterId(),
                 request.userMessage(),
                 request.decision()
@@ -84,7 +84,7 @@ public class DefaultAgentContextRoutingFacade implements AgentContextRoutingFaca
         return ragApplicationService.hybridSearch(new HybridRagQuery(
                 request.projectId(),
                 request.sessionId(),
-                request.taskId(),
+                request.runId(),
                 request.chapterId(),
                 resolveStoryBibleVersion(request, storyBibleEntries),
                 request.taskProfile().skills(),

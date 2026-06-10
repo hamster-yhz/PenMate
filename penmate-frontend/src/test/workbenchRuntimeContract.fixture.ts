@@ -5,27 +5,15 @@ import type {
 } from '@/api/types'
 
 const createTodoItems = () => ([
-  {
-    todoId: 'todo-1',
-    sessionId: '90001',
-    title: '修复密令来源',
-    status: 'pending',
-    priority: 'HIGH',
-  },
-  {
-    todoId: 'todo-2',
-    sessionId: '90001',
-    title: '补充侍从转述桥段',
-    status: 'pending',
-    priority: 'MEDIUM',
-  },
+  { todoId: 'todo-1', sessionId: '90001', title: '修复密令来源', status: 'pending', priority: 'HIGH' },
+  { todoId: 'todo-2', sessionId: '90001', title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
 ])
 
 const createStoryBibleProposalItems = () => ([
   {
     entryKey: 'maid.secret_order',
     entryType: 'CHARACTER_KNOWLEDGE',
-    proposedContent: '侍从知晓密令并负责转述',
+    proposedContent: '侍从知晓密令并负责转运',
     canonicalStatus: 'PROPOSED',
     riskLevel: 2,
     sourceText: '第二段侍从转述密令',
@@ -39,12 +27,8 @@ const createDraftToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCode: 'draft_generation',
   toolName: '正文生成',
   status: 'running',
-  argumentsPreview: {
-    chapterId: '301',
-  },
-  output: {
-    draftText: '夜雨中的追踪在巷口停住。',
-  },
+  argumentsPreview: { chapterId: '301' },
+  output: { draftText: '夜雨中的追踪在巷口停住。' },
   errorMessage: '',
 })
 
@@ -53,12 +37,8 @@ const createTodoToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCode: 'todo_planner',
   toolName: 'Todo 规划',
   status: 'done',
-  argumentsPreview: {
-    planningMode: 'FOLLOW_UP_MODIFICATION',
-  },
-  output: {
-    planTitle: '第三章修订待办',
-  },
+  argumentsPreview: { planningMode: 'FOLLOW_UP_MODIFICATION' },
+  output: { planTitle: '第三章修订待办' },
   errorMessage: '',
 })
 
@@ -67,12 +47,8 @@ const createStoryBibleToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCode: 'story_bible_update',
   toolName: '故事圣经整理',
   status: 'waiting_approval',
-  argumentsPreview: {
-    chapterId: '301',
-  },
-  output: {
-    proposalSummary: '建议补充侍从知晓密令的设定',
-  },
+  argumentsPreview: { chapterId: '301' },
+  output: { proposalSummary: '建议补充侍从知晓密令的设定' },
   errorMessage: '',
 })
 
@@ -91,11 +67,12 @@ export const createBaseRecoverySnapshot = (): WorkbenchRecoverySnapshot => ({
     status: 'ACTIVE',
     boundStyle: { styleId: '81', name: '冷峻悬疑' },
   },
-  activeTask: {
+  activeRun: {
     turnId: '50001',
-    taskId: '70001',
-    taskStatus: 'running',
-    requestContextId: '71001',
+    runId: '70001',
+    runStatus: 'running',
+    runPhase: 'executing',
+    latestSequence: '12',
   },
   pendingApproval: null,
   messages: [],
@@ -104,15 +81,13 @@ export const createBaseRecoverySnapshot = (): WorkbenchRecoverySnapshot => ({
     selectedText: '夜雨中的追踪在巷口停住。',
     activePlugins: ['outline.search'],
     modelConfigId: 'mcfg-9001',
-    activeTaskRuntime: {
+    activeRunRuntime: {
       lastRuntimeStatus: 'draft_generation',
-      recoveryCursor: 'tool_call:draft_generation:call-draft-1',
+      latestSequence: '12',
       activeToolCallsSnapshot: [createDraftToolCall()],
     },
     resultSummary: {
-      draftSummary: {
-        draftText: '夜雨中的追踪在巷口停住。',
-      },
+      draftSummary: { draftText: '夜雨中的追踪在巷口停住。' },
       qualityReportSummary: null,
       todoSummary: null,
       storyBibleProposalSummary: null,
@@ -126,16 +101,14 @@ export const createTodoReviewRecoverySnapshot = (): WorkbenchRecoverySnapshot =>
     ...base,
     workbenchContext: {
       ...base.workbenchContext,
-      activeTaskRuntime: {
+      activeRunRuntime: {
         lastRuntimeStatus: 'todo_review',
-        recoveryCursor: 'tool_call:todo_planner:call-todo-1',
+        latestSequence: '32',
         activeToolCallsSnapshot: [createTodoToolCall()],
       },
       resultSummary: {
         draftSummary: null,
-        qualityReportSummary: {
-          reviewSummary: '存在剧情逻辑问题，需要修订。',
-        },
+        qualityReportSummary: { reviewSummary: '存在剧情逻辑问题，需要修订。' },
         todoSummary: {
           planTitle: '第三章修订待办',
           recommendedNextAction: 'apply_todo_plan',
@@ -151,11 +124,12 @@ export const createStoryBibleWaitingApprovalRecoverySnapshot = (): WorkbenchReco
   const base = createBaseRecoverySnapshot()
   return {
     ...base,
-    activeTask: {
+    activeRun: {
       turnId: '50001',
-      taskId: '70001',
-      taskStatus: 'waiting_approval',
-      requestContextId: '71001',
+      runId: '70001',
+      runStatus: 'waiting_approval',
+      runPhase: 'waiting_approval',
+      latestSequence: '41',
     },
     pendingApproval: {
       approvalId: '88001',
@@ -175,9 +149,9 @@ export const createStoryBibleWaitingApprovalRecoverySnapshot = (): WorkbenchReco
     ],
     workbenchContext: {
       ...base.workbenchContext,
-      activeTaskRuntime: {
+      activeRunRuntime: {
         lastRuntimeStatus: 'story_bible_review',
-        recoveryCursor: 'approval:88001',
+        latestSequence: '41',
         activeToolCallsSnapshot: [createStoryBibleToolCall()],
       },
       resultSummary: {
@@ -197,17 +171,18 @@ export const createFailedRecoverySnapshot = (): WorkbenchRecoverySnapshot => {
   const base = createBaseRecoverySnapshot()
   return {
     ...base,
-    activeTask: {
+    activeRun: {
       turnId: '50002',
-      taskId: '70002',
-      taskStatus: 'failed',
-      requestContextId: '71001',
+      runId: '70002',
+      runStatus: 'failed',
+      runPhase: 'failed',
+      latestSequence: '52',
     },
     workbenchContext: {
       ...base.workbenchContext,
-      activeTaskRuntime: {
+      activeRunRuntime: {
         lastRuntimeStatus: 'failed',
-        recoveryCursor: 'tool_call:quality_review:call-quality-timeout',
+        latestSequence: '52',
         activeToolCallsSnapshot: [createFailedQualityToolCall()],
       },
       resultSummary: {
@@ -221,8 +196,9 @@ export const createFailedRecoverySnapshot = (): WorkbenchRecoverySnapshot => {
 }
 
 export const createRuntimeWaitingApprovalEvent = (): WorkbenchRuntimeEventSource => ({
-  eventName: 'generation.waiting_approval',
-  taskId: '70001',
+  eventName: 'approval.requested',
+  runId: '70001',
+  sequence: '41',
   sessionId: '90001',
   turnId: '50001',
   phase: 'waiting_approval',
@@ -252,23 +228,25 @@ export const createRuntimeWaitingApprovalEvent = (): WorkbenchRuntimeEventSource
 })
 
 export const createRuntimeFailedEvent = (): WorkbenchRuntimeEventSource => ({
-  eventName: 'generation.failed',
-  taskId: '70002',
+  eventName: 'run.failed',
+  runId: '70002',
+  sequence: '52',
   sessionId: '90001',
   turnId: '50002',
   phase: 'failed',
   message: '质量审查超时',
   recoverable: true,
-  nextAction: 'retry_task',
+  nextAction: 'retry_run',
 })
 
 export const createRuntimeDoneEvent = (): WorkbenchRuntimeEventSource => ({
-  eventName: 'generation.done',
-  taskId: '70001',
+  eventName: 'run.completed',
+  runId: '70001',
+  sequence: '61',
   sessionId: '90001',
   turnId: '50001',
   phase: 'done',
   message: '已完成',
-  status: 'done',
+  status: 'completed',
   nextAction: 'show_result',
 })

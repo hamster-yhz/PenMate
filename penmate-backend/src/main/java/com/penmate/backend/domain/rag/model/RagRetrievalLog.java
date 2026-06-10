@@ -16,7 +16,7 @@ public class RagRetrievalLog {
     /** 所属项目业务 ID。 */
     private Long projectId;
     /** 关联生成任务业务 ID。 */
-    private Long taskId;
+    private Long runId;
     /** 检索查询文本。 */
     private String queryText;
     /** 命中片段数量。 */

@@ -5,12 +5,13 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.todo.TodoPlanItemView;
 import com.penmate.backend.application.todo.TodoPlanView;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
-import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -55,14 +56,11 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
             "DONE"
     );
 
-    private final AgentRepository agentRepository;
     private final AgentModelRoutingService agentModelRoutingService;
     private final AgentLlmGateway agentLlmGateway;
 
-    public TodoPlannerToolHandler(AgentRepository agentRepository,
-                                  AgentModelRoutingService agentModelRoutingService,
+    public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
                                   AgentLlmGateway agentLlmGateway) {
-        this.agentRepository = agentRepository;
         this.agentModelRoutingService = agentModelRoutingService;
         this.agentLlmGateway = agentLlmGateway;
     }
@@ -84,7 +82,7 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
         if (request == null) {
-            log.warn("todo_planner 参数非法: taskId=null, traceId=null, message=request must not be null");
+            log.warn("todo_planner 参数非法: runId=null, traceId=null, message=request must not be null");
             return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", "request must not be null");
         }
         TodoPlannerCommand command;
@@ -95,32 +93,34 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "todo planner execution failed"
                     : ex.getMessage();
-            log.warn("todo_planner 参数非法: taskId={}, traceId={}, message={}",
-                    request == null ? null : request.taskId(),
+            log.warn("todo_planner 参数非法: runId={}, traceId={}, message={}",
+                    request == null ? null : request.runId(),
                     request == null ? null : request.traceId(),
                     message);
             return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", message);
         }
 
         try {
-            AgentGenerationTask task = requireGenerationTask(request);
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(
-                    task.getUserId(),
-                    task.getModelConfigId(),
+                    request.operatorId(),
+                    null,
                     request.traceId()
             );
-            AgentGenerationTask planningTask = buildToolGenerationTask(task, command, request.traceId());
-            String planningJson = agentLlmGateway.generate(planningTask, List.of(), "", executionConfig);
+            AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
+                    new AgentLlmTurnRequest(List.of(AgentLlmMessage.user(buildPrompt(command))), List.of(), "none"),
+                    executionConfig
+            );
+            String planningJson = response.assistantText();
             TodoPlanView planView = parsePlan(planningJson);
-            log.info("todo_planner 执行成功: projectId={}, taskId={}, traceId={}, itemCount={}",
-                    request.projectId(), request.taskId(), request.traceId(), planView.items().size());
+            log.info("todo_planner 执行成功: projectId={}, runId={}, traceId={}, itemCount={}",
+                    request.projectId(), request.runId(), request.traceId(), planView.items().size());
             return ToolCallResult.success(AgentJsonCodec.toJson(toOutputMap(planView)));
         } catch (Exception ex) {
             String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "todo planner execution failed"
                     : ex.getMessage();
-            log.warn("todo_planner 执行失败: projectId={}, taskId={}, traceId={}, message={}",
-                    request.projectId(), request.taskId(), request.traceId(), errorMessage);
+            log.warn("todo_planner 执行失败: projectId={}, runId={}, traceId={}, message={}",
+                    request.projectId(), request.runId(), request.traceId(), errorMessage);
             return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", errorMessage);
         }
     }
@@ -274,38 +274,6 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
         }
         output.put("items", items);
         return output;
-    }
-
-    private AgentGenerationTask requireGenerationTask(ToolCallRequest request) {
-        AgentGenerationTask task = agentRepository.findGenerationTask(request.projectId(), request.taskId());
-        if (task == null) {
-            throw new IllegalStateException("generation task not found");
-        }
-        if (task.getUserId() == null) {
-            throw new IllegalStateException("generation task userId is required");
-        }
-        if (task.getModelConfigId() == null) {
-            throw new IllegalStateException("generation task modelConfigId is required");
-        }
-        return task;
-    }
-
-    private AgentGenerationTask buildToolGenerationTask(AgentGenerationTask source,
-                                                        TodoPlannerCommand command,
-                                                        String traceId) {
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(source.getId());
-        task.setTaskId(source.getTaskId());
-        task.setProjectId(source.getProjectId());
-        task.setUserId(source.getUserId());
-        task.setConversationId(source.getConversationId());
-        task.setChapterId(source.getChapterId());
-        task.setModelConfigId(source.getModelConfigId());
-        task.setTaskType(source.getTaskType());
-        task.setPluginSnapshot(source.getPluginSnapshot());
-        task.setTraceId(traceId == null || traceId.isBlank() ? source.getTraceId() : traceId);
-        task.setPromptSnapshot(buildPrompt(command));
-        return task;
     }
 
     private String buildPrompt(TodoPlannerCommand command) {

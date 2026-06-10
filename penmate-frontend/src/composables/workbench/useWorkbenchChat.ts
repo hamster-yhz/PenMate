@@ -8,10 +8,10 @@ import {
   type ChatRecord,
 } from './useWorkbenchChatTimeline'
 import {
-  createTaskRuntime,
-  normalizeGenerationStatus,
-  type GenerationTaskStatus,
-} from './useWorkbenchTaskRuntime'
+  createAgentRunRuntime,
+  normalizeRunStatus,
+  type AgentRunStatus,
+} from './useAgentRunRuntime'
 import { pickBusinessRecord } from '@/utils/apiPayload'
 
 type ContextProfile = {
@@ -33,9 +33,9 @@ type UseWorkbenchChatDeps = {
   createSession: (projectId: string, payload: Record<string, unknown>) => Promise<unknown>
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
-  openTurnStream: (projectId: string, sessionId: string, turnId: string) => EventSource
+  openRunStream: (projectId: string, runId: string, after?: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
-  closeTaskStream?: (stream: EventSource | null) => void
+  closeRunStream?: (stream: EventSource | null) => void
   revealAssistantText?: (assistantMsg: ChatMessage, rawText: string) => Promise<void>
   scrollChat: () => void
   nextTick: () => Promise<void>
@@ -52,43 +52,31 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const chatInput = ref('')
   const isGenerating = ref(false)
   const generationPhase = ref<GenerationPhase>('idle')
-  const generationTaskStatus = ref<GenerationTaskStatus | ''>('')
+  const generationTaskStatus = ref<AgentRunStatus | ''>('')
   const agentStatusDetailText = ref('')
   const streamingAssistantMsgId = ref<string | number | null>(null)
   const runtimeEventSource = ref<WorkbenchRuntimeEventSource | null>(null)
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
-  const currentActiveTask = ref<{ sessionId: string | null; turnId: string | null; taskId: string | null }>({
+  const currentActiveRun = ref<{ sessionId: string | null; runId: string | null; latestSequence: string }>({
     sessionId: null,
-    turnId: null,
-    taskId: null,
+    runId: null,
+    latestSequence: '0',
   })
   const recoveredSelectedText = ref('')
 
   let msgIdCounter = 1
-  let generationStream: EventSource | null = null
+  let runStream: EventSource | null = null
 
   const generationStatusText = computed(() => {
-    if (isGenerating.value && generationTaskStatus.value) return `生成中 · ${generationTaskStatus.value}`
+    if (isGenerating.value && generationTaskStatus.value) return `运行中 · ${generationTaskStatus.value}`
     if (generationPhase.value === 'preparing') return '准备中'
-    if (generationPhase.value === 'streaming') return '流式生成中'
+    if (generationPhase.value === 'streaming') return '生成中'
     if (generationPhase.value === 'waiting_approval') return '等待审批'
     if (generationPhase.value === 'failed') return '异常'
     return '就绪'
   })
-
-  const resolveSafeLocalMessageCounterSeed = (messageId: ChatMessage['id']) => {
-    if (typeof messageId === 'number') {
-      return Number.isSafeInteger(messageId) && messageId >= 0 ? messageId : null
-    }
-    const rawId = String(messageId ?? '').trim()
-    if (!rawId || !/^\d+$/.test(rawId)) {
-      return null
-    }
-    const numericId = Number(rawId)
-    return Number.isSafeInteger(numericId) ? numericId : null
-  }
 
   const scrollChat = async () => {
     await deps.nextTick()
@@ -101,8 +89,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationPhase: generationPhase.value,
       generationTaskStatus: generationTaskStatus.value,
       messageCount: messages.value.length,
-      lastMessageRole: messages.value[messages.value.length - 1]?.role || '',
-      lastMessageLength: messages.value[messages.value.length - 1]?.text?.length || 0,
       ...extra,
     })
   }
@@ -114,10 +100,6 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const createTurn = (projectId: string, sessionId: string, payload: Record<string, unknown>) => deps.createTurn(projectId, sessionId, payload)
-
-  const openTurnStream = (projectId: string, sessionId: string, turnId: string) => deps.openTurnStream(projectId, sessionId, turnId)
-
-  const closeTaskStream = deps.closeTaskStream
 
   const normalizeSessionRecord = (item: ChatRecord) => ({
     ...item,
@@ -139,9 +121,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       const sessions = (await listSessions(projectId)) as Array<ChatRecord>
       return (Array.isArray(sessions) ? sessions : []).map(normalizeSessionRecord)
     },
-    listMessages: async () => {
-      return []
-    },
+    listMessages: async () => [],
     setConversationList: (items) => {
       conversationList.value = items
     },
@@ -154,28 +134,31 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     scrollChat,
   })
 
-  const runtime = createTaskRuntime({
-    getGenerationTaskStatus: () => generationTaskStatus.value,
-    setGenerationTaskStatus: (value: GenerationTaskStatus | '') => {
+  const runtime = createAgentRunRuntime({
+    getRunStatus: () => generationTaskStatus.value,
+    setRunStatus: (value: AgentRunStatus | '') => {
       generationTaskStatus.value = value
     },
     setAgentStatusDetailText: (value: string) => {
       agentStatusDetailText.value = value
     },
-    getGenerationPhase: () => generationPhase.value,
-    setGenerationPhase: (value: GenerationPhase) => {
+    getRunPhase: () => generationPhase.value,
+    setRunPhase: (value: GenerationPhase) => {
       generationPhase.value = value
     },
-    getGenerationStream: () => generationStream,
-    setGenerationStream: (stream: EventSource | null) => {
-      generationStream = stream
+    getRunStream: () => runStream,
+    setRunStream: (stream: EventSource | null) => {
+      runStream = stream
     },
-    openGenerationStream: openTurnStream,
+    openRunStream: deps.openRunStream,
     addStreamListener: deps.addStreamListener,
-    closeGenerationStream: closeTaskStream,
+    closeRunStream: deps.closeRunStream,
     scrollChat: deps.scrollChat,
     setRuntimeEventSource: (value) => {
       runtimeEventSource.value = value
+    },
+    setLatestSequence: (value) => {
+      currentActiveRun.value.latestSequence = value
     },
     onToken: (token) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
@@ -199,9 +182,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const resolveCurrentSessionId = async (projectId: string) => {
-    if (currentConversationId.value) {
-      return currentConversationId.value
-    }
+    if (currentConversationId.value) return currentConversationId.value
     if (preferredConversationId.value) {
       currentConversationId.value = preferredConversationId.value
       return preferredConversationId.value
@@ -222,275 +203,53 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       title: '新会话',
     })) as ChatRecord
     const sessionId = String(created?.sessionId ?? '')
-    if (sessionId) {
-      currentConversationId.value = sessionId
-      preferredConversationId.value = sessionId
-      if (showConversationPanel.value) {
-        await loadConversationList(projectId)
-      }
-      return sessionId
+    if (!sessionId) return null
+    currentConversationId.value = sessionId
+    preferredConversationId.value = sessionId
+    if (showConversationPanel.value) {
+      await loadConversationList(projectId)
     }
-    return null
+    return sessionId
   }
 
   const ensureSessionIdForSend = async (projectId: string, operatorId: string) => {
-    const existingSessionId = await resolveCurrentSessionId(projectId)
-    if (existingSessionId) {
-      return existingSessionId
-    }
-    return createSessionForSend(projectId, operatorId)
-  }
-
-  const selectConversation = async (conversationId: string) => {
-    const projectId = deps.getCurrentProjectId()
-    if (!projectId || !conversationId) return
-    const snapshot = await getSessionRecovery(projectId, conversationId)
-    hydrateFromRecoverySnapshot((snapshot || null) as Record<string, any> | null)
-  }
-
-  const toggleConversationPanel = async () => {
-    showConversationPanel.value = !showConversationPanel.value
-    if (!showConversationPanel.value) return
-    const projectId = deps.getCurrentProjectId()
-    if (!projectId) return
-    await loadConversationList(projectId)
-  }
-
-  const loadConversationHistory = async (projectId: string, operatorId: string) => {
-    if (!projectId || !operatorId) {
-      messages.value = []
-      currentConversationId.value = null
-      return
-    }
-
-    try {
-      const sessions = (await listSessions(projectId)) as Array<ChatRecord>
-      const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? '')
-      if (!latestSessionId) {
-        messages.value = []
-        currentConversationId.value = null
-        preferredConversationId.value = null
-        return
-      }
-      const snapshot = await getSessionRecovery(projectId, latestSessionId)
-      hydrateFromRecoverySnapshot((snapshot || null) as Record<string, any> | null)
-      await loadConversationList(projectId)
-    } catch {
-      messages.value = []
-      currentConversationId.value = null
-      preferredConversationId.value = null
-    }
-  }
-
-  const recoverAssistantTextFromSession = async (projectId: string, sessionId: string) => {
-    try {
-      const snapshot = await getSessionRecovery(projectId, sessionId)
-      const normalizedSnapshot = pickBusinessRecord(snapshot) as {
-        messages?: Array<Record<string, unknown>>
-      }
-      const recoveryMessages = Array.isArray(normalizedSnapshot?.messages) ? normalizedSnapshot.messages : []
-      const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
-      const latestAssistantText = [...mappedMessages]
-        .reverse()
-        .find((item) => item.role === 'assistant' && String(item.text || '').trim().length > 0)
-      return latestAssistantText?.text || ''
-    } catch {
-      return ''
-    }
-  }
-
-  const sendMessage = async () => {
-    if (!chatInput.value.trim() || isGenerating.value) return
-
-    const userText = chatInput.value.trim()
-    messages.value.push({ id: msgIdCounter++, role: 'user', text: escapeHtml(userText) })
-    chatInput.value = ''
-    isGenerating.value = true
-    generationPhase.value = 'idle'
-    generationTaskStatus.value = ''
-    agentStatusDetailText.value = ''
-    runtimeEventSource.value = null
-    debugChatState('user-send-start', { userTextLength: userText.length })
-    await scrollChat()
-
-    const { projectId, operatorId } = deps.getContext()
-    if (!projectId || !operatorId) {
-      messages.value.push({
-        id: msgIdCounter++,
-        role: 'assistant',
-        text: '缺少 projectId/operatorId，当前仅可本地预览消息。',
-      })
-      isGenerating.value = false
-      generationPhase.value = 'idle'
-      generationTaskStatus.value = ''
-      await scrollChat()
-      return
-    }
-
-    let assistantMsg: ChatMessage | null = null
-
-    try {
-      const conversationId = await ensureSessionIdForSend(projectId, operatorId)
-      if (!conversationId) throw new Error('会话初始化失败')
-
-      const modelConfigId = await deps.ensureModelConfigId(projectId)
-      if (!modelConfigId) {
-        deps.onRequireModelSelection?.()
-        throw new Error('未选择可用模型，请先在模型设置中保存并切换模型')
-      }
-
-      const selectedText = String(deps.getSelectedText?.() ?? '').trim() || recoveredSelectedText.value
-      const generation = pickBusinessRecord(await createTurn(projectId, conversationId, {
-        operatorId,
-        userMessage: userText,
-        taskRequest: {
-          taskType: 'WRITE',
-          chapterId: deps.getActiveChapterKey() || null,
-          selectedText,
-          modelConfigId,
-          activePlugins: deps.getActivePlugins() || [],
-        },
-      })) as ChatRecord & {
-        session?: { sessionId?: string | number | null }
-        activeTask?: {
-          turnId?: string | number | null
-          taskId?: string | number | null
-          taskStatus?: string | null
-        }
-      }
-
-      const taskId = generation.activeTask?.taskId ?? generation.taskId
-      const turnId = generation.activeTask?.turnId
-      if (turnId == null || String(turnId).trim() === '' || String(turnId) === '0') {
-        throw new Error('任务创建失败，缺少 turnId')
-      }
-      if (taskId == null || String(taskId).trim() === '' || String(taskId) === '0') {
-        throw new Error('任务创建失败，缺少 taskId')
-      }
-      currentActiveTask.value = {
-        sessionId: conversationId,
-        turnId: String(turnId),
-        taskId: String(taskId),
-      }
-
-      assistantMsg = { id: msgIdCounter++, role: 'assistant', text: '' }
-      messages.value.push(assistantMsg)
-      streamingAssistantMsgId.value = assistantMsg.id
-      await scrollChat()
-
-      const finalStatus = await runtime.consumeGenerationStream(projectId, conversationId, String(turnId))
-
-      if (finalStatus === 'failed' || finalStatus === 'cancelled') {
-        throw new Error(`生成任务结束：${finalStatus}`)
-      }
-
-      const assistantState = assistantMsg as ChatMessage
-      const hasPendingApproval = !!assistantState.approval && !assistantState.approval?.resolved
-      if (hasPendingApproval) {
-        generationPhase.value = 'waiting_approval'
-        generationTaskStatus.value = 'waiting_approval'
-      }
-      if (!assistantMsg.text && !hasPendingApproval) {
-        assistantMsg.text = await recoverAssistantTextFromSession(projectId, conversationId)
-      }
-    } catch (error: any) {
-      generationPhase.value = 'failed'
-      generationTaskStatus.value = 'failed'
-      const resolvedErrorMessage = runtime.getErrorMessage(error)
-      agentStatusDetailText.value = resolvedErrorMessage
-      const currentRuntimeEvent = runtimeEventSource.value as WorkbenchRuntimeEventSource | null
-      const existingFailedRuntime: WorkbenchRuntimeEventSource | null = currentRuntimeEvent && currentRuntimeEvent.eventName === 'generation.failed'
-        ? currentRuntimeEvent
-        : null
-      runtimeEventSource.value = existingFailedRuntime
-        ? {
-            ...existingFailedRuntime,
-            phase: existingFailedRuntime.phase || 'failed',
-            recoverable: existingFailedRuntime.recoverable ?? true,
-            errorMsg: existingFailedRuntime.errorMsg == null
-              ? resolvedErrorMessage
-              : existingFailedRuntime.errorMsg,
-            message: existingFailedRuntime.message || resolvedErrorMessage,
-          }
-        : {
-            eventName: 'generation.failed',
-            phase: 'failed',
-            message: '执行失败',
-            errorMsg: resolvedErrorMessage,
-            nextAction: 'retry_generation',
-            recoverable: true,
-          }
-      const failureText = `生成失败：${resolvedErrorMessage}`
-      if (assistantMsg) {
-        assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
-      } else {
-        messages.value.push({
-          id: msgIdCounter++,
-          role: 'assistant',
-          text: failureText,
-        })
-      }
-    } finally {
-      runtime.closeGenerationStream()
-      isGenerating.value = false
-      streamingAssistantMsgId.value = null
-      if (generationPhase.value !== 'failed' && generationPhase.value !== 'waiting_approval') {
-        generationPhase.value = 'idle'
-        generationTaskStatus.value = ''
-        agentStatusDetailText.value = ''
-      }
-      debugChatState('send-flow-finished')
-      await scrollChat()
-    }
+    return (await resolveCurrentSessionId(projectId)) || createSessionForSend(projectId, operatorId)
   }
 
   const hydrateFromRecoverySnapshot = (snapshot: Record<string, any> | null | undefined) => {
     runtimeEventSource.value = null
     const normalizedSnapshot = pickBusinessRecord(snapshot) as {
       session?: { sessionId?: string | number | null }
-      activeTask?: {
-        turnId?: string | number | null
-        taskId?: string | number | null
-        taskStatus?: string | null
+      activeRun?: {
+        runId?: string | number | null
+        runStatus?: string | null
+        runPhase?: string | null
+        latestSequence?: string | number | null
       }
-      workbenchContext?: {
-        selectedText?: string | null
-      } | null
+      workbenchContext?: { selectedText?: string | null } | null
       messages?: Array<Record<string, unknown>>
     }
     const recoveryMessages = Array.isArray(normalizedSnapshot.messages) ? normalizedSnapshot.messages : []
-    const mappedMessages = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
-    messages.value = mappedMessages
-    const maxId = mappedMessages.reduce((max, item) => {
-      const numericId = resolveSafeLocalMessageCounterSeed(item.id)
-      return numericId != null && numericId > max ? numericId : max
-    }, 0)
-    if (maxId >= msgIdCounter) {
-      msgIdCounter = maxId + 1
-    }
-
+    messages.value = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
     currentConversationId.value = normalizedSnapshot?.session?.sessionId == null ? null : String(normalizedSnapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
     recoveredSelectedText.value = String(normalizedSnapshot?.workbenchContext?.selectedText ?? '')
-    currentActiveTask.value = {
+    currentActiveRun.value = {
       sessionId: currentConversationId.value,
-      turnId: normalizedSnapshot?.activeTask?.turnId == null ? null : String(normalizedSnapshot.activeTask.turnId),
-      taskId: normalizedSnapshot?.activeTask?.taskId == null ? null : String(normalizedSnapshot.activeTask.taskId),
+      runId: normalizedSnapshot?.activeRun?.runId == null ? null : String(normalizedSnapshot.activeRun.runId),
+      latestSequence: String(normalizedSnapshot?.activeRun?.latestSequence ?? '0'),
     }
-
-    const taskStatus = normalizeGenerationStatus(normalizedSnapshot?.activeTask?.taskStatus)
-    if (taskStatus === 'waiting_approval') {
+    const runStatus = normalizeRunStatus(normalizedSnapshot?.activeRun?.runStatus)
+    if (runStatus === 'waiting_approval') {
       generationPhase.value = 'waiting_approval'
       generationTaskStatus.value = 'waiting_approval'
-      agentStatusDetailText.value = ''
       isGenerating.value = false
       streamingAssistantMsgId.value = null
       return
     }
-    if (taskStatus === 'running') {
+    if (runStatus === 'running') {
       generationPhase.value = 'idle'
       generationTaskStatus.value = ''
-      agentStatusDetailText.value = ''
       isGenerating.value = true
       return
     }
@@ -501,43 +260,76 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     streamingAssistantMsgId.value = null
   }
 
-  const resolveAssistantMessageForResume = () => {
-    const existingAssistant = [...messages.value].reverse().find((item) => {
-      if (item.role !== 'assistant') {
-        return false
-      }
-      const hasText = String(item.text || '').trim().length > 0
-      const hasApproval = !!item.approval
-      const hasToolCallBinding = !!item.toolCallId
-      return !hasText && !hasApproval && !hasToolCallBinding
-    }) || null
-    if (existingAssistant) {
-      return existingAssistant
+  const selectConversation = async (conversationId: string) => {
+    const projectId = deps.getCurrentProjectId()
+    if (!projectId || !conversationId) return
+    hydrateFromRecoverySnapshot((await getSessionRecovery(projectId, conversationId) || null) as Record<string, any> | null)
+  }
+
+  const toggleConversationPanel = async () => {
+    showConversationPanel.value = !showConversationPanel.value
+    if (!showConversationPanel.value) return
+    const projectId = deps.getCurrentProjectId()
+    if (projectId) await loadConversationList(projectId)
+  }
+
+  const loadConversationHistory = async (projectId: string, operatorId: string) => {
+    if (!projectId || !operatorId) {
+      messages.value = []
+      currentConversationId.value = null
+      return
     }
-    const assistantMsg = { id: msgIdCounter++, role: 'assistant' as const, text: '' }
+    try {
+      const sessions = (await listSessions(projectId)) as Array<ChatRecord>
+      const latestSessionId = String((Array.isArray(sessions) ? sessions[0] : null)?.sessionId ?? '')
+      if (!latestSessionId) {
+        messages.value = []
+        currentConversationId.value = null
+        preferredConversationId.value = null
+        return
+      }
+      hydrateFromRecoverySnapshot((await getSessionRecovery(projectId, latestSessionId) || null) as Record<string, any> | null)
+      await loadConversationList(projectId)
+    } catch {
+      messages.value = []
+      currentConversationId.value = null
+      preferredConversationId.value = null
+    }
+  }
+
+  const recoverAssistantTextFromSession = async (projectId: string, sessionId: string) => {
+    try {
+      const snapshot = pickBusinessRecord(await getSessionRecovery(projectId, sessionId)) as { messages?: Array<Record<string, unknown>> }
+      const mappedMessages = (Array.isArray(snapshot?.messages) ? snapshot.messages : []).map((item) => timeline.mapApiMessage(item as ChatRecord))
+      return [...mappedMessages].reverse().find((item) => item.role === 'assistant' && String(item.text || '').trim())?.text || ''
+    } catch {
+      return ''
+    }
+  }
+
+  const resolveAssistantMessageForResume = (): ChatMessage => {
+    const existingAssistant = [...messages.value].reverse().find((item) => item.role === 'assistant' && !String(item.text || '').trim() && !item.approval && !item.toolCallId) || null
+    if (existingAssistant) return existingAssistant
+    const assistantMsg: ChatMessage = { id: msgIdCounter++, role: 'assistant', text: '' }
     messages.value.push(assistantMsg)
     return assistantMsg
   }
 
-  const resumeRunningTask = async (projectId: string, sessionId: string, turnId: string) => {
+  const consumeRun = async (projectId: string, sessionId: string, runId: string, after = '0') => {
     const assistantMsg = resolveAssistantMessageForResume()
     isGenerating.value = true
     generationPhase.value = 'idle'
     generationTaskStatus.value = ''
     agentStatusDetailText.value = ''
     streamingAssistantMsgId.value = assistantMsg.id
-    debugChatState('resume-stream-start', { projectId, sessionId, turnId })
+    currentActiveRun.value = { sessionId, runId, latestSequence: after }
     await scrollChat()
-
     try {
-      const finalStatus = await runtime.consumeGenerationStream(projectId, sessionId, turnId)
-
+      const finalStatus = await runtime.consumeRunStream(projectId, runId, after)
       if (finalStatus === 'failed' || finalStatus === 'cancelled') {
-        throw new Error(`生成任务结束：${finalStatus}`)
+        throw new Error(`运行结束: ${finalStatus}`)
       }
-
-      const assistantState = assistantMsg as ChatMessage
-      const hasPendingApproval = !!assistantState.approval && !assistantState.approval?.resolved
+      const hasPendingApproval = !!assistantMsg.approval && !assistantMsg.approval?.resolved
       if (hasPendingApproval) {
         generationPhase.value = 'waiting_approval'
         generationTaskStatus.value = 'waiting_approval'
@@ -550,32 +342,18 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationTaskStatus.value = 'failed'
       const resolvedErrorMessage = runtime.getErrorMessage(error)
       agentStatusDetailText.value = resolvedErrorMessage
-      const currentRuntimeEvent = runtimeEventSource.value as WorkbenchRuntimeEventSource | null
-      const existingFailedRuntime: WorkbenchRuntimeEventSource | null = currentRuntimeEvent && currentRuntimeEvent.eventName === 'generation.failed'
-        ? currentRuntimeEvent
-        : null
-      runtimeEventSource.value = existingFailedRuntime
-        ? {
-            ...existingFailedRuntime,
-            phase: existingFailedRuntime.phase || 'failed',
-            recoverable: existingFailedRuntime.recoverable ?? true,
-            errorMsg: existingFailedRuntime.errorMsg == null
-              ? resolvedErrorMessage
-              : existingFailedRuntime.errorMsg,
-            message: existingFailedRuntime.message || resolvedErrorMessage,
-          }
-        : {
-            eventName: 'generation.failed',
-            phase: 'failed',
-            message: '执行失败',
-            errorMsg: resolvedErrorMessage,
-            nextAction: 'retry_generation',
-            recoverable: true,
-          }
-      const failureText = `生成失败：${resolvedErrorMessage}`
+      runtimeEventSource.value = {
+        eventName: 'run.failed',
+        phase: 'failed',
+        message: '执行失败',
+        errorMsg: resolvedErrorMessage,
+        nextAction: 'retry_run',
+        recoverable: true,
+      }
+      const failureText = `运行失败: ${resolvedErrorMessage}`
       assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
     } finally {
-      runtime.closeGenerationStream()
+      runtime.closeRunStream()
       isGenerating.value = false
       streamingAssistantMsgId.value = null
       if (generationPhase.value !== 'failed' && generationPhase.value !== 'waiting_approval') {
@@ -583,9 +361,68 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         generationTaskStatus.value = ''
         agentStatusDetailText.value = ''
       }
-      debugChatState('resume-stream-finished', { projectId, sessionId, turnId })
       await scrollChat()
     }
+  }
+
+  const sendMessage = async () => {
+    if (!chatInput.value.trim() || isGenerating.value) return
+    const userText = chatInput.value.trim()
+    messages.value.push({ id: msgIdCounter++, role: 'user', text: escapeHtml(userText) })
+    chatInput.value = ''
+    runtimeEventSource.value = null
+    debugChatState('user-send-start', { userTextLength: userText.length })
+    await scrollChat()
+
+    const { projectId, operatorId } = deps.getContext()
+    if (!projectId || !operatorId) {
+      messages.value.push({ id: msgIdCounter++, role: 'assistant', text: '缺少 projectId/operatorId，无法发送。' })
+      return
+    }
+
+    try {
+      const sessionId = await ensureSessionIdForSend(projectId, operatorId)
+      if (!sessionId) throw new Error('会话初始化失败')
+      const modelConfigId = await deps.ensureModelConfigId(projectId)
+      if (!modelConfigId) {
+        deps.onRequireModelSelection?.()
+        throw new Error('未选择可用模型，请先保存并切换模型')
+      }
+      const selectedText = String(deps.getSelectedText?.() ?? '').trim() || recoveredSelectedText.value
+      const created = pickBusinessRecord(await createTurn(projectId, sessionId, {
+        operatorId,
+        userMessage: userText,
+        taskRequest: {
+          taskType: 'WRITE',
+          chapterId: deps.getActiveChapterKey() || null,
+          selectedText,
+          modelConfigId,
+          activePlugins: deps.getActivePlugins() || [],
+        },
+      })) as ChatRecord & {
+        activeRun?: {
+          runId?: string | number | null
+          latestSequence?: string | number | null
+        }
+      }
+      const runId = created.activeRun?.runId
+      if (runId == null || String(runId).trim() === '' || String(runId) === '0') {
+        throw new Error('运行创建失败，缺少 runId')
+      }
+      await consumeRun(projectId, sessionId, String(runId), String(created.activeRun?.latestSequence ?? '0'))
+    } catch (error: any) {
+      generationPhase.value = 'failed'
+      generationTaskStatus.value = 'failed'
+      const resolvedErrorMessage = runtime.getErrorMessage(error)
+      agentStatusDetailText.value = resolvedErrorMessage
+      messages.value.push({ id: msgIdCounter++, role: 'assistant', text: `运行失败: ${resolvedErrorMessage}` })
+      await scrollChat()
+    }
+  }
+
+  const resumeRunningRun = async (projectId: string, runId: string, after = '0') => {
+    const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
+    await consumeRun(projectId, sessionId, runId, after)
   }
 
   return {
@@ -608,8 +445,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     selectConversation,
     toggleConversationPanel,
     sendMessage,
-    resumeRunningTask,
-    consumeGenerationStream: runtime.consumeGenerationStream,
+    resumeRunningRun,
+    consumeRunStream: runtime.consumeRunStream,
     scrollChat,
     applyAssistantEventMetadata,
     hydrateFromRecoverySnapshot,

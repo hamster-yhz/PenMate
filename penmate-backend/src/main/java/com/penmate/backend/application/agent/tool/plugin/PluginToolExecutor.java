@@ -40,10 +40,10 @@ public class PluginToolExecutor {
 
             PluginCallLog callLog = new PluginCallLog();
             callLog.setProjectId(request.projectId());
-            callLog.setTaskId(request.taskId());
+            callLog.setRunId(request.runId());
             callLog.setPluginCode(pluginCode);
             callLog.setToolName(toolName);
-            callLog.setRequestJson("{\"taskId\":" + request.taskId() + ",\"prompt\":\"" + escape(request.prompt()) + "\"}");
+            callLog.setRequestJson("{\"runId\":" + request.runId() + ",\"prompt\":\"" + escape(request.prompt()) + "\"}");
             callLog.setResponseJson("{\"output\":\"" + escape(output) + "\"}");
             callLog.setLatencyMs(latencyMs);
             callLog.setStatus("success");
@@ -54,10 +54,10 @@ public class PluginToolExecutor {
             int latencyMs = (int) (System.currentTimeMillis() - startAt);
             PluginCallLog callLog = new PluginCallLog();
             callLog.setProjectId(request.projectId());
-            callLog.setTaskId(request.taskId());
+            callLog.setRunId(request.runId());
             callLog.setPluginCode(pluginCode);
             callLog.setToolName(toolName);
-            callLog.setRequestJson("{\"taskId\":" + request.taskId() + "}");
+            callLog.setRequestJson("{\"runId\":" + request.runId() + "}");
             callLog.setResponseJson("{}");
             callLog.setLatencyMs(latencyMs);
             callLog.setStatus("failed");

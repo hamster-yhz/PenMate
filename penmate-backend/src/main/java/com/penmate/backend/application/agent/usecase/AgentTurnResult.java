@@ -6,7 +6,7 @@ package com.penmate.backend.application.agent.usecase;
  */
 public record AgentTurnResult(
         SessionView session,
-        ActiveTaskView activeTask,
+        ActiveRunView activeRun,
         String taskType,
         String userMessage
 ) {
@@ -16,7 +16,7 @@ public record AgentTurnResult(
             String title,
             String status,
             BoundStyleView boundStyle,
-            String taskStatus
+            String lastRunStatus
     ) {
     }
 
@@ -26,11 +26,12 @@ public record AgentTurnResult(
     ) {
     }
 
-    public record ActiveTaskView(
+    public record ActiveRunView(
             Long turnId,
-            Long taskId,
-            String taskStatus,
-            Long requestContextId
+            Long runId,
+            String runStatus,
+            String runPhase,
+            Long latestSequence
     ) {
     }
 }

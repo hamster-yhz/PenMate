@@ -7,15 +7,15 @@ package com.penmate.backend.application.agent.tool.runtime;
  */
 public record ToolCallRequest(
         Long projectId,
-        Long taskId,
-        Long conversationId,
+        Long runId,
+        Long sessionId,
+        Long turnId,
         String toolCode,
         String toolArgsJson,
         Long operatorId,
         String traceId,
         String contextJson,
         String idempotencyKey,
-        String loopRunId,
         Integer llmTurnIndex,
         String toolCallId,
         String assistantToolCallsJson,
@@ -25,8 +25,8 @@ public record ToolCallRequest(
 ) {
 
     public ToolCallRequest(Long projectId,
-                           Long taskId,
-                           Long conversationId,
+                           Long runId,
+                           Long sessionId,
                            String toolCode,
                            String toolArgsJson,
                            Long operatorId,
@@ -34,8 +34,9 @@ public record ToolCallRequest(
                            String contextJson,
                            String idempotencyKey) {
         this(projectId,
-                taskId,
-                conversationId,
+                runId,
+                sessionId,
+                null,
                 toolCode,
                 toolArgsJson,
                 operatorId,
@@ -47,7 +48,40 @@ public record ToolCallRequest(
                 null,
                 null,
                 null,
-                null,
                 null);
+    }
+
+    public ToolCallRequest(Long projectId,
+                           Long runId,
+                           Long sessionId,
+                           String toolCode,
+                           String toolArgsJson,
+                           Long operatorId,
+                           String traceId,
+                           String contextJson,
+                           String idempotencyKey,
+                           String ignoredLoopRunId,
+                           Integer llmTurnIndex,
+                           String toolCallId,
+                           String assistantToolCallsJson,
+                           String conversationMessagesJson,
+                           String resumeMode,
+                           String approvalSummaryJson) {
+        this(projectId,
+                runId,
+                sessionId,
+                null,
+                toolCode,
+                toolArgsJson,
+                operatorId,
+                traceId,
+                contextJson,
+                idempotencyKey,
+                llmTurnIndex,
+                toolCallId,
+                assistantToolCallsJson,
+                conversationMessagesJson,
+                resumeMode,
+                approvalSummaryJson);
     }
 }

@@ -5,12 +5,13 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.support.DraftGenerationCommand;
 import com.penmate.backend.application.agent.tool.support.DraftResultView;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
-import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,14 +27,11 @@ import java.util.Map;
 @Slf4j
 public class DraftGenerationToolHandler implements AgentToolHandler {
 
-    private final AgentRepository agentRepository;
     private final AgentModelRoutingService agentModelRoutingService;
     private final AgentLlmGateway agentLlmGateway;
 
-    public DraftGenerationToolHandler(AgentRepository agentRepository,
-                                      AgentModelRoutingService agentModelRoutingService,
+    public DraftGenerationToolHandler(AgentModelRoutingService agentModelRoutingService,
                                       AgentLlmGateway agentLlmGateway) {
-        this.agentRepository = agentRepository;
         this.agentModelRoutingService = agentModelRoutingService;
         this.agentLlmGateway = agentLlmGateway;
     }
@@ -62,22 +60,25 @@ public class DraftGenerationToolHandler implements AgentToolHandler {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "draft generation execution failed"
                     : ex.getMessage();
-            log.warn("draft_generation 参数非法: taskId={}, traceId={}, message={}",
-                    request == null ? null : request.taskId(),
+            log.warn("draft_generation 参数非法: runId={}, traceId={}, message={}",
+                    request == null ? null : request.runId(),
                     request == null ? null : request.traceId(),
                     message);
             return new ToolCallResult("FAILED", null, null, "DRAFT_GENERATION_FAILED", message);
         }
 
         try {
-            AgentGenerationTask task = requireGenerationTask(request);
             AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(
-                    task.getUserId(),
-                    task.getModelConfigId(),
+                    request.operatorId(),
+                    null,
                     request.traceId()
             );
-            AgentGenerationTask generationTask = buildToolGenerationTask(task, command, request.traceId());
-            String draftText = agentLlmGateway.generate(generationTask, List.of(), "", executionConfig);
+            String prompt = buildPrompt(command);
+            AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
+                    new AgentLlmTurnRequest(List.of(AgentLlmMessage.user(prompt)), List.of(), "none"),
+                    executionConfig
+            );
+            String draftText = response.assistantText();
             String normalizedDraftText = requireMeaningfulDraftText(draftText);
             DraftResultView resultView = new DraftResultView(
                     normalizedDraftText,
@@ -90,15 +91,15 @@ public class DraftGenerationToolHandler implements AgentToolHandler {
             output.put("operation", resultView.operation());
             output.put("preservedConstraints", resultView.preservedConstraints());
             output.put("sourceSummary", resultView.sourceSummary());
-            log.info("draft_generation 执行成功: operation={}, projectId={}, taskId={}, traceId={}",
-                    command.operation(), request.projectId(), request.taskId(), request.traceId());
+            log.info("draft_generation 执行成功: operation={}, projectId={}, runId={}, traceId={}",
+                    command.operation(), request.projectId(), request.runId(), request.traceId());
             return ToolCallResult.success(AgentJsonCodec.toJson(output));
         } catch (Exception ex) {
             String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "draft generation execution failed"
                     : ex.getMessage();
-            log.warn("draft_generation 执行失败: operation={}, projectId={}, taskId={}, traceId={}, message={}",
-                    command.operation(), request.projectId(), request.taskId(), request.traceId(), errorMessage);
+            log.warn("draft_generation 执行失败: operation={}, projectId={}, runId={}, traceId={}, message={}",
+                    command.operation(), request.projectId(), request.runId(), request.traceId(), errorMessage);
             return new ToolCallResult("FAILED", null, null, "DRAFT_GENERATION_FAILED", errorMessage);
         }
     }
@@ -149,38 +150,6 @@ public class DraftGenerationToolHandler implements AgentToolHandler {
             throw new IllegalStateException("draft text must not be placeholder ok");
         }
         return normalized;
-    }
-
-    private AgentGenerationTask requireGenerationTask(ToolCallRequest request) {
-        AgentGenerationTask task = agentRepository.findGenerationTask(request.projectId(), request.taskId());
-        if (task == null) {
-            throw new IllegalStateException("generation task not found");
-        }
-        if (task.getUserId() == null) {
-            throw new IllegalStateException("generation task userId is required");
-        }
-        if (task.getModelConfigId() == null) {
-            throw new IllegalStateException("generation task modelConfigId is required");
-        }
-        return task;
-    }
-
-    private AgentGenerationTask buildToolGenerationTask(AgentGenerationTask source,
-                                                        DraftGenerationCommand command,
-                                                        String traceId) {
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(source.getId());
-        task.setTaskId(source.getTaskId());
-        task.setProjectId(source.getProjectId());
-        task.setUserId(source.getUserId());
-        task.setConversationId(source.getConversationId());
-        task.setChapterId(source.getChapterId());
-        task.setModelConfigId(source.getModelConfigId());
-        task.setTaskType(source.getTaskType());
-        task.setPluginSnapshot(source.getPluginSnapshot());
-        task.setTraceId(traceId == null || traceId.isBlank() ? source.getTraceId() : traceId);
-        task.setPromptSnapshot(buildPrompt(command));
-        return task;
     }
 
     private String buildPrompt(DraftGenerationCommand command) {

@@ -5,6 +5,8 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
@@ -17,9 +19,8 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
+import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
@@ -39,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -101,13 +103,11 @@ class DraftGenerationToolHandlerTest {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("第三章初稿正文");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "generated draft", List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-generate", """
                 {
@@ -120,7 +120,7 @@ class DraftGenerationToolHandlerTest {
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         JSONObject output = AgentJsonCodec.parseObj(result.toolOutput());
-        assertThat(output.getStr("draftText")).isEqualTo("第三章初稿正文");
+        assertThat(output.getStr("draftText")).isEqualTo("generated draft");
         assertThat(output.getStr("operation")).isEqualTo("generate");
         assertThat(output.getStr("sourceSummary")).isEqualTo("第三章冲突提纲");
         JSONArray preservedConstraints = output.getJSONArray("preservedConstraints");
@@ -128,12 +128,40 @@ class DraftGenerationToolHandlerTest {
         assertThat(preservedConstraints.toList(String.class))
                 .containsExactly("保留第一人称", "保留女主冷静口吻");
 
-        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
-        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
-        assertThat(taskCaptor.getValue().getPromptSnapshot())
+        ArgumentCaptor<AgentLlmTurnRequest> taskCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(taskCaptor.capture(), eq(executionConfig));
+        assertThat(taskCaptor.getValue().messages().get(0).content())
                 .contains("根据第三章大纲生成初稿")
                 .contains("保留第一人称")
                 .contains("第三章冲突提纲");
+    }
+
+    @Test
+    void UT_APP_AGENT_DRAFT_GENERATION_TOOL_HANDLER_EXECUTE_SHOULD_USE_RUN_IDENTITY_WITHOUT_LOADING_GENERATION_TASK() throws Exception {
+        AgentRepository agentRepository = mock(AgentRepository.class);
+        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
+        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
+        Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
+        AgentLlmExecutionConfig executionConfig = executionConfig();
+
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "run scoped draft", List.of(), "{}"));
+
+        ToolCallResult result = execute(handler, request("call-run-scoped-generate", """
+                {
+                  "operation": "generate",
+                  "prompt": "Generate from run context"
+                }
+                """));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        verifyNoInteractions(agentRepository);
+        ArgumentCaptor<AgentLlmTurnRequest> turnRequestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(turnRequestCaptor.capture(), eq(executionConfig));
+        assertThat(turnRequestCaptor.getValue().messages()).singleElement().satisfies(message -> {
+            assertThat(message.content()).contains("Generate from run context");
+        });
     }
 
     @Test
@@ -142,13 +170,11 @@ class DraftGenerationToolHandlerTest {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("改写后的正文");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "rewritten draft", List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-rewrite", """
                 {
@@ -162,15 +188,15 @@ class DraftGenerationToolHandlerTest {
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         JSONObject output = AgentJsonCodec.parseObj(result.toolOutput());
-        assertThat(output.getStr("draftText")).isEqualTo("改写后的正文");
+        assertThat(output.getStr("draftText")).isEqualTo("rewritten draft");
         assertThat(output.getStr("operation")).isEqualTo("rewrite");
         assertThat(output.getStr("sourceSummary")).isEqualTo("保留原段落剧情节点");
         assertThat(output.getJSONArray("preservedConstraints").toList(String.class))
                 .containsExactly("剧情走向不变");
 
-        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
-        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
-        assertThat(taskCaptor.getValue().getPromptSnapshot())
+        ArgumentCaptor<AgentLlmTurnRequest> taskCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(taskCaptor.capture(), eq(executionConfig));
+        assertThat(taskCaptor.getValue().messages().get(0).content())
                 .contains("原文第一版")
                 .contains("改写成更冷峻紧张的叙述")
                 .contains("剧情走向不变");
@@ -182,13 +208,11 @@ class DraftGenerationToolHandlerTest {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("修订后的正文");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "revised draft", List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-revise", """
                 {
@@ -202,15 +226,15 @@ class DraftGenerationToolHandlerTest {
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         JSONObject output = AgentJsonCodec.parseObj(result.toolOutput());
-        assertThat(output.getStr("draftText")).isEqualTo("修订后的正文");
+        assertThat(output.getStr("draftText")).isEqualTo("revised draft");
         assertThat(output.getStr("operation")).isEqualTo("revise");
         assertThat(output.getStr("sourceSummary")).isEqualTo("来源于质量审查建议");
         assertThat(output.getJSONArray("preservedConstraints").toList(String.class))
                 .containsExactly("结局不变", "保留第二人称称呼");
 
-        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
-        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
-        assertThat(taskCaptor.getValue().getPromptSnapshot())
+        ArgumentCaptor<AgentLlmTurnRequest> taskCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(taskCaptor.capture(), eq(executionConfig));
+        assertThat(taskCaptor.getValue().messages().get(0).content())
                 .contains("初稿正文")
                 .contains("按照审查建议修复节奏与角色动机")
                 .contains("结局不变");
@@ -222,12 +246,10 @@ class DraftGenerationToolHandlerTest {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenThrow(new RuntimeException("provider timeout"));
 
         ToolCallResult result = execute(handler, request("call-failed", """
@@ -250,13 +272,11 @@ class DraftGenerationToolHandlerTest {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("   ");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "   ", List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-blank-draft", """
                 {
@@ -278,13 +298,11 @@ class DraftGenerationToolHandlerTest {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("ok");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", "ok", List.of(), "{}"));
 
         ToolCallResult result = execute(handler, request("call-placeholder-draft", """
                 {
@@ -306,7 +324,7 @@ class DraftGenerationToolHandlerTest {
         DefaultApprovalPolicyEngine approvalPolicyEngine = mock(DefaultApprovalPolicyEngine.class);
         ToolApprovalViewFactory toolApprovalViewFactory = mock(ToolApprovalViewFactory.class);
         ApprovalApplicationService approvalApplicationService = mock(ApprovalApplicationService.class);
-        PendingToolInvocationRepository pendingToolInvocationRepository = mock(PendingToolInvocationRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);
         AgentRepository agentRepository = mock(AgentRepository.class);
         RealtimeEventService realtimeEventService = mock(RealtimeEventService.class);
         AgentToolHandler handler = mock(AgentToolHandler.class);
@@ -316,8 +334,7 @@ class DraftGenerationToolHandlerTest {
                 approvalPolicyEngine,
                 toolApprovalViewFactory,
                 approvalApplicationService,
-                pendingToolInvocationRepository,
-                agentRepository,
+                pendingApprovalRepository,
                 executionService
         );
         ToolCallRequest request = request("call-generate", """
@@ -352,7 +369,7 @@ class DraftGenerationToolHandlerTest {
         DefaultApprovalPolicyEngine approvalPolicyEngine = mock(DefaultApprovalPolicyEngine.class);
         ToolApprovalViewFactory toolApprovalViewFactory = mock(ToolApprovalViewFactory.class);
         ApprovalApplicationService approvalApplicationService = mock(ApprovalApplicationService.class);
-        PendingToolInvocationRepository pendingToolInvocationRepository = mock(PendingToolInvocationRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);
         AgentRepository agentRepository = mock(AgentRepository.class);
         RealtimeEventService realtimeEventService = mock(RealtimeEventService.class);
         AgentToolHandler handler = mock(AgentToolHandler.class);
@@ -362,8 +379,7 @@ class DraftGenerationToolHandlerTest {
                 approvalPolicyEngine,
                 toolApprovalViewFactory,
                 approvalApplicationService,
-                pendingToolInvocationRepository,
-                agentRepository,
+                pendingApprovalRepository,
                 executionService
         );
         ToolCallRequest request = request("call-rewrite", """
@@ -399,7 +415,7 @@ class DraftGenerationToolHandlerTest {
         DefaultApprovalPolicyEngine approvalPolicyEngine = mock(DefaultApprovalPolicyEngine.class);
         ToolApprovalViewFactory toolApprovalViewFactory = mock(ToolApprovalViewFactory.class);
         ApprovalApplicationService approvalApplicationService = mock(ApprovalApplicationService.class);
-        PendingToolInvocationRepository pendingToolInvocationRepository = mock(PendingToolInvocationRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);
         AgentRepository agentRepository = mock(AgentRepository.class);
         RealtimeEventService realtimeEventService = mock(RealtimeEventService.class);
         AgentToolHandler handler = mock(AgentToolHandler.class);
@@ -409,8 +425,7 @@ class DraftGenerationToolHandlerTest {
                 approvalPolicyEngine,
                 toolApprovalViewFactory,
                 approvalApplicationService,
-                pendingToolInvocationRepository,
-                agentRepository,
+                pendingApprovalRepository,
                 executionService
         );
         ToolCallRequest request = request("call-revise", """
@@ -449,13 +464,13 @@ class DraftGenerationToolHandlerTest {
                 9001L,
                 8001L,
                 7001L,
+                6001L,
                 "draft_generation",
                 toolArgsJson,
                 1001L,
                 "trace-1",
                 "{}",
                 toolCallId + "-idem",
-                "loop-1",
                 0,
                 toolCallId,
                 "[{\"id\":\"" + toolCallId + "\"}]",
@@ -465,17 +480,6 @@ class DraftGenerationToolHandlerTest {
         );
     }
 
-    private AgentGenerationTask generationTask() {
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(5001L);
-        task.setTaskId(8001L);
-        task.setProjectId(9001L);
-        task.setUserId(1001L);
-        task.setConversationId(7001L);
-        task.setModelConfigId(7001L);
-        task.setPromptSnapshot("原始任务提示");
-        return task;
-    }
 
     private AgentLlmExecutionConfig executionConfig() {
         return AgentLlmExecutionConfig.builder()
@@ -504,9 +508,9 @@ class DraftGenerationToolHandlerTest {
                                                          AgentModelRoutingService agentModelRoutingService,
                                                          AgentLlmGateway agentLlmGateway) throws Exception {
         Class<?> type = Class.forName("com.penmate.backend.application.agent.tool.handler.DraftGenerationToolHandler");
-        Constructor<?> constructor = type.getDeclaredConstructor(AgentRepository.class, AgentModelRoutingService.class, AgentLlmGateway.class);
+        Constructor<?> constructor = type.getDeclaredConstructor(AgentModelRoutingService.class, AgentLlmGateway.class);
         constructor.setAccessible(true);
-        return constructor.newInstance(agentRepository, agentModelRoutingService, agentLlmGateway);
+        return constructor.newInstance(agentModelRoutingService, agentLlmGateway);
     }
 
     private ToolCallResult execute(Object handler, ToolCallRequest request) throws Exception {

@@ -8,7 +8,7 @@ import lombok.Data;
 /**
  * 创建 agent turn 的请求 DTO。
  * <p>该结构用于承接“用户消息 + 任务请求上下文”的统一提交，
- * 取代旧的 createMessage / createGeneration 双请求模式。</p>
+ * Replaces the legacy split request pattern with a single run-creating turn request.</p>
  */
 @Data
 public class CreateAgentTurnDto {

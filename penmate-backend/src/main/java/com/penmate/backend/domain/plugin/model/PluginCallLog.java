@@ -15,7 +15,7 @@ public class PluginCallLog {
     /** 所属项目业务 ID。 */
     private Long projectId;
     /** 关联生成任务业务 ID。 */
-    private Long taskId;
+    private Long runId;
     /** 插件编码。 */
     private String pluginCode;
     /** 调用的工具名称。 */

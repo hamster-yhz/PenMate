@@ -11,7 +11,7 @@ import java.util.List;
 public record HybridRagQuery(
         Long projectId,
         Long sessionId,
-        Long taskId,
+        Long runId,
         Long chapterId,
         Integer storyBibleVersion,
         List<String> activatedSkills,

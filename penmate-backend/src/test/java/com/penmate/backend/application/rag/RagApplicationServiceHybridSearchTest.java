@@ -55,7 +55,7 @@ class RagApplicationServiceHybridSearchTest extends BaseApplicationServiceTest {
         assertThat(accessorNames(queryType)).contains(
                 "projectId",
                 "sessionId",
-                "taskId",
+                "runId",
                 "chapterId",
                 "storyBibleVersion",
                 "activatedSkills",
@@ -167,7 +167,7 @@ class RagApplicationServiceHybridSearchTest extends BaseApplicationServiceTest {
 
     private static Object newHybridQuery(Long projectId,
                                          Long sessionId,
-                                         Long taskId,
+                                         Long runId,
                                          Long chapterId,
                                          Integer storyBibleVersion,
                                          List<String> activatedSkills,
@@ -197,7 +197,7 @@ class RagApplicationServiceHybridSearchTest extends BaseApplicationServiceTest {
             return constructor.newInstance(
                     projectId,
                     sessionId,
-                    taskId,
+                    runId,
                     chapterId,
                     storyBibleVersion,
                     activatedSkills,

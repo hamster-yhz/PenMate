@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS agent_approval_requests (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     approval_request_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
-    task_id BIGINT UNSIGNED NULL,
+    run_id BIGINT UNSIGNED NULL,
     approval_type VARCHAR(40) NOT NULL,
     payload_json JSON NOT NULL,
     risk_level TINYINT UNSIGNED NOT NULL DEFAULT 2,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS agent_approval_requests (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     UNIQUE KEY uk_agent_approval_requests_request_id (approval_request_id),
     KEY idx_approval_project_status (project_id, status, created_at),
-    KEY idx_approval_task (task_id)
+    KEY idx_approval_run (run_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS agent_approval_actions (

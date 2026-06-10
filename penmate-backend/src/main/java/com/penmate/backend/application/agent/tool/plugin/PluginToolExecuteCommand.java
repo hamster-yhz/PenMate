@@ -5,7 +5,7 @@ package com.penmate.backend.application.agent.tool.plugin;
  */
 public record PluginToolExecuteCommand(
         Long projectId,
-        Long taskId,
+        Long runId,
         String prompt,
         String traceId
 ) {

@@ -261,7 +261,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
     void UT_APP_PLUGIN_RECORD_TOOL_CALL_ASSIGNS_BUSINESS_ID_WHEN_MISSING() {
         PluginCallLog callLog = new PluginCallLog();
         callLog.setProjectId(1L);
-        callLog.setTaskId(2L);
+        callLog.setRunId(2L);
         callLog.setPluginCode("search-tool");
         callLog.setToolName("context_enhancer");
         when(businessIdGenerator.nextId()).thenReturn(30003L);
@@ -280,7 +280,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         PluginCallLog callLog = new PluginCallLog();
         callLog.setPluginCallLogId(30004L);
         callLog.setProjectId(1L);
-        callLog.setTaskId(2L);
+        callLog.setRunId(2L);
         callLog.setPluginCode("search-tool");
         callLog.setToolName("context_enhancer");
         when(pluginRepository.insertCallLog(callLog)).thenReturn(1);

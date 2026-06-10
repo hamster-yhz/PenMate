@@ -44,29 +44,52 @@ class AgentMapperGenerationTaskMysqlContractTest {
     }
 
     @Test
-    void should_define_agent_task_recovery_columns_for_generation_runtime() throws Exception {
-        assertThat(columnsOf("agent_tasks"))
-                .contains("task_id", "session_id", "turn_id", "project_id")
-                .contains("prompt_snapshot", "request_context_id", "result_id", "active_approval_id", "stream_channel_key")
-                .contains("task_status", "started_at", "finished_at", "trace_id");
+    void should_define_agent_run_event_checkpoint_runtime_schema() throws Exception {
+        assertThat(columnsOf("agent_runs"))
+                .contains("run_id", "session_id", "turn_id", "project_id")
+                .contains("run_status", "run_phase", "active_approval_id", "latest_event_seq", "latest_checkpoint_id")
+                .contains("started_at", "finished_at", "trace_id");
 
-        assertThat(columnsOf("agent_task_results"))
-                .contains("result_id", "task_id", "result_status", "output_markdown")
-                .contains("output_structured_json", "tool_trace_json", "token_usage_json", "cost_usage_json");
+        assertThat(columnsOf("agent_run_inputs"))
+                .contains("run_id", "prompt_snapshot", "task_type", "chapter_id", "selected_text")
+                .contains("style_snapshot_json", "model_snapshot_json", "plugin_bindings_json", "input_hash");
 
-        assertThat(columnsOf("agent_task_contexts"))
-                .contains("context_id", "task_id", "style_snapshot_json", "model_snapshot_json", "context_hash");
+        assertThat(columnsOf("agent_events"))
+                .contains("event_id", "run_id", "project_id", "session_id", "turn_id")
+                .contains("sequence", "schema_version", "event_type", "payload_json");
 
+        assertThat(columnsOf("agent_checkpoints"))
+                .contains("checkpoint_id", "run_id", "checkpoint_no", "last_event_seq", "state_json", "state_size_bytes");
+
+        assertThat(columnsOf("agent_run_projections"))
+                .contains("run_id", "project_id", "session_id", "turn_id")
+                .contains("run_status", "run_phase", "active_approval_id", "latest_sequence", "result_artifact_id");
+
+        assertThat(columnsOf("agent_tool_call_projections"))
+                .contains("run_id", "tool_call_id", "tool_code", "status", "approval_id", "output_artifact_id");
+
+        assertThat(columnsOf("agent_todo_projections"))
+                .contains("run_id", "todo_id", "title", "status", "sort_order");
+
+        assertThat(columnsOf("agent_artifacts"))
+                .contains("artifact_id", "run_id", "artifact_type", "content_type", "content_text", "metadata_json");
+
+        assertThat(columnsOf("agent_tasks")).isEmpty();
+        assertThat(columnsOf("agent_task_results")).isEmpty();
+        assertThat(columnsOf("agent_task_contexts")).isEmpty();
         assertThat(columnsOf("agent_generation_tasks")).isEmpty();
 
         String v11Sql = Files.readString(Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"));
         assertThat(v11Sql)
-                .contains("UNIQUE KEY uk_agent_task_contexts_context_id (context_id)")
-                .contains("UNIQUE KEY uk_agent_task_contexts_task_id (task_id)")
-                .contains("UNIQUE KEY uk_agent_task_results_result_id (result_id)")
-                .contains("UNIQUE KEY uk_agent_task_results_task_id (task_id)")
-                .contains("KEY idx_agent_tasks_project_status (project_id, task_status)")
-                .contains("KEY idx_agent_tasks_session_created (session_id, created_at)");
+                .contains("UNIQUE KEY uk_agent_runs_run_id (run_id)")
+                .contains("UNIQUE KEY uk_agent_runs_turn_id (turn_id)")
+                .contains("UNIQUE KEY uk_agent_run_inputs_run_id (run_id)")
+                .contains("UNIQUE KEY uk_agent_events_run_seq (run_id, sequence)")
+                .contains("UNIQUE KEY uk_agent_checkpoints_run_no (run_id, checkpoint_no)")
+                .contains("UNIQUE KEY uk_agent_run_projections_run_id (run_id)")
+                .contains("UNIQUE KEY uk_agent_tool_call_projection (run_id, tool_call_id)")
+                .contains("UNIQUE KEY uk_agent_todo_projection (run_id, todo_id)")
+                .contains("KEY idx_agent_artifacts_run_type (run_id, artifact_type)");
     }
 
     private Set<String> columnsOf(String tableName) throws SQLException {

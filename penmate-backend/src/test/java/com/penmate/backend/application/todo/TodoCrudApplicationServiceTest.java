@@ -32,7 +32,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
 
     private static final Long PROJECT_ID = 10001L;
     private static final Long SESSION_ID = 90001L;
-    private static final Long TASK_ID = 80001L;
+    private static final Long SOURCE_RUN_ID = 80001L;
     private static final Long OPERATOR_ID = 70001L;
     private static final String TRACE_ID = "UT-TRACE-TODO-CRUD";
 
@@ -46,7 +46,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
         String createdTodoId = stringifyBusinessId(readProperty(created, "todoId", "id"));
         assertThat(createdTodoId).isNotBlank();
         assertThat(readProperty(created, "sessionId")).isEqualTo(SESSION_ID);
-        assertThat(readProperty(created, "taskId")).isEqualTo(TASK_ID);
+        assertThat(readProperty(created, "sourceRunId")).isEqualTo(SOURCE_RUN_ID);
         assertThat(readProperty(created, "title")).isEqualTo("修复第三章开场");
         assertThat(readProperty(created, "todoStatus", "status")).isEqualTo("TODO");
 
@@ -298,7 +298,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
                 args[i] = switch (longIndex++) {
                     case 0 -> PROJECT_ID;
                     case 1 -> SESSION_ID;
-                    case 2 -> TASK_ID;
+                    case 2 -> SOURCE_RUN_ID;
                     default -> OPERATOR_ID;
                 };
                 continue;
@@ -395,20 +395,20 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
             case CREATE -> switch (longIndex) {
                 case 0 -> PROJECT_ID;
                 case 1 -> SESSION_ID;
-                case 2 -> TASK_ID;
+                case 2 -> SOURCE_RUN_ID;
                 default -> OPERATOR_ID;
             };
             case BATCH_CREATE -> switch (longIndex) {
                 case 0 -> PROJECT_ID;
                 case 1 -> SESSION_ID;
-                case 2 -> TASK_ID;
+                case 2 -> SOURCE_RUN_ID;
                 default -> OPERATOR_ID;
             };
             case UPDATE -> switch (longIndex) {
                 case 0 -> PROJECT_ID;
                 case 1 -> SESSION_ID;
                 case 2 -> Long.valueOf(todoId);
-                case 3 -> TASK_ID;
+                case 3 -> SOURCE_RUN_ID;
                 default -> OPERATOR_ID;
             };
             case COMPLETE, DELETE -> switch (longIndex) {
@@ -486,7 +486,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
         TodoPayload todoPayload = payload instanceof TodoPayload todo ? todo : null;
         writePropertyIfPresent(instance, "projectId", PROJECT_ID);
         writePropertyIfPresent(instance, "sessionId", SESSION_ID);
-        writePropertyIfPresent(instance, "taskId", TASK_ID);
+        writePropertyIfPresent(instance, "sourceRunId", SOURCE_RUN_ID);
         writePropertyIfPresent(instance, "operatorId", OPERATOR_ID);
         writePropertyIfPresent(instance, "traceId", TRACE_ID);
         if (todoId != null) {
@@ -829,7 +829,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
             row.putIfAbsent("id", physicalIdSequence.getAndIncrement());
             row.putIfAbsent("projectId", PROJECT_ID);
             row.putIfAbsent("sessionId", SESSION_ID);
-            row.putIfAbsent("taskId", TASK_ID);
+            row.putIfAbsent("sourceRunId", SOURCE_RUN_ID);
             row.putIfAbsent("title", "未命名待办");
             row.putIfAbsent("description", "");
             row.putIfAbsent("sourceType", "USER_REQUEST");
@@ -849,7 +849,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
             row.put("todoId", readProperty(todoLike, "todoId", "id"));
             row.put("projectId", normalizeLong(readProperty(todoLike, "projectId"), PROJECT_ID));
             row.put("sessionId", normalizeLong(readProperty(todoLike, "sessionId"), SESSION_ID));
-            row.put("taskId", normalizeLong(readProperty(todoLike, "taskId"), TASK_ID));
+            row.put("sourceRunId", normalizeLong(readProperty(todoLike, "sourceRunId"), SOURCE_RUN_ID));
             row.put("title", readProperty(todoLike, "title"));
             row.put("description", readProperty(todoLike, "description"));
             row.put("sourceType", readProperty(todoLike, "sourceType"));
@@ -992,7 +992,7 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
             writePropertyIfPresent(todo, "todoId", row.get("todoId"));
             writePropertyIfPresent(todo, "projectId", row.get("projectId"));
             writePropertyIfPresent(todo, "sessionId", row.get("sessionId"));
-            writePropertyIfPresent(todo, "taskId", row.get("taskId"));
+            writePropertyIfPresent(todo, "sourceRunId", row.get("sourceRunId"));
             writePropertyIfPresent(todo, "title", row.get("title"));
             writePropertyIfPresent(todo, "description", row.get("description"));
             writePropertyIfPresent(todo, "sourceType", row.get("sourceType"));

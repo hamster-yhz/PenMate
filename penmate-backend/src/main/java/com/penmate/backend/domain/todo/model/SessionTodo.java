@@ -19,7 +19,7 @@ public class SessionTodo {
     /** 所属会话业务 ID。 */
     private Long sessionId;
     /** 来源任务业务 ID。 */
-    private Long taskId;
+    private Long sourceRunId;
     /** 待办标题。 */
     private String title;
     /** 待办说明。 */

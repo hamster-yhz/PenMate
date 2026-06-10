@@ -17,7 +17,7 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
+import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
@@ -54,7 +54,7 @@ class ToolCallApplicationServiceTest {
     private ApprovalApplicationService approvalApplicationService;
 
     @Mock
-    private PendingToolInvocationRepository pendingToolInvocationRepository;
+    private AgentRunPendingApprovalRepository pendingApprovalRepository;
 
     @Mock
     private AgentRepository agentRepository;
@@ -77,8 +77,7 @@ class ToolCallApplicationServiceTest {
                 approvalPolicyEngine,
                 toolApprovalViewFactory,
                 approvalApplicationService,
-                pendingToolInvocationRepository,
-                agentRepository,
+                pendingApprovalRepository,
                 toolCallExecutionService
         );
     }
@@ -89,13 +88,13 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "book_crud",
                 "{\"operation\":\"delete\",\"projectId\":9001}",
                 7L,
                 "trace-approval",
                 "{}",
                 "idem-1",
-                "loop-1",
                 0,
                 "call-1",
                 "[{\"id\":\"call-1\"}]",
@@ -140,11 +139,9 @@ class ToolCallApplicationServiceTest {
         assertThat(commandCaptor.getValue().riskLevel()).isEqualTo(5);
         assertThat(commandCaptor.getValue().payloadJson()).isEqualTo(request.toolArgsJson());
 
-        verify(pendingToolInvocationRepository).save(any());
+        verify(pendingApprovalRepository).save(any());
         verify(toolDefinitionSource).getRequired("book_crud");
         verify(toolApprovalViewFactory).create(descriptor, decision);
-        verify(agentRepository).updateGenerationTaskStatus(1L, 11L, "waiting_approval", null);
-        verify(agentRepository).updateGenerationTaskActiveApproval(1L, 11L, 99L);
     }
 
     @Test
@@ -153,13 +150,13 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "missing_handler_tool",
                 "{}",
                 7L,
                 "trace-missing-handler",
                 "{}",
                 "idem-missing",
-                "loop-missing",
                 0,
                 "call-missing",
                 "[]",
@@ -190,13 +187,13 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "context_enhancer",
                 "{}",
                 7L,
                 "trace-validate",
                 "{}",
                 "idem-validate",
-                "loop-validate",
                 0,
                 "call-validate",
                 "[]",
@@ -231,13 +228,13 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "context_enhancer",
                 "{\"prompt\":\"hello\"}",
                 7L,
                 "trace-direct",
                 "{}",
                 "idem-2",
-                "loop-2",
                 0,
                 "call-2",
                 "[]",

@@ -92,7 +92,7 @@ public interface PluginMapper {
     int deleteInstall(@Param("projectId") Long projectId, @Param("pluginCode") String pluginCode);
 
     @Select("""
-            SELECT id, plugin_call_log_id, project_id, task_id, plugin_code, tool_name,
+            SELECT id, plugin_call_log_id, project_id, run_id AS runId, plugin_code, tool_name,
                    CAST(request_json AS CHAR) AS request_json,
                    CAST(response_json AS CHAR) AS response_json,
                    latency_ms, status, error_msg, created_at
@@ -104,8 +104,8 @@ public interface PluginMapper {
     List<PluginCallLog> listCallLogs(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO plugin_call_logs(plugin_call_log_id, project_id, task_id, plugin_code, tool_name, request_json, response_json, latency_ms, status, error_msg)
-            VALUES(#{pluginCallLogId}, #{projectId}, #{taskId}, #{pluginCode}, #{toolName}, #{requestJson}, #{responseJson}, #{latencyMs}, #{status}, #{errorMsg})
+            INSERT INTO plugin_call_logs(plugin_call_log_id, project_id, run_id, plugin_code, tool_name, request_json, response_json, latency_ms, status, error_msg)
+            VALUES(#{pluginCallLogId}, #{projectId}, #{runId}, #{pluginCode}, #{toolName}, #{requestJson}, #{responseJson}, #{latencyMs}, #{status}, #{errorMsg})
             """)
     int insertCallLog(PluginCallLog callLog);
 }

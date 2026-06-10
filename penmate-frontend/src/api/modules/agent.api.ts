@@ -9,15 +9,17 @@ type AgentSessionRecord = AnyRecord & {
   sessionId?: AgentBusinessId
 }
 
-type AgentTaskRecord = AnyRecord & {
+type AgentRunRecord = AnyRecord & {
   turnId?: AgentBusinessId
-  taskId?: AgentBusinessId
-  taskStatus?: string
+  runId?: AgentBusinessId
+  runStatus?: string
+  runPhase?: string
+  latestSequence?: string
 }
 
 type AgentSessionSnapshot = AnyRecord & {
   session?: AgentSessionRecord
-  activeTask?: AgentTaskRecord
+  activeRun?: AgentRunRecord
 }
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
@@ -31,9 +33,9 @@ const resolveApiBaseUrl = () => {
   return trimTrailingSlash(configuredBase.startsWith('/') ? configuredBase : `/${configuredBase}`)
 }
 
-const buildTurnStreamUrl = (projectId: string, sessionId: string, turnId: string) => {
+const buildRunStreamUrl = (projectId: string, runId: string, after = '0') => {
   const apiBase = resolveApiBaseUrl()
-  return `${apiBase}/v1/novels/${projectId}/agent/sessions/${sessionId}/turns/${turnId}/stream`
+  return `${apiBase}/v1/novels/${projectId}/agent/runs/${runId}/stream?after=${encodeURIComponent(after)}`
 }
 
 export const agentApi = {
@@ -52,14 +54,11 @@ export const agentApi = {
   createTurn(projectId: string, sessionId: string, payload: AnyRecord) {
     return request.post<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
   },
-  getTask(projectId: string, taskId: string) {
-    return request.get<AgentTaskRecord>(`/v1/novels/${projectId}/agent/tasks/${taskId}`)
+  getRunStreamUrl(projectId: string, runId: string, after = '0') {
+    return buildRunStreamUrl(projectId, runId, after)
   },
-  getTurnStreamUrl(projectId: string, sessionId: string, turnId: string) {
-    return buildTurnStreamUrl(projectId, sessionId, turnId)
-  },
-  openTurnStream(projectId: string, sessionId: string, turnId: string) {
-    const url = buildTurnStreamUrl(projectId, sessionId, turnId)
+  openRunStream(projectId: string, runId: string, after = '0') {
+    const url = buildRunStreamUrl(projectId, runId, after)
     return new EventSource(url)
   },
   addStreamListener(stream: EventSource, eventName: string, listener: StreamListener) {

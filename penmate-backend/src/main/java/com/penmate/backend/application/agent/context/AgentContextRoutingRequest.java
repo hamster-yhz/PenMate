@@ -10,7 +10,7 @@ public record AgentContextRoutingRequest(
         Long projectId,
         Long conversationId,
         Long sessionId,
-        Long taskId,
+        Long runId,
         Long chapterId,
         Integer storyBibleVersion,
         List<String> userMentionedEntities,

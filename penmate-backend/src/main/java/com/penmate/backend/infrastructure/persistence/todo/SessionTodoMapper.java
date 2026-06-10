@@ -21,7 +21,7 @@ public interface SessionTodoMapper {
                    todo_id AS todoId,
                    project_id AS projectId,
                    session_id AS sessionId,
-                   task_id AS taskId,
+                   source_run_id AS sourceRunId,
                    title,
                    description,
                    source_type AS sourceType,
@@ -44,7 +44,7 @@ public interface SessionTodoMapper {
                    todo_id AS todoId,
                    project_id AS projectId,
                    session_id AS sessionId,
-                   task_id AS taskId,
+                   source_run_id AS sourceRunId,
                    title,
                    description,
                    source_type AS sourceType,
@@ -69,7 +69,7 @@ public interface SessionTodoMapper {
                    todo_id AS todoId,
                    project_id AS projectId,
                    session_id AS sessionId,
-                   task_id AS taskId,
+                   source_run_id AS sourceRunId,
                    title,
                    description,
                    source_type AS sourceType,
@@ -91,9 +91,9 @@ public interface SessionTodoMapper {
 
     @Insert("""
             INSERT INTO agent_session_todos(
-                todo_id, project_id, session_id, task_id, title, description, source_type, todo_status, completed_at
+                todo_id, project_id, session_id, source_run_id, title, description, source_type, todo_status, completed_at
             ) VALUES (
-                #{todoId}, #{projectId}, #{sessionId}, #{taskId}, #{title}, #{description}, #{sourceType}, #{todoStatus}, #{completedAt}
+                #{todoId}, #{projectId}, #{sessionId}, #{sourceRunId}, #{title}, #{description}, #{sourceType}, #{todoStatus}, #{completedAt}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -101,7 +101,7 @@ public interface SessionTodoMapper {
 
     @Update("""
             UPDATE agent_session_todos
-            SET task_id = #{taskId},
+            SET source_run_id = #{sourceRunId},
                 title = #{title},
                 description = #{description},
                 source_type = #{sourceType},

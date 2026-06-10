@@ -1,9 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.agent;
 
 import com.penmate.backend.domain.agent.model.AgentConversation;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentMessage;
-import com.penmate.backend.domain.agent.model.AgentTaskResult;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -60,7 +58,7 @@ public interface AgentMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, active_context_version, last_turn_id, last_task_id, last_message_at, resumed_at
+                bound_style_id, active_context_version, last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{conversationId}, #{projectId}, #{userId}, #{title}, #{status},
                 NULL, 1, NULL, NULL, NULL, NULL
@@ -113,127 +111,4 @@ public interface AgentMapper {
             WHERE session_id = #{conversationId} AND deleted_at IS NULL
             """)
     int touchConversationLastMessage(@Param("conversationId") Long conversationId);
-
-    @Insert("""
-            INSERT INTO agent_tasks(
-                task_id, session_id, turn_id, project_id,
-                task_type, task_status, prompt_snapshot, request_context_id, result_id, active_approval_id,
-                stream_channel_key, trace_id, started_at, finished_at
-            ) VALUES (
-                #{taskId}, #{conversationId}, 0, #{projectId},
-                #{taskType}, #{status}, #{promptSnapshot}, NULL, NULL, NULL,
-                NULL, #{traceId}, #{startedAt}, #{finishedAt}
-            )
-            """)
-    @Options(useGeneratedKeys = true, keyProperty = "id")
-    int insertGenerationTask(AgentGenerationTask task);
-
-    @Select("""
-            SELECT id,
-                   task_id AS taskId,
-                   project_id AS projectId,
-                   session_id AS conversationId,
-                   task_type AS taskType,
-                   prompt_snapshot AS promptSnapshot,
-                   trace_id AS traceId,
-                   task_status AS status,
-                   started_at AS startedAt,
-                   finished_at AS finishedAt,
-                   created_at AS createdAt
-            FROM agent_tasks
-            WHERE project_id = #{projectId} AND task_id = #{taskId}
-            LIMIT 1
-            """)
-    java.util.Map<String, Object> findGenerationTask(@Param("projectId") Long projectId,
-                                                     @Param("taskId") Long taskId);
-
-    @Update("""
-            UPDATE agent_tasks
-            SET task_status = #{status},
-                finished_at = CASE WHEN #{status} IN ('done', 'applied', 'failed', 'cancelled') THEN CURRENT_TIMESTAMP(3) ELSE finished_at END,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId} AND task_id = #{taskId}
-            """)
-    int updateGenerationTaskStatus(@Param("projectId") Long projectId,
-                                   @Param("taskId") Long taskId,
-                                   @Param("status") String status,
-                                   @Param("errorMsg") String errorMsg);
-
-    @Update("""
-            UPDATE agent_tasks
-            SET active_approval_id = #{approvalId},
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId}
-              AND task_id = #{taskId}
-            """)
-    int updateGenerationTaskActiveApproval(@Param("projectId") Long projectId,
-                                           @Param("taskId") Long taskId,
-                                           @Param("approvalId") Long approvalId);
-
-    @Update("""
-            UPDATE agent_task_results
-            SET token_usage_json = COALESCE(#{tokenUsageJson}, token_usage_json),
-                cost_usage_json = COALESCE(#{costJson}, cost_usage_json)
-            WHERE result_id = (
-                SELECT result_id
-                FROM agent_tasks
-                WHERE project_id = #{projectId}
-                  AND task_id = #{taskId}
-            )
-            """)
-    int updateGenerationTaskRuntime(@Param("projectId") Long projectId,
-                                    @Param("taskId") Long taskId,
-                                    @Param("tokenUsageJson") String tokenUsageJson,
-                                    @Param("costJson") String costJson,
-                                    @Param("traceId") String traceId);
-
-    @Insert("""
-            INSERT INTO agent_task_results(
-                result_id, task_id, result_status, assistant_message_id,
-                output_markdown, output_structured_json, tool_trace_json,
-                draft_summary, quality_report_summary, todo_summary, story_bible_proposal_summary,
-                token_usage_json, cost_usage_json, error_code, error_message
-            ) VALUES (
-                #{resultId}, #{taskId}, #{resultStatus}, #{assistantMessageId},
-                #{outputMarkdown}, #{outputStructuredJson}, #{toolTraceJson},
-                #{draftSummary}, #{qualityReportSummary}, #{todoSummary}, #{storyBibleProposalSummary},
-                #{tokenUsageJson}, #{costUsageJson}, #{errorCode}, #{errorMessage}
-            )
-            """)
-    int insertTaskResult(AgentTaskResult taskResult);
-
-    @Update("""
-            UPDATE agent_tasks
-            SET result_id = #{resultId}
-            WHERE project_id = #{projectId}
-              AND task_id = #{taskId}
-            """)
-    int updateGenerationTaskResultLink(@Param("projectId") Long projectId,
-                                       @Param("taskId") Long taskId,
-                                       @Param("resultId") Long resultId);
-
-    @Update("""
-            UPDATE agent_task_contexts
-            SET task_profile_json = #{taskProfileJson},
-                prompt_plan_json = #{promptPlanJson},
-                context_package_json = #{contextPackageJson},
-                active_tool_calls_snapshot = #{activeToolCallsSnapshot},
-                last_runtime_status = #{lastRuntimeStatus},
-                recovery_cursor = #{recoveryCursor}
-            WHERE task_id = #{taskId}
-              AND EXISTS (
-                  SELECT 1
-                  FROM agent_tasks
-                  WHERE project_id = #{projectId}
-                    AND task_id = #{taskId}
-              )
-            """)
-    int updateGenerationTaskSnapshots(@Param("projectId") Long projectId,
-                                      @Param("taskId") Long taskId,
-                                      @Param("taskProfileJson") String taskProfileJson,
-                                      @Param("promptPlanJson") String promptPlanJson,
-                                      @Param("contextPackageJson") String contextPackageJson,
-                                      @Param("activeToolCallsSnapshot") String activeToolCallsSnapshot,
-                                      @Param("lastRuntimeStatus") String lastRuntimeStatus,
-                                      @Param("recoveryCursor") String recoveryCursor);
 }

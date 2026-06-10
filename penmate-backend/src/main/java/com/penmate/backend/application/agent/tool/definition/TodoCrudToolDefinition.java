@@ -28,7 +28,7 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
                   "type": "integer",
                   "minimum": 1
                 },
-                "taskId": {
+                "sourceRunId": {
                   "type": "integer",
                   "minimum": 1
                 },

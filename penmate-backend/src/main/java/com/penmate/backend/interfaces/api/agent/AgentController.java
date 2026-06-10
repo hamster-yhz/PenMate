@@ -1,21 +1,18 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
-import com.penmate.backend.application.agent.orchestration.AgentGenerationWorkflowDispatcher;
+import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
+import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
-import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryAppService;
-import com.penmate.backend.application.agent.usecase.AgentSessionRecoveryResult;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
-import com.penmate.backend.domain.agent.model.AgentTaskContext;
-import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
-import com.penmate.backend.domain.shared.service.GenerationStreamService;
+import com.penmate.backend.infrastructure.realtime.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
-import com.penmate.backend.interfaces.api.agent.dto.AgentTaskDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
@@ -29,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -41,27 +39,21 @@ import java.util.Objects;
 public class AgentController {
 
     private final AgentConversationAppService agentConversationAppService;
-    private final AgentSessionRecoveryAppService agentSessionRecoveryAppService;
+    private final AgentRunRecoveryAppService agentRunRecoveryAppService;
     private final AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
     private final AgentTurnAppService agentTurnAppService;
-    private final AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher;
-    private final AgentSessionRepository agentSessionRepository;
-    private final GenerationStreamService generationStreamService;
+    private final AgentRunEventStreamService agentRunEventStreamService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
-                           AgentSessionRecoveryAppService agentSessionRecoveryAppService,
+                           AgentRunRecoveryAppService agentRunRecoveryAppService,
                            AgentSessionTokenUsageAppService agentSessionTokenUsageAppService,
                            AgentTurnAppService agentTurnAppService,
-                           AgentGenerationWorkflowDispatcher agentGenerationWorkflowDispatcher,
-                           AgentSessionRepository agentSessionRepository,
-                           GenerationStreamService generationStreamService) {
+                           AgentRunEventStreamService agentRunEventStreamService) {
         this.agentConversationAppService = agentConversationAppService;
-        this.agentSessionRecoveryAppService = agentSessionRecoveryAppService;
+        this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
         this.agentTurnAppService = agentTurnAppService;
-        this.agentGenerationWorkflowDispatcher = agentGenerationWorkflowDispatcher;
-        this.agentSessionRepository = agentSessionRepository;
-        this.generationStreamService = generationStreamService;
+        this.agentRunEventStreamService = agentRunEventStreamService;
     }
 
     /**
@@ -102,7 +94,7 @@ public class AgentController {
     public ApiResponse<AgentRecoverySnapshotDto> getRecovery(@PathVariable String projectId,
                                                              @PathVariable String sessionId,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(toRecoveryDto(agentSessionRecoveryAppService.getRecovery(
+        return ApiResponse.success(toRecoveryDto(agentRunRecoveryAppService.getRecovery(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
                 traceId)), traceId);
@@ -134,7 +126,7 @@ public class AgentController {
         log.info("Resume agent session request: projectId={}, sessionId={}, operatorId={}, trigger={}, traceId={}",
                 projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId);
         return ApiResponse.success(
-                toRecoveryDto(agentSessionRecoveryAppService.resumeSession(
+                toRecoveryDto(agentRunRecoveryAppService.resumeSession(
                         requireLongId(projectId, "projectId"),
                         requireLongId(sessionId, "sessionId"),
                         requireLongId(dto.getOperatorId(), "operatorId"),
@@ -146,13 +138,13 @@ public class AgentController {
 
     /**
      * 创建新的 agent turn，并返回当前运行中的任务视图�?
-     * <p>该接口是新的 workflow entry，不再暴露历�?createMessage/createGeneration 双接口�?/p>
+     * <p>This endpoint is the run workflow entry and does not expose legacy split request APIs.</p>
      */
     @PostMapping("/sessions/{sessionId}/turns")
-    public ApiResponse<AgentTaskDto> createTurn(@PathVariable String projectId,
-                                                @PathVariable String sessionId,
-                                                @Valid @RequestBody CreateAgentTurnDto dto,
-                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    public ApiResponse<AgentRunDto> createTurn(@PathVariable String projectId,
+                                               @PathVariable String sessionId,
+                                               @Valid @RequestBody CreateAgentTurnDto dto,
+                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, taskType={}, traceId={}",
                 projectId, sessionId, dto.getOperatorId(), dto.getTaskRequest().getTaskType(), traceId);
         AgentTurnResult result = agentTurnAppService.createTurn(
@@ -160,31 +152,21 @@ public class AgentController {
                 requireLongId(sessionId, "sessionId"),
                 toCommand(dto),
                 traceId);
-        if (result != null && result.activeTask() != null && result.activeTask().taskId() != null) {
-            agentGenerationWorkflowDispatcher.dispatchInitialRun(
-                    requireLongId(projectId, "projectId"),
-                    result.activeTask().taskId(),
-                    traceId
-            );
-        }
-        return ApiResponse.success(toTaskDto(result), traceId);
+        return ApiResponse.success(toRunDto(result), traceId);
     }
 
-    @GetMapping(path = "/sessions/{sessionId}/turns/{turnId}/stream", produces = "text/event-stream")
-    public SseEmitter openTurnStream(@PathVariable String projectId,
-                                     @PathVariable String sessionId,
-                                     @PathVariable String turnId,
-                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+    @GetMapping(path = "/runs/{runId}/stream", produces = "text/event-stream")
+    public SseEmitter openRunStream(@PathVariable String projectId,
+                                    @PathVariable String runId,
+                                    @RequestParam(value = "after", required = false) String after,
+                                    @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
+                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         Long resolvedProjectId = requireLongId(projectId, "projectId");
-        Long resolvedSessionId = requireLongId(sessionId, "sessionId");
-        Long resolvedTurnId = requireLongId(turnId, "turnId");
-        AgentTaskContext task = agentSessionRepository.findTaskByTurnId(resolvedProjectId, resolvedSessionId, resolvedTurnId);
-        if (task == null || task.getTaskId() == null) {
-            throw new IllegalArgumentException("turnId does not resolve to an active task stream");
-        }
-        log.info("Open agent turn stream request: projectId={}, sessionId={}, turnId={}, taskId={}, traceId={}",
-                resolvedProjectId, resolvedSessionId, resolvedTurnId, task.getTaskId(), traceId);
-        return generationStreamService.openStream(task.getTaskId());
+        Long resolvedRunId = requireLongId(runId, "runId");
+        Long replayCursor = Math.max(optionalSequence(after), optionalSequence(lastEventId));
+        log.info("Open agent run stream request: projectId={}, runId={}, after={}, lastEventId={}, replayCursor={}, traceId={}",
+                resolvedProjectId, resolvedRunId, after, lastEventId, replayCursor, traceId);
+        return agentRunEventStreamService.openStream(resolvedRunId, replayCursor);
     }
 
     private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {
@@ -238,23 +220,24 @@ public class AgentController {
         return value == null ? null : String.valueOf(value);
     }
 
-    private AgentRecoverySnapshotDto toRecoveryDto(AgentSessionRecoveryResult result) {
-        AgentSessionRecoveryResult.SessionView session = result == null ? null : result.session();
-        AgentSessionRecoveryResult.BoundStyleView boundStyle = session == null ? null : session.boundStyle();
-        AgentSessionRecoveryResult.ActiveTaskView activeTask = result == null ? null : result.activeTask();
+    private AgentRecoverySnapshotDto toRecoveryDto(AgentRunRecoveryResult result) {
+        AgentRunRecoveryResult.SessionView session = result == null ? null : result.session();
+        AgentRunRecoveryResult.BoundStyleView boundStyle = session == null ? null : session.boundStyle();
+        AgentRunRecoveryResult.ActiveRunView activeRun = result == null ? null : result.activeRun();
         return new AgentRecoverySnapshotDto(
                 new AgentRecoverySnapshotDto.SessionDto(
                         session == null ? null : stringifyBusinessId(session.sessionId()),
                         session == null ? null : session.title(),
                         session == null ? null : session.status(),
                         boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(stringifyBusinessId(boundStyle.styleId()), boundStyle.name()),
-                        session == null ? null : session.taskStatus()
+                        session == null ? null : session.lastRunStatus()
                 ),
-                activeTask == null ? null : new AgentRecoverySnapshotDto.ActiveTaskDto(
-                        stringifyBusinessId(activeTask.turnId()),
-                        stringifyBusinessId(activeTask.taskId()),
-                        activeTask.taskStatus(),
-                        stringifyBusinessId(activeTask.requestContextId())
+                activeRun == null ? null : new AgentRecoverySnapshotDto.ActiveRunDto(
+                        stringifyBusinessId(activeRun.turnId()),
+                        stringifyBusinessId(activeRun.runId()),
+                        activeRun.runStatus(),
+                        activeRun.runPhase(),
+                        stringifyBusinessId(activeRun.latestSequence())
                 ),
                 result == null ? null : result.pendingApproval(),
                 result == null ? java.util.List.of() : result.messages(),
@@ -270,27 +253,40 @@ public class AgentController {
         );
     }
 
-    private AgentTaskDto toTaskDto(AgentTurnResult result) {
+    private AgentRunDto toRunDto(AgentTurnResult result) {
         AgentTurnResult.SessionView session = result.session();
         AgentTurnResult.BoundStyleView boundStyle = session == null ? null : session.boundStyle();
-        AgentTurnResult.ActiveTaskView activeTask = result.activeTask();
-        return new AgentTaskDto(
+        AgentTurnResult.ActiveRunView activeRun = result.activeRun();
+        return new AgentRunDto(
                 new AgentRecoverySnapshotDto.SessionDto(
                         session == null ? null : stringifyBusinessId(session.sessionId()),
                         session == null ? null : session.title(),
                         session == null ? null : session.status(),
                         boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(stringifyBusinessId(boundStyle.styleId()), boundStyle.name()),
-                        session == null ? null : session.taskStatus()
+                        session == null ? null : session.lastRunStatus()
                 ),
-                new AgentRecoverySnapshotDto.ActiveTaskDto(
-                        activeTask == null ? null : stringifyBusinessId(activeTask.turnId()),
-                        activeTask == null ? null : stringifyBusinessId(activeTask.taskId()),
-                        activeTask == null ? null : activeTask.taskStatus(),
-                        activeTask == null ? null : stringifyBusinessId(activeTask.requestContextId())
+                activeRun == null ? null : new AgentRunDto.ActiveRunDto(
+                        stringifyBusinessId(activeRun.turnId()),
+                        stringifyBusinessId(activeRun.runId()),
+                        activeRun.runStatus(),
+                        activeRun.runPhase(),
+                        stringifyBusinessId(activeRun.latestSequence())
                 ),
                 result.taskType(),
                 result.userMessage()
         );
+    }
+
+    private Long optionalSequence(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return 0L;
+        }
+        try {
+            long parsed = Long.parseLong(rawValue.trim());
+            return Math.max(parsed, 0L);
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
     }
 }
 

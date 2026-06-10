@@ -24,7 +24,7 @@ class AgentSessionSchemaMysqlContractTest {
 
     @BeforeAll
     static void migrateSchema() throws IOException {
-        prepareTask2MigrationsOnly();
+        prepareMigrationsOnly();
         Flyway.configure()
                 .dataSource(JDBC_URL, "sa", "")
                 .locations("filesystem:" + MIGRATION_DIR)
@@ -33,64 +33,75 @@ class AgentSessionSchemaMysqlContractTest {
     }
 
     @Test
-    void should_define_agent_session_recovery_tables() throws Exception {
+    void should_define_agent_session_run_recovery_tables() throws Exception {
         assertThat(columnsOf("agent_sessions"))
                 .contains(
                         "session_id",
                         "bound_style_id",
                         "active_context_version",
+                        "last_run_id",
                         "resumed_at",
                         "total_prompt_tokens",
                         "total_completion_tokens",
                         "total_tokens"
                 );
         assertThat(columnsOf("agent_turns"))
-                .contains("turn_id", "turn_seq", "resume_token", "turn_status");
-        assertThat(columnsOf("agent_tasks"))
-                .contains("prompt_snapshot", "request_context_id", "result_id", "active_approval_id", "stream_channel_key");
-        assertThat(columnsOf("agent_task_contexts"))
+                .contains("turn_id", "turn_seq", "run_id", "resume_token", "turn_status");
+        assertThat(columnsOf("agent_runs"))
                 .contains(
+                        "run_id",
+                        "project_id",
+                        "session_id",
+                        "turn_id",
+                        "run_status",
+                        "run_phase",
+                        "active_approval_id",
+                        "latest_event_seq",
+                        "latest_checkpoint_id"
+                );
+        assertThat(columnsOf("agent_run_inputs"))
+                .contains(
+                        "run_id",
+                        "prompt_snapshot",
+                        "task_type",
                         "style_snapshot_json",
                         "model_snapshot_json",
-                        "context_hash",
-                        "task_profile_json",
-                        "prompt_plan_json",
-                        "context_package_json",
-                        "active_tool_calls_snapshot",
-                        "last_runtime_status",
-                        "recovery_cursor"
+                        "plugin_bindings_json",
+                        "input_hash"
                 );
-        assertThat(columnsOf("agent_task_results"))
-                .contains(
-                        "output_structured_json",
-                        "tool_trace_json",
-                        "draft_summary",
-                        "quality_report_summary",
-                        "todo_summary",
-                        "story_bible_proposal_summary"
-                );
-        assertThat(columnsOf("agent_pending_approvals"))
-                .contains("resume_payload_json", "pending_status");
+        assertThat(columnsOf("agent_events"))
+                .contains("run_id", "session_id", "turn_id", "sequence", "schema_version", "event_type", "payload_json");
+        assertThat(columnsOf("agent_checkpoints"))
+                .contains("run_id", "checkpoint_no", "last_event_seq", "state_json");
+        assertThat(columnsOf("agent_run_projections"))
+                .contains("run_id", "session_id", "turn_id", "run_status", "run_phase", "latest_sequence");
+        assertThat(columnsOf("agent_run_pending_approvals"))
+                .contains("run_id", "session_id", "turn_id", "resume_payload_json", "pending_status");
 
         assertThat(columnsOf("agent_conversations")).isEmpty();
         assertThat(columnsOf("pending_tool_invocations")).isEmpty();
+        assertThat(columnsOf("agent_tasks")).isEmpty();
+        assertThat(columnsOf("agent_task_contexts")).isEmpty();
+        assertThat(columnsOf("agent_task_results")).isEmpty();
+        assertThat(columnsOf("agent_pending_approvals")).isEmpty();
 
         String v11Sql = Files.readString(Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"));
         String v12Sql = Files.readString(Path.of("src/main/resources/db/migration/V12__init_pending_tool_invocations.sql"));
         assertThat(v11Sql)
                 .contains("UNIQUE KEY uk_agent_turns_session_seq (session_id, turn_seq)")
                 .contains("UNIQUE KEY uk_agent_messages_session_seq (session_id, seq_no)")
-                .contains("轮次状态：PENDING/RUNNING/WAITING_APPROVAL/COMPLETED/FAILED/CANCELLED")
-                .contains("任务状态：QUEUED/RUNNING/WAITING_APPROVAL/SUCCEEDED/FAILED/CANCELLED/APPLIED")
-                .contains("恢复令牌；显式 resume 时用于校验当前 turn 是否仍对应同一断点")
-                .contains("提交执行前冻结的提示词快照；异步恢复与 preflight 重试必须依赖该字段")
-                .contains("当前挂起审批单业务 ID；WAITING_APPROVAL 恢复时作为唯一断点指针");
+                .contains("last_run_id BIGINT UNSIGNED NULL")
+                .contains("run_id BIGINT UNSIGNED NULL")
+                .contains("CREATE TABLE IF NOT EXISTS agent_runs")
+                .contains("CREATE TABLE IF NOT EXISTS agent_events")
+                .contains("CREATE TABLE IF NOT EXISTS agent_checkpoints")
+                .contains("CREATE TABLE IF NOT EXISTS agent_run_projections");
         assertThat(v12Sql)
-                .contains("UNIQUE KEY uk_agent_pending_approvals_approval_id (approval_id)")
-                .contains("UNIQUE KEY uk_agent_pending_approvals_idempotency_key (idempotency_key)")
-                .contains("KEY idx_agent_pending_approvals_session_status (session_id, pending_status)")
-                .contains("挂起状态：PENDING/APPROVED/REJECTED/RESUMED/EXPIRED")
-                .contains("恢复幂等键；审批恢复重放时用于去重与防止重复执行");
+                .contains("CREATE TABLE IF NOT EXISTS agent_run_pending_approvals")
+                .contains("UNIQUE KEY uk_agent_run_pending_approvals_approval_id (approval_id)")
+                .contains("UNIQUE KEY uk_agent_run_pending_approvals_idempotency (idempotency_key)")
+                .contains("KEY idx_agent_run_pending_approvals_run_status (run_id, pending_status)")
+                .contains("KEY idx_agent_run_pending_approvals_session_status (session_id, pending_status)");
     }
 
     private Set<String> columnsOf(String tableName) throws SQLException {
@@ -104,7 +115,7 @@ class AgentSessionSchemaMysqlContractTest {
         }
     }
 
-    private static void prepareTask2MigrationsOnly() throws IOException {
+    private static void prepareMigrationsOnly() throws IOException {
         Path migrationDir = Path.of(MIGRATION_DIR);
         Files.createDirectories(migrationDir);
         Files.copy(

@@ -39,7 +39,7 @@ class SessionTodoSchemaMysqlContractTest {
                         "todo_id",
                         "project_id",
                         "session_id",
-                        "task_id",
+                        "source_run_id",
                         "source_type",
                         "todo_status",
                         "title",
@@ -53,13 +53,14 @@ class SessionTodoSchemaMysqlContractTest {
                 .contains("CREATE TABLE IF NOT EXISTS agent_session_todos")
                 .contains("todo_id BIGINT UNSIGNED NOT NULL")
                 .contains("session_id BIGINT UNSIGNED NOT NULL")
-                .contains("task_id BIGINT UNSIGNED NULL")
+                .contains("source_run_id BIGINT UNSIGNED NULL")
                 .contains("source_type VARCHAR(32) NOT NULL")
                 .contains("todo_status VARCHAR(32) NOT NULL")
                 .contains("deleted_at DATETIME(3) NULL")
                 .contains("UNIQUE KEY uk_agent_session_todos_todo_id (todo_id)")
                 .contains("KEY idx_agent_session_todos_session_status_deleted (session_id, todo_status, deleted_at)")
                 .contains("KEY idx_agent_session_todos_session_created (session_id, created_at)")
+                .contains("KEY idx_agent_session_todos_source_run (source_run_id)")
                 .contains("会话级 Todo 持久化表")
                 .contains("软删除时间")
                 .contains("来源类型：USER_REQUEST/QUALITY_REVIEW/STORY_BIBLE_UPDATE/PLANNING")

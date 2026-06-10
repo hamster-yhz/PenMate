@@ -98,14 +98,14 @@ public interface RagRetrievalMapper {
                                                     @Param("searchScope") String searchScope);
 
     @Insert("""
-            INSERT INTO rag_retrieval_logs(retrieval_log_id, project_id, task_id, query_text, hit_count, sources_json, latency_ms, adopted, trace_id)
-            VALUES(#{retrievalLogId}, #{projectId}, #{taskId}, #{queryText}, #{hitCount}, #{sourcesJson}, #{latencyMs}, #{adopted}, #{traceId})
+            INSERT INTO rag_retrieval_logs(retrieval_log_id, project_id, run_id, query_text, hit_count, sources_json, latency_ms, adopted, trace_id)
+            VALUES(#{retrievalLogId}, #{projectId}, #{runId}, #{queryText}, #{hitCount}, #{sourcesJson}, #{latencyMs}, #{adopted}, #{traceId})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertRetrievalLog(RagRetrievalLog retrievalLog);
 
     @Select("""
-            SELECT id, retrieval_log_id, project_id, task_id, query_text, hit_count,
+            SELECT id, retrieval_log_id, project_id, run_id AS runId, query_text, hit_count,
                    CAST(sources_json AS CHAR) AS sources_json,
                    latency_ms, adopted, trace_id, created_at
             FROM rag_retrieval_logs
