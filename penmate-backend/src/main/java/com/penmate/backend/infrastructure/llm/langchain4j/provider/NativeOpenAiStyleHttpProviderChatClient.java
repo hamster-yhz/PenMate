@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONNull;
 import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
@@ -310,9 +311,10 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
 
             LlmTokenUsage tokenUsage = extractTokenUsage(root);
             Object toolCallsNode = message.get("tool_calls");
-            toolCallsPresent = toolCallsNode != null;
-            toolCallsType = describeJsonValueType(toolCallsNode);
-            if (toolCallsNode != null && !(toolCallsNode instanceof JSONArray)) {
+            boolean toolCallsNodeHasValue = toolCallsNode != null && !(toolCallsNode instanceof JSONNull);
+            toolCallsPresent = toolCallsNodeHasValue;
+            toolCallsType = toolCallsNodeHasValue ? describeJsonValueType(toolCallsNode) : "null";
+            if (toolCallsNodeHasValue && !(toolCallsNode instanceof JSONArray)) {
                 throw new IllegalStateException("LLM response tool_calls is not a json array");
             }
             JSONArray toolCalls = toolCallsNode instanceof JSONArray ? (JSONArray) toolCallsNode : null;
