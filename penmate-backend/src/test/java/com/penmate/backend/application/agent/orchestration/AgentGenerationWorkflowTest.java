@@ -626,18 +626,11 @@ class AgentGenerationWorkflowTest {
                 .findFirst()
                 .orElse(null);
 
-        assertThat(todoReviewStatus).isNotNull();
-        assertThat(todoReviewStatus.todoPlan()).isNotNull();
-        assertThat(todoReviewStatus.todoPlan().planTitle()).isEqualTo("第三章修订待办");
-        assertThat(todoReviewStatus.todoPlan().recommendedNextAction()).isEqualTo("apply_todo_plan");
-        assertThat(todoReviewStatus.todoPlan().items())
-                .singleElement()
-                .extracting("title", "priority")
-                .containsExactly("修复密令来源", "P0");
+        assertThat(todoReviewStatus).isNull();
         assertThat(persistedContext.getActiveToolCallsSnapshot())
-                .contains("\"toolCode\":\"todo_planner\"")
-                .contains("\"planTitle\":\"第三章修订待办\"")
-                .contains("\"recommendedNextAction\":\"apply_todo_plan\"");
+                .doesNotContain("todo_planner")
+                .doesNotContain("todoPlan")
+                .doesNotContain("planTitle");
     }
 
     @Test
@@ -682,8 +675,6 @@ class AgentGenerationWorkflowTest {
         String todoPlanJson = "{\"planTitle\":\"第三章修订待办\",\"planSummary\":\"先修复逻辑漏洞\",\"recommendedNextAction\":\"创建第一项\",\"items\":[{\"title\":\"修复密令来源\",\"description\":\"补充侍从转述桥段\",\"priority\":\"P0\",\"sourceType\":\"QUALITY_REVIEW\",\"recommendedStatus\":\"TODO\",\"suggestedAutoCreate\":true,\"rationale\":\"避免剧情漏洞\",\"acceptanceCriteria\":[\"密令来源明确\"]}]}";
         when(agentToolLoopRunner.execute(eq(1L), eq(41L), eq(9L), eq(0L), eq("trace-todo-plan"), any(), any()))
                 .thenReturn(AgentToolLoopIterationResult.completed("待办规划完成", 1, todoPlanJson));
-        when(todoCrudApplicationService.batchCreateTodos(eq(1L), eq(9L), eq(41L), any(), anyLong(), eq("trace-todo-plan")))
-                .thenReturn(List.of());
         doAnswer(invocation -> null).when(agentTaskRuntimeUpdater).updateGenerationRuntime(any(), any(), any(), any(), any(), any(), any(), any());
         doAnswer(invocation -> null).when(agentResultPublisher).publishGenerationTokens(any(), any(), any(), any());
         doAnswer(invocation -> null).when(agentTaskResultRecorder).recordAssistantResult(any(), any(), any());
@@ -691,15 +682,9 @@ class AgentGenerationWorkflowTest {
         agentGenerationWorkflow.run(1L, 41L, "trace-todo-plan");
 
         ArgumentCaptor<RuntimeStatusView> runtimeStatusCaptor = ArgumentCaptor.forClass(RuntimeStatusView.class);
-        verify(todoCrudApplicationService).batchCreateTodos(eq(1L), eq(9L), eq(41L), any(), anyLong(), eq("trace-todo-plan"));
         verify(taskRuntimeStatusPublisher).publishDone(eq(1L), runtimeStatusCaptor.capture());
-        assertThat(runtimeStatusCaptor.getValue().todoPlan()).isNotNull();
-        assertThat(runtimeStatusCaptor.getValue().todoPlan().planTitle()).isEqualTo("第三章修订待办");
-        assertThat(runtimeStatusCaptor.getValue().todoPlan().recommendedNextAction()).isEqualTo("创建第一项");
-        assertThat(runtimeStatusCaptor.getValue().todoPlan().items())
-                .singleElement()
-                .extracting("title", "priority")
-                .containsExactly("修复密令来源", "P0");
+        assertThat(runtimeStatusCaptor.getValue().phase()).isEqualTo("done");
+        verifyNoInteractions(todoCrudApplicationService);
     }
 
     @Test
@@ -976,13 +961,6 @@ class AgentGenerationWorkflowTest {
         assertThat(runtimeStatusCaptor.getValue().storyBibleApproval().proposalSummary()).isEqualTo("故事圣经更新待确认");
         assertThat(runtimeStatusCaptor.getValue().storyBibleApproval().entryKeys()).containsExactly("information_boundary.linjin.secret");
         assertThat(runtimeStatusCaptor.getValue().storyBibleApproval().nextAction()).isEqualTo("await_approval");
-        assertThat(runtimeStatusCaptor.getValue().todoPlan()).isNotNull();
-        assertThat(runtimeStatusCaptor.getValue().todoPlan().planTitle()).isEqualTo("第三章修订待办");
-        assertThat(runtimeStatusCaptor.getValue().todoPlan().recommendedNextAction()).isEqualTo("apply_todo_plan");
-        assertThat(runtimeStatusCaptor.getValue().todoPlan().items())
-                .singleElement()
-                .extracting("title", "priority")
-                .containsExactly("修复密令来源", "P0");
         verify(agentTaskResultRecorder).recordAssistantResult(
                 eq(task),
                 eq("设定建议已整理"),

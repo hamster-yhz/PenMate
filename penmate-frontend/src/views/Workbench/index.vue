@@ -567,7 +567,6 @@ const {
   generationStatusText,
   agentStatusDetailText,
   streamingAssistantMsgId,
-  runtimeEventSource,
   currentConversationId,
   loadConversationList,
   toggleConversationPanel,

@@ -14,7 +14,6 @@ import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDe
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.StoryBibleUpdateToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.TodoPlannerToolDefinition;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
 
@@ -166,8 +165,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new StoryBibleUpdateToolDefinition(),
-                new TodoCrudToolDefinition(),
-                new TodoPlannerToolDefinition()
+                new TodoCrudToolDefinition()
         ));
         List<AgentLlmToolSchema> schemas = definitionSource.listLlmSchemas();
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
@@ -210,8 +208,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         AgentToolDefinitionSource definitionSource = new InMemoryAgentToolDefinitionSource(List.of(
                 new BookCrudToolDefinition(),
                 new DraftGenerationToolDefinition(),
-                new TodoCrudToolDefinition(),
-                new TodoPlannerToolDefinition()
+                new TodoCrudToolDefinition()
         ));
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
                 List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("hello")),
@@ -223,7 +220,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         JSONObject root = AgentJsonCodec.parseObj(requestBody);
         JSONArray tools = root.getJSONArray("tools");
 
-        assertThat(tools).hasSize(4);
+        assertThat(tools).hasSize(3);
         for (Object toolObject : tools) {
             JSONObject parameters = ((JSONObject) toolObject)
                     .getJSONObject("function")

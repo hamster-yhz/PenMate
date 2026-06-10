@@ -5,9 +5,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * todo_crud tool 的静态定义。
- */
 @Component
 public class TodoCrudToolDefinition implements AgentToolDefinition {
 
@@ -17,8 +14,8 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
               "properties": {
                 "operation": {
                   "type": "string",
-                  "enum": ["list", "create", "update", "complete", "delete"],
-                  "description": "list 可选 todoStatus；create 需要 title/sourceType/todoStatus；update 需要 todoId/title/sourceType/todoStatus；complete/delete 需要 todoId"
+                  "enum": ["list", "get", "create", "update", "complete", "reorder", "delete"],
+                  "description": "Agent session Todo runtime state operation"
                 },
                 "sessionId": {
                   "type": "integer",
@@ -40,10 +37,43 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
                 "description": {
                   "type": "string"
                 },
-                "sourceType": {
-                  "type": "string"
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "in_progress", "completed", "blocked", "failed", "cancelled"]
                 },
                 "todoStatus": {
+                  "type": "string",
+                  "description": "Legacy alias for status"
+                },
+                "priority": {
+                  "type": "integer"
+                },
+                "orderIndex": {
+                  "type": "integer"
+                },
+                "orderedTodoIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "dependencies": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "blockedReason": {
+                  "type": "string"
+                },
+                "errorSummary": {
+                  "type": "string"
+                },
+                "metadata": {
                   "type": "string"
                 }
               },
@@ -56,8 +86,8 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
     public AgentToolDescriptor descriptor() {
         return new AgentToolDescriptor(
                 "todo_crud",
-                new ToolPresentation("待办 CRUD"),
-                new ToolExposure(true, "列出、创建、更新、完成或删除当前会话待办事项", PARAMETERS_JSON_SCHEMA),
+                new ToolPresentation("Todo CRUD"),
+                new ToolExposure(true, "List, get, create, update, reorder, complete, or delete Redis-backed session Todo tasks", PARAMETERS_JSON_SCHEMA),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
                         1,

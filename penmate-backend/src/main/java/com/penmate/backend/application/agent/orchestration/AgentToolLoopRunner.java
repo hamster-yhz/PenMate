@@ -230,7 +230,6 @@ public class AgentToolLoopRunner {
                 toolCallStatusView,
                 toolResult == null || toolResult.approvalId() == null ? null : Map.of("approvalId", toolResult.approvalId()),
                 null,
-                null,
                 true,
                 "WAITING_APPROVAL".equals(toolResult == null ? null : toolResult.status()) ? "await_approval" : "continue_tool_loop"
         );

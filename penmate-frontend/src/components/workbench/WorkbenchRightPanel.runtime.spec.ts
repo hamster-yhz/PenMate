@@ -54,9 +54,9 @@ describe('WorkbenchRightPanel no-standalone-runtime-cards contract', () => {
         activePlugins: ['outline.search'],
         toolCallCard: {
           title: 'Todo 规划',
-          toolCode: 'todo_planner',
+          toolCode: 'todo_crud',
           statusText: '进行中',
-          argumentsPreview: '{"planningMode":"FOLLOW_UP_MODIFICATION"}',
+          argumentsPreview: '{"operation":"create"}',
           outputPreview: '{"planTitle":"第三章修订待办"}',
           errorMessage: '',
         },

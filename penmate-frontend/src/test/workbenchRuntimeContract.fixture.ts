@@ -50,11 +50,11 @@ const createDraftToolCall = (): WorkbenchRuntimeToolCall => ({
 
 const createTodoToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCallId: 'call-todo-1',
-  toolCode: 'todo_planner',
+  toolCode: 'todo_crud',
   toolName: 'Todo 规划',
   status: 'done',
   argumentsPreview: {
-    planningMode: 'FOLLOW_UP_MODIFICATION',
+    operation: 'create',
   },
   output: {
     planTitle: '第三章修订待办',
@@ -128,7 +128,7 @@ export const createTodoReviewRecoverySnapshot = (): WorkbenchRecoverySnapshot =>
       ...base.workbenchContext,
       activeTaskRuntime: {
         lastRuntimeStatus: 'todo_review',
-        recoveryCursor: 'tool_call:todo_planner:call-todo-1',
+        recoveryCursor: 'tool_call:todo_crud:call-todo-1',
         activeToolCallsSnapshot: [createTodoToolCall()],
       },
       resultSummary: {
@@ -234,12 +234,6 @@ export const createRuntimeWaitingApprovalEvent = (): WorkbenchRuntimeEventSource
     nextAction: 'await_approval',
   },
   toolCall: createStoryBibleToolCall(),
-  todoPlan: {
-    planTitle: '第三章修订待办',
-    planSummary: '补齐密令来源链路',
-    recommendedNextAction: 'apply_todo_plan',
-    items: createTodoItems().map(({ todoId, sessionId, ...item }) => item),
-  },
   storyBibleApproval: {
     approvalId: '88001',
     approvalType: 'STORY_BIBLE_UPDATE',

@@ -1,7 +1,5 @@
 package com.penmate.backend.application.agent.runtime;
 
-import com.penmate.backend.application.todo.TodoPlanView;
-
 import java.util.Map;
 
 /**
@@ -17,7 +15,6 @@ public record RuntimeStatusView(
         ToolCallStatusView toolCall,
         Map<String, Object> approval,
         StoryBibleApprovalView storyBibleApproval,
-        TodoPlanView todoPlan,
         boolean recoverable,
         String nextAction
 ) {

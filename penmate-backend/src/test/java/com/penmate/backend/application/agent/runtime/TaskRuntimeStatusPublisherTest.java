@@ -36,7 +36,6 @@ class TaskRuntimeStatusPublisherTest {
                 "toolCall",
                 "approval",
                 "storyBibleApproval",
-                "todoPlan",
                 "recoverable",
                 "nextAction"
         );
@@ -96,7 +95,6 @@ class TaskRuntimeStatusPublisherTest {
         runtimeStatusValues.put("toolCall", toolCall);
         runtimeStatusValues.put("approval", Map.of("approvalId", 42L, "approvalType", "QUALITY_REVIEW"));
         runtimeStatusValues.put("storyBibleApproval", null);
-        runtimeStatusValues.put("todoPlan", null);
         runtimeStatusValues.put("recoverable", true);
         runtimeStatusValues.put("nextAction", "wait_tool_result");
         Object runtimeStatus = instantiateRecord(runtimeStatusViewType, runtimeStatusValues);

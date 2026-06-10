@@ -1,4 +1,4 @@
-﻿import { shallowMount } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -429,15 +429,6 @@ describe('Workbench runtime acceptance matrix', () => {
       message: '已完成',
       status: 'done',
       nextAction: 'view_result',
-      todoPlan: {
-        planTitle: '第三章修订待办',
-        planSummary: '补齐密令来源链路',
-        recommendedNextAction: 'apply_todo_plan',
-        items: [
-          { title: '修复密令来源', status: 'pending', priority: 'HIGH' },
-          { title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
-        ],
-      },
       storyBibleApproval: {
         approvalId: '88001',
         approvalType: 'STORY_BIBLE_UPDATE',
@@ -480,11 +471,11 @@ describe('Workbench runtime acceptance matrix', () => {
         ...baseRecoverySnapshot().workbenchContext,
         activeTaskRuntime: {
           lastRuntimeStatus: 'todo_review',
-          recoveryCursor: 'tool_call:todo_planner:call-todo-1',
+          recoveryCursor: 'tool_call:todo_crud:call-todo-1',
           activeToolCallsSnapshot: [
             {
               toolCallId: 'call-todo-1',
-              toolCode: 'todo_planner',
+              toolCode: 'todo_crud',
               toolName: 'Todo 规划',
               status: 'done',
               output: '{"planTitle":"第三章修订待办"}',

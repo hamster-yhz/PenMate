@@ -94,11 +94,11 @@ describe('createTaskRuntime', () => {
       message: '正在整理待办',
       toolCall: {
         toolCallId: 'call-todo-1',
-        toolCode: 'todo_planner',
+        toolCode: 'todo_crud',
         toolName: 'Todo 规划',
         status: 'running',
         iteration: 2,
-        argumentsPreview: '{"planningMode":"FOLLOW_UP_MODIFICATION"}',
+        argumentsPreview: '{"operation":"create"}',
         output: '{"planTitle":"第三章修订待办"}',
         errorMessage: '',
       },
@@ -137,7 +137,7 @@ describe('createTaskRuntime', () => {
       phase: 'todo_review',
       message: '正在整理待办',
       toolCall: expect.objectContaining({
-        toolCode: 'todo_planner',
+        toolCode: 'todo_crud',
         toolName: 'Todo 规划',
       }),
     }))
@@ -172,7 +172,7 @@ describe('createTaskRuntime', () => {
       message: '正在整理待办',
       toolCall: {
         toolCallId: 'call-todo-3',
-        toolCode: 'todo_planner',
+        toolCode: 'todo_crud',
         toolName: 'Todo 规划',
         status: 'running',
       },
@@ -246,13 +246,13 @@ describe('createTaskRuntime', () => {
       message: '正在整理待办',
       toolCall: {
         toolCallId: 'call-todo-5',
-        toolCode: 'todo_planner',
+        toolCode: 'todo_crud',
         toolName: 'Todo 规划',
         status: 'running',
         iteration: 2,
         argumentsPreview: {
           chapterId: '301',
-          planningMode: 'FOLLOW_UP_MODIFICATION',
+          operation: 'create',
         },
         output: {
           planTitle: '第三章修订待办',
@@ -276,7 +276,7 @@ describe('createTaskRuntime', () => {
       toolCall: expect.objectContaining({
         argumentsPreview: {
           chapterId: '301',
-          planningMode: 'FOLLOW_UP_MODIFICATION',
+          operation: 'create',
         },
         output: {
           planTitle: '第三章修订待办',

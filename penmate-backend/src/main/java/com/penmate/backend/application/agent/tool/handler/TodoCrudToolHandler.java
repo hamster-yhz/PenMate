@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
 import cn.hutool.json.JSONObject;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.orchestration.AgentTaskRuntimeUpdater;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
@@ -12,12 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Todo CRUD tool 处理器。
- */
 @Component
 @RequiredArgsConstructor
 public class TodoCrudToolHandler implements AgentToolHandler {
@@ -46,41 +45,42 @@ public class TodoCrudToolHandler implements AgentToolHandler {
             if (sessionId == null) {
                 throw new IllegalArgumentException("sessionId is required");
             }
-            if (sessionId < 1) {
-                throw new IllegalArgumentException("sessionId must be greater than or equal to 1");
-            }
-            if (!("list".equalsIgnoreCase(operation)
-                    || "create".equalsIgnoreCase(operation)
-                    || "update".equalsIgnoreCase(operation)
-                    || "complete".equalsIgnoreCase(operation)
-                    || "delete".equalsIgnoreCase(operation))) {
+            requireMinimumOne(sessionId, "sessionId");
+            String normalizedOperation = operation.trim().toLowerCase();
+            if (!Set.of("list", "get", "create", "update", "complete", "reorder", "delete").contains(normalizedOperation)) {
                 throw new IllegalArgumentException("Unsupported operation: " + operation);
             }
-            if ("list".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoStatus"));
-            }
-            if ("create".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "taskId", "title", "description", "sourceType", "todoStatus"));
-                validateOptionalLong(args, "taskId");
-                requireNonBlank(args, "title");
-                requireNonBlank(args, "sourceType");
-                requireNonBlank(args, "todoStatus");
-            }
-            if ("update".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId", "taskId", "title", "description", "sourceType", "todoStatus"));
-                requireLong(args, "todoId");
-                validateOptionalLong(args, "taskId");
-                requireNonBlank(args, "title");
-                requireNonBlank(args, "sourceType");
-                requireNonBlank(args, "todoStatus");
-            }
-            if ("complete".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId"));
-                requireLong(args, "todoId");
-            }
-            if ("delete".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "sessionId", "todoId"));
-                requireLong(args, "todoId");
+            switch (normalizedOperation) {
+                case "list" -> rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "status", "todoStatus"));
+                case "get" -> {
+                    rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "todoId"));
+                    requireLong(args, "todoId");
+                }
+                case "create" -> {
+                    rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "taskId", "title", "description", "status", "todoStatus", "priority", "orderIndex", "dependencies", "summary", "blockedReason", "errorSummary", "metadata"));
+                    validateOptionalLong(args, "taskId");
+                    requireNonBlank(args, "title");
+                }
+                case "update" -> {
+                    rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "todoId", "taskId", "title", "description", "status", "todoStatus", "priority", "orderIndex", "dependencies", "summary", "blockedReason", "errorSummary", "metadata"));
+                    requireLong(args, "todoId");
+                    validateOptionalLong(args, "taskId");
+                }
+                case "complete" -> {
+                    rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "todoId", "summary"));
+                    requireLong(args, "todoId");
+                }
+                case "reorder" -> {
+                    rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "orderedTodoIds"));
+                    if (args.getJSONArray("orderedTodoIds") == null || args.getJSONArray("orderedTodoIds").isEmpty()) {
+                        throw new IllegalArgumentException("orderedTodoIds is required");
+                    }
+                }
+                case "delete" -> {
+                    rejectUnexpectedFields(args, normalizedOperation, Set.of("operation", "sessionId", "todoId"));
+                    requireLong(args, "todoId");
+                }
+                default -> throw new IllegalArgumentException("Unsupported operation: " + operation);
             }
         } catch (IllegalArgumentException ex) {
             throw ex;
@@ -96,7 +96,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         }
         try {
             validate(request);
-            Map<String, Object> args = OBJECT_MAPPER.readValue(request.toolArgsJson(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+            Map<String, Object> args = OBJECT_MAPPER.readValue(request.toolArgsJson(), new TypeReference<>() {
             });
             String operation = stringValue(args.get("operation")).toLowerCase();
             Long sessionId = longValue(args.get("sessionId"));
@@ -113,12 +113,16 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 );
                 return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("create", created)));
             }
+            if ("get".equals(operation)) {
+                SessionTodo todo = todoCrudApplicationService.getTodo(request.projectId(), sessionId, todoId);
+                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("get", todo)));
+            }
             if ("list".equals(operation)) {
-                java.util.List<SessionTodo> todos = todoCrudApplicationService.listSessionTodos(
-                        request.projectId(),
-                        sessionId,
-                        nullableStringValue(args.get("todoStatus"))
-                );
+                String status = nullableStringValue(args.get("status"));
+                if (status == null) {
+                    status = nullableStringValue(args.get("todoStatus"));
+                }
+                java.util.List<SessionTodo> todos = todoCrudApplicationService.listSessionTodos(request.projectId(), sessionId, status);
                 Map<String, Object> output = new LinkedHashMap<>();
                 output.put("operation", "list");
                 output.put("sessionId", stringifyBusinessId(sessionId));
@@ -128,34 +132,29 @@ public class TodoCrudToolHandler implements AgentToolHandler {
             if ("update".equals(operation)) {
                 Long taskId = longValue(args.get("taskId")) != null ? longValue(args.get("taskId")) : request.taskId();
                 SessionTodo updated = todoCrudApplicationService.updateTodo(
-                        request.projectId(),
-                        sessionId,
-                        todoId,
-                        taskId,
-                        candidate,
-                        request.operatorId(),
-                        request.traceId()
-                );
+                        request.projectId(), sessionId, todoId, taskId, candidate, request.operatorId(), request.traceId());
                 return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("update", updated)));
             }
             if ("complete".equals(operation)) {
-                SessionTodo completed = todoCrudApplicationService.completeTodo(
-                        request.projectId(),
-                        sessionId,
-                        todoId,
-                        request.operatorId(),
-                        request.traceId()
-                );
+                SessionTodo completion = new SessionTodo();
+                completion.setStatus("completed");
+                completion.setSummary(nullableStringValue(args.get("summary")) == null ? "completed" : nullableStringValue(args.get("summary")));
+                SessionTodo completed = todoCrudApplicationService.updateTodo(
+                        request.projectId(), sessionId, todoId, request.taskId(), completion, request.operatorId(), request.traceId());
                 return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(buildTodoOutput("complete", completed)));
             }
+            if ("reorder".equals(operation)) {
+                List<Long> orderedTodoIds = ((List<?>) args.get("orderedTodoIds")).stream().map(this::longValue).toList();
+                java.util.List<SessionTodo> todos = todoCrudApplicationService.reorderTodos(
+                        request.projectId(), sessionId, orderedTodoIds, request.operatorId(), request.traceId());
+                Map<String, Object> output = new LinkedHashMap<>();
+                output.put("operation", "reorder");
+                output.put("sessionId", stringifyBusinessId(sessionId));
+                output.put("items", todos.stream().map(todo -> buildTodoOutput(null, todo)).toList());
+                return ToolCallResult.success(AgentTaskRuntimeUpdater.toSnapshotJson(output));
+            }
             if ("delete".equals(operation)) {
-                todoCrudApplicationService.deleteTodo(
-                        request.projectId(),
-                        sessionId,
-                        todoId,
-                        request.operatorId(),
-                        request.traceId()
-                );
+                todoCrudApplicationService.deleteTodo(request.projectId(), sessionId, todoId, request.operatorId(), request.traceId());
                 Map<String, Object> output = new LinkedHashMap<>();
                 output.put("operation", "delete");
                 output.put("todoId", stringifyBusinessId(todoId));
@@ -174,10 +173,20 @@ public class TodoCrudToolHandler implements AgentToolHandler {
 
     private SessionTodo buildCandidate(Map<String, Object> args) {
         SessionTodo candidate = new SessionTodo();
-        candidate.setTitle(stringValue(args.get("title")));
+        candidate.setTitle(nullableStringValue(args.get("title")));
         candidate.setDescription(nullableStringValue(args.get("description")));
-        candidate.setSourceType(stringValue(args.get("sourceType")));
-        candidate.setTodoStatus(stringValue(args.get("todoStatus")));
+        candidate.setStatus(nullableStringValue(args.get("status")));
+        candidate.setTodoStatus(nullableStringValue(args.get("todoStatus")));
+        candidate.setPriority(integerValue(args.get("priority")));
+        candidate.setOrderIndex(integerValue(args.get("orderIndex")));
+        candidate.setSummary(nullableStringValue(args.get("summary")));
+        candidate.setBlockedReason(nullableStringValue(args.get("blockedReason")));
+        candidate.setErrorSummary(nullableStringValue(args.get("errorSummary")));
+        candidate.setMetadata(nullableStringValue(args.get("metadata")));
+        Object dependencies = args.get("dependencies");
+        if (dependencies instanceof List<?> list) {
+            candidate.setDependencies(list.stream().map(String::valueOf).toList());
+        }
         return candidate;
     }
 
@@ -192,9 +201,16 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         output.put("taskId", stringifyBusinessId(todo == null ? null : todo.getTaskId()));
         output.put("title", todo == null ? null : todo.getTitle());
         output.put("description", todo == null ? null : todo.getDescription());
-        output.put("sourceType", todo == null ? null : todo.getSourceType());
-        output.put("todoStatus", todo == null ? null : todo.getTodoStatus());
+        output.put("status", todo == null ? null : todo.getStatus());
+        output.put("priority", todo == null ? null : todo.getPriority());
+        output.put("orderIndex", todo == null ? null : todo.getOrderIndex());
+        output.put("dependencies", todo == null ? null : todo.getDependencies());
+        output.put("summary", todo == null ? null : todo.getSummary());
+        output.put("blockedReason", todo == null ? null : todo.getBlockedReason());
+        output.put("errorSummary", todo == null ? null : todo.getErrorSummary());
+        output.put("metadata", todo == null ? null : todo.getMetadata());
         output.put("completedAt", todo == null || todo.getCompletedAt() == null ? null : todo.getCompletedAt().toString());
+        output.put("createdAt", todo == null || todo.getCreatedAt() == null ? null : todo.getCreatedAt().toString());
         output.put("updatedAt", todo == null || todo.getUpdatedAt() == null ? null : todo.getUpdatedAt().toString());
         return output;
     }
@@ -204,7 +220,8 @@ public class TodoCrudToolHandler implements AgentToolHandler {
     }
 
     private String nullableStringValue(Object value) {
-        return value == null ? null : String.valueOf(value).trim();
+        String normalized = value == null ? null : String.valueOf(value).trim();
+        return normalized == null || normalized.isBlank() ? null : normalized;
     }
 
     private Long longValue(Object value) {
@@ -216,6 +233,11 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         }
         String normalized = String.valueOf(value).trim();
         return normalized.isEmpty() ? null : Long.valueOf(normalized);
+    }
+
+    private Integer integerValue(Object value) {
+        Long longValue = longValue(value);
+        return longValue == null ? null : longValue.intValue();
     }
 
     private String stringifyBusinessId(Long value) {
@@ -232,10 +254,9 @@ public class TodoCrudToolHandler implements AgentToolHandler {
 
     private void validateOptionalLong(JSONObject args, String fieldName) {
         Long value = args.getLong(fieldName);
-        if (value == null) {
-            return;
+        if (value != null) {
+            requireMinimumOne(value, fieldName);
         }
-        requireMinimumOne(value, fieldName);
     }
 
     private void requireNonBlank(JSONObject args, String fieldName) {
