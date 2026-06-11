@@ -12,7 +12,7 @@
     tool_context_json LONGTEXT NULL,
     resume_payload_json LONGTEXT NULL,
     idempotency_key VARCHAR(128) NOT NULL,
-    pending_status VARCHAR(24) NOT NULL DEFAULT ''PENDING'',
+    pending_status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
     operator_id BIGINT UNSIGNED NULL,
     trace_id VARCHAR(64) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

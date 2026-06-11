@@ -58,7 +58,7 @@ class StoryBibleSchemaMysqlContractTest {
         assertThat(columnsOf("story_bible_versions"))
                 .contains("version_id", "story_bible_id", "project_id", "version_no", "change_summary", "created_by", "created_at");
 
-        String migrationSql = Files.readString(Path.of("src/main/resources/db/migration/V12__init_story_bible_domain.sql"));
+        String migrationSql = Files.readString(Path.of("src/main/resources/db/migration/V14__init_story_bible_domain.sql"));
         assertThat(migrationSql)
                 .contains("CREATE TABLE IF NOT EXISTS story_bibles")
                 .contains("COMMENT='Story Bible 聚合根；项目级长期知识库，不等于 prompt 大文本快照'")
@@ -95,8 +95,8 @@ class StoryBibleSchemaMysqlContractTest {
                 StandardCopyOption.REPLACE_EXISTING
         );
         Files.copy(
-                Path.of("src/main/resources/db/migration/V12__init_story_bible_domain.sql"),
-                migrationDir.resolve("V12__init_story_bible_domain.sql"),
+                Path.of("src/main/resources/db/migration/V14__init_story_bible_domain.sql"),
+                migrationDir.resolve("V14__init_story_bible_domain.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }

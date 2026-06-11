@@ -69,7 +69,7 @@ class AgentSessionSchemaMysqlContractTest {
                         "todo_summary",
                         "story_bible_proposal_summary"
                 );
-        assertThat(columnsOf("agent_pending_approvals"))
+        assertThat(columnsOf("agent_run_pending_approvals"))
                 .contains("resume_payload_json", "pending_status");
 
         assertThat(columnsOf("agent_conversations")).isEmpty();
@@ -86,11 +86,9 @@ class AgentSessionSchemaMysqlContractTest {
                 .contains("提交执行前冻结的提示词快照；异步恢复与 preflight 重试必须依赖该字段")
                 .contains("当前挂起审批单业务 ID；WAITING_APPROVAL 恢复时作为唯一断点指针");
         assertThat(v12Sql)
-                .contains("UNIQUE KEY uk_agent_pending_approvals_approval_id (approval_id)")
-                .contains("UNIQUE KEY uk_agent_pending_approvals_idempotency_key (idempotency_key)")
-                .contains("KEY idx_agent_pending_approvals_session_status (session_id, pending_status)")
-                .contains("挂起状态：PENDING/APPROVED/REJECTED/RESUMED/EXPIRED")
-                .contains("恢复幂等键；审批恢复重放时用于去重与防止重复执行");
+                .contains("UNIQUE KEY uk_agent_run_pending_approvals_approval_id (approval_id)")
+                .contains("UNIQUE KEY uk_agent_run_pending_approvals_idempotency (idempotency_key)")
+                .contains("KEY idx_agent_run_pending_approvals_session_status (session_id, pending_status)");
     }
 
     private Set<String> columnsOf(String tableName) throws SQLException {

@@ -251,8 +251,8 @@ class StoryBibleRepositoryImplTest {
                 StandardCopyOption.REPLACE_EXISTING
         );
         Files.copy(
-                Path.of("src/main/resources/db/migration/V12__init_story_bible_domain.sql"),
-                migrationDir.resolve("V12__init_story_bible_domain.sql"),
+                Path.of("src/main/resources/db/migration/V14__init_story_bible_domain.sql"),
+                migrationDir.resolve("V14__init_story_bible_domain.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }
