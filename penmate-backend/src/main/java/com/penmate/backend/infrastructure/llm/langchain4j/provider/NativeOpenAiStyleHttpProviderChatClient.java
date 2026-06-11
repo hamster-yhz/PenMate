@@ -8,7 +8,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
+import com.penmate.backend.application.agent.llm.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 鍩轰簬鍘熺敓 HTTP 鐨?OpenAI 椋庢牸鑱婂ぉ璋冪敤瀹炵幇銆?
+ * 鍩轰簬鍘熺敓 HTTP �?OpenAI 椋庢牸鑱婂ぉ璋冪敤瀹炵幇銆?
  */
 @Slf4j
 public abstract class NativeOpenAiStyleHttpProviderChatClient implements ProviderChatClient {
