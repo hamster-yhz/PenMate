@@ -3,6 +3,8 @@ package com.penmate.backend.domain.todo.model;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 会话级 Todo 实体。
@@ -28,6 +30,14 @@ public class SessionTodo {
     private String sourceType;
     /** 待办状态。 */
     private String todoStatus;
+    private String status;
+    private Integer priority;
+    private Integer orderIndex;
+    private List<String> dependencies = new ArrayList<>();
+    private String summary;
+    private String blockedReason;
+    private String errorSummary;
+    private String metadata;
     /** 完成时间。 */
     private LocalDateTime completedAt;
     /** 创建时间。 */

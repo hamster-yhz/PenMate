@@ -244,6 +244,35 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
     }
 
     @Test
+    void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_TREATS_NULL_TOOL_CALLS_AS_EMPTY_ON_STOP_RESPONSE() {
+        TestNativeClient client = new TestNativeClient();
+        String responseBody = """
+                {
+                  "choices": [{
+                    "finish_reason": "stop",
+                    "message": {
+                      "role": "assistant",
+                      "content": "hello",
+                      "tool_calls": null
+                    }
+                  }],
+                  "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 2,
+                    "total_tokens": 12
+                  }
+                }
+                """;
+
+        AgentLlmTurnResponse response = client.extractTurnResponse(responseBody);
+
+        assertThat(response.finishReason()).isEqualTo("stop");
+        assertThat(response.assistantText()).isEqualTo("hello");
+        assertThat(response.toolCalls()).isEmpty();
+        assertThat(response.tokenUsage()).isEqualTo(new LlmTokenUsage(10, 2, 12));
+    }
+
+    @Test
     void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_LOGS_TURN_REQUEST_AND_RESPONSE_SNIPPETS_ON_SUCCESS() throws Exception {
         TestNativeClient client = new TestNativeClient();
         HttpClient httpClient = mock(HttpClient.class);

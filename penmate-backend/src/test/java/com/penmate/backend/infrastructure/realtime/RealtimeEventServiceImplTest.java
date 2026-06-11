@@ -169,8 +169,6 @@ class RealtimeEventServiceImplTest {
         Class<?> runtimeStatusViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.RuntimeStatusView");
         Class<?> toolCallStatusViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.ToolCallStatusView");
         Class<?> storyBibleApprovalViewType = tryLoadClass("com.penmate.backend.application.agent.runtime.StoryBibleApprovalView");
-        Class<?> todoPlanViewType = tryLoadClass("com.penmate.backend.application.todo.TodoPlanView");
-        Class<?> todoPlanItemViewType = tryLoadClass("com.penmate.backend.application.todo.TodoPlanItemView");
         Method method = Arrays.stream(RealtimeEventServiceImpl.class.getMethods())
                 .filter(candidate -> candidate.getName().equals("publishTaskRuntimeStatus"))
                 .filter(candidate -> candidate.getParameterCount() == 3)
@@ -189,13 +187,7 @@ class RealtimeEventServiceImplTest {
         assertThat(storyBibleApprovalViewType)
                 .as("StoryBibleApprovalView should exist for structured runtime events")
                 .isNotNull();
-        assertThat(todoPlanViewType)
-                .as("TodoPlanView should exist for structured runtime events")
-                .isNotNull();
-        assertThat(todoPlanItemViewType)
-                .as("TodoPlanItemView should exist for structured runtime events")
-                .isNotNull();
-        if (runtimeStatusViewType == null || toolCallStatusViewType == null || storyBibleApprovalViewType == null || todoPlanViewType == null || todoPlanItemViewType == null || method == null) {
+        if (runtimeStatusViewType == null || toolCallStatusViewType == null || storyBibleApprovalViewType == null || method == null) {
             return;
         }
 
@@ -220,23 +212,6 @@ class RealtimeEventServiceImplTest {
                 "entryKeys", List.of("maid.secret_order"),
                 "nextAction", "await_approval"
         ));
-        Object todoPlan = instantiateRecord(todoPlanViewType, Map.of(
-                "planTitle", "第三章修订待办",
-                "planSummary", "补齐密令来源链路",
-                "recommendedNextAction", "apply_todo_plan",
-                "items", List.of(instantiateRecord(todoPlanItemViewType, Map.of(
-                        "title", "修复密令来源",
-                        "description", "补充侍从转述桥段",
-                        "priority", "P0",
-                        "sourceType", "QUALITY_REVIEW",
-                        "recommendedStatus", "TODO",
-                        "suggestedAutoCreate", true,
-                        "rationale", "避免剧情漏洞",
-                        "acceptanceCriteria", List.of("密令来源明确"),
-                        "dependsOn", List.of()
-                )))
-        ));
-
         Map<String, Object> valuesByName = new java.util.LinkedHashMap<>();
         valuesByName.put("taskId", 17L);
         valuesByName.put("sessionId", 90001L);
@@ -246,7 +221,6 @@ class RealtimeEventServiceImplTest {
         valuesByName.put("toolCall", toolCall);
         valuesByName.put("approval", approval);
         valuesByName.put("storyBibleApproval", storyBibleApproval);
-        valuesByName.put("todoPlan", todoPlan);
         valuesByName.put("recoverable", true);
         valuesByName.put("nextAction", "review_story_bible");
         Object runtimeStatus = instantiateRecord(runtimeStatusViewType, valuesByName);
@@ -283,22 +257,6 @@ class RealtimeEventServiceImplTest {
                 Map.entry("proposalSummary", "建议补充侍从知晓密令的设定"),
                 Map.entry("entryKeys", List.of("maid.secret_order")),
                 Map.entry("nextAction", "await_approval")
-        ));
-        expectedPayload.put("todoPlan", Map.ofEntries(
-                Map.entry("planTitle", "第三章修订待办"),
-                Map.entry("planSummary", "补齐密令来源链路"),
-                Map.entry("recommendedNextAction", "apply_todo_plan"),
-                Map.entry("items", List.of(Map.ofEntries(
-                        Map.entry("title", "修复密令来源"),
-                        Map.entry("description", "补充侍从转述桥段"),
-                        Map.entry("priority", "P0"),
-                        Map.entry("sourceType", "QUALITY_REVIEW"),
-                        Map.entry("recommendedStatus", "TODO"),
-                        Map.entry("suggestedAutoCreate", true),
-                        Map.entry("rationale", "避免剧情漏洞"),
-                        Map.entry("acceptanceCriteria", List.of("密令来源明确")),
-                        Map.entry("dependsOn", List.of())
-                )))
         ));
         expectedPayload.put("recoverable", true);
         expectedPayload.put("nextAction", "review_story_bible");
@@ -354,7 +312,6 @@ class RealtimeEventServiceImplTest {
         runtimeStatusValues.put("toolCall", toolCall);
         runtimeStatusValues.put("approval", null);
         runtimeStatusValues.put("storyBibleApproval", null);
-        runtimeStatusValues.put("todoPlan", null);
         runtimeStatusValues.put("recoverable", true);
         runtimeStatusValues.put("nextAction", "continue_tool_loop");
         Object runtimeStatus = instantiateRecord(runtimeStatusViewType, runtimeStatusValues);
@@ -391,7 +348,6 @@ class RealtimeEventServiceImplTest {
         ));
         expectedPayload.put("approval", null);
         expectedPayload.put("storyBibleApproval", null);
-        expectedPayload.put("todoPlan", null);
         expectedPayload.put("recoverable", true);
         expectedPayload.put("nextAction", "continue_tool_loop");
 

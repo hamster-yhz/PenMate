@@ -29,9 +29,6 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.storybible.StoryBibleProposalItem;
 import com.penmate.backend.application.storybible.StoryBibleUpdateProposalService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
-import com.penmate.backend.application.todo.TodoCrudApplicationService;
-import com.penmate.backend.application.todo.TodoPlanItemView;
-import com.penmate.backend.application.todo.TodoPlanView;
 import com.penmate.backend.domain.agent.model.AgentGenerationTask;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentTaskContext;
@@ -42,7 +39,6 @@ import com.penmate.backend.domain.agent.repository.PendingToolInvocationReposito
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
-import com.penmate.backend.domain.todo.model.SessionTodo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -82,7 +78,6 @@ public class AgentGenerationWorkflow {
     private final TaskRuntimeStatusPublisher taskRuntimeStatusPublisher;
     private final AgentTaskRuntimeUpdater agentTaskRuntimeUpdater;
     private final AgentTaskResultRecorder agentTaskResultRecorder;
-    private final TodoCrudApplicationService todoCrudApplicationService;
     private final StoryBibleUpdateProposalService storyBibleUpdateProposalService;
     private final ToolCallExecutionService toolCallExecutionService;
     private final ApprovalApplicationService approvalApplicationService;
@@ -159,7 +154,6 @@ public class AgentGenerationWorkflow {
             String effectiveToolTrace = revisionDecision.toolTraceJson();
             
             // 6. 如果有 TODO 计划则落库
-            persistTodoPlanIfPresent(projectId, task, taskProfile, effectiveToolTrace, traceId);
             
             // 7. 处理故事设定集的提案和审批
             StoryBibleDecision storyBibleDecision = handleStoryBibleProposals(
@@ -204,7 +198,6 @@ public class AgentGenerationWorkflow {
                 preflightExecutionConfig
         ));
         TaskProfile taskProfile = TaskProfileMapper.from(preflightDecision);
-        seedTodoPlanSnapshotFromPreflight(taskContext, preflightDecision);
         syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "planning", "phase:planning");
         taskRuntimeStatusPublisher.publishStatus(projectId,
                 buildRuntimeStatusView(task, taskContext, "planning", "正在分析请求", true, "compose_prompt", null));
@@ -401,89 +394,6 @@ public class AgentGenerationWorkflow {
         return new ContextPackage(List.of(), List.of(), List.of(), List.of(), List.of(), "", "");
     }
 
-    private void persistTodoPlanIfPresent(Long projectId,
-                                          AgentGenerationTask task,
-                                          TaskProfile taskProfile,
-                                          String toolTraceJson,
-                                          String traceId) {
-        if (task == null || todoCrudApplicationService == null || taskProfile == null || !taskProfile.tools().contains("todo_planner")) {
-            return;
-        }
-        TodoPlanView todoPlanView = extractTodoPlan(toolTraceJson);
-        if (todoPlanView == null) {
-            return;
-        }
-        List<SessionTodo> todosToCreate = toSessionTodos(todoPlanView);
-        if (todosToCreate.isEmpty()) {
-            return;
-        }
-        todoCrudApplicationService.batchCreateTodos(
-                projectId,
-                task.getConversationId(),
-                task.getTaskId(),
-                todosToCreate,
-                task.getUserId(),
-                traceId
-        );
-    }
-
-    private TodoPlanView extractTodoPlan(String toolTraceJson) {
-        String normalized = normalizeToolTraceJson(toolTraceJson);
-        if (normalized == null) {
-            return null;
-        }
-        String[] fragments = normalized.split("\\r?\\n+");
-        for (String fragment : fragments) {
-            TodoPlanView candidate = parseTodoPlan(fragment);
-            if (candidate != null) {
-                return candidate;
-            }
-        }
-        return parseTodoPlan(normalized);
-    }
-
-    private TodoPlanView parseTodoPlan(String rawJson) {
-        String normalized = normalizeToolTraceJson(rawJson);
-        if (normalized == null) {
-            return null;
-        }
-        try {
-            Map<String, Object> json = OBJECT_MAPPER.readValue(normalized, new TypeReference<Map<String, Object>>() {
-            });
-            if (!json.containsKey("planTitle") || !json.containsKey("planSummary") || !json.containsKey("recommendedNextAction") || !json.containsKey("items")) {
-                return null;
-            }
-            List<TodoPlanItemView> items = new java.util.ArrayList<>();
-            Object itemValue = json.get("items");
-            if (itemValue instanceof List<?> itemList) {
-                for (Object entry : itemList) {
-                    if (!(entry instanceof Map<?, ?> itemMap)) {
-                        continue;
-                    }
-                    items.add(new TodoPlanItemView(
-                            stringValue(itemMap.get("title")),
-                            stringValue(itemMap.get("description")),
-                            stringValue(itemMap.get("priority")),
-                            stringValue(itemMap.get("sourceType")),
-                            stringValue(itemMap.get("recommendedStatus")),
-                            Boolean.TRUE.equals(itemMap.get("suggestedAutoCreate")),
-                            stringValue(itemMap.get("rationale")),
-                            stringList(itemMap.get("acceptanceCriteria")),
-                            stringList(itemMap.get("dependsOn"))
-                    ));
-                }
-            }
-            return new TodoPlanView(
-                    stringValue(json.get("planTitle")),
-                    stringValue(json.get("planSummary")),
-                    stringValue(json.get("recommendedNextAction")),
-                    items
-            );
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     private RevisionDecision applyControlledRevisionIfNeeded(Long projectId,
                                                              AgentGenerationTask task,
                                                              TaskProfile taskProfile,
@@ -600,25 +510,6 @@ public class AgentGenerationWorkflow {
             return false;
         }
         return currentRevisionRound < maxRevisionRounds;
-    }
-
-    private List<SessionTodo> toSessionTodos(TodoPlanView todoPlanView) {
-        if (todoPlanView == null || todoPlanView.items() == null) {
-            return List.of();
-        }
-        java.util.ArrayList<SessionTodo> todos = new java.util.ArrayList<>();
-        for (TodoPlanItemView item : todoPlanView.items()) {
-            if (item == null || !item.suggestedAutoCreate()) {
-                continue;
-            }
-            SessionTodo todo = new SessionTodo();
-            todo.setTitle(stringValue(item.title()));
-            todo.setDescription(stringValue(item.description()));
-            todo.setSourceType(stringValue(item.sourceType()));
-            todo.setTodoStatus(stringValue(item.recommendedStatus()));
-            todos.add(todo);
-        }
-        return List.copyOf(todos);
     }
 
     private int maxRiskLevel(List<StoryBibleProposalItem> proposals) {
@@ -962,7 +853,6 @@ public class AgentGenerationWorkflow {
                                                      String toolTraceJson) {
         ToolCallStatusView toolCallStatusView = resolveToolCallStatus(taskContext);
         StoryBibleApprovalView storyBibleApprovalView = resolveStoryBibleApproval(taskContext, toolTraceJson);
-        TodoPlanView todoPlanView = resolveTodoPlan(taskContext, toolCallStatusView, toolTraceJson);
         return new RuntimeStatusView(
                 task == null ? null : task.getTaskId(),
                 task == null ? null : task.getConversationId(),
@@ -972,7 +862,6 @@ public class AgentGenerationWorkflow {
                 toolCallStatusView,
                 resolveApprovalStatus(taskContext),
                 storyBibleApprovalView,
-                todoPlanView,
                 recoverable,
                 nextAction
         );
@@ -1025,7 +914,6 @@ public class AgentGenerationWorkflow {
             case "quality_review" -> "质量审查";
             case "story_bible_update" -> "故事圣经更新";
             case "todo_crud" -> "待办 CRUD";
-            case "todo_planner" -> "Todo 规划";
             default -> normalized.isBlank() ? "approval" : normalized;
         };
     }
@@ -1136,75 +1024,6 @@ public class AgentGenerationWorkflow {
                 entryKeys,
                 nextAction
         );
-    }
-
-    private TodoPlanView resolveTodoPlan(AgentTaskContext taskContext, ToolCallStatusView toolCallStatusView, String toolTraceJson) {
-        TodoPlanView todoPlanFromTrace = extractTodoPlan(toolTraceJson);
-        if (todoPlanFromTrace != null) {
-            return todoPlanFromTrace;
-        }
-        if (normalizeToolCode(toolCallStatusView) != null && !"todo_planner".equals(normalizeToolCode(toolCallStatusView))) {
-            return null;
-        }
-        TodoPlanView todoPlanFromOutput = extractTodoPlanPayload(toolCallStatusView == null ? null : toolCallStatusView.output());
-        if (todoPlanFromOutput != null) {
-            return todoPlanFromOutput;
-        }
-        if (taskContext == null || taskContext.getRecoveryCursor() == null || !taskContext.getRecoveryCursor().startsWith("tool_call:todo_planner:")) {
-            return null;
-        }
-        return extractTodoPlan(taskContext.getActiveToolCallsSnapshot());
-    }
-
-    private void seedTodoPlanSnapshotFromPreflight(AgentTaskContext taskContext, AgentPreflightDecision preflightDecision) {
-        if (taskContext == null
-                || preflightDecision == null
-                || preflightDecision.enabledTools() == null
-                || !preflightDecision.enabledTools().contains("todo_planner")) {
-            return;
-        }
-        TodoPlanView todoPlanView = extractPreflightTodoPlan(preflightDecision.decisionTraceJson());
-        if (todoPlanView == null) {
-            return;
-        }
-        Map<String, Object> todoPlannerSnapshot = new LinkedHashMap<>();
-        todoPlannerSnapshot.put("toolCallId", "preflight:todo_planner");
-        todoPlannerSnapshot.put("toolCode", "todo_planner");
-        todoPlannerSnapshot.put("toolName", "Todo 规划");
-        todoPlannerSnapshot.put("status", "done");
-        todoPlannerSnapshot.put("iteration", 0);
-        todoPlannerSnapshot.put("argumentsPreview", Map.of("source", "preflight"));
-        todoPlannerSnapshot.put("output", parseJsonOrRaw(AgentTaskRuntimeUpdater.toSnapshotJson(todoPlanView)));
-        todoPlannerSnapshot.put("errorMessage", "");
-        taskContext.setActiveToolCallsSnapshot(AgentTaskRuntimeUpdater.toSnapshotJson(List.of(todoPlannerSnapshot)));
-    }
-
-    private TodoPlanView extractPreflightTodoPlan(String decisionTraceJson) {
-        String normalized = normalizeToolTraceJson(decisionTraceJson);
-        if (normalized == null) {
-            return null;
-        }
-        try {
-            Map<String, Object> json = OBJECT_MAPPER.readValue(normalized, new TypeReference<Map<String, Object>>() {
-            });
-            return extractTodoPlanPayload(json.get("todoPlan"));
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private TodoPlanView extractTodoPlanPayload(Object payload) {
-        if (payload == null) {
-            return null;
-        }
-        if (payload instanceof String rawJson) {
-            return extractTodoPlan(rawJson);
-        }
-        try {
-            return extractTodoPlan(OBJECT_MAPPER.writeValueAsString(payload));
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     private String normalizeToolCode(ToolCallStatusView toolCallStatusView) {
@@ -1319,11 +1138,6 @@ public class AgentGenerationWorkflow {
             syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "quality_review", "phase:quality_review");
             taskRuntimeStatusPublisher.publishStatus(projectId,
                     buildRuntimeStatusView(task, taskContext, "quality_review", "正在审查质量", true, "plan_quality_review", null));
-        }
-        if (taskProfile.tools().contains("todo_planner")) {
-            syncRuntimeSnapshot(projectId, task, taskContext, taskProfile, null, null, "todo_review", "phase:todo_review");
-            taskRuntimeStatusPublisher.publishStatus(projectId,
-                    buildRuntimeStatusView(task, taskContext, "todo_review", "正在整理待办", true, "plan_todo_review", null));
         }
     }
 

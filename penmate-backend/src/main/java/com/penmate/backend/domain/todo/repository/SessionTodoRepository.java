@@ -9,15 +9,9 @@ import java.util.List;
  */
 public interface SessionTodoRepository {
 
-    List<SessionTodo> findBySession(Long projectId, Long sessionId, String todoStatus);
+    List<SessionTodo> findBySession(Long projectId, Long sessionId, String status);
 
     SessionTodo findByTodoId(Long projectId, Long sessionId, Long todoId);
 
-    int insert(SessionTodo sessionTodo);
-
-    int update(SessionTodo sessionTodo);
-
-    int markCompleted(Long projectId, Long sessionId, Long todoId);
-
-    int softDelete(Long projectId, Long sessionId, Long todoId);
+    void saveSessionTodos(Long projectId, Long sessionId, List<SessionTodo> todos);
 }

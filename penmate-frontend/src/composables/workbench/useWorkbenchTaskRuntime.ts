@@ -85,7 +85,6 @@ const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown
   status: payload.status == null ? null : String(payload.status),
   toolCall: normalizeToolCall(payload.toolCall),
   approval: normalizeApproval(payload.approval),
-  todoPlan: normalizeStructuredRuntimeRecord(payload.todoPlan),
   storyBibleApproval: normalizeStructuredRuntimeRecord(payload.storyBibleApproval),
 })
 

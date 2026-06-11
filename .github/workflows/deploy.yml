@@ -1,0 +1,174 @@
+name: deploy
+
+on:
+  push:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ${{ github.repository }}/penmate-backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository }}/penmate-frontend
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run backend tests + coverage gate
+        working-directory: penmate-backend
+        run: mvn -B verify
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: penmate-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: penmate-frontend
+        run: npm ci
+
+      - name: Run frontend coverage gate
+        working-directory: penmate-frontend
+        run: npm run test:coverage
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: verify
+    outputs:
+      backend_image: ${{ steps.meta.outputs.backend_image }}
+      frontend_image: ${{ steps.meta.outputs.frontend_image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Package backend jar for image
+        working-directory: penmate-backend
+        run: mvn -B -DskipTests package
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        shell: bash
+        run: |
+          backend_image="${REGISTRY}/${BACKEND_IMAGE_NAME}:${GITHUB_SHA}"
+          frontend_image="${REGISTRY}/${FRONTEND_IMAGE_NAME}:${GITHUB_SHA}"
+          echo "backend_image=${backend_image,,}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${frontend_image,,}" >> "$GITHUB_OUTPUT"
+          echo "backend_latest=${REGISTRY}/${BACKEND_IMAGE_NAME}:latest" | tr '[:upper:]' '[:lower:]' >> "$GITHUB_OUTPUT"
+          echo "frontend_latest=${REGISTRY}/${FRONTEND_IMAGE_NAME}:latest" | tr '[:upper:]' '[:lower:]' >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: penmate-backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.backend_image }}
+            ${{ steps.meta.outputs.backend_latest }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: penmate-frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.frontend_image }}
+            ${{ steps.meta.outputs.frontend_latest }}
+          build-args: |
+            VITE_APP_API_BASE_URL=/api
+            VITE_STORAGE_URL_PROTOCOL=http
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare deployment bundle
+        shell: bash
+        run: |
+          mkdir -p deploy-bundle/scripts
+          cp docker-compose.prod.yml .env.example deploy-bundle/
+          cp scripts/deploy-remote.sh scripts/healthcheck.sh deploy-bundle/scripts/
+          tar -czf deploy-bundle.tgz -C deploy-bundle .
+
+      - name: Install SSH key
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload deployment bundle
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          deploy_path="${DEPLOY_PATH:-/opt/penmate}"
+          ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p '${deploy_path}'"
+          scp deploy-bundle.tgz "${SSH_USER}@${SSH_HOST}:${deploy_path}/deploy-bundle.tgz"
+          ssh "${SSH_USER}@${SSH_HOST}" "cd '${deploy_path}' && tar -xzf deploy-bundle.tgz && chmod +x scripts/*.sh"
+
+      - name: Deploy over SSH
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
+        run: |
+          deploy_path="${DEPLOY_PATH:-/opt/penmate}"
+          ghcr_username="${GHCR_USERNAME}"
+          ssh "${SSH_USER}@${SSH_HOST}" "DEPLOY_PATH='${deploy_path}' bash -s" <<EOF
+          set -euo pipefail
+          cd "\$DEPLOY_PATH"
+          export GHCR_USERNAME='${ghcr_username}'
+          export GHCR_TOKEN='${GHCR_TOKEN}'
+          export BACKEND_IMAGE='${BACKEND_IMAGE}'
+          export FRONTEND_IMAGE='${FRONTEND_IMAGE}'
+          ./scripts/deploy-remote.sh
+          EOF

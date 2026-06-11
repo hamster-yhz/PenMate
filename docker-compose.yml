@@ -1,0 +1,188 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-penmate}
+      MYSQL_USER: ${DB_USER:-penmate}
+      MYSQL_PASSWORD: ${DB_PASS:-penmate_dev_password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-root_dev_password}
+      TZ: ${TZ:-Asia/Shanghai}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "${MYSQL_PUBLIC_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: >
+      sh -c 'if [ -n "$${REDIS_PASS}" ]; then
+      exec redis-server --appendonly yes --requirepass "$${REDIS_PASS}";
+      else
+      exec redis-server --appendonly yes;
+      fi'
+    environment:
+      REDIS_PASS: ${REDIS_PASS:-}
+    ports:
+      - "${REDIS_PUBLIC_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASS}\" ]; then redis-cli -a \"$${REDIS_PASS}\" ping; else redis-cli ping; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: >
+      etcd
+      --advertise-client-urls=http://127.0.0.1:2379
+      --listen-client-urls=http://0.0.0.0:2379
+      --data-dir=/etcd
+    volumes:
+      - etcd-data:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  milvus:
+    image: milvusdb/milvus:v2.5.7
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: ${MILVUS_S3_ADDRESS:?MILVUS_S3_ADDRESS is required}
+      MINIO_PORT: ${MILVUS_S3_PORT:-443}
+      MINIO_ACCESS_KEY_ID: ${MILVUS_S3_ACCESS_KEY:?MILVUS_S3_ACCESS_KEY is required}
+      MINIO_SECRET_ACCESS_KEY: ${MILVUS_S3_SECRET_KEY:?MILVUS_S3_SECRET_KEY is required}
+      MINIO_USE_SSL: ${MILVUS_S3_USE_SSL:-true}
+      MINIO_BUCKET_NAME: ${MILVUS_S3_BUCKET:?MILVUS_S3_BUCKET is required}
+      MINIO_ROOT_PATH: ${MILVUS_S3_ROOT_PATH:-milvus}
+      MINIO_CLOUD_PROVIDER: ${MILVUS_S3_CLOUD_PROVIDER:-aws}
+    depends_on:
+      etcd:
+        condition: service_healthy
+    ports:
+      - "${MILVUS_PUBLIC_PORT:-19530}:19530"
+      - "${MILVUS_METRICS_PUBLIC_PORT:-9091}:9091"
+    volumes:
+      - milvus-data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    profiles: ["rabbitmq"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS:-guest}
+      RABBITMQ_DEFAULT_VHOST: ${RABBIT_VHOST:-/}
+    ports:
+      - "${RABBIT_PUBLIC_PORT:-5672}:5672"
+      - "${RABBIT_MANAGEMENT_PUBLIC_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: penmate-backend/Dockerfile
+    image: ${BACKEND_IMAGE:-penmate-backend:local}
+    environment:
+      SERVER_PORT: 8080
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-penmate}
+      DB_USER: ${DB_USER:-penmate}
+      DB_PASS: ${DB_PASS:-penmate_dev_password}
+      DB_USE_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USER: ${REDIS_USER:-}
+      REDIS_PASS: ${REDIS_PASS:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+      FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-true}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-this-32-char-secret}
+      JWT_ISSUER: ${JWT_ISSUER:-penmate}
+      MODEL_KEY_ENCRYPTION_KEY_BASE64: ${MODEL_KEY_ENCRYPTION_KEY_BASE64:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:?STORAGE_ENDPOINT is required}
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:?STORAGE_PUBLIC_ENDPOINT is required}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?STORAGE_BUCKET is required}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_SECURE: ${STORAGE_SECURE:-true}
+      VECTOR_PROVIDER: ${VECTOR_PROVIDER:-milvus}
+      VECTOR_ENDPOINT: http://milvus:19530
+      VECTOR_API_KEY: ${VECTOR_API_KEY:-}
+      VECTOR_COLLECTION_PREFIX: ${VECTOR_COLLECTION_PREFIX:-penmate_}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-gpt-4o-mini}
+      LLM_MOCK_ENABLED: ${LLM_MOCK_ENABLED:-true}
+      HEALTH_SHOW_DETAILS: ${HEALTH_SHOW_DETAILS:-never}
+      JAVA_OPTS: ${JAVA_OPTS:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PUBLIC_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: penmate-frontend/Dockerfile
+      args:
+        NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}
+        VITE_APP_API_BASE_URL: ${VITE_APP_API_BASE_URL:-/api}
+        VITE_STORAGE_URL_PROTOCOL: ${VITE_STORAGE_URL_PROTOCOL:-http}
+    image: ${FRONTEND_IMAGE:-penmate-frontend:local}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PUBLIC_PORT:-8090}:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:
+  etcd-data:
+  milvus-data:
+  rabbitmq-data:

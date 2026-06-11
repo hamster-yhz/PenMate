@@ -68,7 +68,6 @@ export interface WorkbenchRuntimeEventSource {
   status?: string | null
   toolCall?: WorkbenchRuntimeToolCall | null
   approval?: WorkbenchRuntimeApproval | null
-  todoPlan?: WorkbenchTodoSummarySnapshot | Record<string, unknown> | null
   storyBibleApproval?: WorkbenchRuntimeStoryBibleApproval | Record<string, unknown> | null
 }
 

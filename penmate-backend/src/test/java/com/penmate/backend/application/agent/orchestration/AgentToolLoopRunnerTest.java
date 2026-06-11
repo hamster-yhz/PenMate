@@ -515,29 +515,29 @@ class AgentToolLoopRunnerTest {
     }
 
     @Test
-    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_FEED_STRUCTURED_TODO_PLAN_TOOL_OUTPUT_BACK_TO_NEXT_TURN_MESSAGES() {
+    void UT_APP_AGENT_TOOL_LOOP_RUNNER_SHOULD_FEED_TODO_CRUD_TOOL_OUTPUT_BACK_TO_NEXT_TURN_MESSAGES() {
         AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder()
                 .providerCode("openai-compatible")
                 .modelName("gpt-test")
                 .build();
         List<AgentLlmMessage> initialMessages = List.of(AgentLlmMessage.user("请先整理第三章修订待办"));
-        AgentLlmToolSchema todoPlannerSchema = new AgentLlmToolSchema(
-                "todo_planner",
+        AgentLlmToolSchema todoCrudSchema = new AgentLlmToolSchema(
+                "todo_crud",
                 "将用户请求、质量问题与后续规划整理为结构化 Todo 规划建议",
                 "{\"type\":\"object\"}"
         );
-        String todoPlanJson = "{\"planTitle\":\"第三章修订待办\",\"planSummary\":\"整理修订动作\",\"recommendedNextAction\":\"先修复 P0 问题\",\"items\":[{\"title\":\"修复主角提前知情\",\"description\":\"删除越界知情描写并补充情报来源\",\"priority\":\"P0\",\"sourceType\":\"QUALITY_REVIEW\",\"recommendedStatus\":\"TODO\",\"suggestedAutoCreate\":true,\"rationale\":\"高风险剧情逻辑问题\",\"acceptanceCriteria\":[\"情报来源合理\"],\"dependsOn\":[]}]}";
+        String todoOutputJson = "{\"operation\":\"create\",\"todoId\":\"20031\",\"sessionId\":\"9\",\"title\":\"fix continuity\",\"status\":\"pending\",\"priority\":100}";
 
         when(toolDefinitionSource.listLlmSchemas())
-                .thenReturn(List.of(todoPlannerSchema));
+                .thenReturn(List.of(todoCrudSchema));
         when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
                 .thenReturn(new AgentLlmTurnResponse(
                         "tool_calls",
                         "",
                         List.of(new AgentLlmToolCall(
                                 "call_todo_1",
-                                "todo_planner",
-                                "{\"planningMode\":\"FOLLOW_UP_MODIFICATION\",\"userRequest\":\"请先整理第三章修订待办\"}"
+                                "todo_crud",
+                                "{\"operation\":\"create\",\"sessionId\":9,\"title\":\"fix continuity\"}"
                         )),
                         "{\"finish_reason\":\"tool_calls\"}"
                 ))
@@ -548,7 +548,7 @@ class AgentToolLoopRunnerTest {
                         "{\"finish_reason\":\"stop\"}"
                 ));
         when(toolCallApplicationService.executeToolCall(any()))
-                .thenReturn(ToolCallResult.success(todoPlanJson));
+                .thenReturn(ToolCallResult.success(todoOutputJson));
 
         AgentToolLoopIterationResult result = agentToolLoopRunner.execute(
                 1L,
@@ -563,7 +563,7 @@ class AgentToolLoopRunnerTest {
         assertThat(result.waitingApproval()).isFalse();
         assertThat(result.finalAssistantText()).isEqualTo("这是基于 todo 规划整理后的最终答复");
         assertThat(result.toolCallCount()).isEqualTo(1);
-        assertThat(result.toolContext()).isEqualTo(todoPlanJson);
+        assertThat(result.toolContext()).isEqualTo(todoOutputJson);
 
         ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(agentLlmGateway, times(2)).generateTurn(requestCaptor.capture(), eq(executionConfig));
@@ -573,12 +573,12 @@ class AgentToolLoopRunnerTest {
         assertThat(secondRequest.messages().get(2).role())
                 .isEqualTo(com.penmate.backend.domain.agent.model.AgentLlmMessageRole.TOOL);
         assertThat(secondRequest.messages().get(2).toolCallId()).isEqualTo("call_todo_1");
-        assertThat(secondRequest.messages().get(2).content()).isEqualTo(todoPlanJson);
+        assertThat(secondRequest.messages().get(2).content()).isEqualTo(todoOutputJson);
         assertThat(secondRequest.messages().get(2).content())
-                .contains("\"planTitle\":\"第三章修订待办\"")
-                .contains("\"recommendedNextAction\":\"先修复 P0 问题\"")
-                .contains("\"sourceType\":\"QUALITY_REVIEW\"")
-                .contains("\"recommendedStatus\":\"TODO\"");
+                .contains("\"operation\":\"create\"")
+                .contains("\"todoId\":\"20031\"")
+                .contains("\"status\":\"pending\"");
+
     }
 
     @Test
