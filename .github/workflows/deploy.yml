@@ -190,8 +190,6 @@ jobs:
           sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" "DEPLOY_PATH='${deploy_path}' bash -s" <<EOF
           set -euo pipefail
           cd "\$DEPLOY_PATH"
-          export GHCR_USERNAME='${ghcr_username}'
-          export GHCR_TOKEN='${GHCR_TOKEN}'
           if [ -n '${backend_image}' ]; then export BACKEND_IMAGE='${backend_image}'; fi
           if [ -n '${frontend_image}' ]; then export FRONTEND_IMAGE='${frontend_image}'; fi
           ./scripts/deploy-remote.sh

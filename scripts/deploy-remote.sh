@@ -70,10 +70,6 @@ echo "--- deploy-remote diagnostics ---"
 echo "BACKEND_IMAGE=${BACKEND_IMAGE:-<empty>}"
 echo "FRONTEND_IMAGE=${FRONTEND_IMAGE:-<empty>}"
 
-if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
-  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-fi
-
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" pull
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d --remove-orphans
 
