@@ -8,6 +8,7 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -62,6 +63,20 @@ public class AgentRunEventRepositoryImpl implements AgentRunEventRepository {
     public List<AgentEvent> listAfter(Long runId, Long after) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             return session.getMapper(AgentRunEventMapper.class).listAfter(runId, after == null ? 0L : after);
+        }
+    }
+
+    @Override
+    public int deleteTerminalEventsOlderThan(LocalDateTime cutoff, int minRetain) {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            return session.getMapper(AgentRunEventMapper.class).deleteTerminalEventsOlderThan(cutoff, minRetain);
+        }
+    }
+
+    @Override
+    public int deleteEventsBelowSequence(Long runId, Long maxSequence, int minRetain) {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            return session.getMapper(AgentRunEventMapper.class).deleteEventsBelowSequence(runId, maxSequence, minRetain);
         }
     }
 

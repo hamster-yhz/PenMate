@@ -1,6 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
-import com.penmate.backend.application.agent.llm.LlmTokenUsage;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 
 public record AgentRunLoopResult(
         Status status,

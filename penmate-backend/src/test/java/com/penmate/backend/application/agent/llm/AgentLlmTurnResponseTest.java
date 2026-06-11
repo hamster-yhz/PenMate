@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent.llm;
 
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -5,6 +5,8 @@ import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Map;
 
@@ -53,7 +55,16 @@ public class AgentRunAppService {
         requireOne(agentRunRepository.insert(run), "failed to insert agent run");
         requireOne(agentRunRepository.insertInput(input), "failed to insert agent run input");
         AgentEvent started = eventPublisher.publish(command.runId(), "run.started", Map.of("phase", "created"));
-        runDispatcher.dispatchInitialRun(command.runId(), command.traceId());
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    runDispatcher.dispatchInitialRun(command.runId(), command.traceId());
+                }
+            });
+        } else {
+            runDispatcher.dispatchInitialRun(command.runId(), command.traceId());
+        }
         return new AgentRunResult(command.runId(), "running", "created", started.sequence());
     }
 

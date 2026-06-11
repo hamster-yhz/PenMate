@@ -1,14 +1,8 @@
 package com.penmate.backend.infrastructure.persistence.agent.run;
 
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Arg;
-import org.apache.ibatis.annotations.ConstructorArgs;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
-
+import org.apache.ibatis.annotations.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -71,4 +65,32 @@ public interface AgentRunEventMapper {
             @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
     })
     List<AgentEvent> listAfter(@Param("runId") Long runId, @Param("after") Long after);
+
+    @Delete("""
+            DELETE e FROM agent_events e
+            INNER JOIN agent_runs r ON e.run_id = r.run_id
+            WHERE r.run_status IN ('DONE','FAILED','CANCELLED')
+            AND r.updated_at < #{cutoff}
+            AND e.sequence <= (
+                SELECT COALESCE(MAX(e2.sequence), 0) - #{minRetain}
+                FROM agent_events e2
+                WHERE e2.run_id = e.run_id
+            )
+            """)
+    int deleteTerminalEventsOlderThan(@Param("cutoff") LocalDateTime cutoff,
+                                       @Param("minRetain") int minRetain);
+
+    @Delete("""
+            DELETE FROM agent_events
+            WHERE run_id = #{runId}
+            AND sequence <= #{maxSequence}
+            AND sequence <= (
+                SELECT COALESCE(MAX(sequence), 0) - #{minRetain}
+                FROM agent_events
+                WHERE run_id = #{runId}
+            )
+            """)
+    int deleteEventsBelowSequence(@Param("runId") Long runId,
+                                    @Param("maxSequence") Long maxSequence,
+                                    @Param("minRetain") int minRetain);
 }

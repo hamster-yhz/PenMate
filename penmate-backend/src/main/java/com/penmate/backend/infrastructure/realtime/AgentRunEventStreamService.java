@@ -1,6 +1,10 @@
 package com.penmate.backend.infrastructure.realtime;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
 import lombok.extern.slf4j.Slf4j;
@@ -18,11 +22,17 @@ public class AgentRunEventStreamService {
 
     private final AgentRunEventRepository eventRepository;
     private final InMemoryAgentRunEventBus eventBus;
+    private final AgentArtifactRepository artifactRepository;
+    private final ObjectMapper objectMapper;
 
     public AgentRunEventStreamService(AgentRunEventRepository eventRepository,
-                                      InMemoryAgentRunEventBus eventBus) {
+                                      InMemoryAgentRunEventBus eventBus,
+                                      AgentArtifactRepository artifactRepository,
+                                      ObjectMapper objectMapper) {
         this.eventRepository = eventRepository;
         this.eventBus = eventBus;
+        this.artifactRepository = artifactRepository;
+        this.objectMapper = objectMapper;
     }
 
     public SseEmitter openStream(Long runId, Long after) {
@@ -37,14 +47,35 @@ public class AgentRunEventStreamService {
         emitter.onTimeout(unsubscribe);
         emitter.onError(ignored -> unsubscribe.run());
         for (AgentEvent event : eventRepository.listAfter(runId, cursor)) {
-            send(emitter, event);
-            if (isTerminal(event)) {
+            AgentEvent resolved = resolveArtifact(event);
+            send(emitter, resolved);
+            if (isTerminal(resolved)) {
                 emitter.complete();
                 unsubscribe.run();
                 return emitter;
             }
         }
         return emitter;
+    }
+
+    private AgentEvent resolveArtifact(AgentEvent event) {
+        String payload = event.payloadJson();
+        if (payload == null || !payload.contains("artifactRef")) {
+            return event;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(payload);
+            if (node.has("artifactRef")) {
+                Long artifactId = node.get("artifactRef").asLong();
+                AgentArtifact artifact = artifactRepository.findById(artifactId);
+                if (artifact != null && artifact.payloadJson() != null) {
+                    return AgentEvent.forReplay(event, artifact.payloadJson());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to resolve artifact ref: runId={}, sequence={}", event.runId(), event.sequence(), ex);
+        }
+        return event;
     }
 
     private void send(SseEmitter emitter, AgentEvent event) {

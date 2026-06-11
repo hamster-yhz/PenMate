@@ -83,12 +83,7 @@ class AgentControllerTest {
     void create_turn_returns_active_run_contract() throws Exception {
         String traceId = "trace-agent-turn-create";
         when(agentTurnAppService.createTurn(eq(10001L), eq(90001L), any(), eq(traceId)))
-                .thenReturn(new AgentTurnResult(
-                        new AgentTurnResult.SessionView(90001L, "Session A", "ACTIVE", null, "running"),
-                        new AgentTurnResult.ActiveRunView(50001L, 70001L, "running", "created", 1L),
-                        "WRITE",
-                        "Continue the chapter."
-                ));
+                .thenReturn(AgentTurnResult.forRun(70001L, "running"));
 
         mockMvc().perform(post("/api/v1/novels/10001/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)

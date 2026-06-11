@@ -28,4 +28,9 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     public AgentRunInput findInput(Long runId) {
         return agentRunMapper.findInput(runId);
     }
+
+    @Override
+    public AgentRun findRun(Long runId) {
+        return agentRunMapper.findRun(runId);
+    }
 }

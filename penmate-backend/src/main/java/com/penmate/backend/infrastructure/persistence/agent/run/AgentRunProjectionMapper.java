@@ -60,12 +60,14 @@ public interface AgentRunProjectionMapper {
             INSERT INTO agent_run_projections(
                 run_id, project_id, session_id, turn_id, run_status, run_phase, latest_sequence
             )
-            SELECT run_id, project_id, session_id, turn_id,
-                   COALESCE(#{status}, run_status),
-                   COALESCE(#{phase}, run_phase),
-                   #{sequence}
-            FROM agent_runs
-            WHERE run_id = #{runId}
+            SELECT * FROM (
+                SELECT r.run_id, r.project_id, r.session_id, r.turn_id,
+                       COALESCE(#{status}, r.run_status),
+                       COALESCE(#{phase}, r.run_phase),
+                       #{sequence}
+                FROM agent_runs r
+                WHERE r.run_id = #{runId}
+            ) t
             ON DUPLICATE KEY UPDATE
                 run_status = COALESCE(#{status}, run_status),
                 run_phase = COALESCE(#{phase}, run_phase),
@@ -143,4 +145,41 @@ public interface AgentRunProjectionMapper {
                        @Param("approvalId") Long approvalId,
                        @Param("errorCode") String errorCode,
                        @Param("errorMessage") String errorMessage);
+
+    @Insert("""
+            INSERT INTO agent_todo_projections(
+                run_id, todo_id, title, status, sort_order,
+                blocked_reason, error_summary, completed_summary
+            )
+            VALUES(
+                #{runId}, #{todoId}, #{title}, #{status}, #{sortOrder},
+                #{blockedReason}, #{errorSummary}, #{completedSummary}
+            )
+            ON DUPLICATE KEY UPDATE
+                title = VALUES(title),
+                status = VALUES(status),
+                sort_order = VALUES(sort_order),
+                blocked_reason = VALUES(blocked_reason),
+                error_summary = VALUES(error_summary),
+                completed_summary = VALUES(completed_summary),
+                updated_at = CURRENT_TIMESTAMP(3)
+            """)
+    int upsertTodo(@Param("runId") Long runId,
+                   @Param("todoId") String todoId,
+                   @Param("title") String title,
+                   @Param("status") String status,
+                   @Param("sortOrder") Integer sortOrder,
+                   @Param("blockedReason") String blockedReason,
+                   @Param("errorSummary") String errorSummary,
+                   @Param("completedSummary") String completedSummary);
+
+    @Update("""
+            UPDATE agent_todo_projections
+            SET status = 'DELETE',
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE run_id = #{runId}
+              AND todo_id = #{todoId}
+            """)
+    int deleteTodo(@Param("runId") Long runId,
+                   @Param("todoId") String todoId);
 }

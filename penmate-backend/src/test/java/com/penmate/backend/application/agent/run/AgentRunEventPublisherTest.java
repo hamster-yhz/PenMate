@@ -2,8 +2,10 @@ package com.penmate.backend.application.agent.run;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunProjectionRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +31,10 @@ class AgentRunEventPublisherTest {
     private AgentRunEventBus eventBus;
     @Mock
     private AgentRunProjectionRepository runProjectionRepository;
+    @Mock
+    private AgentArtifactRepository artifactRepository;
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
 
     @Test
     void publish_appends_event_updates_projection_and_broadcasts_after_commit() {
@@ -40,7 +46,9 @@ class AgentRunEventPublisherTest {
                 eventRepository,
                 projectionUpdater,
                 eventBus,
-                new ObjectMapper()
+                new ObjectMapper(),
+                artifactRepository,
+                businessIdGenerator
         );
 
         AgentEvent result = publisher.publish(70001L, "run.started", Map.of("phase", "created"));
@@ -69,7 +77,9 @@ class AgentRunEventPublisherTest {
                 eventRepository,
                 projectionUpdater,
                 eventBus,
-                new ObjectMapper()
+                new ObjectMapper(),
+                artifactRepository,
+                businessIdGenerator
         );
 
         publisher.publish(70001L, "run.started", Map.of("phase", "created"));

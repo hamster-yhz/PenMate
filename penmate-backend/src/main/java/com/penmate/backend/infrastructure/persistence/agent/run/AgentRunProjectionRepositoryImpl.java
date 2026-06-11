@@ -62,4 +62,17 @@ public class AgentRunProjectionRepositoryImpl implements AgentRunProjectionRepos
     public void advanceLatestSequence(Long runId, Long sequence) {
         mapper.upsertRunState(runId, null, null, null, sequence, null, null);
     }
+
+    @Override
+    public void upsertTodo(Long runId, String todoId, String title, String status, Integer sortOrder,
+                           String blockedReason, String errorSummary, String completedSummary, Long sequence) {
+        mapper.upsertTodo(runId, todoId, title, status, sortOrder, blockedReason, errorSummary, completedSummary);
+        mapper.upsertRunState(runId, null, null, null, sequence, null, null);
+    }
+
+    @Override
+    public void deleteTodo(Long runId, String todoId, Long sequence) {
+        mapper.deleteTodo(runId, todoId);
+        mapper.upsertRunState(runId, null, null, null, sequence, null, null);
+    }
 }

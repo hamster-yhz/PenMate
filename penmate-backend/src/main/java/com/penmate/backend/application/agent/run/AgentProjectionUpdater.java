@@ -47,11 +47,46 @@ public class AgentProjectionUpdater {
                     event.runId(), "RUNNING", null, null, event.sequence(), null, null);
             case "approval.rejected" -> runProjectionRepository.updateRunState(
                     event.runId(), "FAILED", null, null, event.sequence(), text(payload, "errorCode", "approval_rejected"), text(payload, "errorMessage", null));
-            case "message.delta" -> runProjectionRepository.appendAssistantDelta(event.runId(), event.sequence(), text(payload, "text", ""));
-            case "message.completed" -> runProjectionRepository.setCurrentAssistantMessage(event.runId(), longValue(payload, "messageId"), event.sequence());
+            case "message.completed" -> runProjectionRepository.updateRunState(
+                    event.runId(), null, null, null, event.sequence(),
+                    text(payload, "text", null), null);
             case "run.completed" -> runProjectionRepository.updateRunState(event.runId(), "DONE", "completed", null, event.sequence(), null, null);
             case "run.failed" -> runProjectionRepository.updateRunState(
                     event.runId(), "FAILED", "failed", null, event.sequence(), text(payload, "errorCode", null), text(payload, "errorMessage", null));
+            case "todo.created" -> runProjectionRepository.upsertTodo(
+                    event.runId(),
+                    text(payload, "todoId", ""),
+                    text(payload, "title", ""),
+                    text(payload, "status", "TODO"),
+                    intValue(payload, "sortOrder"),
+                    text(payload, "blockedReason", null),
+                    text(payload, "errorSummary", null),
+                    text(payload, "completedSummary", null),
+                    event.sequence());
+            case "todo.updated" -> runProjectionRepository.upsertTodo(
+                    event.runId(),
+                    text(payload, "todoId", ""),
+                    text(payload, "title", null),
+                    text(payload, "status", null),
+                    intValue(payload, "sortOrder"),
+                    text(payload, "blockedReason", null),
+                    text(payload, "errorSummary", null),
+                    text(payload, "completedSummary", null),
+                    event.sequence());
+            case "todo.completed" -> runProjectionRepository.upsertTodo(
+                    event.runId(),
+                    text(payload, "todoId", ""),
+                    text(payload, "title", null),
+                    "DONE",
+                    null,
+                    null,
+                    null,
+                    text(payload, "completedSummary", null),
+                    event.sequence());
+            case "todo.deleted" -> runProjectionRepository.deleteTodo(
+                    event.runId(),
+                    text(payload, "todoId", ""),
+                    event.sequence());
             default -> runProjectionRepository.advanceLatestSequence(event.runId(), event.sequence());
         }
     }

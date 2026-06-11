@@ -17,7 +17,6 @@ public record AgentEvent(
 ) {
 
     public AgentEvent {
-        eventId = Objects.requireNonNull(eventId, "eventId must not be null");
         runId = Objects.requireNonNull(runId, "runId must not be null");
         sequence = Objects.requireNonNull(sequence, "sequence must not be null");
         schemaVersion = schemaVersion == null ? 1 : schemaVersion;
@@ -27,6 +26,16 @@ public record AgentEvent(
 
     public static AgentEvent replay(Long eventId, Long runId, Long sequence, String eventType, String payloadJson) {
         return new AgentEvent(eventId, runId, null, null, null, sequence, 1, eventType, payloadJson, null);
+    }
+
+    public static AgentEvent forBroadcast(Long runId, long sequence, String eventType, String payloadJson) {
+        return new AgentEvent(null, runId, null, null, null, sequence, 1, eventType, payloadJson, null);
+    }
+
+    public static AgentEvent forReplay(AgentEvent original, String resolvedPayload) {
+        return new AgentEvent(original.eventId(), original.runId(), original.projectId(),
+                original.sessionId(), original.turnId(), original.sequence(),
+                original.schemaVersion(), original.eventType(), resolvedPayload, original.createdAt());
     }
 
     private static String requireText(String value, String fieldName) {

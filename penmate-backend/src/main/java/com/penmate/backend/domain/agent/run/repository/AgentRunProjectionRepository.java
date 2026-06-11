@@ -35,4 +35,16 @@ public interface AgentRunProjectionRepository {
                         Long sequence);
 
     void advanceLatestSequence(Long runId, Long sequence);
+
+    void upsertTodo(Long runId,
+                    String todoId,
+                    String title,
+                    String status,
+                    Integer sortOrder,
+                    String blockedReason,
+                    String errorSummary,
+                    String completedSummary,
+                    Long sequence);
+
+    void deleteTodo(Long runId, String todoId, Long sequence);
 }

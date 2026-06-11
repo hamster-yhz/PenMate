@@ -1,8 +1,5 @@
-package com.penmate.backend.application.agent.llm;
+package com.penmate.backend.domain.agent.run.model;
 
-/**
- * LLM 单轮或聚合 token 用量。
- */
 public record LlmTokenUsage(
         int promptTokens,
         int completionTokens,

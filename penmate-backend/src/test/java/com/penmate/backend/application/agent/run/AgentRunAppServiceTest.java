@@ -40,7 +40,7 @@ class AgentRunAppServiceTest {
         when(agentRepository.nextMessageSeq(90001L)).thenReturn(1);
         when(agentRepository.insertMessage(any(AgentMessage.class))).thenReturn(1);
         when(agentRepository.touchConversationLastMessage(90001L)).thenReturn(1);
-        when(sessionRepository.insertTurn(eq(90001L), eq(50001L), eq(1), eq(60001L), eq(70001L), eq("pending"), eq(null))).thenReturn(1);
+        when(sessionRepository.insertTurn(eq(90001L), eq(50001L), eq(1), eq(60001L), eq(null), eq("PENDING"), eq(null))).thenReturn(1);
         when(sessionRepository.updateLastTurn(101L, 90001L, 50001L)).thenReturn(1);
         when(sessionRepository.updateLastRun(101L, 90001L, 70001L)).thenReturn(1);
         when(agentRunRepository.insert(any(AgentRun.class))).thenReturn(1);
@@ -52,13 +52,14 @@ class AgentRunAppServiceTest {
                 agentRepository,
                 sessionRepository,
                 idGenerator,
-                new AgentRunAppService(agentRunRepository, eventPublisher, runDispatcher)
+                new AgentRunAppService(agentRunRepository, eventPublisher, runDispatcher),
+                runDispatcher
         );
 
         AgentTurnResult result = service.createTurn(101L, 90001L, command(), "trace-1");
 
         assertThat(result.activeRun().runId()).isEqualTo(70001L);
-        assertThat(result.activeRun().latestSequence()).isEqualTo(1L);
+        assertThat(result.activeRun().runStatus()).isEqualTo("running");
         verify(agentRunRepository).insert(any(AgentRun.class));
         verify(agentRunRepository).insertInput(any(AgentRunInput.class));
         verify(eventPublisher).publish(eq(70001L), eq("run.started"), any());

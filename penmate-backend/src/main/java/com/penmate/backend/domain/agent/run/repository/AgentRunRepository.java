@@ -10,4 +10,6 @@ public interface AgentRunRepository {
     int insertInput(AgentRunInput input);
 
     AgentRunInput findInput(Long runId);
+
+    AgentRun findRun(Long runId);
 }

@@ -1,9 +1,11 @@
 package com.penmate.backend.application.agent.llm;
 
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
+
 import java.util.List;
 
 /**
- * LLM 单轮结构化响应。
+ * LLM 鍗曡疆缁撴瀯鍖栧搷搴斻€?
  */
 public record AgentLlmTurnResponse(
         String finishReason,

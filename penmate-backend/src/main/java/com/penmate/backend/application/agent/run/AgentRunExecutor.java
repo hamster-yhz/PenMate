@@ -11,7 +11,11 @@ import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.application.agent.AgentModelRoutingService;
+import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
+import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Component;
 
@@ -28,19 +32,28 @@ public class AgentRunExecutor {
     private final AgentContextRoutingFacade contextRoutingFacade;
     private final PromptComposer promptComposer;
     private final AgentRunLlmLoop llmLoop;
+    private final AgentModelRoutingService modelRoutingService;
+    private final AgentRuntimeStateReducer stateReducer;
+    private final AgentCheckpointService checkpointService;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
                             AgentRunEventPublisher eventPublisher,
                             AgentPreflightCoordinator preflightCoordinator,
                             AgentContextRoutingFacade contextRoutingFacade,
                             PromptComposer promptComposer,
-                            AgentRunLlmLoop llmLoop) {
+                            AgentRunLlmLoop llmLoop,
+                            AgentModelRoutingService modelRoutingService,
+                            AgentRuntimeStateReducer stateReducer,
+                            AgentCheckpointService checkpointService) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
         this.preflightCoordinator = preflightCoordinator;
         this.contextRoutingFacade = contextRoutingFacade;
         this.promptComposer = promptComposer;
         this.llmLoop = llmLoop;
+        this.modelRoutingService = modelRoutingService;
+        this.stateReducer = stateReducer;
+        this.checkpointService = checkpointService;
     }
 
     public void execute(Long runId, String traceId) {
@@ -50,12 +63,28 @@ public class AgentRunExecutor {
             throw new IllegalArgumentException("Agent run input not found: " + runId);
         }
 
-        Long projectId = runId;
-        Long sessionId = runId;
-        Long turnId = runId;
-        AgentLlmExecutionConfig executionConfig = AgentLlmExecutionConfig.builder().build();
+        AgentRun run = runRepository.findRun(runId);
+        if (run == null) {
+            throw new IllegalStateException("Agent run not found: " + runId);
+        }
+        Long userId = run.ownerUserId();
+        Long modelConfigId = extractModelConfigIdFromSnapshot(input.modelSnapshotJson());
+        AgentLlmExecutionConfig executionConfig;
+        if (modelConfigId != null) {
+            executionConfig = modelRoutingService.resolveExecutionConfig(userId, modelConfigId, traceId);
+        } else {
+            executionConfig = AgentLlmExecutionConfig.builder().build();
+        }
+        Long projectId = run.projectId();
+        Long sessionId = run.sessionId();
+        Long turnId = run.turnId();
 
-        publishPhase(runId, "preflight");
+        AgentRuntimeState state = AgentRuntimeState.empty(runId);
+
+        AgentEvent evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "preflight"));
+        state = stateReducer.apply(state, evt);
+        checkpointService.checkpointIfNeeded(evt, state);
+
         AgentPreflightDecision decision = preflightCoordinator.coordinate(new AgentPreflightRequest(
                 projectId,
                 sessionId,
@@ -65,7 +94,10 @@ public class AgentRunExecutor {
         ));
         TaskProfile taskProfile = taskProfileFrom(decision);
 
-        publishPhase(runId, "context");
+        evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "context"));
+        state = stateReducer.apply(state, evt);
+        checkpointService.checkpointIfNeeded(evt, state);
+
         AgentContextRoutingResult contextResult = contextRoutingFacade.route(new AgentContextRoutingRequest(
                 projectId,
                 sessionId,
@@ -75,15 +107,21 @@ public class AgentRunExecutor {
                 decision,
                 taskProfile
         ));
-        eventPublisher.publish(runId, "context.routing.completed", Map.of(
+        evt = eventPublisher.publish(runId, "context.routing.completed", Map.of(
                 "sourceCount", contextResult.contextPackage().sources().size(),
                 "ragRefCount", contextResult.contextPackage().ragRefs().size()
         ));
+        state = stateReducer.apply(state, evt);
+        checkpointService.checkpointIfNeeded(evt, state);
 
-        publishPhase(runId, "prompt");
+        evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "prompt"));
+        state = stateReducer.apply(state, evt);
+
         PromptPlan promptPlan = promptComposer.compose(taskProfile, contextResult.contextPackage(), input.promptSnapshot());
 
-        publishPhase(runId, "executing");
+        evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "executing"));
+        state = stateReducer.apply(state, evt);
+
         AgentRunLoopResult loopResult = llmLoop.execute(new AgentRunLoopRequest(
                 runId,
                 projectId,
@@ -98,26 +136,28 @@ public class AgentRunExecutor {
         ));
 
         if (loopResult.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
-            eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", loopResult.approvalId()));
+            evt = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", loopResult.approvalId()));
+            state = stateReducer.apply(state, evt);
+            checkpointService.checkpointIfNeeded(evt, state);
             return;
         }
 
-        eventPublisher.publish(runId, "message.completed", Map.of(
+        evt = eventPublisher.publish(runId, "message.completed", Map.of(
                 "role", "assistant",
                 "text", loopResult.finalAssistantText()
         ));
-        eventPublisher.publish(runId, "run.completed", Map.of(
+        state = stateReducer.apply(state, evt);
+
+        evt = eventPublisher.publish(runId, "run.completed", Map.of(
                 "phase", "completed",
                 "tokenUsage", loopResult.tokenUsage()
         ));
+        state = stateReducer.apply(state, evt);
+        checkpointService.checkpointIfNeeded(evt, state);
     }
 
     public void resume(Long runId, String traceId) {
         execute(runId, traceId);
-    }
-
-    private void publishPhase(Long runId, String phase) {
-        eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", phase));
     }
 
     private TaskProfile taskProfileFrom(AgentPreflightDecision decision) {
@@ -133,5 +173,21 @@ public class AgentRunExecutor {
                 decision.includeRagContext(),
                 decision.reasoningSummary()
         );
+    }
+
+    private Long extractModelConfigIdFromSnapshot(String modelSnapshotJson) {
+        if (modelSnapshotJson == null || modelSnapshotJson.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(modelSnapshotJson);
+            if (node.has("modelConfigId")) {
+                return node.get("modelConfigId").asLong();
+            }
+        } catch (Exception e) {
+            // ignore parse failures
+        }
+        return null;
     }
 }

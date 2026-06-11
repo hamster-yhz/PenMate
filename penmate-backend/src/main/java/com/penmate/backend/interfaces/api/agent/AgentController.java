@@ -254,26 +254,18 @@ public class AgentController {
     }
 
     private AgentRunDto toRunDto(AgentTurnResult result) {
-        AgentTurnResult.SessionView session = result.session();
-        AgentTurnResult.BoundStyleView boundStyle = session == null ? null : session.boundStyle();
         AgentTurnResult.ActiveRunView activeRun = result.activeRun();
         return new AgentRunDto(
-                new AgentRecoverySnapshotDto.SessionDto(
-                        session == null ? null : stringifyBusinessId(session.sessionId()),
-                        session == null ? null : session.title(),
-                        session == null ? null : session.status(),
-                        boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(stringifyBusinessId(boundStyle.styleId()), boundStyle.name()),
-                        session == null ? null : session.lastRunStatus()
-                ),
+                null,
                 activeRun == null ? null : new AgentRunDto.ActiveRunDto(
                         stringifyBusinessId(activeRun.turnId()),
                         stringifyBusinessId(activeRun.runId()),
                         activeRun.runStatus(),
-                        activeRun.runPhase(),
-                        stringifyBusinessId(activeRun.latestSequence())
+                        null,
+                        null
                 ),
-                result.taskType(),
-                result.userMessage()
+                null,
+                null
         );
     }
 

@@ -11,10 +11,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,13 +28,19 @@ class AgentCheckpointServiceTest {
 
     @Mock
     private AgentCheckpointRepository checkpointRepository;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOperations;
 
     @Test
     void saves_checkpoint_for_policy_event_with_next_checkpoint_number() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(checkpointRepository.findLatest(70001L))
                 .thenReturn(new AgentCheckpoint(80000L, 70001L, 1L, 1L, "{}", 2, null));
         AgentCheckpointService service = new AgentCheckpointService(
                 checkpointRepository,
+                redisTemplate,
                 incrementingIds(81000L),
                 new ObjectMapper()
         );
@@ -50,8 +60,10 @@ class AgentCheckpointServiceTest {
 
     @Test
     void skips_checkpoint_when_policy_does_not_match() {
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         AgentCheckpointService service = new AgentCheckpointService(
                 checkpointRepository,
+                redisTemplate,
                 incrementingIds(81000L),
                 new ObjectMapper()
         );
@@ -61,13 +73,15 @@ class AgentCheckpointServiceTest {
                 AgentRuntimeState.empty(70001L)
         );
 
-        verify(checkpointRepository, never()).save(org.mockito.Mockito.any());
+        verify(checkpointRepository, never()).save(any());
     }
 
     @Test
     void checkpoints_every_fifteenth_event() {
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         AgentCheckpointService service = new AgentCheckpointService(
                 checkpointRepository,
+                redisTemplate,
                 incrementingIds(81000L),
                 new ObjectMapper()
         );
