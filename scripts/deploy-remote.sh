@@ -60,11 +60,6 @@ PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(read_env_value COMPOSE_PROJECT_NAME)}"
 PROJECT_NAME="${PROJECT_NAME:-penmate}"
 
 export FRONTEND_PUBLIC_PORT="${FRONTEND_PUBLIC_PORT:-$(read_env_value FRONTEND_PUBLIC_PORT)}"
-export PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-$(read_env_value PUBLIC_BASE_URL)}"
-export HEALTH_URL="${HEALTH_URL:-$(read_env_value HEALTH_URL)}"
-export FRONTEND_URL="${FRONTEND_URL:-$(read_env_value FRONTEND_URL)}"
-export HEALTHCHECK_ATTEMPTS="${HEALTHCHECK_ATTEMPTS:-$(read_env_value HEALTHCHECK_ATTEMPTS)}"
-export HEALTHCHECK_SLEEP_SECONDS="${HEALTHCHECK_SLEEP_SECONDS:-$(read_env_value HEALTHCHECK_SLEEP_SECONDS)}"
 
 echo "--- deploy-remote diagnostics ---"
 echo "BACKEND_IMAGE=${BACKEND_IMAGE:-<empty>}"
@@ -73,6 +68,5 @@ echo "FRONTEND_IMAGE=${FRONTEND_IMAGE:-<empty>}"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" pull
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d --remove-orphans
 
-"$DEPLOY_PATH/scripts/healthcheck.sh"
 
 docker image prune -f

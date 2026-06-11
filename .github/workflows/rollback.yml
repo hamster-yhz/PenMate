@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir -p deploy-bundle/scripts
           cp docker-compose.prod.yml .env.example deploy-bundle/
-          cp scripts/deploy-remote.sh scripts/healthcheck.sh deploy-bundle/scripts/
+          cp scripts/deploy-remote.sh deploy-bundle/scripts/
           tar -czf deploy-bundle.tgz -C deploy-bundle .
 
       - name: Upload deployment bundle
