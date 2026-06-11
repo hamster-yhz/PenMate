@@ -160,7 +160,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PUBLIC_PORT:-443}:443"
+      - "${FRONTEND_PUBLIC_PORT:-8443}:8443"
     volumes:
       - ${CERT_DIR:-./certs}:/etc/nginx/certs:ro
     restart: unless-stopped
