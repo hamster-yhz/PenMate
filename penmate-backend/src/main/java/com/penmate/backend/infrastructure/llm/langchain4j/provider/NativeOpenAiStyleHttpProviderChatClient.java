@@ -1,14 +1,14 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONNull;
 import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONNull;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.llm.LlmTokenUsage;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 基于原生 HTTP 的 OpenAI 风格聊天调用实现。
+ * 鍩轰簬鍘熺敓 HTTP 鐨?OpenAI 椋庢牸鑱婂ぉ璋冪敤瀹炵幇銆?
  */
 @Slf4j
 public abstract class NativeOpenAiStyleHttpProviderChatClient implements ProviderChatClient {
@@ -311,13 +311,13 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
 
             LlmTokenUsage tokenUsage = extractTokenUsage(root);
             Object toolCallsNode = message.get("tool_calls");
-            boolean toolCallsNodeHasValue = toolCallsNode != null && !(toolCallsNode instanceof JSONNull);
-            toolCallsPresent = toolCallsNodeHasValue;
-            toolCallsType = toolCallsNodeHasValue ? describeJsonValueType(toolCallsNode) : "null";
-            if (toolCallsNodeHasValue && !(toolCallsNode instanceof JSONArray)) {
+            toolCallsPresent = toolCallsNode != null;
+            if (toolCallsNode instanceof JSONNull) { toolCallsNode = null; }
+            toolCallsType = describeJsonValueType(toolCallsNode);
+            if (toolCallsNode != null && !(toolCallsNode instanceof JSONArray)) {
                 throw new IllegalStateException("LLM response tool_calls is not a json array");
             }
-            JSONArray toolCalls = toolCallsNode instanceof JSONArray ? (JSONArray) toolCallsNode : null;
+            JSONArray toolCalls = (toolCallsNode != null && toolCallsNode instanceof JSONArray) ? (JSONArray) toolCallsNode : null;
             toolCallCount = toolCalls == null ? 0 : toolCalls.size();
 
             log.info("llm.turn.response.structure: finishReason={}, messagePresent={}, messageType={}, contentPresent={}, contentLength={}, toolCallsPresent={}, toolCallsType={}, toolCallCount={}",

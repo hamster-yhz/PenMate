@@ -6,7 +6,7 @@ import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.llm.LlmTokenUsage;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
