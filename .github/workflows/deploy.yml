@@ -183,12 +183,16 @@ jobs:
         run: |
           deploy_path="${DEPLOY_PATH:-/opt/penmate}"
           ghcr_username="${GHCR_USERNAME}"
+          backend_image="${BACKEND_IMAGE}"
+          frontend_image="${FRONTEND_IMAGE}"
+          echo "CI backend_image=${backend_image:-<empty>}"
+          echo "CI frontend_image=${frontend_image:-<empty>}"
           sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" "DEPLOY_PATH='${deploy_path}' bash -s" <<EOF
           set -euo pipefail
           cd "\$DEPLOY_PATH"
           export GHCR_USERNAME='${ghcr_username}'
           export GHCR_TOKEN='${GHCR_TOKEN}'
-          export BACKEND_IMAGE='${BACKEND_IMAGE}'
-          export FRONTEND_IMAGE='${FRONTEND_IMAGE}'
+          if [ -n '${backend_image}' ]; then export BACKEND_IMAGE='${backend_image}'; fi
+          if [ -n '${frontend_image}' ]; then export FRONTEND_IMAGE='${frontend_image}'; fi
           ./scripts/deploy-remote.sh
           EOF

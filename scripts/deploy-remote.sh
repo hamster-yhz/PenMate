@@ -66,6 +66,10 @@ export FRONTEND_URL="${FRONTEND_URL:-$(read_env_value FRONTEND_URL)}"
 export HEALTHCHECK_ATTEMPTS="${HEALTHCHECK_ATTEMPTS:-$(read_env_value HEALTHCHECK_ATTEMPTS)}"
 export HEALTHCHECK_SLEEP_SECONDS="${HEALTHCHECK_SLEEP_SECONDS:-$(read_env_value HEALTHCHECK_SLEEP_SECONDS)}"
 
+echo "--- deploy-remote diagnostics ---"
+echo "BACKEND_IMAGE=${BACKEND_IMAGE:-<empty>}"
+echo "FRONTEND_IMAGE=${FRONTEND_IMAGE:-<empty>}"
+
 if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
   echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 fi
