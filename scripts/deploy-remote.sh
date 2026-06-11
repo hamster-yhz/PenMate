@@ -46,10 +46,14 @@ read_env_value() {
 
 if [ -n "$REQUESTED_BACKEND_IMAGE" ]; then
   export BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"
+else
+  unset BACKEND_IMAGE
 fi
 
 if [ -n "$REQUESTED_FRONTEND_IMAGE" ]; then
   export FRONTEND_IMAGE="$REQUESTED_FRONTEND_IMAGE"
+else
+  unset FRONTEND_IMAGE
 fi
 
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(read_env_value COMPOSE_PROJECT_NAME)}"
