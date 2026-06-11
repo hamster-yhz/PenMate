@@ -7,10 +7,10 @@ spring:
   application:
     name: penmate-backend
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:penmate}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=true
+    url: jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:penmate}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=${DB_USE_SSL:false}
     username: ${DB_USER:root}
     password: ${DB_PASS:root}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.mariadb.jdbc.Driver
   data:
     redis:
       host: ${REDIS_HOST:localhost}
