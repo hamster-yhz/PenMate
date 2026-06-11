@@ -29,7 +29,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes = ApprovalResumeDependencyCycleContextTest.TestConfig.class)
+@SpringBootTest(classes = ApprovalResumeDependencyCycleContextTest.TestConfig.class, properties = "spring.flyway.enabled=false")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 class ApprovalResumeDependencyCycleContextTest {
 
