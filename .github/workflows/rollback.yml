@@ -1,0 +1,79 @@
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_image:
+        description: "Full backend image tag to deploy, e.g. ghcr.io/owner/repo/penmate-backend:<sha>"
+        required: true
+        type: string
+      frontend_image:
+        description: "Full frontend image tag to deploy, e.g. ghcr.io/owner/repo/penmate-frontend:<sha>"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare deployment bundle
+        shell: bash
+        run: |
+          mkdir -p deploy-bundle/scripts
+          cp docker-compose.prod.yml .env.example deploy-bundle/
+          cp scripts/deploy-remote.sh scripts/healthcheck.sh deploy-bundle/scripts/
+          tar -czf deploy-bundle.tgz -C deploy-bundle .
+
+      - name: Install SSH key
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload deployment bundle
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          deploy_path="${DEPLOY_PATH:-/opt/penmate}"
+          ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p '${deploy_path}'"
+          scp deploy-bundle.tgz "${SSH_USER}@${SSH_HOST}:${deploy_path}/deploy-bundle.tgz"
+          ssh "${SSH_USER}@${SSH_HOST}" "cd '${deploy_path}' && tar -xzf deploy-bundle.tgz && chmod +x scripts/*.sh"
+
+      - name: Roll back over SSH
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+        run: |
+          deploy_path="${DEPLOY_PATH:-/opt/penmate}"
+          ghcr_username="${GHCR_USERNAME}"
+          ssh "${SSH_USER}@${SSH_HOST}" "DEPLOY_PATH='${deploy_path}' bash -s" <<EOF
+          set -euo pipefail
+          cd "\$DEPLOY_PATH"
+          export GHCR_USERNAME='${ghcr_username}'
+          export GHCR_TOKEN='${GHCR_TOKEN}'
+          export BACKEND_IMAGE='${BACKEND_IMAGE}'
+          export FRONTEND_IMAGE='${FRONTEND_IMAGE}'
+          ./scripts/deploy-remote.sh
+          EOF
