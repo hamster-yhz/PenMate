@@ -21,6 +21,7 @@ import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -29,6 +30,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = ApprovalResumeDependencyCycleContextTest.TestConfig.class)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.ANY)
 class ApprovalResumeDependencyCycleContextTest {
 
     @Autowired
