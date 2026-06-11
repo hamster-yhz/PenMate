@@ -8,10 +8,6 @@ on:
 
 jobs:
   backend-test:
-    if: |
-      github.event_name == 'pull_request' ||
-      (!contains(github.event.head_commit.message, '[skip ci]') &&
-       !contains(github.event.head_commit.message, '[ci skip]'))
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,10 +22,6 @@ jobs:
         run: mvn -B verify
 
   frontend-test:
-    if: |
-      github.event_name == 'pull_request' ||
-      (!contains(github.event.head_commit.message, '[skip ci]') &&
-       !contains(github.event.head_commit.message, '[ci skip]'))
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,10 +39,6 @@ jobs:
         run: npm run test:coverage
 
   docker-build:
-    if: |
-      github.event_name == 'pull_request' ||
-      (!contains(github.event.head_commit.message, '[skip ci]') &&
-       !contains(github.event.head_commit.message, '[ci skip]'))
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-test]
     steps:
