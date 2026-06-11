@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0.36
+    image: mariadb:10.11
     environment:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
