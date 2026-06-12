@@ -42,15 +42,13 @@ class ClasspathSkillPromptRegistryTest {
     }
 
     @Test
-    void should_fail_fast_for_unknown_skill_alias_instead_of_falling_back_to_generic_directory() {
+    void should_return_null_for_unknown_skill_instead_of_throwing() {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.register(PromptComponentScanConfig.class);
             context.refresh();
 
             SkillPromptRegistry registry = context.getBean(SkillPromptRegistry.class);
-            assertThatThrownBy(() -> registry.load("mystery-planner"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Unsupported skill prompt: mystery-planner");
+            assertThat(registry.load("mystery-planner")).isNull();
         }
     }
 

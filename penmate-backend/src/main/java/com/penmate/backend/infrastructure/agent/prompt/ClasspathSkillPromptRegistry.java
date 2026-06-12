@@ -1,5 +1,7 @@
 package com.penmate.backend.infrastructure.agent.prompt;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptBundle;
 import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
@@ -13,9 +15,11 @@ import java.util.stream.Collectors;
 @Component
 public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
 
-    private static final Map<String, String> DIRECTORY_ALIASES = Map.ofEntries(
-            Map.entry("writer", "writer"),
-            Map.entry("scene_writer", "writer"),
+   private static final Logger log = LoggerFactory.getLogger(ClasspathSkillPromptRegistry.class);
+   private static final Map<String, String> DIRECTORY_ALIASES = Map.ofEntries(
+           Map.entry("writer", "writer"),
+           Map.entry("draft_generation", "writer"),
+           Map.entry("scene_writer", "writer"),
             Map.entry("planner", "planner"),
             Map.entry("checker", "checker"),
             Map.entry("continuity_checker", "checker"),
@@ -37,6 +41,9 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
     public SystemPromptDocument load(String skill) {
         String canonicalSkill = canonicalize(skill);
         String directory = resolveDirectory(skill, canonicalSkill);
+        if (directory == null) {
+            return null;
+        }
         SystemPromptBundle bundle = systemPromptProvider.loadBundle("skills", directory);
         if (bundle.documents().isEmpty()) {
             throw new IllegalArgumentException("No prompt documents found for skill: " + skill);
@@ -54,7 +61,8 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
     private String resolveDirectory(String originalSkill, String canonicalSkill) {
         String directory = DIRECTORY_ALIASES.get(canonicalSkill);
         if (directory == null) {
-            throw new IllegalArgumentException("Unsupported skill prompt: " + originalSkill);
+            log.warn("Unsupported skill prompt: {}, skipping", originalSkill);
+            return null;
         }
         return directory;
     }

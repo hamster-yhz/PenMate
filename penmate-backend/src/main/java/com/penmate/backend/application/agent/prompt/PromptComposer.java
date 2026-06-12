@@ -1,5 +1,8 @@
 package com.penmate.backend.application.agent.prompt;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,8 @@ import java.util.stream.Collectors;
  */
 @Component
 public class PromptComposer {
+    private static final Logger log = LoggerFactory.getLogger(PromptComposer.class);
+
 
     private final SystemPromptProvider systemPromptProvider;
     private final SkillPromptRegistry skillPromptRegistry;
@@ -54,13 +59,17 @@ public class PromptComposer {
                 continue;
             }
             SystemPromptDocument skillDocument = skillPromptRegistry.load(normalizedSkill);
+            if (skillDocument == null) {
+                log.warn("Skill prompt not found for: {}, skipping", normalizedSkill);
+                continue;
+            }
             modules.add(new PromptModulePlan(
                     "skill:" + normalizedSkill,
-                    normalize(skillDocument == null ? null : skillDocument.path()),
+                    normalize(skillDocument.path()),
                     true,
                     "根据 task profile skills 激活"
             ));
-            previewSections.add(normalize(skillDocument == null ? null : skillDocument.content()));
+            previewSections.add(normalize(skillDocument.content()));
         }
 
         modules.add(new PromptModulePlan(
