@@ -181,7 +181,7 @@ export const useBookshelf = () => {
           description: bookForm.description,
           genre: bookForm.genre,
           tags,
-          ownerId: session.userId || undefined,
+          ownerUserId: session.userId || undefined,
         })
         message.success('作品已创建')
       }
