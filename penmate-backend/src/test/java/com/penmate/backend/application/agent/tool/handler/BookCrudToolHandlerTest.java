@@ -3,10 +3,14 @@ package com.penmate.backend.application.agent.tool.handler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.novel.NovelApplicationService;
+import com.penmate.backend.domain.novel.model.NovelProject;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -171,6 +175,31 @@ class BookCrudToolHandlerTest {
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.errorCode()).isEqualTo("BOOK_CRUD_EXECUTION_FAILED");
         assertThat(result.errorMessage()).isEqualTo("boom");
+    }
+
+    @Test
+    void UT_APP_AGENT_BOOK_CRUD_TOOL_HANDLER_EXECUTE_SHOULD_RETURN_SUCCESS_WHEN_CREATED_PROJECT_SUMMARY_IS_NULL() {
+        ToolCallRequest request = request("""
+                {
+                  "operation": "create",
+                  "ownerUserId": 1001,
+                  "title": "雾海边境的星尘档案"
+                }
+                """);
+        NovelProject created = new NovelProject();
+        created.setProjectId(66061336829952L);
+        created.setOwnerUserId(1001L);
+        created.setTitle("雾海边境的星尘档案");
+        created.setSummary(null);
+        created.setStatus(1);
+        when(novelApplicationService.createProject(any(), eq("trace-1"))).thenReturn(created);
+
+        ToolCallResult result = handler.execute(request);
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        assertThat(AgentJsonCodec.parseObj(result.toolOutput()).getLong("projectId")).isEqualTo(66061336829952L);
+        assertThat(AgentJsonCodec.parseObj(result.toolOutput()).containsKey("summary")).isTrue();
+        assertThat(result.toolOutput()).contains("\"summary\":null");
     }
 
     private ToolCallRequest request(String toolArgsJson) {

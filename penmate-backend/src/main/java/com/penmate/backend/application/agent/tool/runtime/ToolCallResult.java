@@ -11,11 +11,40 @@ public record ToolCallResult(
         String errorCode,
         String errorMessage
 ) {
+    private static final String DEFAULT_ERROR_CODE = "TOOL_CALL_FAILED";
+    private static final String DEFAULT_ERROR_MESSAGE = "Unknown error";
+
+    public ToolCallResult {
+        status = normalizeStatus(status);
+        if ("FAILED".equals(status)) {
+            errorCode = normalizeText(errorCode, DEFAULT_ERROR_CODE);
+            errorMessage = normalizeText(errorMessage, DEFAULT_ERROR_MESSAGE);
+        }
+    }
+
     public static ToolCallResult waitingApproval(Long approvalId) {
         return new ToolCallResult("WAITING_APPROVAL", approvalId, null, null, null);
     }
 
     public static ToolCallResult success(String toolOutput) {
         return new ToolCallResult("SUCCESS", null, toolOutput, null, null);
+    }
+
+    public static ToolCallResult failed(String errorCode, String errorMessage) {
+        return new ToolCallResult("FAILED", null, null, errorCode, errorMessage);
+    }
+
+    private static String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "FAILED";
+        }
+        return status.trim().toUpperCase();
+    }
+
+    private static String normalizeText(String value, String defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        return value;
     }
 }

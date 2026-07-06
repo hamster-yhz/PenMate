@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -52,7 +53,7 @@ public class AgentRunLlmLoop {
         StringBuilder fullAssistantText = new StringBuilder();
 
         for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-            eventPublisher.publish(request.runId(), "llm.turn.started", Map.of(
+            eventPublisher.publish(request.runId(), "llm.turn.started", eventPayload(
                     "llmTurnIndex", turnIndex,
                     "traceId", request.traceId()
             ));
@@ -89,10 +90,15 @@ public class AgentRunLlmLoop {
                 return AgentRunLoopResult.completed(fullAssistantText.toString(), totalUsage);
             }
 
+            List<AgentLlmToolCallPayload> toolCallPayloads = response.toolCalls().stream()
+                    .map(tc -> new AgentLlmToolCallPayload(tc.id(), "function", tc.toolCode(), tc.argumentsJson()))
+                    .toList();
+            messages.add(AgentLlmMessage.assistant(response.assistantText(), toolCallPayloads));
+
             for (AgentLlmToolCall toolCall : response.toolCalls()) {
                 String toolName = resolveToolName(toolCall.toolCode());
 
-                eventPublisher.publish(request.runId(), "tool.call.started", Map.of(
+                eventPublisher.publish(request.runId(), "tool.call.started", eventPayload(
                         "llmTurnIndex", turnIndex,
                         "toolCallId", toolCall.id(),
                         "toolCode", toolCall.toolCode(),
@@ -119,9 +125,12 @@ public class AgentRunLlmLoop {
                         null,
                         null
                 ));
+                if (result == null) {
+                    result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
+                }
 
                 if ("WAITING_APPROVAL".equals(result.status())) {
-                    eventPublisher.publish(request.runId(), "tool.call.waiting_approval", Map.of(
+                    eventPublisher.publish(request.runId(), "tool.call.waiting_approval", eventPayload(
                             "llmTurnIndex", turnIndex,
                             "toolCallId", toolCall.id(),
                             "toolCode", toolCall.toolCode(),
@@ -137,7 +146,7 @@ public class AgentRunLlmLoop {
                 }
 
                 if ("SUCCESS".equals(result.status())) {
-                    eventPublisher.publish(request.runId(), "tool.call.completed", Map.of(
+                    eventPublisher.publish(request.runId(), "tool.call.completed", eventPayload(
                             "llmTurnIndex", turnIndex,
                             "toolCallId", toolCall.id(),
                             "toolCode", toolCall.toolCode(),
@@ -145,8 +154,8 @@ public class AgentRunLlmLoop {
                     ));
                     messages.add(AgentLlmMessage.tool(toolCall.id(), result.toolOutput()));
                 } else {
-                    String errorOutput = "Error: " + (result.errorMessage() != null ? result.errorMessage() : "Unknown error");
-                    eventPublisher.publish(request.runId(), "tool.call.failed", Map.of(
+                    String errorOutput = "Error: " + result.errorMessage();
+                    eventPublisher.publish(request.runId(), "tool.call.failed", eventPayload(
                             "llmTurnIndex", turnIndex,
                             "toolCallId", toolCall.id(),
                             "toolCode", toolCall.toolCode(),
@@ -157,10 +166,6 @@ public class AgentRunLlmLoop {
                 }
             }
 
-            List<AgentLlmToolCallPayload> toolCallPayloads = response.toolCalls().stream()
-                    .map(tc -> new AgentLlmToolCallPayload(tc.id(), "function", tc.toolCode(), tc.argumentsJson()))
-                    .toList();
-            messages.add(AgentLlmMessage.assistant(fullAssistantText.toString(), toolCallPayloads));
             turnIndex++;
         }
 
@@ -178,5 +183,13 @@ public class AgentRunLlmLoop {
     private String clipText(String text, int maxLen) {
         if (text == null) return null;
         return text.length() <= maxLen ? text : text.substring(0, maxLen) + "...";
+    }
+
+    private Map<String, Object> eventPayload(Object... entries) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        for (int i = 0; i < entries.length; i += 2) {
+            payload.put((String) entries[i], entries[i + 1]);
+        }
+        return payload;
     }
 }
