@@ -152,7 +152,7 @@ public class AgentController {
                 requireLongId(sessionId, "sessionId"),
                 toCommand(dto),
                 traceId);
-        return ApiResponse.success(toRunDto(result), traceId);
+        return ApiResponse.success(toRunDto(result, requireLongId(sessionId, "sessionId")), traceId);
     }
 
     @GetMapping(path = "/runs/{runId}/stream", produces = "text/event-stream")
@@ -253,16 +253,23 @@ public class AgentController {
         );
     }
 
-    private AgentRunDto toRunDto(AgentTurnResult result) {
+    private AgentRunDto toRunDto(AgentTurnResult result, Long fallbackSessionId) {
         AgentTurnResult.ActiveRunView activeRun = result.activeRun();
+        Long sessionId = result.sessionId() == null ? fallbackSessionId : result.sessionId();
         return new AgentRunDto(
-                null,
+                new AgentRecoverySnapshotDto.SessionDto(
+                        stringifyBusinessId(sessionId),
+                        null,
+                        null,
+                        null,
+                        null
+                ),
                 activeRun == null ? null : new AgentRunDto.ActiveRunDto(
                         stringifyBusinessId(activeRun.turnId()),
                         stringifyBusinessId(activeRun.runId()),
                         activeRun.runStatus(),
-                        null,
-                        null
+                        activeRun.runPhase(),
+                        stringifyBusinessId(activeRun.latestSequence())
                 ),
                 null,
                 null

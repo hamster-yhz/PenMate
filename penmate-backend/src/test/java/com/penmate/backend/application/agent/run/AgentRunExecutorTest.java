@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,6 +82,30 @@ class AgentRunExecutorTest {
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("prompt"));
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("executing"));
         verify(eventPublisher).publish(eq(70001L), eq("message.completed"), any());
+        verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
+    }
+
+    @Test
+    void executor_treats_null_model_config_snapshot_as_default_config() {
+        when(runRepository.findInput(70001L)).thenReturn(new AgentRunInput(70001L, "Write a suspense opening.", "WRITE", 30001L,
+                "selected text", "{\"styleId\":81}", "{\"operatorId\":920001,\"modelConfigId\":null}", null, "hash-70001"));
+        when(runRepository.findRun(70001L)).thenReturn(run());
+        when(preflightCoordinator.coordinate(any())).thenReturn(preflightDecision());
+        when(contextRoutingFacade.route(any())).thenReturn(contextRoutingResult());
+        when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
+        when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("\u5b8c\u6210\u6587\u672c", new LlmTokenUsage(10, 5, 15)));
+
+        AgentEvent mockEvent = new AgentEvent(1L, 70001L, 101L, 20001L, 30001L, 1L, 1, "run.phase.changed", "{}", null);
+        when(eventPublisher.publish(any(), any(), any())).thenReturn(mockEvent);
+
+        AgentRunExecutor executor = new AgentRunExecutor(
+                runRepository, eventPublisher, preflightCoordinator, contextRoutingFacade,
+                promptComposer, llmLoop, modelRoutingService, stateReducer, checkpointService
+        );
+
+        executor.execute(70001L, "trace-1");
+
+        verify(modelRoutingService, never()).resolveExecutionConfig(anyLong(), anyLong(), anyString());
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
     }
 

@@ -182,8 +182,10 @@ public class AgentRunExecutor {
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(modelSnapshotJson);
-            if (node.has("modelConfigId")) {
-                return node.get("modelConfigId").asLong();
+            com.fasterxml.jackson.databind.JsonNode modelConfigId = node.get("modelConfigId");
+            if (modelConfigId != null && !modelConfigId.isNull()) {
+                long value = modelConfigId.asLong(0L);
+                return value > 0 ? value : null;
             }
         } catch (Exception e) {
             // ignore parse failures

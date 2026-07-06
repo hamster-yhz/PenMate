@@ -50,7 +50,7 @@ class AgentControllerRunContractTest {
     void create_turn_returns_active_run_and_does_not_dispatch_old_generation_workflow() throws Exception {
         String traceId = "trace-run-controller-1";
         when(agentTurnAppService.createTurn(eq(101L), eq(90001L), any(), eq(traceId)))
-                .thenReturn(new AgentTurnResult(null, new AgentTurnResult.ActiveRunView(50001L, 70001L, "running")));
+                .thenReturn(AgentTurnResult.forRun(90001L, 50001L, 70001L, "running", "created", 1L));
 
         mockMvc().perform(post("/api/v1/novels/101/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)

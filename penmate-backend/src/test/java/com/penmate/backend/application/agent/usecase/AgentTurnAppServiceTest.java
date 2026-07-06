@@ -18,6 +18,7 @@ class AgentTurnAppServiceTest {
 
     private static final Long FAKE_RUN_ID = 999001L;
     private static final Long FAKE_TURN_ID = 998001L;
+    private static final Long FAKE_USER_MESSAGE_ID = 997001L;
 
     @Test
     void should_create_turn_and_dispatch_run() {
@@ -27,7 +28,7 @@ class AgentTurnAppServiceTest {
                 mock(SessionStyleBindingAppService.class),
                 agentRepository(),
                 sessionRepository(),
-                businessIdGenerator(FAKE_TURN_ID, FAKE_RUN_ID),
+                businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
                 runAppService,
                 runDispatcher
         );
@@ -43,8 +44,12 @@ class AgentTurnAppServiceTest {
         AgentTurnResult result = agentTurnAppService.createTurn(projectId, sessionId, command, "trace-turn-1");
 
         assertThat(result.activeRun()).isNotNull();
+        assertThat(result.sessionId()).isEqualTo(sessionId);
+        assertThat(result.activeRun().turnId()).isEqualTo(FAKE_TURN_ID);
         assertThat(result.activeRun().runId()).isEqualTo(FAKE_RUN_ID);
         assertThat(result.activeRun().runStatus()).isEqualTo("running");
+        assertThat(result.activeRun().runPhase()).isEqualTo("created");
+        assertThat(result.activeRun().latestSequence()).isEqualTo(1L);
     }
 
     @Test
@@ -55,7 +60,7 @@ class AgentTurnAppServiceTest {
                 mock(SessionStyleBindingAppService.class),
                 agentRepository(),
                 sessionRepository(),
-                businessIdGenerator(FAKE_TURN_ID, FAKE_RUN_ID),
+                businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
                 runAppService,
                 runDispatcher
         );
@@ -68,6 +73,7 @@ class AgentTurnAppServiceTest {
         );
 
         assertThat(result.activeRun().runId()).isNotNull();
+        assertThat(result.activeRun().turnId()).isEqualTo(FAKE_TURN_ID);
         assertThat(result.activeRun().runStatus()).isEqualTo("running");
     }
 
@@ -97,9 +103,10 @@ class AgentTurnAppServiceTest {
     private static AgentSessionRepository sessionRepository() {
         AgentSessionRepository repository = mock(AgentSessionRepository.class);
         when(repository.nextTurnSeq(920002L)).thenReturn(1);
-                when(repository.insertTurn(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
+        when(repository.insertTurn(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         when(repository.insertSessionMessage(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         when(repository.updateLastTurn(any(), any(), any())).thenReturn(1);
+        when(repository.updateLastRun(any(), any(), any())).thenReturn(1);
         return repository;
     }
 }
