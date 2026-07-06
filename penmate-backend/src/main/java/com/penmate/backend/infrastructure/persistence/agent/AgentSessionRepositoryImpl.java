@@ -77,6 +77,17 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
     }
 
     @Override
+    public int nextMessageSeq(Long sessionId) {
+        lockSessionForTurnAppend(null, sessionId);
+        return agentSessionMapper.maxMessageSeq(sessionId) + 1;
+    }
+
+    @Override
+    public Long findTurnAssistantMessageId(Long sessionId, Long turnId) {
+        return agentSessionMapper.findTurnAssistantMessageId(sessionId, turnId);
+    }
+
+    @Override
     public int nextTurnSeq(Long sessionId) {
         lockSessionForTurnAppend(null, sessionId);
         return agentSessionMapper.maxTurnSeq(sessionId) + 1;
@@ -102,6 +113,11 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
                                     String contentMarkdown,
                                     Integer seqNo) {
         return agentSessionMapper.insertSessionMessage(sessionId, turnId, messageId, role, messageKind, contentMarkdown, seqNo);
+    }
+
+    @Override
+    public int updateTurnAssistantMessage(Long sessionId, Long turnId, Long assistantMessageId) {
+        return agentSessionMapper.updateTurnAssistantMessage(sessionId, turnId, assistantMessageId);
     }
 
     @Override

@@ -86,11 +86,6 @@ public class AgentRunLlmLoop {
             }
 
             if (response.toolCalls().isEmpty()) {
-                eventPublisher.publish(request.runId(), "message.completed", Map.of(
-                        "llmTurnIndex", turnIndex,
-                        "role", "assistant",
-                        "text", fullAssistantText.toString()
-                ));
                 return AgentRunLoopResult.completed(fullAssistantText.toString(), totalUsage);
             }
 
@@ -169,11 +164,6 @@ public class AgentRunLlmLoop {
             turnIndex++;
         }
 
-        eventPublisher.publish(request.runId(), "message.completed", Map.of(
-                "llmTurnIndex", turnIndex,
-                "role", "assistant",
-                "text", fullAssistantText.toString()
-        ));
         return AgentRunLoopResult.completed(fullAssistantText.toString(), totalUsage);
     }
 

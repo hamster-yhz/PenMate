@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +60,6 @@ class AgentRunLlmLoopTest {
         ArgumentCaptor<Object> payloadCaptor = ArgumentCaptor.forClass(Object.class);
         verify(eventPublisher).broadcastOnly(eq(70001L), eq("message.delta"), payloadCaptor.capture(), anyLong());
         assertThat(payloadCaptor.getValue().toString()).contains("abcdefghijklmnopqrstuvwxyz");
-        verify(eventPublisher).publish(eq(70001L), eq("message.completed"), any());
+        verify(eventPublisher, never()).publish(eq(70001L), eq("message.completed"), any());
     }
 }

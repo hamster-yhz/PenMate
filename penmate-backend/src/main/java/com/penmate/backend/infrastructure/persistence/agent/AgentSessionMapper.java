@@ -132,6 +132,23 @@ public interface AgentSessionMapper {
     int maxTurnSeq(@Param("sessionId") Long sessionId);
 
     @Select("""
+            SELECT COALESCE(MAX(seq_no), 0)
+            FROM agent_messages
+            WHERE session_id = #{sessionId}
+            """)
+    int maxMessageSeq(@Param("sessionId") Long sessionId);
+
+    @Select("""
+            SELECT assistant_message_id
+            FROM agent_turns
+            WHERE session_id = #{sessionId}
+              AND turn_id = #{turnId}
+            LIMIT 1
+            """)
+    Long findTurnAssistantMessageId(@Param("sessionId") Long sessionId,
+                                    @Param("turnId") Long turnId);
+
+    @Select("""
             SELECT turn_id AS turnId,
                    session_id AS sessionId,
                    turn_seq AS turnSeq,
@@ -178,6 +195,20 @@ public interface AgentSessionMapper {
                              @Param("messageKind") String messageKind,
                              @Param("contentMarkdown") String contentMarkdown,
                              @Param("seqNo") Integer seqNo);
+
+    @Update("""
+            UPDATE agent_turns
+            SET assistant_message_id = #{assistantMessageId},
+                turn_status = CASE
+                    WHEN turn_status IN ('PENDING', 'RUNNING') THEN 'DONE'
+                    ELSE turn_status
+                END
+            WHERE session_id = #{sessionId}
+              AND turn_id = #{turnId}
+            """)
+    int updateTurnAssistantMessage(@Param("sessionId") Long sessionId,
+                                   @Param("turnId") Long turnId,
+                                   @Param("assistantMessageId") Long assistantMessageId);
 
     @Select("""
             SELECT model_name AS modelName,

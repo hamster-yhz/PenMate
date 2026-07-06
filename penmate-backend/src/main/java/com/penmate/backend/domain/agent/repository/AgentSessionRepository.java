@@ -20,6 +20,10 @@ public interface AgentSessionRepository {
 
     void lockSessionForTurnAppend(Long projectId, Long sessionId);
 
+    int nextMessageSeq(Long sessionId);
+
+    Long findTurnAssistantMessageId(Long sessionId, Long turnId);
+
     int nextTurnSeq(Long sessionId);
 
     int insertTurn(Long sessionId,
@@ -37,6 +41,8 @@ public interface AgentSessionRepository {
                              String messageKind,
                              String contentMarkdown,
                              Integer seqNo);
+
+    int updateTurnAssistantMessage(Long sessionId, Long turnId, Long assistantMessageId);
 
     int updateLastTurn(Long projectId, Long sessionId, Long turnId);
 
