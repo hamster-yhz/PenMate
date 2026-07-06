@@ -165,6 +165,11 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       if (!assistantMsg) return
       assistantMsg.text += escapeHtml(token)
     },
+    onMessageCompleted: (text) => {
+      const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
+      if (!assistantMsg) return
+      assistantMsg.text = escapeHtml(text)
+    },
     onToolCall: (payload) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
       if (!assistantMsg) return

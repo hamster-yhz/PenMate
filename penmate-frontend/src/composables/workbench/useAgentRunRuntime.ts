@@ -19,7 +19,18 @@ export const normalizeRunStatus = (raw: unknown): AgentRunStatus | '' => {
 
 export const parseSseData = (event: MessageEvent<string>) => {
   try {
-    return JSON.parse(event.data || '{}') as ChatRecord
+    const record = JSON.parse(event.data || '{}') as ChatRecord
+    const payloadJson = typeof record.payloadJson === 'string' ? record.payloadJson : ''
+    if (!payloadJson.trim()) {
+      return record
+    }
+    const payload = JSON.parse(payloadJson) as ChatRecord
+    return {
+      ...payload,
+      ...record,
+      type: record.type ?? payload.type,
+      payloadJson,
+    } as ChatRecord
   } catch {
     return {} as ChatRecord
   }
@@ -99,6 +110,7 @@ export const createAgentRunRuntime = (deps: {
   scrollChat: () => void
   setRuntimeEventSource?: (value: WorkbenchRuntimeEventSource | null) => void
   onToken?: (token: string) => void
+  onMessageCompleted?: (text: string) => void
   onToolCall?: (payload: Record<string, unknown>) => void
   onWaitingApproval?: (payload: Record<string, unknown>) => void
   setLatestSequence?: (value: string) => void
@@ -191,7 +203,13 @@ export const createAgentRunRuntime = (deps: {
       deps.scrollChat()
     })
     deps.addStreamListener(stream, 'message.completed', (event) => {
-      publish('message.completed', parseSseData(event) as Record<string, unknown>)
+      const payload = parseSseData(event) as Record<string, unknown>
+      publish('message.completed', payload)
+      const text = String(payload.text ?? payload.content ?? payload.message ?? '')
+      if (text) {
+        deps.onMessageCompleted?.(text)
+        deps.scrollChat()
+      }
     })
     deps.addStreamListener(stream, 'run.completed', (event) => {
       const payload = parseSseData(event) as Record<string, unknown>
