@@ -54,6 +54,20 @@ class ClasspathSkillPromptRegistryTest {
         }
     }
 
+    @Test
+    void should_list_available_skill_aliases_for_progressive_disclosure_catalog() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.register(PromptComponentScanConfig.class);
+            context.refresh();
+
+            SkillPromptRegistry registry = context.getBean(SkillPromptRegistry.class);
+
+            assertThat(registry.listAvailableSkills())
+                    .contains("writer", "planner", "checker", "editor", "story_bible_query", "story_bible_guard")
+                    .doesNotContain("book_crud");
+        }
+    }
+
     @Configuration
     @ComponentScan(basePackageClasses = {
             PromptComposer.class,

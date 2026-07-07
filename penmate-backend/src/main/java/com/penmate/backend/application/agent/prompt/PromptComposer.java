@@ -47,21 +47,18 @@ public class PromptComposer {
         ));
         previewSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
 
-        List<String> skills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
-        for (String skill : skills) {
-            String normalizedSkill = normalize(skill);
-            if (normalizedSkill.isEmpty()) {
-                continue;
-            }
-            SystemPromptDocument skillDocument = skillPromptRegistry.load(normalizedSkill);
-            modules.add(new PromptModulePlan(
-                    "skill:" + normalizedSkill,
-                    normalize(skillDocument == null ? null : skillDocument.path()),
-                    true,
-                    "根据 task profile skills 激活"
-            ));
-            previewSections.add(normalize(skillDocument == null ? null : skillDocument.content()));
-        }
+        List<String> profileSkills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
+        List<String> availableSkills = skillPromptRegistry.listAvailableSkills().stream()
+                .map(this::normalize)
+                .filter(skill -> !skill.isEmpty())
+                .toList();
+        modules.add(new PromptModulePlan(
+                "skill-catalog",
+                "skill-catalog:" + String.join(",", availableSkills),
+                true,
+                "渐进式披露 skill 目录，正文通过 skill_prompt_read tool 按需读取"
+        ));
+        previewSections.add(buildSkillCatalogPreview(availableSkills));
 
         modules.add(new PromptModulePlan(
                 "context-package",
@@ -73,7 +70,7 @@ public class PromptComposer {
 
         return new PromptPlan(
                 modules,
-                skills,
+                profileSkills,
                 finalProfile,
                 previewSections.stream()
                         .filter(section -> !section.isBlank())
@@ -95,6 +92,26 @@ public class PromptComposer {
                 + "/ragRefs=" + contextPackage.ragRefs().size()
                 + "/conflicts=" + contextPackage.conflicts().size()
                 + "/missing=" + contextPackage.missingContextFlags().size();
+    }
+
+    private String buildSkillCatalogPreview(List<String> availableSkills) {
+        if (availableSkills == null || availableSkills.isEmpty()) {
+            return """
+                    Available skills:
+                    - none
+
+                    Skill details are progressively disclosed. Use tool skill_prompt_read with {"skill":"<skill>"} only when full instructions are needed.
+                    """.trim();
+        }
+        String skills = availableSkills.stream()
+                .map(skill -> "- " + skill)
+                .collect(Collectors.joining("\n"));
+        return """
+                Available skills:
+                %s
+
+                Skill details are progressively disclosed. Use tool skill_prompt_read with {"skill":"<skill>"} only when full instructions are needed.
+                """.formatted(skills).trim();
     }
 
     private String joinDocumentPaths(List<SystemPromptDocument> documents) {

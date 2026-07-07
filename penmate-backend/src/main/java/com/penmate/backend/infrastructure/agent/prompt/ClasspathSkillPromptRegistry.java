@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,11 +27,26 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
             Map.entry("story_bible_query", "story-bible"),
             Map.entry("story_bible_guard", "story-bible")
     );
+    private static final List<String> AVAILABLE_SKILLS = List.of(
+            "writer",
+            "scene_writer",
+            "planner",
+            "checker",
+            "continuity_checker",
+            "editor",
+            "story_bible_query",
+            "story_bible_guard"
+    );
 
     private final SystemPromptProvider systemPromptProvider;
 
     public ClasspathSkillPromptRegistry(SystemPromptProvider systemPromptProvider) {
         this.systemPromptProvider = systemPromptProvider;
+    }
+
+    @Override
+    public List<String> listAvailableSkills() {
+        return AVAILABLE_SKILLS;
     }
 
     @Override
