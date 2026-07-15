@@ -13,17 +13,17 @@ import java.util.Map;
 import java.util.Objects;
 
 @Component
-public class SkillPromptReadToolHandler implements AgentToolHandler {
+public class SkillLoadToolHandler implements AgentToolHandler {
 
     private final SkillPromptRegistry skillPromptRegistry;
 
-    public SkillPromptReadToolHandler(SkillPromptRegistry skillPromptRegistry) {
+    public SkillLoadToolHandler(SkillPromptRegistry skillPromptRegistry) {
         this.skillPromptRegistry = Objects.requireNonNull(skillPromptRegistry, "skillPromptRegistry");
     }
 
     @Override
     public String toolCode() {
-        return "skill_prompt_read";
+        return "skill_load";
     }
 
     @Override
@@ -51,9 +51,9 @@ public class SkillPromptReadToolHandler implements AgentToolHandler {
             return ToolCallResult.success(AgentJsonCodec.toJson(output));
         } catch (Exception ex) {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
-                    ? "skill prompt read failed"
+                    ? "skill load failed"
                     : ex.getMessage();
-            return ToolCallResult.failed("SKILL_PROMPT_READ_FAILED", message);
+            return ToolCallResult.failed("SKILL_LOAD_FAILED", message);
         }
     }
 }

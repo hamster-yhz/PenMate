@@ -24,7 +24,11 @@ class PromptComposerTest {
     @Test
     void should_keep_user_request_out_of_prompt_preview_and_expose_skill_catalog_only() {
         stubExecutionBundle("default", "execution base");
-        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of("writer", "planner", "checker"));
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
+                new SkillCatalogItem("writer", "Write prose and scenes"),
+                new SkillCatalogItem("planner", "Plan writing tasks"),
+                new SkillCatalogItem("checker", "Check continuity and constraints")
+        ));
 
         PromptPlan promptPlan = promptComposer.compose(
                 new TaskProfile(
@@ -56,10 +60,11 @@ class PromptComposerTest {
         assertThat(promptPlan.assembledPromptPreview())
                 .contains("execution base")
                 .contains("Available skills")
-                .contains("writer")
-                .contains("planner")
-                .contains("checker")
-                .contains("skill_prompt_read")
+                .contains("- writer: Write prose and scenes")
+                .contains("- planner: Plan writing tasks")
+                .contains("- checker: Check continuity and constraints")
+                .contains("skill_load")
+                .doesNotContain("skill_prompt_read")
                 .doesNotContain("Please write in first person.");
         verify(skillPromptRegistry, never()).load("writer");
         assertThat(promptPlan.modules())
@@ -77,7 +82,12 @@ class PromptComposerTest {
     @Test
     void should_not_load_task_profile_skills_as_prompt_modules() {
         stubExecutionBundle("default", "execution base");
-        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of("writer", "planner", "checker", "story_bible_query"));
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
+                new SkillCatalogItem("writer", "Write prose and scenes"),
+                new SkillCatalogItem("planner", "Plan writing tasks"),
+                new SkillCatalogItem("checker", "Check continuity and constraints"),
+                new SkillCatalogItem("story_bible_query", "Read relevant story bible facts")
+        ));
 
         PromptPlan promptPlan = promptComposer.compose(
                 profileFor("default", List.of("planner", "checker")),
@@ -88,10 +98,10 @@ class PromptComposerTest {
         assertThat(promptPlan.skills()).containsExactly("planner", "checker");
         assertThat(promptPlan.assembledPromptPreview())
                 .contains("Available skills")
-                .contains("planner")
-                .contains("checker")
-                .contains("story_bible_query")
-                .contains("skill_prompt_read");
+                .contains("- planner: Plan writing tasks")
+                .contains("- checker: Check continuity and constraints")
+                .contains("- story_bible_query: Read relevant story bible facts")
+                .contains("skill_load");
         verify(skillPromptRegistry, never()).load("planner");
         verify(skillPromptRegistry, never()).load("checker");
         assertThat(promptPlan.modules())
@@ -167,7 +177,9 @@ class PromptComposerTest {
                 ),
                 "default base\n\nwriting rules"
         ));
-        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of("editor"));
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
+                new SkillCatalogItem("editor", "Polish and revise existing prose")
+        ));
 
         PromptPlan promptPlan = promptComposer.compose(
                 profileFor("default", List.of("editor")),
@@ -175,26 +187,16 @@ class PromptComposerTest {
                 "Polish paragraph"
         );
 
-        assertThat(promptPlan.modules()).containsExactly(
-                new PromptModulePlan(
-                        "execution:default",
+        assertThat(promptPlan.modules())
+                .extracting(PromptModulePlan::moduleKey)
+                .containsExactly("execution:default", "skill-catalog", "context-package");
+        assertThat(promptPlan.modules())
+                .extracting(PromptModulePlan::source)
+                .containsExactly(
                         "prompts/agent/system/execution/default/00-base-role.md,prompts/agent/system/execution/default/10-writing-rules.md",
-                        true,
-                        "执行基座模块，匹配 task profile=default"
-                ),
-                new PromptModulePlan(
-                        "skill-catalog",
                         "skill-catalog:editor",
-                        true,
-                        "渐进式披露 skill 目录，正文通过 skill_prompt_read tool 按需读取"
-                ),
-                new PromptModulePlan(
-                        "context-package",
-                        "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0",
-                        true,
-                        "仅消费已构建上下文结果，不直接查询 story bible"
-                )
-        );
+                        "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
+                );
     }
 
     @Test

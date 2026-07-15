@@ -4,7 +4,7 @@ import java.util.List;
 
 public interface SkillPromptRegistry {
 
-    List<String> listAvailableSkills();
+    List<SkillCatalogItem> listAvailableSkills();
 
     SystemPromptDocument load(String skill);
 }

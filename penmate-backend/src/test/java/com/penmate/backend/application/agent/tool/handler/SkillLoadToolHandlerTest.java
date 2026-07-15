@@ -13,13 +13,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class SkillPromptReadToolHandlerTest {
+class SkillLoadToolHandlerTest {
 
     private final SkillPromptRegistry skillPromptRegistry = mock(SkillPromptRegistry.class);
-    private final SkillPromptReadToolHandler handler = new SkillPromptReadToolHandler(skillPromptRegistry);
+    private final SkillLoadToolHandler handler = new SkillLoadToolHandler(skillPromptRegistry);
 
     @Test
-    void should_read_full_skill_prompt_content_from_registry() {
+    void should_load_full_skill_prompt_content_from_registry() {
         when(skillPromptRegistry.load("writer")).thenReturn(new SystemPromptDocument(
                 "00-base-role.md",
                 "prompts/agent/system/skills/writer/00-base-role.md",
@@ -47,7 +47,7 @@ class SkillPromptReadToolHandlerTest {
                 9001L,
                 8001L,
                 7001L,
-                "skill_prompt_read",
+                "skill_load",
                 toolArgsJson,
                 1001L,
                 "trace-1",

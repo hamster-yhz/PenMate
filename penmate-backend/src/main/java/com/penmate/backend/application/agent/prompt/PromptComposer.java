@@ -11,11 +11,7 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 /**
- * Composes execution prompt plan from profiled task, already-built context and modular skill prompts.
- * <p>
- * This composer does not query repositories or build context on its own. It only consumes the provided
- * {@link TaskProfile} and {@link ContextPackage}, producing a snapshot-safe {@link PromptPlan} for logging,
- * recovery and downstream message assembly.
+ * Composes execution prompt plan from profiled task, already-built context and modular skill catalog.
  */
 @Component
 public class PromptComposer {
@@ -43,20 +39,22 @@ public class PromptComposer {
                 "execution:" + finalProfile,
                 joinDocumentPaths(executionBundle == null ? null : executionBundle.documents()),
                 true,
-                "执行基座模块，匹配 task profile=" + finalProfile
+                "Execution base module for task profile=" + finalProfile
         ));
         previewSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
 
         List<String> profileSkills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
-        List<String> availableSkills = skillPromptRegistry.listAvailableSkills().stream()
-                .map(this::normalize)
-                .filter(skill -> !skill.isEmpty())
+        List<SkillCatalogItem> availableSkills = skillPromptRegistry.listAvailableSkills().stream()
+                .map(this::normalizeSkillCatalogItem)
+                .filter(skill -> !skill.name().isEmpty())
                 .toList();
         modules.add(new PromptModulePlan(
                 "skill-catalog",
-                "skill-catalog:" + String.join(",", availableSkills),
+                "skill-catalog:" + availableSkills.stream()
+                        .map(SkillCatalogItem::name)
+                        .collect(Collectors.joining(",")),
                 true,
-                "渐进式披露 skill 目录，正文通过 skill_prompt_read tool 按需读取"
+                "Progressively disclosed skill catalog; full content is loaded through skill_load"
         ));
         previewSections.add(buildSkillCatalogPreview(availableSkills));
 
@@ -64,7 +62,7 @@ public class PromptComposer {
                 "context-package",
                 describeContext(normalizedContext),
                 true,
-                "仅消费已构建上下文结果，不直接查询 story bible"
+                "Consumes pre-built context package only"
         ));
         previewSections.add(buildContextPreview(normalizedContext));
 
@@ -94,24 +92,31 @@ public class PromptComposer {
                 + "/missing=" + contextPackage.missingContextFlags().size();
     }
 
-    private String buildSkillCatalogPreview(List<String> availableSkills) {
+    private String buildSkillCatalogPreview(List<SkillCatalogItem> availableSkills) {
         if (availableSkills == null || availableSkills.isEmpty()) {
             return """
                     Available skills:
                     - none
 
-                    Skill details are progressively disclosed. Use tool skill_prompt_read with {"skill":"<skill>"} only when full instructions are needed.
+                    Skill details are progressively disclosed. Use tool skill_load with {"skill":"<skill>"} only when full instructions are needed.
                     """.trim();
         }
         String skills = availableSkills.stream()
-                .map(skill -> "- " + skill)
+                .map(skill -> "- " + skill.name() + ": " + skill.description())
                 .collect(Collectors.joining("\n"));
         return """
                 Available skills:
                 %s
 
-                Skill details are progressively disclosed. Use tool skill_prompt_read with {"skill":"<skill>"} only when full instructions are needed.
+                Skill details are progressively disclosed. Use tool skill_load with {"skill":"<skill>"} only when full instructions are needed.
                 """.formatted(skills).trim();
+    }
+
+    private SkillCatalogItem normalizeSkillCatalogItem(SkillCatalogItem item) {
+        if (item == null) {
+            return new SkillCatalogItem("", "");
+        }
+        return new SkillCatalogItem(normalize(item.name()), normalize(item.description()));
     }
 
     private String joinDocumentPaths(List<SystemPromptDocument> documents) {

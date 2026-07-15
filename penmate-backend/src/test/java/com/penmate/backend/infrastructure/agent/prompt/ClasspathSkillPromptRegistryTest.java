@@ -63,8 +63,12 @@ class ClasspathSkillPromptRegistryTest {
             SkillPromptRegistry registry = context.getBean(SkillPromptRegistry.class);
 
             assertThat(registry.listAvailableSkills())
+                    .extracting("name")
                     .contains("writer", "planner", "checker", "editor", "story_bible_query", "story_bible_guard")
                     .doesNotContain("book_crud");
+            assertThat(registry.listAvailableSkills())
+                    .extracting("description")
+                    .allSatisfy(description -> assertThat((String) description).isNotBlank());
         }
     }
 
