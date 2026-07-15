@@ -3,6 +3,7 @@ package com.penmate.backend.application.agent.prompt;
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskIntentTag;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -19,7 +20,8 @@ class PromptComposerTest {
 
     private final SystemPromptProvider systemPromptProvider = mock(SystemPromptProvider.class);
     private final SkillPromptRegistry skillPromptRegistry = mock(SkillPromptRegistry.class);
-    private final PromptComposer promptComposer = new PromptComposer(systemPromptProvider, skillPromptRegistry);
+    private final AgentToolDefinitionSource toolDefinitionSource = mock(AgentToolDefinitionSource.class);
+    private final PromptComposer promptComposer = new PromptComposer(systemPromptProvider, skillPromptRegistry, toolDefinitionSource);
 
     @Test
     void should_keep_user_request_out_of_prompt_preview_and_expose_skill_catalog_only() {
@@ -69,12 +71,14 @@ class PromptComposerTest {
         verify(skillPromptRegistry, never()).load("writer");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "skill-catalog", "context-package");
+                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::source)
                 .containsExactly(
                         "prompts/agent/system/execution/default/00-base-role.md",
-                        "skill-catalog:writer,planner,checker",
+                        "tool-catalog:",
+                        "skill-catalog:checker,planner,writer",
+                        "context-epoch-core:entries=0",
                         "context-package:sources=1/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
                 );
     }
@@ -106,7 +110,7 @@ class PromptComposerTest {
         verify(skillPromptRegistry, never()).load("checker");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "skill-catalog", "context-package");
+                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
     }
 
     @Test
@@ -189,12 +193,14 @@ class PromptComposerTest {
 
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "skill-catalog", "context-package");
+                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::source)
                 .containsExactly(
                         "prompts/agent/system/execution/default/00-base-role.md,prompts/agent/system/execution/default/10-writing-rules.md",
+                        "tool-catalog:",
                         "skill-catalog:editor",
+                        "context-epoch-core:entries=0",
                         "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
                 );
     }

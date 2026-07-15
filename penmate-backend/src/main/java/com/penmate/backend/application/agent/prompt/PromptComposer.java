@@ -2,6 +2,7 @@ package com.penmate.backend.application.agent.prompt;
 
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -18,11 +19,14 @@ public class PromptComposer {
 
     private final SystemPromptProvider systemPromptProvider;
     private final SkillPromptRegistry skillPromptRegistry;
+    private final AgentToolDefinitionSource toolDefinitionSource;
 
     public PromptComposer(SystemPromptProvider systemPromptProvider,
-                          SkillPromptRegistry skillPromptRegistry) {
+                          SkillPromptRegistry skillPromptRegistry,
+                          AgentToolDefinitionSource toolDefinitionSource) {
         this.systemPromptProvider = systemPromptProvider;
         this.skillPromptRegistry = skillPromptRegistry;
+        this.toolDefinitionSource = toolDefinitionSource;
     }
 
     public PromptPlan compose(TaskProfile taskProfile,
@@ -33,7 +37,8 @@ public class PromptComposer {
 
         SystemPromptBundle executionBundle = systemPromptProvider.loadBundle("execution", finalProfile);
         List<PromptModulePlan> modules = new ArrayList<>();
-        List<String> previewSections = new ArrayList<>();
+        List<String> stableSections = new ArrayList<>();
+        List<String> dynamicSections = new ArrayList<>();
 
         modules.add(new PromptModulePlan(
                 "execution:" + finalProfile,
@@ -41,12 +46,25 @@ public class PromptComposer {
                 true,
                 "Execution base module for task profile=" + finalProfile
         ));
-        previewSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
+        stableSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
+
+        var registeredTools = toolDefinitionSource.listLlmSchemas();
+        var toolSchemas = (registeredTools == null ? List.<com.penmate.backend.application.agent.llm.AgentLlmToolSchema>of() : registeredTools).stream()
+                .sorted(java.util.Comparator.comparing(schema -> normalize(schema.toolCode())))
+                .toList();
+        modules.add(new PromptModulePlan(
+                "tool-catalog",
+                "tool-catalog:" + toolSchemas.stream().map(schema -> normalize(schema.toolCode())).collect(Collectors.joining(",")),
+                true,
+                "Stable deterministically ordered tool schemas"
+        ));
+        stableSections.add(buildToolCatalogPreview(toolSchemas));
 
         List<String> profileSkills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
         List<SkillCatalogItem> availableSkills = skillPromptRegistry.listAvailableSkills().stream()
                 .map(this::normalizeSkillCatalogItem)
                 .filter(skill -> !skill.name().isEmpty())
+                .sorted(java.util.Comparator.comparing(SkillCatalogItem::name))
                 .toList();
         modules.add(new PromptModulePlan(
                 "skill-catalog",
@@ -56,32 +74,54 @@ public class PromptComposer {
                 true,
                 "Progressively disclosed skill catalog; full content is loaded through skill_load"
         ));
-        previewSections.add(buildSkillCatalogPreview(availableSkills));
+        stableSections.add(buildSkillCatalogPreview(availableSkills));
+
+        modules.add(new PromptModulePlan(
+                "context-epoch-core",
+                "context-epoch-core:entries=" + normalizedContext.coreStoryBibleEntries().size(),
+                true,
+                "Immutable Context Epoch core Story Bible"
+        ));
+        stableSections.add(String.join("\n", normalizedContext.coreStoryBibleEntries()));
 
         modules.add(new PromptModulePlan(
                 "context-package",
                 describeContext(normalizedContext),
-                true,
-                "Consumes pre-built context package only"
+                false,
+                "Dynamic history, Working Set and selected Story Bible context"
         ));
-        previewSections.add(buildContextPreview(normalizedContext));
+        dynamicSections.add(buildDynamicContextPreview(normalizedContext));
+
+        String stablePrefix = stableSections.stream().filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"));
+        String dynamicContext = dynamicSections.stream().filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"));
 
         return new PromptPlan(
                 modules,
                 profileSkills,
                 finalProfile,
-                previewSections.stream()
-                        .filter(section -> !section.isBlank())
-                        .collect(Collectors.joining("\n\n"))
+                stablePrefix,
+                dynamicContext,
+                java.util.stream.Stream.of(stablePrefix, dynamicContext)
+                        .filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"))
         );
     }
 
-    private String buildContextPreview(ContextPackage contextPackage) {
+    private String buildDynamicContextPreview(ContextPackage contextPackage) {
         StringJoiner joiner = new StringJoiner("\n");
-        contextPackage.storyBibleEntries().forEach(joiner::add);
+        if (!contextPackage.styleSnapshot().isBlank()) joiner.add(contextPackage.styleSnapshot());
+        contextPackage.workingSetEntries().forEach(joiner::add);
+        contextPackage.selectedStoryBibleEntries().forEach(joiner::add);
         contextPackage.conflicts().forEach(joiner::add);
         contextPackage.missingContextFlags().forEach(joiner::add);
         return joiner.toString().trim();
+    }
+
+    private String buildToolCatalogPreview(List<com.penmate.backend.application.agent.llm.AgentLlmToolSchema> schemas) {
+        if (schemas.isEmpty()) return "Available tools:\n- none";
+        return "Available tools:\n" + schemas.stream()
+                .map(schema -> "- " + normalize(schema.toolCode()) + ": " + normalize(schema.description())
+                        + "\n  parameters: " + normalize(schema.parametersJsonSchema()))
+                .collect(Collectors.joining("\n"));
     }
 
     private String describeContext(ContextPackage contextPackage) {

@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
@@ -11,6 +12,8 @@ import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationSer
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmMessageRole;
+import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
+import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -121,5 +124,54 @@ class AgentRunLlmLoopTest {
         assertThat(secondTurnMessages.get(2).role()).isEqualTo(AgentLlmMessageRole.TOOL);
         assertThat(secondTurnMessages.get(2).toolCallId()).isEqualTo("call-1");
         assertThat(secondTurnMessages.get(2).content()).isEqualTo("Error: Unknown error");
+    }
+
+    @Test
+    void resume_should_execute_remaining_sibling_tool_calls_before_requesting_the_llm_again() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        List<AgentLlmToolCallPayload> calls = List.of(
+                new AgentLlmToolCallPayload("call-1", "function", "story_bible_update", "{\"operation\":\"batch\"}"),
+                new AgentLlmToolCallPayload("call-2", "function", "story_bible_search", "{\"query\":\"Mira\"}")
+        );
+        List<AgentLlmMessage> savedMessages = List.of(
+                AgentLlmMessage.user("Update and inspect Mira"),
+                AgentLlmMessage.assistant("", calls)
+        );
+        AgentRunPendingApproval pending = new AgentRunPendingApproval(
+                1L, 88001L, 88001L, 70001L, 101L, 90001L, 50001L,
+                "call-1", "story_bible_update", "{\"operation\":\"batch\"}",
+                "{\"llmTurnIndex\":1,\"tokenUsage\":{\"promptTokens\":3,\"completionTokens\":2,\"totalTokens\":5},\"assistantText\":\"\"}",
+                objectMapper.writeValueAsString(savedMessages), "70001:call-1", "APPROVED",
+                201L, "trace-1", null, null
+        );
+        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
+        when(toolCallService.executeToolCall(any())).thenReturn(
+                ToolCallResult.success("{\"updated\":true}"),
+                ToolCallResult.success("{\"matches\":[\"Mira\"]}")
+        );
+        when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
+                "stop", "Done", List.of(), "{}", new LlmTokenUsage(4, 1, 5)));
+        AgentRunLlmLoop loop = new AgentRunLlmLoop(
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService);
+
+        AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
+                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L
+        ), pending);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        assertThat(result.finalAssistantText()).isEqualTo("Done");
+        ArgumentCaptor<com.penmate.backend.application.agent.tool.runtime.ToolCallRequest> toolRequests =
+                ArgumentCaptor.forClass(com.penmate.backend.application.agent.tool.runtime.ToolCallRequest.class);
+        verify(toolCallService, org.mockito.Mockito.times(2)).executeToolCall(toolRequests.capture());
+        assertThat(toolRequests.getAllValues()).extracting(
+                com.penmate.backend.application.agent.tool.runtime.ToolCallRequest::toolCallId)
+                .containsExactly("call-1", "call-2");
+
+        ArgumentCaptor<AgentLlmTurnRequest> llmRequest = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway).generateTurn(llmRequest.capture(), any());
+        assertThat(llmRequest.getValue().messages()).hasSize(4);
+        assertThat(llmRequest.getValue().messages().get(2).toolCallId()).isEqualTo("call-1");
+        assertThat(llmRequest.getValue().messages().get(3).toolCallId()).isEqualTo("call-2");
     }
 }

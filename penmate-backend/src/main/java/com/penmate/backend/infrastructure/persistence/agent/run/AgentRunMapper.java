@@ -12,12 +12,12 @@ public interface AgentRunMapper {
     @Insert("""
             INSERT INTO agent_runs(
                 run_id, project_id, session_id, turn_id, owner_user_id,
-                run_status, run_phase, active_approval_id, latest_event_seq,
+                run_status, run_phase, context_epoch_id, active_approval_id, latest_event_seq,
                 latest_checkpoint_id, trace_id, started_at, finished_at
             )
             VALUES(
                 #{runId}, #{projectId}, #{sessionId}, #{turnId}, #{ownerUserId},
-                #{runStatus}, #{runPhase}, #{activeApprovalId}, #{latestEventSeq},
+                #{runStatus}, #{runPhase}, #{contextEpochId}, #{activeApprovalId}, #{latestEventSeq},
                 #{latestCheckpointId}, #{traceId}, #{startedAt}, #{finishedAt}
             )
             """)
@@ -60,6 +60,7 @@ public interface AgentRunMapper {
                 owner_user_id AS ownerUserId,
                 run_status AS runStatus,
                 run_phase AS runPhase,
+                context_epoch_id AS contextEpochId,
                 active_approval_id AS activeApprovalId,
                 latest_event_seq AS latestEventSeq,
                 latest_checkpoint_id AS latestCheckpointId,

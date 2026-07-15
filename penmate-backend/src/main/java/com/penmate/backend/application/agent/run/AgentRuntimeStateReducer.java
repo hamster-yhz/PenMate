@@ -34,7 +34,8 @@ public class AgentRuntimeStateReducer {
                     statusOrCurrent(state, payload),
                     text(payload, "phase", state.phase()),
                     event.sequence());
-            case "context.routing.completed" -> state.withLastEventSeq(event.sequence());
+            case "context.routing.completed", "context.epoch.bound" -> state.withLastEventSeq(event.sequence());
+            case "context.resolved", "prompt.composed" -> state.withArtifactAdded(longValue(payload, "artifactId"), event.sequence());
             case "llm.turn.started" -> state.withLlmTurn(
                     intValue(payload, "llmTurnIndex"),
                     state.tokenUsage(),
@@ -121,6 +122,8 @@ public class AgentRuntimeStateReducer {
         int prompt = usage.has("promptTokens") ? usage.get("promptTokens").asInt() : 0;
         int completion = usage.has("completionTokens") ? usage.get("completionTokens").asInt() : 0;
         int total = usage.has("totalTokens") ? usage.get("totalTokens").asInt() : 0;
-        return current.add(new LlmTokenUsage(prompt, completion, total));
+        int cached = usage.has("cachedPromptTokens") ? usage.get("cachedPromptTokens").asInt() : 0;
+        int cacheCreation = usage.has("cacheCreationPromptTokens") ? usage.get("cacheCreationPromptTokens").asInt() : 0;
+        return current.add(new LlmTokenUsage(prompt, completion, total, cached, cacheCreation));
     }
 }

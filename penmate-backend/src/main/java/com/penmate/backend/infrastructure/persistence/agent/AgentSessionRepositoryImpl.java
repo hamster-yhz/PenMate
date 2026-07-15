@@ -140,6 +140,16 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
         return agentSessionMapper.insertStyleBinding(businessIdGenerator.nextId(), sessionId, styleId);
     }
 
+    @Override
+    public int deactivateStyleBindings(Long sessionId) {
+        return agentSessionMapper.deactivateStyleBindings(sessionId);
+    }
+
+    @Override
+    public Long findActiveStyleBindingRevision(Long sessionId) {
+        return agentSessionMapper.findActiveStyleBindingRevision(sessionId);
+    }
+
     private AgentSession toSession(Map<String, Object> row) {
         AgentSession session = AgentSession.active(
                 longValue(valueOf(row, "sessionId")),
@@ -150,7 +160,9 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
         setField(session, "id", longValue(valueOf(row, "id")));
         setField(session, "sessionStatus", stringValue(valueOf(row, "sessionStatus")));
         setField(session, "boundStyleId", longValue(valueOf(row, "boundStyleId")));
-        setField(session, "activeContextVersion", intValue(valueOf(row, "activeContextVersion")));
+        setField(session, "storyBibleRoutingMode", stringValue(valueOf(row, "storyBibleRoutingMode")));
+        setField(session, "routerModelConfigId", longValue(valueOf(row, "routerModelConfigId")));
+        setField(session, "activeContextEpochId", longValue(valueOf(row, "activeContextEpochId")));
         setField(session, "lastTurnId", longValue(valueOf(row, "lastTurnId")));
         setField(session, "lastRunId", longValue(valueOf(row, "lastRunId")));
         setField(session, "lastRunStatus", null);

@@ -51,6 +51,19 @@ public interface AgentRunPendingApprovalMapper {
             """)
     AgentRunPendingApproval findByApprovalId(@Param("approvalId") Long approvalId);
 
+    @Select("""
+            SELECT id, pending_approval_id AS pendingApprovalId, approval_id AS approvalId, run_id AS runId,
+                   project_id AS projectId, session_id AS sessionId, turn_id AS turnId,
+                   tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
+                   tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
+                   idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
+                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt
+            FROM agent_run_pending_approvals
+            WHERE run_id = #{runId} AND pending_status = 'APPROVED'
+            ORDER BY updated_at DESC, id DESC LIMIT 1
+            """)
+    AgentRunPendingApproval findApprovedByRunId(Long runId);
+
     @Update("""
             UPDATE agent_run_pending_approvals
             SET pending_status = #{targetStatus},

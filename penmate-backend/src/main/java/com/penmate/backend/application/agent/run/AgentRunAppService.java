@@ -35,6 +35,7 @@ public class AgentRunAppService {
                 "PENDING",
                 "created",
                 null,
+                null,
                 0L,
                 null,
                 command.traceId(),

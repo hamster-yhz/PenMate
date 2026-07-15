@@ -56,7 +56,7 @@ public class AgentToolGovernanceService {
         pendingApprovalRepository.save(new AgentRunPendingApproval(
                 null,
                 approvalRequest.getApprovalRequestId(),
-                approvalRequest.getId(),
+                approvalRequest.getApprovalRequestId(),
                 request.runId(),
                 request.projectId(),
                 request.sessionId(),
@@ -73,6 +73,6 @@ public class AgentToolGovernanceService {
                 null,
                 null
         ));
-        return AgentToolGovernanceDecision.waitingApproval(approvalRequest.getId());
+        return AgentToolGovernanceDecision.waitingApproval(approvalRequest.getApprovalRequestId());
     }
 }

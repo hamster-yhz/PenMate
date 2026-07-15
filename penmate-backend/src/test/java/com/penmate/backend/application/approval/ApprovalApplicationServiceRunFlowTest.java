@@ -8,6 +8,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.approval.repository.ApprovalRequestRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -31,7 +32,8 @@ class ApprovalApplicationServiceRunFlowTest {
                 approvalRequestRepository,
                 pendingApprovalRepository,
                 eventPublisher,
-                runResumeDispatcher
+                runResumeDispatcher,
+                mock(BusinessIdGenerator.class)
         );
         ApprovalRequest approval = approvalRequest(88001L, 70001L);
         AgentRunPendingApproval pending = pendingApproval(88001L, 70001L);
@@ -57,7 +59,8 @@ class ApprovalApplicationServiceRunFlowTest {
                 approvalRequestRepository,
                 pendingApprovalRepository,
                 eventPublisher,
-                runResumeDispatcher
+                runResumeDispatcher,
+                mock(BusinessIdGenerator.class)
         );
         ApprovalRequest approval = approvalRequest(88001L, 70001L);
         approval.setStatus("approved");
@@ -77,17 +80,19 @@ class ApprovalApplicationServiceRunFlowTest {
         AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);
         AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
         AgentRunResumeDispatcher runResumeDispatcher = mock(AgentRunResumeDispatcher.class);
+        BusinessIdGenerator businessIdGenerator = mock(BusinessIdGenerator.class);
         ApprovalApplicationService service = new ApprovalApplicationService(
                 approvalRequestRepository,
                 pendingApprovalRepository,
                 eventPublisher,
-                runResumeDispatcher
+                runResumeDispatcher,
+                businessIdGenerator
         );
+        when(businessIdGenerator.nextId()).thenReturn(88001L);
 
         when(approvalRequestRepository.insert(any())).thenAnswer(invocation -> {
             ApprovalRequest request = invocation.getArgument(0);
             request.setId(1L);
-            request.setApprovalRequestId(88001L);
             request.setStatus("pending");
             return 1;
         });

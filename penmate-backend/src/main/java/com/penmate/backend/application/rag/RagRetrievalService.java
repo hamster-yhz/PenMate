@@ -31,22 +31,6 @@ public class RagRetrievalService {
         return persistRetrievalLog(projectId, runId, query, traceId, startAt, chunks);
     }
 
-    public RetrievalResult retrieve(HybridRagQuery query, String traceId) {
-        long startAt = System.currentTimeMillis();
-        List<RagRetrievedChunk> chunks = ragRetrievalRepository.searchChunks(
-                query.projectId(),
-                query.queryText(),
-                query.topK(),
-                query.chapterId(),
-                query.storyBibleVersion(),
-                joinEntities(query.userMentionedEntities()),
-                joinCsv(query.activatedSkills()),
-                joinCsv(query.intentTags()),
-                query.searchScope() == null ? null : query.searchScope().name()
-        );
-        return persistRetrievalLog(query.projectId(), query.runId(), query.queryText(), traceId, startAt, chunks);
-    }
-
     public List<RagRetrievalLog> listRetrievalLogs(Long projectId) {
         return ragRetrievalRepository.listRetrievalLogs(projectId);
     }
@@ -69,26 +53,6 @@ public class RagRetrievalService {
         retrievalLog.setTraceId(traceId);
         ragRetrievalRepository.insertRetrievalLog(retrievalLog);
         return new RetrievalResult(chunks, retrievalLog.getId());
-    }
-
-    private String joinEntities(List<String> entities) {
-        return joinValues(entities, "|");
-    }
-
-    private String joinCsv(List<String> values) {
-        return joinValues(values, ",");
-    }
-
-    private String joinValues(List<String> values, String delimiter) {
-        if (values == null || values.isEmpty()) {
-            return null;
-        }
-        return values.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(String::trim)
-                .distinct()
-                .reduce((left, right) -> left + delimiter + right)
-                .orElse(null);
     }
 
     private String toSourcesJson(List<RagRetrievedChunk> chunks) {

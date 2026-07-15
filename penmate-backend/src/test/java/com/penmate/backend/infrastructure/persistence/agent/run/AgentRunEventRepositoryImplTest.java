@@ -104,21 +104,7 @@ class AgentRunEventRepositoryImplTest {
     private void recreateSchema(DataSource dataSource) throws Exception {
         try (Connection connection = dataSource.getConnection();
             Statement statement = connection.createStatement()) {
-            statement.execute("DROP TABLE IF EXISTS flyway_schema_history");
-            statement.execute("DROP TABLE IF EXISTS agent_events");
-            statement.execute("DROP TABLE IF EXISTS agent_run_inputs");
-            statement.execute("DROP TABLE IF EXISTS agent_artifacts");
-            statement.execute("DROP TABLE IF EXISTS agent_todo_projections");
-            statement.execute("DROP TABLE IF EXISTS agent_tool_call_projections");
-            statement.execute("DROP TABLE IF EXISTS agent_run_projections");
-            statement.execute("DROP TABLE IF EXISTS agent_checkpoints");
-            statement.execute("DROP TABLE IF EXISTS agent_runs");
-            statement.execute("DROP TABLE IF EXISTS agent_messages");
-            statement.execute("DROP TABLE IF EXISTS agent_turns");
-            statement.execute("DROP TABLE IF EXISTS agent_session_style_bindings");
-            statement.execute("DROP TABLE IF EXISTS agent_sessions");
-            statement.execute("DROP TABLE IF EXISTS ops_async_jobs");
-            statement.execute("DROP TABLE IF EXISTS ops_migrations");
+            statement.execute("DROP ALL OBJECTS");
         }
         prepareMigration();
         Flyway.configure()

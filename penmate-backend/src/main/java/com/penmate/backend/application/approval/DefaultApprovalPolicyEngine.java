@@ -28,6 +28,10 @@ public class DefaultApprovalPolicyEngine {
         if (descriptor == null || request == null) {
             throw new IllegalArgumentException("descriptor and request must not be null");
         }
+        if ("APPROVED".equals(request.resumeMode())
+                && request.approvalSummaryJson() != null && !request.approvalSummaryJson().isBlank()) {
+            return new ApprovalPolicyDecision(false, "");
+        }
         log.debug("开始评估审批策略: toolCode={}, traceId={}", descriptor.toolCode(), request.traceId());
 
         ToolGovernancePolicy governancePolicy = descriptor.governancePolicy();

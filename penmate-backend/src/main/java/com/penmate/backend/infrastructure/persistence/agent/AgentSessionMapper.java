@@ -55,10 +55,11 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, active_context_version, last_turn_id, last_run_id, last_message_at, resumed_at
+                bound_style_id, story_bible_routing_mode, router_model_config_id, active_context_epoch_id,
+                last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{conversationId}, #{projectId}, #{userId}, #{title}, #{status},
-                NULL, 1, NULL, NULL, NULL, NULL
+                NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -72,7 +73,9 @@ public interface AgentSessionMapper {
                    title,
                    session_status,
                    bound_style_id,
-                   active_context_version,
+                   story_bible_routing_mode,
+                   router_model_config_id,
+                   active_context_epoch_id,
                    last_turn_id,
                    last_run_id,
                    resumed_at,
@@ -96,7 +99,9 @@ public interface AgentSessionMapper {
                    title AS title,
                    session_status AS sessionStatus,
                    bound_style_id AS boundStyleId,
-                   active_context_version AS activeContextVersion,
+                   story_bible_routing_mode AS storyBibleRoutingMode,
+                   router_model_config_id AS routerModelConfigId,
+                   active_context_epoch_id AS activeContextEpochId,
                    last_turn_id AS lastTurnId,
                    last_run_id AS lastRunId,
                    resumed_at AS resumedAt,
@@ -239,10 +244,12 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, active_context_version, last_turn_id, last_run_id, last_message_at, resumed_at
+                bound_style_id, story_bible_routing_mode, router_model_config_id, active_context_epoch_id,
+                last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{sessionId}, #{projectId}, #{ownerUserId}, #{title}, #{sessionStatus},
-                #{boundStyleId}, 1, #{lastTurnId}, #{lastRunId}, NULL, #{resumedAt}
+                #{boundStyleId}, #{storyBibleRoutingMode}, #{routerModelConfigId}, #{activeContextEpochId},
+                #{lastTurnId}, #{lastRunId}, NULL, #{resumedAt}
             )
             """)
     int insertSession(AgentSession session);
@@ -295,4 +302,20 @@ public interface AgentSessionMapper {
     int insertStyleBinding(@Param("bindingId") Long bindingId,
                            @Param("sessionId") Long sessionId,
                            @Param("styleId") Long styleId);
+
+    @Update("""
+            UPDATE agent_session_style_bindings
+            SET deactivated_at = CURRENT_TIMESTAMP(3)
+            WHERE session_id = #{sessionId} AND deactivated_at IS NULL
+            """)
+    int deactivateStyleBindings(@Param("sessionId") Long sessionId);
+
+    @Select("""
+            SELECT binding_id
+            FROM agent_session_style_bindings
+            WHERE session_id = #{sessionId} AND deactivated_at IS NULL
+            ORDER BY activated_at DESC, id DESC
+            LIMIT 1
+            """)
+    Long findActiveStyleBindingRevision(@Param("sessionId") Long sessionId);
 }

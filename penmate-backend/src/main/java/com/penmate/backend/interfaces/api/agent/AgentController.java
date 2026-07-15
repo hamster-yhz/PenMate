@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
+import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
@@ -17,12 +18,14 @@ import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.StoryBibleRoutingPreferenceDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,17 +46,63 @@ public class AgentController {
     private final AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
     private final AgentTurnAppService agentTurnAppService;
     private final AgentRunEventStreamService agentRunEventStreamService;
+    private final StoryBibleRoutingPreferenceResolver routingPreferences;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
                            AgentSessionTokenUsageAppService agentSessionTokenUsageAppService,
                            AgentTurnAppService agentTurnAppService,
-                           AgentRunEventStreamService agentRunEventStreamService) {
+                           AgentRunEventStreamService agentRunEventStreamService,
+                           StoryBibleRoutingPreferenceResolver routingPreferences) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
         this.agentTurnAppService = agentTurnAppService;
         this.agentRunEventStreamService = agentRunEventStreamService;
+        this.routingPreferences = routingPreferences;
+    }
+
+    @GetMapping("/routing-preference")
+    public ApiResponse<StoryBibleRoutingPreferenceDto.View> getUserRoutingPreference(
+            @PathVariable String projectId, @RequestParam String userId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        requireLongId(projectId, "projectId");
+        var result = routingPreferences.getUserDefault(requireLongId(userId, "userId"));
+        return ApiResponse.success(toRoutingView(result, false), traceId);
+    }
+
+    @PutMapping("/routing-preference")
+    public ApiResponse<StoryBibleRoutingPreferenceDto.View> updateUserRoutingPreference(
+            @PathVariable String projectId, @RequestParam String userId,
+            @RequestBody StoryBibleRoutingPreferenceDto.Update dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        requireLongId(projectId, "projectId");
+        Long parsedUserId = requireLongId(userId, "userId");
+        routingPreferences.saveUserDefault(parsedUserId, dto.mode(), optionalLongId(dto.routerModelConfigId(), "routerModelConfigId"));
+        return ApiResponse.success(toRoutingView(routingPreferences.getUserDefault(parsedUserId), false), traceId);
+    }
+
+    @GetMapping("/sessions/{sessionId}/routing-preference")
+    public ApiResponse<StoryBibleRoutingPreferenceDto.View> getSessionRoutingPreference(
+            @PathVariable String projectId, @PathVariable String sessionId, @RequestParam String userId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var result = routingPreferences.resolve(requireLongId(projectId, "projectId"),
+                requireLongId(sessionId, "sessionId"), requireLongId(userId, "userId"));
+        return ApiResponse.success(toRoutingView(result, !result.sessionOverride()), traceId);
+    }
+
+    @PutMapping("/sessions/{sessionId}/routing-preference")
+    public ApiResponse<StoryBibleRoutingPreferenceDto.View> updateSessionRoutingPreference(
+            @PathVariable String projectId, @PathVariable String sessionId, @RequestParam String userId,
+            @RequestBody StoryBibleRoutingPreferenceDto.Update dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long parsedProjectId = requireLongId(projectId, "projectId");
+        Long parsedSessionId = requireLongId(sessionId, "sessionId");
+        Long parsedUserId = requireLongId(userId, "userId");
+        routingPreferences.saveSessionOverride(parsedProjectId, parsedSessionId, parsedUserId, dto.mode(),
+                optionalLongId(dto.routerModelConfigId(), "routerModelConfigId"));
+        var result = routingPreferences.resolve(parsedProjectId, parsedSessionId, parsedUserId);
+        return ApiResponse.success(toRoutingView(result, !result.sessionOverride()), traceId);
     }
 
     /**
@@ -218,6 +267,12 @@ public class AgentController {
 
     private String stringifyBusinessId(Long value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private StoryBibleRoutingPreferenceDto.View toRoutingView(
+            StoryBibleRoutingPreferenceResolver.EffectivePreference value, boolean inherited) {
+        return new StoryBibleRoutingPreferenceDto.View(value.mode(), stringifyBusinessId(value.routerModelConfigId()),
+                value.routerModelConfigRevision(), inherited);
     }
 
     private AgentRecoverySnapshotDto toRecoveryDto(AgentRunRecoveryResult result) {

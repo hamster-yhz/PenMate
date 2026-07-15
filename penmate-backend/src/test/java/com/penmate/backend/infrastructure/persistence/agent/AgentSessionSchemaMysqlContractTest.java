@@ -38,7 +38,9 @@ class AgentSessionSchemaMysqlContractTest {
                 .contains(
                         "session_id",
                         "bound_style_id",
-                        "active_context_version",
+                        "story_bible_routing_mode",
+                        "router_model_config_id",
+                        "active_context_epoch_id",
                         "last_run_id",
                         "resumed_at",
                         "total_prompt_tokens",

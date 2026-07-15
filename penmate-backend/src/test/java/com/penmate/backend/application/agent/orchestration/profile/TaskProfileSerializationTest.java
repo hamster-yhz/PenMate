@@ -71,7 +71,7 @@ class TaskProfileSerializationTest {
         Map<String, Object> tree = objectMapper.readValue(json, Map.class);
         PromptPlan restored = objectMapper.readValue(json, PromptPlan.class);
 
-        assertThat(tree).containsOnlyKeys("modules", "skills", "finalProfile", "assembledPromptPreview");
+        assertThat(tree).containsOnlyKeys("modules", "skills", "finalProfile", "stablePrefix", "dynamicContext", "assembledPromptPreview");
         assertThat(tree.get("finalProfile")).isEqualTo("default");
         assertThat(tree.get("assembledPromptPreview")).isEqualTo("# assembled prompt preview");
         assertThat(restored).isEqualTo(plan);

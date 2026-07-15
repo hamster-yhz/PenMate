@@ -446,7 +446,8 @@ class DraftGenerationToolHandlerTest {
                 "revise"
         );
         ApprovalRequest approvalRequest = new ApprovalRequest();
-        approvalRequest.setId(55L);
+        approvalRequest.setId(1L);
+        approvalRequest.setApprovalRequestId(55L);
 
         when(toolDefinitionSource.getRequired("draft_generation")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(true, "DRAFT_REVIEW"));

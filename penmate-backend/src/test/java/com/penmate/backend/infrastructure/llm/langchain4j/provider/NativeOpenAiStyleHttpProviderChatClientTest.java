@@ -109,6 +109,25 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
     }
 
     @Test
+    void should_extract_cached_prompt_token_details_when_the_provider_reports_them() {
+        TestNativeClient client = new TestNativeClient();
+        AgentLlmTurnResponse response = client.extractTurnResponse("""
+                {
+                  "choices": [{"finish_reason":"stop","message":{"content":"ok"}}],
+                  "usage": {
+                    "prompt_tokens": 120,
+                    "completion_tokens": 8,
+                    "total_tokens": 128,
+                    "prompt_tokens_details": {"cached_tokens": 96},
+                    "cache_creation_input_tokens": 12
+                  }
+                }
+                """);
+
+        assertThat(response.tokenUsage()).isEqualTo(new LlmTokenUsage(120, 8, 128, 96, 12));
+    }
+
+    @Test
     void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_SHOULD_DEFAULT_MISSING_USAGE_FIELDS_TO_ZERO() {
         TestNativeClient client = new TestNativeClient();
         String responseBody = """

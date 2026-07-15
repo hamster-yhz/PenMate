@@ -1,7 +1,7 @@
 package com.penmate.backend.application.agent.orchestration.profile;
 
 import com.penmate.backend.application.agent.orchestration.preflight.AgentBehaviorType;
-import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightDecision;
+import com.penmate.backend.application.agent.context.AgentRouteDecision;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -17,7 +17,7 @@ public final class TaskProfileMapper {
     private TaskProfileMapper() {
     }
 
-    public static TaskProfile from(AgentPreflightDecision decision) {
+    public static TaskProfile from(AgentRouteDecision decision) {
         Objects.requireNonNull(decision, "decision");
         Set<TaskIntentTag> intentTags = new LinkedHashSet<>();
         for (String rawTag : decision.intentTags()) {

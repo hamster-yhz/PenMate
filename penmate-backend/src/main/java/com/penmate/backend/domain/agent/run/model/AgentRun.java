@@ -11,6 +11,7 @@ public record AgentRun(
         Long ownerUserId,
         String runStatus,
         String runPhase,
+        Long contextEpochId,
         Long activeApprovalId,
         Long latestEventSeq,
         Long latestCheckpointId,

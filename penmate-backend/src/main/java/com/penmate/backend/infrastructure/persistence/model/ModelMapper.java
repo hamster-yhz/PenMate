@@ -179,7 +179,8 @@ public interface ModelMapper {
                    muc.max_context_tokens AS maxContextTokens,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
                    CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
-                   muc.status AS status
+                   muc.status AS status,
+                   muc.updated_at AS updatedAt
             FROM model_user_configurations muc
             LEFT JOIN model_user_api_keys muk
                    ON muc.user_key_id = muk.user_api_key_id

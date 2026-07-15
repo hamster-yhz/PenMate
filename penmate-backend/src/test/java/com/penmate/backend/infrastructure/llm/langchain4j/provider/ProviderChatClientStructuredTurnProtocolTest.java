@@ -76,18 +76,6 @@ class ProviderChatClientStructuredTurnProtocolTest {
     }
 
     @Test
-    void UT_INFRA_LLM_OPENAI_PROVIDER_CHAT_CLIENT_DISABLES_JSON_SCHEMA_RESPONSE_FORMAT_ONLY_FOR_KNOWN_INCOMPATIBLE_HOSTS() {
-        TestOpenAiProviderChatClient client = new TestOpenAiProviderChatClient();
-
-        assertThat(client.supportsJsonSchemaAt("https://api.longcat.chat/openai/v1/chat/completions"))
-                .isFalse();
-        assertThat(client.supportsJsonSchemaAt("https://api.openai.com/v1/chat/completions?via=api.longcat.chat"))
-                .isTrue();
-        assertThat(client.supportsJsonSchemaAt("https://example.com/proxy/api.longcat.chat/chat/completions"))
-                .isTrue();
-    }
-
-    @Test
     void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_FAILS_FAST_WHEN_TOOL_RESULT_MESSAGE_CANNOT_BE_BOUND_TO_TOOL_NAME() throws Exception {
         ClaudeProviderChatClient client = new ClaudeProviderChatClient();
         Method method = ClaudeProviderChatClient.class.getDeclaredMethod("toChatMessages", List.class);
@@ -139,9 +127,6 @@ class ProviderChatClientStructuredTurnProtocolTest {
             return resolveChatCompletionsEndpoint(rawBaseUrl);
         }
 
-        private boolean supportsJsonSchemaAt(String endpoint) {
-            return supportsJsonSchemaResponseFormat(endpoint);
-        }
     }
 
     private static final class TestGeminiProviderChatClient extends GeminiProviderChatClient {

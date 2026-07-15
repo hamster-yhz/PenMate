@@ -58,10 +58,11 @@ public interface AgentMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, active_context_version, last_turn_id, last_run_id, last_message_at, resumed_at
+                bound_style_id, story_bible_routing_mode, router_model_config_id, active_context_epoch_id,
+                last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{conversationId}, #{projectId}, #{userId}, #{title}, #{status},
-                NULL, 1, NULL, NULL, NULL, NULL
+                NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")

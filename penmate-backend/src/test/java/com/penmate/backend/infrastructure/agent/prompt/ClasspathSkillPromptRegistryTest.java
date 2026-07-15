@@ -3,7 +3,10 @@ package com.penmate.backend.infrastructure.agent.prompt;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -78,5 +81,10 @@ class ClasspathSkillPromptRegistryTest {
             ClasspathMarkdownSystemPromptProvider.class
     })
     static class PromptComponentScanConfig {
+
+        @Bean
+        AgentToolDefinitionSource agentToolDefinitionSource() {
+            return new InMemoryAgentToolDefinitionSource(java.util.List.of());
+        }
     }
 }

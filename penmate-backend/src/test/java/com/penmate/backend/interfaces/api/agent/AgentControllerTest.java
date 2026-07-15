@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
+import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
@@ -44,6 +45,8 @@ class AgentControllerTest {
     private AgentTurnAppService agentTurnAppService;
     @Mock
     private AgentRunEventStreamService agentRunEventStreamService;
+    @Mock
+    private StoryBibleRoutingPreferenceResolver routingPreferences;
     @InjectMocks
     private AgentController agentController;
 

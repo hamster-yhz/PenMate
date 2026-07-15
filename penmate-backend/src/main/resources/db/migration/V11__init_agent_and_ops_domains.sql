@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     title VARCHAR(200) NOT NULL,
     session_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     bound_style_id BIGINT UNSIGNED NULL,
-    active_context_version INT NOT NULL DEFAULT 1,
+    story_bible_routing_mode VARCHAR(32) NULL,
+    router_model_config_id BIGINT UNSIGNED NULL,
+    active_context_epoch_id BIGINT UNSIGNED NULL,
     last_turn_id BIGINT UNSIGNED NULL,
     last_run_id BIGINT UNSIGNED NULL,
     last_message_at DATETIME(3) NULL,
@@ -21,6 +23,55 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     KEY idx_agent_sessions_project_updated (project_id, updated_at),
     KEY idx_agent_sessions_project_status_deleted (project_id, session_status, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent sessions';
+
+CREATE TABLE IF NOT EXISTS agent_user_preferences (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    story_bible_routing_mode VARCHAR(32) NOT NULL DEFAULT 'RETRIEVAL_THEN_LLM',
+    router_model_config_id BIGINT UNSIGNED NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_agent_user_preferences_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='User-level Agent routing preferences';
+
+CREATE TABLE IF NOT EXISTS agent_context_epochs (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    epoch_id BIGINT UNSIGNED NOT NULL,
+    session_id BIGINT UNSIGNED NOT NULL,
+    epoch_no INT UNSIGNED NOT NULL,
+    fingerprint CHAR(64) NOT NULL,
+    story_bible_revision BIGINT UNSIGNED NOT NULL,
+    manuscript_revision BIGINT UNSIGNED NOT NULL,
+    active_chapter_id BIGINT UNSIGNED NULL,
+    style_binding_revision BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    routing_mode VARCHAR(32) NOT NULL,
+    router_model_config_id BIGINT UNSIGNED NULL,
+    router_model_config_revision BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    prompt_bundle_hash CHAR(64) NOT NULL,
+    skill_catalog_hash CHAR(64) NOT NULL,
+    tool_catalog_hash CHAR(64) NOT NULL,
+    snapshot_object_key VARCHAR(500) NOT NULL,
+    snapshot_hash CHAR(64) NOT NULL,
+    snapshot_size_bytes BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    superseded_at DATETIME(3) NULL,
+    UNIQUE KEY uk_agent_context_epochs_epoch_id (epoch_id),
+    UNIQUE KEY uk_agent_context_epochs_session_no (session_id, epoch_no),
+    KEY idx_agent_context_epochs_session_fingerprint (session_id, fingerprint, superseded_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Immutable session context epochs';
+
+CREATE TABLE IF NOT EXISTS agent_session_working_set (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    session_id BIGINT UNSIGNED NOT NULL,
+    node_id BIGINT UNSIGNED NOT NULL,
+    activation_score DECIMAL(12,6) NOT NULL DEFAULT 0,
+    last_used_turn_id BIGINT UNSIGNED NULL,
+    use_count INT UNSIGNED NOT NULL DEFAULT 0,
+    pinned TINYINT(1) NOT NULL DEFAULT 0,
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_agent_session_working_set_node (session_id, node_id),
+    KEY idx_agent_session_working_set_eviction (session_id, pinned, last_used_turn_id, activation_score)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Mutable Story Bible working set';
 
 CREATE TABLE IF NOT EXISTS agent_turns (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -69,6 +120,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     owner_user_id BIGINT UNSIGNED NOT NULL,
     run_status VARCHAR(32) NOT NULL,
     run_phase VARCHAR(64) NOT NULL,
+    context_epoch_id BIGINT UNSIGNED NULL,
     active_approval_id BIGINT UNSIGNED NULL,
     latest_event_seq BIGINT UNSIGNED NOT NULL DEFAULT 0,
     latest_checkpoint_id BIGINT UNSIGNED NULL,
@@ -80,7 +132,8 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     UNIQUE KEY uk_agent_runs_run_id (run_id),
     UNIQUE KEY uk_agent_runs_turn_id (turn_id),
     KEY idx_agent_runs_session_updated (session_id, updated_at),
-    KEY idx_agent_runs_project_status (project_id, run_status)
+    KEY idx_agent_runs_project_status (project_id, run_status),
+    KEY idx_agent_runs_context_epoch (context_epoch_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent run execution aggregate';
 
 CREATE TABLE IF NOT EXISTS agent_run_inputs (

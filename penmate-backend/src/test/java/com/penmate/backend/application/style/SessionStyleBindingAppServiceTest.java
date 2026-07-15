@@ -39,6 +39,7 @@ class SessionStyleBindingAppServiceTest {
 
         ArgumentCaptor<Long> styleCaptor = ArgumentCaptor.forClass(Long.class);
         verify(agentSessionRepository).updateBoundStyle(101L, 90001L, 81L, 201L);
+        verify(agentSessionRepository).deactivateStyleBindings(90001L);
         verify(agentSessionRepository).insertStyleBinding(
                 eq(101L),
                 eq(90001L),

@@ -33,6 +33,9 @@ class ContextPackageContractTest {
                 "missingContextFlags",
                 "conflicts",
                 "storyBibleEntries",
+                "coreStoryBibleEntries",
+                "workingSetEntries",
+                "selectedStoryBibleEntries",
                 "ragRefs",
                 "styleSnapshot",
                 "chapterScope"
@@ -62,6 +65,9 @@ class ContextPackageContractTest {
                 "missingContextFlags",
                 "conflicts",
                 "storyBibleEntries",
+                "coreStoryBibleEntries",
+                "workingSetEntries",
+                "selectedStoryBibleEntries",
                 "ragRefs",
                 "styleSnapshot",
                 "chapterScope"
@@ -70,6 +76,9 @@ class ContextPackageContractTest {
         assertThat(tree.get("missingContextFlags")).isEqualTo(List.of());
         assertThat(tree.get("conflicts")).isEqualTo(List.of());
         assertThat(tree.get("storyBibleEntries")).isEqualTo(List.of());
+        assertThat(tree.get("coreStoryBibleEntries")).isEqualTo(List.of());
+        assertThat(tree.get("workingSetEntries")).isEqualTo(List.of());
+        assertThat(tree.get("selectedStoryBibleEntries")).isEqualTo(List.of());
         assertThat(tree.get("ragRefs")).isEqualTo(List.of());
     }
 

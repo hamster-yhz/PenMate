@@ -1,7 +1,7 @@
 package com.penmate.backend.application.agent.orchestration.profile;
 
 import com.penmate.backend.application.agent.orchestration.preflight.AgentBehaviorType;
-import com.penmate.backend.application.agent.orchestration.preflight.AgentPreflightDecision;
+import com.penmate.backend.application.agent.context.AgentRouteDecision;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
@@ -14,7 +14,7 @@ class TaskProfileMapperTest {
 
     @Test
     void should_map_structured_preflight_decision_into_stable_task_profile() {
-        AgentPreflightDecision decision = newDecision(
+        AgentRouteDecision decision = newDecision(
                 AgentBehaviorType.WRITE,
                 "default",
                 true,
@@ -52,7 +52,7 @@ class TaskProfileMapperTest {
 
     @Test
     void should_append_story_bible_query_and_clarification_intents_from_decision_flags() {
-        AgentPreflightDecision decision = newDecision(
+        AgentRouteDecision decision = newDecision(
                 AgentBehaviorType.STORY_BIBLE_QUERY_CANDIDATE,
                 "default",
                 false,
@@ -84,7 +84,7 @@ class TaskProfileMapperTest {
 
     @Test
     void should_reject_unknown_intent_tag_values_from_preflight_decision() {
-        AgentPreflightDecision decision = newDecision(
+        AgentRouteDecision decision = newDecision(
                 AgentBehaviorType.WRITE,
                 "default",
                 false,
@@ -107,7 +107,7 @@ class TaskProfileMapperTest {
                 .hasMessageContaining("UNKNOWN_TAG");
     }
 
-    private static AgentPreflightDecision newDecision(AgentBehaviorType behaviorType,
+    private static AgentRouteDecision newDecision(AgentBehaviorType behaviorType,
                                                       String executionPromptProfile,
                                                       boolean includeStyleContext,
                                                       boolean includeRagContext,
@@ -123,7 +123,7 @@ class TaskProfileMapperTest {
                                                       boolean needsStoryBibleUpdate,
                                                       boolean needsClarification) {
         try {
-            Constructor<AgentPreflightDecision> constructor = AgentPreflightDecision.class.getDeclaredConstructor(
+            Constructor<AgentRouteDecision> constructor = AgentRouteDecision.class.getDeclaredConstructor(
                     AgentBehaviorType.class,
                     String.class,
                     boolean.class,
@@ -158,7 +158,7 @@ class TaskProfileMapperTest {
                     needsClarification
             );
         } catch (ReflectiveOperationException ex) {
-            throw new AssertionError("Expected extended AgentPreflightDecision constructor to exist", ex);
+            throw new AssertionError("Expected extended AgentRouteDecision constructor to exist", ex);
         }
     }
 }

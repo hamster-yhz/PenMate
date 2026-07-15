@@ -9,6 +9,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.approval.repository.ApprovalRequestRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -23,21 +24,25 @@ public class ApprovalApplicationService {
     private final AgentRunPendingApprovalRepository pendingApprovalRepository;
     private final AgentRunEventPublisher eventPublisher;
     private final AgentRunResumeDispatcher runResumeDispatcher;
+    private final BusinessIdGenerator businessIdGenerator;
 
     public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
                                       AgentRunPendingApprovalRepository pendingApprovalRepository,
                                       AgentRunEventPublisher eventPublisher,
-                                      AgentRunResumeDispatcher runResumeDispatcher) {
+                                      AgentRunResumeDispatcher runResumeDispatcher,
+                                      BusinessIdGenerator businessIdGenerator) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.pendingApprovalRepository = pendingApprovalRepository;
         this.eventPublisher = eventPublisher;
         this.runResumeDispatcher = runResumeDispatcher;
+        this.businessIdGenerator = businessIdGenerator;
     }
 
     public ApprovalRequest create(CreateApprovalCommand command, String traceId) {
         log.info("创建审批申请: projectId={}, runId={}, type={}, riskLevel={}, requestedBy={}",
                 command.projectId(), command.runId(), command.approvalType(), command.riskLevel(), command.requestedBy());
         ApprovalRequest request = new ApprovalRequest();
+        request.setApprovalRequestId(businessIdGenerator.nextId());
         request.setProjectId(command.projectId());
         request.setRunId(command.runId());
         request.setApprovalType(command.approvalType());
@@ -51,16 +56,17 @@ public class ApprovalApplicationService {
         }
         if (request.getRunId() != null) {
             eventPublisher.publish(request.getRunId(), "approval.requested", Map.of(
-                    "approvalId", request.getId(),
+                    "approvalId", request.getApprovalRequestId(),
                     "approvalType", request.getApprovalType(),
                     "riskLevel", request.getRiskLevel(),
                     "status", request.getStatus() == null ? "pending" : request.getStatus(),
                     "traceId", traceId
             ));
         }
-        writeAudit(traceId, command.requestedBy(), "approval", "create", "agent_approval_requests", String.valueOf(request.getId()), command.payloadJson(), 201);
+        writeAudit(traceId, command.requestedBy(), "approval", "create", "agent_approval_requests",
+                String.valueOf(request.getApprovalRequestId()), command.payloadJson(), 201);
         log.info("创建审批申请成功: approvalId={}, projectId={}, runId={}, status={}",
-                request.getId(), command.projectId(), command.runId(), request.getStatus());
+                request.getApprovalRequestId(), command.projectId(), command.runId(), request.getStatus());
         return request;
     }
 

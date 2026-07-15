@@ -10,14 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -219,55 +213,6 @@ public class RagApplicationService {
     }
 
     /**
-     * Hybrid RAG retrieval for agent context.
-     * <p>
-     * Story Bible is long-term canon knowledge, while RAG is only the retrieval mechanism.
-     * Retrieved references must still be normalized by Context Builder before entering prompt assembly.
-     */
-    public List<HybridRagResultView> hybridSearch(HybridRagQuery query, String traceId) {
-        if (query == null) {
-            return List.of();
-        }
-        log.info("Hybrid RAG 检索开始: projectId={}, sessionId={}, runId={}, chapterId={}, storyBibleVersion={}, topK={}, scope={}, skills={}, intentTags={}, entities={}",
-                query.projectId(),
-                query.sessionId(),
-                query.runId(),
-                query.chapterId(),
-                query.storyBibleVersion(),
-                query.topK(),
-                query.searchScope(),
-                query.activatedSkills(),
-                query.intentTags(),
-                query.userMentionedEntities());
-
-        RagRetrievalService.RetrievalResult retrievalResult = ragRetrievalService.retrieve(query, traceId);
-
-        List<HybridRagResultView> rankedResults = retrievalResult.chunks().stream()
-                .map(chunk -> toHybridRagResult(query, chunk))
-                .sorted(Comparator.comparingDouble(HybridRagResultView::relevanceScore).reversed()
-                        .thenComparing(HybridRagResultView::sourceId))
-                .limit(query.topK())
-                .toList();
-
-        long staleCount = rankedResults.stream().filter(HybridRagResultView::staleFlag).count();
-        Set<String> sources = rankedResults.stream()
-                .map(HybridRagResultView::sourceType)
-                .collect(LinkedHashSet::new, Set::add, Set::addAll);
-        log.info("Hybrid RAG 检索完成: projectId={}, runId={}, logId={}, hitCount={}, staleCount={}, topK={}, sources={}, filters=chapterId:{}|storyBibleVersion:{}|scope:{}",
-                query.projectId(),
-                query.runId(),
-                retrievalResult.logId(),
-                rankedResults.size(),
-                staleCount,
-                query.topK(),
-                sources,
-                query.chapterId(),
-                query.storyBibleVersion(),
-                query.searchScope());
-        return rankedResults;
-    }
-
-    /**
      * 查询项目检索日志（当前为占位实现）。
      *
      * @param projectId 入参：projectId
@@ -295,142 +240,6 @@ public class RagApplicationService {
                 "traceId", log.getTraceId() == null ? "" : log.getTraceId(),
                 "createdAt", log.getCreatedAt() == null ? "" : log.getCreatedAt().toString()
         );
-    }
-
-    private HybridRagResultView toHybridRagResult(HybridRagQuery query, com.penmate.backend.domain.rag.model.RagRetrievedChunk chunk) {
-        Map<String, String> metadata = parseChunkMetadata(chunk == null ? null : chunk.getContentText());
-        String sourceType = firstNonBlank(metadata.get("sourceType"), inferSourceType(chunk));
-        String sourceId = firstNonBlank(metadata.get("sourceId"), inferSourceId(chunk));
-        String content = firstNonBlank(metadata.get("content"), chunk == null ? null : chunk.getContentText());
-        Integer matchedVersion = parseInteger(metadata.get("matchedVersion"));
-        boolean staleFlag = query.storyBibleVersion() != null
-                && matchedVersion != null
-                && matchedVersion < query.storyBibleVersion();
-
-        List<String> reasons = new ArrayList<>();
-        double relevanceScore = 0.10D;
-        if ("story_bible".equalsIgnoreCase(sourceType)) {
-            relevanceScore += 0.35D;
-            reasons.add("story_bible");
-        }
-        if ("high".equalsIgnoreCase(metadata.get("canon")) || "story_bible".equalsIgnoreCase(sourceType)) {
-            relevanceScore += 0.25D;
-            reasons.add("canon");
-        }
-        if (query.chapterId() != null && String.valueOf(query.chapterId()).equals(normalize(metadata.get("chapter")))) {
-            relevanceScore += 0.15D;
-            reasons.add("chapter");
-        }
-        if (matchesExplicitMention(query.userMentionedEntities(), metadata, sourceId, content)) {
-            relevanceScore += 0.20D;
-            reasons.add("explicit");
-        }
-        if (hasCharacterOrForeshadowSignal(sourceId, content, metadata)) {
-            relevanceScore += 0.10D;
-            reasons.add("character");
-        }
-        if (staleFlag) {
-            relevanceScore -= 0.60D;
-            reasons.add("stale");
-            reasons.add("version_mismatch");
-        }
-        if (reasons.isEmpty()) {
-            reasons.add("keyword");
-        }
-        return new HybridRagResultView(
-                normalize(sourceType),
-                normalize(sourceId),
-                normalize(content),
-                String.join("+", reasons),
-                staleFlag,
-                matchedVersion,
-                relevanceScore
-        );
-    }
-
-    private Map<String, String> parseChunkMetadata(String rawContent) {
-        if (rawContent == null || rawContent.isBlank()) {
-            return Map.of();
-        }
-        Map<String, String> metadata = new LinkedHashMap<>();
-        String[] tokens = rawContent.split(";");
-        for (String token : tokens) {
-            int separatorIndex = token.indexOf('=');
-            if (separatorIndex <= 0) {
-                continue;
-            }
-            String key = token.substring(0, separatorIndex).trim();
-            String value = token.substring(separatorIndex + 1).trim();
-            if (!key.isEmpty()) {
-                metadata.put(key, value);
-            }
-        }
-        return metadata;
-    }
-
-    private boolean matchesExplicitMention(List<String> entities,
-                                           Map<String, String> metadata,
-                                           String sourceId,
-                                           String content) {
-        if (entities == null || entities.isEmpty()) {
-            return false;
-        }
-        String combined = (normalize(metadata.get("entity")) + " " + normalize(sourceId) + " " + normalize(content)).toLowerCase(Locale.ROOT);
-        for (String entity : entities) {
-            String normalizedEntity = normalize(entity).toLowerCase(Locale.ROOT);
-            if (!normalizedEntity.isEmpty() && combined.contains(normalizedEntity)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean hasCharacterOrForeshadowSignal(String sourceId,
-                                                   String content,
-                                                   Map<String, String> metadata) {
-        String normalizedSourceId = normalize(sourceId).toLowerCase(Locale.ROOT);
-        String normalizedContent = normalize(content).toLowerCase(Locale.ROOT);
-        return !normalize(metadata.get("entity")).isEmpty()
-                || normalizedSourceId.contains("character")
-                || normalizedSourceId.contains("hero")
-                || normalizedSourceId.contains("secret")
-                || normalizedContent.contains("伏笔");
-    }
-
-    private String inferSourceType(com.penmate.backend.domain.rag.model.RagRetrievedChunk chunk) {
-        String title = chunk == null ? "" : normalize(chunk.getDocumentTitle()).toLowerCase(Locale.ROOT);
-        if (title.startsWith("story_bible::")) {
-            return "story_bible";
-        }
-        if (title.startsWith("chapter::")) {
-            return "chapter";
-        }
-        return "document";
-    }
-
-    private String inferSourceId(com.penmate.backend.domain.rag.model.RagRetrievedChunk chunk) {
-        String title = chunk == null ? "" : normalize(chunk.getDocumentTitle());
-        if (title.contains("::")) {
-            return title.substring(title.indexOf("::") + 2);
-        }
-        return title;
-    }
-
-    private Integer parseInteger(String value) {
-        try {
-            return value == null || value.isBlank() ? null : Integer.parseInt(value.trim());
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
-
-    private String firstNonBlank(String primary, String fallback) {
-        String normalizedPrimary = normalize(primary);
-        return normalizedPrimary.isEmpty() ? normalize(fallback) : normalizedPrimary;
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim();
     }
 
     private void writeAudit(String traceId,

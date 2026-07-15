@@ -64,7 +64,7 @@ public class ToolCallApplicationService {
             pendingApprovalRepository.save(new AgentRunPendingApproval(
                     null,
                     approvalRequest.getApprovalRequestId(),
-                    approvalRequest.getId(),
+                    approvalRequest.getApprovalRequestId(),
                     request.runId(),
                     request.projectId(),
                     request.sessionId(),
@@ -73,7 +73,7 @@ public class ToolCallApplicationService {
                     request.toolCode(),
                     request.toolArgsJson(),
                     request.contextJson(),
-                    AgentJsonCodec.toJson(approvalView),
+                    request.conversationMessagesJson(),
                     request.idempotencyKey(),
                     "PENDING",
                     request.operatorId(),
@@ -82,8 +82,8 @@ public class ToolCallApplicationService {
                     null
             ));
             log.info("agent.tool.call.waiting_approval: toolCode={}, operationCode={}, approvalId={}, runId={}, traceId={}",
-                    request.toolCode(), operationCode, approvalRequest.getId(), request.runId(), request.traceId());
-            return ToolCallResult.waitingApproval(approvalRequest.getId());
+                    request.toolCode(), operationCode, approvalRequest.getApprovalRequestId(), request.runId(), request.traceId());
+            return ToolCallResult.waitingApproval(approvalRequest.getApprovalRequestId());
         }
         ToolCallResult result = toolCallExecutionService.execute(request);
         if (result != null && "SUCCESS".equals(result.status())) {

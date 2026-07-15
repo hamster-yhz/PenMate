@@ -101,7 +101,8 @@ public class AgentCheckpointService {
         if (event.eventType().equals("run.started")) {
             return true;
         }
-        if (event.eventType().equals("context.routing.completed")) {
+        if (event.eventType().equals("context.routing.completed") || event.eventType().equals("context.resolved")
+                || event.eventType().equals("prompt.composed")) {
             return true;
         }
         if (event.eventType().equals("tool.call.waiting_approval")) {

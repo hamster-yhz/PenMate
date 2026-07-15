@@ -65,7 +65,10 @@ class AgentToolGovernanceServiceTest {
 
         assertThat(decision.requiresApproval()).isTrue();
         assertThat(decision.approvalId()).isEqualTo(88001L);
-        verify(pendingApprovalRepository).save(any(AgentRunPendingApproval.class));
+        verify(pendingApprovalRepository).save(org.mockito.ArgumentMatchers.argThat(pending ->
+                Long.valueOf(88001L).equals(pending.approvalId())
+                        && Long.valueOf(88001L).equals(pending.pendingApprovalId())
+        ));
         verifyNoInteractions(agentRepository);
     }
 
@@ -101,7 +104,7 @@ class AgentToolGovernanceServiceTest {
 
     private ApprovalRequest approvalRequest(Long id) {
         ApprovalRequest request = new ApprovalRequest();
-        request.setId(id);
+        request.setId(99L);
         request.setApprovalRequestId(id);
         request.setProjectId(101L);
         request.setStatus("pending");

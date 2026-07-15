@@ -51,4 +51,8 @@ public interface AgentSessionRepository {
     int updateBoundStyle(Long projectId, Long sessionId, Long styleId, Long operatorId);
 
     int insertStyleBinding(Long projectId, Long sessionId, Long styleId, Long operatorId, String traceId);
+
+    int deactivateStyleBindings(Long sessionId);
+
+    Long findActiveStyleBindingRevision(Long sessionId);
 }
