@@ -22,6 +22,9 @@
         {{ busy ? '处理中...' : '❌ 拒绝' }}
       </button>
     </div>
+    <button v-if="card.toolCode === 'story_bible_update'" type="button" class="btn-open-bible" @click="emit('open-story-bible', targetNodeId)">
+      <BookOutlined /> 打开 Story Bible
+    </button>
     <div class="ac-resolved" v-else>
       <span :class="card.resolvedAction">
         {{ card.resolvedAction === 'approved' ? '✅ 已归档至数据库' : '❌ 已拒绝' }}
@@ -31,12 +34,19 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { BookOutlined } from '@ant-design/icons-vue'
 import type { ApprovalCardData } from './approvalCard.types'
 
-withDefaults(defineProps<{ card: ApprovalCardData; busy?: boolean }>(), {
+const props = withDefaults(defineProps<{ card: ApprovalCardData; busy?: boolean }>(), {
   busy: false
 })
-defineEmits(['approve', 'reject'])
+const emit = defineEmits<{
+  (event: 'approve', id: string): void
+  (event: 'reject', id: string): void
+  (event: 'open-story-bible', nodeId: string): void
+}>()
+const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.card.preview?.entityId || ''))
 </script>
 
 <style lang="less" scoped>
@@ -170,5 +180,16 @@ defineEmits(['approve', 'reject'])
 
   .approved { color: var(--jade-green); }
   .rejected { color: #e8a87c; }
+}
+
+.btn-open-bible {
+  width: 100%;
+  height: 30px;
+  margin-top: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: rgba(11, 17, 32, 0.46);
+  cursor: pointer;
 }
 </style>

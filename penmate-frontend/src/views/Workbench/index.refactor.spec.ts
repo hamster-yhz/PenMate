@@ -140,12 +140,10 @@ describe('Workbench index refactor', () => {
     expect(source).not.toContain('virtual-chapter-')
   })
 
-  it('wraps the workspace in a home-style atmospheric shell', () => {
+  it('keeps the operational workspace free of decorative orb layers', () => {
     const source = readWorkbenchSource()
 
-    expect(source).toContain('class="workbench-backdrop"')
-    expect(source).toContain('class="workbench-orb orb-left"')
-    expect(source).toContain('class="workbench-orb orb-right"')
+    expect(source).not.toContain('workbench-orb')
     expect(source).toContain('class="wb-main workbench-shell"')
   })
 

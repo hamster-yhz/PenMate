@@ -1,11 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, type Component } from 'vue'
 import { describe, expect, it } from 'vitest'
-
-const MissingChatMessageItem = defineComponent({
-  name: 'MissingChatMessageItem',
-  template: '<div data-testid="missing-chat-message-item"></div>',
-})
+import ChatMessageItem from './ChatMessageItem.vue'
 
 type ChatMessage = {
   id: number
@@ -24,15 +19,6 @@ type ChatMessage = {
   }
 }
 
-const loadChatMessageItem = async (): Promise<Component> => {
-  try {
-    const componentPath = './ChatMessageItem.vue'
-    return (await import(/* @vite-ignore */ componentPath)).default
-  } catch {
-    return MissingChatMessageItem
-  }
-}
-
 const mountChatMessageItem = async (
   overrides: Partial<{
     msg: ChatMessage
@@ -41,8 +27,6 @@ const mountChatMessageItem = async (
     approvalBusy: boolean
   }> = {},
 ) => {
-  const ChatMessageItem = await loadChatMessageItem()
-
   return mount(ChatMessageItem, {
     props: {
       msg: {

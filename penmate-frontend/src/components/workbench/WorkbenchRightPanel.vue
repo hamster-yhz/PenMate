@@ -35,6 +35,7 @@
           @replace-selected="emit('replace-selected', $event)"
           @approve="emit('approve', $event)"
           @reject="emit('reject', $event)"
+          @open-story-bible="emit('open-story-bible', $event)"
         />
       </div>
 
@@ -103,6 +104,7 @@ const emit = defineEmits<{
   (event: 'replace-selected', payload: ChatMessage): void
   (event: 'approve', payload: string): void
   (event: 'reject', payload: string): void
+  (event: 'open-story-bible', payload: string): void
   (event: 'update:chat-input', payload: string): void
   (event: 'send'): void
   (event: 'open-model-settings'): void

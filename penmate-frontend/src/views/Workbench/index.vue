@@ -1,10 +1,5 @@
 <template>
   <div class="workbench-page">
-    <div class="workbench-backdrop" aria-hidden="true">
-      <span class="workbench-orb orb-left"></span>
-      <span class="workbench-orb orb-right"></span>
-    </div>
-
     <WorkbenchHeader
       :novel-title="novelTitle"
       :word-count="wordCount"
@@ -13,6 +8,7 @@
       :user-email="userEmail"
       :user-menu-open="userMenuOpen"
       :can-access-rbac-admin="canAccessRbacAdmin"
+      :workbench-mode="workbenchMode"
       @go-home="router.push('/')"
       @update-title="updateTitle"
       @open-style-manager="showStyleManager = true"
@@ -24,24 +20,18 @@
       @go-mybooks="navigateFromUserMenu('/mybooks')"
       @go-rbac-admin="navigateFromUserMenu('/admin/rbac')"
       @logout="handleLogout"
+      @update:workbench-mode="setWorkbenchMode"
     />
 
     <div class="wb-main workbench-shell">
       <WorkbenchLeftPanel
+        v-if="workbenchMode === 'writing'"
         :collapsed="leftCollapsed"
         :left-tabs="leftTabs"
         :active-left-tab="activeLeftTab"
         :outline-data="outlineData"
         :active-chapter="activeChapter"
         :outline-op-busy="outlineOpBusy"
-        :character-cards="characterCards"
-        :world-cards="worldCards"
-        :project-cards="projectCards"
-        :card-relations="cardRelations"
-        :relation-from-id="relationFromId"
-        :relation-to-id="relationToId"
-        :relation-type="relationType"
-        :card-name-by-id="cardNameById"
         @toggle-collapse="leftCollapsed = !leftCollapsed"
         @update:active-left-tab="activeLeftTab = $event"
         @select-chapter="handleOutlineSelectChapter"
@@ -51,20 +41,10 @@
         @add-chapter="addChapter($event as any)"
         @delete-volume="deleteVolume($event as any)"
         @delete-chapter="deleteChapter($event as any)"
-        @create-character-card="createCardQuick('CHARACTER')"
-        @create-world-card="createCardQuick('WORLD')"
-        @toggle-card-expand="toggleCardExpanded($event as any)"
-        @update-card-draft="updateCardDraft($event as any)"
-        @save-card="saveCard($event as any)"
-        @delete-card="deleteCardById($event as any)"
-        @update:relation-from-id="relationFromId = $event"
-        @update:relation-to-id="relationToId = $event"
-        @update:relation-type="relationType = $event"
-        @create-relation="createRelation"
-        @delete-relation="deleteRelationById($event as any)"
       />
 
       <WorkbenchEditorPanel
+        v-if="workbenchMode === 'writing'"
         :current-chapter-title="currentChapterTitle"
         :selected-version-no="selectedVersionNo"
         :version-busy="versionBusy"
@@ -89,6 +69,17 @@
         @update:editor-content="editorContent = $event"
         @input="onEditorInput"
         @cursor-activity="updateCursorPos"
+      />
+
+      <StoryBibleWorkspace
+        v-else
+        :project-id="getCurrentProjectId()"
+        :operator-id="resolveOperatorId()"
+        :user-id="session.userId"
+        :session-id="currentConversationId || undefined"
+        :chapter-id="activeChapter"
+        :project-title="novelTitle"
+        :initial-node-id="storyBibleNodeId"
       />
 
       <WorkbenchRightPanel
@@ -117,6 +108,7 @@
         @replace-selected="handleReplaceSelected"
         @approve="handleApprove"
         @reject="handleReject"
+        @open-story-bible="openStoryBible"
         @update:chat-input="chatInput = $event"
         @send="sendMessage"
         @open-model-settings="showModelSettings = true"
@@ -146,10 +138,10 @@ import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import WorkbenchLeftPanel from '@/components/workbench/WorkbenchLeftPanel.vue'
 import WorkbenchEditorPanel from '@/components/workbench/WorkbenchEditorPanel.vue'
 import WorkbenchRightPanel from '@/components/workbench/WorkbenchRightPanel.vue'
+import StoryBibleWorkspace from '@/components/workbench/story-bible/StoryBibleWorkspace.vue'
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
-import { cardApi } from '@/api/modules/card.api'
 import { agentApi } from '@/api/modules/agent.api'
 import { approvalApi } from '@/api/modules/approval.api'
 import { pluginApi } from '@/api/modules/plugin.api'
@@ -161,7 +153,6 @@ import { createChapterLoadGuard, useWorkbenchDraft } from '@/composables/workben
 import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
 import { useWorkbenchOutline } from '@/composables/workbench/useWorkbenchOutline'
-import { useWorkbenchCards } from '@/composables/workbench/useWorkbenchCards'
 import { useWorkbenchEditor } from '@/composables/workbench/useWorkbenchEditor'
 import { useWorkbenchVersions } from '@/composables/workbench/useWorkbenchVersions'
 import { useWorkbenchChat } from '@/composables/workbench/useWorkbenchChat'
@@ -173,8 +164,6 @@ import {
   resolveDirectUploadTarget,
 } from '@/composables/workbench/workbenchStorage'
 import iconOutline from '@/assets/images/icon-outline.png'
-import iconCharacter from '@/assets/images/icon-character.png'
-import iconWorld from '@/assets/images/icon-world.png'
 import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 const router = useRouter()
@@ -231,9 +220,23 @@ const chapterContents = ref<Record<string, string>>({})
 const activeLeftTab = ref('outline')
 const leftTabs = ref([
   { key: 'outline', label: '大纲', icon: iconOutline },
-  { key: 'characters', label: '角色', icon: iconCharacter },
-  { key: 'world', label: '世界', icon: iconWorld },
 ])
+const workbenchMode = ref<'writing' | 'story-bible'>(route.query.mode === 'story-bible' ? 'story-bible' : 'writing')
+const storyBibleNodeId = computed(() => typeof route.query.nodeId === 'string' ? route.query.nodeId : '')
+const setWorkbenchMode = (mode: 'writing' | 'story-bible') => {
+  workbenchMode.value = mode
+  const query = { ...route.query }
+  if (mode === 'story-bible') query.mode = 'story-bible'
+  else {
+    delete query.mode
+    delete query.nodeId
+  }
+  void router.replace({ query })
+}
+const openStoryBible = (nodeId = '') => {
+  workbenchMode.value = 'story-bible'
+  void router.replace({ query: { ...route.query, mode: 'story-bible', ...(nodeId ? { nodeId } : {}) } })
+}
 
 const setChapterContent = (chapterId: string, content: string) => {
   chapterContents.value[chapterId] = content
@@ -266,41 +269,7 @@ const {
   deleteChapter: novelApi.deleteChapter,
   updateOutlineNode: outlineApi.updateNode,
   moveOutlineNode: outlineApi.moveNode,
-  notify: (warningMessage: string) => {
-    message.warning(warningMessage)
-  },
-  notifySuccess: (successMessage: string) => {
-    message.success(successMessage)
-  },
-})
-
-const {
-  projectCards,
-  characterCards,
-  worldCards,
-  cardRelations,
-  relationFromId,
-  relationToId,
-  relationType,
-  loadCardsAndRelations,
-  createCardQuick,
-  saveCard,
-  deleteCardById,
-  createRelation,
-  deleteRelationById,
-  cardNameById,
-  updateCardDraft,
-  toggleCardExpanded,
-} = useWorkbenchCards({
-  getContext,
-  listCards: cardApi.listCards,
-  listCardRelations: cardApi.listCardRelations,
-  createCard: cardApi.createCard,
-  updateCard: cardApi.updateCard,
-  deleteCard: cardApi.deleteCard,
-  createCardRelation: cardApi.createCardRelation,
-  deleteCardRelation: cardApi.deleteCardRelation,
-  promptCardName: (defaultName: string) => window.prompt('请输入资料卡名称', defaultName),
+  moveChapter: novelApi.moveChapter,
   notify: (warningMessage: string) => {
     message.warning(warningMessage)
   },
@@ -838,7 +807,6 @@ const loadWorkbenchData = async (projectId: string) => {
   loadOutline(outlineNodes, chapterByOutlineNodeId)
 
   await Promise.all([
-    loadCardsAndRelations(projectId),
     loadActivePlugins(projectId),
     refreshActiveModelInfo(),
   ])
@@ -876,6 +844,9 @@ onMounted(async () => {
 
 watch(editorContent, (value) => {
   chapterContents.value[activeChapter.value] = value
+})
+watch(() => route.query.mode, (mode) => {
+  workbenchMode.value = mode === 'story-bible' ? 'story-bible' : 'writing'
 })
 </script>
 

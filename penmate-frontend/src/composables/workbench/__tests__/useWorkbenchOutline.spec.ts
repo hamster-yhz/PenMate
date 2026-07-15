@@ -326,6 +326,38 @@ describe('useWorkbenchOutline', () => {
     expect(notify).toHaveBeenCalledWith('rename failed')
   })
 
+  it('persists_chapter_sort_order_when_reordering_outline_chapters', async () => {
+    const moveChapter = vi.fn(async () => undefined)
+    const outline = useWorkbenchOutline({
+      getContext: () => ({ projectId: '101', operatorId: '201' }),
+      reloadOutline: vi.fn(async () => undefined),
+      createOutlineNode: vi.fn(async () => ({})),
+      createChapter: vi.fn(async () => ({})),
+      deleteOutlineNode: vi.fn(async () => undefined),
+      deleteChapter: vi.fn(async () => undefined),
+      updateOutlineNode: vi.fn(async () => undefined),
+      moveOutlineNode: vi.fn(async () => undefined),
+      moveChapter,
+    })
+    outline.outlineData.value = [{
+      key: '10',
+      title: 'Volume',
+      expanded: true,
+      children: [
+        { key: '11', title: 'One', chapterId: '301' },
+        { key: '12', title: 'Two', chapterId: '302' },
+      ],
+    }]
+
+    await outline.moveNode({ nodeKey: '12', parentKey: '10', direction: -1 })
+
+    expect(moveChapter).toHaveBeenCalledWith('101', '302', '201', {
+      volumeId: null,
+      sortOrder: 1,
+    })
+    expect(outline.outlineData.value[0].children.map((item) => item.chapterId)).toEqual(['302', '301'])
+  })
+
   it('does_not_reorder_and_notifies_when_move_fails', async () => {
     const notify = vi.fn()
     const outline = useWorkbenchOutline({
