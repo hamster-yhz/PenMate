@@ -6,6 +6,7 @@ import com.penmate.backend.application.rag.RagApplicationService;
 import com.penmate.backend.application.rag.RagSearchScope;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -22,18 +23,27 @@ public class DefaultAgentContextRoutingFacade implements AgentContextRoutingFaca
     private final StoryBibleContextProvider storyBibleContextProvider;
     private final DefaultContextBuilder contextBuilder;
     private final RagApplicationService ragApplicationService;
+    private final boolean storyBibleContextEnabled;
 
     public DefaultAgentContextRoutingFacade(StoryBibleContextProvider storyBibleContextProvider) {
-        this(storyBibleContextProvider, new DefaultContextBuilder(), null);
+        this(storyBibleContextProvider, new DefaultContextBuilder(), null, true);
     }
 
     @Autowired
     public DefaultAgentContextRoutingFacade(StoryBibleContextProvider storyBibleContextProvider,
                                             DefaultContextBuilder contextBuilder,
-                                            RagApplicationService ragApplicationService) {
+                                            RagApplicationService ragApplicationService,
+                                            @Value("${penmate.agent.story-bible.context-enabled:false}") boolean storyBibleContextEnabled) {
         this.storyBibleContextProvider = Objects.requireNonNull(storyBibleContextProvider, "storyBibleContextProvider");
         this.contextBuilder = Objects.requireNonNull(contextBuilder, "contextBuilder");
         this.ragApplicationService = ragApplicationService;
+        this.storyBibleContextEnabled = storyBibleContextEnabled;
+    }
+
+    public DefaultAgentContextRoutingFacade(StoryBibleContextProvider storyBibleContextProvider,
+                                            DefaultContextBuilder contextBuilder,
+                                            RagApplicationService ragApplicationService) {
+        this(storyBibleContextProvider, contextBuilder, ragApplicationService, true);
     }
 
     @Override
@@ -48,6 +58,7 @@ public class DefaultAgentContextRoutingFacade implements AgentContextRoutingFaca
                 request.decision().includeStoryBibleContext());
         String styleSnapshot = request.decision().includeStyleContext() ? request.styleSnapshot() : null;
         List<StoryBibleContextEntryView> storyBibleEntries = request.decision().includeStoryBibleContext()
+                && storyBibleContextEnabled
                 ? storyBibleContextProvider.loadContext(
                 request.projectId(),
                 request.sessionId(),

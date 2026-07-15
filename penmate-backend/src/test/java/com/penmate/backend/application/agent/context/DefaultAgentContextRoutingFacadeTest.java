@@ -118,6 +118,31 @@ class DefaultAgentContextRoutingFacadeTest {
     }
 
     @Test
+    void should_not_call_story_bible_provider_when_story_bible_context_feature_is_disabled() {
+        AtomicInteger loadCalls = new AtomicInteger();
+        DefaultAgentContextRoutingFacade facade = new DefaultAgentContextRoutingFacade(
+                proxyProvider(loadCalls, List.of()),
+                new DefaultContextBuilder(),
+                null,
+                false
+        );
+
+        AgentContextRoutingResult result = facade.route(new AgentContextRoutingRequest(
+                1001L,
+                2002L,
+                3003L,
+                "list current books",
+                "{\"style\":\"noir\"}",
+                decision(true, true),
+                taskProfile(List.of("story_bible_query"))
+        ));
+
+        assertThat(loadCalls.get()).isZero();
+        assertThat(result.styleSnapshot()).isEqualTo("{\"style\":\"noir\"}");
+        assertThat(extractContextPackage(result).storyBibleEntries()).isEmpty();
+    }
+
+    @Test
     void should_expose_story_bible_provider_as_structured_entry_view_contract() {
         assertStructuredStoryBibleProviderContract();
     }
