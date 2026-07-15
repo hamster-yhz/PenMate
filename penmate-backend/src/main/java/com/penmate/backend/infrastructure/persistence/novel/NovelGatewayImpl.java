@@ -1,7 +1,5 @@
 package com.penmate.backend.infrastructure.persistence.novel;
 
-import com.penmate.backend.domain.novel.model.NovelCard;
-import com.penmate.backend.domain.novel.model.NovelCardRelation;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
 import com.penmate.backend.domain.novel.model.NovelMember;
@@ -26,25 +24,19 @@ public class NovelGatewayImpl implements NovelGateway {
     private final NovelMemberMapper novelMemberMapper;
     private final NovelChapterVersionMapper novelChapterVersionMapper;
     private final NovelOutlineNodeMapper novelOutlineNodeMapper;
-    private final NovelCardMapper novelCardMapper;
-    private final NovelCardRelationMapper novelCardRelationMapper;
 
     public NovelGatewayImpl(NovelProjectMapper novelProjectMapper,
                             NovelVolumeMapper novelVolumeMapper,
                             NovelChapterMapper novelChapterMapper,
                             NovelMemberMapper novelMemberMapper,
                             NovelChapterVersionMapper novelChapterVersionMapper,
-                            NovelOutlineNodeMapper novelOutlineNodeMapper,
-                            NovelCardMapper novelCardMapper,
-                            NovelCardRelationMapper novelCardRelationMapper) {
+                            NovelOutlineNodeMapper novelOutlineNodeMapper) {
         this.novelProjectMapper = novelProjectMapper;
         this.novelVolumeMapper = novelVolumeMapper;
         this.novelChapterMapper = novelChapterMapper;
         this.novelMemberMapper = novelMemberMapper;
         this.novelChapterVersionMapper = novelChapterVersionMapper;
         this.novelOutlineNodeMapper = novelOutlineNodeMapper;
-        this.novelCardMapper = novelCardMapper;
-        this.novelCardRelationMapper = novelCardRelationMapper;
     }
 
     /**
@@ -82,6 +74,9 @@ public class NovelGatewayImpl implements NovelGateway {
      */
     @Override
     public int updateProject(NovelProject project) { return novelProjectMapper.update(project); }
+
+    @Override
+    public int incrementStructureRevision(Long projectId) { return novelProjectMapper.incrementStructureRevision(projectId); }
 
     /**
      * 处理业务请求。
@@ -344,8 +339,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param novelCardMapper.findByProjectId(projectId 入参：novelCardMapper.findByProjectId(projectId
      * @return 出参：处理结果
      */
-    @Override
-    public List<NovelCard> findCardsByProjectId(Long projectId) { return novelCardMapper.findByProjectId(projectId); }
 
     /**
      * 处理业务请求。
@@ -354,8 +347,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param cardId 入参：cardId
      * @return 出参：处理结果
      */
-    @Override
-    public NovelCard findCardByIdAndProjectId(Long projectId, Long cardId) { return novelCardMapper.findByIdAndProjectId(projectId, cardId); }
 
     /**
      * 处理业务请求。
@@ -363,8 +354,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param novelCardMapper.insert(card 入参：novelCardMapper.insert(card
      * @return 出参：处理结果
      */
-    @Override
-    public int insertCard(NovelCard card) { return novelCardMapper.insert(card); }
 
     /**
      * 更新业务数据。
@@ -372,8 +361,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param novelCardMapper.update(card 入参：novelCardMapper.update(card
      * @return 出参：处理结果
      */
-    @Override
-    public int updateCard(NovelCard card) { return novelCardMapper.update(card); }
 
     /**
      * 处理业务请求。
@@ -382,8 +369,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param cardId 入参：cardId
      * @return 出参：处理结果
      */
-    @Override
-    public int softDeleteCard(Long projectId, Long cardId) { return novelCardMapper.softDelete(projectId, cardId); }
 
     /**
      * 处理业务请求。
@@ -391,8 +376,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param novelCardRelationMapper.findByProjectId(projectId 入参：novelCardRelationMapper.findByProjectId(projectId
      * @return 出参：处理结果
      */
-    @Override
-    public List<NovelCardRelation> findCardRelationsByProjectId(Long projectId) { return novelCardRelationMapper.findByProjectId(projectId); }
 
     /**
      * 处理业务请求。
@@ -400,8 +383,6 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param novelCardRelationMapper.insert(relation 入参：novelCardRelationMapper.insert(relation
      * @return 出参：处理结果
      */
-    @Override
-    public int insertCardRelation(NovelCardRelation relation) { return novelCardRelationMapper.insert(relation); }
 
     /**
      * 处理业务请求。
@@ -410,7 +391,5 @@ public class NovelGatewayImpl implements NovelGateway {
      * @param relationId 入参：relationId
      * @return 出参：处理结果
      */
-    @Override
-    public int softDeleteCardRelation(Long projectId, Long relationId) { return novelCardRelationMapper.softDelete(projectId, relationId); }
 }
 

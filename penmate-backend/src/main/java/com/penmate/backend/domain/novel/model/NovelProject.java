@@ -24,6 +24,7 @@ public class NovelProject {
     private String summary;
     /** 项目状态。 */
     private Integer status;
+    private Long structureRevision;
     /** 创建时间。 */
     private LocalDateTime createdAt;
     /** 更新时间。 */

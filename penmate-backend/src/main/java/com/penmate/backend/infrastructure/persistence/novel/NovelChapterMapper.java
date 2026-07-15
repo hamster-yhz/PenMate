@@ -18,17 +18,22 @@ import java.util.List;
 public interface NovelChapterMapper {
 
     @Select("""
-            SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count,
-                   excerpt, content_object_key, content_etag, content_size, content_checksum,
-                   storage_provider, last_generated_at, created_at, updated_at, deleted_at
-            FROM novel_chapters
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
-            ORDER BY chapter_no ASC, id ASC
+            SELECT c.id, c.chapter_id, c.project_id, c.volume_id, c.outline_node_id, c.title, c.sort_order,
+                   c.status, c.word_count, c.excerpt, c.content_object_key, c.content_etag, c.content_size,
+                   c.content_checksum, c.storage_provider, c.last_generated_at, c.created_at, c.updated_at, c.deleted_at
+            FROM novel_chapters c
+            LEFT JOIN novel_volumes v
+              ON v.volume_id = c.volume_id AND v.project_id = c.project_id AND v.deleted_at IS NULL
+            WHERE c.project_id = #{projectId} AND c.deleted_at IS NULL
+            ORDER BY CASE WHEN c.volume_id IS NULL THEN 1 ELSE 0 END ASC,
+                     COALESCE(v.sort_order, 2147483647) ASC,
+                     c.sort_order ASC,
+                     c.id ASC
             """)
     List<NovelChapter> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count,
+            SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status, word_count,
                    excerpt, content_object_key, content_etag, content_size, content_checksum,
                    storage_provider, last_generated_at, created_at, updated_at, deleted_at
             FROM novel_chapters
@@ -38,10 +43,10 @@ public interface NovelChapterMapper {
 
     @Insert("""
             INSERT INTO novel_chapters(
-                chapter_id, project_id, volume_id, outline_node_id, title, chapter_no, status, word_count, excerpt,
+                chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status, word_count, excerpt,
                 content_object_key, content_etag, content_size, content_checksum, storage_provider
             ) VALUES (
-                #{chapterId}, #{projectId}, #{volumeId}, #{outlineNodeId}, #{title}, #{chapterNo}, #{status}, #{wordCount}, #{excerpt},
+                #{chapterId}, #{projectId}, #{volumeId}, #{outlineNodeId}, #{title}, #{sortOrder}, #{status}, #{wordCount}, #{excerpt},
                 #{contentObjectKey}, #{contentEtag}, #{contentSize}, #{contentChecksum}, #{storageProvider}
             )
             """)
@@ -53,7 +58,7 @@ public interface NovelChapterMapper {
             SET volume_id = #{volumeId},
                 outline_node_id = #{outlineNodeId},
                 title = #{title},
-                chapter_no = #{chapterNo},
+                sort_order = #{sortOrder},
                 status = #{status},
                 word_count = #{wordCount},
                 excerpt = #{excerpt},

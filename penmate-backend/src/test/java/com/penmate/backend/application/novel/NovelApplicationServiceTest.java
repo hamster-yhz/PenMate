@@ -580,9 +580,48 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void should_assign_continuous_full_book_display_numbers_from_gateway_order() {
+        NovelChapter first = new NovelChapter();
+        first.setChapterId(1001L);
+        first.setSortOrder(20);
+        NovelChapter second = new NovelChapter();
+        second.setChapterId(1002L);
+        second.setSortOrder(1);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(first, second));
+
+        List<NovelChapter> chapters = novelApplicationService.listChapters(920002L);
+
+        assertThat(chapters).extracting(NovelChapter::getDisplayNo).containsExactly(1, 2);
+    }
+
+    @Test
+    void should_move_chapter_and_increment_structure_revision_once() {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setChapterId(1001L);
+        chapter.setProjectId(920002L);
+        chapter.setSortOrder(2);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 1001L)).thenReturn(chapter);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(chapter));
+        when(novelGateway.updateChapter(chapter)).thenReturn(1);
+        when(novelGateway.incrementStructureRevision(920002L)).thenReturn(1);
+
+        NovelChapter moved = novelApplicationService.moveChapter(
+                920002L,
+                1001L,
+                new com.penmate.backend.application.novel.command.NovelCommands.MoveChapterCommand(null, 1),
+                920001L,
+                "trace-move-chapter"
+        );
+
+        assertThat(moved.getSortOrder()).isEqualTo(1);
+        verify(novelGateway).incrementStructureRevision(920002L);
+    }
+
+    @Test
     void UT_APP_NOVEL_CREATE_VOLUME_DEFAULT_SORT_ORDER_SUCCESS() {
         when(businessIdGenerator.nextId()).thenReturn(930001L);
         when(novelGateway.insertVolume(any())).thenReturn(1);
+        when(novelGateway.incrementStructureRevision(920002L)).thenReturn(1);
 
         NovelVolume volume = novelApplicationService.createVolume(
                 920002L,
@@ -594,6 +633,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(volume.getVolumeId()).isEqualTo(930001L);
         assertThat(volume.getProjectId()).isEqualTo(920002L);
         assertThat(volume.getSortOrder()).isEqualTo(0);
+        verify(novelGateway).incrementStructureRevision(920002L);
         assertThat(volume.getTitle()).isEqualTo("第一卷");
     }
 
@@ -671,14 +711,6 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(result.get(0).getId()).isEqualTo(9001L);
     }
 
-    @Test
-    void UT_APP_NOVEL_GET_CARD_NOT_FOUND() {
-        when(novelGateway.findCardByIdAndProjectId(920002L, 950001L)).thenReturn(null);
-
-        assertThatThrownBy(() -> novelApplicationService.getCard(920002L, 950001L))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Card not found");
-    }
 }
 
 

@@ -5,12 +5,8 @@ import com.penmate.backend.application.novel.command.NovelCommands;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
-import com.penmate.backend.domain.novel.model.NovelCard;
-import com.penmate.backend.domain.novel.model.NovelCardRelation;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
-import com.penmate.backend.interfaces.api.novel.dto.CreateNovelCardDto;
-import com.penmate.backend.interfaces.api.novel.dto.CreateNovelCardRelationDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelChapterDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateChapterVersionDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelOutlineNodeDto;
@@ -20,8 +16,8 @@ import com.penmate.backend.interfaces.api.novel.dto.AddNovelMemberDto;
 import com.penmate.backend.interfaces.api.novel.dto.CommitChapterContentDto;
 import com.penmate.backend.interfaces.api.novel.dto.MoveNovelOutlineNodeDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelMemberDto;
-import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelCardDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelChapterDto;
+import com.penmate.backend.interfaces.api.novel.dto.MoveNovelChapterDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelOutlineNodeDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelVolumeDto;
@@ -31,6 +27,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -272,7 +269,7 @@ public class NovelController {
                         optionalLongId(dto.getVolumeId()),
                         optionalLongId(dto.getOutlineNodeId()),
                         dto.getTitle(),
-                        dto.getChapterNo(),
+                        dto.getSortOrder(),
                         dto.getStatus(),
                         dto.getWordCount(),
                         dto.getExcerpt(),
@@ -327,7 +324,7 @@ public class NovelController {
                         optionalLongId(dto.getVolumeId()),
                         optionalLongId(dto.getOutlineNodeId()),
                         dto.getTitle(),
-                        dto.getChapterNo(),
+                        dto.getSortOrder(),
                         dto.getStatus(),
                         dto.getWordCount(),
                         dto.getExcerpt(),
@@ -337,6 +334,21 @@ public class NovelController {
                         dto.getContentChecksum(),
                         dto.getStorageProvider()
                 ),
+                requireLongId(operatorId, "operatorId"),
+                traceId
+        ), traceId);
+    }
+
+    @PatchMapping("/{projectId}/chapters/{chapterId}/position")
+    public ApiResponse<NovelChapter> moveChapter(@PathVariable String projectId,
+                                                 @PathVariable String chapterId,
+                                                 @Valid @RequestBody MoveNovelChapterDto dto,
+                                                 @RequestParam("operatorId") String operatorId,
+                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.moveChapter(
+                requireLongId(projectId, "projectId"),
+                requireLongId(chapterId, "chapterId"),
+                new NovelCommands.MoveChapterCommand(optionalLongId(dto.getVolumeId()), dto.getSortOrder()),
                 requireLongId(operatorId, "operatorId"),
                 traceId
         ), traceId);
@@ -751,11 +763,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @GetMapping("/{projectId}/cards")
-    public ApiResponse<List<NovelCard>> listCards(@PathVariable String projectId,
-                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listCards(requireLongId(projectId, "projectId")), traceId);
-    }
 
     /**
      * 创建卡片。
@@ -767,18 +774,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @PostMapping("/{projectId}/cards")
-    public ApiResponse<NovelCard> createCard(@PathVariable String projectId,
-                                               @Valid @RequestBody CreateNovelCardDto dto,
-                                               @RequestParam("operatorId") String operatorId,
-                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.createCard(
-                requireLongId(projectId, "projectId"),
-                new NovelCommands.CreateCardCommand(dto.getCardType(), dto.getName(), dto.getSummary(), dto.getDetailJson()),
-                requireLongId(operatorId, "operatorId"),
-                traceId
-        ), traceId);
-    }
 
     /**
      * 查询卡片详情。
@@ -789,12 +784,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @GetMapping("/{projectId}/cards/{cardId}")
-    public ApiResponse<NovelCard> getCard(@PathVariable String projectId,
-                                          @PathVariable String cardId,
-                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getCard(requireLongId(projectId, "projectId"), requireLongId(cardId, "cardId")), traceId);
-    }
 
     /**
      * 更新卡片。
@@ -807,20 +796,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @PutMapping("/{projectId}/cards/{cardId}")
-    public ApiResponse<NovelCard> updateCard(@PathVariable String projectId,
-                                              @PathVariable String cardId,
-                                               @Valid @RequestBody UpdateNovelCardDto dto,
-                                               @RequestParam("operatorId") String operatorId,
-                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.updateCard(
-                requireLongId(projectId, "projectId"),
-                requireLongId(cardId, "cardId"),
-                new NovelCommands.UpdateCardCommand(dto.getCardType(), dto.getName(), dto.getSummary(), dto.getDetailJson()),
-                requireLongId(operatorId, "operatorId"),
-                traceId
-        ), traceId);
-    }
 
     /**
      * 删除卡片。
@@ -832,14 +807,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @DeleteMapping("/{projectId}/cards/{cardId}")
-    public ApiResponse<String> deleteCard(@PathVariable String projectId,
-                                          @PathVariable String cardId,
-                                          @RequestParam("operatorId") String operatorId,
-                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteCard(requireLongId(projectId, "projectId"), requireLongId(cardId, "cardId"), requireLongId(operatorId, "operatorId"), traceId);
-        return ApiResponse.success("deleted", traceId);
-    }
 
     /**
      * 查询卡片关系列表。
@@ -849,11 +816,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @GetMapping("/{projectId}/card-relations")
-    public ApiResponse<List<NovelCardRelation>> listCardRelations(@PathVariable String projectId,
-                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listCardRelations(requireLongId(projectId, "projectId")), traceId);
-    }
 
     /**
      * 创建卡片关系。
@@ -865,23 +827,6 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @PostMapping("/{projectId}/card-relations")
-    public ApiResponse<NovelCardRelation> createCardRelation(@PathVariable String projectId,
-                                                              @Valid @RequestBody CreateNovelCardRelationDto dto,
-                                                              @RequestParam("operatorId") String operatorId,
-                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.createCardRelation(
-                requireLongId(projectId, "projectId"),
-                new NovelCommands.CreateCardRelationCommand(
-                        requireLongId(dto.getFromCardId(), "fromCardId"),
-                        requireLongId(dto.getToCardId(), "toCardId"),
-                        dto.getRelationType(),
-                        dto.getDescription()
-                ),
-                requireLongId(operatorId, "operatorId"),
-                traceId
-        ), traceId);
-    }
 
     /**
      * 删除卡片关系。
@@ -893,13 +838,5 @@ public class NovelController {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
-    @DeleteMapping("/{projectId}/card-relations/{relationId}")
-    public ApiResponse<String> deleteCardRelation(@PathVariable String projectId,
-                                                  @PathVariable String relationId,
-                                                  @RequestParam("operatorId") String operatorId,
-                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteCardRelation(requireLongId(projectId, "projectId"), requireLongId(relationId, "relationId"), requireLongId(operatorId, "operatorId"), traceId);
-        return ApiResponse.success("deleted", traceId);
-    }
 }
 

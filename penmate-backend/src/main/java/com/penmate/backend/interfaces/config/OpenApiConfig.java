@@ -344,7 +344,6 @@ public class OpenApiConfig {
             case "outlines" -> "大纲";
             case "nodes" -> "大纲节点";
             case "cards" -> "资料卡";
-            case "card-relations" -> "资料卡关系";
             case "styles" -> "风格";
             default -> "数据";
         };

@@ -8,6 +8,9 @@ DELETE FROM agent_approval_requests WHERE approval_request_id BETWEEN 920001 AND
 DELETE FROM agent_generation_tasks  WHERE task_id BETWEEN 920001 AND 922999;
 DELETE FROM agent_messages          WHERE message_id BETWEEN 920001 AND 922999;
 DELETE FROM agent_conversations     WHERE conversation_id BETWEEN 920001 AND 922999;
+DELETE FROM agent_session_working_set WHERE session_id BETWEEN 920001 AND 922999;
+DELETE FROM agent_context_epochs    WHERE epoch_id BETWEEN 920001 AND 922999;
+DELETE FROM agent_user_preferences  WHERE user_id BETWEEN 920001 AND 922999;
 
 DELETE FROM rag_chunks              WHERE chunk_id BETWEEN 920001 AND 922999;
 DELETE FROM rag_documents           WHERE document_id BETWEEN 920001 AND 922999;
@@ -20,8 +23,19 @@ DELETE FROM plugin_catalog          WHERE plugin_id BETWEEN 920001 AND 922999;
 DELETE FROM style_switch_logs       WHERE style_switch_log_id BETWEEN 920001 AND 922999;
 DELETE FROM style_profiles          WHERE style_id BETWEEN 920001 AND 922999;
 
-DELETE FROM novel_card_relations    WHERE card_relation_id BETWEEN 920001 AND 922999;
-DELETE FROM novel_cards             WHERE card_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_change_items WHERE change_item_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_changesets  WHERE changeset_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_view_preferences WHERE story_bible_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_progressions WHERE progression_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_relations   WHERE relation_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_node_tags   WHERE story_bible_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_tags        WHERE tag_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_node_categories WHERE story_bible_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_categories  WHERE category_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_aliases     WHERE alias_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_nodes       WHERE node_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bible_node_types  WHERE type_id BETWEEN 920001 AND 922999;
+DELETE FROM story_bibles            WHERE story_bible_id BETWEEN 920001 AND 922999;
 DELETE FROM novel_outline_nodes     WHERE outline_node_id BETWEEN 920001 AND 922999;
 DELETE FROM novel_chapter_versions  WHERE chapter_version_id BETWEEN 920001 AND 922999;
 DELETE FROM novel_chapters          WHERE chapter_id BETWEEN 920001 AND 922999;

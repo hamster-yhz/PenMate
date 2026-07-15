@@ -27,7 +27,8 @@ public class NovelChapter {
     /** 章节标题。 */
     private String title;
     /** 章节序号。 */
-    private Integer chapterNo;
+    private Integer sortOrder;
+    private Integer displayNo;
     /** 章节状态。 */
     private Integer status;
     /** 字数统计。 */

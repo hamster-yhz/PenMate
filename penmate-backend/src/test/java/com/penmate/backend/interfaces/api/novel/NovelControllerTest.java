@@ -2,7 +2,6 @@ package com.penmate.backend.interfaces.api.novel;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.novel.NovelApplicationService;
-import com.penmate.backend.domain.novel.model.NovelCard;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
@@ -225,44 +224,7 @@ class NovelControllerTest {
                 .andExpect(jsonPath("$.data.status").value(422));
     }
 
-    @Test
-    // 设定卡类型错误。
-    void UT_NOVEL_CARD_TYPE_INVALID() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-CARD-TYPE-INVALID";
-        doThrow(new IllegalArgumentException("Invalid card type"))
-                .when(novelApplicationService).createCard(eq(10001L), any(), eq(1001L), eq(traceId));
 
-        mockMvc().perform(post("/api/v1/novels/10001/cards")
-                        .param("operatorId", "1001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "cardType", "unknown_type",
-                                "name", "设定A"
-                        ))))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
-    }
-
-    @Test
-    // 关系图谱重复关系冲突。
-    void UT_NOVEL_RELATION_DUPLICATED_CONFLICT() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-RELATION-DUPLICATE";
-        doThrow(new IllegalArgumentException("Relation already exists"))
-                .when(novelApplicationService).createCardRelation(eq(10001L), any(), eq(1001L), eq(traceId));
-
-        mockMvc().perform(post("/api/v1/novels/10001/card-relations")
-                        .param("operatorId", "1001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "fromCardId", "1",
-                                "toCardId", "2",
-                                "relationType", "ally"
-                        ))))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.data.status").value(422));
-    }
 
     @Test
     // 章节版本创建成功。
@@ -470,67 +432,8 @@ class NovelControllerTest {
                 .andExpect(jsonPath("$.data").value("moved"));
     }
 
-    @Test
-    // 设定卡创建成功。
-    void UT_NOVEL_CARD_CREATE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-CARD-CREATE";
-        NovelCard card = new NovelCard();
-        card.setId(5001L);
-        card.setCardId(5001L);
-        card.setProjectId(10001L);
-        card.setName("主角");
-        when(novelApplicationService.createCard(eq(10001L), any(), eq(1001L), eq(traceId))).thenReturn(card);
 
-        mockMvc().perform(post("/api/v1/novels/10001/cards")
-                        .param("operatorId", "1001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "cardType", "character",
-                                "name", "主角",
-                                "summary", "简介"
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.cardId").isString())
-                .andExpect(jsonPath("$.data.cardId").value("5001"));
-    }
 
-    @Test
-    // 关系图谱创建成功。
-    void UT_NOVEL_RELATION_CREATE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-RELATION-CREATE";
-        com.penmate.backend.domain.novel.model.NovelCardRelation relation = new com.penmate.backend.domain.novel.model.NovelCardRelation();
-        relation.setId(6001L);
-        relation.setCardRelationId(6001L);
-        relation.setProjectId(10001L);
-        when(novelApplicationService.createCardRelation(eq(10001L), any(), eq(1001L), eq(traceId))).thenReturn(relation);
-
-        mockMvc().perform(post("/api/v1/novels/10001/card-relations")
-                        .param("operatorId", "1001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "fromCardId", "1",
-                                "toCardId", "2",
-                                "relationType", "ally"
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.relationId").isString())
-                .andExpect(jsonPath("$.data.relationId").value("6001"));
-    }
-
-    @Test
-    // 关系图谱删除幂等。
-    void UT_NOVEL_RELATION_DELETE_IDEMPOTENT() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-RELATION-DELETE-IDEMPOTENT";
-        doNothing().when(novelApplicationService).deleteCardRelation(10001L, 6001L, 1001L, traceId);
-
-        mockMvc().perform(delete("/api/v1/novels/10001/card-relations/6001")
-                        .param("operatorId", "1001")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("deleted"));
-    }
 
     @Test
     // 版本快照URL读取成功。
@@ -676,98 +579,9 @@ class NovelControllerTest {
                 .andExpect(jsonPath("$.data[0].title").value("第一幕"));
     }
 
-    @Test
-    // 卡片列表查询成功。
-    void UT_NOVEL_CARD_LIST_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-CARD-LIST";
-        NovelCard card = new NovelCard();
-        card.setId(5001L);
-        card.setCardId(5001L);
-        card.setProjectId(10001L);
-        card.setName("主角");
-        when(novelApplicationService.listCards(10001L)).thenReturn(java.util.List.of(card));
 
-        mockMvc().perform(get("/api/v1/novels/10001/cards")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].cardId").isString())
-                .andExpect(jsonPath("$.data[0].cardId").value("5001"))
-                .andExpect(jsonPath("$.data[0].name").value("主角"));
-    }
 
-    @Test
-    // 卡片详情查询成功。
-    void UT_NOVEL_CARD_GET_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-CARD-GET";
-        NovelCard card = new NovelCard();
-        card.setId(5001L);
-        card.setCardId(5001L);
-        card.setProjectId(10001L);
-        card.setName("主角");
-        when(novelApplicationService.getCard(10001L, 5001L)).thenReturn(card);
 
-        mockMvc().perform(get("/api/v1/novels/10001/cards/5001")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.cardId").isString())
-                .andExpect(jsonPath("$.data.cardId").value("5001"))
-                .andExpect(jsonPath("$.data.name").value("主角"));
-    }
 
-    @Test
-    // 卡片更新成功。
-    void UT_NOVEL_CARD_UPDATE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-CARD-UPDATE";
-        NovelCard card = new NovelCard();
-        card.setId(5001L);
-        card.setCardId(5001L);
-        card.setProjectId(10001L);
-        card.setName("主角-修订");
-        when(novelApplicationService.updateCard(eq(10001L), eq(5001L), any(), eq(1001L), eq(traceId))).thenReturn(card);
-
-        mockMvc().perform(put("/api/v1/novels/10001/cards/5001")
-                        .param("operatorId", "1001")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "cardType", "character",
-                                "name", "主角-修订",
-                                "summary", "新简介"
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.cardId").isString())
-                .andExpect(jsonPath("$.data.cardId").value("5001"))
-                .andExpect(jsonPath("$.data.name").value("主角-修订"));
-    }
-
-    @Test
-    // 卡片删除成功。
-    void UT_NOVEL_CARD_DELETE_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-CARD-DELETE";
-        doNothing().when(novelApplicationService).deleteCard(10001L, 5001L, 1001L, traceId);
-
-        mockMvc().perform(delete("/api/v1/novels/10001/cards/5001")
-                        .param("operatorId", "1001")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("deleted"));
-    }
-
-    @Test
-    // 关系图谱列表查询成功。
-    void UT_NOVEL_RELATION_LIST_SUCCESS() throws Exception {
-        String traceId = "UT-TRACE-NOVEL-RELATION-LIST";
-        com.penmate.backend.domain.novel.model.NovelCardRelation relation = new com.penmate.backend.domain.novel.model.NovelCardRelation();
-        relation.setId(6001L);
-        relation.setCardRelationId(6001L);
-        relation.setProjectId(10001L);
-        when(novelApplicationService.listCardRelations(10001L)).thenReturn(java.util.List.of(relation));
-
-        mockMvc().perform(get("/api/v1/novels/10001/card-relations")
-                        .header("X-Trace-Id", traceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].relationId").isString())
-                .andExpect(jsonPath("$.data[0].relationId").value("6001"));
-    }
 }
 

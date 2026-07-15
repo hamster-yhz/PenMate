@@ -36,7 +36,7 @@ public final class NovelCommands {
     public record CreateChapterCommand(Long volumeId,
                                        Long outlineNodeId,
                                        String title,
-                                       Integer chapterNo,
+                                       Integer sortOrder,
                                        Integer status,
                                        Integer wordCount,
                                        String excerpt,
@@ -53,7 +53,7 @@ public final class NovelCommands {
     public record UpdateChapterCommand(Long volumeId,
                                        Long outlineNodeId,
                                        String title,
-                                       Integer chapterNo,
+                                       Integer sortOrder,
                                        Integer status,
                                        Integer wordCount,
                                        String excerpt,
@@ -62,6 +62,8 @@ public final class NovelCommands {
                                        Long contentSize,
                                        String contentChecksum,
                                        String storageProvider) {}
+
+    public record MoveChapterCommand(Long volumeId, Integer sortOrder) {}
 
     /**
      * AddMemberCommand。
@@ -122,21 +124,15 @@ public final class NovelCommands {
      * CreateCardCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record CreateCardCommand(String cardType, String name, String summary, String detailJson) {}
 
     /**
      * UpdateCardCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record UpdateCardCommand(String cardType, String name, String summary, String detailJson) {}
 
     /**
      * CreateCardRelationCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record CreateCardRelationCommand(Long fromCardId,
-                                            Long toCardId,
-                                            String relationType,
-                                            String description) {}
 }
 
