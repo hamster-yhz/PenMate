@@ -3,6 +3,7 @@ package com.penmate.backend.interfaces.api.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
+import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -127,6 +129,39 @@ class AgentControllerTest {
         mockMvc().perform(get("/api/v1/novels/project-10001/agent/sessions/session-90001/recovery"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
+    void gets_user_story_bible_routing_preference_with_string_model_id() throws Exception {
+        when(routingPreferences.getUserDefault(1001L)).thenReturn(
+                new StoryBibleRoutingPreferenceResolver.EffectivePreference(
+                        StoryBibleRoutingMode.LLM_SELECTOR, 7001L, 9L, false));
+
+        mockMvc().perform(get("/api/v1/novels/10001/agent/routing-preference")
+                        .param("userId", "1001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mode").value("LLM_SELECTOR"))
+                .andExpect(jsonPath("$.data.routerModelConfigId").value("7001"))
+                .andExpect(jsonPath("$.data.routerModelConfigRevision").value(9))
+                .andExpect(jsonPath("$.data.inherited").value(false));
+    }
+
+    @Test
+    void clears_session_override_and_returns_inherited_user_preference() throws Exception {
+        when(routingPreferences.resolve(10001L, 90001L, 1001L)).thenReturn(
+                new StoryBibleRoutingPreferenceResolver.EffectivePreference(
+                        StoryBibleRoutingMode.RETRIEVAL_THEN_LLM, null, 0L, false));
+
+        mockMvc().perform(put("/api/v1/novels/10001/agent/sessions/90001/routing-preference")
+                        .param("userId", "1001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":null,\"routerModelConfigId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mode").value("RETRIEVAL_THEN_LLM"))
+                .andExpect(jsonPath("$.data.routerModelConfigId").doesNotExist())
+                .andExpect(jsonPath("$.data.inherited").value(true));
+
+        verify(routingPreferences).saveSessionOverride(10001L, 90001L, 1001L, null, null);
     }
 
     private AgentConversation conversation(Long sessionId, String title) {

@@ -1,6 +1,5 @@
 package com.penmate.backend.application.agent.run;
 
-import com.penmate.backend.application.agent.context.AgentRouteDecision;
 import com.penmate.backend.application.agent.context.AgentRunContextArtifactService;
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
@@ -89,11 +88,7 @@ public class AgentRunExecutor {
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
 
-        AgentRouteDecision decision = AgentRouteDecision.fromTaskType(
-                input.taskType(),
-                input.styleSnapshotJson() != null && !input.styleSnapshotJson().isBlank()
-        );
-        TaskProfile taskProfile = taskProfileFrom(decision);
+        TaskProfile taskProfile = TaskProfile.fromTaskType(input.taskType());
 
         evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "epoch_binding"));
         state = stateReducer.apply(state, evt);
@@ -107,7 +102,7 @@ public class AgentRunExecutor {
         ));
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
-        evt = eventPublisher.publish(runId, "context.routing.completed", Map.of(
+        evt = eventPublisher.publish(runId, "turn.route.completed", Map.of(
                 "mode", contextResult.routeDecision().mode().name(),
                 "selectedNodeIds", contextResult.routeDecision().selectedNodeIds(),
                 "selectorUsed", contextResult.routeDecision().selectorUsed(),
@@ -225,21 +220,6 @@ public class AgentRunExecutor {
         AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
                 "phase", "completed", "tokenUsage", result.tokenUsage()));
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
-    }
-
-    private TaskProfile taskProfileFrom(AgentRouteDecision decision) {
-        return new TaskProfile(
-                List.of(),
-                decision.executionPromptProfile(),
-                decision.enabledSkills(),
-                decision.enabledTools(),
-                decision.hardConstraints(),
-                decision.outputExpectation(),
-                decision.needsApproval(),
-                decision.includeStoryBibleContext() || decision.needsStoryBibleUpdate(),
-                decision.includeRagContext(),
-                decision.reasoningSummary()
-        );
     }
 
     private List<AgentLlmMessage> promptMessages(PromptPlan plan, String userRequest) {

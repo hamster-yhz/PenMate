@@ -16,6 +16,13 @@ class TaskProfileSerializationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void should_derive_execution_profile_directly_from_explicit_task_type() {
+        assertThat(TaskProfile.fromTaskType("rewrite-chapter").executionProfile()).isEqualTo("rewrite");
+        assertThat(TaskProfile.fromTaskType("world-building").executionProfile()).isEqualTo("world-build");
+        assertThat(TaskProfile.fromTaskType(null).executionProfile()).isEqualTo("default");
+    }
+
+    @Test
     void should_round_trip_task_profile_with_stable_prd_field_names() throws Exception {
         TaskProfile profile = new TaskProfile(
                 List.of(TaskIntentTag.DRAFT_GENERATION, TaskIntentTag.STORY_BIBLE_QUERY),

@@ -41,6 +41,9 @@ public class AgentContextEpochService {
     public Binding bind(BindRequest request) {
         Objects.requireNonNull(request, "request");
         String fingerprint = fingerprint(request);
+        if (repository.lockSession(request.sessionId()) == null) {
+            throw BusinessException.notFound("Agent session not found");
+        }
         AgentContextEpoch current = repository.findCurrentByFingerprint(request.sessionId(), fingerprint);
         if (current != null) {
             requireBound(repository.bindRun(request.runId(), current.epochId()), "Run already belongs to another Context Epoch");

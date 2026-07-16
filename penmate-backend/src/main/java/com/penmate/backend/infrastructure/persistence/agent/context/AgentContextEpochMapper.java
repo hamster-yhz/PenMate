@@ -9,6 +9,13 @@ import org.apache.ibatis.annotations.Update;
 public interface AgentContextEpochMapper {
 
     @Select("""
+            SELECT session_id FROM agent_sessions
+            WHERE session_id = #{sessionId} AND deleted_at IS NULL
+            LIMIT 1 FOR UPDATE
+            """)
+    Long lockSession(Long sessionId);
+
+    @Select("""
             SELECT e.epoch_id, e.session_id, e.epoch_no, e.fingerprint, e.story_bible_revision,
                    e.manuscript_revision, e.active_chapter_id, e.style_binding_revision, e.routing_mode,
                    e.router_model_config_id, e.router_model_config_revision, e.prompt_bundle_hash,
@@ -50,11 +57,13 @@ public interface AgentContextEpochMapper {
     int insert(AgentContextEpoch epoch);
 
     @Update("""
-            UPDATE agent_context_epochs e
-            JOIN agent_sessions s ON s.session_id = e.session_id
-            SET e.superseded_at = CURRENT_TIMESTAMP(3)
-            WHERE e.session_id = #{sessionId} AND e.epoch_id = s.active_context_epoch_id
-              AND e.epoch_id &lt;&gt; #{nextEpochId} AND e.superseded_at IS NULL
+            UPDATE agent_context_epochs
+            SET superseded_at = CURRENT_TIMESTAMP(3)
+            WHERE session_id = #{sessionId}
+              AND epoch_id = (
+                  SELECT active_context_epoch_id FROM agent_sessions WHERE session_id = #{sessionId}
+              )
+              AND epoch_id != #{nextEpochId} AND superseded_at IS NULL
             """)
     int supersedeCurrent(@Param("sessionId") Long sessionId, @Param("nextEpochId") Long nextEpochId);
 

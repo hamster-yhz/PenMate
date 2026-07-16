@@ -33,6 +33,16 @@ public record TaskProfile(
         reasoningSummary = normalize(reasoningSummary);
     }
 
+    public static TaskProfile fromTaskType(String taskType) {
+        String normalized = taskType == null ? "" : taskType.trim().toLowerCase(Locale.ROOT);
+        String profile = normalized.contains("rewrite") ? "rewrite"
+                : normalized.contains("world") ? "world-build" : "default";
+        return new TaskProfile(
+                List.of(), profile, List.of(), List.of(), List.of(), null,
+                false, true, false, "Explicit task type route"
+        );
+    }
+
     private static String normalize(String value) {
         return value == null ? null : value.trim();
     }

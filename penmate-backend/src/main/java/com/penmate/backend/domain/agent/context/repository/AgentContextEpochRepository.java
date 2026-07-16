@@ -4,6 +4,8 @@ import com.penmate.backend.domain.agent.context.model.AgentContextEpoch;
 
 public interface AgentContextEpochRepository {
 
+    Long lockSession(Long sessionId);
+
     AgentContextEpoch findCurrentByFingerprint(Long sessionId, String fingerprint);
 
     AgentContextEpoch findById(Long epochId);

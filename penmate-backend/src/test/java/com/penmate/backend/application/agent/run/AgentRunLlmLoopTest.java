@@ -174,4 +174,45 @@ class AgentRunLlmLoopTest {
         assertThat(llmRequest.getValue().messages().get(2).toolCallId()).isEqualTo("call-1");
         assertThat(llmRequest.getValue().messages().get(3).toolCallId()).isEqualTo("call-2");
     }
+
+    @Test
+    void resume_should_pause_again_when_a_remaining_sibling_requires_approval() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        List<AgentLlmToolCallPayload> calls = List.of(
+                new AgentLlmToolCallPayload("call-1", "function", "story_bible_update", "{\"operation\":\"batch\"}"),
+                new AgentLlmToolCallPayload("call-2", "function", "book_crud", "{\"operation\":\"delete\"}")
+        );
+        List<AgentLlmMessage> savedMessages = List.of(
+                AgentLlmMessage.user("Update the bible and delete the book"),
+                AgentLlmMessage.assistant("", calls)
+        );
+        AgentRunPendingApproval pending = new AgentRunPendingApproval(
+                1L, 88001L, 88001L, 70001L, 101L, 90001L, 50001L,
+                "call-1", "story_bible_update", "{\"operation\":\"batch\"}",
+                "{\"llmTurnIndex\":1,\"tokenUsage\":{\"promptTokens\":3,\"completionTokens\":2,\"totalTokens\":5},\"assistantText\":\"\"}",
+                objectMapper.writeValueAsString(savedMessages), "70001:call-1", "APPROVED",
+                201L, "trace-1", null, null
+        );
+        when(toolCallService.executeToolCall(any())).thenReturn(
+                ToolCallResult.success("{\"updated\":true}"),
+                ToolCallResult.waitingApproval(202L)
+        );
+        AgentRunLlmLoop loop = new AgentRunLlmLoop(
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService);
+
+        AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
+                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L
+        ), pending);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.WAITING_APPROVAL);
+        assertThat(result.approvalId()).isEqualTo(202L);
+        verify(llmGateway, never()).generateTurn(any(), any());
+        ArgumentCaptor<com.penmate.backend.application.agent.tool.runtime.ToolCallRequest> requests =
+                ArgumentCaptor.forClass(com.penmate.backend.application.agent.tool.runtime.ToolCallRequest.class);
+        verify(toolCallService, org.mockito.Mockito.times(2)).executeToolCall(requests.capture());
+        var siblingRequest = requests.getAllValues().get(1);
+        assertThat(siblingRequest.toolCallId()).isEqualTo("call-2");
+        assertThat(siblingRequest.conversationMessagesJson()).contains("call-1").contains("updated");
+    }
 }

@@ -20,13 +20,13 @@ class AgentRuntimeStateReducerContractTest {
         AgentRuntimeState state = AgentRuntimeState.empty(70001L);
 
         // Apply events one by one and check intermediate states
-        AgentRuntimeState s1 = reducer.apply(state, event(1L, "run.started", "{\"phase\":\"preflight\"}"));
+        AgentRuntimeState s1 = reducer.apply(state, event(1L, "run.started", "{\"phase\":\"routing\"}"));
         assertThat(s1.status()).isEqualTo("RUNNING");
-        assertThat(s1.phase()).isEqualTo("preflight");
+        assertThat(s1.phase()).isEqualTo("routing");
         assertThat(s1.lastEventSeq()).isEqualTo(1L);
 
         AgentRuntimeState s2 = reducer.apply(s1, event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"draft_generation\"}"));
-        assertThat(s2.phase()).isEqualTo("preflight");
+        assertThat(s2.phase()).isEqualTo("routing");
         assertThat(s2.lastEventSeq()).isEqualTo(2L);
 
         AgentRuntimeState s3 = reducer.apply(s2, event(3L, "tool.call.waiting_approval", "{\"toolCallId\":\"call-1\",\"approvalId\":88001}"));
@@ -42,7 +42,7 @@ class AgentRuntimeStateReducerContractTest {
     void applyAll_returns_fully_reduced_state() {
         AgentRuntimeState state = AgentRuntimeState.empty(70001L);
         AgentRuntimeState reduced = reducer.applyAll(state, List.of(
-                event(1L, "run.started", "{\"phase\":\"preflight\"}"),
+                event(1L, "run.started", "{\"phase\":\"routing\"}"),
                 event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"draft_generation\"}"),
                 event(3L, "tool.call.waiting_approval", "{\"toolCallId\":\"call-1\",\"approvalId\":88001}"),
                 event(4L, "message.delta", "{\"text\":\"abc\"}")
@@ -50,7 +50,7 @@ class AgentRuntimeStateReducerContractTest {
 
         assertThat(reduced).isNotNull();
         assertThat(reduced.runId()).isEqualTo(70001L);
-        assertThat(reduced.phase()).isEqualTo("preflight");
+        assertThat(reduced.phase()).isEqualTo("routing");
         assertThat(reduced.activeApprovalId()).isEqualTo(88001L);
         assertThat(reduced.assistantDraft()).isEqualTo("abc");
         assertThat(reduced.lastEventSeq()).isEqualTo(4L);

@@ -29,12 +29,12 @@ public class AgentRuntimeStateReducer {
         }
         JsonNode payload = readPayload(event.payloadJson());
         return switch (event.eventType()) {
-            case "run.started" -> state.withStatusAndPhase("RUNNING", "preflight", event.sequence());
+            case "run.started" -> state.withStatusAndPhase("RUNNING", "routing", event.sequence());
             case "run.phase.changed" -> state.withStatusAndPhase(
                     statusOrCurrent(state, payload),
                     text(payload, "phase", state.phase()),
                     event.sequence());
-            case "context.routing.completed", "context.epoch.bound" -> state.withLastEventSeq(event.sequence());
+            case "turn.route.completed", "context.epoch.bound" -> state.withLastEventSeq(event.sequence());
             case "context.resolved", "prompt.composed" -> state.withArtifactAdded(longValue(payload, "artifactId"), event.sequence());
             case "llm.turn.started" -> state.withLlmTurn(
                     intValue(payload, "llmTurnIndex"),

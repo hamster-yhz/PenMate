@@ -15,6 +15,7 @@ public class AgentContextEpochRepositoryImpl implements AgentContextEpochReposit
         this.mapper = Objects.requireNonNull(mapper, "mapper");
     }
 
+    @Override public Long lockSession(Long sessionId) { return mapper.lockSession(sessionId); }
     @Override public AgentContextEpoch findCurrentByFingerprint(Long sessionId, String fingerprint) { return mapper.findCurrentByFingerprint(sessionId, fingerprint); }
     @Override public AgentContextEpoch findById(Long epochId) { return mapper.findById(epochId); }
     @Override public int nextEpochNo(Long sessionId) { return mapper.nextEpochNo(sessionId); }

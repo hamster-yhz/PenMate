@@ -39,7 +39,7 @@ public class AgentProjectionUpdater {
         JsonNode payload = readPayload(event.payloadJson());
         switch (event.eventType()) {
             case "run.started" -> runProjectionRepository.updateRunState(
-                    event.runId(), "RUNNING", text(payload, "phase", "preflight"), null, event.sequence(), null, null);
+                    event.runId(), "RUNNING", text(payload, "phase", "routing"), null, event.sequence(), null, null);
             case "run.phase.changed" -> runProjectionRepository.updateRunState(
                     event.runId(), text(payload, "status", null), text(payload, "phase", null), null, event.sequence(), null, null);
             case "tool.call.started" -> runProjectionRepository.upsertToolCall(

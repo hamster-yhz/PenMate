@@ -29,6 +29,7 @@ class AgentContextEpochServiceTest {
     void should_create_immutable_epoch_and_bind_session_and_run() {
         byte[] snapshot = "{\"catalog\":[]}".getBytes(StandardCharsets.UTF_8);
         when(idGenerator.nextId()).thenReturn(900L);
+        when(repository.lockSession(20L)).thenReturn(20L);
         when(repository.nextEpochNo(20L)).thenReturn(1);
         when(storage.putText(anyString(), anyString(), anyString()))
                 .thenReturn(new ObjectStorageService.PutObjectResult("etag", (long) snapshot.length, null));
@@ -51,6 +52,7 @@ class AgentContextEpochServiceTest {
         AgentContextEpoch current = new AgentContextEpoch(
                 900L, 20L, 1, "ignored", 4L, 3L, 40L, 2L, "RETRIEVAL_THEN_LLM",
                 null, 0L, "prompt", "skills", "tools", "key", "hash", 2L, null, null);
+        when(repository.lockSession(20L)).thenReturn(20L);
         when(repository.findCurrentByFingerprint(any(), anyString())).thenReturn(current);
         when(repository.bindRun(30L, 900L)).thenReturn(1);
 

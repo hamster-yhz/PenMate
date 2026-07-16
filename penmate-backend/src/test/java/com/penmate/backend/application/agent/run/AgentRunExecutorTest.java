@@ -69,7 +69,7 @@ class AgentRunExecutorTest {
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("routing"));
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("epoch_binding"));
         verify(eventPublisher).publish(eq(70001L), eq("context.epoch.bound"), any());
-        verify(eventPublisher).publish(eq(70001L), eq("context.routing.completed"), any());
+        verify(eventPublisher).publish(eq(70001L), eq("turn.route.completed"), any());
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
     }
 

@@ -24,6 +24,9 @@ class StoryBibleContextEpochArchitectureTest {
             "AgentPreflightCoordinator",
             "AgentPreflightDecision",
             "DefaultAgentPreflightCoordinator",
+            "AgentRouteDecision",
+            "includeStoryBibleContext",
+            "preflight",
             "skill_prompt_read"
     );
 
