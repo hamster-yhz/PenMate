@@ -98,7 +98,8 @@ public class AgentRunEventStreamService {
         return event != null
                 && ("run.completed".equals(event.eventType())
                 || "run.failed".equals(event.eventType())
-                || "run.cancelled".equals(event.eventType()));
+                || "run.cancelled".equals(event.eventType())
+                || "run.superseded".equals(event.eventType()));
     }
 
     private AgentRunEventDto toDto(AgentEvent event) {

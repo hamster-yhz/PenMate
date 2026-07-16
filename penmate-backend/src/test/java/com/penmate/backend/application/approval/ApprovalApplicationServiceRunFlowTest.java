@@ -2,6 +2,7 @@ package com.penmate.backend.application.approval;
 
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.application.agent.run.AgentRunResumeDispatcher;
+import com.penmate.backend.application.agent.run.AgentRunLeaseService;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
@@ -33,6 +34,7 @@ class ApprovalApplicationServiceRunFlowTest {
                 pendingApprovalRepository,
                 eventPublisher,
                 runResumeDispatcher,
+                mock(AgentRunLeaseService.class),
                 mock(BusinessIdGenerator.class)
         );
         ApprovalRequest approval = approvalRequest(88001L, 70001L);
@@ -60,6 +62,7 @@ class ApprovalApplicationServiceRunFlowTest {
                 pendingApprovalRepository,
                 eventPublisher,
                 runResumeDispatcher,
+                mock(AgentRunLeaseService.class),
                 mock(BusinessIdGenerator.class)
         );
         ApprovalRequest approval = approvalRequest(88001L, 70001L);
@@ -86,6 +89,7 @@ class ApprovalApplicationServiceRunFlowTest {
                 pendingApprovalRepository,
                 eventPublisher,
                 runResumeDispatcher,
+                mock(AgentRunLeaseService.class),
                 businessIdGenerator
         );
         when(businessIdGenerator.nextId()).thenReturn(88001L);

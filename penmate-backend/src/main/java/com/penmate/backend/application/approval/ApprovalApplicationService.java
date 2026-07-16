@@ -2,6 +2,7 @@ package com.penmate.backend.application.approval;
 
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.application.agent.run.AgentRunResumeDispatcher;
+import com.penmate.backend.application.agent.run.AgentRunLeaseService;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.application.common.exception.BusinessException;
@@ -24,17 +25,20 @@ public class ApprovalApplicationService {
     private final AgentRunPendingApprovalRepository pendingApprovalRepository;
     private final AgentRunEventPublisher eventPublisher;
     private final AgentRunResumeDispatcher runResumeDispatcher;
+    private final AgentRunLeaseService runLeaseService;
     private final BusinessIdGenerator businessIdGenerator;
 
     public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
                                       AgentRunPendingApprovalRepository pendingApprovalRepository,
                                       AgentRunEventPublisher eventPublisher,
                                       AgentRunResumeDispatcher runResumeDispatcher,
+                                      AgentRunLeaseService runLeaseService,
                                       BusinessIdGenerator businessIdGenerator) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.pendingApprovalRepository = pendingApprovalRepository;
         this.eventPublisher = eventPublisher;
         this.runResumeDispatcher = runResumeDispatcher;
+        this.runLeaseService = runLeaseService;
         this.businessIdGenerator = businessIdGenerator;
     }
 
@@ -143,13 +147,15 @@ public class ApprovalApplicationService {
             log.info("审批驳回重复 pending 状态迁移跳过: approvalId={}", approvalId);
             return;
         }
+        runLeaseService.cancelWaitingApproval(pendingApproval.runId(),
+                "AGENT_APPROVAL_REJECTED", "Approval rejected");
         eventPublisher.publish(pendingApproval.runId(), "approval.rejected", Map.of(
                 "approvalId", approvalId,
                 "reviewedBy", command.reviewedBy(),
                 "comment", command.comment() == null ? "" : command.comment(),
                 "traceId", traceId
         ));
-        eventPublisher.publish(pendingApproval.runId(), "run.failed", Map.of(
+        eventPublisher.publish(pendingApproval.runId(), "run.cancelled", Map.of(
                 "errorCode", "AGENT_APPROVAL_REJECTED",
                 "errorMessage", "Approval rejected",
                 "approvalId", approvalId

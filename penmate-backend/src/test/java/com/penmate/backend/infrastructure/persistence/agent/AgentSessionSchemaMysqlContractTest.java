@@ -58,6 +58,11 @@ class AgentSessionSchemaMysqlContractTest {
                         "run_status",
                         "run_phase",
                         "active_approval_id",
+                        "lease_owner",
+                        "lease_until",
+                        "execution_token",
+                        "attempt_count",
+                        "next_retry_at",
                         "latest_event_seq",
                         "latest_checkpoint_id"
                 );
@@ -128,6 +133,11 @@ class AgentSessionSchemaMysqlContractTest {
         Files.copy(
                 Path.of("src/main/resources/db/migration/V12__init_pending_tool_invocations.sql"),
                 migrationDir.resolve("V12__init_pending_tool_invocations.sql"),
+                StandardCopyOption.REPLACE_EXISTING
+        );
+        Files.copy(
+                Path.of("src/main/resources/db/migration/V15__add_agent_run_leases.sql"),
+                migrationDir.resolve("V15__add_agent_run_leases.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }

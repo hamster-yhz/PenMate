@@ -55,7 +55,9 @@ public class AgentRuntimeStateReducer {
             case "approval.approved" -> state.withToolCallApproved(
                     text(payload, "approvedPayload", ""),
                     event.sequence());
-            case "approval.rejected" -> state.withStatusAndPhase("FAILED", "rejected", event.sequence());
+            case "approval.rejected", "run.cancelled" -> state.withStatusAndPhase("CANCELLED", "cancelled", event.sequence());
+            case "run.suspended" -> state.withStatusAndPhase("SUSPENDED", "suspended", event.sequence());
+            case "run.superseded" -> state.withStatusAndPhase("SUPERSEDED", "superseded", event.sequence());
             case "message.delta" -> state.appendAssistantDraft(text(payload, "text", ""), event.sequence());
             case "message.completed" -> state.withLastEventSeq(event.sequence());
             case "todo.created" -> state.withTodoAdded(text(payload, "todoId", ""), event.sequence());

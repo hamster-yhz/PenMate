@@ -14,17 +14,22 @@ public class AsyncAgentRunDispatcher implements AgentRunDispatcher {
 
     private final AgentRunExecutor agentRunExecutor;
     private final AgentRunEventPublisher eventPublisher;
+    private final AgentRunLeaseService leaseService;
 
     @Async
     @Override
     public void dispatchInitialRun(Long runId, String traceId) {
+        var lease = leaseService.tryAcquire(runId).orElse(null);
+        if (lease == null) return;
         try {
-            agentRunExecutor.execute(runId, traceId);
+            agentRunExecutor.execute(runId, traceId, lease);
         } catch (Exception ex) {
             log.error("agent run dispatch failed: runId={}, traceId={}", runId, traceId, ex);
             try {
-                eventPublisher.publish(runId, "run.failed", Map.of(
-                        "errorCode", "AGENT_RUN_DISPATCH_FAILED",
+                var status = leaseService.handleFailure(lease, ex);
+                eventPublisher.publish(runId, status.name().equals("SUSPENDED") ? "run.suspended" : "run.failed", Map.of(
+                        "errorCode", status.name().equals("SUSPENDED")
+                                ? "AGENT_RUN_TRANSIENT_FAILURE" : "AGENT_RUN_DISPATCH_FAILED",
                         "errorMessage", ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()
                 ));
             } catch (Exception publishEx) {

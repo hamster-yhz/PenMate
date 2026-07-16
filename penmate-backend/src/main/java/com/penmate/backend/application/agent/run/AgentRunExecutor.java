@@ -11,6 +11,7 @@ import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
+import com.penmate.backend.domain.agent.run.model.AgentRunLease;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
@@ -34,6 +35,7 @@ public class AgentRunExecutor {
     private final AgentRunPendingApprovalRepository pendingApprovals;
     private final AgentRunContextArtifactService contextArtifacts;
     private final AgentRunRecoveryService recoveryService;
+    private final AgentRunLeaseService leaseService;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
                             AgentRunEventPublisher eventPublisher,
@@ -45,7 +47,8 @@ public class AgentRunExecutor {
                             AgentCheckpointService checkpointService,
                             AgentRunPendingApprovalRepository pendingApprovals,
                             AgentRunContextArtifactService contextArtifacts,
-                            AgentRunRecoveryService recoveryService) {
+                            AgentRunRecoveryService recoveryService,
+                            AgentRunLeaseService leaseService) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
         this.contextResolutionService = contextResolutionService;
@@ -57,9 +60,14 @@ public class AgentRunExecutor {
         this.pendingApprovals = pendingApprovals;
         this.contextArtifacts = contextArtifacts;
         this.recoveryService = recoveryService;
+        this.leaseService = leaseService;
     }
 
     public void execute(Long runId, String traceId) {
+        execute(runId, traceId, null);
+    }
+
+    public void execute(Long runId, String traceId, AgentRunLease lease) {
         Objects.requireNonNull(runId, "runId must not be null");
         AgentRunInput input = runRepository.findInput(runId);
         if (input == null) {
@@ -157,12 +165,14 @@ public class AgentRunExecutor {
             evt = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", loopResult.approvalId()));
             state = stateReducer.apply(state, evt);
             checkpointService.checkpointIfNeeded(evt, state);
+            if (lease != null) leaseService.waitingApproval(lease, loopResult.approvalId());
             return;
         }
         if (loopResult.status() == AgentRunLoopResult.Status.FAILED) {
             evt = eventPublisher.publish(runId, "run.failed", Map.of("phase", "failed", "message", loopResult.finalAssistantText()));
             state = stateReducer.apply(state, evt);
             checkpointService.checkpointIfNeeded(evt, state);
+            if (lease != null) leaseService.failTerminal(lease, "AGENT_RUN_FAILED", loopResult.finalAssistantText());
             return;
         }
 
@@ -178,9 +188,14 @@ public class AgentRunExecutor {
         ));
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
+        if (lease != null) leaseService.complete(lease);
     }
 
     public void resume(Long runId, String traceId) {
+        resume(runId, traceId, null);
+    }
+
+    private void resume(Long runId, String traceId, AgentRunLease lease) {
         AgentRun run = runRepository.findRun(runId);
         AgentRunInput input = runRepository.findInput(runId);
         if (run == null || input == null) throw new IllegalArgumentException("Agent run not found: " + runId);
@@ -207,11 +222,13 @@ public class AgentRunExecutor {
         if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
             AgentEvent waiting = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", result.approvalId()));
             checkpointService.checkpointIfNeeded(waiting, stateReducer.apply(state, waiting));
+            if (lease != null) leaseService.waitingApproval(lease, result.approvalId());
             return;
         }
         if (result.status() == AgentRunLoopResult.Status.FAILED) {
             AgentEvent failed = eventPublisher.publish(runId, "run.failed", Map.of("phase", "failed", "message", result.finalAssistantText()));
             checkpointService.checkpointIfNeeded(failed, stateReducer.apply(state, failed));
+            if (lease != null) leaseService.failTerminal(lease, "AGENT_RUN_FAILED", result.finalAssistantText());
             return;
         }
         AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
@@ -220,6 +237,62 @@ public class AgentRunExecutor {
         AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
                 "phase", "completed", "tokenUsage", result.tokenUsage()));
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
+        if (lease != null) leaseService.complete(lease);
+    }
+
+    public void recover(Long runId, String traceId, AgentRunLease lease) {
+        if (pendingApprovals.findApprovedByRunId(runId) != null) {
+            resume(runId, traceId, lease);
+            return;
+        }
+
+        AgentRun run = runRepository.findRun(runId);
+        AgentRunInput input = runRepository.findInput(runId);
+        if (run == null || input == null) throw new IllegalArgumentException("Agent run not found: " + runId);
+        AgentRuntimeState state = recoveryService.recover(runId);
+        if (state == null || state.artifactRefs().isEmpty()) {
+            execute(runId, traceId, lease);
+            return;
+        }
+
+        var contextArtifact = contextArtifacts.loadContextForRun(runId, state.artifactRefs());
+        if (run.contextEpochId() == null || !run.contextEpochId().equals(contextArtifact.contextEpochId())) {
+            throw new IllegalStateException("Run Context Epoch does not match its immutable artifact");
+        }
+        var promptArtifact = contextArtifacts.loadPromptPlanForRun(runId, state.artifactRefs());
+        Long modelConfigId = extractModelConfigIdFromSnapshot(input.modelSnapshotJson());
+        AgentLlmExecutionConfig executionConfig = modelConfigId == null
+                ? AgentLlmExecutionConfig.builder().build()
+                : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
+        leaseService.assertOwned(lease);
+        AgentRunLoopResult result = llmLoop.execute(new AgentRunLoopRequest(
+                runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
+                promptMessages(promptArtifact.plan(), input.promptSnapshot()), executionConfig, run.ownerUserId()));
+        finishRecoveredRun(runId, result, state, lease);
+    }
+
+    private void finishRecoveredRun(Long runId, AgentRunLoopResult result,
+                                    AgentRuntimeState state, AgentRunLease lease) {
+        if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
+            AgentEvent waiting = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", result.approvalId()));
+            checkpointService.checkpointIfNeeded(waiting, stateReducer.apply(state, waiting));
+            leaseService.waitingApproval(lease, result.approvalId());
+            return;
+        }
+        if (result.status() == AgentRunLoopResult.Status.FAILED) {
+            AgentEvent failed = eventPublisher.publish(runId, "run.failed", Map.of(
+                    "phase", "failed", "message", result.finalAssistantText()));
+            checkpointService.checkpointIfNeeded(failed, stateReducer.apply(state, failed));
+            leaseService.failTerminal(lease, "AGENT_RUN_FAILED", result.finalAssistantText());
+            return;
+        }
+        AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
+                "role", "assistant", "text", result.finalAssistantText()));
+        state = stateReducer.apply(state, message);
+        AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
+                "phase", "completed", "tokenUsage", result.tokenUsage()));
+        checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
+        leaseService.complete(lease);
     }
 
     private List<AgentLlmMessage> promptMessages(PromptPlan plan, String userRequest) {

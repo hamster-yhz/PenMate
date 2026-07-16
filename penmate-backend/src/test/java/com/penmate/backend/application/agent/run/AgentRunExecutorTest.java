@@ -50,6 +50,7 @@ class AgentRunExecutorTest {
     @Mock private AgentRunPendingApprovalRepository pendingApprovals;
     @Mock private AgentRunContextArtifactService contextArtifacts;
     @Mock private AgentRunRecoveryService recoveryService;
+    @Mock private AgentRunLeaseService leaseService;
 
     @Test
     void executor_routes_context_without_full_preflight_then_executes_run() {
@@ -127,7 +128,7 @@ class AgentRunExecutorTest {
     private AgentRunExecutor executor() {
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
-                recoveryService);
+                recoveryService, leaseService);
     }
 
     private AgentRun run() {

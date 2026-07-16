@@ -58,8 +58,17 @@ public class AgentProjectionUpdater {
             case "approval.approved" -> runProjectionRepository.updateRunState(
                     event.runId(), "RUNNING", null, null, event.sequence(), null, null);
             case "approval.rejected" -> runProjectionRepository.updateRunState(
-                    event.runId(), "FAILED", null, null, event.sequence(),
+                    event.runId(), "CANCELLED", "cancelled", null, event.sequence(),
                     errorCode(payload, "AGENT_APPROVAL_REJECTED"), errorMessage(payload));
+            case "run.suspended" -> runProjectionRepository.updateRunState(
+                    event.runId(), "SUSPENDED", "suspended", null, event.sequence(),
+                    errorCode(payload, "AGENT_RUN_TRANSIENT_FAILURE"), errorMessage(payload));
+            case "run.cancelled" -> runProjectionRepository.updateRunState(
+                    event.runId(), "CANCELLED", "cancelled", null, event.sequence(),
+                    errorCode(payload, "AGENT_RUN_CANCELLED"), errorMessage(payload));
+            case "run.superseded" -> runProjectionRepository.updateRunState(
+                    event.runId(), "SUPERSEDED", "superseded", null, event.sequence(),
+                    errorCode(payload, "AGENT_RUN_SUPERSEDED"), errorMessage(payload));
             case "message.completed" -> persistAssistantMessage(event, payload);
             case "run.completed" -> runProjectionRepository.updateRunState(event.runId(), "DONE", "completed", null, event.sequence(), null, null);
             case "run.failed" -> runProjectionRepository.updateRunState(

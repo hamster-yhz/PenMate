@@ -109,6 +109,19 @@ public class AgentRunContextArtifactService {
         catch (JsonProcessingException ex) { throw BusinessException.conflict("Run prompt artifact is invalid"); }
     }
 
+    public PromptArtifact loadPromptPlanForRun(Long runId, List<Long> artifactRefs) {
+        List<Long> refs = artifactRefs == null ? List.of() : artifactRefs;
+        ListIterator<Long> iterator = refs.listIterator(refs.size());
+        while (iterator.hasPrevious()) {
+            Long artifactId = iterator.previous();
+            AgentArtifact row = artifacts.findById(artifactId);
+            if (row != null && runId.equals(row.runId()) && "prompt.composed".equals(row.artifactType())) {
+                return loadPromptPlan(artifactId);
+            }
+        }
+        throw BusinessException.notFound("Run prompt artifact not found");
+    }
+
     private String json(Object value) {
         try { return objectMapper.writeValueAsString(value); }
         catch (JsonProcessingException ex) { throw BusinessException.of("Failed to serialize Run context artifact"); }

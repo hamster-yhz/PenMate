@@ -36,6 +36,11 @@ class AgentMapperGenerationTaskMysqlContractTest {
                 migrationDir.resolve("V12__init_pending_tool_invocations.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
+        Files.copy(
+                Path.of("src/main/resources/db/migration/V15__add_agent_run_leases.sql"),
+                migrationDir.resolve("V15__add_agent_run_leases.sql"),
+                StandardCopyOption.REPLACE_EXISTING
+        );
         Flyway.configure()
                 .dataSource(JDBC_URL, "sa", "")
                 .locations("filesystem:" + MIGRATION_DIR)
@@ -48,6 +53,7 @@ class AgentMapperGenerationTaskMysqlContractTest {
         assertThat(columnsOf("agent_runs"))
                 .contains("run_id", "session_id", "turn_id", "project_id")
                 .contains("run_status", "run_phase", "active_approval_id", "latest_event_seq", "latest_checkpoint_id")
+                .contains("lease_owner", "lease_until", "execution_token", "attempt_count", "next_retry_at")
                 .contains("started_at", "finished_at", "trace_id");
 
         assertThat(columnsOf("agent_run_inputs"))
