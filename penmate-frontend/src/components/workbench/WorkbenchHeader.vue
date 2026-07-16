@@ -8,10 +8,10 @@
     </div>
     <div class="header-center">
       <div class="workspace-mode" role="group" aria-label="工作模式">
-        <button type="button" :class="{ active: workbenchMode === 'writing' }" @click="emit('update:workbench-mode', 'writing')">
+        <button type="button" title="写作" aria-label="写作" :class="{ active: workbenchMode === 'writing' }" @click="emit('update:workbench-mode', 'writing')">
           <EditOutlined /> 写作
         </button>
-        <button type="button" :class="{ active: workbenchMode === 'story-bible' }" @click="emit('update:workbench-mode', 'story-bible')">
+        <button type="button" title="Story Bible" aria-label="Story Bible" :class="{ active: workbenchMode === 'story-bible' }" @click="emit('update:workbench-mode', 'story-bible')">
           <BookOutlined /> Story Bible
         </button>
       </div>
@@ -321,5 +321,26 @@ const emit = defineEmits<{
       background: rgba(192, 60, 45, 0.08);
     }
   }
+}
+
+@media (max-width: 640px) {
+  .wb-header { position: relative; padding: 0 8px; gap: 8px; }
+  .header-left,
+  .header-center,
+  .header-right { flex: 0 0 auto; gap: 6px; }
+  .header-left .header-divider,
+  .novel-title,
+  .word-count,
+  .save-hint,
+  .header-right > .hdr-btn,
+  .header-right > .header-divider { display: none; }
+  .header-logo { width: 26px; height: 26px; }
+  .header-brand { flex: 0 0 auto; font-size: 0.88rem; white-space: nowrap; }
+  .header-center { position: absolute; left: 50%; transform: translateX(-50%); }
+  .header-right { position: absolute; right: 8px; }
+  .workspace-mode { grid-template-columns: 42px 48px; width: 90px; }
+  .workspace-mode button { gap: 0; font-size: 0; }
+  .workspace-mode button :deep(.anticon) { font-size: 14px; }
+  .user-avatar { width: 28px; height: 28px; }
 }
 </style>

@@ -10,7 +10,9 @@ import {
   type StoryBibleNodePayload,
   type StoryBibleNodeType,
   type StoryBibleProgression,
+  type StoryBibleProgressionUpdatePayload,
   type StoryBibleRelation,
+  type StoryBibleRelationUpdatePayload,
   type StoryBibleRoot,
   type StoryBibleRoutingMode,
   type StoryBibleRoutingPreference,
@@ -128,6 +130,16 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     const message = String((error as Error)?.message || fallback)
     errorMessage.value = message
     options.notify?.(message)
+  }
+
+  const refreshRevisionAndHistory = async () => {
+    const { projectId } = requireContext()
+    const [nextRoot, nextHistory] = await Promise.all([
+      storyBibleApi.get(projectId),
+      storyBibleApi.listChanges(projectId),
+    ])
+    root.value = nextRoot
+    history.value = nextHistory
   }
 
   const loadRoutingPreferences = async () => {
@@ -269,12 +281,24 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     const context = requireContext()
     const relation = await storyBibleApi.createRelation(context.projectId, context.operatorId, payload)
     relations.value.push(relation)
+    await refreshRevisionAndHistory()
+  }
+
+  const updateRelation = async (relationId: string, payload: StoryBibleRelationUpdatePayload) => {
+    const context = requireContext()
+    const relation = await storyBibleApi.updateRelation(
+      context.projectId, relationId, context.operatorId, payload,
+    )
+    const index = relations.value.findIndex((item) => item.relationId === relationId)
+    if (index >= 0) relations.value.splice(index, 1, relation)
+    await refreshRevisionAndHistory()
   }
 
   const deleteRelation = async (relation: StoryBibleRelation) => {
     const context = requireContext()
     await storyBibleApi.deleteRelation(context.projectId, relation.relationId, context.operatorId, relation.revision)
     relations.value = relations.value.filter((item) => item.relationId !== relation.relationId)
+    await refreshRevisionAndHistory()
   }
 
   const createProgression = async (payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>) => {
@@ -285,6 +309,18 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     )
     progressions.value.push(progression)
     await selectNode(selectedNodeId.value)
+    await refreshRevisionAndHistory()
+  }
+
+  const updateProgression = async (progressionId: string, payload: StoryBibleProgressionUpdatePayload) => {
+    const context = requireContext()
+    const progression = await storyBibleApi.updateProgression(
+      context.projectId, progressionId, context.operatorId, payload,
+    )
+    const index = progressions.value.findIndex((item) => item.progressionId === progressionId)
+    if (index >= 0) progressions.value.splice(index, 1, progression)
+    if (selectedNodeId.value) await selectNode(selectedNodeId.value)
+    await refreshRevisionAndHistory()
   }
 
   const deleteProgression = async (progression: StoryBibleProgression) => {
@@ -294,54 +330,64 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     )
     progressions.value = progressions.value.filter((item) => item.progressionId !== progression.progressionId)
     if (selectedNodeId.value) await selectNode(selectedNodeId.value)
+    await refreshRevisionAndHistory()
   }
 
   const saveNodeType = async (payload: Omit<StoryBibleNodeType, 'typeId' | 'storyBibleId' | 'system'> & { typeId?: string }) => {
     const context = requireContext()
-    const saved = payload.typeId
-      ? await storyBibleApi.updateNodeType(context.projectId, payload.typeId, context.operatorId, payload)
-      : await storyBibleApi.createNodeType(context.projectId, context.operatorId, payload)
+    const { typeId, ...command } = payload
+    const saved = typeId
+      ? await storyBibleApi.updateNodeType(context.projectId, typeId, context.operatorId, command)
+      : await storyBibleApi.createNodeType(context.projectId, context.operatorId, command)
     const index = nodeTypes.value.findIndex((item) => item.typeId === saved.typeId)
     if (index >= 0) nodeTypes.value.splice(index, 1, saved)
     else nodeTypes.value.push(saved)
+    await refreshRevisionAndHistory()
   }
 
   const archiveNodeType = async (type: StoryBibleNodeType) => {
     const context = requireContext()
     await storyBibleApi.archiveNodeType(context.projectId, type.typeId, context.operatorId)
     nodeTypes.value = nodeTypes.value.filter((item) => item.typeId !== type.typeId)
+    await refreshRevisionAndHistory()
   }
 
   const saveCategory = async (payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'> & { categoryId?: string }) => {
     const context = requireContext()
-    const saved = payload.categoryId
-      ? await storyBibleApi.updateCategory(context.projectId, payload.categoryId, context.operatorId, payload)
-      : await storyBibleApi.createCategory(context.projectId, context.operatorId, payload)
+    const { categoryId, ...command } = payload
+    const saved = categoryId
+      ? await storyBibleApi.updateCategory(context.projectId, categoryId, context.operatorId, command)
+      : await storyBibleApi.createCategory(context.projectId, context.operatorId, command)
     const index = categories.value.findIndex((item) => item.categoryId === saved.categoryId)
     if (index >= 0) categories.value.splice(index, 1, saved)
     else categories.value.push(saved)
+    await refreshRevisionAndHistory()
   }
 
   const deleteCategory = async (category: StoryBibleCategory) => {
     const context = requireContext()
     await storyBibleApi.deleteCategory(context.projectId, category.categoryId, context.operatorId)
     categories.value = categories.value.filter((item) => item.categoryId !== category.categoryId)
+    await refreshRevisionAndHistory()
   }
 
   const saveTag = async (payload: Pick<StoryBibleTag, 'name' | 'color'> & { tagId?: string }) => {
     const context = requireContext()
-    const saved = payload.tagId
-      ? await storyBibleApi.updateTag(context.projectId, payload.tagId, context.operatorId, payload)
-      : await storyBibleApi.createTag(context.projectId, context.operatorId, payload)
+    const { tagId, ...command } = payload
+    const saved = tagId
+      ? await storyBibleApi.updateTag(context.projectId, tagId, context.operatorId, command)
+      : await storyBibleApi.createTag(context.projectId, context.operatorId, command)
     const index = tags.value.findIndex((item) => item.tagId === saved.tagId)
     if (index >= 0) tags.value.splice(index, 1, saved)
     else tags.value.push(saved)
+    await refreshRevisionAndHistory()
   }
 
   const deleteTag = async (tag: StoryBibleTag) => {
     const context = requireContext()
     await storyBibleApi.deleteTag(context.projectId, tag.tagId, context.operatorId)
     tags.value = tags.value.filter((item) => item.tagId !== tag.tagId)
+    await refreshRevisionAndHistory()
   }
 
   const saveViewPreference = async (view: StoryBibleViewPreference) => {
@@ -349,6 +395,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     const saved = await storyBibleApi.updateView(context.projectId, view.viewCode, context.operatorId, view)
     const index = views.value.findIndex((item) => item.viewCode === saved.viewCode)
     if (index >= 0) views.value.splice(index, 1, saved)
+    await refreshRevisionAndHistory()
   }
 
   const saveUserRoutingPreference = async (mode: StoryBibleRoutingMode, routerModelConfigId?: string | null) => {
@@ -404,8 +451,10 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     saveNode,
     deleteSelectedNode,
     createRelation,
+    updateRelation,
     deleteRelation,
     createProgression,
+    updateProgression,
     deleteProgression,
     saveNodeType,
     archiveNodeType,

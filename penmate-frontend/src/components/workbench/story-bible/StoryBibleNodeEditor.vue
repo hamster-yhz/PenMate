@@ -27,6 +27,7 @@
           :nodes="nodes"
           :relations="relations"
           @create="emit('createRelation', $event)"
+          @update="emit('updateRelation', $event)"
           @delete="emit('deleteRelation', $event)"
         />
         <StoryBibleProgressionsTab
@@ -35,6 +36,7 @@
           :progressions="progressions"
           :effective-state="effectiveState"
           @create="emit('createProgression', $event)"
+          @update="emit('updateProgression', $event)"
           @delete="emit('deleteProgression', $event)"
         />
         <StoryBibleHistoryTab v-else-if="activeTab === 'history'" :history="history" @open-run="emit('openRun', $event)" />
@@ -51,7 +53,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ApartmentOutlined, BookOutlined, ClockCircleOutlined, DeleteOutlined, HistoryOutlined, SaveOutlined, SettingOutlined } from '@ant-design/icons-vue'
-import type { StoryBibleCategory, StoryBibleChangeset, StoryBibleNode, StoryBibleNodeType, StoryBibleProgression, StoryBibleRelation, StoryBibleTag } from '@/api/modules/storyBible.api'
+import type { StoryBibleCategory, StoryBibleChangeset, StoryBibleNode, StoryBibleNodeType, StoryBibleProgression, StoryBibleProgressionUpdatePayload, StoryBibleRelation, StoryBibleRelationUpdatePayload, StoryBibleTag } from '@/api/modules/storyBible.api'
 import type { StoryBibleNodeDraft } from '@/composables/workbench/useStoryBible'
 import StoryBibleBaseTab from './StoryBibleBaseTab.vue'
 import StoryBibleHistoryTab from './StoryBibleHistoryTab.vue'
@@ -76,8 +78,10 @@ const emit = defineEmits<{
   (event: 'delete'): void
   (event: 'openRouting'): void
   (event: 'createRelation', payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'revision'>): void
+  (event: 'updateRelation', payload: { relationId: string; update: StoryBibleRelationUpdatePayload }): void
   (event: 'deleteRelation', payload: StoryBibleRelation): void
   (event: 'createProgression', payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>): void
+  (event: 'updateProgression', payload: { progressionId: string; update: StoryBibleProgressionUpdatePayload }): void
   (event: 'deleteProgression', payload: StoryBibleProgression): void
   (event: 'openRun', runId: string): void
 }>()

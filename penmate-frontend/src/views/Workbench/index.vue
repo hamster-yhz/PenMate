@@ -73,6 +73,7 @@
 
       <StoryBibleWorkspace
         v-else
+        ref="storyBibleWorkspaceRef"
         :project-id="getCurrentProjectId()"
         :operator-id="resolveOperatorId()"
         :user-id="session.userId"
@@ -113,6 +114,16 @@
         @send="sendMessage"
         @open-model-settings="showModelSettings = true"
       />
+
+      <button
+        type="button"
+        class="mobile-chat-toggle"
+        :title="rightCollapsed ? '打开 Agent 对话' : '关闭 Agent 对话'"
+        @click="rightCollapsed = !rightCollapsed"
+      >
+        <MessageOutlined v-if="rightCollapsed" />
+        <CloseOutlined v-else />
+      </button>
     </div>
 
     <StyleManager
@@ -131,6 +142,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { CloseOutlined, MessageOutlined } from '@ant-design/icons-vue'
 import StyleManager from '@/components/workbench/StyleManager.vue'
 import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
 import ModelSettings from '@/components/workbench/ModelSettings.vue'
@@ -211,7 +223,7 @@ const userMenuOpen = ref(false)
 const canAccessRbacAdmin = ref(false)
 const novelTitle = ref('未命名小说')
 const leftCollapsed = ref(false)
-const rightCollapsed = ref(false)
+const rightCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches)
 const showStyleManager = ref(false)
 const showPluginWorkshop = ref(false)
 const showModelSettings = ref(false)
@@ -223,6 +235,7 @@ const leftTabs = ref([
 ])
 const workbenchMode = ref<'writing' | 'story-bible'>(route.query.mode === 'story-bible' ? 'story-bible' : 'writing')
 const storyBibleNodeId = computed(() => typeof route.query.nodeId === 'string' ? route.query.nodeId : '')
+const storyBibleWorkspaceRef = ref<{ reload: () => Promise<void> } | null>(null)
 const setWorkbenchMode = (mode: 'writing' | 'story-bible') => {
   workbenchMode.value = mode
   const query = { ...route.query }
@@ -536,6 +549,7 @@ const {
   generationStatusText,
   agentStatusDetailText,
   streamingAssistantMsgId,
+  runtimeEventSource,
   currentConversationId,
   loadConversationList,
   toggleConversationPanel,
@@ -848,6 +862,11 @@ watch(editorContent, (value) => {
 watch(() => route.query.mode, (mode) => {
   workbenchMode.value = mode === 'story-bible' ? 'story-bible' : 'writing'
 })
+watch(runtimeEventSource, (event) => {
+  if (event?.eventName === 'run.completed' && storyBibleWorkspaceRef.value) {
+    void storyBibleWorkspaceRef.value.reload()
+  }
+})
 </script>
 
 <style lang="less">
@@ -866,6 +885,40 @@ watch(() => route.query.mode, (mode) => {
   flex-direction: row;
   align-items: stretch;
   overflow: hidden;
+}
+
+.mobile-chat-toggle { display: none; }
+
+@media (max-width: 1080px) {
+  .workbench-shell > .panel-right {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    bottom: 0;
+    z-index: 240;
+    width: min(92vw, 360px);
+    border-left: 1px solid var(--border-gold);
+    background: rgba(11, 17, 32, 0.99);
+    box-shadow: var(--shadow-lg);
+  }
+  .workbench-shell > .panel-right.collapsed { display: none; }
+  .workbench-shell > .panel-right .panel-toggle { display: none; }
+  .mobile-chat-toggle {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 260;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border-gold);
+    border-radius: 50%;
+    color: var(--amber-gold);
+    background: rgba(17, 24, 39, 0.98);
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+  }
 }
 </style>
 

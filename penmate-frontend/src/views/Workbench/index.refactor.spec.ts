@@ -154,4 +154,14 @@ describe('Workbench index refactor', () => {
     expect(source).toMatch(/\.workbench-shell\s*\{[\s\S]*?flex:\s*1;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;/)
   })
 
+  it('refreshes Story Bible after completed runs and uses a mobile chat drawer', () => {
+    const source = readWorkbenchSource()
+
+    expect(source).toContain('ref="storyBibleWorkspaceRef"')
+    expect(source).toContain("event?.eventName === 'run.completed'")
+    expect(source).toContain('storyBibleWorkspaceRef.value.reload()')
+    expect(source).toContain('class="mobile-chat-toggle"')
+    expect(source).toMatch(/@media\s*\(max-width:\s*1080px\)[\s\S]*?\.workbench-shell\s*>\s*\.panel-right[\s\S]*?position:\s*fixed;/)
+  })
+
 })

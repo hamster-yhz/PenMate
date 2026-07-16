@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { storyBibleApi, type StoryBibleNode } from '@/api/modules/storyBible.api'
+import { storyBibleApi, type StoryBibleNode, type StoryBibleProgression, type StoryBibleRelation } from '@/api/modules/storyBible.api'
 import { useStoryBible } from '../useStoryBible'
 
 const node: StoryBibleNode = {
   nodeId: '71', storyBibleId: '11', typeId: '21', title: 'Mira', summary: 'Pilot', bodyMarkdown: 'Body',
   attributesJson: '{}', inclusionPolicy: 'AUTO_RETRIEVE', canonStatus: 'CANON', revision: 3,
+}
+const relation: StoryBibleRelation = {
+  relationId: '91', storyBibleId: '11', sourceNodeId: '71', targetNodeId: '72', relationType: 'ALLY_OF',
+  description: 'Old', attributesJson: '{}', revision: 2,
+}
+const progression: StoryBibleProgression = {
+  progressionId: '92', storyBibleId: '11', nodeId: '71', anchorChapterId: '301', endChapterId: null,
+  storyEventNodeId: null, patchJson: '[]', summary: 'Old', revision: 4,
 }
 
 describe('useStoryBible', () => {
@@ -46,5 +54,39 @@ describe('useStoryBible', () => {
 
     expect(story.draft.value?.title).toBe('Local edit')
     expect(story.errorMessage.value).toContain('revision conflict')
+  })
+
+  it('updates relations and progressions with expected revisions and refreshes audit metadata', async () => {
+    vi.mocked(storyBibleApi.listRelations).mockResolvedValueOnce([relation])
+    vi.mocked(storyBibleApi.listProgressions).mockResolvedValueOnce([progression])
+    const updatedRelation = { ...relation, description: 'New', revision: 3 }
+    const updatedProgression = { ...progression, summary: 'New', revision: 5 }
+    const updateRelation = vi.spyOn(storyBibleApi, 'updateRelation').mockResolvedValue(updatedRelation)
+    const updateProgression = vi.spyOn(storyBibleApi, 'updateProgression').mockResolvedValue(updatedProgression)
+    const story = useStoryBible({ getContext: () => ({ projectId: '101', operatorId: '7', chapterId: '301' }) })
+    await story.loadWorkspace()
+
+    await story.updateRelation('91', {
+      expectedRevision: 2,
+      targetNodeId: '72',
+      relationType: 'ALLY_OF',
+      description: 'New',
+      attributesJson: '{}',
+    })
+    await story.updateProgression('92', {
+      expectedRevision: 4,
+      anchorChapterId: '301',
+      endChapterId: null,
+      storyEventNodeId: null,
+      patchJson: '[]',
+      summary: 'New',
+    })
+
+    expect(updateRelation).toHaveBeenCalledWith('101', '91', '7', expect.objectContaining({ expectedRevision: 2 }))
+    expect(updateProgression).toHaveBeenCalledWith('101', '92', '7', expect.objectContaining({ expectedRevision: 4 }))
+    expect(story.relations.value[0]).toEqual(updatedRelation)
+    expect(story.progressions.value[0]).toEqual(updatedProgression)
+    expect(storyBibleApi.get).toHaveBeenCalledTimes(3)
+    expect(storyBibleApi.listChanges).toHaveBeenCalledTimes(3)
   })
 })

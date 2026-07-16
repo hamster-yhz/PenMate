@@ -18,9 +18,26 @@
 
     <div class="progression-list">
       <div v-for="item in progressions" :key="item.progressionId" class="progression-row">
-        <div class="anchor"><span>{{ item.anchorChapterId }}</span><ArrowRightOutlined /><span>{{ item.endChapterId || '持续' }}</span></div>
-        <div class="progression-copy"><strong>{{ item.summary || '状态演进' }}</strong><code>{{ item.patchJson }}</code></div>
-        <button type="button" title="删除状态演进" @click="emit('delete', item)"><DeleteOutlined /></button>
+        <template v-if="editingProgressionId === item.progressionId">
+          <div class="progression-edit">
+            <input v-model="editAnchorChapterId" required aria-label="编辑起始章节" />
+            <input v-model="editEndChapterId" aria-label="编辑结束章节" />
+            <input v-model="editSummary" aria-label="编辑变化摘要" />
+            <textarea v-model="editPatchJson" rows="4" required aria-label="编辑 RFC 6902 Patch"></textarea>
+          </div>
+          <div class="row-actions">
+            <button type="button" title="保存状态演进" @click="saveEdit(item)"><SaveOutlined /></button>
+            <button type="button" title="取消编辑" @click="cancelEdit"><CloseOutlined /></button>
+          </div>
+        </template>
+        <template v-else>
+          <div class="anchor"><span>{{ item.anchorChapterId }}</span><ArrowRightOutlined /><span>{{ item.endChapterId || '持续' }}</span></div>
+          <div class="progression-copy"><strong>{{ item.summary || '状态演进' }}</strong><code>{{ item.patchJson }}</code></div>
+          <div class="row-actions">
+            <button type="button" title="编辑状态演进" @click="startEdit(item)"><EditOutlined /></button>
+            <button type="button" title="删除状态演进" class="danger" @click="emit('delete', item)"><DeleteOutlined /></button>
+          </div>
+        </template>
       </div>
       <div v-if="!progressions.length" class="empty-state">当前节点尚无状态演进</div>
     </div>
@@ -29,18 +46,24 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ArrowRightOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue'
-import type { StoryBibleProgression } from '@/api/modules/storyBible.api'
+import { ArrowRightOutlined, CloseOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons-vue'
+import type { StoryBibleProgression, StoryBibleProgressionUpdatePayload } from '@/api/modules/storyBible.api'
 
 const props = defineProps<{ chapterId?: string; progressions: StoryBibleProgression[]; effectiveState: Record<string, unknown> | null }>()
 const emit = defineEmits<{
   (event: 'create', payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>): void
+  (event: 'update', payload: { progressionId: string; update: StoryBibleProgressionUpdatePayload }): void
   (event: 'delete', payload: StoryBibleProgression): void
 }>()
 const anchorChapterId = ref(props.chapterId || '')
 const endChapterId = ref('')
 const summary = ref('')
 const patchJson = ref('[\n  { "op": "replace", "path": "/summary", "value": "" }\n]')
+const editingProgressionId = ref('')
+const editAnchorChapterId = ref('')
+const editEndChapterId = ref('')
+const editSummary = ref('')
+const editPatchJson = ref('[]')
 watch(() => props.chapterId, (value) => { if (value) anchorChapterId.value = value })
 const formattedEffectiveState = computed(() => props.effectiveState ? JSON.stringify(props.effectiveState, null, 2) : '选择章节后显示有效状态')
 const submit = () => {
@@ -53,6 +76,30 @@ const submit = () => {
   })
   endChapterId.value = ''
   summary.value = ''
+}
+const startEdit = (item: StoryBibleProgression) => {
+  editingProgressionId.value = item.progressionId
+  editAnchorChapterId.value = item.anchorChapterId
+  editEndChapterId.value = item.endChapterId || ''
+  editSummary.value = item.summary || ''
+  editPatchJson.value = item.patchJson
+}
+const cancelEdit = () => {
+  editingProgressionId.value = ''
+}
+const saveEdit = (item: StoryBibleProgression) => {
+  emit('update', {
+    progressionId: item.progressionId,
+    update: {
+      expectedRevision: item.revision,
+      anchorChapterId: editAnchorChapterId.value,
+      endChapterId: editEndChapterId.value || null,
+      storyEventNodeId: item.storyEventNodeId || null,
+      patchJson: editPatchJson.value,
+      summary: editSummary.value,
+    },
+  })
+  cancelEdit()
 }
 </script>
 
@@ -70,11 +117,15 @@ input, textarea, button { min-width: 0; border: 1px solid var(--border-subtle); 
 input, button { height: 34px; padding: 0 8px; }
 textarea { padding: 8px; resize: vertical; }
 .progression-form button { width: max-content; color: var(--amber-gold); border-color: var(--border-gold); cursor: pointer; }
-.progression-row { min-height: 70px; display: grid; grid-template-columns: 120px minmax(0, 1fr) 32px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-subtle); }
+.progression-row { min-height: 70px; display: grid; grid-template-columns: 120px minmax(0, 1fr) 68px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border-subtle); }
 .anchor { display: flex; align-items: center; gap: 5px; color: var(--amber-gold); font-size: 0.7rem; }
 .progression-copy { min-width: 0; display: grid; gap: 4px; }
 .progression-copy strong { font-size: 0.78rem; }
 .progression-copy code { overflow: hidden; color: var(--text-muted); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
-.progression-row button { width: 32px; padding: 0; color: #c9827b; border-color: transparent; background: transparent; cursor: pointer; }
+.progression-edit { grid-column: 1 / 3; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; }
+.progression-edit textarea { grid-column: 1 / -1; }
+.row-actions { display: flex; gap: 2px; }
+.progression-row button { width: 32px; padding: 0; color: var(--amber-gold); border-color: transparent; background: transparent; cursor: pointer; }
+.progression-row button.danger { color: #c9827b; }
 .empty-state { padding: 24px; text-align: center; color: var(--text-muted); }
 </style>

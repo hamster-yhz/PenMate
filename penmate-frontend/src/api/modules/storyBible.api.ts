@@ -88,6 +88,14 @@ export interface StoryBibleRelation {
   revision: number
 }
 
+export interface StoryBibleRelationUpdatePayload {
+  expectedRevision: number
+  relationType: string
+  targetNodeId: string
+  description?: string | null
+  attributesJson: string
+}
+
 export interface StoryBibleProgression {
   progressionId: string
   storyBibleId: string
@@ -98,6 +106,15 @@ export interface StoryBibleProgression {
   patchJson: string
   summary?: string | null
   revision: number
+}
+
+export interface StoryBibleProgressionUpdatePayload {
+  expectedRevision: number
+  anchorChapterId: string
+  endChapterId?: string | null
+  storyEventNodeId?: string | null
+  patchJson: string
+  summary?: string | null
 }
 
 export interface StoryBibleChangeset {
@@ -222,7 +239,7 @@ export const storyBibleApi = {
   createRelation(projectId: string, operatorId: string, payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'revision'>) {
     return request.post<StoryBibleRelation>(`${base(projectId)}/relations?${operatorQuery(operatorId)}`, payload)
   },
-  updateRelation(projectId: string, relationId: string, operatorId: string, payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'sourceNodeId'>) {
+  updateRelation(projectId: string, relationId: string, operatorId: string, payload: StoryBibleRelationUpdatePayload) {
     return request.patch<StoryBibleRelation>(`${base(projectId)}/relations/${relationId}?${operatorQuery(operatorId)}`, payload)
   },
   deleteRelation(projectId: string, relationId: string, operatorId: string, expectedRevision: number) {
@@ -234,7 +251,7 @@ export const storyBibleApi = {
   createProgression(projectId: string, nodeId: string, operatorId: string, payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>) {
     return request.post<StoryBibleProgression>(`${base(projectId)}/nodes/${nodeId}/progressions?${operatorQuery(operatorId)}`, payload)
   },
-  updateProgression(projectId: string, progressionId: string, operatorId: string, payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId'>) {
+  updateProgression(projectId: string, progressionId: string, operatorId: string, payload: StoryBibleProgressionUpdatePayload) {
     return request.patch<StoryBibleProgression>(`${base(projectId)}/progressions/${progressionId}?${operatorQuery(operatorId)}`, payload)
   },
   deleteProgression(projectId: string, progressionId: string, operatorId: string, expectedRevision: number) {
