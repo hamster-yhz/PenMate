@@ -914,6 +914,64 @@ Provider usage parsing should retain cached-token metadata where the provider ex
 14. Story Bible Workbench mode is usable on desktop and mobile without overlap.
 15. Backend and frontend focused tests, full builds, and contract scans pass.
 
+## Run Reliability And Retention Addendum
+
+This section supersedes earlier retention or recovery details where they conflict.
+
+### Minimal durable execution model
+
+MySQL is the execution source of truth. The existing in-process asynchronous dispatcher remains a
+low-latency fast path, while a scheduled reconciler is the durable fallback. Both paths must acquire
+the Run through the same compare-and-set lease operation before executing it.
+
+The Run lease contains an owner, expiry, monotonic execution token, attempt count, and next retry
+time. Every state transition is conditional on the expected status and execution token. A stale
+worker must not publish terminal events or perform a new side effect.
+
+### State model
+
+Recoverable states are `PENDING`, `RUNNING`, `WAITING_APPROVAL`, and `SUSPENDED`. Terminal states are
+`DONE`, `FAILED`, `CANCELLED`, and `SUPERSEDED`.
+
+- Process loss, model timeout, rate limiting, and temporary infrastructure failure become
+  `SUSPENDED` and retry at most three times with backoff.
+- Invalid parameters and unrecoverable business failures become `FAILED`.
+- Approval rejection and explicit user cancellation become `CANCELLED`.
+- A dependency conflict supersedes the old Run and creates a successor with a new Context Epoch.
+- A terminal Run is never resumed in place.
+
+### Checkpoints and side effects
+
+Recoverable Runs retain the latest two valid checkpoints without age-based deletion. Terminal Run
+checkpoints remain hot for seven days, cold for ninety days, and are then deleted. Checkpoints carry
+a schema version, SHA-256 digest, and optional object-storage reference. State above the inline limit
+is stored as an object artifact rather than replaced by an unrecoverable marker. Recovery tries the
+newest checkpoint, falls back to the previous checkpoint, and finally replays durable events from
+sequence zero when no valid checkpoint remains.
+
+Mutating tool calls use a unique `(run_id, tool_call_id)` execution record. Entity revisions and the
+Run execution token are revalidated immediately before a side effect. An ambiguous external result
+must not be retried automatically when the downstream system cannot honor an idempotency key.
+
+### Dependency revalidation
+
+The Run artifact records project structure revision, active chapter content revision, Story Bible
+revision, style/config revision, and prompt/tool/skill catalog hashes. Resume compares this manifest
+with authoritative current revisions. A relevant mismatch atomically marks the old Run
+`SUPERSEDED`; a successor Run resolves a new Context Epoch. Pending approvals are invalidated and
+must be requested again after a mismatch.
+
+### Event delivery and retention
+
+Durable events are hot in MySQL for seven days, archived as gzip JSONL in object storage for ninety
+days, and deleted afterwards. An archive manifest records sequence bounds, count, object key, size,
+and SHA-256. MySQL events may be deleted only after the uploaded archive is read back and verified.
+
+The in-process event bus remains an accelerator, not a correctness dependency. SSE replays durable
+events from MySQL and polls for new durable events. When a requested cursor predates the oldest hot
+event, the server emits `stream.reset`; the client reloads messages and projections. Redis Streams,
+Kafka, and a separate workflow engine are intentionally deferred.
+
 ## Research Basis
 
 The classification and retrieval design was informed by:
