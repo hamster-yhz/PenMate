@@ -15,6 +15,8 @@ import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.domain.storybible.model.StoryBibleSemanticFamily;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -26,6 +28,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class ContextEpochSnapshotFactoryTest {
+
+    @Test
+    void reads_each_epoch_snapshot_from_one_repeatable_database_view() throws Exception {
+        Transactional transaction = ContextEpochSnapshotFactory.class
+                .getMethod("create", Long.class, Long.class).getAnnotation(Transactional.class);
+
+        assertThat(transaction).isNotNull();
+        assertThat(transaction.readOnly()).isTrue();
+        assertThat(transaction.isolation()).isEqualTo(Isolation.REPEATABLE_READ);
+    }
 
     @Test
     void creates_effective_core_and_selector_manifest_for_the_bound_chapter() {

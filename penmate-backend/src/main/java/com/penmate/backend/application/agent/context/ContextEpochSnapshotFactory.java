@@ -18,6 +18,8 @@ import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import com.penmate.backend.application.storybible.StoryBibleEffectiveStateResolver;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -42,6 +44,7 @@ public class ContextEpochSnapshotFactory {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ContextEpochSnapshotCodec.Snapshot create(Long projectId, Long activeChapterId) {
         StoryBible root = storyBibles.findByProjectId(projectId);
         if (root == null) throw BusinessException.notFound("Story Bible not found");
