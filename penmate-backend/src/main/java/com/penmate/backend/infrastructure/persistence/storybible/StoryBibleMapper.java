@@ -224,6 +224,18 @@ public interface StoryBibleMapper {
     List<StoryBibleAlias> findAliases(@Param("storyBibleId") Long storyBibleId, @Param("nodeId") Long nodeId);
 
     @Select("""
+            <script>
+            SELECT id, alias_id, story_bible_id, node_id, alias, normalized_alias, created_at, deleted_at
+            FROM story_bible_aliases
+            WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL AND node_id IN
+              <foreach collection="nodeIds" item="nodeId" open="(" separator="," close=")">#{nodeId}</foreach>
+            ORDER BY node_id, normalized_alias, id
+            </script>
+            """)
+    List<StoryBibleAlias> findAliasesByNodeIds(@Param("storyBibleId") Long storyBibleId,
+                                               @Param("nodeIds") List<Long> nodeIds);
+
+    @Select("""
             SELECT id, alias_id, story_bible_id, node_id, alias, normalized_alias, created_at, deleted_at
             FROM story_bible_aliases
             WHERE story_bible_id = #{storyBibleId} AND normalized_alias = #{normalizedAlias} AND deleted_at IS NULL

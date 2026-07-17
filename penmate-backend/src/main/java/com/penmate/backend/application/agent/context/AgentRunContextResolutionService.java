@@ -107,14 +107,13 @@ public class AgentRunContextResolutionService {
         java.util.Set<Long> selectedIds = new java.util.HashSet<>(resolved.decision().selectedNodeIds());
         java.util.Set<Long> workingIds = new java.util.HashSet<>(workingSetIds);
         List<String> rendered = new ArrayList<>();
-        List<String> core = new ArrayList<>();
+        List<String> core = snapshot.coreContext().stream().map(this::json).toList();
         List<String> working = new ArrayList<>();
         List<String> selected = new ArrayList<>();
         for (StoryBibleContextResolver.RenderedNode node : resolved.nodes()) {
             String json = json(node);
             rendered.add(json);
-            if (coreIds.contains(node.nodeId())) core.add(json);
-            else if (workingIds.contains(node.nodeId())) working.add(json);
+            if (!coreIds.contains(node.nodeId()) && workingIds.contains(node.nodeId())) working.add(json);
             if (selectedIds.contains(node.nodeId()) && !coreIds.contains(node.nodeId())) selected.add(json);
         }
         return new ContextPackage(List.of("story-bible"), resolved.decision().missingFlags(), List.of(), rendered,

@@ -46,6 +46,7 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int updateNode(StoryBibleNode node, Long expectedRevision) { return mapper.updateNode(node, expectedRevision); }
     @Override public int softDeleteNode(Long storyBibleId, Long nodeId, Long expectedRevision, Long updatedBy) { return mapper.softDeleteNode(storyBibleId, nodeId, expectedRevision, updatedBy); }
     @Override public List<StoryBibleAlias> findAliases(Long storyBibleId, Long nodeId) { return mapper.findAliases(storyBibleId, nodeId); }
+    @Override public List<StoryBibleAlias> findAliasesByNodeIds(Long storyBibleId, List<Long> nodeIds) { return empty(nodeIds) ? List.of() : mapper.findAliasesByNodeIds(storyBibleId, nodeIds); }
     @Override public List<StoryBibleAlias> findByNormalizedAlias(Long storyBibleId, String normalizedAlias) { return mapper.findByNormalizedAlias(storyBibleId, normalizedAlias); }
     @Override public int insertAlias(StoryBibleAlias alias) { return mapper.insertAlias(alias); }
     @Override public int softDeleteAlias(Long storyBibleId, Long aliasId) { return mapper.softDeleteAlias(storyBibleId, aliasId); }

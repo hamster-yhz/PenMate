@@ -53,6 +53,8 @@ public interface StoryBibleRepository {
 
     List<StoryBibleAlias> findAliases(Long storyBibleId, Long nodeId);
 
+    List<StoryBibleAlias> findAliasesByNodeIds(Long storyBibleId, List<Long> nodeIds);
+
     List<StoryBibleAlias> findByNormalizedAlias(Long storyBibleId, String normalizedAlias);
 
     int insertAlias(StoryBibleAlias alias);

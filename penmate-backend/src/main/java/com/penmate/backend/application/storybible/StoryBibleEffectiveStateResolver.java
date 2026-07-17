@@ -114,6 +114,11 @@ public class StoryBibleEffectiveStateResolver {
         return new EffectiveState(effective, List.copyOf(applied), List.copyOf(unresolved), List.copyOf(conflicts), complete);
     }
 
+    public EffectiveState resolveBase(StoryBibleNode node) {
+        Objects.requireNonNull(node, "node");
+        return new EffectiveState(baseState(node), List.of(), List.of(), List.of(), true);
+    }
+
     private ObjectNode baseState(StoryBibleNode node) {
         ObjectNode state = objectMapper.createObjectNode();
         state.put("title", node.getTitle());

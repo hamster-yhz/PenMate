@@ -25,7 +25,31 @@ public record StoryBibleRouteRequest(
         routingMode = routingMode == null ? StoryBibleRoutingMode.RETRIEVAL_THEN_LLM : routingMode;
     }
 
-    public record CatalogEntry(Long nodeId, String title, String typeCode, String summary,
-                               String inclusionPolicy, String canonStatus) {
+    public record CatalogEntry(
+            Long nodeId,
+            String semanticFamily,
+            String typeCode,
+            String title,
+            List<String> aliases,
+            String summary,
+            List<CatalogRelation> keyRelations,
+            String currentChapterStateSummary,
+            String inclusionPolicy,
+            String canonStatus
+    ) {
+        public CatalogEntry {
+            aliases = List.copyOf(aliases == null ? List.of() : aliases);
+            keyRelations = List.copyOf(keyRelations == null ? List.of() : keyRelations);
+            currentChapterStateSummary = currentChapterStateSummary == null ? "" : currentChapterStateSummary;
+        }
+
+        public CatalogEntry(Long nodeId, String title, String typeCode, String summary,
+                            String inclusionPolicy, String canonStatus) {
+            this(nodeId, "UNKNOWN", typeCode, title, List.of(), summary, List.of(), "",
+                    inclusionPolicy, canonStatus);
+        }
+    }
+
+    public record CatalogRelation(String direction, String relationType, Long otherNodeId, String otherTitle) {
     }
 }

@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.springframework.stereotype.Component;
@@ -54,7 +55,39 @@ public class ContextEpochSnapshotCodec {
         }
     }
 
-    public record CoreNode(Long nodeId, Long typeId, String title, String summary,
-                           String bodyMarkdown, String attributesJson) {
+    public record CoreNode(
+            Long nodeId,
+            Long typeId,
+            String typeCode,
+            String semanticFamily,
+            String title,
+            JsonNode effectiveState,
+            List<Long> appliedProgressionIds,
+            List<String> stateFlags
+    ) {
+        public CoreNode {
+            appliedProgressionIds = List.copyOf(appliedProgressionIds == null ? List.of() : appliedProgressionIds);
+            stateFlags = List.copyOf(stateFlags == null ? List.of() : stateFlags);
+        }
+
+        public CoreNode(Long nodeId, Long typeId, String title, String summary,
+                        String bodyMarkdown, String attributesJson) {
+            this(nodeId, typeId, "UNKNOWN", "UNKNOWN", title, legacyState(title, summary, bodyMarkdown, attributesJson),
+                    List.of(), List.of());
+        }
+
+        private static JsonNode legacyState(String title, String summary, String bodyMarkdown, String attributesJson) {
+            ObjectMapper mapper = new ObjectMapper();
+            var state = mapper.createObjectNode();
+            state.put("title", title);
+            if (summary == null) state.putNull("summary"); else state.put("summary", summary);
+            if (bodyMarkdown == null) state.putNull("bodyMarkdown"); else state.put("bodyMarkdown", bodyMarkdown);
+            try {
+                state.set("attributes", mapper.readTree(attributesJson == null ? "{}" : attributesJson));
+            } catch (JsonProcessingException ex) {
+                state.set("attributes", mapper.createObjectNode());
+            }
+            return state;
+        }
     }
 }
