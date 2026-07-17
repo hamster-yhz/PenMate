@@ -55,7 +55,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, type_id, story_bible_id, type_code, semantic_family, display_name, icon_code,
-                   CAST(field_schema_json AS CHAR) AS field_schema_json, is_system AS system, sort_order,
+                   CAST(field_schema_json AS CHAR) AS field_schema_json, is_system AS `system`, sort_order,
                    created_at, updated_at, archived_at
             FROM story_bible_node_types
             WHERE (story_bible_id = #{storyBibleId} OR story_bible_id IS NULL)
@@ -66,7 +66,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, type_id, story_bible_id, type_code, semantic_family, display_name, icon_code,
-                   CAST(field_schema_json AS CHAR) AS field_schema_json, is_system AS system, sort_order,
+                   CAST(field_schema_json AS CHAR) AS field_schema_json, is_system AS `system`, sort_order,
                    created_at, updated_at, archived_at
             FROM story_bible_node_types
             WHERE type_id = #{typeId}
