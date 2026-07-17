@@ -66,31 +66,18 @@ public interface AgentRunEventMapper {
     })
     List<AgentEvent> listAfter(@Param("runId") Long runId, @Param("after") Long after);
 
-    @Delete("""
-            DELETE e FROM agent_events e
-            INNER JOIN agent_runs r ON e.run_id = r.run_id
-            WHERE r.run_status IN ('DONE','FAILED','CANCELLED')
-            AND r.updated_at < #{cutoff}
-            AND e.sequence <= (
-                SELECT COALESCE(MAX(e2.sequence), 0) - #{minRetain}
-                FROM agent_events e2
-                WHERE e2.run_id = e.run_id
-            )
+    @Select("""
+            SELECT DISTINCT r.run_id
+            FROM agent_runs r
+            INNER JOIN agent_events e ON e.run_id = r.run_id
+            WHERE r.run_status IN ('DONE','FAILED','CANCELLED','SUPERSEDED')
+              AND r.finished_at < #{cutoff}
+            ORDER BY r.run_id
+            LIMIT #{limit}
             """)
-    int deleteTerminalEventsOlderThan(@Param("cutoff") LocalDateTime cutoff,
-                                       @Param("minRetain") int minRetain);
+    List<Long> findTerminalRunIdsWithEventsBefore(@Param("cutoff") LocalDateTime cutoff,
+                                                   @Param("limit") int limit);
 
-    @Delete("""
-            DELETE FROM agent_events
-            WHERE run_id = #{runId}
-            AND sequence <= #{maxSequence}
-            AND sequence <= (
-                SELECT COALESCE(MAX(sequence), 0) - #{minRetain}
-                FROM agent_events
-                WHERE run_id = #{runId}
-            )
-            """)
-    int deleteEventsBelowSequence(@Param("runId") Long runId,
-                                    @Param("maxSequence") Long maxSequence,
-                                    @Param("minRetain") int minRetain);
+    @Delete("DELETE FROM agent_events WHERE run_id = #{runId} AND sequence <= #{maxSequence}")
+    int deleteThrough(@Param("runId") Long runId, @Param("maxSequence") Long maxSequence);
 }

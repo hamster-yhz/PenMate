@@ -14,6 +14,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -163,6 +164,25 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
         } catch (S3Exception ex) {
             if (ex.statusCode() == 404) return false;
             throw ex;
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        String endpoint = normalizedStorageEndpoint();
+        URI endpointUri = URI.create(endpoint);
+        try (S3Client client = S3Client.builder()
+                .endpointOverride(endpointUri)
+                .region(Region.of(storageRegion))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(storageAccessKey, storageSecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(shouldUsePathStyle(endpointUri))
+                        .chunkedEncodingEnabled(false)
+                        .checksumValidationEnabled(false)
+                        .build())
+                .build()) {
+            client.deleteObject(DeleteObjectRequest.builder().bucket(storageBucket).key(objectKey).build());
         }
     }
 

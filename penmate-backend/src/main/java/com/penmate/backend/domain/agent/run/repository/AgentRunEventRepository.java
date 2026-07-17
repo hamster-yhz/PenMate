@@ -11,7 +11,7 @@ public interface AgentRunEventRepository {
 
     List<AgentEvent> listAfter(Long runId, Long after);
 
-    int deleteTerminalEventsOlderThan(LocalDateTime cutoff, int minRetain);
+    List<Long> findTerminalRunIdsWithEventsBefore(LocalDateTime cutoff, int limit);
 
-    int deleteEventsBelowSequence(Long runId, Long maxSequence, int minRetain);
+    int deleteThrough(Long runId, Long maxSequence);
 }

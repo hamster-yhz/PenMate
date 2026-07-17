@@ -67,16 +67,16 @@ public class AgentRunEventRepositoryImpl implements AgentRunEventRepository {
     }
 
     @Override
-    public int deleteTerminalEventsOlderThan(LocalDateTime cutoff, int minRetain) {
+    public List<Long> findTerminalRunIdsWithEventsBefore(LocalDateTime cutoff, int limit) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
-            return session.getMapper(AgentRunEventMapper.class).deleteTerminalEventsOlderThan(cutoff, minRetain);
+            return session.getMapper(AgentRunEventMapper.class).findTerminalRunIdsWithEventsBefore(cutoff, limit);
         }
     }
 
     @Override
-    public int deleteEventsBelowSequence(Long runId, Long maxSequence, int minRetain) {
+    public int deleteThrough(Long runId, Long maxSequence) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
-            return session.getMapper(AgentRunEventMapper.class).deleteEventsBelowSequence(runId, maxSequence, minRetain);
+            return session.getMapper(AgentRunEventMapper.class).deleteThrough(runId, maxSequence);
         }
     }
 
