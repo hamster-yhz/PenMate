@@ -13,7 +13,12 @@ import java.util.HexFormat;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AgentRunContextArtifactServiceTest {
@@ -46,5 +51,27 @@ class AgentRunContextArtifactServiceTest {
         assertThat(loaded.runId()).isEqualTo(70001L);
         assertThat(loaded.contextEpochId()).isEqualTo(99L);
         assertThat(service.loadLatestContextForRun(70001L)).isEqualTo(loaded);
+    }
+
+    @Test
+    void should_not_publish_context_metadata_when_object_readback_is_corrupt() {
+        AgentArtifactRepository artifacts = mock(AgentArtifactRepository.class);
+        ObjectStorageService storage = mock(ObjectStorageService.class);
+        BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
+        AgentRunContextArtifactService service = new AgentRunContextArtifactService(
+                artifacts, ids, storage, new ObjectMapper().findAndRegisterModules());
+        when(ids.nextId()).thenReturn(88L);
+        when(storage.putText(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+            String content = invocation.getArgument(1);
+            return new ObjectStorageService.PutObjectResult("etag",
+                    (long) content.getBytes(StandardCharsets.UTF_8).length, null);
+        });
+        when(storage.readText(anyString())).thenReturn("corrupt");
+
+        assertThatThrownBy(() -> service.save(70001L,
+                new AgentRunContextArtifactService.ResolvedArtifact(2, 70001L, 99L, null, null, List.of())))
+                .hasMessageContaining("verification failed");
+
+        verify(artifacts, never()).save(any());
     }
 }

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -33,6 +34,7 @@ class AgentContextEpochServiceTest {
         when(repository.nextEpochNo(20L)).thenReturn(1);
         when(storage.putText(anyString(), anyString(), anyString()))
                 .thenReturn(new ObjectStorageService.PutObjectResult("etag", (long) snapshot.length, null));
+        when(storage.readText(anyString())).thenReturn("{\"catalog\":[]}");
         when(repository.insert(any())).thenReturn(1);
         when(repository.bindSession(20L, 900L)).thenReturn(1);
         when(repository.bindRun(30L, 900L)).thenReturn(1);
@@ -62,6 +64,24 @@ class AgentContextEpochServiceTest {
         assertThat(binding.epoch()).isSameAs(current);
         verify(storage, never()).putText(anyString(), anyString(), anyString());
         verify(repository, never()).insert(any());
+    }
+
+    @Test
+    void should_not_publish_epoch_metadata_when_object_readback_is_corrupt() {
+        byte[] snapshot = "{\"catalog\":[]}".getBytes(StandardCharsets.UTF_8);
+        when(idGenerator.nextId()).thenReturn(900L);
+        when(repository.lockSession(20L)).thenReturn(20L);
+        when(repository.nextEpochNo(20L)).thenReturn(1);
+        when(storage.putText(anyString(), anyString(), anyString()))
+                .thenReturn(new ObjectStorageService.PutObjectResult("etag", (long) snapshot.length, null));
+        when(storage.readText(anyString())).thenReturn("{\"corrupt\":[]}");
+
+        assertThatThrownBy(() -> service.bind(request("{\"catalog\":[]}")))
+                .hasMessageContaining("verification failed");
+
+        verify(repository, never()).insert(any());
+        verify(repository, never()).bindSession(any(), any());
+        verify(repository, never()).bindRun(any(), any());
     }
 
     private AgentContextEpochService.BindRequest request(String snapshotJson) {

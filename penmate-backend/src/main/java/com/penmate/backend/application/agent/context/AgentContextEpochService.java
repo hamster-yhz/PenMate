@@ -60,6 +60,11 @@ public class AgentContextEpochService {
         if (stored.size() == null || stored.size() != snapshot.length) {
             throw BusinessException.of("Context Epoch snapshot upload size mismatch");
         }
+        String storedSnapshot = objectStorage.readText(objectKey);
+        if (storedSnapshot == null
+                || !MessageDigest.isEqual(snapshot, storedSnapshot.getBytes(StandardCharsets.UTF_8))) {
+            throw BusinessException.of("Context Epoch snapshot upload verification failed");
+        }
         AgentContextEpoch epoch = new AgentContextEpoch(
                 epochId, request.sessionId(), epochNo, fingerprint, request.storyBibleRevision(),
                 request.manuscriptRevision(), request.activeChapterId(), request.activeChapterContentRevision(),

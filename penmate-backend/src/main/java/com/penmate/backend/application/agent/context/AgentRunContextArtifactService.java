@@ -42,6 +42,7 @@ public class AgentRunContextArtifactService {
         if (stored.size() == null || stored.size() != bytes.length) {
             throw BusinessException.of("Run context artifact upload size mismatch");
         }
+        verifyUploadedText(key, bytes, hash, "Run context artifact");
         ArtifactRef ref = new ArtifactRef(artifactId, key, hash, bytes.length);
         artifacts.save(new AgentArtifact(artifactId, runId, null, "context.resolved", json(ref), bytes.length, null));
         return ref;
@@ -95,6 +96,7 @@ public class AgentRunContextArtifactService {
         if (stored.size() == null || stored.size() != bytes.length) {
             throw BusinessException.of("Run prompt artifact upload size mismatch");
         }
+        verifyUploadedText(key, bytes, hash, "Run prompt artifact");
         ArtifactRef ref = new ArtifactRef(artifactId, key, hash, bytes.length);
         artifacts.save(new AgentArtifact(artifactId, runId, null, "prompt.composed", json(ref), bytes.length, null));
         return ref;
@@ -133,6 +135,17 @@ public class AgentRunContextArtifactService {
     private String json(Object value) {
         try { return objectMapper.writeValueAsString(value); }
         catch (JsonProcessingException ex) { throw BusinessException.of("Failed to serialize Run context artifact"); }
+    }
+
+    private void verifyUploadedText(String objectKey, byte[] expected, String expectedHash, String label) {
+        String readBack = storage.readText(objectKey);
+        if (readBack == null) {
+            throw BusinessException.of(label + " upload verification failed");
+        }
+        byte[] actual = readBack.getBytes(StandardCharsets.UTF_8);
+        if (actual.length != expected.length || !sha256(actual).equals(expectedHash)) {
+            throw BusinessException.of(label + " upload verification failed");
+        }
     }
 
     private String sha256(byte[] bytes) {
