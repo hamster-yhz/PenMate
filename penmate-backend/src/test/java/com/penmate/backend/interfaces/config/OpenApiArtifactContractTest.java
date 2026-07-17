@@ -18,11 +18,14 @@ class OpenApiArtifactContractTest {
         assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/sessions/{sessionId}/recovery");
         assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/sessions/{sessionId}/resume");
         assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/sessions/{sessionId}/turns");
+        assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/runs/{runId}/cancel");
         assertThat(openApi).contains("\"userId\":{\"type\":\"string\"");
         assertThat(openApi).contains("\"operatorId\":{\"type\":\"string\"");
         assertThat(openApi).contains("\"chapterId\":{\"type\":\"string\"");
         assertThat(openApi).contains("\"name\":\"projectId\",\"in\":\"path\"");
         assertThat(openApi).contains("\"name\":\"sessionId\",\"in\":\"path\"");
         assertThat(openApi).contains("\"schema\":{\"type\":\"string\"");
+        assertThat(openApi).doesNotContain("/cards", "NovelCard", "\"chapterNo\"",
+                "StoryBibleVersion", "story_bible_versions");
     }
 }
