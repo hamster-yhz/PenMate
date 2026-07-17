@@ -19,6 +19,7 @@ class OpenApiArtifactContractTest {
         assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/sessions/{sessionId}/resume");
         assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/sessions/{sessionId}/turns");
         assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/runs/{runId}/cancel");
+        assertThat(openApi).contains("/api/v1/novels/{projectId}/agent/runs/{runId}/retry");
         assertThat(openApi).contains("\"userId\":{\"type\":\"string\"");
         assertThat(openApi).contains("\"operatorId\":{\"type\":\"string\"");
         assertThat(openApi).contains("\"chapterId\":{\"type\":\"string\"");
