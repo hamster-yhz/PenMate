@@ -41,6 +41,8 @@ public class NovelChapter {
     private String contentEtag;
     /** 正文内容大小（字节）。 */
     private Long contentSize;
+    /** Monotonic revision of the chapter body stored in object storage. */
+    private Long contentRevision;
     /** 正文内容校验和。 */
     private String contentChecksum;
     /** 存储服务提供商。 */

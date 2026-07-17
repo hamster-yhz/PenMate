@@ -2,6 +2,7 @@ package com.penmate.backend.application.agent.run;
 
 import com.penmate.backend.application.agent.context.AgentRunContextArtifactService;
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
+import com.penmate.backend.application.agent.context.AgentRunDependencyValidator;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
@@ -36,6 +37,8 @@ public class AgentRunExecutor {
     private final AgentRunContextArtifactService contextArtifacts;
     private final AgentRunRecoveryService recoveryService;
     private final AgentRunLeaseService leaseService;
+    private final AgentRunDependencyValidator dependencyValidator;
+    private final AgentRunSuccessorService successorService;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
                             AgentRunEventPublisher eventPublisher,
@@ -48,7 +51,9 @@ public class AgentRunExecutor {
                             AgentRunPendingApprovalRepository pendingApprovals,
                             AgentRunContextArtifactService contextArtifacts,
                             AgentRunRecoveryService recoveryService,
-                            AgentRunLeaseService leaseService) {
+                            AgentRunLeaseService leaseService,
+                            AgentRunDependencyValidator dependencyValidator,
+                            AgentRunSuccessorService successorService) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
         this.contextResolutionService = contextResolutionService;
@@ -61,6 +66,8 @@ public class AgentRunExecutor {
         this.contextArtifacts = contextArtifacts;
         this.recoveryService = recoveryService;
         this.leaseService = leaseService;
+        this.dependencyValidator = dependencyValidator;
+        this.successorService = successorService;
     }
 
     public void execute(Long runId, String traceId) {
@@ -207,6 +214,7 @@ public class AgentRunExecutor {
         if (run.contextEpochId() == null || !run.contextEpochId().equals(contextArtifact.contextEpochId())) {
             throw new IllegalStateException("Run Context Epoch does not match its immutable artifact");
         }
+        if (lease != null && !continueIfDependenciesCurrent(run, input, contextArtifact, lease, traceId)) return;
         var pending = pendingApprovals.findApprovedByRunId(runId);
         if (pending == null || !"APPROVED".equals(pending.pendingStatus())) {
             throw new IllegalStateException("Run approval is not ready for resume");
@@ -259,6 +267,7 @@ public class AgentRunExecutor {
         if (run.contextEpochId() == null || !run.contextEpochId().equals(contextArtifact.contextEpochId())) {
             throw new IllegalStateException("Run Context Epoch does not match its immutable artifact");
         }
+        if (!continueIfDependenciesCurrent(run, input, contextArtifact, lease, traceId)) return;
         var promptArtifact = contextArtifacts.loadPromptPlanForRun(runId, state.artifactRefs());
         Long modelConfigId = extractModelConfigIdFromSnapshot(input.modelSnapshotJson());
         AgentLlmExecutionConfig executionConfig = modelConfigId == null
@@ -269,6 +278,22 @@ public class AgentRunExecutor {
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
                 promptMessages(promptArtifact.plan(), input.promptSnapshot()), executionConfig, run.ownerUserId()));
         finishRecoveredRun(runId, result, state, lease);
+    }
+
+    private boolean continueIfDependenciesCurrent(AgentRun run, AgentRunInput input,
+                                                  AgentRunContextArtifactService.ResolvedArtifact artifact,
+                                                  AgentRunLease lease, String traceId) {
+        var validation = dependencyValidator.validate(run, input, artifact);
+        if (validation.current()) return true;
+        String fields = String.join(",", validation.changedFields());
+        pendingApprovals.invalidateOpenByRunId(run.runId());
+        leaseService.supersede(lease, "Run dependencies changed: " + fields);
+        eventPublisher.publish(run.runId(), "run.superseded", Map.of(
+                "errorCode", "AGENT_RUN_DEPENDENCY_CHANGED",
+                "errorMessage", "Run dependencies changed",
+                "changedFields", validation.changedFields()));
+        successorService.create(run, input, traceId);
+        return false;
     }
 
     private void finishRecoveredRun(Long runId, AgentRunLoopResult result,

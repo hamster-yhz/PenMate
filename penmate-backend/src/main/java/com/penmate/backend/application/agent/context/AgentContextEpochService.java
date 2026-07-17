@@ -62,7 +62,8 @@ public class AgentContextEpochService {
         }
         AgentContextEpoch epoch = new AgentContextEpoch(
                 epochId, request.sessionId(), epochNo, fingerprint, request.storyBibleRevision(),
-                request.manuscriptRevision(), request.activeChapterId(), request.styleBindingRevision(),
+                request.manuscriptRevision(), request.activeChapterId(), request.activeChapterContentRevision(),
+                request.styleBindingRevision(),
                 required(request.routingMode(), "routingMode"), request.routerModelConfigId(),
                 request.routerModelConfigRevision(), required(request.promptBundleHash(), "promptBundleHash"),
                 required(request.skillCatalogHash(), "skillCatalogHash"), required(request.toolCatalogHash(), "toolCatalogHash"),
@@ -100,6 +101,7 @@ public class AgentContextEpochService {
         fields.put("storyBibleRevision", request.storyBibleRevision());
         fields.put("manuscriptRevision", request.manuscriptRevision());
         fields.put("activeChapterId", request.activeChapterId());
+        fields.put("activeChapterContentRevision", request.activeChapterContentRevision());
         fields.put("styleBindingRevision", request.styleBindingRevision());
         fields.put("routingMode", request.routingMode());
         fields.put("routerModelConfigId", request.routerModelConfigId());
@@ -141,6 +143,7 @@ public class AgentContextEpochService {
             Long storyBibleRevision,
             Long manuscriptRevision,
             Long activeChapterId,
+            Long activeChapterContentRevision,
             Long styleBindingRevision,
             String routingMode,
             Long routerModelConfigId,
@@ -150,6 +153,20 @@ public class AgentContextEpochService {
             String toolCatalogHash,
             String snapshotJson
     ) {
+        public BindRequest(Long sessionId, Long runId, Long storyBibleRevision, Long manuscriptRevision,
+                           Long activeChapterId, Long styleBindingRevision, String routingMode,
+                           Long routerModelConfigId, Long routerModelConfigRevision, String promptBundleHash,
+                           String skillCatalogHash, String toolCatalogHash, String snapshotJson) {
+            this(sessionId, runId, storyBibleRevision, manuscriptRevision, activeChapterId, 0L,
+                    styleBindingRevision, routingMode, routerModelConfigId, routerModelConfigRevision,
+                    promptBundleHash, skillCatalogHash, toolCatalogHash, snapshotJson);
+        }
+    }
+
+    public AgentContextEpoch get(Long epochId) {
+        AgentContextEpoch epoch = repository.findById(epochId);
+        if (epoch == null) throw BusinessException.notFound("Context Epoch not found");
+        return epoch;
     }
 
     public record Binding(AgentContextEpoch epoch, boolean reused) {

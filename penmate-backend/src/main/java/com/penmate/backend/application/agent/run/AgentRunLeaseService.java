@@ -47,6 +47,11 @@ public class AgentRunLeaseService {
         transition(lease, AgentRunStatus.DONE, "completed", null, null, null, null);
     }
 
+    public void supersede(AgentRunLease lease, String reason) {
+        transition(lease, AgentRunStatus.SUPERSEDED, "superseded", null, null,
+                "AGENT_RUN_DEPENDENCY_CHANGED", reason);
+    }
+
     public void failTerminal(AgentRunLease lease, String errorCode, String errorMessage) {
         transition(lease, AgentRunStatus.FAILED, "failed", null, null, errorCode, errorMessage);
     }

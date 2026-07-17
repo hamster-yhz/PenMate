@@ -116,4 +116,11 @@ public interface AgentRunPendingApprovalMapper {
             """)
     List<AgentRunPendingApproval> findStaleResumingOrApproved(@Param("timeoutMinutes") int timeoutMinutes,
                                                               @Param("limit") int limit);
+
+    @Update("""
+            UPDATE agent_run_pending_approvals
+            SET pending_status = 'INVALIDATED', updated_at = CURRENT_TIMESTAMP(3)
+            WHERE run_id = #{runId} AND pending_status IN ('PENDING', 'APPROVED', 'RESUMING')
+            """)
+    int invalidateOpenByRunId(@Param("runId") Long runId);
 }

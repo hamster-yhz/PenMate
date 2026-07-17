@@ -140,11 +140,31 @@ public class AgentRunContextArtifactService {
             Long contextEpochId,
             StoryBibleRouteDecision routeDecision,
             ContextPackage contextPackage,
-            java.util.List<Long> workingSetNodeIds
+            java.util.List<Long> workingSetNodeIds,
+            DependencyManifest dependencies
     ) {
+        public ResolvedArtifact(int schemaVersion, Long runId, Long contextEpochId,
+                                StoryBibleRouteDecision routeDecision, ContextPackage contextPackage,
+                                java.util.List<Long> workingSetNodeIds) {
+            this(schemaVersion, runId, contextEpochId, routeDecision, contextPackage, workingSetNodeIds, null);
+        }
         public ResolvedArtifact {
             workingSetNodeIds = java.util.List.copyOf(workingSetNodeIds == null ? java.util.List.of() : workingSetNodeIds);
         }
+    }
+    public record DependencyManifest(
+            Long storyBibleRevision,
+            Long projectStructureRevision,
+            Long activeChapterId,
+            Long activeChapterContentRevision,
+            Long styleBindingRevision,
+            String routingMode,
+            Long routerModelConfigId,
+            Long routerModelConfigRevision,
+            String promptBundleHash,
+            String skillCatalogHash,
+            String toolCatalogHash
+    ) {
     }
     public record PromptArtifact(int schemaVersion, PromptPlan plan, PromptManifest manifest) {
     }

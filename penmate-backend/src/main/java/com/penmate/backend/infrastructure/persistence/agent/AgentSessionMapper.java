@@ -273,6 +273,16 @@ public interface AgentSessionMapper {
                       @Param("runId") Long runId);
 
     @Update("""
+            UPDATE agent_turns
+            SET run_id = #{successorRunId}, turn_status = 'PENDING', updated_at = CURRENT_TIMESTAMP(3)
+            WHERE session_id = #{sessionId} AND turn_id = #{turnId} AND run_id = #{expectedRunId}
+            """)
+    int rebindTurnRun(@Param("sessionId") Long sessionId,
+                      @Param("turnId") Long turnId,
+                      @Param("expectedRunId") Long expectedRunId,
+                      @Param("successorRunId") Long successorRunId);
+
+    @Update("""
             UPDATE agent_sessions
             SET bound_style_id = #{styleId}
             WHERE project_id = #{projectId} AND session_id = #{sessionId} AND deleted_at IS NULL

@@ -9,6 +9,7 @@ public record AgentRun(
         Long sessionId,
         Long turnId,
         Long ownerUserId,
+        Long predecessorRunId,
         String runStatus,
         String runPhase,
         Long contextEpochId,
@@ -44,7 +45,7 @@ public record AgentRun(
                     String runStatus, String runPhase, Long contextEpochId, Long activeApprovalId,
                     Long latestEventSeq, Long latestCheckpointId, String traceId,
                     LocalDateTime startedAt, LocalDateTime finishedAt) {
-        this(runId, projectId, sessionId, turnId, ownerUserId, runStatus, runPhase, contextEpochId,
+        this(runId, projectId, sessionId, turnId, ownerUserId, null, runStatus, runPhase, contextEpochId,
                 activeApprovalId, null, null, 0L, 0, null, null, null, latestEventSeq,
                 latestCheckpointId, traceId, startedAt, finishedAt);
     }

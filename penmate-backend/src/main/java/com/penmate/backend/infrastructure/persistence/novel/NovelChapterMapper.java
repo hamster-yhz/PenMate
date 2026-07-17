@@ -20,7 +20,7 @@ public interface NovelChapterMapper {
     @Select("""
             SELECT c.id, c.chapter_id, c.project_id, c.volume_id, c.outline_node_id, c.title, c.sort_order,
                    c.status, c.word_count, c.excerpt, c.content_object_key, c.content_etag, c.content_size,
-                   c.content_checksum, c.storage_provider, c.last_generated_at, c.created_at, c.updated_at, c.deleted_at
+                   c.content_checksum, c.content_revision, c.storage_provider, c.last_generated_at, c.created_at, c.updated_at, c.deleted_at
             FROM novel_chapters c
             LEFT JOIN novel_volumes v
               ON v.volume_id = c.volume_id AND v.project_id = c.project_id AND v.deleted_at IS NULL
@@ -34,7 +34,7 @@ public interface NovelChapterMapper {
 
     @Select("""
             SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status, word_count,
-                   excerpt, content_object_key, content_etag, content_size, content_checksum,
+                   excerpt, content_object_key, content_etag, content_size, content_checksum, content_revision,
                    storage_provider, last_generated_at, created_at, updated_at, deleted_at
             FROM novel_chapters
             WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
@@ -91,6 +91,7 @@ public interface NovelChapterMapper {
                 content_etag = #{etag},
                 content_size = #{size},
                 content_checksum = #{checksum},
+                content_revision = content_revision + 1,
                 storage_provider = #{storageProvider}
             WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)

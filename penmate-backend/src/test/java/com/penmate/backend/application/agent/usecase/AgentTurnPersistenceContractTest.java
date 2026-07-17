@@ -248,6 +248,7 @@ class AgentTurnPersistenceContractTest {
                         session_id BIGINT NOT NULL,
                         turn_id BIGINT NOT NULL,
                         owner_user_id BIGINT NOT NULL,
+                        predecessor_run_id BIGINT NULL,
                         run_status VARCHAR(24) NOT NULL,
                         run_phase VARCHAR(32) NOT NULL,
                         context_epoch_id BIGINT NULL,

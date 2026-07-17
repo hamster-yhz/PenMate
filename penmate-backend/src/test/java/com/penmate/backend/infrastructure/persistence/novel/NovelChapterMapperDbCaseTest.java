@@ -65,6 +65,7 @@ class NovelChapterMapperDbCaseTest {
                         content_etag VARCHAR(128) NULL,
                         content_size BIGINT NULL,
                         content_checksum VARCHAR(128) NULL,
+                        content_revision BIGINT NOT NULL DEFAULT 1,
                         storage_provider VARCHAR(32) NOT NULL,
                         last_generated_at TIMESTAMP NULL,
                         created_at TIMESTAMP NOT NULL,
@@ -97,9 +98,9 @@ class NovelChapterMapperDbCaseTest {
         statement.execute("""
                 INSERT INTO novel_chapters(
                     id, chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status,
-                    word_count, excerpt, content_object_key, content_etag, content_size, content_checksum,
+                    word_count, excerpt, content_object_key, content_etag, content_size, content_checksum, content_revision,
                     storage_provider, last_generated_at, created_at, updated_at, deleted_at
-                ) VALUES (%d, %d, 77, %s, NULL, 'chapter', %d, 1, 0, NULL, '', NULL, NULL, NULL,
+                ) VALUES (%d, %d, 77, %s, NULL, 'chapter', %d, 1, 0, NULL, '', NULL, NULL, NULL, 1,
                           's3', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
                 """.formatted(id, chapterId, volume, sortOrder));
     }

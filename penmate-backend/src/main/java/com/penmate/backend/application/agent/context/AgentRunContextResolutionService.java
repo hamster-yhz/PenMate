@@ -64,7 +64,8 @@ public class AgentRunContextResolutionService {
         Long styleBindingRevision = sessionRepository.findActiveStyleBindingRevision(run.sessionId());
         var binding = epochs.bind(new AgentContextEpochService.BindRequest(
                 run.sessionId(), run.runId(), newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(),
-                input.chapterId(), styleBindingRevision == null ? 0L : styleBindingRevision,
+                input.chapterId(), newSnapshot.activeChapterContentRevision(),
+                styleBindingRevision == null ? 0L : styleBindingRevision,
                 preference.mode().name(), preference.routerModelConfigId(),
                 preference.routerModelConfigRevision(), catalogHashes.promptBundleHash(), catalogHashes.skillCatalogHash(),
                 catalogHashes.toolCatalogHash(), snapshotJson));
@@ -79,14 +80,19 @@ public class AgentRunContextResolutionService {
                 preference.mode(), boundSnapshot.storyBibleRevision(), boundSnapshot.selectorCatalog(), workingSetIds, selectorConfig));
         ContextPackage contextPackage = toContextPackage(resolved, boundSnapshot, workingSetIds,
                 input.styleSnapshotJson(), input.chapterId());
+        var manifest = new AgentRunContextArtifactService.DependencyManifest(
+                newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(), input.chapterId(),
+                newSnapshot.activeChapterContentRevision(), styleBindingRevision == null ? 0L : styleBindingRevision,
+                preference.mode().name(), preference.routerModelConfigId(), preference.routerModelConfigRevision(),
+                catalogHashes.promptBundleHash(), catalogHashes.skillCatalogHash(), catalogHashes.toolCatalogHash());
         var durable = new AgentRunContextArtifactService.ResolvedArtifact(
-                1, run.runId(), binding.epoch().epochId(), resolved.decision(), contextPackage, workingSetIds);
+                2, run.runId(), binding.epoch().epochId(), resolved.decision(), contextPackage, workingSetIds, manifest);
         var ref = artifacts.save(run.runId(), durable);
         return new Resolution(binding, contextPackage, resolved.decision(), ref, catalogHashes,
                 sha256(snapshotCodec.encode(new ContextEpochSnapshotCodec.Snapshot(
                         newSnapshot.schemaVersion(), newSnapshot.projectId(), newSnapshot.storyBibleId(),
                         newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(), newSnapshot.activeChapterId(),
-                        newSnapshot.coreContext(), List.of()))));
+                        newSnapshot.activeChapterContentRevision(), newSnapshot.coreContext(), List.of()))));
     }
 
     public void promoteAfterDurable(Long sessionId, Long turnId, List<Long> nodeIds) {

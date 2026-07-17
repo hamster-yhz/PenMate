@@ -44,4 +44,9 @@ public class AgentRunPendingApprovalRepositoryImpl implements AgentRunPendingApp
     public List<AgentRunPendingApproval> findStaleResumingOrApproved(int timeoutMinutes, int limit) {
         return mapper.findStaleResumingOrApproved(timeoutMinutes, limit);
     }
+
+    @Override
+    public int invalidateOpenByRunId(Long runId) {
+        return mapper.invalidateOpenByRunId(runId);
+    }
 }

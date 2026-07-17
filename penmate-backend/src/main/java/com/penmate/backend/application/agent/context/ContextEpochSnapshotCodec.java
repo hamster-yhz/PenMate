@@ -38,9 +38,16 @@ public class ContextEpochSnapshotCodec {
             Long storyBibleRevision,
             Long manuscriptRevision,
             Long activeChapterId,
+            Long activeChapterContentRevision,
             List<CoreNode> coreContext,
             List<StoryBibleRouteRequest.CatalogEntry> selectorCatalog
     ) {
+        public Snapshot(int schemaVersion, Long projectId, Long storyBibleId, Long storyBibleRevision,
+                        Long manuscriptRevision, Long activeChapterId, List<CoreNode> coreContext,
+                        List<StoryBibleRouteRequest.CatalogEntry> selectorCatalog) {
+            this(schemaVersion, projectId, storyBibleId, storyBibleRevision, manuscriptRevision,
+                    activeChapterId, 0L, coreContext, selectorCatalog);
+        }
         public Snapshot {
             coreContext = List.copyOf(coreContext == null ? List.of() : coreContext);
             selectorCatalog = List.copyOf(selectorCatalog == null ? List.of() : selectorCatalog);

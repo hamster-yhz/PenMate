@@ -48,6 +48,8 @@ public interface AgentSessionRepository {
 
     int updateLastRun(Long projectId, Long sessionId, Long runId);
 
+    int rebindTurnRun(Long sessionId, Long turnId, Long expectedRunId, Long successorRunId);
+
     int updateBoundStyle(Long projectId, Long sessionId, Long styleId, Long operatorId);
 
     int insertStyleBinding(Long projectId, Long sessionId, Long styleId, Long operatorId, String traceId);

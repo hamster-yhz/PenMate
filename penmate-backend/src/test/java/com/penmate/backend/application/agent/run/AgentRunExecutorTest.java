@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.context.AgentContextEpochService;
 import com.penmate.backend.application.agent.context.AgentRunContextArtifactService;
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
+import com.penmate.backend.application.agent.context.AgentRunDependencyValidator;
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
@@ -13,6 +14,8 @@ import com.penmate.backend.application.agent.prompt.PromptPlan;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
+import com.penmate.backend.domain.agent.run.model.AgentRunLease;
+import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
@@ -26,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -51,6 +55,8 @@ class AgentRunExecutorTest {
     @Mock private AgentRunContextArtifactService contextArtifacts;
     @Mock private AgentRunRecoveryService recoveryService;
     @Mock private AgentRunLeaseService leaseService;
+    @Mock private AgentRunDependencyValidator dependencyValidator;
+    @Mock private AgentRunSuccessorService successorService;
 
     @Test
     void executor_routes_context_without_full_preflight_then_executes_run() {
@@ -125,10 +131,42 @@ class AgentRunExecutorTest {
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
     }
 
+    @Test
+    void recovery_supersedes_stale_run_and_creates_successor_without_executing_llm() {
+        AgentRun stale = new AgentRun(70001L, 10001L, 20001L, 30001L, 920001L,
+                "RUNNING", "executing", 99L, null, 10L, null, "trace-1", null, null);
+        AgentRunInput input = runInput();
+        AgentRuntimeState state = AgentRuntimeState.empty(70001L).withArtifactAdded(88L, 5L);
+        var artifact = new AgentRunContextArtifactService.ResolvedArtifact(
+                2, 70001L, 99L, null, null, List.of(),
+                new AgentRunContextArtifactService.DependencyManifest(
+                        1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, 0L, "p", "s", "t"));
+        AgentRunLease lease = new AgentRunLease(70001L, "worker", 2L, 1,
+                AgentRunStatus.SUSPENDED, LocalDateTime.now().plusMinutes(1));
+        when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(null);
+        when(runRepository.findRun(70001L)).thenReturn(stale);
+        when(runRepository.findInput(70001L)).thenReturn(input);
+        when(recoveryService.recover(70001L)).thenReturn(state);
+        when(contextArtifacts.loadContextForRun(70001L, List.of(88L))).thenReturn(artifact);
+        when(dependencyValidator.validate(stale, input, artifact)).thenReturn(
+                new AgentRunDependencyValidator.Validation(false, artifact.dependencies(), artifact.dependencies(),
+                        List.of("activeChapterContentRevision")));
+        when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
+        when(successorService.create(stale, input, "trace-1")).thenReturn(70002L);
+
+        executor().recover(70001L, "trace-1", lease);
+
+        verify(pendingApprovals).invalidateOpenByRunId(70001L);
+        verify(leaseService).supersede(lease, "Run dependencies changed: activeChapterContentRevision");
+        verify(successorService).create(stale, input, "trace-1");
+        verify(llmLoop, never()).execute(any());
+        verify(llmLoop, never()).resumeApproved(any(), any());
+    }
+
     private AgentRunExecutor executor() {
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
-                recoveryService, leaseService);
+                recoveryService, leaseService, dependencyValidator, successorService);
     }
 
     private AgentRun run() {

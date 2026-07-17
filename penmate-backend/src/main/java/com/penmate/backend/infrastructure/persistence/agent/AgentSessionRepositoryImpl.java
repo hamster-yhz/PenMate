@@ -131,6 +131,11 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
     }
 
     @Override
+    public int rebindTurnRun(Long sessionId, Long turnId, Long expectedRunId, Long successorRunId) {
+        return agentSessionMapper.rebindTurnRun(sessionId, turnId, expectedRunId, successorRunId);
+    }
+
+    @Override
     public int updateBoundStyle(Long projectId, Long sessionId, Long styleId, Long operatorId) {
         return agentSessionMapper.updateBoundStyle(projectId, sessionId, styleId);
     }

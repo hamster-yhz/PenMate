@@ -2,6 +2,7 @@ package com.penmate.backend.application.agent.context;
 
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.novel.model.NovelProject;
+import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleCanonStatus;
@@ -51,7 +52,12 @@ public class ContextEpochSnapshotFactory {
                     type == null ? "UNKNOWN" : type.getTypeCode(), node.getSummary(),
                     node.getInclusionPolicy().name(), node.getCanonStatus().name());
         }).toList();
+        NovelChapter activeChapter = activeChapterId == null ? null
+                : novels.findChapterByIdAndProjectId(projectId, activeChapterId);
+        long chapterRevision = activeChapter == null || activeChapter.getContentRevision() == null
+                ? 0L : activeChapter.getContentRevision();
         return new ContextEpochSnapshotCodec.Snapshot(1, projectId, root.getStoryBibleId(), root.getContentRevision(),
-                project.getStructureRevision() == null ? 0L : project.getStructureRevision(), activeChapterId, core, catalog);
+                project.getStructureRevision() == null ? 0L : project.getStructureRevision(), activeChapterId,
+                chapterRevision, core, catalog);
     }
 }

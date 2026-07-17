@@ -17,4 +17,6 @@ public interface AgentRunPendingApprovalRepository {
     int markStatusByRunAndToolCall(Long runId, String toolCallId, String expectedStatus, String targetStatus);
 
     List<AgentRunPendingApproval> findStaleResumingOrApproved(int timeoutMinutes, int limit);
+
+    int invalidateOpenByRunId(Long runId);
 }
