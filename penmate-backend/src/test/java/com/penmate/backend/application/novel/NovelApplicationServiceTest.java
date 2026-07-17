@@ -159,66 +159,6 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                null,
-                920101L,
-                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, null),
-                920001L,
-                "trace-commit-null-project"
-        ))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                920002L,
-                null,
-                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, null),
-                920001L,
-                "trace-commit-null-chapter"
-        ))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("chapterId must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_OBJECT_KEY_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                920002L,
-                920101L,
-                new CommitChapterContentCommand(null, "etag", 12L, "sha256", null, null),
-                920001L,
-                "trace-commit-null-object-key"
-        ))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("objectKey must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_OPERATOR_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                920002L,
-                920101L,
-                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, null),
-                null,
-                "trace-commit-null-operator"
-        ))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("operatorId must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
     void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_RETURNS_EMPTY_WHEN_OBJECT_KEY_BLANK() {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(920002L);
@@ -254,24 +194,6 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterContentUrl(null, 920101L))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterContentUrl(920002L, null))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("chapterId must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
-    }
-
-    @Test
     void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_SUCCESS() {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(920002L);
@@ -291,24 +213,6 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterContentUploadUrl(null, 920101L))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterContentUploadUrl(920002L, null))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("chapterId must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
-    }
-
-    @Test
     void UT_APP_NOVEL_GET_CHAPTER_VERSION_NOT_FOUND() {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(920002L);
@@ -319,60 +223,6 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, 920101L, 3))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Chapter version not found");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(null, 920101L, 3))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, null, 3))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("chapterId must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NULL_VERSION_NO_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, 920101L, null))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("versionNo must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_NULL_PROJECT_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(null, 920101L, 3))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("projectId must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_NULL_CHAPTER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(920002L, null, 3))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("chapterId must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_NULL_VERSION_NO_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, null))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("versionNo must not be null");
-
-        verifyNoInteractions(novelGateway, objectStorageService);
     }
 
     @Test

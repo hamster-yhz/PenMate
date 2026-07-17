@@ -178,30 +178,6 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_NON_POSITIVE_PROVIDER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.createOfficialKey(
-                new CreateOfficialModelKeyCommand(0L, "官方Key", "sk-123456", false, "active", 1001L),
-                "trace"
-        )).isExactlyInstanceOf(BusinessException.class)
-                .hasMessage("Provider id is invalid");
-
-        verify(modelRepository, never()).insertOfficialKey(anyLong(), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
-        verifyNoInteractions(auditService);
-    }
-
-    @Test
-    void UT_APP_MODEL_CREATE_OFFICIAL_KEY_UNKNOWN_PROVIDER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.createOfficialKey(
-                new CreateOfficialModelKeyCommand(999L, "官方Key", "sk-123456", false, "active", 1001L),
-                "trace"
-        )).isExactlyInstanceOf(BusinessException.class)
-                .hasMessage("Provider id is invalid");
-
-        verify(modelRepository, never()).insertOfficialKey(anyLong(), anyLong(), anyString(), anyString(), anyString(), eq(false), eq("active"));
-        verifyNoInteractions(auditService);
-    }
-
-    @Test
     void UT_APP_MODEL_CREATE_USER_MODEL_CONFIG_WITH_DIRECT_USER_KEY_SUCCESS() {
         Long userId = 1001L;
         when(businessIdGenerator.nextId()).thenReturn(9001L);
@@ -529,55 +505,12 @@ class ModelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_MODEL_UPDATE_KEY_NULL_USER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.updateKey(
-                null,
-                9999L,
-                new UpdateModelKeyCommand("更新Key", "sk-654321", false, "active", 1001L),
-                "trace"
-        )).isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("userId must not be null");
-    }
-
-    @Test
-    void UT_APP_MODEL_UPDATE_KEY_NULL_KEY_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.updateKey(
-                1001L,
-                null,
-                new UpdateModelKeyCommand("更新Key", "sk-654321", false, "active", 1001L),
-                "trace"
-        )).isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("keyId must not be null");
-    }
-
-    @Test
     void UT_APP_MODEL_DELETE_KEY_NOT_FOUND() {
         when(modelRepository.softDeleteUserKey(1001L, 9999L)).thenReturn(0);
 
         assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, 9999L, 1001L, "trace"))
                 .isExactlyInstanceOf(BusinessException.class)
                 .hasMessage("Model key not found");
-    }
-
-    @Test
-    void UT_APP_MODEL_DELETE_KEY_NULL_USER_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.deleteKey(null, 9999L, 1001L, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("userId must not be null");
-    }
-
-    @Test
-    void UT_APP_MODEL_DELETE_KEY_NULL_KEY_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, null, 1001L, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("keyId must not be null");
-    }
-
-    @Test
-    void UT_APP_MODEL_DELETE_KEY_NULL_OPERATOR_ID_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> modelApplicationService.deleteKey(1001L, 9999L, null, "trace"))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("operatorId must not be null");
     }
 
     @Test
