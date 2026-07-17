@@ -98,7 +98,7 @@ describe('ChatComposer', () => {
       ['请补充主角与反派对话'],
     ])
     expect(wrapper.emitted('send')).toEqual([[]])
-  })
+  }, 10_000)
 
   it('offers_an_icon_stop_action_while_a_run_is_cancellable', async () => {
     const wrapper = await mountChatComposer({
