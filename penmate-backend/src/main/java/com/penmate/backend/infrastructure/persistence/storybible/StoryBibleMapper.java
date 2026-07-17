@@ -293,7 +293,8 @@ public interface StoryBibleMapper {
 
     @Insert("""
             INSERT INTO story_bible_aliases(alias_id, story_bible_id, node_id, alias, normalized_alias)
-            VALUES(#{aliasId}, #{storyBibleId}, #{nodeId}, #{alias}, #{normalizedAlias})
+            VALUES(#{aliasId}, #{storyBibleId}, #{nodeId}, #{alias}, #{normalizedAlias}) AS incoming
+            ON DUPLICATE KEY UPDATE alias = incoming.alias, deleted_at = NULL
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertAlias(StoryBibleAlias alias);
@@ -353,6 +354,13 @@ public interface StoryBibleMapper {
             """)
     int deleteNodeCategories(@Param("storyBibleId") Long storyBibleId, @Param("nodeId") Long nodeId);
 
+    @org.apache.ibatis.annotations.Delete("""
+            DELETE FROM story_bible_node_categories
+            WHERE story_bible_id = #{storyBibleId} AND category_id = #{categoryId}
+            """)
+    int deleteNodeCategoriesByCategory(@Param("storyBibleId") Long storyBibleId,
+                                       @Param("categoryId") Long categoryId);
+
     @Select("""
             SELECT id, tag_id, story_bible_id, name, normalized_name, color, created_at, updated_at, deleted_at
             FROM story_bible_tags WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL ORDER BY name, id
@@ -397,6 +405,13 @@ public interface StoryBibleMapper {
             DELETE FROM story_bible_node_tags WHERE story_bible_id = #{storyBibleId} AND node_id = #{nodeId}
             """)
     int deleteNodeTags(@Param("storyBibleId") Long storyBibleId, @Param("nodeId") Long nodeId);
+
+    @org.apache.ibatis.annotations.Delete("""
+            DELETE FROM story_bible_node_tags
+            WHERE story_bible_id = #{storyBibleId} AND tag_id = #{tagId}
+            """)
+    int deleteNodeTagsByTag(@Param("storyBibleId") Long storyBibleId,
+                            @Param("tagId") Long tagId);
 
     @Select("""
             <script>

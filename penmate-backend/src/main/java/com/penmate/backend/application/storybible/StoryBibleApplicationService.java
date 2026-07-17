@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -249,6 +250,8 @@ public class StoryBibleApplicationService {
         StoryBible root = get(projectId);
         StoryBibleNodeType nodeType = requireNodeType(root, command.typeId());
         schemaValidator.validateAttributes(command.attributesJson(), nodeType.getFieldSchemaJson());
+        NodeOrganization organization = normalizeOrganization(command.aliases(), command.categoryIds(), command.tagIds());
+        validateNodeOrganization(root, organization);
         StoryBibleNode node = new StoryBibleNode();
         node.setNodeId(idGenerator.nextId());
         node.setStoryBibleId(root.getStoryBibleId());
@@ -263,9 +266,12 @@ public class StoryBibleApplicationService {
         node.setCreatedBy(actorId);
         node.setUpdatedBy(actorId);
         requireOne(repository.insertNode(node), "Failed to create Story Bible node");
-        replaceNodeOrganization(root, node.getNodeId(), command.aliases(), command.categoryIds(), command.tagIds());
-        append(root, actorType, actorId, sourceRunId, "Created Story Bible node",
-                draft("NODE", node.getNodeId(), StoryBibleChangeOperation.CREATE, null, node));
+        replaceNodeOrganization(root, node.getNodeId(), organization);
+        List<ChangeDraft> drafts = new ArrayList<>();
+        drafts.add(draft("NODE", node.getNodeId(), StoryBibleChangeOperation.CREATE, null, node));
+        drafts.addAll(organizationDrafts(node.getNodeId(), NodeOrganization.EMPTY, organization,
+                StoryBibleChangeOperation.CREATE));
+        append(root, actorType, actorId, sourceRunId, "Created Story Bible node", drafts);
         return node;
     }
 
@@ -275,6 +281,9 @@ public class StoryBibleApplicationService {
         StoryBibleNode node = requireNode(root, nodeId);
         StoryBibleNodeType nodeType = requireNodeType(root, command.typeId());
         schemaValidator.validateAttributes(command.attributesJson(), nodeType.getFieldSchemaJson());
+        NodeOrganization beforeOrganization = readNodeOrganization(root, nodeId);
+        NodeOrganization afterOrganization = normalizeOrganization(command.aliases(), command.categoryIds(), command.tagIds());
+        validateNodeOrganization(root, afterOrganization);
         String before = json(node);
         node.setTypeId(command.typeId());
         node.setTitle(required(command.title(), "title"));
@@ -286,9 +295,12 @@ public class StoryBibleApplicationService {
         node.setUpdatedBy(actorId);
         requireOne(repository.updateNode(node, command.expectedRevision()), "Story Bible node revision conflict");
         node.setRevision(command.expectedRevision() + 1);
-        replaceNodeOrganization(root, nodeId, command.aliases(), command.categoryIds(), command.tagIds());
-        append(root, actorType, actorId, sourceRunId, "Updated Story Bible node",
+        replaceNodeOrganization(root, nodeId, afterOrganization);
+        List<ChangeDraft> drafts = new ArrayList<>(
                 draftsWithBeforeJson("NODE", nodeId, StoryBibleChangeOperation.UPDATE, before, node));
+        drafts.addAll(organizationDrafts(nodeId, beforeOrganization, afterOrganization,
+                StoryBibleChangeOperation.UPDATE));
+        append(root, actorType, actorId, sourceRunId, "Updated Story Bible node", drafts);
         return node;
     }
 
@@ -297,8 +309,26 @@ public class StoryBibleApplicationService {
         StoryBible root = get(projectId);
         StoryBibleNode node = requireNode(root, nodeId);
         requireOne(repository.softDeleteNode(root.getStoryBibleId(), nodeId, expectedRevision, actorId), "Story Bible node revision conflict");
-        append(root, actorType, actorId, sourceRunId, "Deleted Story Bible node",
-                draft("NODE", nodeId, StoryBibleChangeOperation.DELETE, node, null));
+        List<ChangeDraft> drafts = new ArrayList<>();
+        drafts.add(draft("NODE", nodeId, StoryBibleChangeOperation.DELETE, node, null));
+        for (StoryBibleRelation relation : repository.findRelations(root.getStoryBibleId(), List.of(nodeId))) {
+            requireOne(repository.softDeleteRelation(root.getStoryBibleId(), relation.getRelationId(),
+                    relation.getRevision(), actorId), "Story Bible relation revision conflict");
+            drafts.add(draft("RELATION", relation.getRelationId(), StoryBibleChangeOperation.DELETE, relation, null));
+        }
+        for (StoryBibleProgression progression : repository.findProgressions(root.getStoryBibleId(), List.of(nodeId))) {
+            requireOne(repository.softDeleteProgression(root.getStoryBibleId(), progression.getProgressionId(),
+                    progression.getRevision(), actorId), "Story Bible progression revision conflict");
+            drafts.add(draft("PROGRESSION", progression.getProgressionId(), StoryBibleChangeOperation.DELETE,
+                    progression, null));
+        }
+        for (StoryBibleAlias alias : repository.findAliases(root.getStoryBibleId(), nodeId)) {
+            requireOne(repository.softDeleteAlias(root.getStoryBibleId(), alias.getAliasId()),
+                    "Failed to delete Story Bible alias");
+        }
+        repository.deleteNodeCategories(root.getStoryBibleId(), nodeId);
+        repository.deleteNodeTags(root.getStoryBibleId(), nodeId);
+        append(root, actorType, actorId, sourceRunId, "Deleted Story Bible node", drafts);
     }
 
     public List<StoryBibleCategory> listCategories(Long projectId) {
@@ -365,6 +395,7 @@ public class StoryBibleApplicationService {
             throw BusinessException.conflict("Category still has child categories");
         }
         requireOne(repository.softDeleteCategory(root.getStoryBibleId(), categoryId), "Failed to delete Story Bible category");
+        repository.deleteNodeCategoriesByCategory(root.getStoryBibleId(), categoryId);
         append(root, actorType, actorId, sourceRunId, "Deleted category",
                 draft("CATEGORY", categoryId, StoryBibleChangeOperation.DELETE, category, null));
     }
@@ -425,6 +456,7 @@ public class StoryBibleApplicationService {
         StoryBible root = get(projectId);
         StoryBibleTag tag = requireTag(root, tagId);
         requireOne(repository.softDeleteTag(root.getStoryBibleId(), tagId), "Failed to delete Story Bible tag");
+        repository.deleteNodeTagsByTag(root.getStoryBibleId(), tagId);
         append(root, actorType, actorId, sourceRunId, "Deleted tag",
                 draft("TAG", tagId, StoryBibleChangeOperation.DELETE, tag, null));
     }
@@ -580,12 +612,12 @@ public class StoryBibleApplicationService {
                 Math.max(1, Math.min(limit, 200)));
     }
 
-    private void replaceNodeOrganization(StoryBible root, Long nodeId, List<String> aliases, List<Long> categoryIds, List<Long> tagIds) {
+    private void replaceNodeOrganization(StoryBible root, Long nodeId, NodeOrganization organization) {
         for (StoryBibleAlias existing : repository.findAliases(root.getStoryBibleId(), nodeId)) {
-            repository.softDeleteAlias(root.getStoryBibleId(), existing.getAliasId());
+            requireOne(repository.softDeleteAlias(root.getStoryBibleId(), existing.getAliasId()),
+                    "Failed to replace Story Bible alias");
         }
-        for (String value : aliases == null ? List.<String>of() : aliases) {
-            if (value == null || value.isBlank()) continue;
+        for (String value : organization.aliases()) {
             StoryBibleAlias alias = new StoryBibleAlias();
             alias.setAliasId(idGenerator.nextId());
             alias.setStoryBibleId(root.getStoryBibleId());
@@ -595,7 +627,7 @@ public class StoryBibleApplicationService {
             requireOne(repository.insertAlias(alias), "Failed to save Story Bible alias");
         }
         repository.deleteNodeCategories(root.getStoryBibleId(), nodeId);
-        for (Long categoryId : categoryIds == null ? List.<Long>of() : categoryIds) {
+        for (Long categoryId : organization.categoryIds()) {
             StoryBibleNodeCategory membership = new StoryBibleNodeCategory();
             membership.setStoryBibleId(root.getStoryBibleId());
             membership.setNodeId(nodeId);
@@ -603,13 +635,67 @@ public class StoryBibleApplicationService {
             requireOne(repository.insertNodeCategory(membership), "Failed to save Story Bible category membership");
         }
         repository.deleteNodeTags(root.getStoryBibleId(), nodeId);
-        for (Long tagId : tagIds == null ? List.<Long>of() : tagIds) {
+        for (Long tagId : organization.tagIds()) {
             StoryBibleNodeTag membership = new StoryBibleNodeTag();
             membership.setStoryBibleId(root.getStoryBibleId());
             membership.setNodeId(nodeId);
             membership.setTagId(tagId);
             requireOne(repository.insertNodeTag(membership), "Failed to save Story Bible tag membership");
         }
+    }
+
+    private NodeOrganization readNodeOrganization(StoryBible root, Long nodeId) {
+        return normalizeOrganization(
+                repository.findAliases(root.getStoryBibleId(), nodeId).stream().map(StoryBibleAlias::getAlias).toList(),
+                repository.findNodeCategories(root.getStoryBibleId(), nodeId).stream()
+                        .map(StoryBibleNodeCategory::getCategoryId).toList(),
+                repository.findNodeTags(root.getStoryBibleId(), nodeId).stream()
+                        .map(StoryBibleNodeTag::getTagId).toList()
+        );
+    }
+
+    private NodeOrganization normalizeOrganization(List<String> aliases, List<Long> categoryIds, List<Long> tagIds) {
+        List<String> normalizedAliases = (aliases == null ? List.<String>of() : aliases).stream()
+                .filter(Objects::nonNull).map(String::trim).filter(value -> !value.isEmpty())
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                        values -> values.stream().sorted().toList()));
+        return new NodeOrganization(normalizedAliases, distinctIds(categoryIds, "categoryIds"),
+                distinctIds(tagIds, "tagIds"));
+    }
+
+    private List<Long> distinctIds(List<Long> values, String field) {
+        LinkedHashSet<Long> ids = new LinkedHashSet<>();
+        for (Long value : values == null ? List.<Long>of() : values) {
+            if (value == null) throw BusinessException.badRequest(field + " must not contain null IDs");
+            ids.add(value);
+        }
+        return ids.stream().sorted().toList();
+    }
+
+    private void validateNodeOrganization(StoryBible root, NodeOrganization organization) {
+        organization.categoryIds().forEach(categoryId -> requireCategory(root, categoryId));
+        organization.tagIds().forEach(tagId -> requireTag(root, tagId));
+        long uniqueNormalizedAliases = organization.aliases().stream().map(this::normalizeAlias).distinct().count();
+        if (uniqueNormalizedAliases != organization.aliases().size()) {
+            throw BusinessException.badRequest("Story Bible aliases must be unique after normalization");
+        }
+    }
+
+    private List<ChangeDraft> organizationDrafts(Long nodeId, NodeOrganization before, NodeOrganization after,
+                                                 StoryBibleChangeOperation operation) {
+        List<ChangeDraft> drafts = new ArrayList<>();
+        addOrganizationDraft(drafts, nodeId, "/aliases", before.aliases(), after.aliases(), operation);
+        addOrganizationDraft(drafts, nodeId, "/categoryIds", before.categoryIds(), after.categoryIds(), operation);
+        addOrganizationDraft(drafts, nodeId, "/tagIds", before.tagIds(), after.tagIds(), operation);
+        return List.copyOf(drafts);
+    }
+
+    private void addOrganizationDraft(List<ChangeDraft> drafts, Long nodeId, String path,
+                                      Object before, Object after, StoryBibleChangeOperation operation) {
+        if (Objects.equals(before, after)) return;
+        drafts.add(new ChangeDraft("NODE", nodeId, operation, path,
+                asJson(before), asJson(after)));
     }
 
     private StoryBibleNode requireNode(StoryBible root, Long nodeId) {
@@ -795,6 +881,16 @@ public class StoryBibleApplicationService {
     }
 
     private record SystemNodeType(String code, StoryBibleSemanticFamily family, String displayName, String iconCode, int sortOrder) {
+    }
+
+    private record NodeOrganization(List<String> aliases, List<Long> categoryIds, List<Long> tagIds) {
+        private static final NodeOrganization EMPTY = new NodeOrganization(List.of(), List.of(), List.of());
+
+        private NodeOrganization {
+            aliases = List.copyOf(aliases == null ? List.of() : aliases);
+            categoryIds = List.copyOf(categoryIds == null ? List.of() : categoryIds);
+            tagIds = List.copyOf(tagIds == null ? List.of() : tagIds);
+        }
     }
 
     public record NodeDetails(

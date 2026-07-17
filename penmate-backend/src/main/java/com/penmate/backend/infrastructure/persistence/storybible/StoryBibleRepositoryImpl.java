@@ -58,6 +58,7 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int insertNodeCategory(StoryBibleNodeCategory membership) { return mapper.insertNodeCategory(membership); }
     @Override public List<StoryBibleNodeCategory> findNodeCategories(Long storyBibleId, Long nodeId) { return mapper.findNodeCategories(storyBibleId, nodeId); }
     @Override public int deleteNodeCategories(Long storyBibleId, Long nodeId) { return mapper.deleteNodeCategories(storyBibleId, nodeId); }
+    @Override public int deleteNodeCategoriesByCategory(Long storyBibleId, Long categoryId) { return mapper.deleteNodeCategoriesByCategory(storyBibleId, categoryId); }
     @Override public List<StoryBibleTag> findTags(Long storyBibleId) { return mapper.findTags(storyBibleId); }
     @Override public int insertTag(StoryBibleTag tag) { return mapper.insertTag(tag); }
     @Override public int updateTag(StoryBibleTag tag) { return mapper.updateTag(tag); }
@@ -65,6 +66,7 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int insertNodeTag(StoryBibleNodeTag membership) { return mapper.insertNodeTag(membership); }
     @Override public List<StoryBibleNodeTag> findNodeTags(Long storyBibleId, Long nodeId) { return mapper.findNodeTags(storyBibleId, nodeId); }
     @Override public int deleteNodeTags(Long storyBibleId, Long nodeId) { return mapper.deleteNodeTags(storyBibleId, nodeId); }
+    @Override public int deleteNodeTagsByTag(Long storyBibleId, Long tagId) { return mapper.deleteNodeTagsByTag(storyBibleId, tagId); }
     @Override public List<StoryBibleRelation> findRelations(Long storyBibleId, List<Long> nodeIds) { return mapper.findRelations(storyBibleId, nodeIds); }
     @Override public StoryBibleRelation findRelation(Long storyBibleId, Long relationId) { return mapper.findRelation(storyBibleId, relationId); }
     @Override public int insertRelation(StoryBibleRelation relation) { return mapper.insertRelation(relation); }

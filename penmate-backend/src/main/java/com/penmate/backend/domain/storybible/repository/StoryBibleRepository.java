@@ -78,6 +78,8 @@ public interface StoryBibleRepository {
 
     int deleteNodeCategories(Long storyBibleId, Long nodeId);
 
+    int deleteNodeCategoriesByCategory(Long storyBibleId, Long categoryId);
+
     List<StoryBibleTag> findTags(Long storyBibleId);
 
     int insertTag(StoryBibleTag tag);
@@ -91,6 +93,8 @@ public interface StoryBibleRepository {
     List<StoryBibleNodeTag> findNodeTags(Long storyBibleId, Long nodeId);
 
     int deleteNodeTags(Long storyBibleId, Long nodeId);
+
+    int deleteNodeTagsByTag(Long storyBibleId, Long tagId);
 
     List<StoryBibleRelation> findRelations(Long storyBibleId, List<Long> nodeIds);
 
