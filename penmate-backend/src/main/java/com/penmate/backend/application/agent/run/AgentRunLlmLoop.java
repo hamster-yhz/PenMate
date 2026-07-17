@@ -251,7 +251,8 @@ public class AgentRunLlmLoop {
                         "llmTurnIndex", turnIndex,
                         "toolCallId", toolCall.id(),
                         "toolCode", toolCall.functionName(),
-                        "approvalId", result.approvalId()
+                        "approvalId", result.approvalId(),
+                        "approvalPreview", result.approvalPreview()
                 ));
                 log.info("Tool call waiting approval: runId={}, toolCode={}, approvalId={}",
                         request.runId(), toolCall.functionName(), result.approvalId());

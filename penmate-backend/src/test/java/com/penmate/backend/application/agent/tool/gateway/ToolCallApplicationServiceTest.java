@@ -193,6 +193,7 @@ class ToolCallApplicationServiceTest {
 
         assertThat(result.status()).isEqualTo("WAITING_APPROVAL");
         assertThat(result.approvalId()).isEqualTo(88001L);
+        assertThat(result.approvalPreview()).containsEntry("operation", "delete");
         verify(approvalApplicationService, never()).create(any(), any());
         verify(pendingApprovalRepository, never()).save(any());
     }

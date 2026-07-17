@@ -9,6 +9,7 @@ import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
+import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
@@ -52,6 +53,7 @@ public class ToolCallApplicationService {
         ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         String operationCode = extractOperationCode(request);
         if (decision.approvalRequired()) {
+            var approvalPreview = ToolApprovalPreview.from(request.toolCode(), request.toolArgsJson());
             ToolCallResult validationFailure = toolCallExecutionService.validate(request);
             if (validationFailure != null) return validationFailure;
             AgentRunPendingApproval existing = pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey());
@@ -63,7 +65,7 @@ public class ToolCallApplicationService {
                 if ("PENDING".equals(existing.pendingStatus())
                         || "APPROVED".equals(existing.pendingStatus())
                         || "RESUMING".equals(existing.pendingStatus())) {
-                    return ToolCallResult.waitingApproval(existing.approvalId());
+                    return ToolCallResult.waitingApproval(existing.approvalId(), approvalPreview);
                 }
                 return ToolCallResult.failed("TOOL_APPROVAL_NOT_EXECUTABLE",
                         "Existing tool approval is already terminal: " + existing.pendingStatus());
@@ -99,7 +101,7 @@ public class ToolCallApplicationService {
             ));
             log.info("agent.tool.call.waiting_approval: toolCode={}, operationCode={}, approvalId={}, runId={}, traceId={}",
                     request.toolCode(), operationCode, approvalRequest.getApprovalRequestId(), request.runId(), request.traceId());
-            return ToolCallResult.waitingApproval(approvalRequest.getApprovalRequestId());
+            return ToolCallResult.waitingApproval(approvalRequest.getApprovalRequestId(), approvalPreview);
         }
         ToolCallResult result = toolCallExecutionService.execute(request);
         if (result != null && "SUCCESS".equals(result.status())) {

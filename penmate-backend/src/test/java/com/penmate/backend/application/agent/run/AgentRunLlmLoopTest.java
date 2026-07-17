@@ -221,7 +221,7 @@ class AgentRunLlmLoopTest {
         );
         when(toolCallService.executeToolCall(any())).thenReturn(
                 ToolCallResult.success("{\"updated\":true}"),
-                ToolCallResult.waitingApproval(202L)
+                ToolCallResult.waitingApproval(202L, Map.of("nodeId", "71"))
         );
         AgentRunLlmLoop loop = new AgentRunLlmLoop(
                 llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
@@ -242,6 +242,10 @@ class AgentRunLlmLoopTest {
         assertThat(siblingRequest.toolCallId()).isEqualTo("call-2");
         assertThat(siblingRequest.executionToken()).isEqualTo(7L);
         assertThat(siblingRequest.conversationMessagesJson()).contains("call-1").contains("updated");
+        ArgumentCaptor<Object> waitingPayload = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publish(eq(70001L), eq("tool.call.waiting_approval"), waitingPayload.capture());
+        assertThat(((Map<?, ?>) waitingPayload.getValue()).get("approvalPreview"))
+                .isEqualTo(Map.of("nodeId", "71"));
     }
 
     @Test

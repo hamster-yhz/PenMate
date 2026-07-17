@@ -14,6 +14,8 @@ public interface AgentRunPendingApprovalRepository {
 
     AgentRunPendingApproval findApprovedByRunId(Long runId);
 
+    AgentRunPendingApproval findPendingByRunId(Long runId);
+
     int markStatus(Long approvalId, String expectedStatus, String targetStatus);
 
     int markStatusByRunAndToolCall(Long runId, String toolCallId, String expectedStatus, String targetStatus);

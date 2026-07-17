@@ -36,6 +36,11 @@ public class AgentRunPendingApprovalRepositoryImpl implements AgentRunPendingApp
     }
 
     @Override
+    public AgentRunPendingApproval findPendingByRunId(Long runId) {
+        return mapper.findPendingByRunId(runId);
+    }
+
+    @Override
     public int markStatus(Long approvalId, String expectedStatus, String targetStatus) {
         return mapper.markStatus(approvalId, expectedStatus, targetStatus);
     }

@@ -1,7 +1,10 @@
 package com.penmate.backend.application.agent.run;
 
+import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
+import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
+import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunProjectionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,11 +19,14 @@ public class AgentRunRecoveryAppService {
 
     private final AgentSessionRepository agentSessionRepository;
     private final AgentRunProjectionRepository agentRunProjectionRepository;
+    private final AgentRunPendingApprovalRepository pendingApprovals;
 
     public AgentRunRecoveryAppService(AgentSessionRepository agentSessionRepository,
-                                      AgentRunProjectionRepository agentRunProjectionRepository) {
+                                      AgentRunProjectionRepository agentRunProjectionRepository,
+                                      AgentRunPendingApprovalRepository pendingApprovals) {
         this.agentSessionRepository = agentSessionRepository;
         this.agentRunProjectionRepository = agentRunProjectionRepository;
+        this.pendingApprovals = pendingApprovals;
     }
 
     public AgentRunRecoveryResult getRecovery(Long projectId, Long sessionId, String traceId) {
@@ -59,9 +65,22 @@ public class AgentRunRecoveryAppService {
         }
         Map<String, Object> runProjection = agentRunProjectionRepository.findLatestRunForSession(projectId, sessionId);
         AgentRunRecoveryResult.ActiveRunView activeRun = toActiveRun(runProjection);
-        List<Object> messages = agentSessionRepository.listMessageRows(sessionId).stream()
+        List<Object> messages = new java.util.ArrayList<>(agentSessionRepository.listMessageRows(sessionId).stream()
                 .<Object>map(LinkedHashMap::new)
-                .toList();
+                .toList());
+        Map<String, Object> pendingApproval = null;
+        if (activeRun != null && "WAITING_APPROVAL".equalsIgnoreCase(activeRun.runStatus())) {
+            var pending = pendingApprovals.findPendingByRunId(activeRun.runId());
+            if (pending != null) {
+                pendingApproval = pendingApprovalView(pending);
+                Map<String, Object> message = new LinkedHashMap<>(pendingApproval);
+                message.put("messageId", "approval-" + pending.approvalId());
+                message.put("role", "assistant");
+                message.put("contentMarkdown", "");
+                message.put("createdAt", pending.createdAt());
+                messages.add(message);
+            }
+        }
         Map<String, Object> workbenchContext = new LinkedHashMap<>();
         if (activeRun != null) {
             workbenchContext.put("activeRun", Map.of(
@@ -82,10 +101,20 @@ public class AgentRunRecoveryAppService {
                         activeRun == null ? session.getLastRunStatus() : activeRun.runStatus()
                 ),
                 activeRun,
-                null,
+                pendingApproval,
                 messages,
                 workbenchContext.isEmpty() ? null : workbenchContext
         );
+    }
+
+    private Map<String, Object> pendingApprovalView(AgentRunPendingApproval pending) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("approvalId", String.valueOf(pending.approvalId()));
+        view.put("approvalStatus", "pending");
+        view.put("toolCallId", pending.toolCallId());
+        view.put("toolCode", pending.toolCode());
+        view.put("approvalPreview", ToolApprovalPreview.from(pending.toolCode(), pending.toolArgsJson()));
+        return view;
     }
 
     private AgentRunRecoveryResult.ActiveRunView toActiveRun(Map<String, Object> row) {

@@ -14,6 +14,7 @@ type ChatMessage = {
     toolDisplayName?: string
     riskLevel?: number
     operationCode?: string
+    preview?: Record<string, string>
     resolved: boolean
     resolvedAction?: 'approved' | 'rejected'
   }
@@ -100,5 +101,27 @@ describe('ChatMessageItem', () => {
       riskLevel: 2,
       operationCode: 'delete',
     })
+  })
+
+  it('opens_the_story_bible_node_from_the_approval_preview', async () => {
+    const wrapper = await mountChatMessageItem({
+      msg: {
+        id: 13,
+        role: 'assistant',
+        text: '',
+        approval: {
+          id: '43',
+          message: 'pending',
+          time: '2026-07-17 12:00:00',
+          toolCode: 'story_bible_update',
+          preview: { kind: 'update_node', nodeId: '71' },
+          resolved: false,
+        },
+      },
+    })
+
+    await wrapper.get('.btn-open-bible').trigger('click')
+
+    expect(wrapper.emitted('open-story-bible')).toEqual([['71']])
   })
 })
