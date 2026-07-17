@@ -100,8 +100,19 @@ public class StoryBibleController {
                                          @RequestParam(required = false) String typeId,
                                          @RequestParam(required = false) StoryBibleCanonStatus status,
                                          @RequestParam(required = false) String query,
+                                         @RequestParam(required = false) String categoryId,
+                                         @RequestParam(required = false) String tagId,
                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return success(service.listNodes(id(projectId, "projectId"), optionalId(typeId, "typeId"), status, query), traceId);
+        return success(service.searchNodes(id(projectId, "projectId"), optionalId(typeId, "typeId"), status, query,
+                optionalId(categoryId, "categoryId"), optionalId(tagId, "tagId"), 500), traceId);
+    }
+
+    @PostMapping("/search")
+    public ApiResponse<Object> searchNodes(@PathVariable String projectId, @RequestBody StoryBibleDtos.SearchNodes dto,
+                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return success(service.searchNodes(id(projectId, "projectId"), optionalId(dto.typeId(), "typeId"),
+                dto.status(), dto.query(), optionalId(dto.categoryId(), "categoryId"),
+                optionalId(dto.tagId(), "tagId"), dto.limit() == null ? 100 : dto.limit()), traceId);
     }
 
     @PostMapping("/nodes")
@@ -273,10 +284,23 @@ public class StoryBibleController {
         return ApiResponse.success("deleted", traceId);
     }
 
-    @GetMapping("/changes")
+    @GetMapping({"/changesets", "/changes"})
     public ApiResponse<Object> recentChanges(@PathVariable String projectId, @RequestParam(defaultValue = "50") int limit,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.recentChanges(id(projectId, "projectId"), limit), traceId);
+    }
+
+    @GetMapping("/changesets/{changesetId}")
+    public ApiResponse<Object> getChangeset(@PathVariable String projectId, @PathVariable String changesetId,
+                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return success(service.getChangeset(id(projectId, "projectId"), id(changesetId, "changesetId")), traceId);
+    }
+
+    @GetMapping("/nodes/{nodeId}/changesets")
+    public ApiResponse<Object> nodeChanges(@PathVariable String projectId, @PathVariable String nodeId,
+                                           @RequestParam(defaultValue = "50") int limit,
+                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return success(service.nodeChanges(id(projectId, "projectId"), id(nodeId, "nodeId"), limit), traceId);
     }
 
     private ApiResponse<Object> success(Object value, String traceId) {

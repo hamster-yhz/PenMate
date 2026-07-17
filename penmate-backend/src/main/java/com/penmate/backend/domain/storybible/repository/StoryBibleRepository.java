@@ -37,6 +37,9 @@ public interface StoryBibleRepository {
 
     List<StoryBibleNode> findNodes(Long storyBibleId, Long typeId, String canonStatus, String query);
 
+    List<StoryBibleNode> findNodesFiltered(Long storyBibleId, Long typeId, String canonStatus, String query,
+                                           Long categoryId, Long tagId, int limit);
+
     List<StoryBibleNode> searchNodesLexically(Long storyBibleId, List<String> terms, int limit);
 
     List<StoryBibleNode> findAlwaysIncludeNodes(Long storyBibleId);
@@ -118,6 +121,10 @@ public interface StoryBibleRepository {
     int insertChangeItem(StoryBibleChangeItem item);
 
     List<StoryBibleChangeset> findRecentChangesets(Long storyBibleId, int limit);
+
+    StoryBibleChangeset findChangeset(Long storyBibleId, Long changesetId);
+
+    List<StoryBibleChangeset> findChangesetsForNode(Long storyBibleId, Long nodeId, int limit);
 
     List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, LocalDateTime cutoff, int retainCount);
 

@@ -7,6 +7,8 @@ import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleActorType;
 import com.penmate.backend.domain.storybible.model.StoryBibleCanonStatus;
 import com.penmate.backend.domain.storybible.model.StoryBibleCategory;
+import com.penmate.backend.domain.storybible.model.StoryBibleChangeItem;
+import com.penmate.backend.domain.storybible.model.StoryBibleChangeset;
 import com.penmate.backend.domain.storybible.model.StoryBibleInclusionPolicy;
 import com.penmate.backend.domain.storybible.model.StoryBibleNode;
 import com.penmate.backend.domain.storybible.model.StoryBibleNodeType;
@@ -90,6 +92,38 @@ class StoryBibleApplicationServiceTest {
         assertThat(category.getCategoryId()).isEqualTo(101L);
         verify(changesetService).append(eq(root), eq(StoryBibleActorType.AGENT), eq(9L), eq(88L),
                 eq("Created category"), any());
+    }
+
+    @Test
+    void should_validate_filters_and_delegate_bounded_story_bible_search() {
+        StoryBible root = root();
+        StoryBibleCategory category = new StoryBibleCategory();
+        category.setCategoryId(31L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findCategories(10L)).thenReturn(List.of(category));
+        when(repository.findNodesFiltered(10L, 33L, "CANON", "Mira", 31L, null, 500))
+                .thenReturn(List.of());
+
+        service.searchNodes(20L, 33L, StoryBibleCanonStatus.CANON, " Mira ", 31L, null, 900);
+
+        verify(repository).findNodesFiltered(10L, 33L, "CANON", "Mira", 31L, null, 500);
+    }
+
+    @Test
+    void should_return_changeset_with_field_level_items_in_project_scope() {
+        StoryBible root = root();
+        StoryBibleChangeset changeset = new StoryBibleChangeset();
+        changeset.setChangesetId(41L);
+        StoryBibleChangeItem item = new StoryBibleChangeItem();
+        item.setChangesetId(41L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findChangeset(10L, 41L)).thenReturn(changeset);
+        when(repository.findChangeItemsByChangesetIds(List.of(41L))).thenReturn(List.of(item));
+
+        var result = service.getChangeset(20L, 41L);
+
+        assertThat(result.changeset()).isSameAs(changeset);
+        assertThat(result.items()).containsExactly(item);
     }
 
     private StoryBible root() {

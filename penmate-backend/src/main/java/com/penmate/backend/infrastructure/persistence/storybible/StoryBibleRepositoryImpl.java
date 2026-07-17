@@ -38,6 +38,7 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int updateNodeType(StoryBibleNodeType nodeType) { return mapper.updateNodeType(nodeType); }
     @Override public int archiveNodeType(Long storyBibleId, Long typeId) { return mapper.archiveNodeType(storyBibleId, typeId); }
     @Override public List<StoryBibleNode> findNodes(Long storyBibleId, Long typeId, String canonStatus, String query) { return mapper.findNodes(storyBibleId, typeId, canonStatus, query); }
+    @Override public List<StoryBibleNode> findNodesFiltered(Long storyBibleId, Long typeId, String canonStatus, String query, Long categoryId, Long tagId, int limit) { return mapper.findNodesFiltered(storyBibleId, typeId, canonStatus, query, categoryId, tagId, limit); }
     @Override public List<StoryBibleNode> searchNodesLexically(Long storyBibleId, List<String> terms, int limit) { return mapper.searchNodesLexically(storyBibleId, terms, limit); }
     @Override public List<StoryBibleNode> findAlwaysIncludeNodes(Long storyBibleId) { return mapper.findAlwaysIncludeNodes(storyBibleId); }
     @Override public List<StoryBibleNode> findNodesByIds(Long storyBibleId, List<Long> nodeIds) { return empty(nodeIds) ? List.of() : mapper.findNodesByIds(storyBibleId, nodeIds); }
@@ -79,6 +80,8 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int insertChangeset(StoryBibleChangeset changeset) { return mapper.insertChangeset(changeset); }
     @Override public int insertChangeItem(StoryBibleChangeItem item) { return mapper.insertChangeItem(item); }
     @Override public List<StoryBibleChangeset> findRecentChangesets(Long storyBibleId, int limit) { return mapper.findRecentChangesets(storyBibleId, limit); }
+    @Override public StoryBibleChangeset findChangeset(Long storyBibleId, Long changesetId) { return mapper.findChangeset(storyBibleId, changesetId); }
+    @Override public List<StoryBibleChangeset> findChangesetsForNode(Long storyBibleId, Long nodeId, int limit) { return mapper.findChangesetsForNode(storyBibleId, nodeId, limit); }
     @Override public List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, LocalDateTime cutoff, int retainCount) { return mapper.findChangesetsBefore(storyBibleId, cutoff, retainCount); }
     @Override public List<StoryBible> findStoryBiblesWithChangesetsBefore(LocalDateTime cutoff) { return mapper.findStoryBiblesWithChangesetsBefore(cutoff); }
     @Override public List<StoryBibleChangeItem> findChangeItemsByChangesetIds(List<Long> changesetIds) { return empty(changesetIds) ? List.of() : mapper.findChangeItemsByChangesetIds(changesetIds); }

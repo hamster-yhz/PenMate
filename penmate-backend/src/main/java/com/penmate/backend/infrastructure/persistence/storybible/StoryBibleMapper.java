@@ -126,6 +126,53 @@ public interface StoryBibleMapper {
 
     @Select("""
             <script>
+            SELECT n.id, n.node_id, n.story_bible_id, n.type_id, n.title, n.summary, n.body_markdown,
+                   CAST(n.attributes_json AS CHAR) AS attributes_json, n.inclusion_policy, n.canon_status, n.revision,
+                   n.created_by, n.updated_by, n.created_at, n.updated_at, n.archived_at, n.deleted_at
+            FROM story_bible_nodes n
+            WHERE n.story_bible_id = #{storyBibleId} AND n.deleted_at IS NULL
+            <if test="typeId != null">AND n.type_id = #{typeId}</if>
+            <if test="canonStatus != null and canonStatus != ''">AND n.canon_status = #{canonStatus}</if>
+            <if test="categoryId != null">
+              AND EXISTS (
+                SELECT 1 FROM story_bible_node_categories nc
+                WHERE nc.story_bible_id = n.story_bible_id AND nc.node_id = n.node_id
+                  AND nc.category_id = #{categoryId}
+              )
+            </if>
+            <if test="tagId != null">
+              AND EXISTS (
+                SELECT 1 FROM story_bible_node_tags nt
+                WHERE nt.story_bible_id = n.story_bible_id AND nt.node_id = n.node_id
+                  AND nt.tag_id = #{tagId}
+              )
+            </if>
+            <if test="query != null and query != ''">
+              AND (
+                n.title LIKE CONCAT('%', #{query}, '%')
+                OR n.summary LIKE CONCAT('%', #{query}, '%')
+                OR n.body_markdown LIKE CONCAT('%', #{query}, '%')
+                OR EXISTS (
+                  SELECT 1 FROM story_bible_aliases a
+                  WHERE a.story_bible_id = n.story_bible_id AND a.node_id = n.node_id
+                    AND a.deleted_at IS NULL AND a.alias LIKE CONCAT('%', #{query}, '%')
+                )
+              )
+            </if>
+            ORDER BY n.updated_at DESC, n.id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<StoryBibleNode> findNodesFiltered(@Param("storyBibleId") Long storyBibleId,
+                                           @Param("typeId") Long typeId,
+                                           @Param("canonStatus") String canonStatus,
+                                           @Param("query") String query,
+                                           @Param("categoryId") Long categoryId,
+                                           @Param("tagId") Long tagId,
+                                           @Param("limit") int limit);
+
+    @Select("""
+            <script>
             SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
                    CAST(attributes_json AS CHAR) AS attributes_json, inclusion_policy, canon_status, revision,
                    created_by, updated_by, created_at, updated_at, archived_at, deleted_at
@@ -523,6 +570,40 @@ public interface StoryBibleMapper {
             """)
     List<StoryBibleChangeset> findRecentChangesets(@Param("storyBibleId") Long storyBibleId,
                                                    @Param("limit") int limit);
+
+    @Select("""
+            SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
+                   source_run_id, change_summary, created_at
+            FROM story_bible_changesets
+            WHERE story_bible_id = #{storyBibleId} AND changeset_id = #{changesetId}
+            LIMIT 1
+            """)
+    StoryBibleChangeset findChangeset(@Param("storyBibleId") Long storyBibleId,
+                                      @Param("changesetId") Long changesetId);
+
+    @Select("""
+            SELECT DISTINCT sc.id, sc.changeset_id, sc.story_bible_id, sc.content_revision,
+                   sc.actor_type, sc.actor_id, sc.source_run_id, sc.change_summary, sc.created_at
+            FROM story_bible_changesets sc
+            JOIN story_bible_change_items ci ON ci.changeset_id = sc.changeset_id
+            LEFT JOIN story_bible_relations r
+              ON ci.entity_type = 'RELATION' AND ci.entity_id = r.relation_id
+             AND r.story_bible_id = sc.story_bible_id
+            LEFT JOIN story_bible_progressions p
+              ON ci.entity_type = 'PROGRESSION' AND ci.entity_id = p.progression_id
+             AND p.story_bible_id = sc.story_bible_id
+            WHERE sc.story_bible_id = #{storyBibleId}
+              AND (
+                (ci.entity_type = 'NODE' AND ci.entity_id = #{nodeId})
+                OR (ci.entity_type = 'RELATION' AND (r.source_node_id = #{nodeId} OR r.target_node_id = #{nodeId}))
+                OR (ci.entity_type = 'PROGRESSION' AND p.node_id = #{nodeId})
+              )
+            ORDER BY sc.created_at DESC, sc.id DESC
+            LIMIT #{limit}
+            """)
+    List<StoryBibleChangeset> findChangesetsForNode(@Param("storyBibleId") Long storyBibleId,
+                                                    @Param("nodeId") Long nodeId,
+                                                    @Param("limit") int limit);
 
     @Select("""
             SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,

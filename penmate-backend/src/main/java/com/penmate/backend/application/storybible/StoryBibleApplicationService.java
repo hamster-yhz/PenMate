@@ -204,6 +204,16 @@ public class StoryBibleApplicationService {
         return repository.findNodes(root.getStoryBibleId(), typeId, status == null ? null : status.name(), normalizeQuery(query));
     }
 
+    public List<StoryBibleNode> searchNodes(Long projectId, Long typeId, StoryBibleCanonStatus status,
+                                            String query, Long categoryId, Long tagId, int limit) {
+        StoryBible root = get(projectId);
+        if (categoryId != null) requireCategory(root, categoryId);
+        if (tagId != null) requireTag(root, tagId);
+        return repository.findNodesFiltered(root.getStoryBibleId(), typeId,
+                status == null ? null : status.name(), normalizeQuery(query), categoryId, tagId,
+                Math.max(1, Math.min(limit, 500)));
+    }
+
     public StoryBibleNode getNode(Long projectId, Long nodeId) {
         return requireNode(get(projectId), nodeId);
     }
@@ -555,6 +565,21 @@ public class StoryBibleApplicationService {
         return repository.findRecentChangesets(get(projectId).getStoryBibleId(), Math.max(1, Math.min(limit, 200)));
     }
 
+    public ChangesetDetails getChangeset(Long projectId, Long changesetId) {
+        StoryBible root = get(projectId);
+        StoryBibleChangeset changeset = repository.findChangeset(root.getStoryBibleId(), changesetId);
+        if (changeset == null) throw BusinessException.notFound("Story Bible changeset not found");
+        return new ChangesetDetails(changeset,
+                repository.findChangeItemsByChangesetIds(List.of(changeset.getChangesetId())));
+    }
+
+    public List<StoryBibleChangeset> nodeChanges(Long projectId, Long nodeId, int limit) {
+        StoryBible root = get(projectId);
+        requireNode(root, nodeId);
+        return repository.findChangesetsForNode(root.getStoryBibleId(), nodeId,
+                Math.max(1, Math.min(limit, 200)));
+    }
+
     private void replaceNodeOrganization(StoryBible root, Long nodeId, List<String> aliases, List<Long> categoryIds, List<Long> tagIds) {
         for (StoryBibleAlias existing : repository.findAliases(root.getStoryBibleId(), nodeId)) {
             repository.softDeleteAlias(root.getStoryBibleId(), existing.getAliasId());
@@ -778,5 +803,14 @@ public class StoryBibleApplicationService {
             List<Long> categoryIds,
             List<Long> tagIds
     ) {
+    }
+
+    public record ChangesetDetails(
+            StoryBibleChangeset changeset,
+            List<com.penmate.backend.domain.storybible.model.StoryBibleChangeItem> items
+    ) {
+        public ChangesetDetails {
+            items = List.copyOf(items == null ? List.of() : items);
+        }
     }
 }

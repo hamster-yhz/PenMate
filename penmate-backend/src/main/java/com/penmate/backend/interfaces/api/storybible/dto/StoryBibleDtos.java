@@ -107,4 +107,14 @@ public final class StoryBibleDtos {
 
     public record UpdateView(String displayName, Boolean hidden, Integer sortOrder) {
     }
+
+    public record SearchNodes(
+            String typeId,
+            StoryBibleCanonStatus status,
+            String query,
+            String categoryId,
+            String tagId,
+            Integer limit
+    ) {
+    }
 }
