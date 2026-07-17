@@ -54,6 +54,9 @@ export const agentApi = {
   createTurn(projectId: string, sessionId: string, payload: AnyRecord) {
     return request.post<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
   },
+  cancelRun(projectId: string, runId: string, payload: AnyRecord) {
+    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/cancel`, payload)
+  },
   getRunStreamUrl(projectId: string, runId: string, after = '0') {
     return buildRunStreamUrl(projectId, runId, after)
   },

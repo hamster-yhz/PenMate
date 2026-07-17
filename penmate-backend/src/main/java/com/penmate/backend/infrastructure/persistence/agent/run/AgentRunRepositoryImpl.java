@@ -100,6 +100,11 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     }
 
     @Override
+    public boolean cancelRecoverable(Long runId, String errorCode, String errorMessage) {
+        return agentRunMapper.cancelRecoverable(runId, errorCode, errorMessage) == 1;
+    }
+
+    @Override
     public int suspendExpiredRuns(LocalDateTime now, LocalDateTime nextRetryAt, int maxAttempts) {
         return agentRunMapper.suspendExpiredRuns(now, nextRetryAt, maxAttempts);
     }

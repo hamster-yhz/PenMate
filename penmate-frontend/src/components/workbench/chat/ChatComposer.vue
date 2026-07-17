@@ -1,14 +1,19 @@
 <script setup lang="ts">
+import { StopOutlined } from '@ant-design/icons-vue'
 import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
   isGenerating?: boolean
+  canCancelRun?: boolean
+  isCancelling?: boolean
   currentModelName?: string
   activePlugins?: string[]
 }>(), {
   modelValue: '',
   isGenerating: false,
+  canCancelRun: false,
+  isCancelling: false,
   currentModelName: '',
   activePlugins: () => [],
 })
@@ -16,6 +21,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   send: []
+  cancel: []
   'open-model-settings': []
 }>()
 
@@ -78,6 +84,18 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
         @keydown="handleCtrlEnter"
       />
       <button
+        v-if="canCancelRun"
+        type="button"
+        class="btn-stop"
+        data-testid="chat-cancel"
+        title="停止运行"
+        aria-label="停止运行"
+        :disabled="isCancelling"
+        @click="$emit('cancel')"
+      >
+        <StopOutlined />
+      </button>
+      <button
         type="button"
         class="btn-send"
         data-testid="chat-send"
@@ -119,7 +137,8 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
 }
 
 .model-warning-btn,
-.btn-send {
+.btn-send,
+.btn-stop {
   cursor: pointer;
   transition: all 0.25s var(--ease-silk);
 }
@@ -200,7 +219,17 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
   letter-spacing: 0.12em;
 }
 
+.btn-stop {
+  flex: 0 0 48px;
+  width: 48px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.28);
+  color: #fca5a5;
+}
+
 .btn-send:hover:not([disabled]),
+.btn-stop:hover:not([disabled]),
 .model-warning-btn:hover {
   box-shadow: var(--shadow-gold);
   border-color: var(--border-glow);
@@ -209,5 +238,11 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
 .btn-send[disabled] {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+
+.btn-stop[disabled] {
+  cursor: wait;
+  opacity: 0.55;
 }
 </style>

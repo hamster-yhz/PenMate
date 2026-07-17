@@ -34,6 +34,8 @@ public interface AgentRunRepository {
     boolean transitionExpected(Long runId, AgentRunStatus expected, AgentRunStatus target,
                                String phase, String errorCode, String errorMessage);
 
+    boolean cancelRecoverable(Long runId, String errorCode, String errorMessage);
+
     int suspendExpiredRuns(LocalDateTime now, LocalDateTime nextRetryAt, int maxAttempts);
 
     List<Long> findClaimableRunIds(LocalDateTime now, int limit);

@@ -33,6 +33,7 @@ type UseWorkbenchChatDeps = {
   createSession: (projectId: string, payload: Record<string, unknown>) => Promise<unknown>
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
+  cancelRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
   openRunStream: (projectId: string, runId: string, after?: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeRunStream?: (stream: EventSource | null) => void
@@ -51,6 +52,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const conversationList = ref<ConversationItem[]>([])
   const chatInput = ref('')
   const isGenerating = ref(false)
+  const isCancelling = ref(false)
   const generationPhase = ref<GenerationPhase>('idle')
   const generationTaskStatus = ref<AgentRunStatus | ''>('')
   const agentStatusDetailText = ref('')
@@ -65,6 +67,12 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     latestSequence: '0',
   })
   const recoveredSelectedText = ref('')
+
+  const canCancelRun = computed(() => {
+    if (!currentActiveRun.value.runId) return false
+    return isGenerating.value || ['pending', 'running', 'waiting_approval', 'suspended']
+      .includes(generationTaskStatus.value)
+  })
 
   let msgIdCounter = 1
   let runStream: EventSource | null = null
@@ -260,10 +268,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       streamingAssistantMsgId.value = null
       return
     }
-    if (runStatus === 'running') {
+    if (runStatus === 'pending' || runStatus === 'running' || runStatus === 'suspended') {
       generationPhase.value = 'idle'
-      generationTaskStatus.value = ''
-      isGenerating.value = true
+      generationTaskStatus.value = runStatus
+      isGenerating.value = runStatus === 'running'
       return
     }
     generationPhase.value = 'idle'
@@ -339,7 +347,13 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     await scrollChat()
     try {
       const finalStatus = await runtime.consumeRunStream(projectId, runId, after)
-      if (finalStatus === 'failed' || finalStatus === 'cancelled' || finalStatus === 'superseded') {
+      if (finalStatus === 'cancelled') {
+        generationPhase.value = 'idle'
+        generationTaskStatus.value = 'cancelled'
+        agentStatusDetailText.value = ''
+        return
+      }
+      if (finalStatus === 'failed' || finalStatus === 'superseded') {
         throw new Error(`运行结束: ${finalStatus}`)
       }
       const hasPendingApproval = !!assistantMsg.approval && !assistantMsg.approval?.resolved
@@ -438,6 +452,26 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     await consumeRun(projectId, sessionId, runId, after)
   }
 
+  const cancelCurrentRun = async () => {
+    if (!canCancelRun.value || isCancelling.value) return
+    const { projectId, operatorId } = deps.getContext()
+    const runId = currentActiveRun.value.runId
+    if (!projectId || !operatorId || !runId) return
+    const awaitingRunStream = isGenerating.value
+    isCancelling.value = true
+    try {
+      await deps.cancelRun(projectId, runId, { operatorId })
+      generationTaskStatus.value = 'cancelled'
+      generationPhase.value = 'idle'
+      agentStatusDetailText.value = ''
+      if (!awaitingRunStream) isGenerating.value = false
+    } catch (error: any) {
+      deps.notifyWarning?.(runtime.getErrorMessage(error))
+    } finally {
+      isCancelling.value = false
+    }
+  }
+
   return {
     messages,
     showConversationPanel,
@@ -445,6 +479,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     conversationList,
     chatInput,
     isGenerating,
+    isCancelling,
+    canCancelRun,
     generationPhase,
     generationTaskStatus,
     generationStatusText,
@@ -458,6 +494,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     selectConversation,
     toggleConversationPanel,
     sendMessage,
+    cancelCurrentRun,
     resumeRunningRun,
     consumeRunStream: runtime.consumeRunStream,
     scrollChat,

@@ -90,6 +90,8 @@
         :generation-status-text="generationStatusText"
         :agent-status-detail-text="agentStatusDetailText"
         :is-generating="isGenerating"
+        :can-cancel-run="canCancelRun"
+        :is-cancelling="isCancelling"
         :generation-phase="generationPhase"
         :show-conversation-panel="showConversationPanel"
         :conversation-loading="conversationLoading"
@@ -113,6 +115,7 @@
         @open-story-bible="openStoryBible"
         @update:chat-input="chatInput = $event"
         @send="sendMessage"
+        @cancel-run="cancelCurrentRun"
         @open-model-settings="showModelSettings = true"
       />
 
@@ -547,6 +550,8 @@ const {
   conversationList,
   chatInput,
   isGenerating,
+  isCancelling,
+  canCancelRun,
   generationPhase,
   generationTaskStatus,
   generationStatusText,
@@ -557,6 +562,7 @@ const {
   loadConversationList,
   toggleConversationPanel,
   sendMessage,
+  cancelCurrentRun,
   resumeRunningRun,
   hydrateFromRecoverySnapshot,
 } = useWorkbenchChat({
@@ -593,6 +599,7 @@ const {
     })
     return result
   },
+  cancelRun: (projectId, runId, payload) => agentApi.cancelRun(projectId, runId, payload),
   openRunStream: (projectId, runId, after) => {
     const resolvedRunId = String(runId ?? '').trim()
     if (!resolvedRunId) {

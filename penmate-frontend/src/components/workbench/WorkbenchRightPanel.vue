@@ -10,6 +10,8 @@
         :generation-status-text="generationStatusText"
         :agent-status-detail-text="agentStatusDetailText"
         :is-generating="isGenerating"
+        :can-cancel-run="canCancelRun"
+        :is-cancelling="isCancelling"
         :generation-phase="generationPhase"
         :bound-style-name="boundStyleName"
         @toggle-history="emit('toggle-history')"
@@ -46,6 +48,7 @@
         :active-plugins="activePlugins"
         @update:model-value="emit('update:chat-input', $event)"
         @send="emit('send')"
+        @cancel="emit('cancel-run')"
         @open-model-settings="emit('open-model-settings')"
       />
     </div>
@@ -66,6 +69,8 @@ const props = withDefaults(defineProps<{
   generationStatusText?: string
   agentStatusDetailText?: string
   isGenerating?: boolean
+  canCancelRun?: boolean
+  isCancelling?: boolean
   generationPhase?: GenerationPhase
   boundStyleName?: string
   showConversationPanel?: boolean
@@ -83,6 +88,8 @@ const props = withDefaults(defineProps<{
   generationStatusText: '',
   agentStatusDetailText: '',
   isGenerating: false,
+  canCancelRun: false,
+  isCancelling: false,
   generationPhase: 'idle',
   boundStyleName: '',
   showConversationPanel: false,
@@ -107,6 +114,7 @@ const emit = defineEmits<{
   (event: 'open-story-bible', payload: string): void
   (event: 'update:chat-input', payload: string): void
   (event: 'send'): void
+  (event: 'cancel-run'): void
   (event: 'open-model-settings'): void
 }>()
 

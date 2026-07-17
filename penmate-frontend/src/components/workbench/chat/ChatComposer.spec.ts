@@ -20,6 +20,8 @@ const mountChatComposer = async (
   overrides: Partial<{
     modelValue: string
     isGenerating: boolean
+    canCancelRun: boolean
+    isCancelling: boolean
     currentModelName: string
     activePlugins: string[]
   }> = {},
@@ -96,6 +98,22 @@ describe('ChatComposer', () => {
       ['请补充主角与反派对话'],
     ])
     expect(wrapper.emitted('send')).toEqual([[]])
+  })
+
+  it('offers_an_icon_stop_action_while_a_run_is_cancellable', async () => {
+    const wrapper = await mountChatComposer({
+      modelValue: '继续写',
+      isGenerating: true,
+      canCancelRun: true,
+    })
+
+    const stopButton = wrapper.get('[data-testid="chat-cancel"]')
+    expect(stopButton.attributes('title')).toBe('停止运行')
+    expect((stopButton.element as HTMLButtonElement).disabled).toBe(false)
+
+    await stopButton.trigger('click')
+
+    expect(wrapper.emitted('cancel')).toEqual([[]])
   })
 
   it('shows_model_warning_and_emits_open_model_settings_when_model_missing', async () => {

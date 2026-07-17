@@ -201,6 +201,20 @@ public interface AgentRunMapper {
 
     @Update("""
             UPDATE agent_runs
+            SET run_status = 'CANCELLED', run_phase = 'cancelled',
+                active_approval_id = NULL, lease_owner = NULL, lease_until = NULL,
+                next_retry_at = NULL, last_error_code = #{errorCode},
+                last_error_message = #{errorMessage}, finished_at = CURRENT_TIMESTAMP(3),
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE run_id = #{runId}
+              AND run_status IN ('PENDING','RUNNING','WAITING_APPROVAL','SUSPENDED')
+            """)
+    int cancelRecoverable(@Param("runId") Long runId,
+                          @Param("errorCode") String errorCode,
+                          @Param("errorMessage") String errorMessage);
+
+    @Update("""
+            UPDATE agent_runs
             SET run_status = CASE WHEN attempt_count >= #{maxAttempts} THEN 'FAILED' ELSE 'SUSPENDED' END,
                 run_phase = CASE WHEN attempt_count >= #{maxAttempts} THEN 'failed' ELSE 'suspended' END,
                 lease_owner = NULL,

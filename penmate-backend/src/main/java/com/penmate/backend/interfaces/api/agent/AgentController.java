@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
+import com.penmate.backend.application.agent.run.AgentRunCancellationService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
@@ -15,6 +16,7 @@ import com.penmate.backend.infrastructure.realtime.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
@@ -47,19 +49,22 @@ public class AgentController {
     private final AgentTurnAppService agentTurnAppService;
     private final AgentRunEventStreamService agentRunEventStreamService;
     private final StoryBibleRoutingPreferenceResolver routingPreferences;
+    private final AgentRunCancellationService runCancellationService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
                            AgentSessionTokenUsageAppService agentSessionTokenUsageAppService,
                            AgentTurnAppService agentTurnAppService,
                            AgentRunEventStreamService agentRunEventStreamService,
-                           StoryBibleRoutingPreferenceResolver routingPreferences) {
+                           StoryBibleRoutingPreferenceResolver routingPreferences,
+                           AgentRunCancellationService runCancellationService) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
         this.agentTurnAppService = agentTurnAppService;
         this.agentRunEventStreamService = agentRunEventStreamService;
         this.routingPreferences = routingPreferences;
+        this.runCancellationService = runCancellationService;
     }
 
     @GetMapping("/routing-preference")
@@ -216,6 +221,25 @@ public class AgentController {
         log.info("Open agent run stream request: projectId={}, runId={}, after={}, lastEventId={}, replayCursor={}, traceId={}",
                 resolvedProjectId, resolvedRunId, after, lastEventId, replayCursor, traceId);
         return agentRunEventStreamService.openStream(resolvedRunId, replayCursor);
+    }
+
+    @PostMapping("/runs/{runId}/cancel")
+    public ApiResponse<AgentRunDto.ActiveRunDto> cancelRun(
+            @PathVariable String projectId,
+            @PathVariable String runId,
+            @Valid @RequestBody CancelAgentRunDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var run = runCancellationService.cancel(
+                requireLongId(projectId, "projectId"),
+                requireLongId(runId, "runId"),
+                requireLongId(dto.getOperatorId(), "operatorId"),
+                dto.getReason());
+        return ApiResponse.success(new AgentRunDto.ActiveRunDto(
+                stringifyBusinessId(run.turnId()),
+                stringifyBusinessId(run.runId()),
+                run.runStatus(),
+                run.runPhase(),
+                stringifyBusinessId(run.latestEventSeq())), traceId);
     }
 
     private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {

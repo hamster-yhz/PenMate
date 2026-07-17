@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +60,22 @@ class AgentRunExecutionTokenRepositoryImplTest {
         }
     }
 
+    @Test
+    void cancelling_a_recoverable_run_revokes_the_execution_token() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        insertRun(now.plusMinutes(1));
+        try (SqlSession session = sessions.openSession(true)) {
+            AgentRunRepositoryImpl repository = new AgentRunRepositoryImpl(session.getMapper(AgentRunMapper.class));
+
+            assertThat(repository.cancelRecoverable(
+                    70001L, "AGENT_RUN_CANCELLED", "Cancelled by user")).isTrue();
+            assertThat(repository.ownsExecutionToken(70001L, 7L, now)).isFalse();
+            assertThat(runStatus()).isEqualTo("CANCELLED");
+            assertThat(repository.cancelRecoverable(
+                    70001L, "AGENT_RUN_CANCELLED", "Cancelled by user")).isFalse();
+        }
+    }
+
     private void insertRun(LocalDateTime leaseUntil) throws Exception {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -69,6 +86,16 @@ class AgentRunExecutionTokenRepositoryImplTest {
                      """)) {
             statement.setObject(1, leaseUntil);
             statement.executeUpdate();
+        }
+    }
+
+    private String runStatus() throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT run_status FROM agent_runs WHERE run_id = 70001");
+             ResultSet result = statement.executeQuery()) {
+            assertThat(result.next()).isTrue();
+            return result.getString(1);
         }
     }
 
