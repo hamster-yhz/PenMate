@@ -15,5 +15,12 @@ public interface AgentCheckpointRepository {
 
     int deleteOlderThanLatest(Long runId, int keep);
 
-    int deleteTerminalOlderThan(LocalDateTime cutoff);
+    List<AgentCheckpoint> findTerminalHotBefore(LocalDateTime cutoff, int limit);
+
+    int markCold(Long checkpointId, String stateJson, String stateObjectKey, String stateSha256,
+                 LocalDateTime archivedAt, LocalDateTime expiresAt);
+
+    List<AgentCheckpoint> findExpiredCold(LocalDateTime now, int limit);
+
+    int deleteCold(Long checkpointId);
 }

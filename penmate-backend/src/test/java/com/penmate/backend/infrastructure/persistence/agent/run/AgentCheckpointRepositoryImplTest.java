@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,6 +57,29 @@ class AgentCheckpointRepositoryImplTest {
         assertThat(repository.findLatest(70001L, 2))
                 .extracting(AgentCheckpoint::checkpointNo)
                 .containsExactly(3L, 2L);
+    }
+
+    @Test
+    void archives_and_expires_only_terminal_hot_checkpoints() throws Exception {
+        String state = "{\"phase\":\"done\"}";
+        repository.save(new AgentCheckpoint(80001L, 70001L, 1L, 5L, state, state.length(), null));
+        LocalDateTime now = LocalDateTime.of(2026, 7, 17, 3, 15);
+        try (Connection connection = new UnpooledDataSource("org.h2.Driver", JDBC_URL, "sa", "").getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE agent_runs SET run_status='DONE', finished_at=TIMESTAMP '2026-07-09 03:15:00' "
+                    + "WHERE run_id=70001");
+        }
+
+        assertThat(repository.findTerminalHotBefore(now.minusDays(7), 10)).hasSize(1);
+        assertThat(repository.markCold(
+                80001L, "{\"externalState\":true}", "checkpoint-key", "a".repeat(64),
+                now, now.plusDays(90))).isEqualTo(1);
+
+        AgentCheckpoint archived = repository.findLatest(70001L);
+        assertThat(archived.isCold()).isTrue();
+        assertThat(archived.stateObjectKey()).isEqualTo("checkpoint-key");
+        assertThat(repository.findExpiredCold(now.plusDays(91), 10)).hasSize(1);
+        assertThat(repository.deleteCold(80001L)).isEqualTo(1);
     }
 
     private SqlSessionFactory buildSqlSessionFactory(DataSource dataSource) {
@@ -106,6 +130,11 @@ class AgentCheckpointRepositoryImplTest {
         Files.copy(
                 Path.of("src/main/resources/db/migration/V17__harden_agent_checkpoints.sql"),
                 migrationDir.resolve("V17__harden_agent_checkpoints.sql"),
+                StandardCopyOption.REPLACE_EXISTING
+        );
+        Files.copy(
+                Path.of("src/main/resources/db/migration/V19__add_checkpoint_cold_storage.sql"),
+                migrationDir.resolve("V19__add_checkpoint_cold_storage.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }

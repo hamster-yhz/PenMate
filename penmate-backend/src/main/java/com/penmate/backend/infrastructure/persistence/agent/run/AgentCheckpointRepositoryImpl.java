@@ -47,9 +47,32 @@ public class AgentCheckpointRepositoryImpl implements AgentCheckpointRepository 
     }
 
     @Override
-    public int deleteTerminalOlderThan(LocalDateTime cutoff) {
+    public List<AgentCheckpoint> findTerminalHotBefore(LocalDateTime cutoff, int limit) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
-            return session.getMapper(AgentCheckpointMapper.class).deleteTerminalOlderThan(cutoff);
+            return session.getMapper(AgentCheckpointMapper.class).findTerminalHotBefore(cutoff, limit);
+        }
+    }
+
+    @Override
+    public int markCold(Long checkpointId, String stateJson, String stateObjectKey, String stateSha256,
+                        LocalDateTime archivedAt, LocalDateTime expiresAt) {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            return session.getMapper(AgentCheckpointMapper.class).markCold(
+                    checkpointId, stateJson, stateObjectKey, stateSha256, archivedAt, expiresAt);
+        }
+    }
+
+    @Override
+    public List<AgentCheckpoint> findExpiredCold(LocalDateTime now, int limit) {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            return session.getMapper(AgentCheckpointMapper.class).findExpiredCold(now, limit);
+        }
+    }
+
+    @Override
+    public int deleteCold(Long checkpointId) {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            return session.getMapper(AgentCheckpointMapper.class).deleteCold(checkpointId);
         }
     }
 }
