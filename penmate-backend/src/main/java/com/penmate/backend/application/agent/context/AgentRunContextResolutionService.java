@@ -23,6 +23,7 @@ public class AgentRunContextResolutionService {
     private final AgentContextCatalogHashService hashes;
     private final AgentContextEpochService epochs;
     private final AgentWorkingSetService workingSet;
+    private final AgentWorkingSetPromotionService workingSetPromotions;
     private final StoryBibleContextResolver contextResolver;
     private final AgentRunContextArtifactService artifacts;
     private final AgentModelRoutingService modelRouting;
@@ -36,6 +37,7 @@ public class AgentRunContextResolutionService {
             AgentContextCatalogHashService hashes,
             AgentContextEpochService epochs,
             AgentWorkingSetService workingSet,
+            AgentWorkingSetPromotionService workingSetPromotions,
             StoryBibleContextResolver contextResolver,
             AgentRunContextArtifactService artifacts,
             AgentModelRoutingService modelRouting,
@@ -48,6 +50,7 @@ public class AgentRunContextResolutionService {
         this.hashes = hashes;
         this.epochs = epochs;
         this.workingSet = workingSet;
+        this.workingSetPromotions = workingSetPromotions;
         this.contextResolver = contextResolver;
         this.artifacts = artifacts;
         this.modelRouting = modelRouting;
@@ -96,7 +99,7 @@ public class AgentRunContextResolutionService {
     }
 
     public void promoteAfterDurable(Long sessionId, Long turnId, List<Long> nodeIds) {
-        workingSet.promote(sessionId, turnId, nodeIds, BigDecimal.ONE);
+        workingSetPromotions.promoteBestEffort(sessionId, turnId, nodeIds, BigDecimal.ONE);
     }
 
     private ContextPackage toContextPackage(StoryBibleContextResolver.ResolvedContext resolved,

@@ -3,7 +3,7 @@ package com.penmate.backend.application.agent.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.penmate.backend.application.agent.context.AgentContextEpochService;
-import com.penmate.backend.application.agent.context.AgentWorkingSetService;
+import com.penmate.backend.application.agent.context.AgentWorkingSetPromotionService;
 import com.penmate.backend.application.agent.context.ContextEpochSnapshotCodec;
 import com.penmate.backend.application.agent.context.StoryBibleContextResolver;
 import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
@@ -34,14 +34,14 @@ class StoryBibleSearchApplicationServiceTest {
     @Mock private AgentRunRepository runs;
     @Mock private AgentContextEpochService epochs;
     @Mock private StoryBibleContextResolver resolver;
-    @Mock private AgentWorkingSetService workingSet;
+    @Mock private AgentWorkingSetPromotionService workingSetPromotions;
 
     @Test
     void should_search_only_the_run_bound_epoch_and_promote_returned_nodes() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         ContextEpochSnapshotCodec codec = new ContextEpochSnapshotCodec(objectMapper);
         StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
-                runs, epochs, codec, resolver, workingSet, objectMapper);
+                runs, epochs, codec, resolver, workingSetPromotions, objectMapper);
         AgentRun run = new AgentRun(70001L, 101L, 90001L, 50001L, 201L,
                 "RUNNING", "executing", 88001L, null, 5L, null, "trace-1", null, null);
         AgentRunInput input = new AgentRunInput(70001L, "Inspect Mira", "CHAT", 301L,
@@ -74,14 +74,14 @@ class StoryBibleSearchApplicationServiceTest {
         assertThat(route.getValue().epochCatalog()).isEqualTo(catalog);
         assertThat(route.getValue().chapterId()).isEqualTo(301L);
         assertThat(route.getValue().routingMode()).isEqualTo(StoryBibleRoutingMode.RETRIEVAL);
-        verify(workingSet).promote(90001L, 50001L, List.of(71L), BigDecimal.ONE);
+        verify(workingSetPromotions).promoteBestEffort(90001L, 50001L, List.of(71L), BigDecimal.ONE);
     }
 
     @Test
     void should_fail_without_a_run_bound_context_epoch() {
         ObjectMapper objectMapper = new ObjectMapper();
         StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
-                runs, epochs, new ContextEpochSnapshotCodec(objectMapper), resolver, workingSet, objectMapper);
+                runs, epochs, new ContextEpochSnapshotCodec(objectMapper), resolver, workingSetPromotions, objectMapper);
         when(runs.findRun(70001L)).thenReturn(new AgentRun(
                 70001L, 101L, 90001L, 50001L, 201L, "RUNNING", "executing",
                 null, null, 0L, null, "trace", null, null));
