@@ -128,13 +128,13 @@ class AgentCheckpointRepositoryImplTest {
                 StandardCopyOption.REPLACE_EXISTING
         );
         Files.copy(
-                Path.of("src/main/resources/db/migration/V17__harden_agent_checkpoints.sql"),
-                migrationDir.resolve("V17__harden_agent_checkpoints.sql"),
+                Path.of("src/main/resources/db/migration/V19__harden_agent_checkpoints.sql"),
+                migrationDir.resolve("V19__harden_agent_checkpoints.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
         Files.copy(
-                Path.of("src/main/resources/db/migration/V19__add_checkpoint_cold_storage.sql"),
-                migrationDir.resolve("V19__add_checkpoint_cold_storage.sql"),
+                Path.of("src/main/resources/db/migration/V21__add_checkpoint_cold_storage.sql"),
+                migrationDir.resolve("V21__add_checkpoint_cold_storage.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }

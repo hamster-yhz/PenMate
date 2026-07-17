@@ -104,7 +104,7 @@ class AgentRunExecutionTokenRepositoryImplTest {
         Files.createDirectories(directory);
         Files.copy(Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"),
                 directory.resolve("V11__init_agent_and_ops_domains.sql"), StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(Path.of("src/main/resources/db/migration/V15__add_agent_run_leases.sql"),
-                directory.resolve("V15__add_agent_run_leases.sql"), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(Path.of("src/main/resources/db/migration/V17__add_agent_run_leases.sql"),
+                directory.resolve("V17__add_agent_run_leases.sql"), StandardCopyOption.REPLACE_EXISTING);
     }
 }

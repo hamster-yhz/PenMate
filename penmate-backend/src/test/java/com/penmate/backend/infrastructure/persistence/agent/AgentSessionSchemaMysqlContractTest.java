@@ -136,8 +136,8 @@ class AgentSessionSchemaMysqlContractTest {
                 StandardCopyOption.REPLACE_EXISTING
         );
         Files.copy(
-                Path.of("src/main/resources/db/migration/V15__add_agent_run_leases.sql"),
-                migrationDir.resolve("V15__add_agent_run_leases.sql"),
+                Path.of("src/main/resources/db/migration/V17__add_agent_run_leases.sql"),
+                migrationDir.resolve("V17__add_agent_run_leases.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }

@@ -25,8 +25,8 @@ class AgentEventArchiveRepositoryImplTest {
         Files.createDirectories(directory);
         Files.copy(Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"),
                 directory.resolve("V11__init_agent_and_ops_domains.sql"), StandardCopyOption.REPLACE_EXISTING);
-        Files.copy(Path.of("src/main/resources/db/migration/V18__add_agent_event_archives.sql"),
-                directory.resolve("V18__add_agent_event_archives.sql"), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(Path.of("src/main/resources/db/migration/V20__add_agent_event_archives.sql"),
+                directory.resolve("V20__add_agent_event_archives.sql"), StandardCopyOption.REPLACE_EXISTING);
         Flyway.configure().dataSource(url, "sa", "").locations("filesystem:" + directory).load().migrate();
         var dataSource = new UnpooledDataSource("org.h2.Driver", url, "sa", "");
         Configuration configuration = new Configuration(new Environment(

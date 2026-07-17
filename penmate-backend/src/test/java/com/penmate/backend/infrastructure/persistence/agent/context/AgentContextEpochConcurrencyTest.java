@@ -65,8 +65,8 @@ class AgentContextEpochConcurrencyTest {
                 StandardCopyOption.REPLACE_EXISTING
         );
         Files.copy(
-                Path.of("src/main/resources/db/migration/V16__add_agent_run_dependency_revisions.sql"),
-                migrationDir.resolve("V16__add_agent_run_dependency_revisions.sql"),
+                Path.of("src/main/resources/db/migration/V18__add_agent_run_dependency_revisions.sql"),
+                migrationDir.resolve("V18__add_agent_run_dependency_revisions.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
         Flyway.configure().dataSource(dataSource).locations("filesystem:" + MIGRATION_DIR).load().migrate();

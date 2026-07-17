@@ -122,8 +122,8 @@ class AgentToolCallExecutionRepositoryImplTest {
     private void prepareMigration() throws Exception {
         Path directory = Path.of(MIGRATION_DIR);
         Files.createDirectories(directory);
-        Files.copy(Path.of("src/main/resources/db/migration/V20__add_agent_tool_call_executions.sql"),
-                directory.resolve("V20__add_agent_tool_call_executions.sql"),
+        Files.copy(Path.of("src/main/resources/db/migration/V22__add_agent_tool_call_executions.sql"),
+                directory.resolve("V22__add_agent_tool_call_executions.sql"),
                 StandardCopyOption.REPLACE_EXISTING);
     }
 }
