@@ -38,6 +38,7 @@ class StoryBibleContextResolverTest {
         assertThat(result.decision().selectedNodeIds()).containsExactly(1L);
         assertThat(result.nodes()).extracting(StoryBibleContextResolver.RenderedNode::nodeId).containsExactly(1L, 2L);
         assertThat(result.decision().selectorUsed()).isFalse();
+        assertThat(result.decision().retrievalTrace().mergedCandidateCount()).isEqualTo(1);
     }
 
     @Test

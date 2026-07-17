@@ -16,6 +16,7 @@ public record StoryBibleRouteDecision(
         double selectorConfidence,
         LlmTokenUsage selectorTokenUsage,
         boolean semanticUnavailable,
+        StoryBibleRetrievalTrace retrievalTrace,
         List<String> missingFlags
 ) {
     public StoryBibleRouteDecision {
@@ -24,6 +25,7 @@ public record StoryBibleRouteDecision(
         relationExpansionNodeIds = List.copyOf(relationExpansionNodeIds == null ? List.of() : relationExpansionNodeIds);
         reasons = Map.copyOf(reasons == null ? Map.of() : reasons);
         selectorTokenUsage = selectorTokenUsage == null ? LlmTokenUsage.ZERO : selectorTokenUsage;
+        retrievalTrace = retrievalTrace == null ? StoryBibleRetrievalTrace.EMPTY : retrievalTrace;
         missingFlags = List.copyOf(missingFlags == null ? List.of() : missingFlags);
     }
 
@@ -32,6 +34,6 @@ public record StoryBibleRouteDecision(
                                    long selectorLatencyMillis, boolean semanticUnavailable,
                                    List<String> missingFlags) {
         this(mode, List.of(), selectedNodeIds, List.of(), reasons, selectorUsed, selectorLatencyMillis,
-                0d, LlmTokenUsage.ZERO, semanticUnavailable, missingFlags);
+                0d, LlmTokenUsage.ZERO, semanticUnavailable, StoryBibleRetrievalTrace.EMPTY, missingFlags);
     }
 }

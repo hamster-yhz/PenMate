@@ -46,6 +46,55 @@ class StoryBibleCandidateRetrieverTest {
                 .containsExactly(1L, 2L, 3L);
         assertThat(result.candidates().get(1).reasons()).contains("exact_alias:Mira", "lexical");
         assertThat(result.semanticUnavailable()).isTrue();
+        assertThat(result.trace().semanticRetrieverAvailable()).isFalse();
+        assertThat(result.trace().alwaysIncludeCount()).isEqualTo(1);
+        assertThat(result.trace().exactAliasCount()).isEqualTo(1);
+        assertThat(result.trace().lexicalCandidateCount()).isEqualTo(2);
+        assertThat(result.trace().mergedCandidateCount()).isEqualTo(3);
+        assertThat(result.trace().candidates()).extracting(StoryBibleRetrievalTrace.Candidate::nodeId)
+                .containsExactly(1L, 2L, 3L);
+    }
+
+    @Test
+    void should_detect_catalog_aliases_directly_from_the_user_message() {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        StoryBible root = new StoryBible();
+        root.setStoryBibleId(10L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        StoryBibleCandidateRetriever retriever = new StoryBibleCandidateRetriever(
+                repository, new NoopStoryBibleSemanticRetriever());
+
+        var result = retriever.retrieve(new StoryBibleRouteRequest(
+                20L, 30L, 40L, 50L, "Captain enters the tower", List.of(),
+                StoryBibleRoutingMode.RETRIEVAL, null, List.of(
+                new StoryBibleRouteRequest.CatalogEntry(2L, "CHARACTER", "PERSON", "Mira",
+                        List.of("Captain"), "Pilot", List.of(), "", "AUTO_RETRIEVE", "CANON")
+        ), List.of(), null));
+
+        assertThat(result.candidates()).extracting(StoryBibleCandidateRetriever.Candidate::nodeId)
+                .containsExactly(2L);
+        assertThat(result.trace().exactAliasCount()).isEqualTo(1);
+        assertThat(result.candidates().getFirst().reasons()).containsExactly("exact_alias:Captain");
+    }
+
+    @Test
+    void should_detect_cjk_aliases_without_whitespace_boundaries() {
+        StoryBibleRepository repository = mock(StoryBibleRepository.class);
+        StoryBible root = new StoryBible();
+        root.setStoryBibleId(10L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        StoryBibleCandidateRetriever retriever = new StoryBibleCandidateRetriever(
+                repository, new NoopStoryBibleSemanticRetriever());
+
+        var result = retriever.retrieve(new StoryBibleRouteRequest(
+                20L, 30L, 40L, 50L, "船长走进高塔", List.of(), StoryBibleRoutingMode.RETRIEVAL, null,
+                List.of(new StoryBibleRouteRequest.CatalogEntry(2L, "CHARACTER", "PERSON", "Mira",
+                        List.of("船长"), "Pilot", List.of(), "", "AUTO_RETRIEVE", "CANON")),
+                List.of(), null));
+
+        assertThat(result.trace().exactAliasCount()).isEqualTo(1);
+        assertThat(result.candidates()).extracting(StoryBibleCandidateRetriever.Candidate::nodeId)
+                .containsExactly(2L);
     }
 
     private StoryBibleNode node(Long id, StoryBibleInclusionPolicy policy) {

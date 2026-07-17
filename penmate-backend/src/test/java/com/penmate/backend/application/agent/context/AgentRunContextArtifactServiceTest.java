@@ -5,6 +5,7 @@ import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,8 +37,14 @@ class AgentRunContextArtifactServiceTest {
         AgentRunContextArtifactService service = new AgentRunContextArtifactService(
                 artifacts, mock(BusinessIdGenerator.class), storage, objectMapper);
 
+        var trace = new StoryBibleRetrievalTrace(false, 1, 2, 3, 0, 4,
+                List.of(new StoryBibleRetrievalTrace.Candidate(71L, 90d, List.of("exact_alias:Mira"))));
+        var decision = new StoryBibleRouteDecision(StoryBibleRoutingMode.RETRIEVAL, List.of(), List.of(71L),
+                List.of(), Map.of(71L, "exact_alias:Mira"), false, 0L, 0d, LlmTokenUsage.ZERO,
+                true, trace, List.of());
         var resolved = new AgentRunContextArtifactService.ResolvedArtifact(
-                1, 70001L, 99L, null, null, List.of());
+                3, 70001L, 99L, decision, null, List.of(72L), null,
+                List.of(801L), Map.of(71L, "content-hash"));
         String content = objectMapper.writeValueAsString(resolved);
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(content.getBytes(StandardCharsets.UTF_8)));
@@ -54,6 +62,10 @@ class AgentRunContextArtifactServiceTest {
 
         assertThat(loaded.runId()).isEqualTo(70001L);
         assertThat(loaded.contextEpochId()).isEqualTo(99L);
+        assertThat(loaded.routeDecision().retrievalTrace().exactAliasCount()).isEqualTo(2);
+        assertThat(loaded.routeDecision().selectedNodeIds()).containsExactly(71L);
+        assertThat(loaded.progressionIds()).containsExactly(801L);
+        assertThat(loaded.contentHashes()).containsEntry(71L, "content-hash");
         assertThat(service.loadLatestContextForRun(70001L)).isEqualTo(loaded);
     }
 

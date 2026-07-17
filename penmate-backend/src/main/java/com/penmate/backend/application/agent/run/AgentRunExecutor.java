@@ -16,6 +16,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunLease;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 
 @Component
+@Slf4j
 public class AgentRunExecutor {
 
     private final AgentRunRepository runRepository;
@@ -117,16 +119,22 @@ public class AgentRunExecutor {
         ));
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
-        evt = eventPublisher.publish(runId, "turn.route.completed", Map.of(
-                "mode", contextResult.routeDecision().mode().name(),
-                "selectedNodeIds", contextResult.routeDecision().selectedNodeIds(),
-                "relationExpansionNodeIds", contextResult.routeDecision().relationExpansionNodeIds(),
-                "selectorUsed", contextResult.routeDecision().selectorUsed(),
-                "selectorLatencyMillis", contextResult.routeDecision().selectorLatencyMillis(),
-                "selectorConfidence", contextResult.routeDecision().selectorConfidence(),
-                "selectorTokenUsage", contextResult.routeDecision().selectorTokenUsage(),
-                "semanticUnavailable", contextResult.routeDecision().semanticUnavailable()
-        ));
+        var routePayload = new java.util.LinkedHashMap<String, Object>();
+        routePayload.put("mode", contextResult.routeDecision().mode().name());
+        routePayload.put("routingMode", contextResult.routeDecision().mode().name());
+        routePayload.put("selectedNodeIds", contextResult.routeDecision().selectedNodeIds());
+        routePayload.put("relationExpansionNodeIds", contextResult.routeDecision().relationExpansionNodeIds());
+        routePayload.put("selectorUsed", contextResult.routeDecision().selectorUsed());
+        routePayload.put("selectorLatencyMillis", contextResult.routeDecision().selectorLatencyMillis());
+        routePayload.put("selectorConfidence", contextResult.routeDecision().selectorConfidence());
+        routePayload.put("selectorTokenUsage", contextResult.routeDecision().selectorTokenUsage());
+        routePayload.put("semanticRetrieverAvailable",
+                contextResult.routeDecision().retrievalTrace().semanticRetrieverAvailable());
+        routePayload.put("semanticUnavailable", contextResult.routeDecision().semanticUnavailable());
+        routePayload.put("exactAliasCount", contextResult.routeDecision().retrievalTrace().exactAliasCount());
+        routePayload.put("lexicalCandidateCount", contextResult.routeDecision().retrievalTrace().lexicalCandidateCount());
+        routePayload.put("selectedNodeCount", contextResult.routeDecision().selectedNodeIds().size());
+        evt = eventPublisher.publish(runId, "turn.route.completed", routePayload);
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
         evt = eventPublisher.publish(runId, "context.resolved", Map.of(
@@ -136,7 +144,32 @@ public class AgentRunExecutor {
         ));
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
-        contextResolutionService.promoteAfterDurable(sessionId, turnId, contextResult.routeDecision().selectedNodeIds());
+        var workingSetSummary = contextResolutionService.promoteAfterDurable(
+                sessionId, turnId, contextResult.routeDecision().selectedNodeIds());
+        evt = eventPublisher.publish(runId, "working_set.updated", Map.of(
+                "candidateCount", workingSetSummary.candidateCount(),
+                "promotedCount", workingSetSummary.promotedCount(),
+                "evictedCount", workingSetSummary.evictedCount(),
+                "succeeded", workingSetSummary.succeeded()
+        ));
+        state = stateReducer.apply(state, evt);
+        checkpointService.checkpointIfNeeded(evt, state);
+        log.info("agent.context.resolved: projectId={}, sessionId={}, runId={}, epochId={}, contentRevision={}, "
+                        + "routingMode={}, selectorUsed={}, semanticRetrieverAvailable={}, exactAliasCount={}, "
+                        + "lexicalCandidateCount={}, selectedNodeCount={}, workingSetCandidateCount={}, "
+                        + "workingSetPromotedCount={}, workingSetEvictedCount={}, selectorTokenUsage={}, "
+                        + "selectorLatencyMillis={}, contextArtifactId={}, contextArtifactSha256={}",
+                projectId, sessionId, runId, contextResult.epochBinding().epoch().epochId(),
+                contextResult.epochBinding().epoch().storyBibleRevision(), contextResult.routeDecision().mode(),
+                contextResult.routeDecision().selectorUsed(),
+                contextResult.routeDecision().retrievalTrace().semanticRetrieverAvailable(),
+                contextResult.routeDecision().retrievalTrace().exactAliasCount(),
+                contextResult.routeDecision().retrievalTrace().lexicalCandidateCount(),
+                contextResult.routeDecision().selectedNodeIds().size(), workingSetSummary.candidateCount(),
+                workingSetSummary.promotedCount(), workingSetSummary.evictedCount(),
+                contextResult.routeDecision().selectorTokenUsage(),
+                contextResult.routeDecision().selectorLatencyMillis(), contextResult.artifactRef().artifactId(),
+                contextResult.artifactRef().sha256());
 
         evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "prompt"));
         state = stateReducer.apply(state, evt);

@@ -41,7 +41,7 @@ public class StoryBibleContextResolver {
         StoryBibleCandidateRetriever.Retrieval retrieval = candidateRetriever.retrieve(request);
         if (retrieval.storyBible() == null) {
             return new ResolvedContext(new StoryBibleRouteDecision(request.routingMode(), List.of(), List.of(),
-                    List.of(), Map.of(), false, 0L, 0d, null, true,
+                    List.of(), Map.of(), false, 0L, 0d, null, true, retrieval.trace(),
                     List.of("STORY_BIBLE_MISSING")), List.of(), List.of());
         }
         Map<Long, StoryBibleCandidateRetriever.Candidate> candidateById = new LinkedHashMap<>();
@@ -111,7 +111,7 @@ public class StoryBibleContextResolver {
         long latency = selectorUsed ? (System.nanoTime() - started) / 1_000_000L : 0L;
         StoryBibleRouteDecision decision = new StoryBibleRouteDecision(request.routingMode(), selection.intentTags(),
                 List.copyOf(selected), selection.relationExpansionNodeIds(), reasons, selectorUsed, latency,
-                selection.confidence(), selection.tokenUsage(), retrieval.semanticUnavailable(), missing);
+                selection.confidence(), selection.tokenUsage(), retrieval.semanticUnavailable(), retrieval.trace(), missing);
         return new ResolvedContext(decision, List.copyOf(rendered), relations);
     }
 

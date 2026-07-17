@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.context.AgentContextEpochService;
 import com.penmate.backend.application.agent.context.AgentRunContextArtifactService;
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
 import com.penmate.backend.application.agent.context.AgentRunDependencyValidator;
+import com.penmate.backend.application.agent.context.AgentWorkingSetPromotionService;
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
@@ -70,6 +71,8 @@ class AgentRunExecutorTest {
         when(modelRoutingService.resolveExecutionConfig(anyLong(), anyLong(), anyString()))
                 .thenReturn(AgentLlmExecutionConfig.builder().build());
         when(contextResolutionService.resolveInitial(any(), any(), any(), any(), any())).thenReturn(contextRoutingResult());
+        when(contextResolutionService.promoteAfterDurable(anyLong(), anyLong(), anyList())).thenReturn(
+                new AgentWorkingSetPromotionService.PromotionSummary(1, 1, 0, true));
         when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
         when(contextArtifacts.savePromptPlan(anyLong(), any(), any(), anyList()))
                 .thenReturn(new AgentRunContextArtifactService.ArtifactRef(89L, "prompt", "hash", 10));
@@ -82,6 +85,7 @@ class AgentRunExecutorTest {
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("epoch_binding"));
         verify(eventPublisher).publish(eq(70001L), eq("context.epoch.bound"), any());
         verify(eventPublisher).publish(eq(70001L), eq("turn.route.completed"), any());
+        verify(eventPublisher).publish(eq(70001L), eq("working_set.updated"), any());
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
         ArgumentCaptor<AgentRunLoopRequest> loopRequest = ArgumentCaptor.forClass(AgentRunLoopRequest.class);
         verify(llmLoop).execute(loopRequest.capture());
@@ -99,6 +103,8 @@ class AgentRunExecutorTest {
                 "{\"styleId\":81}", "{\"operatorId\":920001,\"modelConfigId\":null}", null, "hash-70001"));
         when(runRepository.findRun(70001L)).thenReturn(run());
         when(contextResolutionService.resolveInitial(any(), any(), any(), any(), any())).thenReturn(contextRoutingResult());
+        when(contextResolutionService.promoteAfterDurable(anyLong(), anyLong(), anyList())).thenReturn(
+                new AgentWorkingSetPromotionService.PromotionSummary(1, 1, 0, true));
         when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
         when(contextArtifacts.savePromptPlan(anyLong(), any(), any(), anyList()))
                 .thenReturn(new AgentRunContextArtifactService.ArtifactRef(89L, "prompt", "hash", 10));

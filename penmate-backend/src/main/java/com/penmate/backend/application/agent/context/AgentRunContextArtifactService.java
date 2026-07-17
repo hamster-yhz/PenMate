@@ -168,15 +168,26 @@ public class AgentRunContextArtifactService {
             StoryBibleRouteDecision routeDecision,
             ContextPackage contextPackage,
             java.util.List<Long> workingSetNodeIds,
-            DependencyManifest dependencies
+            DependencyManifest dependencies,
+            java.util.List<Long> progressionIds,
+            java.util.Map<Long, String> contentHashes
     ) {
         public ResolvedArtifact(int schemaVersion, Long runId, Long contextEpochId,
                                 StoryBibleRouteDecision routeDecision, ContextPackage contextPackage,
                                 java.util.List<Long> workingSetNodeIds) {
-            this(schemaVersion, runId, contextEpochId, routeDecision, contextPackage, workingSetNodeIds, null);
+            this(schemaVersion, runId, contextEpochId, routeDecision, contextPackage, workingSetNodeIds,
+                    null, java.util.List.of(), java.util.Map.of());
+        }
+        public ResolvedArtifact(int schemaVersion, Long runId, Long contextEpochId,
+                                StoryBibleRouteDecision routeDecision, ContextPackage contextPackage,
+                                java.util.List<Long> workingSetNodeIds, DependencyManifest dependencies) {
+            this(schemaVersion, runId, contextEpochId, routeDecision, contextPackage, workingSetNodeIds,
+                    dependencies, java.util.List.of(), java.util.Map.of());
         }
         public ResolvedArtifact {
             workingSetNodeIds = java.util.List.copyOf(workingSetNodeIds == null ? java.util.List.of() : workingSetNodeIds);
+            progressionIds = java.util.List.copyOf(progressionIds == null ? java.util.List.of() : progressionIds);
+            contentHashes = java.util.Map.copyOf(contentHashes == null ? java.util.Map.of() : contentHashes);
         }
     }
     public record DependencyManifest(

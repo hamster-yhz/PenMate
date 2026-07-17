@@ -99,7 +99,8 @@ public class AgentRunContextResolutionService {
                 preference.mode().name(), preference.routerModelConfigId(), preference.routerModelConfigRevision(),
                 catalogHashes.promptBundleHash(), catalogHashes.skillCatalogHash(), catalogHashes.toolCatalogHash());
         var durable = new AgentRunContextArtifactService.ResolvedArtifact(
-                2, run.runId(), binding.epoch().epochId(), resolved.decision(), contextPackage, workingSetIds, manifest);
+                3, run.runId(), binding.epoch().epochId(), resolved.decision(), contextPackage, workingSetIds, manifest,
+                progressionIds(resolved), contentHashes(resolved));
         var ref = artifacts.save(run.runId(), durable);
         return new Resolution(binding, contextPackage, resolved.decision(), ref, catalogHashes,
                 sha256(snapshotCodec.encode(new ContextEpochSnapshotCodec.Snapshot(
@@ -109,8 +110,19 @@ public class AgentRunContextResolutionService {
                 conversationWindow);
     }
 
-    public void promoteAfterDurable(Long sessionId, Long turnId, List<Long> nodeIds) {
-        workingSetPromotions.promoteBestEffort(sessionId, turnId, nodeIds, BigDecimal.ONE);
+    public AgentWorkingSetPromotionService.PromotionSummary promoteAfterDurable(
+            Long sessionId, Long turnId, List<Long> nodeIds) {
+        return workingSetPromotions.promoteBestEffort(sessionId, turnId, nodeIds, BigDecimal.ONE);
+    }
+
+    private List<Long> progressionIds(StoryBibleContextResolver.ResolvedContext resolved) {
+        return resolved.nodes().stream().flatMap(node -> node.appliedProgressionIds().stream()).distinct().toList();
+    }
+
+    private java.util.Map<Long, String> contentHashes(StoryBibleContextResolver.ResolvedContext resolved) {
+        java.util.Map<Long, String> hashes = new java.util.LinkedHashMap<>();
+        resolved.nodes().forEach(node -> hashes.put(node.nodeId(), sha256(json(node))));
+        return java.util.Map.copyOf(hashes);
     }
 
     private ContextPackage toContextPackage(StoryBibleContextResolver.ResolvedContext resolved,
