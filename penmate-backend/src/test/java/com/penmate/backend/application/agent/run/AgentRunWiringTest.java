@@ -36,6 +36,7 @@ class AgentRunWiringTest {
             .withBean(AgentRunContinuationArtifactService.class,
                     () -> mock(AgentRunContinuationArtifactService.class))
             .withBean(AgentRunSuccessorService.class)
+            .withBean(AgentRunStateTransitionService.class)
             .withBean(AgentRunExecutor.class)
             .withBean(AsyncAgentRunDispatcher.class)
             .withBean(AgentRunDispatchRequestedListener.class);
@@ -45,6 +46,7 @@ class AgentRunWiringTest {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(AgentRunSuccessorService.class);
+            assertThat(context).hasSingleBean(AgentRunStateTransitionService.class);
             assertThat(context).hasSingleBean(AgentRunExecutor.class);
             assertThat(context).hasSingleBean(AgentRunDispatcher.class);
         });
