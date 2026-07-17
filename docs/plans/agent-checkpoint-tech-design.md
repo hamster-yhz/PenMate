@@ -1,229 +1,114 @@
-# Agent Checkpoint 技术方案
+# Agent Run Checkpoint and Recovery Design
 
-## 1. 背景
+## Status
 
-Agent 长任务可能会因为页面刷新、Worker 重启、模型调用失败、工具超时、用户暂停审批等原因中断。  
-为了支持任务恢复，需要保存 Checkpoint。
+Implemented by the Story Bible and Context Epoch refactor on 2026-07-16.
 
-Checkpoint 的作用不是保存全部上下文，而是保存 Agent 恢复运行所需的最小状态。
+This document describes the current Run recovery contract. It supersedes the former restart-from-input behavior.
 
-## 2. 目标
+## Recovery Invariants
 
-- 支持 Agent Run 中断后继续执行
-- 降低恢复时的数据库读取成本
-- 避免每一步保存完整上下文
-- 支持与 Event Stream 配合恢复当前状态
-- 支持长期任务的压缩存储
+1. A Run binds one immutable Context Epoch.
+2. Routing, Story Bible selection, effective-state resolution, and prompt composition execute only during initial Run execution.
+3. The resolved context and composed prompt are durable artifacts. Mutable Story Bible state is never read to reconstruct an existing Run.
+4. Approval resume continues from the persisted LLM messages and tool-call position. It does not call the initial execution path.
+5. Redis is an optional read-through cache. Redis expiry or loss does not change Run identity or Context Epoch identity.
+6. Durable events and the latest MySQL checkpoint remain the recovery source of truth.
 
-## 3. 非目标
+## Initial Execution
 
-- 不在 Checkpoint 中保存完整聊天历史
-- 不保存完整工具结果、网页全文、文件全文
-- 不替代 Event Stream
-- 不替代 Artifact / Blob 存储
-
-## 4. 核心设计
-
-Checkpoint 采用：
+The initial path is:
 
 ```text
-最新 Checkpoint + Checkpoint 之后的 Events = 当前 Runtime State
+routing
+-> epoch_binding
+-> context selection and effective-state resolution
+-> context artifact persistence
+-> prompt composition and prompt artifact persistence
+-> LLM/tool execution
+-> completion or approval wait
 ```
 
-恢复时不从第一条事件开始回放，而是：
+The durable boundary events are:
 
 ```text
-1. 读取最新 checkpoint
-2. 读取 checkpoint.last_event_seq 之后的事件
-3. 回放少量增量事件
-4. 恢复当前运行状态
-5. 由 Context Builder 构造本轮 Agent 上下文
+context.epoch.bound
+turn.route.completed
+context.resolved
+prompt.composed
+tool.call.waiting_approval
+run.completed | run.failed
 ```
 
-## 5. Checkpoint 内容
+`context.resolved` and `prompt.composed` include artifact IDs, SHA-256 hashes, and byte sizes. The reducer adds those artifact IDs to `AgentRuntimeState.artifactRefs`.
 
-Checkpoint 只保存最小可恢复状态。
+## Context and Prompt Artifacts
 
-示例：
-
-```json
-{
-  "run_id": "run_123",
-  "checkpoint_no": 8,
-  "last_event_seq": 152,
-  "status": "running",
-  "current_task_id": "task_7",
-  "state": {
-    "goal": "分析竞品并生成报告",
-    "todo_summary": {
-      "completed": 5,
-      "in_progress": 1,
-      "pending": 3
-    },
-    "current_task": {
-      "id": "task_7",
-      "title": "整理价格差异",
-      "status": "in_progress"
-    },
-    "memory_summary": "已完成 A/B/C 三个竞品的信息收集，重点差异在价格、API 和企业版功能。",
-    "recent_messages": [
-      {
-        "role": "user",
-        "content": "继续分析价格差异"
-      }
-    ],
-    "artifact_refs": [
-      {
-        "type": "research_notes",
-        "blob_id": "blob_abc"
-      }
-    ]
-  }
-}
-```
-
-## 6. 不应保存的内容
-
-以下内容不应直接进入 Checkpoint：
-
-| 内容 | 存储位置 |
-|---|---|
-| 完整历史消息 | messages 表 |
-| 工具原始结果 | Blob |
-| 网页全文 / HTML | Blob |
-| 文件全文 | Blob / 文件存储 |
-| 长日志 | Blob |
-| 大模型 raw response | Blob |
-| 完整事件历史 | agent_events |
-| 向量数据 | Vector Store |
-
-Checkpoint 中只保存这些内容的引用、摘要或预览。
-
-## 7. 数据模型
-
-```sql
-CREATE TABLE agent_checkpoints (
-  id TEXT PRIMARY KEY,
-  run_id TEXT NOT NULL,
-  checkpoint_no BIGINT NOT NULL,
-  last_event_seq BIGINT NOT NULL,
-  state_json JSONB NOT NULL,
-  state_size_bytes INT,
-  created_at TIMESTAMP DEFAULT now(),
-
-  UNIQUE(run_id, checkpoint_no)
-);
-
-CREATE INDEX idx_agent_checkpoints_run_latest
-ON agent_checkpoints(run_id, checkpoint_no DESC);
-```
-
-`agent_runs` 中保存最新 Checkpoint 引用：
-
-```sql
-ALTER TABLE agent_runs
-ADD COLUMN latest_checkpoint_id TEXT,
-ADD COLUMN latest_event_seq BIGINT DEFAULT 0;
-```
-
-## 8. 生成时机
-
-不需要每一步都保存完整 Checkpoint。
-
-推荐策略：
-
-| 时机 | 是否生成 |
-|---|---|
-| Run 开始后 | 是 |
-| 每 10~20 个关键事件 | 是 |
-| 每个阶段完成后 | 是 |
-| 用户暂停 / 审批前 | 是 |
-| Worker 即将退出 | 是 |
-| 每个 token 输出 | 否 |
-| 每次 message.delta | 否 |
-
-## 9. 大小控制
-
-建议限制：
-
-| Checkpoint 大小 | 策略 |
-|---|---|
-| <= 64KB | 直接写 JSONB |
-| 64KB ~ 256KB | 压缩后写 DB，或写 Blob |
-| > 256KB | 写 Blob |
-| > 1MB | 需要重构 Checkpoint 内容 |
-
-如果 Checkpoint 超过 1MB，通常说明错误地保存了完整工具结果、完整文件或完整历史消息。
-
-## 10. 恢复流程
+`AgentRunContextArtifactService` stores immutable JSON objects under:
 
 ```text
-1. 用户打开 Run 或 Worker 重启
-2. 查询 agent_runs.latest_checkpoint_id
-3. 加载最新 checkpoint
-4. 查询 sequence > checkpoint.last_event_seq 的 events
-5. 对 checkpoint.state 应用增量 events
-6. 恢复 Runtime State
-7. Context Builder 生成下一轮 Agent 输入
-8. Agent 继续执行
+agent-runs/{runId}/context-{artifactId}.json
+agent-runs/{runId}/prompt-{artifactId}.json
 ```
 
-## 11. Context Builder
+The context artifact contains:
 
-恢复 Runtime State 后，不应直接把完整状态塞给模型。
+- schema version and Run ID
+- bound Context Epoch ID
+- focused Story Bible route decision
+- fully rendered `ContextPackage`
+- Working Set node IDs observed by the Run
 
-Context Builder 只构造本轮必要上下文：
+The prompt artifact contains the `PromptPlan` and a manifest of epoch, prompt bundle, tool catalog, skill catalog, Story Bible core, stable-prefix, and dynamic-context hashes.
 
-```text
-- 用户原始目标
-- 当前任务
-- Todo 摘要
-- 最近完成事项
-- 最近用户消息
-- 最近工具观察
-- 必要 Artifact 摘要或引用
-```
+Artifact metadata is stored in `agent_artifacts`. Every load verifies object byte size and SHA-256 before deserialization.
 
-示例：
+## Checkpoint State
 
-```text
-用户目标：
-分析竞品并生成报告。
+`AgentRuntimeState` records:
 
-当前任务：
-整理价格差异。
+- Run status, phase, and last durable event sequence
+- active approval and pending tool-call state
+- assistant draft, LLM turn index, and token usage
+- persisted LLM messages and tool-call continuation fields
+- active Todo projection IDs
+- durable artifact references
 
-当前进度：
-已完成竞品信息收集和功能对比。
-待完成报告撰写和风险总结。
+`AgentCheckpointService` writes a checkpoint for Run start, route completion, resolved context, composed prompt, approval wait, and terminal events. It also writes every fifteenth event as a bounded replay checkpoint.
 
-最近观察：
-B 产品企业版价格未公开，需要标注为“需销售咨询”。
-```
+The checkpoint is written to MySQL first. Redis key `agent:checkpoint:{runId}:latest` caches the same serialized state for 30 minutes. A Redis miss falls back to the latest MySQL checkpoint.
 
-## 12. 存储优化
+## Event Replay
 
-推荐分层：
+`AgentRunRecoveryService` loads the latest checkpoint and then replays `agent_events` after `lastEventSeq` through `AgentRuntimeStateReducer`. Duplicate or older sequences are ignored.
 
-```text
-Postgres:
-  run 状态、task 状态、event、轻量 checkpoint
+The projection updater consumes the same durable event types. `run.started` defaults to phase `routing`; there is no preflight phase.
 
-Object Storage:
-  大文本、文件、网页、工具原始结果
+## Approval Resume
 
-Redis:
-  运行中状态缓存
+Tool approval persistence includes the saved conversation messages, assistant tool calls, tool-call ID, continuation metadata, and idempotency key.
 
-Vector Store:
-  可检索长期记忆和文档片段
-```
+`AgentRunExecutor.resume()`:
 
-## 13. 关键原则
+1. recovers the latest state;
+2. loads the approved pending tool call;
+3. resolves only the execution model configuration needed to continue the LLM loop;
+4. calls `AgentRunLlmLoop.resumeApproved()`;
+5. executes remaining sibling tool calls in order;
+6. checkpoints another approval wait or the terminal event.
 
-- Checkpoint 不是完整上下文备份
-- Checkpoint 只保存最小可恢复状态
-- 大内容必须使用 Blob 引用
-- 恢复时使用最新 Checkpoint + 少量 Events
-- 给模型的上下文由 Context Builder 动态生成
-- Checkpoint 应定期生成，但不能每步全量复制
+It does not bind an epoch, route Story Bible context, create a Working Set selection, or compose a prompt.
+
+## Failure Semantics
+
+- Missing or corrupt context/prompt artifacts fail closed.
+- A Run already bound to another epoch returns a conflict.
+- A missing Session fails epoch binding before object creation.
+- Context Epoch snapshot hash or size mismatch returns a conflict.
+- Tool idempotency keys prevent approved calls from being applied twice.
+
+## Current Limits
+
+- Live event notification is process-local; durable replay preserves correctness but multi-instance low-latency fan-out needs a shared broker or polling strategy.
+- Checkpoint JSON above 256 KiB is represented by an artifact-required marker. A dedicated large-checkpoint artifact path is still required before states of that size can be resumed.
+- Durable event and checkpoint compaction are not implemented.

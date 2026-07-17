@@ -22,29 +22,6 @@ public class RagRetrievalRepositoryImpl implements RagRetrievalRepository {
     }
 
     @Override
-    public List<RagRetrievedChunk> searchChunks(Long projectId,
-                                                String query,
-                                                int limit,
-                                                Long chapterId,
-                                                Integer storyBibleVersion,
-                                                String entityHint,
-                                                String activatedSkills,
-                                                String intentTags,
-                                                String searchScope) {
-        return ragRetrievalMapper.searchChunksWithFilters(
-                projectId,
-                query,
-                limit,
-                chapterId,
-                storyBibleVersion,
-                entityHint,
-                activatedSkills,
-                intentTags,
-                searchScope
-        );
-    }
-
-    @Override
     public int insertRetrievalLog(RagRetrievalLog retrievalLog) {
         return ragRetrievalMapper.insertRetrievalLog(retrievalLog);
     }

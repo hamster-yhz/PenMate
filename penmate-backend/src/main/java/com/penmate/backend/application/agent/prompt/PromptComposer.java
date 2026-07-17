@@ -1,10 +1,8 @@
 package com.penmate.backend.application.agent.prompt;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,24 +12,21 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 /**
- * Composes execution prompt plan from profiled task, already-built context and modular skill prompts.
- * <p>
- * This composer does not query repositories or build context on its own. It only consumes the provided
- * {@link TaskProfile} and {@link ContextPackage}, producing a snapshot-safe {@link PromptPlan} for logging,
- * recovery and downstream message assembly.
+ * Composes execution prompt plan from profiled task, already-built context and modular skill catalog.
  */
 @Component
 public class PromptComposer {
-    private static final Logger log = LoggerFactory.getLogger(PromptComposer.class);
-
 
     private final SystemPromptProvider systemPromptProvider;
     private final SkillPromptRegistry skillPromptRegistry;
+    private final AgentToolDefinitionSource toolDefinitionSource;
 
     public PromptComposer(SystemPromptProvider systemPromptProvider,
-                          SkillPromptRegistry skillPromptRegistry) {
+                          SkillPromptRegistry skillPromptRegistry,
+                          AgentToolDefinitionSource toolDefinitionSource) {
         this.systemPromptProvider = systemPromptProvider;
         this.skillPromptRegistry = skillPromptRegistry;
+        this.toolDefinitionSource = toolDefinitionSource;
     }
 
     public PromptPlan compose(TaskProfile taskProfile,
@@ -42,60 +37,91 @@ public class PromptComposer {
 
         SystemPromptBundle executionBundle = systemPromptProvider.loadBundle("execution", finalProfile);
         List<PromptModulePlan> modules = new ArrayList<>();
-        List<String> previewSections = new ArrayList<>();
+        List<String> stableSections = new ArrayList<>();
+        List<String> dynamicSections = new ArrayList<>();
 
         modules.add(new PromptModulePlan(
                 "execution:" + finalProfile,
                 joinDocumentPaths(executionBundle == null ? null : executionBundle.documents()),
                 true,
-                "执行基座模块，匹配 task profile=" + finalProfile
+                "Execution base module for task profile=" + finalProfile
         ));
-        previewSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
+        stableSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
 
-        List<String> skills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
-        for (String skill : skills) {
-            String normalizedSkill = normalize(skill);
-            if (normalizedSkill.isEmpty()) {
-                continue;
-            }
-            SystemPromptDocument skillDocument = skillPromptRegistry.load(normalizedSkill);
-            if (skillDocument == null) {
-                log.warn("Skill prompt not found for: {}, skipping", normalizedSkill);
-                continue;
-            }
-            modules.add(new PromptModulePlan(
-                    "skill:" + normalizedSkill,
-                    normalize(skillDocument.path()),
-                    true,
-                    "根据 task profile skills 激活"
-            ));
-            previewSections.add(normalize(skillDocument.content()));
-        }
+        var registeredTools = toolDefinitionSource.listLlmSchemas();
+        var toolSchemas = (registeredTools == null ? List.<com.penmate.backend.application.agent.llm.AgentLlmToolSchema>of() : registeredTools).stream()
+                .sorted(java.util.Comparator.comparing(schema -> normalize(schema.toolCode())))
+                .toList();
+        modules.add(new PromptModulePlan(
+                "tool-catalog",
+                "tool-catalog:" + toolSchemas.stream().map(schema -> normalize(schema.toolCode())).collect(Collectors.joining(",")),
+                true,
+                "Stable deterministically ordered tool schemas"
+        ));
+        stableSections.add(buildToolCatalogPreview(toolSchemas));
+
+        List<String> profileSkills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
+        List<SkillCatalogItem> availableSkills = skillPromptRegistry.listAvailableSkills().stream()
+                .map(this::normalizeSkillCatalogItem)
+                .filter(skill -> !skill.name().isEmpty())
+                .sorted(java.util.Comparator.comparing(SkillCatalogItem::name))
+                .toList();
+        modules.add(new PromptModulePlan(
+                "skill-catalog",
+                "skill-catalog:" + availableSkills.stream()
+                        .map(SkillCatalogItem::name)
+                        .collect(Collectors.joining(",")),
+                true,
+                "Progressively disclosed skill catalog; full content is loaded through skill_load"
+        ));
+        stableSections.add(buildSkillCatalogPreview(availableSkills));
+
+        modules.add(new PromptModulePlan(
+                "context-epoch-core",
+                "context-epoch-core:entries=" + normalizedContext.coreStoryBibleEntries().size(),
+                true,
+                "Immutable Context Epoch core Story Bible"
+        ));
+        stableSections.add(String.join("\n", normalizedContext.coreStoryBibleEntries()));
 
         modules.add(new PromptModulePlan(
                 "context-package",
                 describeContext(normalizedContext),
-                true,
-                "仅消费已构建上下文结果，不直接查询 story bible"
+                false,
+                "Dynamic history, Working Set and selected Story Bible context"
         ));
-        previewSections.add(buildContextPreview(normalizedContext));
+        dynamicSections.add(buildDynamicContextPreview(normalizedContext));
+
+        String stablePrefix = stableSections.stream().filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"));
+        String dynamicContext = dynamicSections.stream().filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"));
 
         return new PromptPlan(
                 modules,
-                skills,
+                profileSkills,
                 finalProfile,
-                previewSections.stream()
-                        .filter(section -> !section.isBlank())
-                        .collect(Collectors.joining("\n\n"))
+                stablePrefix,
+                dynamicContext,
+                java.util.stream.Stream.of(stablePrefix, dynamicContext)
+                        .filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"))
         );
     }
 
-    private String buildContextPreview(ContextPackage contextPackage) {
+    private String buildDynamicContextPreview(ContextPackage contextPackage) {
         StringJoiner joiner = new StringJoiner("\n");
-        contextPackage.storyBibleEntries().forEach(joiner::add);
+        if (!contextPackage.styleSnapshot().isBlank()) joiner.add(contextPackage.styleSnapshot());
+        contextPackage.workingSetEntries().forEach(joiner::add);
+        contextPackage.selectedStoryBibleEntries().forEach(joiner::add);
         contextPackage.conflicts().forEach(joiner::add);
         contextPackage.missingContextFlags().forEach(joiner::add);
         return joiner.toString().trim();
+    }
+
+    private String buildToolCatalogPreview(List<com.penmate.backend.application.agent.llm.AgentLlmToolSchema> schemas) {
+        if (schemas.isEmpty()) return "Available tools:\n- none";
+        return "Available tools:\n" + schemas.stream()
+                .map(schema -> "- " + normalize(schema.toolCode()) + ": " + normalize(schema.description())
+                        + "\n  parameters: " + normalize(schema.parametersJsonSchema()))
+                .collect(Collectors.joining("\n"));
     }
 
     private String describeContext(ContextPackage contextPackage) {
@@ -104,6 +130,33 @@ public class PromptComposer {
                 + "/ragRefs=" + contextPackage.ragRefs().size()
                 + "/conflicts=" + contextPackage.conflicts().size()
                 + "/missing=" + contextPackage.missingContextFlags().size();
+    }
+
+    private String buildSkillCatalogPreview(List<SkillCatalogItem> availableSkills) {
+        if (availableSkills == null || availableSkills.isEmpty()) {
+            return """
+                    Available skills:
+                    - none
+
+                    Skill details are progressively disclosed. Use tool skill_load with {"skill":"<skill>"} only when full instructions are needed.
+                    """.trim();
+        }
+        String skills = availableSkills.stream()
+                .map(skill -> "- " + skill.name() + ": " + skill.description())
+                .collect(Collectors.joining("\n"));
+        return """
+                Available skills:
+                %s
+
+                Skill details are progressively disclosed. Use tool skill_load with {"skill":"<skill>"} only when full instructions are needed.
+                """.formatted(skills).trim();
+    }
+
+    private SkillCatalogItem normalizeSkillCatalogItem(SkillCatalogItem item) {
+        if (item == null) {
+            return new SkillCatalogItem("", "");
+        }
+        return new SkillCatalogItem(normalize(item.name()), normalize(item.description()));
     }
 
     private String joinDocumentPaths(List<SystemPromptDocument> documents) {

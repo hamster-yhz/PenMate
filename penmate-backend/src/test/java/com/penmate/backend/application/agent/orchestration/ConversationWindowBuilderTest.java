@@ -46,6 +46,19 @@ class ConversationWindowBuilderTest {
         assertThat(conversationWindowBuilder.build(9L, "当前提问", null)).isEmpty();
     }
 
+    @Test
+    void should_build_from_messages_strictly_before_the_current_turn() {
+        when(agentRepository.listMessagesBeforeTurn(9L, 77L)).thenReturn(List.of(
+                message(1001L, "user", "Earlier request", 1),
+                message(1002L, "assistant", "Earlier answer", 2)
+        ));
+
+        List<AgentLlmMessage> result = conversationWindowBuilder.buildBeforeTurn(9L, 77L, 8);
+
+        assertThat(result).extracting(AgentLlmMessage::content)
+                .containsExactly("Earlier request", "Earlier answer");
+    }
+
     private AgentMessage message(Long messageId, String role, String content, int seqNo) {
         AgentMessage message = new AgentMessage();
         message.setMessageId(messageId);

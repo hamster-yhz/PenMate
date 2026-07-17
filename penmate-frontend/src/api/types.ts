@@ -59,7 +59,8 @@ export interface WorkbenchRuntimeEventSource {
   eventName?: string | null
   sessionId?: string | null
   turnId?: string | null
-  taskId?: string | null
+  runId?: string | null
+  sequence?: string | null
   phase?: string | null
   message?: string | null
   errorMsg?: string | null
@@ -68,12 +69,13 @@ export interface WorkbenchRuntimeEventSource {
   status?: string | null
   toolCall?: WorkbenchRuntimeToolCall | null
   approval?: WorkbenchRuntimeApproval | null
+  todoPlan?: WorkbenchTodoSummarySnapshot | Record<string, unknown> | null
   storyBibleApproval?: WorkbenchRuntimeStoryBibleApproval | Record<string, unknown> | null
 }
 
-export interface WorkbenchActiveTaskRuntimeSnapshot {
+export interface WorkbenchActiveRunRuntimeSnapshot {
   lastRuntimeStatus?: string | null
-  recoveryCursor?: string | null
+  latestSequence?: string | null
   activeToolCallsSnapshot?: WorkbenchRuntimeToolCall[] | null
 }
 
@@ -143,7 +145,7 @@ export interface WorkbenchRecoveryContextSnapshot {
   taskProfile?: WorkbenchTaskProfileSnapshot | null
   promptPlan?: WorkbenchPromptPlanSnapshot | null
   contextPackage?: WorkbenchContextPackageSnapshot | null
-  activeTaskRuntime?: WorkbenchActiveTaskRuntimeSnapshot | null
+  activeRunRuntime?: WorkbenchActiveRunRuntimeSnapshot | null
   resultSummary?: WorkbenchResultSummarySnapshot | null
 }
 
@@ -157,12 +159,12 @@ export interface WorkbenchRecoverySnapshot {
       name?: string | null
     } | null
   } | null
-  activeTask?: {
+  activeRun?: {
     turnId?: string | null
-    taskId?: string | null
-    taskStatus?: string | null
-    requestContextId?: string | null
-    streamChannelKey?: string | null
+    runId?: string | null
+    runStatus?: string | null
+    runPhase?: string | null
+    latestSequence?: string | null
   } | null
   pendingApproval?: WorkbenchRuntimeApproval | Record<string, unknown> | null
   messages?: Array<Record<string, unknown>> | null

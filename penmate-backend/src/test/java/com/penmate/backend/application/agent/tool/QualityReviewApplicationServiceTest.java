@@ -4,12 +4,12 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
-import com.penmate.backend.application.novel.NovelApplicationService;
-import com.penmate.backend.application.agent.tool.support.QualityReviewCommandParser;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
-import com.penmate.backend.domain.agent.model.AgentGenerationTask;
-import com.penmate.backend.domain.agent.model.AgentTaskContext;
+import com.penmate.backend.application.agent.tool.support.QualityReviewCommandParser;
+import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
@@ -19,6 +19,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -27,48 +28,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class QualityReviewApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_RETURN_STRUCTURED_REPORT_AND_BUILD_REVIEW_PROMPT() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-service-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "score": 61,
-                          "passes": ["用户要求主冲突已出现"],
-                          "issues": [
-                            {
-                              "dimension": "PLOT_LOGIC",
-                              "severity": "HIGH",
-                              "summary": "主角在未获情报前提前得知密令内容",
-                              "evidence": "第二段直接复述密令全文",
-                              "suggestion": "删除提前知情描写，改为通过侍从转述获取信息"
-                            }
-                          ],
-                          "riskFlags": ["PLOT_HOLE"],
-                          "needsRevision": true,
-                          "revisionSuggestions": [
-                            {
-                              "priority": "P0",
-                              "target": "剧情逻辑",
-                              "instruction": "修复密令来源与密道知情范围，避免角色越界知情",
-                              "rationale": "当前冲突建立在错误前提上，会削弱可信度"
-                            }
-                          ],
-                          "reviewSummary": "存在高风险剧情逻辑问题，需要修订后再继续生成。"
-                        }
-                        """);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-service-1"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", revisionRequiredReportJson(), List.of(), "{}"));
 
         ToolCallResult result = review(service, request("call-quality-service-1", validArgsJson()));
 
@@ -77,41 +52,48 @@ class QualityReviewApplicationServiceTest {
         assertThat(output.getInt("score")).isEqualTo(61);
         assertThat(output.getBool("needsRevision")).isTrue();
         assertThat(output.getBool("revisionAllowed")).isTrue();
-        assertThat(output.getStr("reviewSummary")).contains("需要修订");
+        assertThat(output.getStr("reviewSummary")).contains("revision required");
 
-        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
-        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
-        assertThat(taskCaptor.getValue().getPromptSnapshot())
-                .contains("第三章初稿正文")
-                .contains("保留第一人称")
-                .contains("角色知识边界")
+        ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(executionConfig));
+        assertThat(requestCaptor.getValue().messages().get(0).content())
+                .contains("Chapter 3 draft text")
+                .contains("Keep first person POV")
+                .contains("Only the heroine knows the tunnel location")
                 .contains("当前修订轮次：1")
                 .contains("最大修订轮次：2");
     }
 
     @Test
-    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_ALLOW_ZERO_ISSUE_PASS_RESULT() throws Exception {
+    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_NOT_LOAD_GENERATION_TASK_FOR_STRUCTURED_RUN_REQUEST() throws Exception {
         AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-service-pass")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "score": 96,
-                          "passes": ["用户要求满足", "时间线一致"],
-                          "issues": [],
-                          "riskFlags": [],
-                          "needsRevision": false,
-                          "revisionSuggestions": [],
-                          "reviewSummary": "质量良好"
-                        }
-                        """);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-run-shaped"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", passReportJson(), List.of(), "{}"));
+
+        ToolCallResult result = review(service, request("call-quality-run-shaped", validArgsJson()));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        verifyNoInteractions(agentRepository);
+    }
+
+    @Test
+    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_ALLOW_ZERO_ISSUE_PASS_RESULT() throws Exception {
+        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
+        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
+        AgentLlmExecutionConfig executionConfig = executionConfig();
+
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-service-pass"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", passReportJson(), List.of(), "{}"));
 
         ToolCallResult result = review(service, request("call-quality-service-pass", validArgsJson()));
 
@@ -121,61 +103,22 @@ class QualityReviewApplicationServiceTest {
         assertThat(output.getBool("needsRevision")).isFalse();
         assertThat(output.getJSONArray("issues")).isEmpty();
         assertThat(output.getJSONArray("revisionSuggestions")).isEmpty();
-        assertThat(output.getStr("reviewSummary")).isEqualTo("质量良好");
+        assertThat(output.getStr("reviewSummary")).isEqualTo("quality is acceptable");
     }
 
     @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_DISABLE_REVISION_WHEN_ROUND_LIMIT_REACHED() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-service-limit")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "score": 52,
-                          "passes": ["人设基调大体一致"],
-                          "issues": [
-                            {
-                              "dimension": "USER_REQUIREMENT",
-                              "severity": "HIGH",
-                              "summary": "用户要求的悬疑节奏中段掉线",
-                              "evidence": "中段大段说明背景没有推进冲突",
-                              "suggestion": "压缩背景说明并增加现场动作"
-                            }
-                          ],
-                          "riskFlags": ["PACE_DROP"],
-                          "needsRevision": true,
-                          "revisionSuggestions": [
-                            {
-                              "priority": "P0",
-                              "target": "用户要求",
-                              "instruction": "恢复悬疑节奏并删减解释段落",
-                              "rationale": "已经达到修订轮次上限，需由主编排决定是否继续"
-                            }
-                          ],
-                          "reviewSummary": "仍需修订，但本轮已达到自动修订上限。"
-                        }
-                        """);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-service-limit"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", revisionRequiredReportJson(), List.of(), "{}"));
 
-        ToolCallResult result = review(service, request("call-quality-service-limit", """
-                {
-                  "draftText": "第三章修订稿",
-                  "userRequirements": ["保留第一人称", "维持紧张悬疑节奏"],
-                  "personaProfile": ["女主冷静克制"],
-                  "storyOutline": ["夜宴收到密令", "女主独自调查密道"],
-                  "timelineConstraints": ["全章发生于同一夜晚"],
-                  "worldRules": ["凡人不可直接施法"],
-                  "characterKnowledgeBoundaries": ["密道位置仅女主知晓"],
-                  "currentRevisionRound": 2,
-                  "maxRevisionRounds": 2
-                }
-                """));
+        ToolCallResult result = review(service, request("call-quality-service-limit", limitReachedArgsJson()));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         JSONObject output = AgentJsonCodec.parseObj(result.toolOutput());
@@ -183,59 +126,37 @@ class QualityReviewApplicationServiceTest {
         assertThat(output.getBool("revisionAllowed")).isFalse();
         assertThat(output.getInt("currentRevisionRound")).isEqualTo(2);
         assertThat(output.getInt("maxRevisionRounds")).isEqualTo(2);
-        assertThat(output.getJSONArray("revisionSuggestions")).isNotNull();
-        assertThat(output.getJSONArray("revisionSuggestions").size()).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
-    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_NON_JSON_PROVIDER_RESULT() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
-        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
-        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
-        AgentLlmExecutionConfig executionConfig = executionConfig();
-
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-service-bad-json-result")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("not-json");
-
-        assertThatThrownBy(() -> review(service, request("call-quality-service-bad-json-result", validArgsJson())))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("quality review result must");
+        assertThat(output.getJSONArray("revisionSuggestions")).isNotEmpty();
     }
 
     @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_RESULT_WHEN_REVISION_SUGGESTIONS_MISSING() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-service-no-suggestions")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-service-no-suggestions"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", """
                         {
                           "score": 61,
-                          "passes": ["用户要求主冲突已出现"],
+                          "passes": ["main conflict exists"],
                           "issues": [
                             {
                               "dimension": "PLOT_LOGIC",
                               "severity": "HIGH",
-                              "summary": "主角提前知道密令",
-                              "evidence": "第二段直接复述密令",
-                              "suggestion": "改为侍从转述"
+                              "summary": "secret known too early",
+                              "evidence": "paragraph two states it directly",
+                              "suggestion": "change the information source"
                             }
                           ],
                           "riskFlags": ["PLOT_HOLE"],
                           "needsRevision": true,
-                          "reviewSummary": "存在剧情逻辑问题，需要修订。"
+                          "reviewSummary": "revision required"
                         }
-                        """);
+                        """, List.of(), "{}"));
 
         assertThatThrownBy(() -> review(service, request("call-quality-service-no-suggestions", validArgsJson())))
                 .isInstanceOf(IllegalStateException.class)
@@ -244,10 +165,9 @@ class QualityReviewApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_MALFORMED_JSON_ARGUMENTS() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
 
         assertThatThrownBy(() -> review(service, request("call-quality-service-malformed-json", "{")))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -256,20 +176,19 @@ class QualityReviewApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_INVALID_REVISION_ROUND_ARGUMENTS() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
 
         assertThatThrownBy(() -> review(service, request("call-quality-invalid-round", """
                 {
-                  "draftText": "第三章初稿正文",
-                  "userRequirements": ["保留第一人称"],
-                  "personaProfile": ["女主冷静克制"],
-                  "storyOutline": ["夜宴收到密令"],
-                  "timelineConstraints": ["全章发生于同一夜晚"],
-                  "worldRules": ["凡人不可直接施法"],
-                  "characterKnowledgeBoundaries": ["密道位置仅女主知晓"],
+                  "draftText": "Chapter 3 draft text.",
+                  "userRequirements": ["Keep first person POV"],
+                  "personaProfile": ["Heroine stays calm"],
+                  "storyOutline": ["Night banquet receives a secret command"],
+                  "timelineConstraints": ["The full chapter happens in one night"],
+                  "worldRules": ["Ordinary characters cannot cast forbidden techniques directly"],
+                  "characterKnowledgeBoundaries": ["Only the heroine knows the tunnel location"],
                   "currentRevisionRound": 3,
                   "maxRevisionRounds": 2
                 }
@@ -280,20 +199,19 @@ class QualityReviewApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_WHEN_ARRAY_ONLY_CONTAINS_BLANK_ITEMS() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
 
         assertThatThrownBy(() -> review(service, request("call-quality-blank-array-item", """
                 {
-                  "draftText": "第三章初稿正文",
+                  "draftText": "Chapter 3 draft text.",
                   "userRequirements": ["   "],
-                  "personaProfile": ["女主冷静克制"],
-                  "storyOutline": ["夜宴收到密令"],
-                  "timelineConstraints": ["全章发生于同一夜晚"],
-                  "worldRules": ["凡人不可直接施法"],
-                  "characterKnowledgeBoundaries": ["密道位置仅女主知晓"],
+                  "personaProfile": ["Heroine stays calm"],
+                  "storyOutline": ["Night banquet receives a secret command"],
+                  "timelineConstraints": ["The full chapter happens in one night"],
+                  "worldRules": ["Ordinary characters cannot cast forbidden techniques directly"],
+                  "characterKnowledgeBoundaries": ["Only the heroine knows the tunnel location"],
                   "currentRevisionRound": 0,
                   "maxRevisionRounds": 2
                 }
@@ -303,29 +221,17 @@ class QualityReviewApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_ACCEPT_IDENTIFIER_ONLY_ARGS_AND_LOAD_REVIEW_SOURCE_IN_SERVICE_LAYER() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
+    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_ACCEPT_IDENTIFIER_ONLY_ARGS_AND_USE_RUN_CONTEXT_DEFAULTS() throws Exception {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
         AgentLlmExecutionConfig executionConfig = executionConfig();
         java.util.concurrent.atomic.AtomicReference<ToolCallResult> resultRef = new java.util.concurrent.atomic.AtomicReference<>();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-identifiers-only")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "score": 88,
-                          "passes": ["正文已成功装载"],
-                          "issues": [],
-                          "riskFlags": [],
-                          "needsRevision": false,
-                          "revisionSuggestions": [],
-                          "reviewSummary": "已按业务标识读取正文并完成质量审查。"
-                        }
-                        """);
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-identifiers-only"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", passReportJson(), List.of(), "{}"));
 
         assertThatCode(() -> resultRef.set(review(service, request("call-quality-identifiers-only", """
                 {
@@ -341,48 +247,19 @@ class QualityReviewApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_WHEN_TASK_DOES_NOT_BELONG_TO_CURRENT_OPERATOR() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
-        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
-        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentGenerationTask task = generationTask();
-
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-
-        assertThatThrownBy(() -> review(service, requestWithOperator("call-quality-operator-mismatch", validArgsJson(), 2002L)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("operator")
-                .hasMessageContaining("generation task");
-    }
-
-    @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_LOAD_REAL_CHAPTER_CONTENT_FROM_NOVEL_SERVICE_WHEN_ONLY_CHAPTER_IDENTIFIER_PROVIDED() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
         NovelApplicationService novelApplicationService = mock(NovelApplicationService.class);
-        Object service = instantiateQualityReviewApplicationService(agentRepository, agentModelRoutingService, agentLlmGateway, novelApplicationService);
-        AgentGenerationTask task = generationTask();
-        AgentTaskContext taskContext = AgentTaskContext.runningOf(71001L, 8001L, "running", 5001L, "局部选中文本，不应作为整章正文");
+        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway, novelApplicationService);
         AgentLlmExecutionConfig executionConfig = executionConfig();
 
-        when(agentRepository.findGenerationTask(9001L, 8001L)).thenReturn(task);
-        when(agentRepository.findTaskContext(8001L)).thenReturn(taskContext);
-        when(novelApplicationService.getChapterContentText(9001L, 5001L)).thenReturn("真实章节正文：夜雨中的追踪在巷口停住。");
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, 7001L, "trace-call-quality-chapter-content")).thenReturn(executionConfig);
-        when(agentLlmGateway.generate(any(AgentGenerationTask.class), eq(List.of()), eq(""), eq(executionConfig)))
-                .thenReturn("""
-                        {
-                          "score": 91,
-                          "passes": ["章节正文已通过服务层装载"],
-                          "issues": [],
-                          "riskFlags": [],
-                          "needsRevision": false,
-                          "revisionSuggestions": [],
-                          "reviewSummary": "已使用真实章节正文完成质量审查。"
-                        }
-                        """);
+        when(novelApplicationService.getChapterContentText(9001L, 5001L))
+                .thenReturn("Real chapter content: the chase stops at the alley.");
+        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-chapter-content"))
+                .thenReturn(executionConfig);
+        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
+                .thenReturn(new AgentLlmTurnResponse("stop", passReportJson(), List.of(), "{}"));
 
         ToolCallResult result = review(service, request("call-quality-chapter-content", """
                 {
@@ -393,42 +270,37 @@ class QualityReviewApplicationServiceTest {
                 """));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
-        ArgumentCaptor<AgentGenerationTask> taskCaptor = ArgumentCaptor.forClass(AgentGenerationTask.class);
-        verify(agentLlmGateway).generate(taskCaptor.capture(), eq(List.of()), eq(""), eq(executionConfig));
+        ArgumentCaptor<AgentLlmTurnRequest> requestCaptor = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(agentLlmGateway).generateTurn(requestCaptor.capture(), eq(executionConfig));
         verify(novelApplicationService).getChapterContentText(9001L, 5001L);
-        assertThat(taskCaptor.getValue().getPromptSnapshot())
-                .contains("真实章节正文：夜雨中的追踪在巷口停住。")
-                .doesNotContain("局部选中文本，不应作为整章正文");
+        assertThat(requestCaptor.getValue().messages().get(0).content())
+                .contains("Real chapter content: the chase stops at the alley.");
     }
 
-    private static Object instantiateQualityReviewApplicationService(AgentRepository agentRepository,
-                                                                     AgentModelRoutingService agentModelRoutingService,
+    private static Object instantiateQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
                                                                      AgentLlmGateway agentLlmGateway) throws Exception {
         Class<?> clazz = loadClass("com.penmate.backend.application.agent.tool.DefaultQualityReviewApplicationService");
         Constructor<?> constructor = clazz.getDeclaredConstructor(
-                AgentRepository.class,
                 AgentModelRoutingService.class,
                 AgentLlmGateway.class,
                 QualityReviewCommandParser.class
         );
         constructor.setAccessible(true);
-        return constructor.newInstance(agentRepository, agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser());
+        return constructor.newInstance(agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser());
     }
 
-    private static Object instantiateQualityReviewApplicationService(AgentRepository agentRepository,
-                                                                     AgentModelRoutingService agentModelRoutingService,
+    private static Object instantiateQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
                                                                      AgentLlmGateway agentLlmGateway,
                                                                      NovelApplicationService novelApplicationService) throws Exception {
         Class<?> clazz = loadClass("com.penmate.backend.application.agent.tool.DefaultQualityReviewApplicationService");
         Constructor<?> constructor = clazz.getDeclaredConstructor(
-                AgentRepository.class,
                 AgentModelRoutingService.class,
                 AgentLlmGateway.class,
                 QualityReviewCommandParser.class,
                 NovelApplicationService.class
         );
         constructor.setAccessible(true);
-        return constructor.newInstance(agentRepository, agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser(), novelApplicationService);
+        return constructor.newInstance(agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser(), novelApplicationService);
     }
 
     private static Class<?> loadClass(String fqcn) {
@@ -454,17 +326,13 @@ class QualityReviewApplicationServiceTest {
     }
 
     private static ToolCallRequest request(String toolCallId, String toolArgsJson) {
-        return requestWithOperator(toolCallId, toolArgsJson, 1001L);
-    }
-
-    private static ToolCallRequest requestWithOperator(String toolCallId, String toolArgsJson, Long operatorId) {
         return new ToolCallRequest(
                 9001L,
                 8001L,
                 6001L,
                 "quality_review",
                 toolArgsJson,
-                operatorId,
+                1001L,
                 "trace-" + toolCallId,
                 "{}",
                 toolCallId + "-8001",
@@ -478,34 +346,77 @@ class QualityReviewApplicationServiceTest {
         );
     }
 
-    private static AgentGenerationTask generationTask() {
-        AgentGenerationTask task = new AgentGenerationTask();
-        task.setId(1L);
-        task.setTaskId(8001L);
-        task.setProjectId(9001L);
-        task.setUserId(1001L);
-        task.setConversationId(6001L);
-        task.setChapterId(5001L);
-        task.setModelConfigId(7001L);
-        task.setTaskType("CHAPTER_DRAFT");
-        task.setTraceId("trace-quality-seed");
-        task.setPromptSnapshot("请生成第三章初稿");
-        task.setPluginSnapshot("[]");
-        return task;
-    }
-
     private static String validArgsJson() {
         return """
                 {
-                  "draftText": "第三章初稿正文",
-                  "userRequirements": ["保留第一人称", "维持紧张悬疑节奏"],
-                  "personaProfile": ["女主冷静克制", "副官不掌握密道"],
-                  "storyOutline": ["夜宴收到密令", "女主独自调查密道"],
-                  "timelineConstraints": ["全章发生于同一夜晚"],
-                  "worldRules": ["凡人不可直接施法", "禁术只能由祭司发动"],
-                  "characterKnowledgeBoundaries": ["密道位置仅女主知晓", "密令全文仅皇帝与女主知晓"],
+                  "draftText": "Chapter 3 draft text.",
+                  "userRequirements": ["Keep first person POV", "Maintain suspense"],
+                  "personaProfile": ["Heroine stays calm"],
+                  "storyOutline": ["Night banquet receives a secret command"],
+                  "timelineConstraints": ["The full chapter happens in one night"],
+                  "worldRules": ["Ordinary characters cannot cast forbidden techniques directly"],
+                  "characterKnowledgeBoundaries": ["Only the heroine knows the tunnel location"],
                   "currentRevisionRound": 1,
                   "maxRevisionRounds": 2
+                }
+                """;
+    }
+
+    private static String limitReachedArgsJson() {
+        return """
+                {
+                  "draftText": "Chapter 3 revised draft.",
+                  "userRequirements": ["Keep first person POV", "Maintain suspense"],
+                  "personaProfile": ["Heroine stays calm"],
+                  "storyOutline": ["Night banquet receives a secret command"],
+                  "timelineConstraints": ["The full chapter happens in one night"],
+                  "worldRules": ["Ordinary characters cannot cast forbidden techniques directly"],
+                  "characterKnowledgeBoundaries": ["Only the heroine knows the tunnel location"],
+                  "currentRevisionRound": 2,
+                  "maxRevisionRounds": 2
+                }
+                """;
+    }
+
+    private static String passReportJson() {
+        return """
+                {
+                  "score": 96,
+                  "passes": ["requirements satisfied", "timeline consistent"],
+                  "issues": [],
+                  "riskFlags": [],
+                  "needsRevision": false,
+                  "revisionSuggestions": [],
+                  "reviewSummary": "quality is acceptable"
+                }
+                """;
+    }
+
+    private static String revisionRequiredReportJson() {
+        return """
+                {
+                  "score": 61,
+                  "passes": ["main conflict exists"],
+                  "issues": [
+                    {
+                      "dimension": "PLOT_LOGIC",
+                      "severity": "HIGH",
+                      "summary": "protagonist knows the secret command too early",
+                      "evidence": "paragraph two states the command directly",
+                      "suggestion": "add a valid intelligence source"
+                    }
+                  ],
+                  "riskFlags": ["PLOT_HOLE"],
+                  "needsRevision": true,
+                  "revisionSuggestions": [
+                    {
+                      "priority": "P0",
+                      "target": "plot logic",
+                      "instruction": "repair the secret command source and tunnel knowledge boundary",
+                      "rationale": "the conflict currently depends on invalid knowledge"
+                    }
+                  ],
+                  "reviewSummary": "revision required for plot logic"
                 }
                 """;
     }

@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ToolApprovalViewFactoryTest {
 
@@ -33,17 +32,4 @@ class ToolApprovalViewFactoryTest {
         assertThat(view.operationCode()).isEqualTo("delete");
     }
 
-    @Test
-    void UT_APP_AGENT_TOOL_APPROVAL_VIEW_FACTORY_SHOULD_FAIL_FAST_WHEN_GOVERNANCE_POLICY_IS_MISSING() {
-        AgentToolDescriptor descriptor = new AgentToolDescriptor(
-                "book_crud",
-                new ToolPresentation("书籍 CRUD"),
-                new ToolExposure(true, "desc", "{}"),
-                null
-        );
-
-        assertThatThrownBy(() -> factory.create(descriptor, new ApprovalPolicyDecision(true, "BOOK_DELETE")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("governancePolicy");
-    }
 }

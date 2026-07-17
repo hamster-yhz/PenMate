@@ -1,10 +1,5 @@
 <template>
   <div class="workbench-page">
-    <div class="workbench-backdrop" aria-hidden="true">
-      <span class="workbench-orb orb-left"></span>
-      <span class="workbench-orb orb-right"></span>
-    </div>
-
     <WorkbenchHeader
       :novel-title="novelTitle"
       :word-count="wordCount"
@@ -13,6 +8,7 @@
       :user-email="userEmail"
       :user-menu-open="userMenuOpen"
       :can-access-rbac-admin="canAccessRbacAdmin"
+      :workbench-mode="workbenchMode"
       @go-home="router.push('/')"
       @update-title="updateTitle"
       @open-style-manager="showStyleManager = true"
@@ -24,24 +20,18 @@
       @go-mybooks="navigateFromUserMenu('/mybooks')"
       @go-rbac-admin="navigateFromUserMenu('/admin/rbac')"
       @logout="handleLogout"
+      @update:workbench-mode="setWorkbenchMode"
     />
 
     <div class="wb-main workbench-shell">
       <WorkbenchLeftPanel
+        v-if="workbenchMode === 'writing'"
         :collapsed="leftCollapsed"
         :left-tabs="leftTabs"
         :active-left-tab="activeLeftTab"
         :outline-data="outlineData"
         :active-chapter="activeChapter"
         :outline-op-busy="outlineOpBusy"
-        :character-cards="characterCards"
-        :world-cards="worldCards"
-        :project-cards="projectCards"
-        :card-relations="cardRelations"
-        :relation-from-id="relationFromId"
-        :relation-to-id="relationToId"
-        :relation-type="relationType"
-        :card-name-by-id="cardNameById"
         @toggle-collapse="leftCollapsed = !leftCollapsed"
         @update:active-left-tab="activeLeftTab = $event"
         @select-chapter="handleOutlineSelectChapter"
@@ -51,20 +41,10 @@
         @add-chapter="addChapter($event as any)"
         @delete-volume="deleteVolume($event as any)"
         @delete-chapter="deleteChapter($event as any)"
-        @create-character-card="createCardQuick('CHARACTER')"
-        @create-world-card="createCardQuick('WORLD')"
-        @toggle-card-expand="toggleCardExpanded($event as any)"
-        @update-card-draft="updateCardDraft($event as any)"
-        @save-card="saveCard($event as any)"
-        @delete-card="deleteCardById($event as any)"
-        @update:relation-from-id="relationFromId = $event"
-        @update:relation-to-id="relationToId = $event"
-        @update:relation-type="relationType = $event"
-        @create-relation="createRelation"
-        @delete-relation="deleteRelationById($event as any)"
       />
 
       <WorkbenchEditorPanel
+        v-if="workbenchMode === 'writing'"
         :current-chapter-title="currentChapterTitle"
         :selected-version-no="selectedVersionNo"
         :version-busy="versionBusy"
@@ -91,12 +71,29 @@
         @cursor-activity="updateCursorPos"
       />
 
+      <StoryBibleWorkspace
+        v-else
+        ref="storyBibleWorkspaceRef"
+        :project-id="getCurrentProjectId()"
+        :operator-id="resolveOperatorId()"
+        :user-id="session.userId"
+        :session-id="currentConversationId || undefined"
+        :chapter-id="activeChapter"
+        :chapters="storyBibleChapters"
+        :project-title="novelTitle"
+        :initial-node-id="storyBibleNodeId"
+      />
+
       <WorkbenchRightPanel
         :collapsed="rightCollapsed"
         :current-model-name="currentModelName"
         :generation-status-text="generationStatusText"
         :agent-status-detail-text="agentStatusDetailText"
         :is-generating="isGenerating"
+        :can-cancel-run="canCancelRun"
+        :is-cancelling="isCancelling"
+        :can-retry-run="canRetryRun"
+        :is-retrying="isRetrying"
         :generation-phase="generationPhase"
         :show-conversation-panel="showConversationPanel"
         :conversation-loading="conversationLoading"
@@ -117,10 +114,23 @@
         @replace-selected="handleReplaceSelected"
         @approve="handleApprove"
         @reject="handleReject"
+        @open-story-bible="openStoryBible"
         @update:chat-input="chatInput = $event"
         @send="sendMessage"
+        @cancel-run="cancelCurrentRun"
+        @retry-run="retryCurrentRun"
         @open-model-settings="showModelSettings = true"
       />
+
+      <button
+        type="button"
+        class="mobile-chat-toggle"
+        :title="rightCollapsed ? '打开 Agent 对话' : '关闭 Agent 对话'"
+        @click="rightCollapsed = !rightCollapsed"
+      >
+        <MessageOutlined v-if="rightCollapsed" />
+        <CloseOutlined v-else />
+      </button>
     </div>
 
     <StyleManager
@@ -139,6 +149,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { CloseOutlined, MessageOutlined } from '@ant-design/icons-vue'
 import StyleManager from '@/components/workbench/StyleManager.vue'
 import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
 import ModelSettings from '@/components/workbench/ModelSettings.vue'
@@ -146,10 +157,11 @@ import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import WorkbenchLeftPanel from '@/components/workbench/WorkbenchLeftPanel.vue'
 import WorkbenchEditorPanel from '@/components/workbench/WorkbenchEditorPanel.vue'
 import WorkbenchRightPanel from '@/components/workbench/WorkbenchRightPanel.vue'
+import StoryBibleWorkspace from '@/components/workbench/story-bible/StoryBibleWorkspace.vue'
+import type { StoryBibleChapterOption } from '@/components/workbench/story-bible/storyBibleTypes'
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
-import { cardApi } from '@/api/modules/card.api'
 import { agentApi } from '@/api/modules/agent.api'
 import { approvalApi } from '@/api/modules/approval.api'
 import { pluginApi } from '@/api/modules/plugin.api'
@@ -161,7 +173,6 @@ import { createChapterLoadGuard, useWorkbenchDraft } from '@/composables/workben
 import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
 import { useWorkbenchOutline } from '@/composables/workbench/useWorkbenchOutline'
-import { useWorkbenchCards } from '@/composables/workbench/useWorkbenchCards'
 import { useWorkbenchEditor } from '@/composables/workbench/useWorkbenchEditor'
 import { useWorkbenchVersions } from '@/composables/workbench/useWorkbenchVersions'
 import { useWorkbenchChat } from '@/composables/workbench/useWorkbenchChat'
@@ -173,8 +184,6 @@ import {
   resolveDirectUploadTarget,
 } from '@/composables/workbench/workbenchStorage'
 import iconOutline from '@/assets/images/icon-outline.png'
-import iconCharacter from '@/assets/images/icon-character.png'
-import iconWorld from '@/assets/images/icon-world.png'
 import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 const router = useRouter()
@@ -222,18 +231,34 @@ const userMenuOpen = ref(false)
 const canAccessRbacAdmin = ref(false)
 const novelTitle = ref('未命名小说')
 const leftCollapsed = ref(false)
-const rightCollapsed = ref(false)
+const rightCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches)
 const showStyleManager = ref(false)
 const showPluginWorkshop = ref(false)
 const showModelSettings = ref(false)
 const chatRef = ref<HTMLElement | null>(null)
 const chapterContents = ref<Record<string, string>>({})
+const storyBibleChapters = ref<StoryBibleChapterOption[]>([])
 const activeLeftTab = ref('outline')
 const leftTabs = ref([
   { key: 'outline', label: '大纲', icon: iconOutline },
-  { key: 'characters', label: '角色', icon: iconCharacter },
-  { key: 'world', label: '世界', icon: iconWorld },
 ])
+const workbenchMode = ref<'writing' | 'story-bible'>(route.query.mode === 'story-bible' ? 'story-bible' : 'writing')
+const storyBibleNodeId = computed(() => typeof route.query.nodeId === 'string' ? route.query.nodeId : '')
+const storyBibleWorkspaceRef = ref<{ reload: () => Promise<void> } | null>(null)
+const setWorkbenchMode = (mode: 'writing' | 'story-bible') => {
+  workbenchMode.value = mode
+  const query = { ...route.query }
+  if (mode === 'story-bible') query.mode = 'story-bible'
+  else {
+    delete query.mode
+    delete query.nodeId
+  }
+  void router.replace({ query })
+}
+const openStoryBible = (nodeId = '') => {
+  workbenchMode.value = 'story-bible'
+  void router.replace({ query: { ...route.query, mode: 'story-bible', ...(nodeId ? { nodeId } : {}) } })
+}
 
 const setChapterContent = (chapterId: string, content: string) => {
   chapterContents.value[chapterId] = content
@@ -266,41 +291,7 @@ const {
   deleteChapter: novelApi.deleteChapter,
   updateOutlineNode: outlineApi.updateNode,
   moveOutlineNode: outlineApi.moveNode,
-  notify: (warningMessage: string) => {
-    message.warning(warningMessage)
-  },
-  notifySuccess: (successMessage: string) => {
-    message.success(successMessage)
-  },
-})
-
-const {
-  projectCards,
-  characterCards,
-  worldCards,
-  cardRelations,
-  relationFromId,
-  relationToId,
-  relationType,
-  loadCardsAndRelations,
-  createCardQuick,
-  saveCard,
-  deleteCardById,
-  createRelation,
-  deleteRelationById,
-  cardNameById,
-  updateCardDraft,
-  toggleCardExpanded,
-} = useWorkbenchCards({
-  getContext,
-  listCards: cardApi.listCards,
-  listCardRelations: cardApi.listCardRelations,
-  createCard: cardApi.createCard,
-  updateCard: cardApi.updateCard,
-  deleteCard: cardApi.deleteCard,
-  createCardRelation: cardApi.createCardRelation,
-  deleteCardRelation: cardApi.deleteCardRelation,
-  promptCardName: (defaultName: string) => window.prompt('请输入资料卡名称', defaultName),
+  moveChapter: novelApi.moveChapter,
   notify: (warningMessage: string) => {
     message.warning(warningMessage)
   },
@@ -463,13 +454,13 @@ const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
   })
 }
 
-const openAgentTurnStream = (projectId: string, sessionId: string, turnId: string) => {
-  console.info('[agent-ui] turn-stream-open', {
+const openAgentRunStream = (projectId: string, runId: string, after = '0') => {
+  console.info('[agent-ui] run-stream-open', {
     projectId,
-    sessionId,
-    turnId,
+    runId,
+    after,
   })
-  return agentApi.openTurnStream(projectId, sessionId, turnId)
+  return agentApi.openRunStream(projectId, runId, after)
 }
 
 const bindChatContainer = (element: HTMLElement | null) => {
@@ -562,16 +553,23 @@ const {
   conversationList,
   chatInput,
   isGenerating,
+  isCancelling,
+  isRetrying,
+  canCancelRun,
+  canRetryRun,
   generationPhase,
   generationTaskStatus,
   generationStatusText,
   agentStatusDetailText,
   streamingAssistantMsgId,
+  runtimeEventSource,
   currentConversationId,
   loadConversationList,
   toggleConversationPanel,
   sendMessage,
-  resumeRunningTask,
+  cancelCurrentRun,
+  retryCurrentRun,
+  resumeRunningRun,
   hydrateFromRecoverySnapshot,
 } = useWorkbenchChat({
   getContext: getAgentContext,
@@ -601,18 +599,20 @@ const {
     debugChatState('create-turn-created', {
       projectId,
       sessionId,
-      taskId: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskId ?? ''),
-      taskStatus: String((result.activeTask as Record<string, unknown> | null | undefined)?.taskStatus ?? ''),
+      runId: String((result.activeRun as Record<string, unknown> | null | undefined)?.runId ?? ''),
+      runStatus: String((result.activeRun as Record<string, unknown> | null | undefined)?.runStatus ?? ''),
       sessionStatus: String((result.session as Record<string, unknown> | null | undefined)?.status ?? ''),
     })
     return result
   },
-  openTurnStream: (projectId, sessionId, turnId) => {
-    const resolvedSessionId = String(sessionId ?? '').trim() || String(currentConversationId.value ?? '').trim()
-    if (!resolvedSessionId) {
+  cancelRun: (projectId, runId, payload) => agentApi.cancelRun(projectId, runId, payload),
+  retryRun: (projectId, runId, payload) => agentApi.retryRun(projectId, runId, payload),
+  openRunStream: (projectId, runId, after) => {
+    const resolvedRunId = String(runId ?? '').trim()
+    if (!resolvedRunId) {
       throw new Error('缺少 sessionId，无法打开 turn stream')
     }
-    return openAgentTurnStream(projectId, resolvedSessionId, turnId)
+    return openAgentRunStream(projectId, resolvedRunId, after)
   },
   addStreamListener: agentApi.addStreamListener,
   scrollChat,
@@ -650,8 +650,8 @@ const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
 const sessionRecovery = useWorkbenchSessionRecovery({
   getSessionRecovery: (projectId, sessionId) => agentApi.getSessionRecovery(projectId, sessionId),
   resumeSession: (projectId, sessionId, payload) => agentApi.resumeSession(projectId, sessionId, payload),
-  openTurnStream: (projectId, sessionId, turnId) => openAgentTurnStream(projectId, sessionId, turnId),
-  resumeRunningTask,
+  openRunStream: (projectId, runId, after) => openAgentRunStream(projectId, runId, after),
+  resumeRunningRun,
   hydrateStore: (snapshot) => {
     const normalizedSnapshot = pickBusinessRecord(snapshot)
     hydrateFromRecoverySnapshot(normalizedSnapshot)
@@ -822,6 +822,16 @@ const loadWorkbenchData = async (projectId: string) => {
   if (!projectId) return
   const outlineResp = pickBusinessArray<Record<string, unknown>>(await outlineApi.listOutlineTree(projectId))
   const chapterResp = pickBusinessArray<Record<string, unknown>>(await novelApi.listChapters(projectId))
+  storyBibleChapters.value = chapterResp.flatMap((chapter) => {
+    const chapterId = normalizeBusinessId(chapter.chapterId)
+    const displayNo = Number(chapter.displayNo)
+    if (!chapterId || !Number.isInteger(displayNo) || displayNo < 1) return []
+    return [{
+      chapterId,
+      displayNo,
+      title: String(chapter.title ?? '').trim() || '未命名章节',
+    }]
+  })
   const chapterByOutlineNodeId = Object.fromEntries(
     chapterResp
       .map((chapter: Record<string, unknown>) => {
@@ -838,7 +848,6 @@ const loadWorkbenchData = async (projectId: string) => {
   loadOutline(outlineNodes, chapterByOutlineNodeId)
 
   await Promise.all([
-    loadCardsAndRelations(projectId),
     loadActivePlugins(projectId),
     refreshActiveModelInfo(),
   ])
@@ -877,6 +886,14 @@ onMounted(async () => {
 watch(editorContent, (value) => {
   chapterContents.value[activeChapter.value] = value
 })
+watch(() => route.query.mode, (mode) => {
+  workbenchMode.value = mode === 'story-bible' ? 'story-bible' : 'writing'
+})
+watch(runtimeEventSource, (event) => {
+  if (event?.eventName === 'run.completed' && storyBibleWorkspaceRef.value) {
+    void storyBibleWorkspaceRef.value.reload()
+  }
+})
 </script>
 
 <style lang="less">
@@ -895,6 +912,40 @@ watch(editorContent, (value) => {
   flex-direction: row;
   align-items: stretch;
   overflow: hidden;
+}
+
+.mobile-chat-toggle { display: none; }
+
+@media (max-width: 1080px) {
+  .workbench-shell > .panel-right {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    bottom: 0;
+    z-index: 240;
+    width: min(92vw, 360px);
+    border-left: 1px solid var(--border-gold);
+    background: rgba(11, 17, 32, 0.99);
+    box-shadow: var(--shadow-lg);
+  }
+  .workbench-shell > .panel-right.collapsed { display: none; }
+  .workbench-shell > .panel-right .panel-toggle { display: none; }
+  .mobile-chat-toggle {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 260;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border-gold);
+    border-radius: 50%;
+    color: var(--amber-gold);
+    background: rgba(17, 24, 39, 0.98);
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+  }
 }
 </style>
 

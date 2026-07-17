@@ -139,7 +139,7 @@ class LongcatProviderChatClientTest {
     }
 
     @Test
-    void UT_INFRA_LLM_OPENAI_PROVIDER_CHAT_CLIENT_SHOULD_FALL_BACK_TO_TOOL_MODE_FOR_LONGCAT_ENDPOINT_DURING_STRUCTURED_PREFLIGHT() throws Exception {
+    void UT_INFRA_LLM_OPENAI_PROVIDER_CHAT_CLIENT_SHOULD_PRESERVE_REQUIRED_TOOL_CHOICE_FOR_LONGCAT_ENDPOINT() throws Exception {
         OpenAiProviderChatClient client = new OpenAiProviderChatClient();
         HttpClient httpClient = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
@@ -168,8 +168,8 @@ class LongcatProviderChatClientTest {
                 new AgentLlmTurnRequest(
                         List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("请分析请求")),
                         List.of(new AgentLlmToolSchema(
-                                "submit_preflight_decision",
-                                "Return the preflight decision as structured Json only.",
+                                "structured_output",
+                                "Return structured output.",
                                 """
                                         {
                                           "type": "object",
@@ -200,9 +200,7 @@ class LongcatProviderChatClientTest {
         JSONObject root = AgentJsonCodec.parseObj(capturedRequestBody[0]);
         assertThat(root.get("response_format")).isNull();
         assertThat(root.getJSONArray("tools")).hasSize(1);
-        assertThat(root.getJSONObject("tool_choice").getStr("type")).isEqualTo("function");
-        assertThat(root.getJSONObject("tool_choice").getJSONObject("function").getStr("name"))
-                .isEqualTo("submit_preflight_decision");
+        assertThat(root.getStr("tool_choice")).isEqualTo("required");
     }
 
     private void injectHttpClient(NativeOpenAiStyleHttpProviderChatClient client, HttpClient httpClient) throws Exception {

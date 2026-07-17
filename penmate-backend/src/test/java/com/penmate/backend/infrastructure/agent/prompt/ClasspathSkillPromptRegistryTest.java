@@ -3,7 +3,10 @@ package com.penmate.backend.infrastructure.agent.prompt;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -52,11 +55,34 @@ class ClasspathSkillPromptRegistryTest {
         }
     }
 
+    @Test
+    void should_list_available_skill_aliases_for_progressive_disclosure_catalog() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.register(PromptComponentScanConfig.class);
+            context.refresh();
+
+            SkillPromptRegistry registry = context.getBean(SkillPromptRegistry.class);
+
+            assertThat(registry.listAvailableSkills())
+                    .extracting("name")
+                    .contains("writer", "planner", "checker", "editor", "story_bible_query", "story_bible_guard")
+                    .doesNotContain("book_crud");
+            assertThat(registry.listAvailableSkills())
+                    .extracting("description")
+                    .allSatisfy(description -> assertThat((String) description).isNotBlank());
+        }
+    }
+
     @Configuration
     @ComponentScan(basePackageClasses = {
             PromptComposer.class,
             ClasspathMarkdownSystemPromptProvider.class
     })
     static class PromptComponentScanConfig {
+
+        @Bean
+        AgentToolDefinitionSource agentToolDefinitionSource() {
+            return new InMemoryAgentToolDefinitionSource(java.util.List.of());
+        }
     }
 }

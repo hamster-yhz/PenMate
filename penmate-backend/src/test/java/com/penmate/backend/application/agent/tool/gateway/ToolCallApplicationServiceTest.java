@@ -10,6 +10,7 @@ import com.penmate.backend.application.agent.tool.definition.ToolOperationPolicy
 import com.penmate.backend.application.agent.tool.definition.ToolPresentation;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
+import com.penmate.backend.application.agent.tool.runtime.AgentToolMutationGuard;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
@@ -17,10 +18,13 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
-import com.penmate.backend.domain.agent.repository.PendingToolInvocationRepository;
+import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
+import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,7 +59,7 @@ class ToolCallApplicationServiceTest {
     private ApprovalApplicationService approvalApplicationService;
 
     @Mock
-    private PendingToolInvocationRepository pendingToolInvocationRepository;
+    private AgentRunPendingApprovalRepository pendingApprovalRepository;
 
     @Mock
     private AgentRepository agentRepository;
@@ -65,20 +70,32 @@ class ToolCallApplicationServiceTest {
     @Mock
     private AgentToolHandler handler;
 
+    @Mock
+    private AgentToolCallExecutionRepository executionRepository;
+
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
+
+    @Mock
+    private AgentToolMutationGuard mutationGuard;
+
     private ToolCallApplicationService toolCallApplicationService;
 
     private ToolCallExecutionService toolCallExecutionService;
 
     @BeforeEach
     void setUp() {
-        toolCallExecutionService = new ToolCallExecutionService(List.of(handler));
+        toolCallExecutionService = new ToolCallExecutionService(List.of(handler), executionRepository,
+                businessIdGenerator, mutationGuard, new ObjectMapper());
+        lenient().when(businessIdGenerator.nextId()).thenReturn(99001L);
+        lenient().when(executionRepository.tryInsertStarted(any())).thenReturn(true);
+        lenient().when(executionRepository.markFinished(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         toolCallApplicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
                 toolApprovalViewFactory,
                 approvalApplicationService,
-                pendingToolInvocationRepository,
-                agentRepository,
+                pendingApprovalRepository,
                 toolCallExecutionService
         );
     }
@@ -89,19 +106,20 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "book_crud",
                 "{\"operation\":\"delete\",\"projectId\":9001}",
                 7L,
                 "trace-approval",
                 "{}",
                 "idem-1",
-                "loop-1",
                 0,
                 "call-1",
                 "[{\"id\":\"call-1\"}]",
                 "[{\"role\":\"user\"}]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud",
@@ -123,8 +141,10 @@ class ToolCallApplicationServiceTest {
         );
         ApprovalRequest approvalRequest = new ApprovalRequest();
         approvalRequest.setId(99L);
+        approvalRequest.setApprovalRequestId(88001L);
 
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
+        when(handler.toolCode()).thenReturn("book_crud");
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(decision);
         when(toolApprovalViewFactory.create(descriptor, decision)).thenReturn(approvalView);
         when(approvalApplicationService.create(any(CreateApprovalCommand.class), eq("trace-approval"))).thenReturn(approvalRequest);
@@ -132,7 +152,7 @@ class ToolCallApplicationServiceTest {
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
         assertThat(result.status()).isEqualTo("WAITING_APPROVAL");
-        assertThat(result.approvalId()).isEqualTo(99L);
+        assertThat(result.approvalId()).isEqualTo(88001L);
 
         ArgumentCaptor<CreateApprovalCommand> commandCaptor = ArgumentCaptor.forClass(CreateApprovalCommand.class);
         verify(approvalApplicationService).create(commandCaptor.capture(), eq("trace-approval"));
@@ -140,11 +160,42 @@ class ToolCallApplicationServiceTest {
         assertThat(commandCaptor.getValue().riskLevel()).isEqualTo(5);
         assertThat(commandCaptor.getValue().payloadJson()).isEqualTo(request.toolArgsJson());
 
-        verify(pendingToolInvocationRepository).save(any());
+        ArgumentCaptor<com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval> pendingCaptor =
+                ArgumentCaptor.forClass(com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval.class);
+        verify(pendingApprovalRepository).save(pendingCaptor.capture());
+        assertThat(pendingCaptor.getValue().approvalId()).isEqualTo(88001L);
+        assertThat(pendingCaptor.getValue().pendingApprovalId()).isEqualTo(88001L);
         verify(toolDefinitionSource).getRequired("book_crud");
         verify(toolApprovalViewFactory).create(descriptor, decision);
-        verify(agentRepository).updateGenerationTaskStatus(1L, 11L, "waiting_approval", null);
-        verify(agentRepository).updateGenerationTaskActiveApproval(1L, 11L, 99L);
+    }
+
+    @Test
+    void replays_existing_pending_approval_after_crash_without_creating_another_approval() {
+        ToolCallRequest request = new ToolCallRequest(
+                1L, 11L, 9L, 501L, "book_crud",
+                "{\"operation\":\"delete\",\"projectId\":9001}", 7L, "trace-recovery",
+                "{}", "11:call-recovery", 1, "call-recovery", "[]", "[]", null, null, 3L);
+        AgentToolDescriptor descriptor = new AgentToolDescriptor(
+                "book_crud", new ToolPresentation("Book CRUD"),
+                new ToolExposure(true, "desc", "{}"),
+                new ToolGovernancePolicy(new ApprovalPolicyDecision(true, "BOOK_DELETE"), 5, Map.of()));
+        var pending = new com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval(
+                1L, 88001L, 88001L, 11L, 1L, 9L, 501L, "call-recovery", "book_crud",
+                request.toolArgsJson(), "{}", "[]", request.idempotencyKey(), "PENDING",
+                7L, "trace-original", null, null);
+        when(handler.toolCode()).thenReturn("book_crud");
+        when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
+        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(
+                new ApprovalPolicyDecision(true, "BOOK_DELETE"));
+        when(pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey())).thenReturn(pending);
+
+        ToolCallResult result = toolCallApplicationService.executeToolCall(request);
+
+        assertThat(result.status()).isEqualTo("WAITING_APPROVAL");
+        assertThat(result.approvalId()).isEqualTo(88001L);
+        assertThat(result.approvalPreview()).containsEntry("operation", "delete");
+        verify(approvalApplicationService, never()).create(any(), any());
+        verify(pendingApprovalRepository, never()).save(any());
     }
 
     @Test
@@ -153,19 +204,20 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "missing_handler_tool",
                 "{}",
                 7L,
                 "trace-missing-handler",
                 "{}",
                 "idem-missing",
-                "loop-missing",
                 0,
                 "call-missing",
                 "[]",
                 "[]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
 
         when(toolDefinitionSource.getRequired("missing_handler_tool")).thenReturn(new AgentToolDescriptor(
@@ -190,19 +242,20 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "context_enhancer",
                 "{}",
                 7L,
                 "trace-validate",
                 "{}",
                 "idem-validate",
-                "loop-validate",
                 0,
                 "call-validate",
                 "[]",
                 "[]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "context_enhancer",
@@ -231,19 +284,20 @@ class ToolCallApplicationServiceTest {
                 1L,
                 11L,
                 9L,
+                501L,
                 "context_enhancer",
                 "{\"prompt\":\"hello\"}",
                 7L,
                 "trace-direct",
                 "{}",
                 "idem-2",
-                "loop-2",
                 0,
                 "call-2",
                 "[]",
                 "[]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "context_enhancer",

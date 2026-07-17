@@ -43,7 +43,7 @@ public class ApprovalController {
      * <p><b>关键调用�?/b>{@code approvalApplicationService.create(command, traceId)} 负责审批单落库与状态初始化�?/p>
      * <p><b>异常与分支：</b>任务不存在、审批类型非法或请求人无权限时返回业务异常�?/p>
      * <p><b>副作用：</b>新增审批请求记录�?/p>
-     * <p><b>ID 语义�?/b>projectId / taskId / requestedBy 均为业务语义 ID�?/p>
+     * <p><b>ID semantics:</b> projectId / runId / requestedBy are business IDs.</p>
      *
      * @param projectId 入参：projectId（项目业务ID�?
      * @param dto 入参：dto
@@ -56,7 +56,7 @@ public class ApprovalController {
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         CreateApprovalCommand command = new CreateApprovalCommand(
                 requireLongId(projectId, "projectId"),
-                optionalLongId(dto.getTaskId(), "taskId"),
+                optionalLongId(dto.getRunId(), "runId"),
                 dto.getApprovalType(),
                 dto.getPayloadJson(),
                 dto.getRiskLevel(),
@@ -160,7 +160,7 @@ public class ApprovalController {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", approvalRequest == null ? null : stringifyBusinessId(approvalRequest.getApprovalRequestId()));
         data.put("projectId", approvalRequest == null ? null : stringifyBusinessId(approvalRequest.getProjectId()));
-        data.put("taskId", approvalRequest == null ? null : stringifyBusinessId(approvalRequest.getTaskId()));
+        data.put("runId", approvalRequest == null ? null : stringifyBusinessId(approvalRequest.getRunId()));
         data.put("approvalType", approvalRequest == null ? null : approvalRequest.getApprovalType());
         data.put("payloadJson", approvalRequest == null ? null : approvalRequest.getPayloadJson());
         data.put("riskLevel", approvalRequest == null ? null : approvalRequest.getRiskLevel());

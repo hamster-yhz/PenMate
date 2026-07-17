@@ -1,17 +1,13 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, type Component, type PropType } from 'vue'
+import { defineComponent, type PropType } from 'vue'
 import { describe, expect, it } from 'vitest'
+import ChatMessageList from './ChatMessageList.vue'
 
 type ChatMessage = {
   id: number
   role: 'user' | 'assistant' | 'system'
   text: string
 }
-
-const MissingChatMessageList = defineComponent({
-  name: 'MissingChatMessageList',
-  template: '<div data-testid="missing-chat-message-list"></div>',
-})
 
 const ChatMessageItemStub = defineComponent({
   name: 'ChatMessageItem',
@@ -31,15 +27,6 @@ const ChatMessageItemStub = defineComponent({
   `,
 })
 
-const loadChatMessageList = async (): Promise<Component> => {
-  try {
-    const componentPath = './ChatMessageList.vue'
-    return (await import(/* @vite-ignore */ componentPath)).default
-  } catch {
-    return MissingChatMessageList
-  }
-}
-
 const mountChatMessageList = async (
   overrides: Partial<{
     messages: ChatMessage[]
@@ -47,8 +34,6 @@ const mountChatMessageList = async (
     streamingAssistantMsgId: number | null
   }> = {},
 ) => {
-  const ChatMessageList = await loadChatMessageList()
-
   return mount(ChatMessageList, {
     props: {
       messages: [

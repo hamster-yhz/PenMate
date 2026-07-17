@@ -107,6 +107,7 @@ penmate-frontend/*.log
 penmate-frontend/coverage/
 
 ### Workspace tooling ###
+.artifacts/
 .roo/
 .roomodes
 .agents/

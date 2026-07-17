@@ -1,13 +1,21 @@
 package com.penmate.backend.application.agent.usecase;
 
+import com.penmate.backend.application.agent.run.AgentRunAppService;
+import com.penmate.backend.application.agent.run.AgentRunDispatcher;
+import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
+import com.penmate.backend.application.agent.run.AgentRunAppService;
+import com.penmate.backend.application.agent.run.AsyncAgentRunDispatcher;
 import com.penmate.backend.domain.agent.model.AgentSession;
-import com.penmate.backend.domain.agent.model.AgentSessionRecoverySnapshot;
+import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.infrastructure.persistence.agent.AgentMapper;
 import com.penmate.backend.infrastructure.persistence.agent.AgentRepositoryImpl;
 import com.penmate.backend.infrastructure.persistence.agent.AgentSessionMapper;
 import com.penmate.backend.infrastructure.persistence.agent.AgentSessionRepositoryImpl;
+import com.penmate.backend.infrastructure.persistence.agent.run.AgentRunMapper;
+import com.penmate.backend.infrastructure.persistence.agent.run.AgentRunRepositoryImpl;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
@@ -24,6 +32,11 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class AgentTurnPersistenceContractTest {
 
@@ -43,9 +56,10 @@ class AgentTurnPersistenceContractTest {
     }
 
     @Test
-    void should_persist_turn_message_task_context_and_update_session_pointers() throws Exception {
+    void should_persist_turn_message_run_input_and_update_session_run_pointer() throws Exception {
+        AgentRunDispatcher dispatcher = mock(AgentRunDispatcher.class);
         try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
-            BusinessIdGenerator businessIdGenerator = sequenceIdGenerator(930001L, 940001L, 950001L, 960001L);
+            BusinessIdGenerator businessIdGenerator = sequenceIdGenerator(930001L, 940001L, 950001L);
             AgentSessionRepositoryImpl sessionRepository = new AgentSessionRepositoryImpl(
                     sqlSession.getMapper(AgentSessionMapper.class),
                     businessIdGenerator
@@ -54,46 +68,51 @@ class AgentTurnPersistenceContractTest {
                     sqlSession.getMapper(AgentMapper.class),
                     sqlSession.getMapper(AgentSessionMapper.class)
             );
-            SessionStyleBindingAppService styleBindingAppService = new SessionStyleBindingAppService(sessionRepository);
+            AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
+            when(eventPublisher.publish(eq(950001L), eq("run.started"), any()))
+                    .thenReturn(new AgentEvent(960001L, 950001L, 920001L, 920002L, 940001L, 1L, 1, "run.started", "{\"schemaVersion\":1}", null));
             AgentTurnAppService service = new AgentTurnAppService(
-                    styleBindingAppService,
+                    new SessionStyleBindingAppService(sessionRepository),
                     agentRepository,
                     sessionRepository,
-                    businessIdGenerator
+                    businessIdGenerator,
+                    new AgentRunAppService(
+                            new AgentRunRepositoryImpl(sqlSession.getMapper(AgentRunMapper.class)),
+                            eventPublisher,
+                            dispatcher
+                    ),
+                    dispatcher
             );
 
-            service.createTurn(
+            AgentTurnResult result = service.createTurn(
                     920001L,
                     920002L,
-                    new AgentTurnCommand(
-                            1001L,
-                            "请继续写作",
-                            new AgentTurnCommand.TaskRequest("WRITE", 3001L, null, "selected text")
-                    ),
+                    command("Write the next beat.", 3001L, 4001L, "selected text"),
                     "trace-turn-persist-1"
             );
 
-            assertThat(countRows("agent_messages")).as("recovery message should be persisted exactly once").isEqualTo(1);
-            assertThat(countRows("agent_generation_tasks")).as("legacy generation task table should no longer receive createTurn writes").isZero();
-            assertThat(countRows("agent_tasks")).as("recovery runtime task should be persisted").isEqualTo(1);
-            assertThat(countRows("agent_turns")).as("turn should be persisted").isEqualTo(1);
-            assertThat(countRows("agent_task_contexts")).as("task context should be persisted").isEqualTo(1);
-            assertThat(singleLong("SELECT last_task_id FROM agent_sessions WHERE session_id = 920002"))
-                    .as("session last_task_id should point to created task")
-                    .isEqualTo(940001L);
-            assertThat(singleLong("SELECT turn_id FROM agent_tasks WHERE task_id = 940001"))
-                    .as("runtime task should reference the created turn id")
+            assertThat(result.activeRun().runId()).isEqualTo(950001L);
+            assertThat(result.activeRun().turnId()).isEqualTo(940001L);
+            assertThat(countRows("agent_messages")).isEqualTo(1);
+            assertThat(countRows("agent_turns")).isEqualTo(1);
+            assertThat(countRows("agent_runs")).isEqualTo(1);
+            assertThat(countRows("agent_run_inputs")).isEqualTo(1);
+            assertThat(singleLong("SELECT last_run_id FROM agent_sessions WHERE session_id = 920002"))
                     .isEqualTo(950001L);
-            assertThat(singleString("SELECT prompt_snapshot FROM agent_tasks WHERE task_id = 940001"))
-                    .as("runtime task should persist prompt snapshot for async workflow recovery")
-                    .isEqualTo("请继续写作");
+            assertThat(singleLong("SELECT run_id FROM agent_turns WHERE turn_id = 940001"))
+                    .isEqualTo(950001L);
+            assertThat(singleString("SELECT prompt_snapshot FROM agent_run_inputs WHERE run_id = 950001"))
+                    .isEqualTo("Write the next beat.");
+            assertThat(singleString("SELECT style_snapshot_json FROM agent_run_inputs WHERE run_id = 950001"))
+                    .isEqualTo("{\"styleId\":81}");
+            verify(dispatcher).dispatchInitialRun(950001L, "trace-turn-persist-1");
         }
     }
 
     @Test
-    void should_restore_created_turn_via_recovery_snapshot_contract() throws Exception {
+    void should_reload_run_input_from_created_turn() {
         try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
-            BusinessIdGenerator businessIdGenerator = sequenceIdGenerator(930011L, 940011L, 950011L, 960011L);
+            BusinessIdGenerator businessIdGenerator = sequenceIdGenerator(930011L, 940011L, 950011L);
             AgentSessionRepositoryImpl sessionRepository = new AgentSessionRepositoryImpl(
                     sqlSession.getMapper(AgentSessionMapper.class),
                     businessIdGenerator
@@ -102,42 +121,36 @@ class AgentTurnPersistenceContractTest {
                     sqlSession.getMapper(AgentMapper.class),
                     sqlSession.getMapper(AgentSessionMapper.class)
             );
-            SessionStyleBindingAppService styleBindingAppService = new SessionStyleBindingAppService(sessionRepository);
+            AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
+            when(eventPublisher.publish(eq(950011L), eq("run.started"), any()))
+                    .thenReturn(new AgentEvent(960011L, 950011L, 920001L, 920002L, 940011L, 1L, 1, "run.started", "{\"schemaVersion\":1}", null));
+            AgentRunRepositoryImpl runRepository = new AgentRunRepositoryImpl(sqlSession.getMapper(AgentRunMapper.class));
             AgentTurnAppService service = new AgentTurnAppService(
-                    styleBindingAppService,
+                    new SessionStyleBindingAppService(sessionRepository),
                     agentRepository,
                     sessionRepository,
-                    businessIdGenerator
+                    businessIdGenerator,
+                    new AgentRunAppService(runRepository, eventPublisher, mock(AgentRunDispatcher.class)),
+                    mock(AgentRunDispatcher.class)
             );
 
             service.createTurn(
                     920001L,
                     920002L,
-                    new AgentTurnCommand(
-                            1001L,
-                            "恢复测试消息",
-                            new AgentTurnCommand.TaskRequest("WRITE", 3002L, null, "恢复测试选中文本")
-                    ),
-                    "trace-turn-recovery-1"
+                    command("Recover this turn.", 3002L, null, "recovery selection"),
+                    "trace-turn-reload-1"
             );
 
-            AgentSessionRecoverySnapshot snapshot = sessionRepository.findRecoverySnapshot(920001L, 920002L);
+            AgentRunInput input = runRepository.findInput(950011L);
 
-            assertThat(snapshot).isNotNull();
-            assertThat(snapshot.getSession()).isNotNull();
-            assertThat(snapshot.getSession().getLastTaskId()).isEqualTo(940011L);
-            assertThat(snapshot.getActiveTask()).isNotNull();
-            assertThat(snapshot.getActiveTask().getTaskId()).isEqualTo(940011L);
-            assertThat(snapshot.getActiveTask().getTaskStatus()).isEqualTo("pending");
-            assertThat(snapshot.getActiveTask().getSelectedText()).isEqualTo("恢复测试选中文本");
-            assertThat(snapshot.getActiveTask().getActiveToolCallsSnapshot()).isNull();
-            assertThat(snapshot.getActiveTask().getLastRuntimeStatus()).isNull();
-            assertThat(snapshot.getActiveTask().getRecoveryCursor()).isNull();
-            assertThat(agentRepository.findGenerationTask(920001L, 940011L))
-                    .as("runtime task repository reload should restore promptSnapshot from agent_tasks")
-                    .extracting(com.penmate.backend.domain.agent.model.AgentGenerationTask::getPromptSnapshot)
-                    .isEqualTo("恢复测试消息");
-            assertThat(snapshot.getMessages()).hasSize(1);
+            assertThat(input).isNotNull();
+            assertThat(input.runId()).isEqualTo(950011L);
+            assertThat(input.taskType()).isEqualTo("WRITE");
+            assertThat(input.promptSnapshot()).isEqualTo("Recover this turn.");
+            assertThat(input.chapterId()).isEqualTo(3002L);
+            assertThat(input.selectedText()).isEqualTo("recovery selection");
+            assertThat(input.modelSnapshotJson()).contains("\"operatorId\":1001", "\"modelConfigId\":null");
+            assertThat(input.inputHash()).isNotBlank();
         }
     }
 
@@ -153,21 +166,19 @@ class AgentTurnPersistenceContractTest {
         configuration.setMapUnderscoreToCamelCase(true);
         configuration.addMapper(AgentMapper.class);
         configuration.addMapper(AgentSessionMapper.class);
+        configuration.addMapper(AgentRunMapper.class);
         return new SqlSessionFactoryBuilder().build(configuration);
     }
 
     private static void recreateSchema() throws Exception {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
-            statement.execute("DROP TABLE IF EXISTS agent_task_contexts");
-            statement.execute("DROP TABLE IF EXISTS agent_task_results");
-            statement.execute("DROP TABLE IF EXISTS agent_tasks");
-            statement.execute("DROP TABLE IF EXISTS agent_generation_tasks");
+            statement.execute("DROP TABLE IF EXISTS agent_run_inputs");
+            statement.execute("DROP TABLE IF EXISTS agent_runs");
             statement.execute("DROP TABLE IF EXISTS agent_turns");
             statement.execute("DROP TABLE IF EXISTS agent_session_style_bindings");
             statement.execute("DROP TABLE IF EXISTS agent_sessions");
             statement.execute("DROP TABLE IF EXISTS agent_messages");
-            statement.execute("DROP TABLE IF EXISTS agent_conversations");
             statement.execute("""
                     CREATE TABLE agent_sessions (
                         id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -177,9 +188,11 @@ class AgentTurnPersistenceContractTest {
                         title VARCHAR(200) NOT NULL,
                         session_status VARCHAR(20) NOT NULL,
                         bound_style_id BIGINT NULL,
-                        active_context_version INT NOT NULL,
+                        story_bible_routing_mode VARCHAR(32) NULL,
+                        router_model_config_id BIGINT NULL,
+                        active_context_epoch_id BIGINT NULL,
                         last_turn_id BIGINT NULL,
-                        last_task_id BIGINT NULL,
+                        last_run_id BIGINT NULL,
                         last_message_at TIMESTAMP NULL,
                         resumed_at TIMESTAMP NULL,
                         total_prompt_tokens INT NOT NULL DEFAULT 0,
@@ -198,26 +211,11 @@ class AgentTurnPersistenceContractTest {
                         turn_seq INT NOT NULL,
                         user_message_id BIGINT NULL,
                         assistant_message_id BIGINT NULL,
-                        task_id BIGINT NULL,
+                        run_id BIGINT NULL,
                         turn_status VARCHAR(24) NOT NULL,
                         resume_token VARCHAR(128) NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """);
-            statement.execute("""
-                    CREATE TABLE agent_conversations (
-                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                        conversation_id BIGINT NOT NULL,
-                        project_id BIGINT NOT NULL,
-                        user_id BIGINT NOT NULL,
-                        title VARCHAR(200) NOT NULL,
-                        context_scope_json VARCHAR(2000) NULL,
-                        last_message_at TIMESTAMP NULL,
-                        status VARCHAR(20) NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        deleted_at TIMESTAMP NULL
                     )
                     """);
             statement.execute("""
@@ -243,41 +241,21 @@ class AgentTurnPersistenceContractTest {
                     )
                     """);
             statement.execute("""
-                    CREATE TABLE agent_generation_tasks (
+                    CREATE TABLE agent_runs (
                         id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                        task_id BIGINT NOT NULL,
+                        run_id BIGINT NOT NULL,
                         project_id BIGINT NOT NULL,
-                        conversation_id BIGINT NOT NULL,
-                        chapter_id BIGINT NULL,
-                        model_config_id BIGINT NULL,
-                        task_type VARCHAR(32) NOT NULL,
-                        prompt_snapshot VARCHAR(2000) NULL,
-                        plugin_snapshot VARCHAR(2000) NULL,
-                        token_usage_json VARCHAR(2000) NULL,
-                        cost_json VARCHAR(2000) NULL,
-                        trace_id VARCHAR(64) NULL,
-                        status VARCHAR(24) NOT NULL,
-                        started_at TIMESTAMP NULL,
-                        finished_at TIMESTAMP NULL,
-                        error_msg VARCHAR(500) NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """);
-            statement.execute("""
-                    CREATE TABLE agent_tasks (
-                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                        task_id BIGINT NOT NULL,
                         session_id BIGINT NOT NULL,
                         turn_id BIGINT NOT NULL,
-                        project_id BIGINT NOT NULL,
-                        task_type VARCHAR(32) NOT NULL,
-                        task_status VARCHAR(24) NOT NULL,
-                        prompt_snapshot VARCHAR(4000) NULL,
-                        request_context_id BIGINT NULL,
-                        result_id BIGINT NULL,
+                        owner_user_id BIGINT NOT NULL,
+                        predecessor_run_id BIGINT NULL,
+                        run_status VARCHAR(24) NOT NULL,
+                        run_phase VARCHAR(32) NOT NULL,
+                        context_epoch_id BIGINT NULL,
                         active_approval_id BIGINT NULL,
-                        stream_channel_key VARCHAR(128) NULL,
-                        trace_id VARCHAR(64) NULL,
+                        latest_event_seq BIGINT NOT NULL DEFAULT 0,
+                        latest_checkpoint_id BIGINT NULL,
+                        trace_id VARCHAR(128) NULL,
                         started_at TIMESTAMP NULL,
                         finished_at TIMESTAMP NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -285,37 +263,18 @@ class AgentTurnPersistenceContractTest {
                     )
                     """);
             statement.execute("""
-                    CREATE TABLE agent_task_contexts (
+                    CREATE TABLE agent_run_inputs (
                         id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                        context_id BIGINT NOT NULL,
-                        task_id BIGINT NOT NULL,
+                        run_id BIGINT NOT NULL,
+                        prompt_snapshot VARCHAR(4000) NULL,
+                        task_type VARCHAR(32) NOT NULL,
                         chapter_id BIGINT NULL,
                         selected_text VARCHAR(2000) NULL,
-                        outline_snapshot_json VARCHAR(2000) NULL,
-                        cards_snapshot_json VARCHAR(2000) NULL,
-                        rag_snapshot_json VARCHAR(2000) NULL,
-                        plugin_bindings_json VARCHAR(2000) NULL,
                         style_snapshot_json VARCHAR(2000) NULL,
                         model_snapshot_json VARCHAR(2000) NULL,
-                        task_profile_json VARCHAR(2000) NULL,
-                        prompt_plan_json VARCHAR(2000) NULL,
-                        context_package_json VARCHAR(2000) NULL,
-                        active_tool_calls_snapshot VARCHAR(2000) NULL,
-                        last_runtime_status VARCHAR(64) NULL,
-                        recovery_cursor VARCHAR(255) NULL,
-                        context_hash VARCHAR(128) NOT NULL,
+                        plugin_bindings_json VARCHAR(2000) NULL,
+                        input_hash VARCHAR(128) NOT NULL,
                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """);
-            statement.execute("""
-                    CREATE TABLE agent_task_results (
-                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                        result_id BIGINT NULL,
-                        task_id BIGINT NOT NULL,
-                        draft_summary VARCHAR(2000) NULL,
-                        quality_report_summary VARCHAR(2000) NULL,
-                        todo_summary VARCHAR(2000) NULL,
-                        story_bible_proposal_summary VARCHAR(2000) NULL
                     )
                     """);
             statement.execute("""
@@ -343,18 +302,20 @@ class AgentTurnPersistenceContractTest {
             );
             repository.insertSession(session);
             repository.updateBoundStyle(920001L, 920002L, 81L, 1001L);
-            Statement statement = sqlSession.getConnection().createStatement();
-            statement.execute("""
-                    INSERT INTO agent_conversations(conversation_id, project_id, user_id, title, context_scope_json, status)
-                    VALUES (920002, 920001, 1001, 'Session-A', NULL, 'ACTIVE')
-                    """);
-            statement.close();
         }
+    }
+
+    private static AgentTurnCommand command(String message, Long chapterId, Long modelConfigId, String selectedText) {
+        return new AgentTurnCommand(
+                1001L,
+                message,
+                new AgentTurnCommand.TaskRequest("WRITE", chapterId, modelConfigId, selectedText)
+        );
     }
 
     private static BusinessIdGenerator sequenceIdGenerator(Long... ids) {
         return new BusinessIdGenerator() {
-            private int index = 0;
+            private int index;
 
             @Override
             public Long nextId() {

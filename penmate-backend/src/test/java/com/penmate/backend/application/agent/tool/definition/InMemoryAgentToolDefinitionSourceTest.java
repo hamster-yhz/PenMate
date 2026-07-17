@@ -14,95 +14,97 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class InMemoryAgentToolDefinitionSourceTest {
 
     @Test
-    void getRequiredReturnsDescriptorDeclaredByToolDefinition() {
+    void exposes_descriptors_in_declaration_order_as_an_immutable_snapshot() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                new TestToolDefinition(
-                        "context_enhancer",
-                        "Context Enhancer",
-                        true,
-                        "Enhance context",
-                        "{\"type\":\"object\"}",
-                        new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
-                )
+                definition("tool_a", true, governance(false, "", 1)),
+                definition("book_crud", true, new ToolGovernancePolicy(
+                        new ApprovalPolicyDecision(false, ""), 2,
+                        Map.of("delete", new ToolOperationPolicy("delete", new ApprovalPolicyDecision(true, "BOOK_DELETE")))))
         ));
 
-        AgentToolDescriptor descriptor = source.getRequired("context_enhancer");
-
-        assertThat(descriptor.toolCode()).isEqualTo("context_enhancer");
-        assertThat(descriptor.presentation().displayName()).isEqualTo("Context Enhancer");
+        assertThat(source.listAll()).extracting(AgentToolDescriptor::toolCode)
+                .containsExactly("tool_a", "book_crud");
+        ApprovalPolicyDecision deleteDecision = source.getRequired("book_crud")
+                .governancePolicy().operationPolicies().get("delete").decision();
+        assertThat(deleteDecision.approvalRequired()).isTrue();
+        assertThat(deleteDecision.approvalType()).isEqualTo("BOOK_DELETE");
+        assertThatThrownBy(() -> source.listAll().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
-    void rejectsDuplicatedToolDefinitions() {
-        TestToolDefinition first = new TestToolDefinition(
-                "book_crud",
-                "Book CRUD",
-                true,
-                "Book CRUD",
-                "{\"type\":\"object\"}",
-                new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
-        );
-        TestToolDefinition duplicated = new TestToolDefinition(
-                "book_crud",
-                "Book CRUD Duplicate",
-                true,
-                "Book CRUD Duplicate",
-                "{\"type\":\"object\"}",
-                new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
-        );
-
-        assertThatThrownBy(() -> new InMemoryAgentToolDefinitionSource(List.of(first, duplicated)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Duplicated tool definition: book_crud");
-    }
-
-    @Test
-    void listLlmSchemasExposesRedisTodoCrudToolDefinition() {
+    void rejects_unknown_tool_codes() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                new TodoCrudToolDefinition()
-        ));
-
-        AgentToolDescriptor descriptor = source.getRequired("todo_crud");
-        Map<String, AgentLlmToolSchema> schemasByToolCode = source.listLlmSchemas().stream()
-                .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
-
-        assertThat(descriptor.presentation().displayName()).isEqualTo("Todo CRUD");
-        assertThat(schemasByToolCode).containsKey("todo_crud");
-        assertThat(schemasByToolCode.get("todo_crud").description()).contains("Redis-backed session Todo");
-        assertThat(schemasByToolCode.get("todo_crud").parametersJsonSchema())
-                .contains("\"reorder\"")
-                .contains("\"status\"")
-                .doesNotContain("todo_planner");
-    }
-
-    @Test
-    void missingDescriptorThrowsStableError() {
-        InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                new TodoCrudToolDefinition()
-        ));
+                definition("context_enhancer", true, governance(false, "", 1))));
 
         assertThatThrownBy(() -> source.getRequired("missing_tool"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Tool descriptor not found: missing_tool");
+                .hasMessage("Tool descriptor not found: missing_tool");
     }
 
-    private record TestToolDefinition(
-            String toolCode,
-            String displayName,
-            boolean exposedToLlm,
-            String llmDescription,
-            String parametersJsonSchema,
-            ToolGovernancePolicy governancePolicy
-    ) implements AgentToolDefinition {
+    @Test
+    void derives_llm_schemas_only_from_exposed_descriptors() {
+        InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
+                definition("context_enhancer", true, governance(false, "", 1)),
+                definition("book_crud", true, governance(false, "", 2)),
+                definition("internal_audit", false, governance(true, "AUDIT", 3))
+        ));
 
-        @Override
-        public AgentToolDescriptor descriptor() {
-            return new AgentToolDescriptor(
-                    toolCode,
-                    new ToolPresentation(displayName),
-                    new ToolExposure(exposedToLlm, llmDescription, parametersJsonSchema),
-                    governancePolicy
-            );
-        }
+        Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
+                .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
+
+        assertThat(schemas.keySet()).containsExactlyInAnyOrder("context_enhancer", "book_crud");
+        assertThat(schemas).doesNotContainKey("internal_audit");
+        assertThat(schemas.get("book_crud").description()).isEqualTo("book_crud description");
+    }
+
+    @Test
+    void exposes_real_draft_and_todo_planner_definitions_to_the_llm() {
+        InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
+                new DraftGenerationToolDefinition(), new TodoPlannerToolDefinition()));
+        Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
+                .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
+
+        assertThat(source.getRequired("draft_generation").presentation().displayName()).isNotBlank();
+        assertThat(schemas.get("draft_generation").parametersJsonSchema()).contains("\"oneOf\"");
+        assertThat(source.getRequired("todo_planner").presentation().displayName()).isNotBlank();
+        assertThat(schemas.get("todo_planner").parametersJsonSchema()).contains("\"planningMode\"");
+    }
+
+    @Test
+    void rejects_duplicate_tool_codes() {
+        assertThatThrownBy(() -> new InMemoryAgentToolDefinitionSource(List.of(
+                definition("book_crud", true, governance(false, "", 1)),
+                definition("book_crud", true, governance(false, "", 2)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Duplicated tool definition: book_crud");
+    }
+
+    @Test
+    void rejects_descriptors_missing_required_contract_sections() {
+        List<AgentToolDefinition> invalidDefinitions = List.of(
+                () -> new AgentToolDescriptor("book_crud", new ToolPresentation("Book CRUD"), null,
+                        governance(false, "", 2)),
+                () -> new AgentToolDescriptor("book_crud", new ToolPresentation("Book CRUD"),
+                        new ToolExposure(true, "description", "{}"), null)
+        );
+
+        assertThatThrownBy(() -> new InMemoryAgentToolDefinitionSource(List.of(invalidDefinitions.get(0))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("exposure");
+        assertThatThrownBy(() -> new InMemoryAgentToolDefinitionSource(List.of(invalidDefinitions.get(1))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("governancePolicy");
+    }
+
+    private AgentToolDefinition definition(String toolCode, boolean exposed, ToolGovernancePolicy governance) {
+        return () -> new AgentToolDescriptor(
+                toolCode,
+                new ToolPresentation(toolCode + " display"),
+                new ToolExposure(exposed, toolCode + " description", "{\"type\":\"object\"}"),
+                governance
+        );
+    }
+
+    private static ToolGovernancePolicy governance(boolean approvalRequired, String approvalType, int riskLevel) {
+        return new ToolGovernancePolicy(
+                new ApprovalPolicyDecision(approvalRequired, approvalType), riskLevel, Map.of());
     }
 }

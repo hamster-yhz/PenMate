@@ -11,7 +11,9 @@ import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -33,6 +35,12 @@ public class BookCrudToolHandler implements AgentToolHandler {
     @Override
     public String toolCode() {
         return "book_crud";
+    }
+
+    @Override
+    public boolean mutatesState(ToolCallRequest request) {
+        String operation = AgentJsonCodec.getString(AgentJsonCodec.parseObj(request.toolArgsJson()), "operation");
+        return !"list".equalsIgnoreCase(operation);
     }
 
     @Override
@@ -133,23 +141,22 @@ public class BookCrudToolHandler implements AgentToolHandler {
     }
 
     private String toOutput(NovelProject project) {
-        return AgentJsonCodec.toJson(java.util.Map.of(
-                "projectId", project.getProjectId(),
-                "title", project.getTitle(),
-                "summary", project.getSummary(),
-                "status", project.getStatus()
-        ));
+        return AgentJsonCodec.toJson(toOutputMap(project));
     }
 
     private String toListOutput(List<NovelProject> projects) {
         return AgentJsonCodec.toJson(projects.stream()
-                .map(project -> java.util.Map.of(
-                        "projectId", project.getProjectId(),
-                        "title", project.getTitle(),
-                        "summary", project.getSummary(),
-                        "status", project.getStatus()
-                ))
+                .map(this::toOutputMap)
                 .toList());
+    }
+
+    private Map<String, Object> toOutputMap(NovelProject project) {
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("projectId", project.getProjectId());
+        output.put("title", project.getTitle());
+        output.put("summary", project.getSummary());
+        output.put("status", project.getStatus());
+        return output;
     }
 
     private void rejectUnexpectedFields(JSONObject args, String operation, Set<String> allowedFields) {

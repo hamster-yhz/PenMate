@@ -1,11 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, type Component } from 'vue'
 import { describe, expect, it } from 'vitest'
-
-const MissingChatMessageItem = defineComponent({
-  name: 'MissingChatMessageItem',
-  template: '<div data-testid="missing-chat-message-item"></div>',
-})
+import ChatMessageItem from './ChatMessageItem.vue'
 
 type ChatMessage = {
   id: number
@@ -19,17 +14,9 @@ type ChatMessage = {
     toolDisplayName?: string
     riskLevel?: number
     operationCode?: string
+    preview?: Record<string, string>
     resolved: boolean
     resolvedAction?: 'approved' | 'rejected'
-  }
-}
-
-const loadChatMessageItem = async (): Promise<Component> => {
-  try {
-    const componentPath = './ChatMessageItem.vue'
-    return (await import(/* @vite-ignore */ componentPath)).default
-  } catch {
-    return MissingChatMessageItem
   }
 }
 
@@ -41,8 +28,6 @@ const mountChatMessageItem = async (
     approvalBusy: boolean
   }> = {},
 ) => {
-  const ChatMessageItem = await loadChatMessageItem()
-
   return mount(ChatMessageItem, {
     props: {
       msg: {
@@ -116,5 +101,27 @@ describe('ChatMessageItem', () => {
       riskLevel: 2,
       operationCode: 'delete',
     })
+  })
+
+  it('opens_the_story_bible_node_from_the_approval_preview', async () => {
+    const wrapper = await mountChatMessageItem({
+      msg: {
+        id: 13,
+        role: 'assistant',
+        text: '',
+        approval: {
+          id: '43',
+          message: 'pending',
+          time: '2026-07-17 12:00:00',
+          toolCode: 'story_bible_update',
+          preview: { kind: 'update_node', nodeId: '71' },
+          resolved: false,
+        },
+      },
+    })
+
+    await wrapper.get('.btn-open-bible').trigger('click')
+
+    expect(wrapper.emitted('open-story-bible')).toEqual([['71']])
   })
 })

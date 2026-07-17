@@ -9,8 +9,12 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -80,10 +84,16 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
 
     @Override
     public PutObjectResult putText(String objectKey, String content, String contentType) {
+        byte[] bytes = content == null ? new byte[0] : content.getBytes(StandardCharsets.UTF_8);
+        return putBytes(objectKey, bytes, contentType);
+    }
+
+    @Override
+    public PutObjectResult putBytes(String objectKey, byte[] content, String contentType) {
         String endpoint = normalizedStorageEndpoint();
         URI endpointUri = URI.create(endpoint);
         boolean pathStyle = shouldUsePathStyle(endpointUri);
-        byte[] bytes = content == null ? new byte[0] : content.getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = content == null ? new byte[0] : content.clone();
         try (S3Client client = S3Client.builder()
                 .endpointOverride(endpointUri)
                 .region(Region.of(storageRegion))
@@ -106,6 +116,11 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
 
     @Override
     public String readText(String objectKey) {
+        return new String(readBytes(objectKey), StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public byte[] readBytes(String objectKey) {
         String endpoint = normalizedStorageEndpoint();
         URI endpointUri = URI.create(endpoint);
         boolean pathStyle = shouldUsePathStyle(endpointUri);
@@ -123,7 +138,51 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
                             .bucket(storageBucket)
                             .key(objectKey)
                             .build())
-                    .asUtf8String();
+                    .asByteArray();
+        }
+    }
+
+    @Override
+    public boolean exists(String objectKey) {
+        String endpoint = normalizedStorageEndpoint();
+        URI endpointUri = URI.create(endpoint);
+        boolean pathStyle = shouldUsePathStyle(endpointUri);
+        try (S3Client client = S3Client.builder()
+                .endpointOverride(endpointUri)
+                .region(Region.of(storageRegion))
+                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(storageAccessKey, storageSecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(pathStyle)
+                        .chunkedEncodingEnabled(false)
+                        .checksumValidationEnabled(false)
+                        .build())
+                .build()) {
+            client.headObject(HeadObjectRequest.builder().bucket(storageBucket).key(objectKey).build());
+            return true;
+        } catch (NoSuchKeyException ex) {
+            return false;
+        } catch (S3Exception ex) {
+            if (ex.statusCode() == 404) return false;
+            throw ex;
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        String endpoint = normalizedStorageEndpoint();
+        URI endpointUri = URI.create(endpoint);
+        try (S3Client client = S3Client.builder()
+                .endpointOverride(endpointUri)
+                .region(Region.of(storageRegion))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(storageAccessKey, storageSecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(shouldUsePathStyle(endpointUri))
+                        .chunkedEncodingEnabled(false)
+                        .checksumValidationEnabled(false)
+                        .build())
+                .build()) {
+            client.deleteObject(DeleteObjectRequest.builder().bucket(storageBucket).key(objectKey).build());
         }
     }
 

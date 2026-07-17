@@ -8,7 +8,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.llm.LlmTokenUsage;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
@@ -24,15 +24,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
- * 鍩轰簬鍘熺敓 HTTP �?OpenAI 椋庢牸鑱婂ぉ璋冪敤瀹炵幇銆?
+ * 鍩轰簬鍘熺敓 HTTP 鐨?OpenAI 椋庢牸鑱婂ぉ璋冪敤瀹炵幇銆?
  */
 @Slf4j
 public abstract class NativeOpenAiStyleHttpProviderChatClient implements ProviderChatClient {
-
-    private static final String STRUCTURED_PREFLIGHT_TOOL_CODE = "submit_preflight_decision";
 
     @Autowired
     private AgentLlmMessagePayloadMapper agentLlmMessagePayloadMapper = new AgentLlmMessagePayloadMapper();
@@ -165,11 +162,6 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             LinkedHashMap<String, Object> body = new LinkedHashMap<>();
             body.put("model", modelName);
             body.put("messages", agentLlmMessagePayloadMapper.toProviderMessages(request == null ? List.of() : request.messages()));
-            if (shouldUseJsonSchemaResponseFormat(request, endpoint)) {
-                AgentLlmToolSchema structuredOutputTool = request.tools().get(0);
-                body.put("response_format", buildJsonSchemaResponseFormat(structuredOutputTool));
-                return AgentJsonCodec.toJson(body);
-            }
             if (request != null && request.tools() != null && !request.tools().isEmpty()) {
                 List<Map<String, Object>> tools = new ArrayList<>();
                 for (AgentLlmToolSchema toolSchema : request.tools()) {
@@ -184,56 +176,12 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                     tools.add(tool);
                 }
                 body.put("tools", tools);
-                body.put("tool_choice", buildToolChoicePayload(request));
+                body.put("tool_choice", request.toolChoice());
             }
             return AgentJsonCodec.toJson(body);
         } catch (Exception ex) {
             throw BusinessException.of("Failed to build LLM request");
         }
-    }
-
-    protected boolean supportsJsonSchemaResponseFormat() {
-        return false;
-    }
-
-    protected boolean supportsJsonSchemaResponseFormat(String endpoint) {
-        return supportsJsonSchemaResponseFormat();
-    }
-
-    private boolean shouldUseJsonSchemaResponseFormat(AgentLlmTurnRequest request, String endpoint) {
-        return supportsJsonSchemaResponseFormat(endpoint) && isStructuredPreflightDecisionRequest(request);
-    }
-
-    private Object buildToolChoicePayload(AgentLlmTurnRequest request) {
-        if (isStructuredPreflightDecisionRequest(request)) {
-            return Map.of(
-                    "type", "function",
-                    "function", Map.of("name", request.tools().get(0).toolCode())
-            );
-        }
-        return request.toolChoice();
-    }
-
-    private boolean isStructuredPreflightDecisionRequest(AgentLlmTurnRequest request) {
-        if (request == null || request.tools() == null || request.tools().size() != 1) {
-            return false;
-        }
-        if (!"required".equalsIgnoreCase(trim(request.toolChoice()))) {
-            return false;
-        }
-        AgentLlmToolSchema toolSchema = request.tools().get(0);
-        return toolSchema != null && Objects.equals(STRUCTURED_PREFLIGHT_TOOL_CODE, toolSchema.toolCode());
-    }
-
-    private Map<String, Object> buildJsonSchemaResponseFormat(AgentLlmToolSchema toolSchema) {
-        return Map.of(
-                "type", "json_schema",
-                "json_schema", Map.of(
-                        "name", toolSchema.toolCode(),
-                        "strict", true,
-                        "schema", AgentJsonCodec.parseObj(toolSchema.parametersJsonSchema())
-                )
-        );
     }
 
     private JSONObject sanitizeTopLevelFunctionParametersSchema(String parametersJsonSchema) {
@@ -394,10 +342,16 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         Integer promptTokens = usage.getInt("prompt_tokens");
         Integer completionTokens = usage.getInt("completion_tokens");
         Integer totalTokens = usage.getInt("total_tokens");
+        JSONObject promptDetails = usage.getJSONObject("prompt_tokens_details");
+        Integer cachedTokens = promptDetails == null ? null : promptDetails.getInt("cached_tokens");
+        if (cachedTokens == null) cachedTokens = usage.getInt("cache_read_input_tokens");
+        Integer cacheCreationTokens = usage.getInt("cache_creation_input_tokens");
         return new LlmTokenUsage(
                 promptTokens == null ? 0 : promptTokens,
                 completionTokens == null ? 0 : completionTokens,
-                totalTokens == null ? 0 : totalTokens
+                totalTokens == null ? 0 : totalTokens,
+                cachedTokens == null ? 0 : cachedTokens,
+                cacheCreationTokens == null ? 0 : cacheCreationTokens
         );
     }
 

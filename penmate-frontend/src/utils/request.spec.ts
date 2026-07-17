@@ -102,12 +102,12 @@ describe('request', () => {
   })
 
   it('does_not_convert_quoted_business_ids_into_numbers', async () => {
-    const transformed = await applyTransformResponse('{"data":{"sessionId":"2052639275832553472","taskId":"2052639275832553999","safeId":920001}}')
+    const transformed = await applyTransformResponse('{"data":{"sessionId":"2052639275832553472","runId":"2052639275832553999","safeId":920001}}')
 
     expect(transformed).toEqual({
       data: {
         sessionId: '2052639275832553472',
-        taskId: '2052639275832553999',
+        runId: '2052639275832553999',
         safeId: 920001,
       },
     })
@@ -132,7 +132,7 @@ describe('request', () => {
 
   it('preserves_mixed_nested_numeric_types_inside_envelope_objects', async () => {
     const transformed = await applyTransformResponse(
-      '{"data":{"session":{"sessionId":2052639275832553472,"title":"超大会话"},"activeTask":{"taskId":77,"version":3},"items":[{"messageId":2052639275832553999},{"messageId":12}]}}'
+      '{"data":{"session":{"sessionId":2052639275832553472,"title":"超大会话"},"activeRun":{"runId":77,"version":3},"items":[{"messageId":2052639275832553999},{"messageId":12}]}}'
     )
 
     expect(transformed).toEqual({
@@ -141,8 +141,8 @@ describe('request', () => {
           sessionId: '2052639275832553472',
           title: '超大会话',
         },
-        activeTask: {
-          taskId: 77,
+        activeRun: {
+          runId: 77,
           version: 3,
         },
         items: [

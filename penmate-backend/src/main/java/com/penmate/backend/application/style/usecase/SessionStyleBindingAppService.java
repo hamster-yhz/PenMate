@@ -40,6 +40,7 @@ public class SessionStyleBindingAppService {
         if (updated != 1) {
             throw new IllegalStateException("failed to update session bound style");
         }
+        agentSessionRepository.deactivateStyleBindings(sessionId);
         int inserted = agentSessionRepository.insertStyleBinding(projectId, sessionId, styleId, operatorId, traceId);
         if (inserted != 1) {
             throw new IllegalStateException("failed to insert style binding history");

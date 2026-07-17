@@ -18,7 +18,8 @@ import java.util.List;
 public interface NovelProjectMapper {
 
     @Select("""
-            SELECT id, project_id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
+            SELECT id, project_id, owner_user_id, title, summary, status, structure_revision,
+                   created_at, updated_at, deleted_at
             FROM novel_projects
             WHERE deleted_at IS NULL
             ORDER BY updated_at DESC
@@ -26,15 +27,16 @@ public interface NovelProjectMapper {
     List<NovelProject> findAll();
 
     @Select("""
-            SELECT id, project_id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
+            SELECT id, project_id, owner_user_id, title, summary, status, structure_revision,
+                   created_at, updated_at, deleted_at
             FROM novel_projects
             WHERE project_id = #{projectId} AND deleted_at IS NULL
             """)
     NovelProject findByProjectId(@Param("projectId") Long projectId);
 
     @Insert("""
-            INSERT INTO novel_projects(project_id, owner_user_id, title, summary, status)
-            VALUES(#{projectId}, #{ownerUserId}, #{title}, #{summary}, #{status})
+            INSERT INTO novel_projects(project_id, owner_user_id, title, summary, status, structure_revision)
+            VALUES(#{projectId}, #{ownerUserId}, #{title}, #{summary}, #{status}, #{structureRevision})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(NovelProject project);
@@ -45,6 +47,13 @@ public interface NovelProjectMapper {
             WHERE project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelProject project);
+
+    @Update("""
+            UPDATE novel_projects
+            SET structure_revision = structure_revision + 1
+            WHERE project_id = #{projectId} AND deleted_at IS NULL
+            """)
+    int incrementStructureRevision(@Param("projectId") Long projectId);
 
     @Update("""
             UPDATE novel_projects

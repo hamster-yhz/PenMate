@@ -15,7 +15,7 @@ public class ApprovalRequest {
     /** 关联项目业务 ID。 */
     private Long projectId;
     /** 关联任务业务 ID。 */
-    private Long taskId;
+    private Long runId;
     /** 审批类型（发布审批、高风险操作审批等）。 */
     private String approvalType;
     /** 审批业务载荷（JSON）。 */

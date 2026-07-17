@@ -43,6 +43,8 @@ public interface ObjectStorageService {
      */
     PutObjectResult putText(String objectKey, String content, String contentType);
 
+    PutObjectResult putBytes(String objectKey, byte[] content, String contentType);
+
     /**
      * 服务端读取文本对象内容。
      *
@@ -50,5 +52,11 @@ public interface ObjectStorageService {
      * @return 文本内容
      */
     String readText(String objectKey);
+
+    byte[] readBytes(String objectKey);
+
+    boolean exists(String objectKey);
+
+    void delete(String objectKey);
 }
 

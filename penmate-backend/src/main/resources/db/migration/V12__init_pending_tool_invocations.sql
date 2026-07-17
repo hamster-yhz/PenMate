@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS agent_run_pending_approvals (
+CREATE TABLE IF NOT EXISTS agent_run_pending_approvals (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     pending_approval_id BIGINT UNSIGNED NOT NULL,
     approval_id BIGINT UNSIGNED NOT NULL,
@@ -22,4 +22,4 @@
     UNIQUE KEY uk_agent_run_pending_approvals_idempotency (idempotency_key),
     KEY idx_agent_run_pending_approvals_run_status (run_id, pending_status),
     KEY idx_agent_run_pending_approvals_session_status (session_id, pending_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent run pending approvals';

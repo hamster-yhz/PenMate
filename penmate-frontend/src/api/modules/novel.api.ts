@@ -51,6 +51,9 @@ export const novelApi = {
   updateChapter(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}?operatorId=${operatorId}`, payload)
   },
+  moveChapter(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
+    return request.patch<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/position?operatorId=${operatorId}`, payload)
+  },
   deleteChapter(projectId: string, chapterId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/chapters/${chapterId}?operatorId=${operatorId}`)
   },
@@ -100,29 +103,5 @@ export const novelApi = {
   deleteOutlineNode(projectId: string, nodeId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`)
   },
-  listCards(projectId: string) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/cards`)
-  },
-  createCard(projectId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/cards?operatorId=${operatorId}`, payload)
-  },
-  getCard(projectId: string, cardId: string) {
-    return request.get<AnyRecord>(`/v1/novels/${projectId}/cards/${cardId}`)
-  },
-  updateCard(projectId: string, cardId: string, operatorId: string, payload: AnyRecord) {
-    return request.put<AnyRecord>(`/v1/novels/${projectId}/cards/${cardId}?operatorId=${operatorId}`, payload)
-  },
-  deleteCard(projectId: string, cardId: string, operatorId: string) {
-    return request.delete<string>(`/v1/novels/${projectId}/cards/${cardId}?operatorId=${operatorId}`)
-  },
-  listCardRelations(projectId: string) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/card-relations`)
-  },
-  createCardRelation(projectId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/card-relations?operatorId=${operatorId}`, payload)
-  },
-  deleteCardRelation(projectId: string, relationId: string, operatorId: string) {
-    return request.delete<string>(`/v1/novels/${projectId}/card-relations/${relationId}?operatorId=${operatorId}`)
-  }
 }
 

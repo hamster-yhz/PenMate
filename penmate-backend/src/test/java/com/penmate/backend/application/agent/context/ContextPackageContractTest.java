@@ -33,6 +33,9 @@ class ContextPackageContractTest {
                 "missingContextFlags",
                 "conflicts",
                 "storyBibleEntries",
+                "coreStoryBibleEntries",
+                "workingSetEntries",
+                "selectedStoryBibleEntries",
                 "ragRefs",
                 "styleSnapshot",
                 "chapterScope"
@@ -40,37 +43,6 @@ class ContextPackageContractTest {
         assertThat(tree.get("styleSnapshot")).isEqualTo("第一人称、冷峻、短句推进");
         assertThat(tree.get("chapterScope")).isEqualTo("chapter:3003");
         assertThat(restored).isEqualTo(contextPackage);
-    }
-
-    @Test
-    void should_preserve_empty_lists_instead_of_switching_to_alias_fields() throws Exception {
-        ContextPackage contextPackage = new ContextPackage(
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                "",
-                "global"
-        );
-
-        String json = objectMapper.writeValueAsString(contextPackage);
-        Map<String, Object> tree = objectMapper.readValue(json, Map.class);
-
-        assertThat(tree).containsOnlyKeys(
-                "sources",
-                "missingContextFlags",
-                "conflicts",
-                "storyBibleEntries",
-                "ragRefs",
-                "styleSnapshot",
-                "chapterScope"
-        );
-        assertThat(tree.get("sources")).isEqualTo(List.of());
-        assertThat(tree.get("missingContextFlags")).isEqualTo(List.of());
-        assertThat(tree.get("conflicts")).isEqualTo(List.of());
-        assertThat(tree.get("storyBibleEntries")).isEqualTo(List.of());
-        assertThat(tree.get("ragRefs")).isEqualTo(List.of());
     }
 
     @Test

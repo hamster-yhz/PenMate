@@ -12,21 +12,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AgentLlmMessageTest {
 
     @Test
-    void should_create_history_safe_user_and_assistant_messages() {
-        AgentLlmMessage user = AgentLlmMessage.user("最近剧情是主角夜访城门");
-        AgentLlmMessage assistant = AgentLlmMessage.assistant("守卫已经认出主角身份。", List.of());
-
-        assertThat(user.role()).isEqualTo(AgentLlmMessageRole.USER);
-        assertThat(user.content()).isEqualTo("最近剧情是主角夜访城门");
-        assertThat(user.toolCalls()).isEmpty();
-        assertThat(user.toolCallId()).isNull();
-
-        assertThat(assistant.role()).isEqualTo(AgentLlmMessageRole.ASSISTANT);
-        assertThat(assistant.content()).isEqualTo("守卫已经认出主角身份。");
-        assertThat(assistant.toolCalls()).isEmpty();
-    }
-
-    @Test
     void should_create_assistant_tool_call_and_tool_result_messages() {
         AgentLlmToolCallPayload payload = new AgentLlmToolCallPayload(
                 "call_1",

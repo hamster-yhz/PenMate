@@ -10,7 +10,7 @@ export type WorkbenchSessionState = {
   title: string
   status: string
   boundStyle: { styleId: string | null; name: string }
-  activeTask: { taskId: string | null; taskStatus: string; streamChannelKey: string }
+  activeRun: { runId: string | null; runStatus: string; runPhase: string; latestSequence: string }
   pendingApproval: Record<string, unknown> | null
   messages: Array<Record<string, unknown>>
   workbenchContext: {
@@ -34,7 +34,7 @@ export const createWorkbenchSessionState = (): WorkbenchSessionState => reactive
   title: '',
   status: 'IDLE',
   boundStyle: { styleId: null, name: '' },
-  activeTask: { taskId: null, taskStatus: '', streamChannelKey: '' },
+  activeRun: { runId: null, runStatus: '', runPhase: '', latestSequence: '0' },
   pendingApproval: null,
   messages: [],
   workbenchContext: {

@@ -12,6 +12,8 @@ public record PromptPlan(
         List<PromptModulePlan> modules,
         List<String> skills,
         String finalProfile,
+        String stablePrefix,
+        String dynamicContext,
         String assembledPromptPreview
 ) {
 
@@ -19,7 +21,14 @@ public record PromptPlan(
         modules = List.copyOf(modules == null ? List.of() : modules);
         skills = List.copyOf(skills == null ? List.of() : skills);
         finalProfile = normalize(finalProfile);
+        stablePrefix = normalize(stablePrefix);
+        dynamicContext = normalize(dynamicContext);
         assembledPromptPreview = normalize(assembledPromptPreview);
+    }
+
+    public PromptPlan(List<PromptModulePlan> modules, List<String> skills, String finalProfile,
+                      String assembledPromptPreview) {
+        this(modules, skills, finalProfile, assembledPromptPreview, "", assembledPromptPreview);
     }
 
     private static String normalize(String value) {

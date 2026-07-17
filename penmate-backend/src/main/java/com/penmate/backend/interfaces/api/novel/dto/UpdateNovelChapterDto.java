@@ -15,7 +15,7 @@ public class UpdateNovelChapterDto {
     private String title;
 
     @NotNull
-    private Integer chapterNo;
+    private Integer sortOrder;
 
     private Integer status;
     private Integer wordCount;

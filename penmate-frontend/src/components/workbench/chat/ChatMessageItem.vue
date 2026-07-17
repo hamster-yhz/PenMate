@@ -18,6 +18,7 @@ const emit = defineEmits<{
   'replace-selected': [msg: ChatMessage]
   approve: [id: string]
   reject: [id: string]
+  'open-story-bible': [nodeId: string]
 }>()
 
 const emitMerge = () => {
@@ -79,6 +80,7 @@ const emitReplace = () => {
       :busy="approvalBusy"
       @approve="$emit('approve', $event)"
       @reject="$emit('reject', $event)"
+      @open-story-bible="$emit('open-story-bible', $event)"
     />
   </div>
 </template>

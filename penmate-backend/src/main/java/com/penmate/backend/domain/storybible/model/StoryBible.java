@@ -22,7 +22,7 @@ public class StoryBible {
     /** 知识库描述。 */
     private String description;
     /** 当前激活版本号。 */
-    private Integer activeVersionNo;
+    private Long contentRevision;
     /** 创建时间。 */
     private LocalDateTime createdAt;
     /** 更新时间。 */

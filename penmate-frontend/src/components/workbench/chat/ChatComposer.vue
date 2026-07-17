@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import { RedoOutlined, StopOutlined } from '@ant-design/icons-vue'
 import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
   isGenerating?: boolean
+  canCancelRun?: boolean
+  isCancelling?: boolean
+  canRetryRun?: boolean
+  isRetrying?: boolean
   currentModelName?: string
   activePlugins?: string[]
 }>(), {
   modelValue: '',
   isGenerating: false,
+  canCancelRun: false,
+  isCancelling: false,
+  canRetryRun: false,
+  isRetrying: false,
   currentModelName: '',
   activePlugins: () => [],
 })
@@ -16,6 +25,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   send: []
+  cancel: []
+  retry: []
   'open-model-settings': []
 }>()
 
@@ -78,6 +89,30 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
         @keydown="handleCtrlEnter"
       />
       <button
+        v-if="canCancelRun"
+        type="button"
+        class="btn-stop"
+        data-testid="chat-cancel"
+        title="停止运行"
+        aria-label="停止运行"
+        :disabled="isCancelling"
+        @click="$emit('cancel')"
+      >
+        <StopOutlined />
+      </button>
+      <button
+        v-if="canRetryRun"
+        type="button"
+        class="btn-retry"
+        data-testid="chat-retry"
+        title="重试运行"
+        aria-label="重试运行"
+        :disabled="isRetrying"
+        @click="$emit('retry')"
+      >
+        <RedoOutlined />
+      </button>
+      <button
         type="button"
         class="btn-send"
         data-testid="chat-send"
@@ -119,7 +154,8 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
 }
 
 .model-warning-btn,
-.btn-send {
+.btn-send,
+.btn-stop {
   cursor: pointer;
   transition: all 0.25s var(--ease-silk);
 }
@@ -200,7 +236,28 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
   letter-spacing: 0.12em;
 }
 
+.btn-retry {
+  flex: 0 0 48px;
+  width: 48px;
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  background: rgba(201, 169, 110, 0.1);
+  color: var(--amber-gold);
+  cursor: pointer;
+}
+
+.btn-stop {
+  flex: 0 0 48px;
+  width: 48px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.28);
+  color: #fca5a5;
+}
+
 .btn-send:hover:not([disabled]),
+.btn-stop:hover:not([disabled]),
+.btn-retry:hover:not([disabled]),
 .model-warning-btn:hover {
   box-shadow: var(--shadow-gold);
   border-color: var(--border-glow);
@@ -209,5 +266,16 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
 .btn-send[disabled] {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+
+.btn-stop[disabled] {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.btn-retry[disabled] {
+  cursor: wait;
+  opacity: 0.55;
 }
 </style>

@@ -19,15 +19,16 @@ public interface ApprovalRequestMapper {
 
     @Insert("""
             INSERT INTO agent_approval_requests
-            (approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status, requested_by)
+            (approval_request_id, project_id, run_id, approval_type, payload_json, risk_level, status, requested_by)
             VALUES
-            (#{approvalRequestId}, #{projectId}, #{taskId}, #{approvalType}, #{payloadJson}, #{riskLevel}, 'pending', #{requestedBy})
+            (#{approvalRequestId}, #{projectId}, #{runId}, #{approvalType}, #{payloadJson}, #{riskLevel}, 'pending', #{requestedBy})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(ApprovalRequest approvalRequest);
 
     @Select("""
-            SELECT id, approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status,
+            SELECT id, approval_request_id AS approvalRequestId, project_id AS projectId, run_id AS runId,
+                   approval_type AS approvalType, payload_json AS payloadJson, risk_level AS riskLevel, status,
                    requested_by, reviewed_by, reviewed_at, review_comment, created_at, updated_at
             FROM agent_approval_requests
             WHERE project_id = #{projectId}
@@ -36,7 +37,8 @@ public interface ApprovalRequestMapper {
     List<ApprovalRequest> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, approval_request_id, project_id, task_id, approval_type, payload_json, risk_level, status,
+            SELECT id, approval_request_id AS approvalRequestId, project_id AS projectId, run_id AS runId,
+                   approval_type AS approvalType, payload_json AS payloadJson, risk_level AS riskLevel, status,
                    requested_by, reviewed_by, reviewed_at, review_comment, created_at, updated_at
             FROM agent_approval_requests
             WHERE approval_request_id = #{approvalRequestId}

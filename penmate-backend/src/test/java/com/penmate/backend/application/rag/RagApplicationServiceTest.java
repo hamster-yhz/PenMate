@@ -152,7 +152,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         log.setId(1L);
         log.setRetrievalLogId(1L);
         log.setProjectId(1L);
-        log.setTaskId(2L);
+        log.setRunId(2L);
         log.setHitCount(3);
         log.setSourcesJson("[]");
         log.setAdopted(true);
@@ -163,7 +163,7 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0)).containsEntry("id", 1L)
                 .containsEntry("projectId", 1L)
-                .containsEntry("taskId", 2L)
+                .containsEntry("runId", 2L)
                 .containsEntry("hitCount", 3);
     }
 }

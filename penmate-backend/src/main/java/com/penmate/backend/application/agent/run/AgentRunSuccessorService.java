@@ -1,0 +1,59 @@
+package com.penmate.backend.application.agent.run;
+
+import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
+import com.penmate.backend.domain.agent.run.model.AgentRun;
+import com.penmate.backend.domain.agent.run.model.AgentRunInput;
+import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+
+@Service
+public class AgentRunSuccessorService {
+
+    private final AgentRunRepository runs;
+    private final AgentSessionRepository sessions;
+    private final BusinessIdGenerator ids;
+    private final AgentRunEventPublisher events;
+    private final ApplicationEventPublisher applicationEvents;
+
+    public AgentRunSuccessorService(AgentRunRepository runs, AgentSessionRepository sessions,
+                                    BusinessIdGenerator ids, AgentRunEventPublisher events,
+                                    ApplicationEventPublisher applicationEvents) {
+        this.runs = runs;
+        this.sessions = sessions;
+        this.ids = ids;
+        this.events = events;
+        this.applicationEvents = applicationEvents;
+    }
+
+    @Transactional
+    public Long create(AgentRun predecessor, AgentRunInput oldInput, String traceId) {
+        Long runId = ids.nextId();
+        AgentRun successor = new AgentRun(
+                runId, predecessor.projectId(), predecessor.sessionId(), predecessor.turnId(),
+                predecessor.ownerUserId(), predecessor.runId(), "PENDING", "created", null, null,
+                null, null, 0L, 0, null, null, null, 0L, null, traceId, null, null);
+        AgentRunInput input = new AgentRunInput(
+                runId, oldInput.promptSnapshot(), oldInput.taskType(), oldInput.chapterId(),
+                oldInput.selectedText(), oldInput.styleSnapshotJson(), oldInput.modelSnapshotJson(),
+                oldInput.pluginBindingsJson(), oldInput.inputHash());
+        requireOne(runs.insert(successor), "failed to insert successor Run");
+        requireOne(runs.insertInput(input), "failed to insert successor Run input");
+        requireOne(sessions.rebindTurnRun(predecessor.sessionId(), predecessor.turnId(), predecessor.runId(), runId),
+                "failed to bind successor Run to Turn");
+        requireOne(sessions.updateLastRun(predecessor.projectId(), predecessor.sessionId(), runId),
+                "failed to bind successor Run to Session");
+        events.publish(runId, "run.started", Map.of(
+                "phase", "created", "predecessorRunId", String.valueOf(predecessor.runId())));
+        applicationEvents.publishEvent(new AgentRunDispatchRequested(runId, traceId));
+        return runId;
+    }
+
+    private void requireOne(int affected, String message) {
+        if (affected != 1) throw new IllegalStateException(message);
+    }
+}

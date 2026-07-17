@@ -22,6 +22,7 @@ type UseWorkbenchOutlineDeps = {
   deleteChapter: (projectId: string, chapterId: string, operatorId: string) => Promise<unknown>
   updateOutlineNode: (projectId: string, nodeId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
   moveOutlineNode: (projectId: string, nodeId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
+  moveChapter?: (projectId: string, chapterId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
   notify?: (message: string) => void
   notifySuccess?: (message: string) => void
 }
@@ -165,7 +166,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
         volumeId: null,
         outlineNodeId: createdOutlineNodeId || null,
         title,
-        chapterNo: idx + 1,
+        sortOrder: idx + 1,
         status: 1,
         wordCount: 0,
         excerpt: '',
@@ -291,6 +292,13 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
           parentId: parentKey || null,
           sortOrder: targetIdx + 1,
         })
+        const chapter = volume.children[currentIdx]
+        if (chapter.chapterId && deps.moveChapter) {
+          await deps.moveChapter(projectId, chapter.chapterId, operatorId, {
+            volumeId: null,
+            sortOrder: targetIdx + 1,
+          })
+        }
       } catch (error: unknown) {
         deps.notify?.(error instanceof Error ? error.message : '移动章节失败')
         return

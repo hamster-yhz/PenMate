@@ -1,7 +1,5 @@
 package com.penmate.backend.domain.novel.repository;
 
-import com.penmate.backend.domain.novel.model.NovelCard;
-import com.penmate.backend.domain.novel.model.NovelCardRelation;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
 import com.penmate.backend.domain.novel.model.NovelMember;
@@ -20,6 +18,8 @@ public interface NovelGateway {
     int insertProject(NovelProject project);
 
     int updateProject(NovelProject project);
+
+    int incrementStructureRevision(Long projectId);
 
     int softDeleteProject(Long projectId);
 
@@ -79,20 +79,5 @@ public interface NovelGateway {
 
     int softDeleteOutlineNode(Long projectId, Long nodeId);
 
-    List<NovelCard> findCardsByProjectId(Long projectId);
-
-    NovelCard findCardByIdAndProjectId(Long projectId, Long cardId);
-
-    int insertCard(NovelCard card);
-
-    int updateCard(NovelCard card);
-
-    int softDeleteCard(Long projectId, Long cardId);
-
-    List<NovelCardRelation> findCardRelationsByProjectId(Long projectId);
-
-    int insertCardRelation(NovelCardRelation relation);
-
-    int softDeleteCardRelation(Long projectId, Long relationId);
 }
 

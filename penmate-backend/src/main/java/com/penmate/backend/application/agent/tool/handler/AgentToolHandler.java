@@ -14,6 +14,10 @@ public interface AgentToolHandler {
 
     String toolCode();
 
+    default boolean mutatesState(ToolCallRequest request) {
+        return false;
+    }
+
     /**
      * 对 tool 调用请求执行参数级校验。
      *

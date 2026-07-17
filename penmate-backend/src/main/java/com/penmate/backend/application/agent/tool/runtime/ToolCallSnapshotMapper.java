@@ -6,7 +6,6 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
-import com.penmate.backend.domain.agent.model.PendingToolInvocationSnapshot;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.springframework.stereotype.Component;
 
@@ -138,34 +137,6 @@ public class ToolCallSnapshotMapper {
             return AgentLlmMessage.tool(stringValue(rawMessage.get("tool_call_id")), content);
         }
         throw new IllegalArgumentException("Unsupported llm message role: " + role);
-    }
-
-    public ToolCallRequest buildLoopResumeRequest(PendingToolInvocationSnapshot snapshot,
-                                                        Map<String, Object> toolCallPayload,
-                                                        List<AgentLlmMessage> messages,
-                                                        String idempotencyKey) {
-        Map<String, Object> functionPayload = mapValue(toolCallPayload.get("function"));
-        String toolCallId = stringValue(toolCallPayload.get("id"));
-        String toolCode = stringValue(functionPayload.get("name"));
-        String toolArgsJson = stringValue(functionPayload.get("arguments"));
-        return new ToolCallRequest(
-                snapshot.projectId(),
-                snapshot.taskId(),
-                snapshot.conversationId(),
-                toolCode,
-                toolArgsJson,
-                snapshot.operatorId(),
-                snapshot.traceId(),
-                snapshot.contextJson(),
-                idempotencyKey,
-                snapshot.loopRunId(),
-                snapshot.llmTurnIndex(),
-                toolCallId,
-                snapshot.assistantToolCallsJson(),
-                toConversationMessagesJson(messages),
-                "RESUME_LOOP",
-                snapshot.approvalSummaryJson()
-        );
     }
 
     private List<Map<String, Object>> buildToolCallPayloads(List<AgentLlmToolCall> toolCalls) {

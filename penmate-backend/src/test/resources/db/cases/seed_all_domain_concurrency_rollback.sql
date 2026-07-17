@@ -10,9 +10,9 @@ SET NAMES utf8mb4;
 
 -- A1. 并发更新样本（基于同一 project_id 记录）
 INSERT INTO novel_projects (
-  id, project_id, owner_user_id, title, summary, status, created_at, updated_at, deleted_at
+  id, project_id, owner_user_id, title, summary, status, structure_revision, created_at, updated_at, deleted_at
 ) VALUES
-  (922001, 922001, 920002, 'DBCASE_并发样本项目', '用于并发更新冲突验证', 1, NOW(3), NOW(3), NULL)
+  (922001, 922001, 920002, 'DBCASE_并发样本项目', '用于并发更新冲突验证', 1, 1, NOW(3), NOW(3), NULL)
 ON DUPLICATE KEY UPDATE
   updated_at = VALUES(updated_at),
   summary = VALUES(summary);

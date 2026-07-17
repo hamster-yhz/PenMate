@@ -7,7 +7,15 @@
       <span class="novel-title" contenteditable="true" @blur="emit('update-title', $event)">{{ novelTitle }}</span>
     </div>
     <div class="header-center">
-      <span class="word-count">
+      <div class="workspace-mode" role="group" aria-label="工作模式">
+        <button type="button" title="写作" aria-label="写作" :class="{ active: workbenchMode === 'writing' }" @click="emit('update:workbench-mode', 'writing')">
+          <EditOutlined /> 写作
+        </button>
+        <button type="button" title="Story Bible" aria-label="Story Bible" :class="{ active: workbenchMode === 'story-bible' }" @click="emit('update:workbench-mode', 'story-bible')">
+          <BookOutlined /> Story Bible
+        </button>
+      </div>
+      <span v-if="workbenchMode === 'writing'" class="word-count">
         <span class="wc-num">{{ wordCount }}</span> 字
       </span>
       <span v-if="saveHint" class="save-hint">{{ saveHint }}</span>
@@ -50,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import { BookOutlined, EditOutlined } from '@ant-design/icons-vue'
 import logoImg from '@/assets/images/logo.png'
 import iconStyle from '@/assets/images/icon-style.png'
 import iconPlugin from '@/assets/images/feature-plugin.png'
@@ -62,9 +71,11 @@ withDefaults(defineProps<{
   userEmail: string
   userMenuOpen: boolean
   canAccessRbacAdmin: boolean
+  workbenchMode?: 'writing' | 'story-bible'
 }>(), {
   wordCount: 0,
   saveHint: '',
+  workbenchMode: 'writing',
 })
 
 const emit = defineEmits<{
@@ -79,6 +90,7 @@ const emit = defineEmits<{
   (event: 'go-mybooks'): void
   (event: 'go-rbac-admin'): void
   (event: 'logout'): void
+  (event: 'update:workbench-mode', payload: 'writing' | 'story-bible'): void
 }>()
 </script>
 
@@ -160,6 +172,31 @@ const emit = defineEmits<{
   font-size: 0.72rem;
   color: var(--jade-green);
   animation: fadeInUp 0.3s ease;
+}
+
+.workspace-mode {
+  display: grid;
+  grid-template-columns: 92px 126px;
+  height: 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+
+  button {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border: 0;
+    border-right: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    background: rgba(17, 24, 39, 0.72);
+    cursor: pointer;
+  }
+
+  button:last-child { border-right: 0; }
+  button.active { color: var(--amber-gold); background: rgba(201, 169, 110, 0.12); }
 }
 
 .hdr-btn {
@@ -284,5 +321,26 @@ const emit = defineEmits<{
       background: rgba(192, 60, 45, 0.08);
     }
   }
+}
+
+@media (max-width: 640px) {
+  .wb-header { position: relative; padding: 0 8px; gap: 8px; }
+  .header-left,
+  .header-center,
+  .header-right { flex: 0 0 auto; gap: 6px; }
+  .header-left .header-divider,
+  .novel-title,
+  .word-count,
+  .save-hint,
+  .header-right > .hdr-btn,
+  .header-right > .header-divider { display: none; }
+  .header-logo { width: 26px; height: 26px; }
+  .header-brand { flex: 0 0 auto; font-size: 0.88rem; white-space: nowrap; }
+  .header-center { position: absolute; left: 50%; transform: translateX(-50%); }
+  .header-right { position: absolute; right: 8px; }
+  .workspace-mode { grid-template-columns: 42px 48px; width: 90px; }
+  .workspace-mode button { gap: 0; font-size: 0; }
+  .workspace-mode button :deep(.anticon) { font-size: 14px; }
+  .user-avatar { width: 28px; height: 28px; }
 }
 </style>

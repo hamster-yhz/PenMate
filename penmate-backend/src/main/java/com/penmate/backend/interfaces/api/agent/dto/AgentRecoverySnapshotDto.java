@@ -2,48 +2,35 @@ package com.penmate.backend.interfaces.api.agent.dto;
 
 import java.util.List;
 
-/**
- * Agent recovery snapshot API DTO。
- * <p>该 DTO 用于冻结 session / activeTask / pendingApproval / messages / workbenchContext 的接口返回结构，
- * 避免控制器直接暴露临时内部视图类。</p>
- */
 public record AgentRecoverySnapshotDto(
         SessionDto session,
-        ActiveTaskDto activeTask,
+        ActiveRunDto activeRun,
         Object pendingApproval,
         List<Object> messages,
         Object workbenchContext
 ) {
 
-    /**
-     * 会话摘要 DTO。
-     */
     public record SessionDto(
             String sessionId,
             String title,
             String status,
             BoundStyleDto boundStyle,
-            String lastTaskStatus
+            String lastRunStatus
     ) {
     }
 
-    /**
-     * 会话绑定风格摘要 DTO。
-     */
     public record BoundStyleDto(
             String styleId,
             String name
     ) {
     }
 
-    /**
-     * 当前激活任务摘要 DTO。
-     */
-    public record ActiveTaskDto(
+    public record ActiveRunDto(
             String turnId,
-            String taskId,
-            String taskStatus,
-            String requestContextId
+            String runId,
+            String runStatus,
+            String runPhase,
+            String latestSequence
     ) {
     }
 }

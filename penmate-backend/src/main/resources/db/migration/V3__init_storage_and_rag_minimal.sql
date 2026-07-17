@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS rag_retrieval_logs (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     retrieval_log_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
-    task_id BIGINT UNSIGNED NULL,
+    run_id BIGINT UNSIGNED NULL,
     query_text VARCHAR(500) NULL,
     hit_count INT NOT NULL DEFAULT 0,
     sources_json JSON NULL,
@@ -71,6 +71,6 @@ CREATE TABLE IF NOT EXISTS rag_retrieval_logs (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     UNIQUE KEY uk_rag_retrieval_logs_retrieval_log_id (retrieval_log_id),
     KEY idx_rag_retrieval_project_created (project_id, created_at),
-    KEY idx_rag_retrieval_task_created (task_id, created_at)
+    KEY idx_rag_retrieval_run_created (run_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

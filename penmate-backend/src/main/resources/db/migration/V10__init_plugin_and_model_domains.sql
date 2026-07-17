@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS plugin_call_logs (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     plugin_call_log_id BIGINT UNSIGNED NOT NULL,
     project_id BIGINT UNSIGNED NOT NULL,
-    task_id BIGINT UNSIGNED NULL,
+    run_id BIGINT UNSIGNED NULL,
     plugin_code VARCHAR(100) NOT NULL,
     tool_name VARCHAR(100) NULL,
     request_json JSON NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS plugin_call_logs (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     UNIQUE KEY uk_plugin_call_logs_log_id (plugin_call_log_id),
     KEY idx_plugin_call_project_time (project_id, created_at),
-    KEY idx_plugin_call_task (task_id, created_at)
+    KEY idx_plugin_call_run (run_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS model_user_api_keys (

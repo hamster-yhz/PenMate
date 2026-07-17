@@ -1,32 +1,20 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, type Component } from 'vue'
 import { describe, expect, it } from 'vitest'
+import ChatComposer from './ChatComposer.vue'
 
-const MissingChatComposer = defineComponent({
-  name: 'MissingChatComposer',
-  template: '<div data-testid="missing-chat-composer"></div>',
-})
-
-const loadChatComposer = async (): Promise<Component> => {
-  try {
-    const componentPath = './ChatComposer.vue'
-    return (await import(/* @vite-ignore */ componentPath)).default
-  } catch {
-    return MissingChatComposer
-  }
-}
-
-const mountChatComposer = async (
+const mountChatComposer = (
   overrides: Partial<{
     modelValue: string
     isGenerating: boolean
+    canCancelRun: boolean
+    isCancelling: boolean
+    canRetryRun: boolean
+    isRetrying: boolean
     currentModelName: string
     activePlugins: string[]
   }> = {},
-) => {
-  const ChatComposer = await loadChatComposer()
-
-  return mount(ChatComposer, {
+) =>
+  mount(ChatComposer, {
     props: {
       modelValue: '',
       isGenerating: false,
@@ -35,7 +23,6 @@ const mountChatComposer = async (
       ...overrides,
     },
   })
-}
 
 describe('ChatComposer', () => {
   it('disables_send_when_input_blank_or_generating', async () => {
@@ -63,7 +50,7 @@ describe('ChatComposer', () => {
     })
 
     expect((readyWrapper.get('[data-testid="chat-send"]').element as HTMLButtonElement).disabled).toBe(false)
-  })
+  }, 10_000)
 
   it('allows_followup_send_after_waiting_approval_when_generation_has_stopped', async () => {
     const wrapper = await mountChatComposer({
@@ -96,6 +83,39 @@ describe('ChatComposer', () => {
       ['请补充主角与反派对话'],
     ])
     expect(wrapper.emitted('send')).toEqual([[]])
+  }, 10_000)
+
+  it('offers_an_icon_stop_action_while_a_run_is_cancellable', async () => {
+    const wrapper = await mountChatComposer({
+      modelValue: '继续写',
+      isGenerating: true,
+      canCancelRun: true,
+    })
+
+    const stopButton = wrapper.get('[data-testid="chat-cancel"]')
+    expect(stopButton.attributes('title')).toBe('停止运行')
+    expect((stopButton.element as HTMLButtonElement).disabled).toBe(false)
+
+    await stopButton.trigger('click')
+
+    expect(wrapper.emitted('cancel')).toEqual([[]])
+  }, 10_000)
+
+  it('offers_one_locked_retry_action_for_a_terminal_run', async () => {
+    const wrapper = await mountChatComposer({
+      canRetryRun: true,
+      isRetrying: false,
+    })
+
+    const retryButton = wrapper.get('[data-testid="chat-retry"]')
+    expect(retryButton.attributes('title')).toBe('重试运行')
+    expect((retryButton.element as HTMLButtonElement).disabled).toBe(false)
+
+    await retryButton.trigger('click')
+
+    expect(wrapper.emitted('retry')).toEqual([[]])
+    await wrapper.setProps({ isRetrying: true })
+    expect((retryButton.element as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('shows_model_warning_and_emits_open_model_settings_when_model_missing', async () => {

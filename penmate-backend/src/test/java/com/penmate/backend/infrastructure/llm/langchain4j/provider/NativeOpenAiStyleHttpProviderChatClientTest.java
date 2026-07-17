@@ -6,7 +6,7 @@ import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.llm.LlmTokenUsage;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -106,6 +106,25 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
         AgentLlmTurnResponse response = client.extractTurnResponse(responseBody);
 
         assertThat(response.tokenUsage()).isEqualTo(LlmTokenUsage.ZERO);
+    }
+
+    @Test
+    void should_extract_cached_prompt_token_details_when_the_provider_reports_them() {
+        TestNativeClient client = new TestNativeClient();
+        AgentLlmTurnResponse response = client.extractTurnResponse("""
+                {
+                  "choices": [{"finish_reason":"stop","message":{"content":"ok"}}],
+                  "usage": {
+                    "prompt_tokens": 120,
+                    "completion_tokens": 8,
+                    "total_tokens": 128,
+                    "prompt_tokens_details": {"cached_tokens": 96},
+                    "cache_creation_input_tokens": 12
+                  }
+                }
+                """);
+
+        assertThat(response.tokenUsage()).isEqualTo(new LlmTokenUsage(120, 8, 128, 96, 12));
     }
 
     @Test

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS novel_chapters (
     volume_id BIGINT UNSIGNED NULL,
     outline_node_id BIGINT UNSIGNED NULL,
     title VARCHAR(200) NOT NULL,
-    chapter_no INT UNSIGNED NOT NULL,
+    sort_order INT UNSIGNED NOT NULL DEFAULT 0,
     status TINYINT UNSIGNED NOT NULL DEFAULT 1,
     word_count INT UNSIGNED NOT NULL DEFAULT 0,
     excerpt TEXT NULL,
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS novel_chapters (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     deleted_at DATETIME(3) NULL,
     UNIQUE KEY uk_novel_chapters_chapter_id (chapter_id),
-    KEY idx_chapter_project_volume_no (project_id, volume_id, chapter_no),
+    KEY idx_chapter_project_volume_sort (project_id, volume_id, sort_order, deleted_at),
     KEY idx_chapter_outline (outline_node_id),
-    KEY idx_chapter_content_object (content_object_key(191))
+    KEY idx_chapter_content_object (content_object_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

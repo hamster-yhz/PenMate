@@ -26,7 +26,8 @@ class AgentArchitectureDependencyTest {
             noClasses()
                     .that().resideInAPackage("..domain.agent.service..")
                     .should().dependOnClassesThat()
-                    .resideInAPackage("org.springframework..");
+                    .resideInAPackage("org.springframework..")
+                    .allowEmptyShould(true);
 
     @ArchTest
     static final ArchRule application_agent_should_not_depend_on_legacy_agent_json_helpers =

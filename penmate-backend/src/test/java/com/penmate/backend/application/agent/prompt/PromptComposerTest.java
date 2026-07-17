@@ -3,57 +3,47 @@ package com.penmate.backend.application.agent.prompt;
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskIntentTag;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PromptComposerTest {
 
     private final SystemPromptProvider systemPromptProvider = mock(SystemPromptProvider.class);
     private final SkillPromptRegistry skillPromptRegistry = mock(SkillPromptRegistry.class);
-    private final PromptComposer promptComposer = new PromptComposer(systemPromptProvider, skillPromptRegistry);
+    private final AgentToolDefinitionSource toolDefinitionSource = mock(AgentToolDefinitionSource.class);
+    private final PromptComposer promptComposer = new PromptComposer(systemPromptProvider, skillPromptRegistry, toolDefinitionSource);
 
     @Test
-    void should_keep_user_request_out_of_prompt_preview_so_explicit_user_instruction_overrides_skill_prompt() {
-        when(systemPromptProvider.loadBundle("execution", "default")).thenReturn(new SystemPromptBundle(
-                "execution",
-                "default",
-                List.of(
-                        new SystemPromptDocument(
-                                "00-base-role.md",
-                                "prompts/agent/system/execution/default/00-base-role.md",
-                                "你是执行阶段写作代理。"
-                        )
-                ),
-                "你是执行阶段写作代理。"
+    void should_keep_user_request_out_of_prompt_preview_and_expose_skill_catalog_only() {
+        stubExecutionBundle("default", "execution base");
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
+                new SkillCatalogItem("writer", "Write prose and scenes"),
+                new SkillCatalogItem("planner", "Plan writing tasks"),
+                new SkillCatalogItem("checker", "Check continuity and constraints")
         ));
-        when(skillPromptRegistry.load("writer")).thenReturn(new SystemPromptDocument(
-                "00-base-role.md",
-                "prompts/agent/system/skills/writer/00-base-role.md",
-                "默认使用第三人称叙事。"
-        ));
-
-        TaskProfile taskProfile = new TaskProfile(
-                List.of(TaskIntentTag.DRAFT_GENERATION),
-                "default",
-                List.of("writer"),
-                List.of(),
-                List.of("保留用户明确指定的人称"),
-                "输出正文续写",
-                false,
-                false,
-                false,
-                "用户要求正文续写"
-        );
 
         PromptPlan promptPlan = promptComposer.compose(
-                taskProfile,
+                new TaskProfile(
+                        List.of(TaskIntentTag.DRAFT_GENERATION),
+                        "default",
+                        List.of("writer"),
+                        List.of(),
+                        List.of("keep explicit user perspective"),
+                        "draft output",
+                        false,
+                        false,
+                        false,
+                        "draft request"
+                ),
                 new ContextPackage(
                         List.of("style-snapshot"),
                         List.of(),
@@ -63,135 +53,112 @@ class PromptComposerTest {
                         "{\"person\":\"first\"}",
                         "chapter:12"
                 ),
-                "请用第一人称续写这一段。"
+                "Please write in first person."
         );
 
         assertThat(promptPlan.finalProfile()).isEqualTo("default");
         assertThat(promptPlan.skills()).containsExactly("writer");
         assertThat(promptPlan.assembledPromptPreview())
-                .contains("你是执行阶段写作代理。")
-                .contains("默认使用第三人称叙事。")
-                .doesNotContain("请用第一人称续写这一段");
+                .contains("execution base")
+                .contains("Available skills")
+                .contains("- writer: Write prose and scenes")
+                .contains("- planner: Plan writing tasks")
+                .contains("- checker: Check continuity and constraints")
+                .contains("skill_load")
+                .doesNotContain("skill_prompt_read")
+                .doesNotContain("Please write in first person.");
+        verify(skillPromptRegistry, never()).load("writer");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "skill:writer", "context-package");
+                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::source)
                 .containsExactly(
                         "prompts/agent/system/execution/default/00-base-role.md",
-                        "prompts/agent/system/skills/writer/00-base-role.md",
+                        "tool-catalog:",
+                        "skill-catalog:checker,planner,writer",
+                        "context-epoch-core:entries=0",
                         "context-package:sources=1/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
                 );
     }
 
     @Test
-    void should_activate_distinct_skill_prompts_from_task_profile_skills() {
-        when(systemPromptProvider.loadBundle("execution", "default")).thenReturn(new SystemPromptBundle(
-                "execution",
-                "default",
-                List.of(),
-                "执行基座"
-        ));
-        when(skillPromptRegistry.load("planner")).thenReturn(new SystemPromptDocument(
-                "00-base-role.md",
-                "prompts/agent/system/skills/planner/00-base-role.md",
-                "先规划再写作。"
-        ));
-        when(skillPromptRegistry.load("checker")).thenReturn(new SystemPromptDocument(
-                "00-base-role.md",
-                "prompts/agent/system/skills/checker/00-base-role.md",
-                "输出前检查一致性。"
+    void should_not_load_task_profile_skills_as_prompt_modules() {
+        stubExecutionBundle("default", "execution base");
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
+                new SkillCatalogItem("writer", "Write prose and scenes"),
+                new SkillCatalogItem("planner", "Plan writing tasks"),
+                new SkillCatalogItem("checker", "Check continuity and constraints"),
+                new SkillCatalogItem("story_bible_query", "Read relevant story bible facts")
         ));
 
-        TaskProfile taskProfile = new TaskProfile(
-                List.of(TaskIntentTag.DRAFT_GENERATION, TaskIntentTag.CONTINUITY_CHECK),
-                "default",
-                List.of("planner", "checker"),
-                List.of(),
-                List.of(),
-                "先规划后输出正文",
-                false,
-                false,
-                false,
-                "需要规划和检查"
+        PromptPlan promptPlan = promptComposer.compose(
+                profileFor("default", List.of("planner", "checker")),
+                emptyContextPackage(),
+                "Generate a plot outline."
         );
-
-        PromptPlan promptPlan = promptComposer.compose(taskProfile, emptyContextPackage(), "请生成剧情大纲");
 
         assertThat(promptPlan.skills()).containsExactly("planner", "checker");
         assertThat(promptPlan.assembledPromptPreview())
-                .contains("执行基座")
-                .contains("先规划再写作。")
-                .contains("输出前检查一致性。");
+                .contains("Available skills")
+                .contains("- planner: Plan writing tasks")
+                .contains("- checker: Check continuity and constraints")
+                .contains("- story_bible_query: Read relevant story bible facts")
+                .contains("skill_load");
+        verify(skillPromptRegistry, never()).load("planner");
+        verify(skillPromptRegistry, never()).load("checker");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "skill:planner", "skill:checker", "context-package");
+                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
     }
 
     @Test
     void should_align_execution_bundle_with_world_build_rewrite_and_default_profiles() {
-        when(systemPromptProvider.loadBundle("execution", "world-build")).thenReturn(new SystemPromptBundle(
-                "execution",
-                "world-build",
-                List.of(),
-                "世界观构建基座"
-        ));
-        when(systemPromptProvider.loadBundle("execution", "rewrite")).thenReturn(new SystemPromptBundle(
-                "execution",
-                "rewrite",
-                List.of(),
-                "改写基座"
-        ));
-        when(systemPromptProvider.loadBundle("execution", "default")).thenReturn(new SystemPromptBundle(
-                "execution",
-                "default",
-                List.of(),
-                "默认执行基座"
-        ));
+        stubExecutionBundle("world-build", "world build base");
+        stubExecutionBundle("rewrite", "rewrite base");
+        stubExecutionBundle("default", "default base");
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of());
 
-        PromptPlan worldBuildPlan = promptComposer.compose(profileFor("world-build", List.of()), emptyContextPackage(), "补全设定");
-        PromptPlan rewritePlan = promptComposer.compose(profileFor("rewrite", List.of()), emptyContextPackage(), "改写文案");
-        PromptPlan defaultPlan = promptComposer.compose(profileFor("default", List.of()), emptyContextPackage(), "续写正文");
+        PromptPlan worldBuildPlan = promptComposer.compose(profileFor("world-build", List.of()), emptyContextPackage(), "Complete setting");
+        PromptPlan rewritePlan = promptComposer.compose(profileFor("rewrite", List.of()), emptyContextPackage(), "Rewrite copy");
+        PromptPlan defaultPlan = promptComposer.compose(profileFor("default", List.of()), emptyContextPackage(), "Continue draft");
 
         assertThat(worldBuildPlan.finalProfile()).isEqualTo("world-build");
-        assertThat(worldBuildPlan.assembledPromptPreview()).contains("世界观构建基座");
+        assertThat(worldBuildPlan.assembledPromptPreview()).contains("world build base");
         assertThat(rewritePlan.finalProfile()).isEqualTo("rewrite");
-        assertThat(rewritePlan.assembledPromptPreview()).contains("改写基座");
+        assertThat(rewritePlan.assembledPromptPreview()).contains("rewrite base");
         assertThat(defaultPlan.finalProfile()).isEqualTo("default");
-        assertThat(defaultPlan.assembledPromptPreview()).contains("默认执行基座");
+        assertThat(defaultPlan.assembledPromptPreview()).contains("default base");
     }
 
     @Test
     void should_only_consume_built_context_package_without_querying_story_bible_directly() {
-        when(systemPromptProvider.loadBundle("execution", "default")).thenReturn(new SystemPromptBundle(
-                "execution",
-                "default",
-                List.of(),
-                "默认执行基座"
-        ));
+        stubExecutionBundle("default", "default base");
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of());
 
         ContextPackage contextPackage = new ContextPackage(
                 List.of("story-bible", "style-snapshot"),
                 List.of("rag-missing"),
-                List.of("设定冲突：角色年龄待确认"),
-                List.of("角色年龄：17（canon）"),
+                List.of("story bible conflict: character age"),
+                List.of("character age: 17 (canon)"),
                 List.of(),
-                "{\"tone\":\"克制\"}",
+                "{\"tone\":\"restrained\"}",
                 "chapter:21"
         );
 
         PromptPlan promptPlan = promptComposer.compose(
                 profileFor("default", List.of()),
                 contextPackage,
-                "核对设定后继续写作"
+                "Continue after checking continuity."
         );
 
         assertThat(promptPlan.assembledPromptPreview())
-                .contains("默认执行基座")
-                .contains("角色年龄：17（canon）")
-                .contains("设定冲突：角色年龄待确认")
+                .contains("default base")
+                .contains("character age: 17 (canon)")
+                .contains("story bible conflict: character age")
                 .contains("rag-missing");
-        verifyNoInteractions(skillPromptRegistry);
+        verify(skillPromptRegistry).listAvailableSkills();
+        verify(skillPromptRegistry, never()).load(anyString());
     }
 
     @Test
@@ -203,62 +170,51 @@ class PromptComposerTest {
                         new SystemPromptDocument(
                                 "00-base-role.md",
                                 "prompts/agent/system/execution/default/00-base-role.md",
-                                "默认执行基座"
+                                "default base"
                         ),
                         new SystemPromptDocument(
                                 "10-writing-rules.md",
                                 "prompts/agent/system/execution/default/10-writing-rules.md",
-                                "写作规则"
+                                "writing rules"
                         )
                 ),
-                "默认执行基座\n\n写作规则"
+                "default base\n\nwriting rules"
         ));
-        when(skillPromptRegistry.load("editor")).thenReturn(new SystemPromptDocument(
-                "00-base-role.md",
-                "prompts/agent/system/skills/editor/00-base-role.md",
-                "进行句式润色。"
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
+                new SkillCatalogItem("editor", "Polish and revise existing prose")
         ));
 
         PromptPlan promptPlan = promptComposer.compose(
                 profileFor("default", List.of("editor")),
                 emptyContextPackage(),
-                "润色段落"
+                "Polish paragraph"
         );
 
-        assertThat(promptPlan.modules()).containsExactly(
-                new PromptModulePlan(
-                        "execution:default",
+        assertThat(promptPlan.modules())
+                .extracting(PromptModulePlan::moduleKey)
+                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
+        assertThat(promptPlan.modules())
+                .extracting(PromptModulePlan::source)
+                .containsExactly(
                         "prompts/agent/system/execution/default/00-base-role.md,prompts/agent/system/execution/default/10-writing-rules.md",
-                        true,
-                        "执行基座模块，匹配 task profile=default"
-                ),
-                new PromptModulePlan(
-                        "skill:editor",
-                        "prompts/agent/system/skills/editor/00-base-role.md",
-                        true,
-                        "根据 task profile skills 激活"
-                ),
-                new PromptModulePlan(
-                        "context-package",
-                        "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0",
-                        true,
-                        "仅消费已构建上下文结果，不直接查询 story bible"
-                )
-        );
+                        "tool-catalog:",
+                        "skill-catalog:editor",
+                        "context-epoch-core:entries=0",
+                        "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
+                );
     }
 
-    @Test
-    void should_fail_fast_when_context_package_is_null() {
-        when(systemPromptProvider.loadBundle("execution", "default")).thenReturn(new SystemPromptBundle(
+    private void stubExecutionBundle(String profile, String content) {
+        when(systemPromptProvider.loadBundle("execution", profile)).thenReturn(new SystemPromptBundle(
                 "execution",
-                "default",
-                List.of(),
-                "默认执行基座"
+                profile,
+                List.of(new SystemPromptDocument(
+                        "00-base-role.md",
+                        "prompts/agent/system/execution/" + profile + "/00-base-role.md",
+                        content
+                )),
+                content
         ));
-
-        assertThatThrownBy(() -> promptComposer.compose(profileFor("default", List.of()), null, "续写正文"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("contextPackage");
     }
 
     private TaskProfile profileFor(String executionProfile, List<String> skills) {
@@ -268,11 +224,11 @@ class PromptComposerTest {
                 skills,
                 List.of(),
                 List.of(),
-                "输出正文",
+                "draft output",
                 false,
                 true,
                 false,
-                "测试 profile"
+                "test profile"
         );
     }
 
