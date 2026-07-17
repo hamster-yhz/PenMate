@@ -180,6 +180,14 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       if (!assistantMsg) return
       applyAssistantEventMetadata(assistantMsg, payload as ChatRecord)
     },
+    onStreamReset: async () => {
+      const projectId = deps.getCurrentProjectId()
+      const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
+      if (!projectId || !sessionId) return ''
+      const snapshot = await getSessionRecovery(projectId, sessionId) as Record<string, any>
+      hydrateFromRecoverySnapshot(snapshot)
+      return normalizeRunStatus(snapshot?.activeRun?.runStatus ?? snapshot?.session?.lastRunStatus)
+    },
   })
 
   const loadConversationList = async (projectId: string) => {
@@ -221,7 +229,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return (await resolveCurrentSessionId(projectId)) || createSessionForSend(projectId, operatorId)
   }
 
-  const hydrateFromRecoverySnapshot = (snapshot: Record<string, any> | null | undefined) => {
+  function hydrateFromRecoverySnapshot(snapshot: Record<string, any> | null | undefined) {
     runtimeEventSource.value = null
     const normalizedSnapshot = pickBusinessRecord(snapshot) as {
       session?: { sessionId?: string | number | null }
@@ -331,7 +339,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     await scrollChat()
     try {
       const finalStatus = await runtime.consumeRunStream(projectId, runId, after)
-      if (finalStatus === 'failed' || finalStatus === 'cancelled') {
+      if (finalStatus === 'failed' || finalStatus === 'cancelled' || finalStatus === 'superseded') {
         throw new Error(`运行结束: ${finalStatus}`)
       }
       const hasPendingApproval = !!assistantMsg.approval && !assistantMsg.approval?.resolved

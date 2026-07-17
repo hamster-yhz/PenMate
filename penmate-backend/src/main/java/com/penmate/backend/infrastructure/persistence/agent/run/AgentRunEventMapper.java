@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.agent.run;
 
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import org.apache.ibatis.annotations.*;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -80,4 +81,18 @@ public interface AgentRunEventMapper {
 
     @Delete("DELETE FROM agent_events WHERE run_id = #{runId} AND sequence <= #{maxSequence}")
     int deleteThrough(@Param("runId") Long runId, @Param("maxSequence") Long maxSequence);
+
+    @Select("""
+            SELECT MIN(e.sequence) AS oldest_hot_sequence,
+                   r.latest_event_seq AS latest_sequence
+            FROM agent_runs r
+            LEFT JOIN agent_events e ON e.run_id = r.run_id
+            WHERE r.run_id = #{runId}
+            GROUP BY r.run_id, r.latest_event_seq
+            """)
+    @ConstructorArgs({
+            @Arg(column = "oldest_hot_sequence", javaType = Long.class),
+            @Arg(column = "latest_sequence", javaType = Long.class)
+    })
+    AgentEventWindow findWindow(@Param("runId") Long runId);
 }

@@ -6,13 +6,14 @@ import type {
 import type { GenerationPhase } from '@/components/workbench/workbenchTypes'
 import type { ChatRecord } from './useWorkbenchChatTimeline'
 
-export type AgentRunStatus = 'pending' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled'
+export type AgentRunStatus = 'pending' | 'running' | 'waiting_approval' | 'suspended' | 'completed' | 'failed' | 'cancelled' | 'superseded'
 
 type StreamListener = (event: MessageEvent<string>) => void
 
 export const normalizeRunStatus = (raw: unknown): AgentRunStatus | '' => {
   const status = String(raw || '').trim().toLowerCase()
-  return (['pending', 'running', 'waiting_approval', 'completed', 'failed', 'cancelled'] as const).includes(status as AgentRunStatus)
+  if (status === 'done') return 'completed'
+  return (['pending', 'running', 'waiting_approval', 'suspended', 'completed', 'failed', 'cancelled', 'superseded'] as const).includes(status as AgentRunStatus)
     ? (status as AgentRunStatus)
     : ''
 }
@@ -113,6 +114,7 @@ export const createAgentRunRuntime = (deps: {
   onMessageCompleted?: (text: string) => void
   onToolCall?: (payload: Record<string, unknown>) => void
   onWaitingApproval?: (payload: Record<string, unknown>) => void
+  onStreamReset?: (payload: Record<string, unknown>) => AgentRunStatus | '' | Promise<AgentRunStatus | ''>
   setLatestSequence?: (value: string) => void
 }) => {
   const closeRunStream = () => {
@@ -126,7 +128,7 @@ export const createAgentRunRuntime = (deps: {
 
   const publish = (eventName: string, payload: Record<string, unknown>) => {
     const sequence = payload.sequence == null ? null : String(payload.sequence)
-    if (sequence) deps.setLatestSequence?.(sequence)
+    if (sequence && /^\d+$/.test(sequence)) deps.setLatestSequence?.(sequence)
     deps.setRuntimeEventSource?.(toRuntimeEventSource(eventName, payload))
   }
 
@@ -149,6 +151,22 @@ export const createAgentRunRuntime = (deps: {
       closeRunStream()
       reject(error)
     }
+
+    deps.addStreamListener(stream, 'stream.reset', async (event) => {
+      const payload = parseSseData(event) as Record<string, unknown>
+      const latestSequence = String(payload.latestSequence ?? after)
+      publish('stream.reset', { ...payload, sequence: latestSequence })
+      try {
+        const status = await deps.onStreamReset?.(payload) || ''
+        if (status === 'completed' || status === 'cancelled' || status === 'superseded') {
+          settleResolve(status)
+        } else if (status === 'failed') {
+          settleReject(new Error(failureMessage(payload)))
+        }
+      } catch (error) {
+        settleReject(error instanceof Error ? error : new Error(String(error)))
+      }
+    })
 
     deps.addStreamListener(stream, 'run.started', (event) => {
       const payload = parseSseData(event) as Record<string, unknown>

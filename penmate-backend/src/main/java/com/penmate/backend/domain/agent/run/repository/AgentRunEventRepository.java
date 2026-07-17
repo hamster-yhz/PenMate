@@ -1,6 +1,7 @@
 package com.penmate.backend.domain.agent.run.repository;
 
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,4 +15,6 @@ public interface AgentRunEventRepository {
     List<Long> findTerminalRunIdsWithEventsBefore(LocalDateTime cutoff, int limit);
 
     int deleteThrough(Long runId, Long maxSequence);
+
+    AgentEventWindow findWindow(Long runId);
 }

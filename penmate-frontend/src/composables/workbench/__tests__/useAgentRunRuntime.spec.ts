@@ -43,6 +43,7 @@ const createRuntimeHarness = () => {
   let runStatus = ''
   let statusDetail = ''
   let latestSequence = '0'
+  let resetCount = 0
 
   const runtime = createAgentRunRuntime({
     getRunStatus: () => runStatus as any,
@@ -75,6 +76,10 @@ const createRuntimeHarness = () => {
     onMessageCompleted: (text) => {
       completedText = text
     },
+    onStreamReset: async () => {
+      resetCount += 1
+      return 'completed' as const
+    },
   })
 
   return {
@@ -98,6 +103,9 @@ const createRuntimeHarness = () => {
     get latestSequence() {
       return latestSequence
     },
+    get resetCount() {
+      return resetCount
+    },
     consume: () => runtime.consumeRunStream('project-1', 'run-1', '0'),
   }
 }
@@ -117,6 +125,7 @@ describe('createAgentRunRuntime', () => {
       { llmTurnIndex: 1, text: 'Hello' },
       '-1',
     ))
+    expect(harness.latestSequence).toBe('6')
     harness.stream.listeners.get('message.completed')?.(agentRunEventDto(
       'message.completed',
       { llmTurnIndex: 1, role: 'assistant', text: 'Hello final' },
@@ -142,5 +151,27 @@ describe('createAgentRunRuntime', () => {
     expect(harness.runStatus).toBe('completed')
     expect(harness.statusDetail).toBe('done')
     expect(harness.latestSequence).toBe('11')
+  })
+
+  it('reloads recovery state and settles when the server resets an expired cursor', async () => {
+    const harness = createRuntimeHarness()
+    const consuming = harness.consume()
+
+    harness.stream.listeners.get('stream.reset')?.(sseEvent({
+      runId: 'run-1',
+      requestedAfter: '2',
+      oldestAvailableSequence: '51',
+      latestSequence: '80',
+      reason: 'CURSOR_EXPIRED',
+    }))
+
+    await expect(consuming).resolves.toBe('completed')
+    expect(harness.resetCount).toBe(1)
+    expect(harness.latestSequence).toBe('80')
+    expect(harness.runtimeEvent).toMatchObject({
+      eventName: 'stream.reset',
+      runId: 'run-1',
+      sequence: '80',
+    })
   })
 })

@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.agent.run;
 
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.apache.ibatis.session.SqlSession;
@@ -77,6 +78,13 @@ public class AgentRunEventRepositoryImpl implements AgentRunEventRepository {
     public int deleteThrough(Long runId, Long maxSequence) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             return session.getMapper(AgentRunEventMapper.class).deleteThrough(runId, maxSequence);
+        }
+    }
+
+    @Override
+    public AgentEventWindow findWindow(Long runId) {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            return session.getMapper(AgentRunEventMapper.class).findWindow(runId);
         }
     }
 

@@ -4,15 +4,22 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentStreamResetDto;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
@@ -24,6 +31,8 @@ public class AgentRunEventStreamService {
     private final InMemoryAgentRunEventBus eventBus;
     private final AgentArtifactRepository artifactRepository;
     private final ObjectMapper objectMapper;
+    private final AtomicLong streamIds = new AtomicLong();
+    private final Map<Long, StreamConnection> activeStreams = new ConcurrentHashMap<>();
 
     public AgentRunEventStreamService(AgentRunEventRepository eventRepository,
                                       InMemoryAgentRunEventBus eventBus,
@@ -36,26 +45,72 @@ public class AgentRunEventStreamService {
     }
 
     public SseEmitter openStream(Long runId, Long after) {
-        Long cursor = after == null ? 0L : after;
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
-        Runnable unsubscribe = eventBus.subscribe(runId, event -> {
-            if (event.sequence() != null && event.sequence() > cursor) {
-                send(emitter, event);
+        long cursor = after == null ? 0L : Math.max(0L, after);
+        SseEmitter emitter = createEmitter();
+        StreamConnection connection = new StreamConnection(
+                streamIds.incrementAndGet(), runId, emitter, cursor);
+        activeStreams.put(connection.streamId, connection);
+        connection.unsubscribe = eventBus.subscribe(runId, event -> onBusEvent(connection, event));
+        emitter.onCompletion(() -> close(connection));
+        emitter.onTimeout(() -> close(connection));
+        emitter.onError(ignored -> close(connection));
+        poll(connection);
+        return emitter;
+    }
+
+    protected SseEmitter createEmitter() {
+        return new SseEmitter(SSE_TIMEOUT_MS);
+    }
+
+    @Scheduled(fixedDelayString = "${penmate.agent.stream-poll-ms:1000}")
+    public void pollActiveStreams() {
+        activeStreams.values().forEach(this::poll);
+    }
+
+    private void onBusEvent(StreamConnection connection, AgentEvent event) {
+        if (event.sequence() == null || event.sequence() < 0) {
+            synchronized (connection.monitor) {
+                if (!connection.closed.get()) {
+                    sendEvent(connection, event);
+                }
             }
-        });
-        emitter.onCompletion(unsubscribe);
-        emitter.onTimeout(unsubscribe);
-        emitter.onError(ignored -> unsubscribe.run());
-        for (AgentEvent event : eventRepository.listAfter(runId, cursor)) {
-            AgentEvent resolved = resolveArtifact(event);
-            send(emitter, resolved);
-            if (isTerminal(resolved)) {
-                emitter.complete();
-                unsubscribe.run();
-                return emitter;
+            return;
+        }
+        poll(connection);
+    }
+
+    private void poll(StreamConnection connection) {
+        synchronized (connection.monitor) {
+            if (connection.closed.get()) return;
+            try {
+                AgentEventWindow window = eventRepository.findWindow(connection.runId);
+                if (window == null) {
+                    throw new IllegalArgumentException("Agent run not found: " + connection.runId);
+                }
+                long cursor = connection.cursor.get();
+                if (window.requiresResetAfter(cursor)) {
+                    if (!sendReset(connection, cursor, window)) return;
+                    connection.cursor.set(window.latestSequence());
+                    cursor = window.latestSequence();
+                }
+                for (AgentEvent event : eventRepository.listAfter(connection.runId, cursor)) {
+                    if (event.sequence() == null || event.sequence() <= connection.cursor.get()) continue;
+                    AgentEvent resolved = resolveArtifact(event);
+                    if (!sendEvent(connection, resolved)) return;
+                    connection.cursor.set(event.sequence());
+                    if (isTerminal(resolved)) {
+                        connection.emitter.complete();
+                        close(connection);
+                        return;
+                    }
+                }
+            } catch (RuntimeException ex) {
+                log.debug("agent run SSE poll failed: runId={}, cursor={}",
+                        connection.runId, connection.cursor.get(), ex);
+                connection.emitter.completeWithError(ex);
+                close(connection);
             }
         }
-        return emitter;
     }
 
     private AgentEvent resolveArtifact(AgentEvent event) {
@@ -78,20 +133,50 @@ public class AgentRunEventStreamService {
         return event;
     }
 
-    private void send(SseEmitter emitter, AgentEvent event) {
+    private boolean sendEvent(StreamConnection connection, AgentEvent event) {
         try {
-            emitter.send(SseEmitter.event()
-                    .id(stringify(event.sequence()))
+            SseEmitter.SseEventBuilder builder = SseEmitter.event()
                     .name(event.eventType())
-                    .data(toDto(event)));
-            if (isTerminal(event)) {
-                emitter.complete();
+                    .data(toDto(event));
+            if (event.sequence() != null && event.sequence() >= 0) {
+                builder.id(stringify(event.sequence()));
             }
+            connection.emitter.send(builder);
+            return true;
         } catch (IOException | IllegalStateException ex) {
             log.debug("agent run SSE send failed: runId={}, sequence={}, eventType={}",
                     event.runId(), event.sequence(), event.eventType(), ex);
-            emitter.completeWithError(ex);
+            connection.emitter.completeWithError(ex);
+            close(connection);
+            return false;
         }
+    }
+
+    private boolean sendReset(StreamConnection connection, long requestedAfter, AgentEventWindow window) {
+        try {
+            connection.emitter.send(SseEmitter.event()
+                    .id(stringify(window.latestSequence()))
+                    .name("stream.reset")
+                    .data(new AgentStreamResetDto(
+                            stringify(connection.runId),
+                            stringify(requestedAfter),
+                            stringify(window.oldestHotSequence()),
+                            stringify(window.latestSequence()),
+                            "CURSOR_EXPIRED")));
+            return true;
+        } catch (IOException | IllegalStateException ex) {
+            log.debug("agent run SSE reset failed: runId={}, cursor={}",
+                    connection.runId, requestedAfter, ex);
+            connection.emitter.completeWithError(ex);
+            close(connection);
+            return false;
+        }
+    }
+
+    private void close(StreamConnection connection) {
+        if (!connection.closed.compareAndSet(false, true)) return;
+        activeStreams.remove(connection.streamId, connection);
+        connection.unsubscribe.run();
     }
 
     private boolean isTerminal(AgentEvent event) {
@@ -119,5 +204,22 @@ public class AgentRunEventStreamService {
 
     private String stringify(Long value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private static final class StreamConnection {
+        private final long streamId;
+        private final Long runId;
+        private final SseEmitter emitter;
+        private final AtomicLong cursor;
+        private final AtomicBoolean closed = new AtomicBoolean();
+        private final Object monitor = new Object();
+        private volatile Runnable unsubscribe = () -> { };
+
+        private StreamConnection(long streamId, Long runId, SseEmitter emitter, long cursor) {
+            this.streamId = streamId;
+            this.runId = runId;
+            this.emitter = emitter;
+            this.cursor = new AtomicLong(cursor);
+        }
     }
 }

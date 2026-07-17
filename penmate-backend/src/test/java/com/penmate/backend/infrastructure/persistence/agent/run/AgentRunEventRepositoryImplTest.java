@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.agent.run;
 
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
 import org.apache.ibatis.mapping.Environment;
@@ -58,6 +59,12 @@ class AgentRunEventRepositoryImplTest {
         assertThat(second.sequence()).isEqualTo(2L);
         assertThat(repository.listAfter(70001L, 0L)).extracting(AgentEvent::eventType)
                 .containsExactly("run.started", "run.phase.changed");
+
+        AgentEventWindow fullWindow = repository.findWindow(70001L);
+        assertThat(fullWindow.oldestHotSequence()).isEqualTo(1L);
+        assertThat(fullWindow.latestSequence()).isEqualTo(2L);
+        assertThat(repository.deleteThrough(70001L, 1L)).isEqualTo(1);
+        assertThat(repository.findWindow(70001L).oldestHotSequence()).isEqualTo(2L);
     }
 
     @Test
