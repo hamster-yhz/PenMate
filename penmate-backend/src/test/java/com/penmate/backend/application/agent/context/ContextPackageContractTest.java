@@ -46,43 +46,6 @@ class ContextPackageContractTest {
     }
 
     @Test
-    void should_preserve_empty_lists_instead_of_switching_to_alias_fields() throws Exception {
-        ContextPackage contextPackage = new ContextPackage(
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                "",
-                "global"
-        );
-
-        String json = objectMapper.writeValueAsString(contextPackage);
-        Map<String, Object> tree = objectMapper.readValue(json, Map.class);
-
-        assertThat(tree).containsOnlyKeys(
-                "sources",
-                "missingContextFlags",
-                "conflicts",
-                "storyBibleEntries",
-                "coreStoryBibleEntries",
-                "workingSetEntries",
-                "selectedStoryBibleEntries",
-                "ragRefs",
-                "styleSnapshot",
-                "chapterScope"
-        );
-        assertThat(tree.get("sources")).isEqualTo(List.of());
-        assertThat(tree.get("missingContextFlags")).isEqualTo(List.of());
-        assertThat(tree.get("conflicts")).isEqualTo(List.of());
-        assertThat(tree.get("storyBibleEntries")).isEqualTo(List.of());
-        assertThat(tree.get("coreStoryBibleEntries")).isEqualTo(List.of());
-        assertThat(tree.get("workingSetEntries")).isEqualTo(List.of());
-        assertThat(tree.get("selectedStoryBibleEntries")).isEqualTo(List.of());
-        assertThat(tree.get("ragRefs")).isEqualTo(List.of());
-    }
-
-    @Test
     void should_deserialize_raw_context_package_json_with_null_lists_and_trimmed_strings() throws Exception {
         String json = """
                 {

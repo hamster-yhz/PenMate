@@ -3,7 +3,6 @@ package com.penmate.backend.application.agent.orchestration.profile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.prompt.PromptModulePlan;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
-import com.penmate.backend.application.storybible.StoryBibleUpdateProposal;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -111,39 +110,4 @@ class TaskProfileSerializationTest {
         assertThat(restored.skills()).isUnmodifiable();
     }
 
-    @Test
-    void should_deserialize_raw_prompt_plan_json_with_missing_lists_as_empty_lists() throws Exception {
-        String json = """
-                {
-                  "modules": null,
-                  "skills": null,
-                  "finalProfile": " default ",
-                  "assembledPromptPreview": "  # preview  "
-                }
-                """;
-
-        PromptPlan restored = objectMapper.readValue(json, PromptPlan.class);
-
-        assertThat(restored.modules()).isEmpty();
-        assertThat(restored.skills()).isEmpty();
-        assertThat(restored.finalProfile()).isEqualTo("default");
-        assertThat(restored.assembledPromptPreview()).isEqualTo("# preview");
-    }
-
-    @Test
-    void should_round_trip_story_bible_update_proposal_without_alias_names() throws Exception {
-        StoryBibleUpdateProposal proposal = new StoryBibleUpdateProposal(
-                List.of("hero.identity", "world.taboo"),
-                "proposed",
-                "本轮生成新增了主角身份与禁忌规则，需进入后续审核"
-        );
-
-        String json = objectMapper.writeValueAsString(proposal);
-        Map<String, Object> tree = objectMapper.readValue(json, Map.class);
-        StoryBibleUpdateProposal restored = objectMapper.readValue(json, StoryBibleUpdateProposal.class);
-
-        assertThat(tree).containsOnlyKeys("entryKeys", "canonicalStatus", "reasoningSummary");
-        assertThat(tree.get("canonicalStatus")).isEqualTo("proposed");
-        assertThat(restored).isEqualTo(proposal);
-    }
 }

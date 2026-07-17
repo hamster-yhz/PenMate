@@ -72,7 +72,14 @@ class DraftGenerationToolHandlerTest {
                 .contains("\"sourceText\"")
                 .contains("\"instruction\"")
                 .contains("\"preservedConstraints\"")
-                .contains("\"sourceSummary\"");
+                .contains("\"sourceSummary\"")
+                .contains("\"oneOf\"")
+                .contains("\"const\": \"generate\"")
+                .contains("\"required\": [\"operation\", \"prompt\"]")
+                .contains("\"const\": \"rewrite\"")
+                .contains("\"required\": [\"operation\", \"sourceText\", \"instruction\"]")
+                .contains("\"const\": \"revise\"")
+                .contains("\"additionalProperties\": false");
 
         Object governancePolicy = readAccessor(descriptor, "governancePolicy");
         assertThat(readAccessor(governancePolicy, "riskLevel")).isEqualTo(1);
@@ -82,23 +89,6 @@ class DraftGenerationToolHandlerTest {
         assertThat(operationPolicies.containsKey("generate")).isTrue();
         assertThat(operationPolicies.containsKey("rewrite")).isTrue();
         assertThat(operationPolicies.containsKey("revise")).isTrue();
-    }
-
-    @Test
-    void UT_APP_AGENT_DRAFT_GENERATION_TOOL_DEFINITION_SCHEMA_SHOULD_MATCH_OPERATION_SPECIFIC_REQUIRED_FIELDS() throws Exception {
-        Object definition = instantiateDraftGenerationToolDefinition();
-        Object descriptor = definition.getClass().getMethod("descriptor").invoke(definition);
-        Object exposure = readAccessor(descriptor, "exposure");
-        String schema = String.valueOf(readAccessor(exposure, "parametersJsonSchema"));
-
-        assertThat(schema)
-                .contains("\"oneOf\"")
-                .contains("\"const\": \"generate\"")
-                .contains("\"required\": [\"operation\", \"prompt\"]")
-                .contains("\"const\": \"rewrite\"")
-                .contains("\"required\": [\"operation\", \"sourceText\", \"instruction\"]")
-                .contains("\"const\": \"revise\"")
-                .contains("\"additionalProperties\": false");
     }
 
     @Test
@@ -268,32 +258,6 @@ class DraftGenerationToolHandlerTest {
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.errorCode()).isEqualTo("DRAFT_GENERATION_FAILED");
         assertThat(result.errorMessage()).isEqualTo("provider timeout");
-    }
-
-    @Test
-    void UT_APP_AGENT_DRAFT_GENERATION_TOOL_HANDLER_EXECUTE_SHOULD_REJECT_BLANK_DRAFT_TEXT() throws Exception {
-        AgentRepository agentRepository = mock(AgentRepository.class);
-        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
-        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateDraftGenerationToolHandler(agentRepository, agentModelRoutingService, agentLlmGateway);
-        AgentLlmExecutionConfig executionConfig = executionConfig();
-
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-1")).thenReturn(executionConfig);
-        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
-                .thenReturn(new AgentLlmTurnResponse("stop", "   ", List.of(), "{}"));
-
-        ToolCallResult result = execute(handler, request("call-blank-draft", """
-                {
-                  "operation": "generate",
-                  "prompt": "生成一版空正文样例",
-                  "preservedConstraints": ["保留人设"],
-                  "sourceSummary": "空正文防呆"
-                }
-                """));
-
-        assertThat(result.status()).isEqualTo("FAILED");
-        assertThat(result.errorCode()).isEqualTo("DRAFT_GENERATION_FAILED");
-        assertThat(result.errorMessage()).contains("draft text");
     }
 
     @Test

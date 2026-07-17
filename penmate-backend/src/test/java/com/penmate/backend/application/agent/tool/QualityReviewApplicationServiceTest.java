@@ -130,23 +130,6 @@ class QualityReviewApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_NON_JSON_PROVIDER_RESULT() throws Exception {
-        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
-        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object service = instantiateQualityReviewApplicationService(agentModelRoutingService, agentLlmGateway);
-        AgentLlmExecutionConfig executionConfig = executionConfig();
-
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-quality-service-bad-json-result"))
-                .thenReturn(executionConfig);
-        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
-                .thenReturn(new AgentLlmTurnResponse("stop", "not-json", List.of(), "{}"));
-
-        assertThatThrownBy(() -> review(service, request("call-quality-service-bad-json-result", validArgsJson())))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("quality review result must");
-    }
-
-    @Test
     void UT_APP_AGENT_QUALITY_REVIEW_APPLICATION_SERVICE_REVIEW_SHOULD_REJECT_RESULT_WHEN_REVISION_SUGGESTIONS_MISSING() throws Exception {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);

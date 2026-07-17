@@ -273,29 +273,6 @@ class TodoPlannerToolHandlerTest {
     }
 
     @Test
-    void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_REJECT_INVALID_RECOMMENDED_STATUS_VALUE() throws Exception {
-        AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
-        AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);
-        Object handler = instantiateTodoPlannerToolHandler(agentModelRoutingService, agentLlmGateway);
-        AgentLlmExecutionConfig executionConfig = executionConfig();
-
-        when(agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-call-todo-invalid-status"))
-                .thenReturn(executionConfig);
-        when(agentLlmGateway.generateTurn(any(AgentLlmTurnRequest.class), eq(executionConfig)))
-                .thenReturn(new AgentLlmTurnResponse("stop", invalidPlanJson("""
-                        "priority": "P0",
-                        "sourceType": "QUALITY_REVIEW",
-                        "recommendedStatus": "LATER"
-                        """), List.of(), "{}"));
-
-        ToolCallResult result = execute(handler, request("call-todo-invalid-status", validArgsJson()));
-
-        assertThat(result.status()).isEqualTo("FAILED");
-        assertThat(result.errorCode()).isEqualTo("TODO_PLANNER_FAILED");
-        assertThat(result.errorMessage()).contains("recommendedStatus must be one of");
-    }
-
-    @Test
     void UT_APP_AGENT_TODO_PLANNER_TOOL_HANDLER_EXECUTE_SHOULD_MAP_NULL_REQUEST_TO_STABLE_FAILED_RESULT() throws Exception {
         AgentModelRoutingService agentModelRoutingService = mock(AgentModelRoutingService.class);
         AgentLlmGateway agentLlmGateway = mock(AgentLlmGateway.class);

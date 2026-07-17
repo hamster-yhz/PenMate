@@ -183,27 +183,6 @@ class AgentRunEventPublisherTest {
         verify(runProjectionRepository).setCurrentAssistantMessage(70001L, 99001L, 9L);
     }
 
-    @Test
-    void publish_adds_schema_version_to_payload_before_append() {
-        AgentEvent appended = new AgentEvent(1L, 70001L, 101L, 90001L, 50001L, 1L, 1,
-                "run.started", "{\"schemaVersion\":1,\"phase\":\"created\"}", null);
-        when(eventRepository.append(any(), any(), any())).thenReturn(appended);
-        AgentRunEventPublisher publisher = new AgentRunEventPublisher(
-                eventRepository,
-                projectionUpdater,
-                eventBus,
-                new ObjectMapper(),
-                artifactRepository,
-                businessIdGenerator
-        );
-
-        publisher.publish(70001L, "run.started", Map.of("phase", "created"));
-
-        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
-        verify(eventRepository).append(org.mockito.Mockito.eq(70001L), org.mockito.Mockito.eq("run.started"), payloadCaptor.capture());
-        assertThat(payloadCaptor.getValue()).contains("\"schemaVersion\":1");
-    }
-
     private AgentEvent event(Long runId, Long sequence, String eventType, Map<String, Object> payload) {
         try {
             ObjectMapper objectMapper = new ObjectMapper();

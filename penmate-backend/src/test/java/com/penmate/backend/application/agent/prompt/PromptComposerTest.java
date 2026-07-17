@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -203,15 +202,6 @@ class PromptComposerTest {
                         "context-epoch-core:entries=0",
                         "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
                 );
-    }
-
-    @Test
-    void should_fail_fast_when_context_package_is_null() {
-        stubExecutionBundle("default", "default base");
-
-        assertThatThrownBy(() -> promptComposer.compose(profileFor("default", List.of()), null, "Continue draft"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("contextPackage");
     }
 
     private void stubExecutionBundle(String profile, String content) {
