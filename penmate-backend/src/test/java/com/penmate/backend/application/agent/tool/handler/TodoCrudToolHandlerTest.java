@@ -29,9 +29,11 @@ class TodoCrudToolHandlerTest {
         assertThat(descriptor.toolCode()).isEqualTo("todo_crud");
         assertThat(descriptor.exposure().parametersJsonSchema())
                 .contains("\"operation\"", "\"list\"", "\"create\"", "\"update\"", "\"complete\"", "\"delete\"")
+                .contains("\"sourceType\"", "\"todoStatus\"")
                 .contains("\"required\": [\"operation\", \"sessionId\"]")
                 .contains("\"additionalProperties\": false")
-                .doesNotContain("\"taskId\"", "\"oneOf\"", "\"anyOf\"", "\"allOf\"");
+                .doesNotContain("\"get\"", "\"reorder\"", "\"status\"", "\"priority\"",
+                        "\"taskId\"", "\"oneOf\"", "\"anyOf\"", "\"allOf\"", "Redis-backed");
         assertThat(descriptor.governancePolicy().defaultDecision().approvalRequired()).isFalse();
         assertThat(descriptor.governancePolicy().operationPolicies()).isEmpty();
         assertThat(handler.toolCode()).isEqualTo("todo_crud");
