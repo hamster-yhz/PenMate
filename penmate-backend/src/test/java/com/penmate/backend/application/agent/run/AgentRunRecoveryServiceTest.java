@@ -36,13 +36,17 @@ class AgentRunRecoveryServiceTest {
     }
 
     @Test
-    void should_return_null_when_no_durable_checkpoint_exists() {
+    void should_replay_from_zero_when_no_durable_checkpoint_exists() {
         AgentCheckpointService checkpoints = mock(AgentCheckpointService.class);
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         AgentRunRecoveryService service = new AgentRunRecoveryService(
                 checkpoints, events, new AgentRuntimeStateReducer());
         when(checkpoints.loadLatestFromRedis(70001L)).thenReturn(null);
+        when(events.listAfter(70001L, 0L)).thenReturn(List.of(
+                AgentEvent.replay(1L, 70001L, 1L, "run.started", "{\"phase\":\"routing\"}")
+        ));
 
-        assertThat(service.recover(70001L)).isNull();
+        assertThat(service.recover(70001L).status()).isEqualTo("RUNNING");
+        verify(events).listAfter(70001L, 0L);
     }
 }

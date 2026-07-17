@@ -42,13 +42,16 @@ class AgentRunLlmLoopTest {
     private AgentRunEventPublisher eventPublisher;
     @Mock
     private ToolCallApplicationService toolCallService;
+    @Mock
+    private AgentCheckpointBoundaryService checkpointBoundary;
 
     @Test
     void emits_llm_turn_events_and_bounded_message_delta_for_completed_text_response() {
         when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(llmGateway.generateTurn(any(), any()))
                 .thenReturn(new AgentLlmTurnResponse("stop", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabc", List.of(), "{}", new LlmTokenUsage(7, 9, 16)));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource, eventPublisher, toolCallService);
+        AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource,
+                eventPublisher, toolCallService, checkpointBoundary);
 
         AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
                 70001L,
@@ -92,7 +95,8 @@ class AgentRunLlmLoopTest {
                 );
         when(toolCallService.executeToolCall(any()))
                 .thenReturn(new ToolCallResult("FAILED", null, null, "BOOK_CRUD_EXECUTION_FAILED", null));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource, eventPublisher, toolCallService);
+        AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource,
+                eventPublisher, toolCallService, checkpointBoundary);
 
         AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
                 70001L,
@@ -152,7 +156,7 @@ class AgentRunLlmLoopTest {
         when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
                 "stop", "Done", List.of(), "{}", new LlmTokenUsage(4, 1, 5)));
         AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService);
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary);
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
@@ -198,7 +202,7 @@ class AgentRunLlmLoopTest {
                 ToolCallResult.waitingApproval(202L)
         );
         AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService);
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary);
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),

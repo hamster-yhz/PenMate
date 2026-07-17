@@ -14,6 +14,7 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
+import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -37,15 +38,18 @@ public class AgentRunLlmLoop {
     private final AgentToolDefinitionSource toolDefinitionSource;
     private final AgentRunEventPublisher eventPublisher;
     private final ToolCallApplicationService toolCallService;
+    private final AgentCheckpointBoundaryService checkpointBoundary;
 
     public AgentRunLlmLoop(AgentLlmGateway llmGateway,
                            AgentToolDefinitionSource toolDefinitionSource,
                            AgentRunEventPublisher eventPublisher,
-                           @Lazy ToolCallApplicationService toolCallService) {
+                           @Lazy ToolCallApplicationService toolCallService,
+                           AgentCheckpointBoundaryService checkpointBoundary) {
         this.llmGateway = llmGateway;
         this.toolDefinitionSource = toolDefinitionSource;
         this.eventPublisher = eventPublisher;
         this.toolCallService = toolCallService;
+        this.checkpointBoundary = checkpointBoundary;
     }
 
     public AgentRunLoopResult execute(AgentRunLoopRequest request) {
@@ -73,7 +77,7 @@ public class AgentRunLlmLoop {
                 return new AgentRunLoopResult(AgentRunLoopResult.Status.FAILED, message,
                         continuation.tokenUsage(), pending.approvalId());
             }
-            eventPublisher.publish(request.runId(), "tool.call.completed", eventPayload(
+            publishBoundary(request.runId(), "tool.call.completed", eventPayload(
                     "llmTurnIndex", continuation.llmTurnIndex(), "toolCallId", pending.toolCallId(),
                     "toolCode", pending.toolCode(), "outputPreview", clipText(result.toolOutput(), 200)
             ));
@@ -86,7 +90,7 @@ public class AgentRunLlmLoop {
             for (int index = approvedIndex + 1; index < siblingCalls.size(); index++) {
                 AgentLlmToolCallPayload sibling = siblingCalls.get(index);
                 String toolName = resolveToolName(sibling.functionName());
-                eventPublisher.publish(request.runId(), "tool.call.started", eventPayload(
+                publishBoundary(request.runId(), "tool.call.started", eventPayload(
                         "llmTurnIndex", continuation.llmTurnIndex(),
                         "toolCallId", sibling.id(),
                         "toolCode", sibling.functionName(),
@@ -114,7 +118,7 @@ public class AgentRunLlmLoop {
                             siblingResult.approvalId(), continuation.assistantText(), continuation.tokenUsage());
                 }
                 if ("SUCCESS".equals(siblingResult.status())) {
-                    eventPublisher.publish(request.runId(), "tool.call.completed", eventPayload(
+                    publishBoundary(request.runId(), "tool.call.completed", eventPayload(
                             "llmTurnIndex", continuation.llmTurnIndex(),
                             "toolCallId", sibling.id(),
                             "toolCode", sibling.functionName(),
@@ -123,7 +127,7 @@ public class AgentRunLlmLoop {
                     messages.add(AgentLlmMessage.tool(sibling.id(), siblingResult.toolOutput()));
                 } else {
                     String error = siblingResult.errorMessage() == null ? "Unknown error" : siblingResult.errorMessage();
-                    eventPublisher.publish(request.runId(), "tool.call.failed", eventPayload(
+                    publishBoundary(request.runId(), "tool.call.failed", eventPayload(
                             "llmTurnIndex", continuation.llmTurnIndex(),
                             "toolCallId", sibling.id(),
                             "toolCode", sibling.functionName(),
@@ -194,7 +198,7 @@ public class AgentRunLlmLoop {
             for (AgentLlmToolCall toolCall : response.toolCalls()) {
                 String toolName = resolveToolName(toolCall.toolCode());
 
-                eventPublisher.publish(request.runId(), "tool.call.started", eventPayload(
+                publishBoundary(request.runId(), "tool.call.started", eventPayload(
                         "llmTurnIndex", turnIndex,
                         "toolCallId", toolCall.id(),
                         "toolCode", toolCall.toolCode(),
@@ -242,7 +246,7 @@ public class AgentRunLlmLoop {
                 }
 
                 if ("SUCCESS".equals(result.status())) {
-                    eventPublisher.publish(request.runId(), "tool.call.completed", eventPayload(
+                    publishBoundary(request.runId(), "tool.call.completed", eventPayload(
                             "llmTurnIndex", turnIndex,
                             "toolCallId", toolCall.id(),
                             "toolCode", toolCall.toolCode(),
@@ -251,7 +255,7 @@ public class AgentRunLlmLoop {
                     messages.add(AgentLlmMessage.tool(toolCall.id(), result.toolOutput()));
                 } else {
                     String errorOutput = "Error: " + result.errorMessage();
-                    eventPublisher.publish(request.runId(), "tool.call.failed", eventPayload(
+                    publishBoundary(request.runId(), "tool.call.failed", eventPayload(
                             "llmTurnIndex", turnIndex,
                             "toolCallId", toolCall.id(),
                             "toolCode", toolCall.toolCode(),
@@ -316,5 +320,11 @@ public class AgentRunLlmLoop {
             payload.put((String) entries[i], entries[i + 1]);
         }
         return payload;
+    }
+
+    private AgentEvent publishBoundary(Long runId, String eventType, Map<String, Object> payload) {
+        AgentEvent event = eventPublisher.publish(runId, eventType, payload);
+        checkpointBoundary.checkpoint(event);
+        return event;
     }
 }

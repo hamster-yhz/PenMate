@@ -10,6 +10,9 @@ public record AgentCheckpoint(
         Long lastEventSeq,
         String stateJson,
         Integer stateSizeBytes,
+        Integer stateSchemaVersion,
+        String stateSha256,
+        String stateObjectKey,
         LocalDateTime createdAt
 ) {
 
@@ -20,5 +23,12 @@ public record AgentCheckpoint(
         lastEventSeq = Objects.requireNonNull(lastEventSeq, "lastEventSeq must not be null");
         stateJson = stateJson == null ? "{}" : stateJson;
         stateSizeBytes = stateSizeBytes == null ? stateJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length : stateSizeBytes;
+        stateSchemaVersion = stateSchemaVersion == null ? 1 : stateSchemaVersion;
+    }
+
+    public AgentCheckpoint(Long checkpointId, Long runId, Long checkpointNo, Long lastEventSeq,
+                           String stateJson, Integer stateSizeBytes, LocalDateTime createdAt) {
+        this(checkpointId, runId, checkpointNo, lastEventSeq, stateJson, stateSizeBytes,
+                1, null, null, createdAt);
     }
 }

@@ -46,6 +46,18 @@ class AgentCheckpointRepositoryImplTest {
         assertThat(latest.lastEventSeq()).isEqualTo(9L);
     }
 
+    @Test
+    void retains_only_the_latest_two_checkpoints() {
+        repository.save(new AgentCheckpoint(80001L, 70001L, 1L, 5L, "{}", 2, null));
+        repository.save(new AgentCheckpoint(80002L, 70001L, 2L, 9L, "{}", 2, null));
+        repository.save(new AgentCheckpoint(80003L, 70001L, 3L, 12L, "{}", 2, null));
+
+        assertThat(repository.deleteOlderThanLatest(70001L, 2)).isEqualTo(1);
+        assertThat(repository.findLatest(70001L, 2))
+                .extracting(AgentCheckpoint::checkpointNo)
+                .containsExactly(3L, 2L);
+    }
+
     private SqlSessionFactory buildSqlSessionFactory(DataSource dataSource) {
         Configuration configuration = new Configuration();
         configuration.setMapUnderscoreToCamelCase(true);
@@ -57,6 +69,7 @@ class AgentCheckpointRepositoryImplTest {
     private void recreateSchema(DataSource dataSource) throws Exception {
         try (Connection connection = dataSource.getConnection();
             Statement statement = connection.createStatement()) {
+            statement.execute("DROP ALL OBJECTS");
             statement.execute("DROP TABLE IF EXISTS flyway_schema_history");
             statement.execute("DROP TABLE IF EXISTS agent_events");
             statement.execute("DROP TABLE IF EXISTS agent_run_inputs");
@@ -88,6 +101,11 @@ class AgentCheckpointRepositoryImplTest {
         Files.copy(
                 Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"),
                 migrationDir.resolve("V11__init_agent_and_ops_domains.sql"),
+                StandardCopyOption.REPLACE_EXISTING
+        );
+        Files.copy(
+                Path.of("src/main/resources/db/migration/V17__harden_agent_checkpoints.sql"),
+                migrationDir.resolve("V17__harden_agent_checkpoints.sql"),
                 StandardCopyOption.REPLACE_EXISTING
         );
     }
