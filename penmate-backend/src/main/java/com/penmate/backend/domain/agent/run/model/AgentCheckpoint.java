@@ -26,7 +26,7 @@ public record AgentCheckpoint(
         lastEventSeq = Objects.requireNonNull(lastEventSeq, "lastEventSeq must not be null");
         stateJson = stateJson == null ? "{}" : stateJson;
         stateSizeBytes = stateSizeBytes == null ? stateJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length : stateSizeBytes;
-        stateSchemaVersion = stateSchemaVersion == null ? 1 : stateSchemaVersion;
+        stateSchemaVersion = stateSchemaVersion == null ? 2 : stateSchemaVersion;
         storageTier = storageTier == null || storageTier.isBlank() ? "HOT" : storageTier;
         if (!storageTier.equals("HOT") && !storageTier.equals("COLD")) {
             throw new IllegalArgumentException("Unsupported checkpoint storage tier: " + storageTier);
@@ -46,7 +46,7 @@ public record AgentCheckpoint(
     public AgentCheckpoint(Long checkpointId, Long runId, Long checkpointNo, Long lastEventSeq,
                            String stateJson, Integer stateSizeBytes, LocalDateTime createdAt) {
         this(checkpointId, runId, checkpointNo, lastEventSeq, stateJson, stateSizeBytes,
-                1, null, null, "HOT", null, null, createdAt);
+                2, null, null, "HOT", null, null, createdAt);
     }
 
     public boolean isCold() {

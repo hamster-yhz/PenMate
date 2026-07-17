@@ -19,6 +19,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
+import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,7 @@ class AgentRunExecutorTest {
     @Mock private AgentRunLeaseService leaseService;
     @Mock private AgentRunDependencyValidator dependencyValidator;
     @Mock private AgentRunSuccessorService successorService;
+    @Mock private AgentRunContinuationArtifactService continuations;
 
     @Test
     void executor_routes_context_without_full_preflight_then_executes_run() {
@@ -169,10 +171,71 @@ class AgentRunExecutorTest {
         verify(llmLoop, never()).resumeApproved(any(), any());
     }
 
+    @Test
+    void recovery_resumes_durable_llm_continuation_instead_of_restarting_from_prompt() {
+        AgentRun running = new AgentRun(70001L, 10001L, 20001L, 30001L, 920001L,
+                "RUNNING", "executing", 99L, null, 10L, null, "trace-1", null, null);
+        AgentRunInput input = runInput();
+        AgentRuntimeState state = AgentRuntimeState.empty(70001L)
+                .withArtifactAdded(88L, 4L)
+                .withArtifactAdded(89L, 5L)
+                .withArtifactAdded(90L, 6L)
+                .withAssistantMessageCompleted(7L);
+        var context = new AgentRunContextArtifactService.ResolvedArtifact(
+                2, 70001L, 99L, null, null, List.of(),
+                new AgentRunContextArtifactService.DependencyManifest(
+                        1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, 0L, "p", "s", "t"));
+        AgentRunContinuation continuation = AgentRunContinuation.completed(
+                70001L, List.of(), 2, 1, "durable answer", new LlmTokenUsage(3, 2, 5));
+        AgentRunLease lease = lease();
+        when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(null);
+        when(runRepository.findRun(70001L)).thenReturn(running);
+        when(runRepository.findInput(70001L)).thenReturn(input);
+        when(recoveryService.recover(70001L)).thenReturn(state);
+        when(contextArtifacts.loadContextForRun(70001L, state.artifactRefs())).thenReturn(context);
+        when(contextArtifacts.loadPromptPlanForRun(70001L, state.artifactRefs())).thenReturn(
+                new AgentRunContextArtifactService.PromptArtifact(1, promptPlan(), null));
+        when(dependencyValidator.validate(running, input, context)).thenReturn(
+                new AgentRunDependencyValidator.Validation(true, context.dependencies(), context.dependencies(), List.of()));
+        when(modelRoutingService.resolveExecutionConfig(anyLong(), anyLong(), anyString()))
+                .thenReturn(AgentLlmExecutionConfig.builder().build());
+        when(continuations.loadLatestForRun(70001L, state.artifactRefs()))
+                .thenReturn(java.util.Optional.of(continuation));
+        when(llmLoop.resume(any(), eq(continuation))).thenReturn(
+                AgentRunLoopResult.completed("durable answer", new LlmTokenUsage(3, 2, 5)));
+        when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
+
+        executor().recover(70001L, "trace-1", lease);
+
+        verify(llmLoop).resume(any(), eq(continuation));
+        verify(llmLoop, never()).execute(any());
+        verify(eventPublisher, never()).publish(eq(70001L), eq("message.completed"), any());
+        verify(leaseService).complete(lease);
+    }
+
+    @Test
+    void recovery_closes_a_durable_done_event_without_reexecuting_work() {
+        AgentRun running = new AgentRun(70001L, 10001L, 20001L, 30001L, 920001L,
+                "RUNNING", "executing", 99L, null, 10L, null, "trace-1", null, null);
+        AgentRunLease lease = lease();
+        when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(null);
+        when(runRepository.findRun(70001L)).thenReturn(running);
+        when(runRepository.findInput(70001L)).thenReturn(runInput());
+        when(recoveryService.recover(70001L)).thenReturn(
+                AgentRuntimeState.empty(70001L).withStatusAndPhase("DONE", "completed", 9L));
+
+        executor().recover(70001L, "trace-1", lease);
+
+        verify(leaseService).complete(lease);
+        verify(llmLoop, never()).execute(any());
+        verify(llmLoop, never()).resume(any(), any());
+        verify(contextArtifacts, never()).loadContextForRun(any(), any());
+    }
+
     private AgentRunExecutor executor() {
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
-                recoveryService, leaseService, dependencyValidator, successorService);
+                recoveryService, leaseService, dependencyValidator, successorService, continuations);
     }
 
     private AgentRun run() {

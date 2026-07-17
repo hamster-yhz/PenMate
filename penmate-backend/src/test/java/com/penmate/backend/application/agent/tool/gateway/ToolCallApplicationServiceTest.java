@@ -170,6 +170,34 @@ class ToolCallApplicationServiceTest {
     }
 
     @Test
+    void replays_existing_pending_approval_after_crash_without_creating_another_approval() {
+        ToolCallRequest request = new ToolCallRequest(
+                1L, 11L, 9L, 501L, "book_crud",
+                "{\"operation\":\"delete\",\"projectId\":9001}", 7L, "trace-recovery",
+                "{}", "11:call-recovery", 1, "call-recovery", "[]", "[]", null, null, 3L);
+        AgentToolDescriptor descriptor = new AgentToolDescriptor(
+                "book_crud", new ToolPresentation("Book CRUD"),
+                new ToolExposure(true, "desc", "{}"),
+                new ToolGovernancePolicy(new ApprovalPolicyDecision(true, "BOOK_DELETE"), 5, Map.of()));
+        var pending = new com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval(
+                1L, 88001L, 88001L, 11L, 1L, 9L, 501L, "call-recovery", "book_crud",
+                request.toolArgsJson(), "{}", "[]", request.idempotencyKey(), "PENDING",
+                7L, "trace-original", null, null);
+        when(handler.toolCode()).thenReturn("book_crud");
+        when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
+        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(
+                new ApprovalPolicyDecision(true, "BOOK_DELETE"));
+        when(pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey())).thenReturn(pending);
+
+        ToolCallResult result = toolCallApplicationService.executeToolCall(request);
+
+        assertThat(result.status()).isEqualTo("WAITING_APPROVAL");
+        assertThat(result.approvalId()).isEqualTo(88001L);
+        verify(approvalApplicationService, never()).create(any(), any());
+        verify(pendingApprovalRepository, never()).save(any());
+    }
+
+    @Test
     void UT_APP_AGENT_TOOL_CALL_APPLICATION_SERVICE_SHOULD_RETURN_HANDLER_NOT_FOUND_WHEN_NO_MATCHED_HANDLER_EXISTS() {
         ToolCallRequest request = new ToolCallRequest(
                 1L,

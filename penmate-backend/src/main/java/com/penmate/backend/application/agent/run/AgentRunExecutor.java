@@ -39,6 +39,7 @@ public class AgentRunExecutor {
     private final AgentRunLeaseService leaseService;
     private final AgentRunDependencyValidator dependencyValidator;
     private final AgentRunSuccessorService successorService;
+    private final AgentRunContinuationArtifactService continuations;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
                             AgentRunEventPublisher eventPublisher,
@@ -53,7 +54,8 @@ public class AgentRunExecutor {
                             AgentRunRecoveryService recoveryService,
                             AgentRunLeaseService leaseService,
                             AgentRunDependencyValidator dependencyValidator,
-                            AgentRunSuccessorService successorService) {
+                            AgentRunSuccessorService successorService,
+                            AgentRunContinuationArtifactService continuations) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
         this.contextResolutionService = contextResolutionService;
@@ -68,6 +70,7 @@ public class AgentRunExecutor {
         this.leaseService = leaseService;
         this.dependencyValidator = dependencyValidator;
         this.successorService = successorService;
+        this.continuations = continuations;
     }
 
     public void execute(Long runId, String traceId, AgentRunLease lease) {
@@ -202,6 +205,15 @@ public class AgentRunExecutor {
         AgentRunInput input = runRepository.findInput(runId);
         if (run == null || input == null) throw new IllegalArgumentException("Agent run not found: " + runId);
         AgentRuntimeState state = recoveryService.recover(runId);
+        if (state != null && "DONE".equals(state.status())) {
+            leaseService.complete(lease);
+            return;
+        }
+        if (state != null && "FAILED".equals(state.status())) {
+            leaseService.failTerminal(lease, "AGENT_RUN_RECOVERED_FAILED_EVENT",
+                    "Run failure event was durable before the previous worker stopped");
+            return;
+        }
         if (state == null || state.artifactRefs().isEmpty()) {
             throw new IllegalStateException("Run has no recoverable resolved-context checkpoint: " + runId);
         }
@@ -234,9 +246,11 @@ public class AgentRunExecutor {
             if (lease != null) leaseService.failTerminal(lease, "AGENT_RUN_FAILED", result.finalAssistantText());
             return;
         }
-        AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
-                "role", "assistant", "text", result.finalAssistantText()));
-        state = stateReducer.apply(state, message);
+        if (!state.assistantMessageCompleted()) {
+            AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
+                    "role", "assistant", "text", result.finalAssistantText()));
+            state = stateReducer.apply(state, message);
+        }
         AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
                 "phase", "completed", "tokenUsage", result.tokenUsage()));
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
@@ -253,6 +267,15 @@ public class AgentRunExecutor {
         AgentRunInput input = runRepository.findInput(runId);
         if (run == null || input == null) throw new IllegalArgumentException("Agent run not found: " + runId);
         AgentRuntimeState state = recoveryService.recover(runId);
+        if (state != null && "DONE".equals(state.status())) {
+            leaseService.complete(lease);
+            return;
+        }
+        if (state != null && "FAILED".equals(state.status())) {
+            leaseService.failTerminal(lease, "AGENT_RUN_RECOVERED_FAILED_EVENT",
+                    "Run failure event was durable before the previous worker stopped");
+            return;
+        }
         if (state == null || state.artifactRefs().isEmpty()) {
             execute(runId, traceId, lease);
             return;
@@ -269,10 +292,13 @@ public class AgentRunExecutor {
                 ? AgentLlmExecutionConfig.builder().build()
                 : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
         leaseService.assertOwned(lease);
-        AgentRunLoopResult result = llmLoop.execute(new AgentRunLoopRequest(
+        AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
                 promptMessages(promptArtifact.plan(), input.promptSnapshot()), executionConfig, run.ownerUserId(),
-                lease.executionToken()));
+                lease.executionToken());
+        AgentRunLoopResult result = continuations.loadLatestForRun(runId, state.artifactRefs())
+                .map(continuation -> llmLoop.resume(loopRequest, continuation))
+                .orElseGet(() -> llmLoop.execute(loopRequest));
         finishRecoveredRun(runId, result, state, lease);
     }
 
@@ -307,9 +333,11 @@ public class AgentRunExecutor {
             leaseService.failTerminal(lease, "AGENT_RUN_FAILED", result.finalAssistantText());
             return;
         }
-        AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
-                "role", "assistant", "text", result.finalAssistantText()));
-        state = stateReducer.apply(state, message);
+        if (!state.assistantMessageCompleted()) {
+            AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
+                    "role", "assistant", "text", result.finalAssistantText()));
+            state = stateReducer.apply(state, message);
+        }
         AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
                 "phase", "completed", "tokenUsage", result.tokenUsage()));
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));

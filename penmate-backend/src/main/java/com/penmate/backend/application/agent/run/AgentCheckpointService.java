@@ -25,8 +25,8 @@ public class AgentCheckpointService {
     private static final Logger log = LoggerFactory.getLogger(AgentCheckpointService.class);
     private static final int INLINE_STATE_LIMIT_BYTES = 256 * 1024;
     private static final long REDIS_TTL_SECONDS = 30 * 60;
-    private static final String REDIS_KEY_PREFIX = "agent:checkpoint:";
-    private static final int STATE_SCHEMA_VERSION = 1;
+    private static final String REDIS_KEY_PREFIX = "agent:checkpoint:v2:";
+    private static final int STATE_SCHEMA_VERSION = 2;
     private static final int CHECKPOINTS_TO_KEEP = 2;
 
     private final AgentCheckpointRepository checkpointRepository;
@@ -130,7 +130,8 @@ public class AgentCheckpointService {
             return true;
         }
         if (event.eventType().equals("turn.route.completed") || event.eventType().equals("context.resolved")
-                || event.eventType().equals("prompt.composed")) {
+                || event.eventType().equals("prompt.composed")
+                || event.eventType().equals("llm.continuation.saved")) {
             return true;
         }
         if (event.eventType().equals("tool.call.waiting_approval")) {

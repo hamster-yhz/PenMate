@@ -54,6 +54,20 @@ public class ToolCallApplicationService {
         if (decision.approvalRequired()) {
             ToolCallResult validationFailure = toolCallExecutionService.validate(request);
             if (validationFailure != null) return validationFailure;
+            AgentRunPendingApproval existing = pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey());
+            if (existing != null) {
+                if (!matches(existing, request)) {
+                    return ToolCallResult.failed("TOOL_CALL_REQUEST_MISMATCH",
+                            "Tool approval idempotency key was already used by another request");
+                }
+                if ("PENDING".equals(existing.pendingStatus())
+                        || "APPROVED".equals(existing.pendingStatus())
+                        || "RESUMING".equals(existing.pendingStatus())) {
+                    return ToolCallResult.waitingApproval(existing.approvalId());
+                }
+                return ToolCallResult.failed("TOOL_APPROVAL_NOT_EXECUTABLE",
+                        "Existing tool approval is already terminal: " + existing.pendingStatus());
+            }
             ToolApprovalView approvalView = toolApprovalViewFactory.create(descriptor, decision);
             ApprovalRequest approvalRequest = approvalApplicationService.create(new CreateApprovalCommand(
                     request.projectId(),
@@ -109,5 +123,15 @@ public class ToolCallApplicationService {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    private boolean matches(AgentRunPendingApproval pending, ToolCallRequest request) {
+        return java.util.Objects.equals(pending.runId(), request.runId())
+                && java.util.Objects.equals(pending.projectId(), request.projectId())
+                && java.util.Objects.equals(pending.sessionId(), request.sessionId())
+                && java.util.Objects.equals(pending.turnId(), request.turnId())
+                && java.util.Objects.equals(pending.toolCallId(), request.toolCallId())
+                && java.util.Objects.equals(pending.toolCode(), request.toolCode())
+                && java.util.Objects.equals(pending.toolArgsJson(), request.toolArgsJson());
     }
 }

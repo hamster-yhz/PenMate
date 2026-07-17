@@ -22,7 +22,8 @@ public record AgentRuntimeState(
         Integer remainingToolCalls,
         LlmTokenUsage tokenUsage,
         List<String> activeTodoProjections,
-        List<Long> artifactRefs
+        List<Long> artifactRefs,
+        boolean assistantMessageCompleted
 ) {
 
     public AgentRuntimeState {
@@ -44,50 +45,50 @@ public record AgentRuntimeState(
 
     public static AgentRuntimeState empty(Long runId) {
         return new AgentRuntimeState(runId, "PENDING", "created", null, 0L, "", List.of(),
-                0, "", "", "[]", 0, LlmTokenUsage.ZERO, List.of(), List.of());
+                0, "", "", "[]", 0, LlmTokenUsage.ZERO, List.of(), List.of(), false);
     }
 
     public AgentRuntimeState withStatusAndPhase(String nextStatus, String nextPhase, Long sequence) {
         return new AgentRuntimeState(runId, nextStatus, nextPhase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs);
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withActiveApproval(Long approvalId, Long sequence) {
         return new AgentRuntimeState(runId, status, phase, approvalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs);
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState appendAssistantDraft(String delta, Long sequence) {
         String text = delta == null ? "" : delta;
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft + text,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs);
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withLastEventSeq(Long sequence) {
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs);
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withLlmTurn(int turnIndex, LlmTokenUsage usage, Long sequence) {
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, turnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, usage, activeTodoProjections, artifactRefs);
+                remainingToolCalls, usage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withToolCallWaiting(String toolCallId, String toolCallsJson, int count, Long sequence) {
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, toolCallId, approvedToolPayload, toolCallsJson,
-                count, tokenUsage, activeTodoProjections, artifactRefs);
+                count, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withToolCallApproved(String payload, Long sequence) {
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, payload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs);
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withTodoAdded(String todoId, Long sequence) {
@@ -97,7 +98,7 @@ public record AgentRuntimeState(
         }
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, todos, artifactRefs);
+                remainingToolCalls, tokenUsage, todos, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withTodoRemoved(String todoId, Long sequence) {
@@ -105,7 +106,7 @@ public record AgentRuntimeState(
         todos.remove(todoId);
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, todos, artifactRefs);
+                remainingToolCalls, tokenUsage, todos, artifactRefs, assistantMessageCompleted);
     }
 
     public AgentRuntimeState withArtifactAdded(Long artifactId, Long sequence) {
@@ -115,7 +116,13 @@ public record AgentRuntimeState(
         }
         return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
-                remainingToolCalls, tokenUsage, activeTodoProjections, refs);
+                remainingToolCalls, tokenUsage, activeTodoProjections, refs, assistantMessageCompleted);
+    }
+
+    public AgentRuntimeState withAssistantMessageCompleted(Long sequence) {
+        return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
+                llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, true);
     }
 
     private static String requireText(String value, String fieldName) {

@@ -14,7 +14,9 @@ import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmMessageRole;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
+import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -44,6 +46,14 @@ class AgentRunLlmLoopTest {
     private ToolCallApplicationService toolCallService;
     @Mock
     private AgentCheckpointBoundaryService checkpointBoundary;
+    @Mock
+    private AgentRunContinuationArtifactService continuations;
+
+    @BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient().when(continuations.save(any())).thenReturn(
+                new AgentRunContinuationArtifactService.ArtifactRef(99001L, "key", "a".repeat(64), 100));
+    }
 
     @Test
     void emits_llm_turn_events_and_bounded_message_delta_for_completed_text_response() {
@@ -51,7 +61,7 @@ class AgentRunLlmLoopTest {
         when(llmGateway.generateTurn(any(), any()))
                 .thenReturn(new AgentLlmTurnResponse("stop", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabc", List.of(), "{}", new LlmTokenUsage(7, 9, 16)));
         AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource,
-                eventPublisher, toolCallService, checkpointBoundary);
+                eventPublisher, toolCallService, checkpointBoundary, continuations);
 
         AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
                 70001L,
@@ -98,7 +108,7 @@ class AgentRunLlmLoopTest {
         when(toolCallService.executeToolCall(any()))
                 .thenReturn(new ToolCallResult("FAILED", null, null, "BOOK_CRUD_EXECUTION_FAILED", null));
         AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource,
-                eventPublisher, toolCallService, checkpointBoundary);
+                eventPublisher, toolCallService, checkpointBoundary, continuations);
 
         AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
                 70001L,
@@ -164,7 +174,8 @@ class AgentRunLlmLoopTest {
         when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
                 "stop", "Done", List.of(), "{}", new LlmTokenUsage(4, 1, 5)));
         AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary);
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
+                continuations);
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
@@ -213,7 +224,8 @@ class AgentRunLlmLoopTest {
                 ToolCallResult.waitingApproval(202L)
         );
         AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary);
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
+                continuations);
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
@@ -230,5 +242,57 @@ class AgentRunLlmLoopTest {
         assertThat(siblingRequest.toolCallId()).isEqualTo("call-2");
         assertThat(siblingRequest.executionToken()).isEqualTo(7L);
         assertThat(siblingRequest.conversationMessagesJson()).contains("call-1").contains("updated");
+    }
+
+    @Test
+    void resumes_from_ready_for_tool_with_the_same_tool_call_before_next_llm_turn() {
+        List<AgentLlmToolCallPayload> calls = List.of(
+                new AgentLlmToolCallPayload("call-recover", "function", "story_bible_search", "{\"query\":\"Mira\"}"));
+        List<AgentLlmMessage> messages = List.of(
+                AgentLlmMessage.user("Find Mira"),
+                AgentLlmMessage.assistant("", calls));
+        AgentRunContinuation continuation = AgentRunContinuation.readyForTool(
+                70001L, messages, 2, 1, 0, "", new LlmTokenUsage(4, 2, 6));
+        when(toolCallService.executeToolCall(any())).thenReturn(
+                ToolCallResult.success("{\"matches\":[\"Mira\"]}"));
+        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
+        when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
+                "stop", "Recovered", List.of(), "{}", new LlmTokenUsage(2, 1, 3)));
+        AgentRunLlmLoop loop = new AgentRunLlmLoop(
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
+                continuations);
+
+        AgentRunLoopResult result = loop.resume(new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace", List.of(),
+                AgentLlmExecutionConfig.builder().build(), 201L, 7L), continuation);
+
+        assertThat(result.finalAssistantText()).isEqualTo("Recovered");
+        ArgumentCaptor<com.penmate.backend.application.agent.tool.runtime.ToolCallRequest> toolRequest =
+                ArgumentCaptor.forClass(com.penmate.backend.application.agent.tool.runtime.ToolCallRequest.class);
+        verify(toolCallService).executeToolCall(toolRequest.capture());
+        assertThat(toolRequest.getValue().toolCallId()).isEqualTo("call-recover");
+        assertThat(toolRequest.getValue().executionToken()).isEqualTo(7L);
+        ArgumentCaptor<AgentLlmTurnRequest> llmRequest = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway).generateTurn(llmRequest.capture(), any());
+        assertThat(llmRequest.getValue().messages()).extracting(AgentLlmMessage::role)
+                .containsExactly(AgentLlmMessageRole.USER, AgentLlmMessageRole.ASSISTANT,
+                        AgentLlmMessageRole.TOOL);
+    }
+
+    @Test
+    void completed_continuation_finishes_without_calling_llm_or_tools() {
+        AgentRunContinuation continuation = AgentRunContinuation.completed(
+                70001L, List.of(), 2, 1, "Already complete", new LlmTokenUsage(4, 2, 6));
+        AgentRunLlmLoop loop = new AgentRunLlmLoop(
+                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
+                continuations);
+
+        AgentRunLoopResult result = loop.resume(new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace", List.of(),
+                AgentLlmExecutionConfig.builder().build(), 201L, 7L), continuation);
+
+        assertThat(result.finalAssistantText()).isEqualTo("Already complete");
+        verify(llmGateway, never()).generateTurn(any(), any());
+        verify(toolCallService, never()).executeToolCall(any());
     }
 }

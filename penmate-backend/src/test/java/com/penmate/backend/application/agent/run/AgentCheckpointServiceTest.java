@@ -65,6 +65,18 @@ class AgentCheckpointServiceTest {
         assertThat(captor.getValue().checkpointId()).isEqualTo(81001L);
         assertThat(captor.getValue().checkpointNo()).isEqualTo(2L);
         assertThat(captor.getValue().lastEventSeq()).isEqualTo(2L);
+        assertThat(captor.getValue().stateSchemaVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void continuation_artifact_event_is_a_checkpoint_boundary() {
+        AgentCheckpointService service = new AgentCheckpointService(
+                checkpointRepository, redisTemplate, incrementingIds(81000L),
+                new ObjectMapper(), objectStorage);
+
+        assertThat(service.shouldCheckpoint(
+                AgentEvent.replay(3L, 70001L, 3L, "llm.continuation.saved", "{\"artifactId\":90}"),
+                AgentRuntimeState.empty(70001L).withArtifactAdded(90L, 3L))).isTrue();
     }
 
     @Test
@@ -137,10 +149,10 @@ class AgentCheckpointServiceTest {
         String validJson = mapper.writeValueAsString(
                 AgentRuntimeState.empty(70001L).withStatusAndPhase("RUNNING", "prompt", 5L));
         AgentCheckpoint corrupt = new AgentCheckpoint(
-                2L, 70001L, 2L, 8L, "{}", 100, 1, "bad", null, null);
+                2L, 70001L, 2L, 8L, "{}", 100, 2, "bad", null, null);
         AgentCheckpoint valid = new AgentCheckpoint(
                 1L, 70001L, 1L, 5L, validJson, validJson.getBytes(StandardCharsets.UTF_8).length,
-                1, sha256(validJson), null, null);
+                2, sha256(validJson), null, null);
         when(checkpointRepository.findLatest(70001L, 2)).thenReturn(List.of(corrupt, valid));
 
         AgentRuntimeState restored = service(mapper).loadLatestFromRedis(70001L);

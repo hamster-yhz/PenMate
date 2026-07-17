@@ -10,6 +10,8 @@ public interface AgentRunPendingApprovalRepository {
 
     AgentRunPendingApproval findByApprovalId(Long approvalId);
 
+    AgentRunPendingApproval findByIdempotencyKey(String idempotencyKey);
+
     AgentRunPendingApproval findApprovedByRunId(Long runId);
 
     int markStatus(Long approvalId, String expectedStatus, String targetStatus);

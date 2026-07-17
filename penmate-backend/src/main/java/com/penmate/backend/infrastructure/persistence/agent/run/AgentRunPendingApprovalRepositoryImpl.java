@@ -26,6 +26,11 @@ public class AgentRunPendingApprovalRepositoryImpl implements AgentRunPendingApp
     }
 
     @Override
+    public AgentRunPendingApproval findByIdempotencyKey(String idempotencyKey) {
+        return mapper.findByIdempotencyKey(idempotencyKey);
+    }
+
+    @Override
     public AgentRunPendingApproval findApprovedByRunId(Long runId) {
         return mapper.findApprovedByRunId(runId);
     }

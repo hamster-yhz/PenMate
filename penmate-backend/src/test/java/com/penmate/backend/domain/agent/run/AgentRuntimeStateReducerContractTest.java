@@ -45,7 +45,9 @@ class AgentRuntimeStateReducerContractTest {
                 event(1L, "run.started", "{\"phase\":\"routing\"}"),
                 event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"draft_generation\"}"),
                 event(3L, "tool.call.waiting_approval", "{\"toolCallId\":\"call-1\",\"approvalId\":88001}"),
-                event(4L, "message.delta", "{\"text\":\"abc\"}")
+                event(4L, "message.delta", "{\"text\":\"abc\"}"),
+                event(5L, "llm.continuation.saved", "{\"artifactId\":99001}"),
+                event(6L, "message.completed", "{\"text\":\"abc\"}")
         ));
 
         assertThat(reduced).isNotNull();
@@ -53,7 +55,9 @@ class AgentRuntimeStateReducerContractTest {
         assertThat(reduced.phase()).isEqualTo("routing");
         assertThat(reduced.activeApprovalId()).isEqualTo(88001L);
         assertThat(reduced.assistantDraft()).isEqualTo("abc");
-        assertThat(reduced.lastEventSeq()).isEqualTo(4L);
+        assertThat(reduced.artifactRefs()).containsExactly(99001L);
+        assertThat(reduced.assistantMessageCompleted()).isTrue();
+        assertThat(reduced.lastEventSeq()).isEqualTo(6L);
     }
 
     private AgentEvent event(Long sequence, String eventType, String payloadJson) {

@@ -35,7 +35,8 @@ public class AgentRuntimeStateReducer {
                     text(payload, "phase", state.phase()),
                     event.sequence());
             case "turn.route.completed", "context.epoch.bound" -> state.withLastEventSeq(event.sequence());
-            case "context.resolved", "prompt.composed" -> state.withArtifactAdded(longValue(payload, "artifactId"), event.sequence());
+            case "context.resolved", "prompt.composed", "llm.continuation.saved" ->
+                    state.withArtifactAdded(longValue(payload, "artifactId"), event.sequence());
             case "llm.turn.started" -> state.withLlmTurn(
                     intValue(payload, "llmTurnIndex"),
                     state.tokenUsage(),
@@ -59,7 +60,7 @@ public class AgentRuntimeStateReducer {
             case "run.suspended" -> state.withStatusAndPhase("SUSPENDED", "suspended", event.sequence());
             case "run.superseded" -> state.withStatusAndPhase("SUPERSEDED", "superseded", event.sequence());
             case "message.delta" -> state.appendAssistantDraft(text(payload, "text", ""), event.sequence());
-            case "message.completed" -> state.withLastEventSeq(event.sequence());
+            case "message.completed" -> state.withAssistantMessageCompleted(event.sequence());
             case "todo.created" -> state.withTodoAdded(text(payload, "todoId", ""), event.sequence());
             case "todo.updated" -> state.withLastEventSeq(event.sequence());
             case "todo.completed" -> state.withLastEventSeq(event.sequence());

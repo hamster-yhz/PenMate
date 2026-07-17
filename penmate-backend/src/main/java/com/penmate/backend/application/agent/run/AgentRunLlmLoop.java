@@ -3,18 +3,18 @@ package com.penmate.backend.application.agent.run;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
-import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
-import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
+import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
+import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -39,30 +39,50 @@ public class AgentRunLlmLoop {
     private final AgentRunEventPublisher eventPublisher;
     private final ToolCallApplicationService toolCallService;
     private final AgentCheckpointBoundaryService checkpointBoundary;
+    private final AgentRunContinuationArtifactService continuations;
 
     public AgentRunLlmLoop(AgentLlmGateway llmGateway,
                            AgentToolDefinitionSource toolDefinitionSource,
                            AgentRunEventPublisher eventPublisher,
                            @Lazy ToolCallApplicationService toolCallService,
-                           AgentCheckpointBoundaryService checkpointBoundary) {
+                           AgentCheckpointBoundaryService checkpointBoundary,
+                           AgentRunContinuationArtifactService continuations) {
         this.llmGateway = llmGateway;
         this.toolDefinitionSource = toolDefinitionSource;
         this.eventPublisher = eventPublisher;
         this.toolCallService = toolCallService;
         this.checkpointBoundary = checkpointBoundary;
+        this.continuations = continuations;
     }
 
     public AgentRunLoopResult execute(AgentRunLoopRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         return executeFrom(request, new ArrayList<>(request.messages()), INITIAL_TURN_INDEX,
-                LlmTokenUsage.ZERO, new StringBuilder());
+                0, LlmTokenUsage.ZERO, new StringBuilder());
+    }
+
+    public AgentRunLoopResult resume(AgentRunLoopRequest request, AgentRunContinuation continuation) {
+        Objects.requireNonNull(request, "request must not be null");
+        Objects.requireNonNull(continuation, "continuation must not be null");
+        if (!request.runId().equals(continuation.runId())) {
+            throw new IllegalArgumentException("Agent Run continuation belongs to another Run");
+        }
+        List<AgentLlmMessage> messages = new ArrayList<>(continuation.messages());
+        StringBuilder assistantText = new StringBuilder(continuation.assistantText());
+        return switch (continuation.stage()) {
+            case COMPLETED -> AgentRunLoopResult.completed(
+                    continuation.assistantText(), continuation.tokenUsage());
+            case READY_FOR_LLM -> executeFrom(request, messages, continuation.llmTurnIndex(),
+                    continuation.iterationIndex(), continuation.tokenUsage(), assistantText);
+            case READY_FOR_TOOL -> resumeToolBatch(request, continuation, messages, assistantText);
+        };
     }
 
     public AgentRunLoopResult resumeApproved(AgentRunLoopRequest request, AgentRunPendingApproval pending) {
         Objects.requireNonNull(pending, "pending must not be null");
         try {
-            List<AgentLlmMessage> messages = OBJECT_MAPPER.readValue(
-                    pending.resumePayloadJson(), new TypeReference<List<AgentLlmMessage>>() { });
+            List<AgentLlmMessage> messages = new ArrayList<>(OBJECT_MAPPER.readValue(
+                    pending.resumePayloadJson(), new TypeReference<List<AgentLlmMessage>>() { }));
             Continuation continuation = OBJECT_MAPPER.readValue(pending.toolContextJson(), Continuation.class);
             ToolCallResult result = toolCallService.executeToolCall(new ToolCallRequest(
                     pending.projectId(), pending.runId(), pending.sessionId(), pending.turnId(), pending.toolCode(),
@@ -88,71 +108,47 @@ public class AgentRunLlmLoop {
             if (approvedIndex < 0) {
                 throw new IllegalStateException("Approved tool call is missing from the saved assistant response");
             }
-            for (int index = approvedIndex + 1; index < siblingCalls.size(); index++) {
-                AgentLlmToolCallPayload sibling = siblingCalls.get(index);
-                String toolName = resolveToolName(sibling.functionName());
-                publishBoundary(request.runId(), "tool.call.started", eventPayload(
-                        "llmTurnIndex", continuation.llmTurnIndex(),
-                        "toolCallId", sibling.id(),
-                        "toolCode", sibling.functionName(),
-                        "toolName", toolName,
-                        "resumedSibling", true,
-                        "argumentsPreview", sibling.argumentsJson()
-                ));
-                ToolCallResult siblingResult = toolCallService.executeToolCall(new ToolCallRequest(
-                        request.projectId(), request.runId(), request.sessionId(), request.turnId(),
-                        sibling.functionName(), sibling.argumentsJson(), request.operatorId(), request.traceId(),
-                        json(continuation), request.runId() + ":" + sibling.id(), continuation.llmTurnIndex(),
-                        sibling.id(), json(siblingCalls), json(messages), null, null,
-                        request.executionToken()
-                ));
-                if (siblingResult == null) {
-                    siblingResult = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
-                }
-                if ("WAITING_APPROVAL".equals(siblingResult.status())) {
-                    eventPublisher.publish(request.runId(), "tool.call.waiting_approval", eventPayload(
-                            "llmTurnIndex", continuation.llmTurnIndex(),
-                            "toolCallId", sibling.id(),
-                            "toolCode", sibling.functionName(),
-                            "approvalId", siblingResult.approvalId()
-                    ));
-                    return AgentRunLoopResult.waitingApproval(
-                            siblingResult.approvalId(), continuation.assistantText(), continuation.tokenUsage());
-                }
-                if ("SUCCESS".equals(siblingResult.status())) {
-                    publishBoundary(request.runId(), "tool.call.completed", eventPayload(
-                            "llmTurnIndex", continuation.llmTurnIndex(),
-                            "toolCallId", sibling.id(),
-                            "toolCode", sibling.functionName(),
-                            "outputPreview", clipText(siblingResult.toolOutput(), 200)
-                    ));
-                    messages.add(AgentLlmMessage.tool(sibling.id(), siblingResult.toolOutput()));
-                } else {
-                    String error = siblingResult.errorMessage() == null ? "Unknown error" : siblingResult.errorMessage();
-                    publishBoundary(request.runId(), "tool.call.failed", eventPayload(
-                            "llmTurnIndex", continuation.llmTurnIndex(),
-                            "toolCallId", sibling.id(),
-                            "toolCode", sibling.functionName(),
-                            "errorCode", siblingResult.errorCode(),
-                            "errorMessage", error
-                    ));
-                    messages.add(AgentLlmMessage.tool(sibling.id(), "Error: " + error));
-                }
-            }
+            AgentRunLoopResult waiting = executeToolBatch(request, messages, siblingCalls,
+                    approvedIndex + 1, continuation.llmTurnIndex(), continuation.iterationIndex(),
+                    continuation.tokenUsage(), new StringBuilder(continuation.assistantText()), true);
+            if (waiting != null) return waiting;
             return executeFrom(request, messages, continuation.llmTurnIndex() + 1,
-                    continuation.tokenUsage(), new StringBuilder(continuation.assistantText()));
+                    continuation.iterationIndex() + 1, continuation.tokenUsage(),
+                    new StringBuilder(continuation.assistantText()));
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to restore approved Agent tool continuation", ex);
         }
     }
 
-    private AgentRunLoopResult executeFrom(AgentRunLoopRequest request, List<AgentLlmMessage> messages,
-                                           int initialTurnIndex, LlmTokenUsage initialUsage,
+    private AgentRunLoopResult resumeToolBatch(AgentRunLoopRequest request,
+                                               AgentRunContinuation continuation,
+                                               List<AgentLlmMessage> messages,
+                                               StringBuilder assistantText) {
+        List<AgentLlmToolCallPayload> toolCalls = latestAssistantToolCalls(messages);
+        if (toolCalls.isEmpty() || continuation.nextToolCallIndex() >= toolCalls.size()) {
+            throw new IllegalStateException("Agent Run continuation has no recoverable tool call");
+        }
+        AgentRunLoopResult waiting = executeToolBatch(request, messages, toolCalls,
+                continuation.nextToolCallIndex(), continuation.llmTurnIndex(),
+                continuation.iterationIndex(), continuation.tokenUsage(), assistantText, true);
+        if (waiting != null) return waiting;
+        return executeFrom(request, messages, continuation.llmTurnIndex() + 1,
+                continuation.iterationIndex() + 1, continuation.tokenUsage(), assistantText);
+    }
+
+    private AgentRunLoopResult executeFrom(AgentRunLoopRequest request,
+                                           List<AgentLlmMessage> messages,
+                                           int initialTurnIndex,
+                                           int initialIterationIndex,
+                                           LlmTokenUsage initialUsage,
                                            StringBuilder fullAssistantText) {
         int turnIndex = initialTurnIndex;
         LlmTokenUsage totalUsage = initialUsage;
 
-        for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        for (int iteration = initialIterationIndex; iteration < MAX_ITERATIONS; iteration++) {
+            saveContinuation(AgentRunContinuation.readyForLlm(
+                    request.runId(), messages, turnIndex, iteration,
+                    fullAssistantText.toString(), totalUsage));
             eventPublisher.publish(request.runId(), "llm.turn.started", eventPayload(
                     "llmTurnIndex", turnIndex,
                     "traceId", request.traceId()
@@ -189,95 +185,122 @@ public class AgentRunLlmLoop {
             }
 
             if (response.toolCalls().isEmpty()) {
+                saveContinuation(AgentRunContinuation.completed(
+                        request.runId(), messages, turnIndex, iteration,
+                        fullAssistantText.toString(), totalUsage));
                 return AgentRunLoopResult.completed(fullAssistantText.toString(), totalUsage);
             }
 
-            List<AgentLlmToolCallPayload> toolCallPayloads = response.toolCalls().stream()
-                    .map(tc -> new AgentLlmToolCallPayload(tc.id(), "function", tc.toolCode(), tc.argumentsJson()))
+            List<AgentLlmToolCallPayload> toolCalls = response.toolCalls().stream()
+                    .map(call -> new AgentLlmToolCallPayload(
+                            call.id(), "function", call.toolCode(), call.argumentsJson()))
                     .toList();
-            messages.add(AgentLlmMessage.assistant(response.assistantText(), toolCallPayloads));
+            messages.add(AgentLlmMessage.assistant(response.assistantText(), toolCalls));
 
-            for (AgentLlmToolCall toolCall : response.toolCalls()) {
-                String toolName = resolveToolName(toolCall.toolCode());
-
-                publishBoundary(request.runId(), "tool.call.started", eventPayload(
-                        "llmTurnIndex", turnIndex,
-                        "toolCallId", toolCall.id(),
-                        "toolCode", toolCall.toolCode(),
-                        "toolName", toolName,
-                        "iteration", iteration,
-                        "argumentsPreview", toolCall.argumentsJson()
-                ));
-
-                ToolCallResult result = toolCallService.executeToolCall(new ToolCallRequest(
-                        request.projectId(),
-                        request.runId(),
-                        request.sessionId(),
-                        request.turnId(),
-                        toolCall.toolCode(),
-                        toolCall.argumentsJson(),
-                        request.operatorId(),
-                        request.traceId(),
-                        json(new Continuation(turnIndex, totalUsage, fullAssistantText.toString())),
-                        request.runId() + ":" + toolCall.id(),
-                        turnIndex,
-                        toolCall.id(),
-                        json(toolCallPayloads),
-                        json(messages),
-                        null,
-                        null,
-                        request.executionToken()
-                ));
-                if (result == null) {
-                    result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
-                }
-
-                if ("WAITING_APPROVAL".equals(result.status())) {
-                    eventPublisher.publish(request.runId(), "tool.call.waiting_approval", eventPayload(
-                            "llmTurnIndex", turnIndex,
-                            "toolCallId", toolCall.id(),
-                            "toolCode", toolCall.toolCode(),
-                            "approvalId", result.approvalId()
-                    ));
-                    log.info("Tool call waiting approval: runId={}, toolCode={}, approvalId={}",
-                            request.runId(), toolCall.toolCode(), result.approvalId());
-                    return AgentRunLoopResult.waitingApproval(
-                            result.approvalId(),
-                            fullAssistantText.toString(),
-                            totalUsage
-                    );
-                }
-
-                if ("SUCCESS".equals(result.status())) {
-                    publishBoundary(request.runId(), "tool.call.completed", eventPayload(
-                            "llmTurnIndex", turnIndex,
-                            "toolCallId", toolCall.id(),
-                            "toolCode", toolCall.toolCode(),
-                            "outputPreview", clipText(result.toolOutput(), 200)
-                    ));
-                    messages.add(AgentLlmMessage.tool(toolCall.id(), result.toolOutput()));
-                } else {
-                    String errorOutput = "Error: " + result.errorMessage();
-                    publishBoundary(request.runId(), "tool.call.failed", eventPayload(
-                            "llmTurnIndex", turnIndex,
-                            "toolCallId", toolCall.id(),
-                            "toolCode", toolCall.toolCode(),
-                            "errorCode", result.errorCode(),
-                            "errorMessage", result.errorMessage()
-                    ));
-                    messages.add(AgentLlmMessage.tool(toolCall.id(), errorOutput));
-                }
-            }
-
+            AgentRunLoopResult waiting = executeToolBatch(request, messages, toolCalls, 0,
+                    turnIndex, iteration, totalUsage, fullAssistantText, false);
+            if (waiting != null) return waiting;
             turnIndex++;
         }
 
+        saveContinuation(AgentRunContinuation.completed(
+                request.runId(), messages, turnIndex, MAX_ITERATIONS,
+                fullAssistantText.toString(), totalUsage));
         return AgentRunLoopResult.completed(fullAssistantText.toString(), totalUsage);
     }
 
+    private AgentRunLoopResult executeToolBatch(AgentRunLoopRequest request,
+                                                List<AgentLlmMessage> messages,
+                                                List<AgentLlmToolCallPayload> toolCalls,
+                                                int startIndex,
+                                                int turnIndex,
+                                                int iterationIndex,
+                                                LlmTokenUsage tokenUsage,
+                                                StringBuilder fullAssistantText,
+                                                boolean recovered) {
+        for (int index = startIndex; index < toolCalls.size(); index++) {
+            AgentLlmToolCallPayload toolCall = toolCalls.get(index);
+            saveContinuation(AgentRunContinuation.readyForTool(
+                    request.runId(), messages, turnIndex, iterationIndex, index,
+                    fullAssistantText.toString(), tokenUsage));
+            String toolName = resolveToolName(toolCall.functionName());
+            publishBoundary(request.runId(), "tool.call.started", eventPayload(
+                    "llmTurnIndex", turnIndex,
+                    "toolCallId", toolCall.id(),
+                    "toolCode", toolCall.functionName(),
+                    "toolName", toolName,
+                    "iteration", iterationIndex,
+                    "recovered", recovered,
+                    "argumentsPreview", toolCall.argumentsJson()
+            ));
+
+            Continuation context = new Continuation(turnIndex, iterationIndex, tokenUsage,
+                    fullAssistantText.toString());
+            ToolCallResult result = toolCallService.executeToolCall(new ToolCallRequest(
+                    request.projectId(), request.runId(), request.sessionId(), request.turnId(),
+                    toolCall.functionName(), toolCall.argumentsJson(), request.operatorId(), request.traceId(),
+                    json(context), request.runId() + ":" + toolCall.id(), turnIndex, toolCall.id(),
+                    json(toolCalls), json(messages), null, null, request.executionToken()
+            ));
+            if (result == null) {
+                result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
+            }
+
+            if ("WAITING_APPROVAL".equals(result.status())) {
+                publishBoundary(request.runId(), "tool.call.waiting_approval", eventPayload(
+                        "llmTurnIndex", turnIndex,
+                        "toolCallId", toolCall.id(),
+                        "toolCode", toolCall.functionName(),
+                        "approvalId", result.approvalId()
+                ));
+                log.info("Tool call waiting approval: runId={}, toolCode={}, approvalId={}",
+                        request.runId(), toolCall.functionName(), result.approvalId());
+                return AgentRunLoopResult.waitingApproval(
+                        result.approvalId(), fullAssistantText.toString(), tokenUsage);
+            }
+
+            if ("SUCCESS".equals(result.status())) {
+                publishBoundary(request.runId(), "tool.call.completed", eventPayload(
+                        "llmTurnIndex", turnIndex,
+                        "toolCallId", toolCall.id(),
+                        "toolCode", toolCall.functionName(),
+                        "outputPreview", clipText(result.toolOutput(), 200)
+                ));
+                messages.add(AgentLlmMessage.tool(toolCall.id(), result.toolOutput()));
+            } else {
+                String error = result.errorMessage() == null ? "Unknown error" : result.errorMessage();
+                publishBoundary(request.runId(), "tool.call.failed", eventPayload(
+                        "llmTurnIndex", turnIndex,
+                        "toolCallId", toolCall.id(),
+                        "toolCode", toolCall.functionName(),
+                        "errorCode", result.errorCode(),
+                        "errorMessage", error
+                ));
+                messages.add(AgentLlmMessage.tool(toolCall.id(), "Error: " + error));
+            }
+        }
+        return null;
+    }
+
+    private void saveContinuation(AgentRunContinuation continuation) {
+        AgentRunContinuationArtifactService.ArtifactRef ref = continuations.save(continuation);
+        publishBoundary(continuation.runId(), "llm.continuation.saved", Map.of(
+                "artifactId", ref.artifactId(),
+                "sha256", ref.sha256(),
+                "sizeBytes", ref.sizeBytes(),
+                "stage", continuation.continuationStage(),
+                "llmTurnIndex", continuation.llmTurnIndex(),
+                "iterationIndex", continuation.iterationIndex(),
+                "nextToolCallIndex", continuation.nextToolCallIndex()
+        ));
+    }
+
     private String json(Object value) {
-        try { return OBJECT_MAPPER.writeValueAsString(value); }
-        catch (Exception ex) { throw new IllegalStateException("Failed to snapshot Agent LLM continuation", ex); }
+        try {
+            return OBJECT_MAPPER.writeValueAsString(value);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to snapshot Agent LLM continuation", ex);
+        }
     }
 
     private List<AgentLlmToolCallPayload> latestAssistantToolCalls(List<AgentLlmMessage> messages) {
@@ -297,8 +320,11 @@ public class AgentRunLlmLoop {
         return -1;
     }
 
-    private record Continuation(Integer llmTurnIndex, LlmTokenUsage tokenUsage, String assistantText) {
+    private record Continuation(Integer llmTurnIndex, Integer iterationIndex,
+                                LlmTokenUsage tokenUsage, String assistantText) {
         private Continuation {
+            llmTurnIndex = llmTurnIndex == null ? INITIAL_TURN_INDEX : llmTurnIndex;
+            iterationIndex = iterationIndex == null ? 0 : iterationIndex;
             tokenUsage = tokenUsage == null ? LlmTokenUsage.ZERO : tokenUsage;
             assistantText = assistantText == null ? "" : assistantText;
         }
