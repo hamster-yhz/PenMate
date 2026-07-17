@@ -7,6 +7,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,14 +24,14 @@ class AgentRunSuccessorServiceTest {
         AgentSessionRepository sessions = mock(AgentSessionRepository.class);
         BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
         AgentRunEventPublisher events = mock(AgentRunEventPublisher.class);
-        AgentRunDispatcher dispatcher = mock(AgentRunDispatcher.class);
+        ApplicationEventPublisher applicationEvents = mock(ApplicationEventPublisher.class);
         when(ids.nextId()).thenReturn(61L);
         when(runs.insert(any())).thenReturn(1);
         when(runs.insertInput(any())).thenReturn(1);
         when(sessions.rebindTurnRun(30L, 80L, 60L, 61L)).thenReturn(1);
         when(sessions.updateLastRun(10L, 30L, 61L)).thenReturn(1);
 
-        Long successorId = new AgentRunSuccessorService(runs, sessions, ids, events, dispatcher)
+        Long successorId = new AgentRunSuccessorService(runs, sessions, ids, events, applicationEvents)
                 .create(run(), input(), "trace-2");
 
         ArgumentCaptor<AgentRun> runCaptor = ArgumentCaptor.forClass(AgentRun.class);
@@ -42,7 +43,7 @@ class AgentRunSuccessorServiceTest {
         assertThat(runCaptor.getValue().runStatus()).isEqualTo("PENDING");
         assertThat(inputCaptor.getValue().promptSnapshot()).isEqualTo("continue");
         verify(events).publish(eq(61L), eq("run.started"), any());
-        verify(dispatcher).dispatchInitialRun(61L, "trace-2");
+        verify(applicationEvents).publishEvent(new AgentRunDispatchRequested(61L, "trace-2"));
     }
 
     private AgentRun run() {

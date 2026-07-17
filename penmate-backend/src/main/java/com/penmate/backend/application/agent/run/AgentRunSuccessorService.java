@@ -5,10 +5,9 @@ import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Map;
 
@@ -19,16 +18,16 @@ public class AgentRunSuccessorService {
     private final AgentSessionRepository sessions;
     private final BusinessIdGenerator ids;
     private final AgentRunEventPublisher events;
-    private final AgentRunDispatcher dispatcher;
+    private final ApplicationEventPublisher applicationEvents;
 
     public AgentRunSuccessorService(AgentRunRepository runs, AgentSessionRepository sessions,
                                     BusinessIdGenerator ids, AgentRunEventPublisher events,
-                                    AgentRunDispatcher dispatcher) {
+                                    ApplicationEventPublisher applicationEvents) {
         this.runs = runs;
         this.sessions = sessions;
         this.ids = ids;
         this.events = events;
-        this.dispatcher = dispatcher;
+        this.applicationEvents = applicationEvents;
     }
 
     @Transactional
@@ -50,21 +49,8 @@ public class AgentRunSuccessorService {
                 "failed to bind successor Run to Session");
         events.publish(runId, "run.started", Map.of(
                 "phase", "created", "predecessorRunId", String.valueOf(predecessor.runId())));
-        dispatchAfterCommit(runId, traceId);
+        applicationEvents.publishEvent(new AgentRunDispatchRequested(runId, traceId));
         return runId;
-    }
-
-    private void dispatchAfterCommit(Long runId, String traceId) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            dispatcher.dispatchInitialRun(runId, traceId);
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                dispatcher.dispatchInitialRun(runId, traceId);
-            }
-        });
     }
 
     private void requireOne(int affected, String message) {
