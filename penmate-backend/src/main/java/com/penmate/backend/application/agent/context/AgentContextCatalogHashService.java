@@ -29,7 +29,10 @@ public class AgentContextCatalogHashService {
     }
 
     public Hashes hashes(String executionProfile) {
-        var prompt = prompts.loadBundle("execution", executionProfile);
+        var prompt = new PromptBundles(
+                prompts.loadBundle("execution", executionProfile),
+                prompts.loadBundle("context-selector", "default")
+        );
         var skillCatalog = skills.listAvailableSkills().stream()
                 .sorted(Comparator.comparing(item -> item.name() == null ? "" : item.name())).toList();
         var toolCatalog = tools.listLlmSchemas().stream()
@@ -49,5 +52,8 @@ public class AgentContextCatalogHashService {
     }
 
     public record Hashes(String promptBundleHash, String skillCatalogHash, String toolCatalogHash) {
+    }
+
+    private record PromptBundles(Object execution, Object selector) {
     }
 }

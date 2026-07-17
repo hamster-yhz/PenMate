@@ -43,13 +43,15 @@ class StoryBibleContextResolverTest {
     @Test
     void retrieval_then_llm_should_send_only_dynamic_candidates() {
         stubGraph();
-        when(selector.select(any(), anyList(), any())).thenReturn(new StoryBibleSelectorGateway.Selection(List.of(1L), Map.of()));
+        when(selector.select(any(StoryBibleSelectorGateway.SelectorRequest.class), any()))
+                .thenReturn(new StoryBibleSelectorGateway.Selection(List.of(1L), Map.of()));
         resolver.resolve(request(StoryBibleRoutingMode.RETRIEVAL_THEN_LLM));
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<StoryBibleRouteRequest.CatalogEntry>> captor = ArgumentCaptor.forClass(List.class);
-        verify(selector).select(any(), captor.capture(), any());
-        assertThat(captor.getValue()).extracting(StoryBibleRouteRequest.CatalogEntry::nodeId).containsExactly(1L);
+        ArgumentCaptor<StoryBibleSelectorGateway.SelectorRequest> captor =
+                ArgumentCaptor.forClass(StoryBibleSelectorGateway.SelectorRequest.class);
+        verify(selector).select(captor.capture(), any());
+        assertThat(captor.getValue().catalog()).extracting(StoryBibleRouteRequest.CatalogEntry::nodeId)
+                .containsExactly(1L);
     }
 
     private void stubGraph() {

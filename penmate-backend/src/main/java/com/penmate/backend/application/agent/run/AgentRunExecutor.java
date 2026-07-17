@@ -120,8 +120,11 @@ public class AgentRunExecutor {
         evt = eventPublisher.publish(runId, "turn.route.completed", Map.of(
                 "mode", contextResult.routeDecision().mode().name(),
                 "selectedNodeIds", contextResult.routeDecision().selectedNodeIds(),
+                "relationExpansionNodeIds", contextResult.routeDecision().relationExpansionNodeIds(),
                 "selectorUsed", contextResult.routeDecision().selectorUsed(),
                 "selectorLatencyMillis", contextResult.routeDecision().selectorLatencyMillis(),
+                "selectorConfidence", contextResult.routeDecision().selectorConfidence(),
+                "selectorTokenUsage", contextResult.routeDecision().selectorTokenUsage(),
                 "semanticUnavailable", contextResult.routeDecision().semanticUnavailable()
         ));
         state = stateReducer.apply(state, evt);

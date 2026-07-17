@@ -40,14 +40,16 @@ public class StoryBibleContextResolver {
         long started = System.nanoTime();
         StoryBibleCandidateRetriever.Retrieval retrieval = candidateRetriever.retrieve(request);
         if (retrieval.storyBible() == null) {
-            return new ResolvedContext(new StoryBibleRouteDecision(request.routingMode(), List.of(), Map.of(),
-                    false, 0L, true, List.of("STORY_BIBLE_MISSING")), List.of(), List.of());
+            return new ResolvedContext(new StoryBibleRouteDecision(request.routingMode(), List.of(), List.of(),
+                    List.of(), Map.of(), false, 0L, 0d, null, true,
+                    List.of("STORY_BIBLE_MISSING")), List.of(), List.of());
         }
         Map<Long, StoryBibleCandidateRetriever.Candidate> candidateById = new LinkedHashMap<>();
         retrieval.candidates().stream().sorted(Comparator.comparingDouble(StoryBibleCandidateRetriever.Candidate::score).reversed())
                 .forEach(candidate -> candidateById.put(candidate.nodeId(), candidate));
         List<Long> selected;
         Map<Long, String> reasons = new LinkedHashMap<>();
+        StoryBibleSelectorGateway.Selection selection = new StoryBibleSelectorGateway.Selection(List.of(), Map.of());
         boolean selectorUsed = request.routingMode() != StoryBibleRoutingMode.RETRIEVAL;
         if (!selectorUsed) {
             selected = new ArrayList<>(candidateById.keySet());
@@ -56,8 +58,9 @@ public class StoryBibleContextResolver {
             List<StoryBibleRouteRequest.CatalogEntry> selectorCatalog = request.routingMode() == StoryBibleRoutingMode.LLM_SELECTOR
                     ? request.epochCatalog()
                     : request.epochCatalog().stream().filter(item -> candidateById.containsKey(item.nodeId())).toList();
-            StoryBibleSelectorGateway.Selection selection = selectorGateway.select(
-                    request.userMessage(), selectorCatalog, request.selectorExecutionConfig());
+            selection = selectorGateway.select(new StoryBibleSelectorGateway.SelectorRequest(
+                    request.routingMode(), request.userMessage(), selectorCatalog, request.workingSetNodeIds()),
+                    request.selectorExecutionConfig());
             selected = new ArrayList<>(selection.nodeIds());
             reasons.putAll(selection.reasons());
             candidateById.values().stream()
@@ -73,10 +76,14 @@ public class StoryBibleContextResolver {
                 .collect(java.util.stream.Collectors.toSet());
         LinkedHashSet<Long> expanded = new LinkedHashSet<>(selected);
         request.workingSetNodeIds().stream().filter(epochIds::contains).forEach(expanded::add);
-        for (StoryBibleRelation relation : relations) {
-            if (expanded.contains(relation.getSourceNodeId()) || expanded.contains(relation.getTargetNodeId())) {
-                expanded.add(relation.getSourceNodeId());
-                expanded.add(relation.getTargetNodeId());
+        if (selectorUsed) {
+            selection.relationExpansionNodeIds().stream().filter(epochIds::contains).forEach(expanded::add);
+        } else {
+            for (StoryBibleRelation relation : relations) {
+                if (expanded.contains(relation.getSourceNodeId()) || expanded.contains(relation.getTargetNodeId())) {
+                    expanded.add(relation.getSourceNodeId());
+                    expanded.add(relation.getTargetNodeId());
+                }
             }
         }
         List<StoryBibleNode> nodes = expanded.isEmpty() ? List.of()
@@ -87,7 +94,7 @@ public class StoryBibleContextResolver {
                 .findProgressions(retrieval.storyBible().getStoryBibleId(), List.copyOf(expanded)).stream()
                 .collect(java.util.stream.Collectors.groupingBy(StoryBibleProgression::getNodeId));
         List<RenderedNode> rendered = new ArrayList<>();
-        List<String> missing = new ArrayList<>();
+        List<String> missing = new ArrayList<>(selection.missingContextFlags());
         for (StoryBibleNode node : nodes) {
             StoryBibleNodeType type = types.get(node.getTypeId());
             if (type == null) {
@@ -101,8 +108,9 @@ public class StoryBibleContextResolver {
                     effective.appliedProgressionIds(), effective.complete()));
         }
         long latency = selectorUsed ? (System.nanoTime() - started) / 1_000_000L : 0L;
-        StoryBibleRouteDecision decision = new StoryBibleRouteDecision(request.routingMode(), List.copyOf(selected), reasons,
-                selectorUsed, latency, retrieval.semanticUnavailable(), missing);
+        StoryBibleRouteDecision decision = new StoryBibleRouteDecision(request.routingMode(), selection.intentTags(),
+                List.copyOf(selected), selection.relationExpansionNodeIds(), reasons, selectorUsed, latency,
+                selection.confidence(), selection.tokenUsage(), retrieval.semanticUnavailable(), missing);
         return new ResolvedContext(decision, List.copyOf(rendered), relations);
     }
 
