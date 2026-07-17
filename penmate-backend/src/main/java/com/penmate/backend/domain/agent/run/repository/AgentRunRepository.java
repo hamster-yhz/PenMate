@@ -19,6 +19,10 @@ public interface AgentRunRepository {
 
     AgentRun findRun(Long runId);
 
+    AgentRun findRunForUpdate(Long runId);
+
+    AgentRun findSuccessor(Long predecessorRunId);
+
     Optional<AgentRunLease> tryAcquireLease(Long runId, String owner, LocalDateTime now, LocalDateTime leaseUntil);
 
     boolean renewLease(AgentRunLease lease, LocalDateTime leaseUntil);

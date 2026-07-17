@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.context.StoryBibleRoutingPreference
 import com.penmate.backend.application.agent.run.AgentRunCancellationService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
+import com.penmate.backend.application.agent.run.AgentRunRetryService;
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
@@ -20,6 +21,7 @@ import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.RetryAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.StoryBibleRoutingPreferenceDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.validation.Valid;
@@ -50,6 +52,7 @@ public class AgentController {
     private final AgentRunEventStreamService agentRunEventStreamService;
     private final StoryBibleRoutingPreferenceResolver routingPreferences;
     private final AgentRunCancellationService runCancellationService;
+    private final AgentRunRetryService runRetryService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
@@ -57,7 +60,8 @@ public class AgentController {
                            AgentTurnAppService agentTurnAppService,
                            AgentRunEventStreamService agentRunEventStreamService,
                            StoryBibleRoutingPreferenceResolver routingPreferences,
-                           AgentRunCancellationService runCancellationService) {
+                           AgentRunCancellationService runCancellationService,
+                           AgentRunRetryService runRetryService) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
@@ -65,6 +69,7 @@ public class AgentController {
         this.agentRunEventStreamService = agentRunEventStreamService;
         this.routingPreferences = routingPreferences;
         this.runCancellationService = runCancellationService;
+        this.runRetryService = runRetryService;
     }
 
     @GetMapping("/routing-preference")
@@ -234,6 +239,25 @@ public class AgentController {
                 requireLongId(runId, "runId"),
                 requireLongId(dto.getOperatorId(), "operatorId"),
                 dto.getReason());
+        return ApiResponse.success(new AgentRunDto.ActiveRunDto(
+                stringifyBusinessId(run.turnId()),
+                stringifyBusinessId(run.runId()),
+                run.runStatus(),
+                run.runPhase(),
+                stringifyBusinessId(run.latestEventSeq())), traceId);
+    }
+
+    @PostMapping("/runs/{runId}/retry")
+    public ApiResponse<AgentRunDto.ActiveRunDto> retryRun(
+            @PathVariable String projectId,
+            @PathVariable String runId,
+            @Valid @RequestBody RetryAgentRunDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var run = runRetryService.retry(
+                requireLongId(projectId, "projectId"),
+                requireLongId(runId, "runId"),
+                requireLongId(dto.getOperatorId(), "operatorId"),
+                traceId);
         return ApiResponse.success(new AgentRunDto.ActiveRunDto(
                 stringifyBusinessId(run.turnId()),
                 stringifyBusinessId(run.runId()),

@@ -42,6 +42,16 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     }
 
     @Override
+    public AgentRun findRunForUpdate(Long runId) {
+        return agentRunMapper.findRunForUpdate(runId);
+    }
+
+    @Override
+    public AgentRun findSuccessor(Long predecessorRunId) {
+        return agentRunMapper.findSuccessor(predecessorRunId);
+    }
+
+    @Override
     public Optional<AgentRunLease> tryAcquireLease(Long runId, String owner,
                                                    LocalDateTime now, LocalDateTime leaseUntil) {
         AgentRun before = agentRunMapper.findRun(runId);

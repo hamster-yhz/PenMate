@@ -215,6 +215,17 @@ public interface AgentSessionMapper {
                                    @Param("turnId") Long turnId,
                                    @Param("assistantMessageId") Long assistantMessageId);
 
+    @Update("""
+            UPDATE agent_messages
+            SET content_markdown = #{contentMarkdown}
+            WHERE session_id = #{sessionId}
+              AND message_id = #{messageId}
+              AND role = 'assistant'
+            """)
+    int updateMessageContent(@Param("sessionId") Long sessionId,
+                             @Param("messageId") Long messageId,
+                             @Param("contentMarkdown") String contentMarkdown);
+
     @Select("""
             SELECT model_name AS modelName,
                    max_context_tokens AS maxContextTokens

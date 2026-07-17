@@ -112,6 +112,7 @@ class AgentRunEventPublisherTest {
     void projection_reuses_existing_completed_assistant_message_for_same_turn() {
         when(runProjectionRepository.findLatestSequence(70001L)).thenReturn(8L);
         when(agentSessionRepository.findTurnAssistantMessageId(90001L, 50001L)).thenReturn(99001L);
+        when(agentSessionRepository.updateMessageContent(90001L, 99001L, "already persisted")).thenReturn(1);
 
         AgentProjectionUpdater updater = new AgentProjectionUpdater(
                 runProjectionRepository,
@@ -127,6 +128,7 @@ class AgentRunEventPublisherTest {
         )));
 
         verify(agentSessionRepository, never()).insertSessionMessage(any(), any(), any(), any(), any(), any(), any());
+        verify(agentSessionRepository).updateMessageContent(90001L, 99001L, "already persisted");
         verify(runProjectionRepository).setCurrentAssistantMessage(70001L, 99001L, 9L);
     }
 

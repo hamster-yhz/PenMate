@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.command.AgentCommands.CreateConvers
 import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
+import com.penmate.backend.application.agent.run.AgentRunRetryService;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
@@ -49,6 +50,8 @@ class AgentControllerTest {
     private AgentRunEventStreamService agentRunEventStreamService;
     @Mock
     private StoryBibleRoutingPreferenceResolver routingPreferences;
+    @Mock
+    private AgentRunRetryService agentRunRetryService;
     @InjectMocks
     private AgentController agentController;
 

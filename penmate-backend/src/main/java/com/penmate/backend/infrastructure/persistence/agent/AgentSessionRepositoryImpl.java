@@ -121,6 +121,11 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
     }
 
     @Override
+    public int updateMessageContent(Long sessionId, Long messageId, String contentMarkdown) {
+        return agentSessionMapper.updateMessageContent(sessionId, messageId, contentMarkdown);
+    }
+
+    @Override
     public int updateLastTurn(Long projectId, Long sessionId, Long turnId) {
         return agentSessionMapper.updateLastTurn(projectId, sessionId, turnId);
     }

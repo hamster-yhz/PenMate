@@ -27,6 +27,9 @@ class AgentRunDependencyMigrationTest {
                 .contains("agent_runs ADD COLUMN predecessor_run_id")
                 .contains("DROP INDEX uk_agent_runs_turn_id")
                 .contains("idx_agent_runs_predecessor");
+        assertThat(Files.readString(Path.of(
+                "src/main/resources/db/migration/V21__enforce_single_agent_run_successor.sql")))
+                .contains("UNIQUE KEY uk_agent_runs_predecessor (predecessor_run_id)");
     }
 
     @Test
@@ -38,6 +41,7 @@ class AgentRunDependencyMigrationTest {
         copy(directory, "V12__init_pending_tool_invocations.sql");
         copy(directory, "V15__add_agent_run_leases.sql");
         copy(directory, "V16__add_agent_run_dependency_revisions.sql");
+        copy(directory, "V21__enforce_single_agent_run_successor.sql");
         String url = "jdbc:h2:mem:agent_run_dependencies;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
         Flyway.configure().dataSource(url, "sa", "").locations("filesystem:" + directory).load().migrate();
 

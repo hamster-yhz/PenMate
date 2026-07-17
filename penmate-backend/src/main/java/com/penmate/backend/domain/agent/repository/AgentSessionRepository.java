@@ -44,6 +44,8 @@ public interface AgentSessionRepository {
 
     int updateTurnAssistantMessage(Long sessionId, Long turnId, Long assistantMessageId);
 
+    int updateMessageContent(Long sessionId, Long messageId, String contentMarkdown);
+
     int updateLastTurn(Long projectId, Long sessionId, Long turnId);
 
     int updateLastRun(Long projectId, Long sessionId, Long runId);

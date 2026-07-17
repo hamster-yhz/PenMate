@@ -137,6 +137,9 @@ public class AgentProjectionUpdater {
 
         Long existingMessageId = agentSessionRepository.findTurnAssistantMessageId(event.sessionId(), event.turnId());
         if (existingMessageId != null && existingMessageId > 0) {
+            if (agentSessionRepository.updateMessageContent(event.sessionId(), existingMessageId, content) != 1) {
+                throw new IllegalStateException("failed to update retried assistant message");
+            }
             runProjectionRepository.setCurrentAssistantMessage(event.runId(), existingMessageId, event.sequence());
             return;
         }
