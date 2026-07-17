@@ -42,13 +42,14 @@ const ChatMessageListStub = defineComponent({
 
 const ChatComposerStub = defineComponent({
   name: 'ChatComposer',
-  emits: ['update:model-value', 'send', 'cancel', 'open-model-settings'],
+  emits: ['update:model-value', 'send', 'cancel', 'retry', 'open-model-settings'],
   setup(_, { emit }) {
     return () =>
       h('div', [
         h('button', { 'data-testid': 'chat-input-update', onClick: () => emit('update:model-value', '继续生成') }),
         h('button', { 'data-testid': 'chat-send', onClick: () => emit('send') }),
         h('button', { 'data-testid': 'chat-cancel', onClick: () => emit('cancel') }),
+        h('button', { 'data-testid': 'chat-retry', onClick: () => emit('retry') }),
         h('button', { 'data-testid': 'open-model-settings', onClick: () => emit('open-model-settings') }),
       ])
   },
@@ -68,6 +69,8 @@ describe('WorkbenchRightPanel', () => {
         isGenerating: false,
         canCancelRun: true,
         isCancelling: false,
+        canRetryRun: true,
+        isRetrying: false,
         generationPhase: 'waiting_approval',
         boundStyleName: '冷峻悬疑',
         showConversationPanel: true,
@@ -103,6 +106,7 @@ describe('WorkbenchRightPanel', () => {
     await wrapper.get('[data-testid="chat-input-update"]').trigger('click')
     await wrapper.get('[data-testid="chat-send"]').trigger('click')
     await wrapper.get('[data-testid="chat-cancel"]').trigger('click')
+    await wrapper.get('[data-testid="chat-retry"]').trigger('click')
     await wrapper.get('[data-testid="open-model-settings"]').trigger('click')
 
     expect(wrapper.emitted('toggle-collapse')).toEqual([[]])
@@ -114,6 +118,7 @@ describe('WorkbenchRightPanel', () => {
     expect(wrapper.emitted('update:chat-input')).toEqual([['继续生成']])
     expect(wrapper.emitted('send')).toEqual([[]])
     expect(wrapper.emitted('cancel-run')).toEqual([[]])
+    expect(wrapper.emitted('retry-run')).toEqual([[]])
     expect(wrapper.emitted('open-model-settings')).toEqual([[]])
   })
 

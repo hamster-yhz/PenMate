@@ -57,6 +57,9 @@ export const agentApi = {
   cancelRun(projectId: string, runId: string, payload: AnyRecord) {
     return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/cancel`, payload)
   },
+  retryRun(projectId: string, runId: string, payload: AnyRecord) {
+    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/retry`, payload)
+  },
   getRunStreamUrl(projectId: string, runId: string, after = '0') {
     return buildRunStreamUrl(projectId, runId, after)
   },

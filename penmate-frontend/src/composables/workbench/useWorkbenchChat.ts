@@ -34,6 +34,7 @@ type UseWorkbenchChatDeps = {
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
   cancelRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
+  retryRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
   openRunStream: (projectId: string, runId: string, after?: string) => EventSource
   addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
   closeRunStream?: (stream: EventSource | null) => void
@@ -53,6 +54,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const chatInput = ref('')
   const isGenerating = ref(false)
   const isCancelling = ref(false)
+  const isRetrying = ref(false)
   const generationPhase = ref<GenerationPhase>('idle')
   const generationTaskStatus = ref<AgentRunStatus | ''>('')
   const agentStatusDetailText = ref('')
@@ -61,10 +63,16 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
-  const currentActiveRun = ref<{ sessionId: string | null; runId: string | null; latestSequence: string }>({
+  const currentActiveRun = ref<{
+    sessionId: string | null
+    runId: string | null
+    latestSequence: string
+    runStatus: AgentRunStatus | ''
+  }>({
     sessionId: null,
     runId: null,
     latestSequence: '0',
+    runStatus: '',
   })
   const recoveredSelectedText = ref('')
 
@@ -72,6 +80,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     if (!currentActiveRun.value.runId) return false
     return isGenerating.value || ['pending', 'running', 'waiting_approval', 'suspended']
       .includes(generationTaskStatus.value)
+  })
+  const canRetryRun = computed(() => {
+    if (!currentActiveRun.value.runId || isGenerating.value || isRetrying.value) return false
+    return ['completed', 'failed', 'cancelled', 'superseded'].includes(currentActiveRun.value.runStatus)
   })
 
   let msgIdCounter = 1
@@ -146,6 +158,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     getRunStatus: () => generationTaskStatus.value,
     setRunStatus: (value: AgentRunStatus | '') => {
       generationTaskStatus.value = value
+      currentActiveRun.value.runStatus = value
     },
     setAgentStatusDetailText: (value: string) => {
       agentStatusDetailText.value = value
@@ -259,6 +272,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       sessionId: currentConversationId.value,
       runId: normalizedSnapshot?.activeRun?.runId == null ? null : String(normalizedSnapshot.activeRun.runId),
       latestSequence: String(normalizedSnapshot?.activeRun?.latestSequence ?? '0'),
+      runStatus: normalizeRunStatus(normalizedSnapshot?.activeRun?.runStatus),
     }
     const runStatus = normalizeRunStatus(normalizedSnapshot?.activeRun?.runStatus)
     if (runStatus === 'waiting_approval') {
@@ -343,7 +357,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     generationTaskStatus.value = ''
     agentStatusDetailText.value = ''
     streamingAssistantMsgId.value = assistantMsg.id
-    currentActiveRun.value = { sessionId, runId, latestSequence: after }
+    currentActiveRun.value = { sessionId, runId, latestSequence: after, runStatus: currentActiveRun.value.runStatus }
     await scrollChat()
     try {
       const finalStatus = await runtime.consumeRunStream(projectId, runId, after)
@@ -462,6 +476,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     try {
       await deps.cancelRun(projectId, runId, { operatorId })
       generationTaskStatus.value = 'cancelled'
+      currentActiveRun.value.runStatus = 'cancelled'
       generationPhase.value = 'idle'
       agentStatusDetailText.value = ''
       if (!awaitingRunStream) isGenerating.value = false
@@ -469,6 +484,42 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       deps.notifyWarning?.(runtime.getErrorMessage(error))
     } finally {
       isCancelling.value = false
+    }
+  }
+
+  const prepareAssistantMessageForRetry = () => {
+    const assistant = [...messages.value].reverse().find((item) => item.role === 'assistant')
+    if (!assistant) return
+    assistant.text = ''
+    assistant.approval = undefined
+    assistant.toolCallId = undefined
+  }
+
+  const retryCurrentRun = async () => {
+    if (!canRetryRun.value) return
+    const { projectId, operatorId } = deps.getContext()
+    const predecessorRunId = currentActiveRun.value.runId
+    const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
+    if (!projectId || !operatorId || !predecessorRunId || !sessionId) return
+
+    isRetrying.value = true
+    try {
+      const retried = pickBusinessRecord(await deps.retryRun(projectId, predecessorRunId, { operatorId })) as ChatRecord
+      const successorRunId = String(retried.runId ?? '').trim()
+      if (!successorRunId || successorRunId === '0') {
+        throw new Error('Retry did not return a successor Run')
+      }
+      const runStatus = normalizeRunStatus(retried.runStatus) || 'pending'
+      const latestSequence = String(retried.latestSequence ?? '0')
+      runtimeEventSource.value = null
+      generationTaskStatus.value = runStatus
+      currentActiveRun.value = { sessionId, runId: successorRunId, latestSequence, runStatus }
+      prepareAssistantMessageForRetry()
+      await consumeRun(projectId, sessionId, successorRunId, latestSequence)
+    } catch (error: any) {
+      deps.notifyWarning?.(runtime.getErrorMessage(error))
+    } finally {
+      isRetrying.value = false
     }
   }
 
@@ -480,7 +531,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     chatInput,
     isGenerating,
     isCancelling,
+    isRetrying,
     canCancelRun,
+    canRetryRun,
     generationPhase,
     generationTaskStatus,
     generationStatusText,
@@ -495,6 +548,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     toggleConversationPanel,
     sendMessage,
     cancelCurrentRun,
+    retryCurrentRun,
     resumeRunningRun,
     consumeRunStream: runtime.consumeRunStream,
     scrollChat,

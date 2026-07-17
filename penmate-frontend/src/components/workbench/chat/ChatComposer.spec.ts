@@ -22,6 +22,8 @@ const mountChatComposer = async (
     isGenerating: boolean
     canCancelRun: boolean
     isCancelling: boolean
+    canRetryRun: boolean
+    isRetrying: boolean
     currentModelName: string
     activePlugins: string[]
   }> = {},
@@ -114,6 +116,23 @@ describe('ChatComposer', () => {
     await stopButton.trigger('click')
 
     expect(wrapper.emitted('cancel')).toEqual([[]])
+  })
+
+  it('offers_one_locked_retry_action_for_a_terminal_run', async () => {
+    const wrapper = await mountChatComposer({
+      canRetryRun: true,
+      isRetrying: false,
+    })
+
+    const retryButton = wrapper.get('[data-testid="chat-retry"]')
+    expect(retryButton.attributes('title')).toBe('重试运行')
+    expect((retryButton.element as HTMLButtonElement).disabled).toBe(false)
+
+    await retryButton.trigger('click')
+
+    expect(wrapper.emitted('retry')).toEqual([[]])
+    await wrapper.setProps({ isRetrying: true })
+    expect((retryButton.element as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('shows_model_warning_and_emits_open_model_settings_when_model_missing', async () => {
