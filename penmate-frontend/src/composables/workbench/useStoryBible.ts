@@ -79,6 +79,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const relations = ref<StoryBibleRelation[]>([])
   const progressions = ref<StoryBibleProgression[]>([])
   const history = ref<StoryBibleChangeset[]>([])
+  const nodeHistory = ref<StoryBibleChangeset[]>([])
   const selectedNodeId = ref('')
   const selectedTypeId = ref('')
   const selectedFamily = ref<string>('')
@@ -99,18 +100,11 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     .sort((a, b) => a.sortOrder - b.sortOrder))
 
   const filteredNodes = computed(() => {
-    const query = searchQuery.value.trim().toLocaleLowerCase()
-    const category = selectedCategoryId.value
-    const tag = selectedTagId.value
     return nodes.value.filter((node) => {
+      const nodeType = nodeTypes.value.find((item) => item.typeId === node.typeId)
+      if (selectedFamily.value && nodeType?.semanticFamily !== selectedFamily.value) return false
       if (selectedTypeId.value && node.typeId !== selectedTypeId.value) return false
       if (canonFilter.value && node.canonStatus !== canonFilter.value) return false
-      if (query && !`${node.title} ${node.summary || ''}`.toLocaleLowerCase().includes(query)) return false
-      if (category || tag) {
-        if (node.nodeId !== selectedNodeId.value || !draft.value) return false
-        if (category && !draft.value.categoryIds.includes(category)) return false
-        if (tag && !draft.value.tagIds.includes(tag)) return false
-      }
       return true
     })
   })
@@ -134,12 +128,33 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
 
   const refreshRevisionAndHistory = async () => {
     const { projectId } = requireContext()
-    const [nextRoot, nextHistory] = await Promise.all([
+    const selectedId = selectedNodeId.value
+    const [nextRoot, nextHistory, nextNodeHistory] = await Promise.all([
       storyBibleApi.get(projectId),
       storyBibleApi.listChanges(projectId),
+      selectedId ? storyBibleApi.listNodeChanges(projectId, selectedId) : Promise.resolve([]),
     ])
     root.value = nextRoot
     history.value = nextHistory
+    nodeHistory.value = nextNodeHistory
+  }
+
+  let latestNodeQuery = 0
+  const refreshNodes = async () => {
+    const { projectId } = requireContext()
+    const queryId = ++latestNodeQuery
+    try {
+      const nextNodes = await storyBibleApi.listNodes(projectId, {
+        typeId: selectedTypeId.value || undefined,
+        status: canonFilter.value || undefined,
+        query: searchQuery.value.trim() || undefined,
+        categoryId: selectedCategoryId.value || undefined,
+        tagId: selectedTagId.value || undefined,
+      })
+      if (queryId === latestNodeQuery) nodes.value = nextNodes
+    } catch (error) {
+      if (queryId === latestNodeQuery) reportError(error, 'Failed to filter Story Bible nodes')
+    }
   }
 
   const loadRoutingPreferences = async () => {
@@ -153,6 +168,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
 
   const loadWorkspace = async () => {
     const context = requireContext()
+    latestNodeQuery += 1
     loading.value = true
     errorMessage.value = ''
     try {
@@ -201,10 +217,16 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     selectedNodeId.value = nodeId
     draft.value = null
     effectiveState.value = null
+    nodeHistory.value = []
     try {
-      const details = await storyBibleApi.getNode(projectId, nodeId)
+      const [details, nextNodeHistory, nextEffectiveState] = await Promise.all([
+        storyBibleApi.getNode(projectId, nodeId),
+        storyBibleApi.listNodeChanges(projectId, nodeId),
+        chapterId ? storyBibleApi.getEffectiveState(projectId, nodeId, chapterId) : Promise.resolve(null),
+      ])
       draft.value = toDraft(details)
-      if (chapterId) effectiveState.value = await storyBibleApi.getEffectiveState(projectId, nodeId, chapterId)
+      nodeHistory.value = nextNodeHistory
+      effectiveState.value = nextEffectiveState
     } catch (error) {
       reportError(error, 'Failed to load Story Bible node')
     }
@@ -214,6 +236,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     selectedNodeId.value = ''
     selectedTypeId.value = typeId
     effectiveState.value = null
+    nodeHistory.value = []
     draft.value = emptyDraft(typeId)
   }
 
@@ -268,6 +291,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
       selectedNodeId.value = ''
       draft.value = null
       effectiveState.value = null
+      nodeHistory.value = []
       history.value = await storyBibleApi.listChanges(context.projectId)
       options.notifySuccess?.('Story Bible node deleted')
     } catch (error) {
@@ -427,6 +451,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     relations,
     progressions,
     history,
+    nodeHistory,
     selectedNodeId,
     selectedNode,
     selectedTypeId,
@@ -445,6 +470,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     saving,
     errorMessage,
     loadWorkspace,
+    refreshNodes,
     loadRoutingPreferences,
     selectNode,
     createNodeDraft,

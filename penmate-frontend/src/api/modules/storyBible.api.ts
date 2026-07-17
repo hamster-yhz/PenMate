@@ -128,6 +128,23 @@ export interface StoryBibleChangeset {
   createdAt: string
 }
 
+export interface StoryBibleChangeItem {
+  changeItemId: string
+  changesetId: string
+  entityType: string
+  entityId: string
+  operation: string
+  fieldPath: string
+  beforeJson?: string | null
+  afterJson?: string | null
+  createdAt: string
+}
+
+export interface StoryBibleChangesetDetails {
+  changeset: StoryBibleChangeset
+  items: StoryBibleChangeItem[]
+}
+
 export interface StoryBibleRoutingPreference {
   mode: StoryBibleRoutingMode
   routerModelConfigId?: string | null
@@ -186,11 +203,19 @@ export const storyBibleApi = {
   archiveNodeType(projectId: string, typeId: string, operatorId: string) {
     return request.delete<string>(`${base(projectId)}/node-types/${typeId}?${operatorQuery(operatorId)}`)
   },
-  listNodes(projectId: string, filters: { typeId?: string; status?: StoryBibleCanonStatus; query?: string } = {}) {
+  listNodes(projectId: string, filters: {
+    typeId?: string
+    status?: StoryBibleCanonStatus
+    query?: string
+    categoryId?: string
+    tagId?: string
+  } = {}) {
     const params = new URLSearchParams()
     if (filters.typeId) params.set('typeId', filters.typeId)
     if (filters.status) params.set('status', filters.status)
     if (filters.query) params.set('query', filters.query)
+    if (filters.categoryId) params.set('categoryId', filters.categoryId)
+    if (filters.tagId) params.set('tagId', filters.tagId)
     const suffix = params.size ? `?${params.toString()}` : ''
     return request.get<StoryBibleNode[]>(`${base(projectId)}/nodes${suffix}`)
   },
@@ -258,7 +283,13 @@ export const storyBibleApi = {
     return request.delete<string>(`${base(projectId)}/progressions/${progressionId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`)
   },
   listChanges(projectId: string, limit = 50) {
-    return request.get<StoryBibleChangeset[]>(`${base(projectId)}/changes?limit=${limit}`)
+    return request.get<StoryBibleChangeset[]>(`${base(projectId)}/changesets?limit=${limit}`)
+  },
+  getChangeset(projectId: string, changesetId: string) {
+    return request.get<StoryBibleChangesetDetails>(`${base(projectId)}/changesets/${changesetId}`)
+  },
+  listNodeChanges(projectId: string, nodeId: string, limit = 50) {
+    return request.get<StoryBibleChangeset[]>(`${base(projectId)}/nodes/${nodeId}/changesets?limit=${limit}`)
   },
   getUserRoutingPreference(projectId: string, userId: string) {
     return request.get<StoryBibleRoutingPreference>(`/v1/novels/${projectId}/agent/routing-preference?userId=${encodeURIComponent(userId)}`)

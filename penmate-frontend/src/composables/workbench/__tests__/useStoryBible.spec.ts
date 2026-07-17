@@ -27,6 +27,7 @@ describe('useStoryBible', () => {
     vi.spyOn(storyBibleApi, 'listRelations').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listProgressions').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listChanges').mockResolvedValue([])
+    vi.spyOn(storyBibleApi, 'listNodeChanges').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'getUserRoutingPreference').mockResolvedValue({ mode: 'RETRIEVAL', routerModelConfigRevision: 0, inherited: false })
     vi.spyOn(storyBibleApi, 'getSessionRoutingPreference').mockResolvedValue({ mode: 'RETRIEVAL', routerModelConfigRevision: 0, inherited: true })
     vi.spyOn(storyBibleApi, 'getNode').mockResolvedValue({ node, aliases: [{ aliasId: '81', nodeId: '71', alias: 'Captain' }], categoryIds: [], tagIds: [] })
@@ -41,6 +42,28 @@ describe('useStoryBible', () => {
     expect(story.root.value?.storyBibleId).toBe('11')
     expect(story.draft.value).toMatchObject({ nodeId: '71', revision: 3, title: 'Mira', aliases: ['Captain'] })
     expect(story.effectiveState.value).toEqual({ state: { title: 'Mira' } })
+    expect(storyBibleApi.listNodeChanges).toHaveBeenCalledWith('101', '71')
+  })
+
+  it('delegates category tag and alias filtering to the backend without hiding alias matches locally', async () => {
+    const aliasMatch = { ...node, title: 'Mira' }
+    const story = useStoryBible({ getContext: () => ({ projectId: '101', operatorId: '7' }) })
+    await story.loadWorkspace()
+    vi.mocked(storyBibleApi.listNodes).mockResolvedValueOnce([aliasMatch])
+    story.searchQuery.value = 'Captain'
+    story.selectedCategoryId.value = '31'
+    story.selectedTagId.value = '41'
+
+    await story.refreshNodes()
+
+    expect(storyBibleApi.listNodes).toHaveBeenLastCalledWith('101', {
+      typeId: undefined,
+      status: undefined,
+      query: 'Captain',
+      categoryId: '31',
+      tagId: '41',
+    })
+    expect(story.filteredNodes.value).toEqual([aliasMatch])
   })
 
   it('keeps the local draft intact when optimistic update conflicts', async () => {

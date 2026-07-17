@@ -62,7 +62,7 @@
         :tags="story.tags.value"
         :relations="story.selectedRelations.value"
         :progressions="story.selectedProgressions.value"
-        :history="story.history.value"
+        :history="story.nodeHistory.value"
         :effective-state="story.effectiveState.value"
         @save="story.saveNode()"
         @delete="deleteNode"
@@ -104,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AppstoreOutlined, BookOutlined, ReloadOutlined, UnorderedListOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useStoryBible } from '@/composables/workbench/useStoryBible'
@@ -166,6 +166,18 @@ watch(() => props.chapterId, () => {
   if (story.selectedNodeId.value) void story.selectNode(story.selectedNodeId.value)
 })
 watch(() => props.initialNodeId, (nodeId) => { if (nodeId) void story.selectNode(nodeId) })
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch([
+  () => story.selectedTypeId.value,
+  () => story.selectedCategoryId.value,
+  () => story.selectedTagId.value,
+  () => story.searchQuery.value,
+  () => story.canonFilter.value,
+], () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => { void story.refreshNodes() }, 180)
+})
+onBeforeUnmount(() => { if (filterTimer) clearTimeout(filterTimer) })
 
 defineExpose({ reload })
 </script>
