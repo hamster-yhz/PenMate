@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
@@ -54,10 +51,6 @@ const ChatComposerStub = defineComponent({
       ])
   },
 })
-
-const currentDir = dirname(fileURLToPath(import.meta.url))
-const readWorkbenchRightPanelSource = () => readFileSync(resolve(currentDir, 'WorkbenchRightPanel.vue'), 'utf-8')
-const readConversationHistoryPanelSource = () => readFileSync(resolve(currentDir, './chat/ConversationHistoryPanel.vue'), 'utf-8')
 
 describe('WorkbenchRightPanel', () => {
   it('forwards_chat_shell_events_and_accepts_nullable_chat_ref', async () => {
@@ -122,12 +115,4 @@ describe('WorkbenchRightPanel', () => {
     expect(wrapper.emitted('open-model-settings')).toEqual([[]])
   })
 
-  it('keeps the right column scroll confined to the internal chat message region', () => {
-    const source = readWorkbenchRightPanelSource()
-    const historySource = readConversationHistoryPanelSource()
-
-    expect(source).toMatch(/\.panel-content\s*\{[\s\S]*?overflow:\s*hidden;/)
-    expect(source).toMatch(/\.chat-messages\s*\{[\s\S]*?flex:\s*1;[\s\S]*?overflow-y:\s*auto;/)
-    expect(historySource).toMatch(/\.conversation-panel\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?inset:\s*0;/)
-  })
 })

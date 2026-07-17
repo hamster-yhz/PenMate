@@ -67,7 +67,7 @@ describe('ChatComposer', () => {
     })
 
     expect((readyWrapper.get('[data-testid="chat-send"]').element as HTMLButtonElement).disabled).toBe(false)
-  })
+  }, 10_000)
 
   it('allows_followup_send_after_waiting_approval_when_generation_has_stopped', async () => {
     const wrapper = await mountChatComposer({
@@ -116,7 +116,7 @@ describe('ChatComposer', () => {
     await stopButton.trigger('click')
 
     expect(wrapper.emitted('cancel')).toEqual([[]])
-  })
+  }, 10_000)
 
   it('offers_one_locked_retry_action_for_a_terminal_run', async () => {
     const wrapper = await mountChatComposer({

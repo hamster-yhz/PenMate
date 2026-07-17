@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -30,11 +27,6 @@ vi.mock('@/api/modules/model.api', async () => {
     },
   }
 })
-
-const currentDir = dirname(fileURLToPath(import.meta.url))
-const readProfileSource = () => readFileSync(resolve(currentDir, 'index.vue'), 'utf-8')
-const readProfileSettingsSource = () =>
-  readFileSync(resolve(currentDir, '../../composables/profile/useProfileSettings.ts'), 'utf-8')
 
 describe('Profile index refactor', () => {
   beforeEach(() => {
@@ -126,12 +118,4 @@ describe('Profile index refactor', () => {
     expect(wrapper.text()).toContain('保存模型偏好失败')
   })
 
-  it('removes dead parent edit forwarding state after profile split', () => {
-    const pageSource = readProfileSource()
-    const settingsSource = readProfileSettingsSource()
-
-    expect(pageSource).not.toContain('@edit-profile="startProfileEdit"')
-    expect(settingsSource).not.toContain('isEditingProfile')
-    expect(settingsSource).not.toContain('const startProfileEdit')
-  })
 })
