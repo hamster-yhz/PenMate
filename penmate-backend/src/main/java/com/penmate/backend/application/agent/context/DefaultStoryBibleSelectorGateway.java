@@ -71,6 +71,7 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
                 : systemPrompt;
         StringBuilder dynamic = new StringBuilder();
         if (!stableCatalog) dynamic.append("RETRIEVAL_CANDIDATES_JSON:\n").append(catalogJson).append("\n\n");
+        dynamic.append("CONVERSATION_WINDOW_JSON:\n").append(json(request.conversationWindow())).append("\n\n");
         dynamic.append("WORKING_SET_NODE_IDS:\n").append(json(request.workingSetNodeIds())).append("\n\n")
                 .append("USER_REQUEST:\n").append(request.userMessage());
         var response = llmGateway.generateTurn(new AgentLlmTurnRequest(

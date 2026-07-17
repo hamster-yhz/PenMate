@@ -15,6 +15,8 @@ public interface AgentRepository {
 
     List<AgentMessage> listMessages(Long conversationId);
 
+    List<AgentMessage> listMessagesBeforeTurn(Long conversationId, Long turnId);
+
     int nextMessageSeq(Long conversationId);
 
     int insertMessage(AgentMessage message);

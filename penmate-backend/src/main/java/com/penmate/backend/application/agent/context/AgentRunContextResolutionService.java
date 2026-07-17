@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
+import com.penmate.backend.application.agent.orchestration.ConversationWindowBuilder;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.context.model.AgentWorkingSetEntry;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
@@ -17,6 +19,8 @@ import java.util.List;
 
 @Service
 public class AgentRunContextResolutionService {
+    private static final int CONVERSATION_WINDOW_TURNS = 8;
+
     private final StoryBibleRoutingPreferenceResolver preferences;
     private final ContextEpochSnapshotFactory snapshotFactory;
     private final ContextEpochSnapshotCodec snapshotCodec;
@@ -29,6 +33,7 @@ public class AgentRunContextResolutionService {
     private final AgentModelRoutingService modelRouting;
     private final ObjectMapper objectMapper;
     private final AgentSessionRepository sessionRepository;
+    private final ConversationWindowBuilder conversationWindows;
 
     public AgentRunContextResolutionService(
             StoryBibleRoutingPreferenceResolver preferences,
@@ -42,7 +47,8 @@ public class AgentRunContextResolutionService {
             AgentRunContextArtifactService artifacts,
             AgentModelRoutingService modelRouting,
             ObjectMapper objectMapper,
-            AgentSessionRepository sessionRepository
+            AgentSessionRepository sessionRepository,
+            ConversationWindowBuilder conversationWindows
     ) {
         this.preferences = preferences;
         this.snapshotFactory = snapshotFactory;
@@ -56,6 +62,7 @@ public class AgentRunContextResolutionService {
         this.modelRouting = modelRouting;
         this.objectMapper = objectMapper;
         this.sessionRepository = sessionRepository;
+        this.conversationWindows = conversationWindows;
     }
 
     public Resolution resolveInitial(AgentRun run, AgentRunInput input, TaskProfile profile,
@@ -76,11 +83,14 @@ public class AgentRunContextResolutionService {
                 epochs.loadVerifiedSnapshot(binding.epoch().epochId()));
         List<AgentWorkingSetEntry> currentWorkingSet = workingSet.list(run.sessionId());
         List<Long> workingSetIds = currentWorkingSet.stream().map(AgentWorkingSetEntry::nodeId).toList();
+        List<AgentLlmMessage> conversationWindow = conversationWindows.buildBeforeTurn(
+                run.sessionId(), run.turnId(), CONVERSATION_WINDOW_TURNS);
         AgentLlmExecutionConfig selectorConfig = preference.routerModelConfigId() == null ? executionConfig
                 : modelRouting.resolveExecutionConfig(run.ownerUserId(), preference.routerModelConfigId(), traceId);
         var resolved = contextResolver.resolve(new StoryBibleRouteRequest(
                 run.projectId(), run.sessionId(), run.runId(), input.chapterId(), input.promptSnapshot(), List.of(),
-                preference.mode(), boundSnapshot.storyBibleRevision(), boundSnapshot.selectorCatalog(), workingSetIds, selectorConfig));
+                preference.mode(), boundSnapshot.storyBibleRevision(), boundSnapshot.selectorCatalog(), workingSetIds,
+                selectorConfig, conversationWindow));
         ContextPackage contextPackage = toContextPackage(resolved, boundSnapshot, workingSetIds,
                 input.styleSnapshotJson(), input.chapterId());
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
@@ -95,7 +105,8 @@ public class AgentRunContextResolutionService {
                 sha256(snapshotCodec.encode(new ContextEpochSnapshotCodec.Snapshot(
                         newSnapshot.schemaVersion(), newSnapshot.projectId(), newSnapshot.storyBibleId(),
                         newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(), newSnapshot.activeChapterId(),
-                        newSnapshot.activeChapterContentRevision(), newSnapshot.coreContext(), List.of()))));
+                        newSnapshot.activeChapterContentRevision(), newSnapshot.coreContext(), List.of()))),
+                conversationWindow);
     }
 
     public void promoteAfterDurable(Long sessionId, Long turnId, List<Long> nodeIds) {
@@ -144,7 +155,19 @@ public class AgentRunContextResolutionService {
             StoryBibleRouteDecision routeDecision,
             AgentRunContextArtifactService.ArtifactRef artifactRef,
             AgentContextCatalogHashService.Hashes catalogHashes,
-            String storyBibleCoreHash
+            String storyBibleCoreHash,
+            List<AgentLlmMessage> conversationWindow
     ) {
+        public Resolution {
+            conversationWindow = List.copyOf(conversationWindow == null ? List.of() : conversationWindow);
+        }
+
+        public Resolution(AgentContextEpochService.Binding epochBinding, ContextPackage contextPackage,
+                          StoryBibleRouteDecision routeDecision,
+                          AgentRunContextArtifactService.ArtifactRef artifactRef,
+                          AgentContextCatalogHashService.Hashes catalogHashes,
+                          String storyBibleCoreHash) {
+            this(epochBinding, contextPackage, routeDecision, artifactRef, catalogHashes, storyBibleCoreHash, List.of());
+        }
     }
 }

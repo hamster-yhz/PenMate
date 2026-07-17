@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 
 import java.util.List;
@@ -11,18 +12,26 @@ public interface StoryBibleSelectorGateway {
 
     default Selection select(String userMessage, List<StoryBibleRouteRequest.CatalogEntry> catalog,
                              AgentLlmExecutionConfig executionConfig) {
-        return select(new SelectorRequest(StoryBibleRoutingMode.LLM_SELECTOR, userMessage, catalog, List.of()),
+        return select(new SelectorRequest(StoryBibleRoutingMode.LLM_SELECTOR, userMessage, catalog, List.of(), List.of()),
                 executionConfig);
     }
 
     record SelectorRequest(StoryBibleRoutingMode mode, String userMessage,
                            List<StoryBibleRouteRequest.CatalogEntry> catalog,
-                           List<Long> workingSetNodeIds) {
+                           List<Long> workingSetNodeIds,
+                           List<AgentLlmMessage> conversationWindow) {
         public SelectorRequest {
             mode = mode == null ? StoryBibleRoutingMode.LLM_SELECTOR : mode;
             userMessage = userMessage == null ? "" : userMessage;
             catalog = List.copyOf(catalog == null ? List.of() : catalog);
             workingSetNodeIds = List.copyOf(workingSetNodeIds == null ? List.of() : workingSetNodeIds);
+            conversationWindow = List.copyOf(conversationWindow == null ? List.of() : conversationWindow);
+        }
+
+        public SelectorRequest(StoryBibleRoutingMode mode, String userMessage,
+                               List<StoryBibleRouteRequest.CatalogEntry> catalog,
+                               List<Long> workingSetNodeIds) {
+            this(mode, userMessage, catalog, workingSetNodeIds, List.of());
         }
     }
 

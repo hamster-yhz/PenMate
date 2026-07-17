@@ -9,6 +9,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.prompt.SystemPromptBundle;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -70,13 +71,16 @@ class DefaultStoryBibleSelectorGatewayTest {
                         """)), "{}"));
 
         gateway.select(new StoryBibleSelectorGateway.SelectorRequest(
-                StoryBibleRoutingMode.RETRIEVAL_THEN_LLM, "write Mira", catalog(), List.of(2L)), config);
+                StoryBibleRoutingMode.RETRIEVAL_THEN_LLM, "write Mira", catalog(), List.of(2L),
+                List.of(AgentLlmMessage.user("Earlier request"),
+                        AgentLlmMessage.assistant("Earlier answer", List.of()))), config);
 
         ArgumentCaptor<AgentLlmTurnRequest> request = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(llm).generateTurn(request.capture(), any());
         assertThat(request.getValue().messages().getFirst().content()).isEqualTo("selector prompt");
         assertThat(request.getValue().messages().get(1).content())
-                .contains("RETRIEVAL_CANDIDATES_JSON", "WORKING_SET_NODE_IDS", "Mira");
+                .contains("RETRIEVAL_CANDIDATES_JSON", "CONVERSATION_WINDOW_JSON",
+                        "Earlier request", "WORKING_SET_NODE_IDS", "Mira");
     }
 
     private List<StoryBibleRouteRequest.CatalogEntry> catalog() {

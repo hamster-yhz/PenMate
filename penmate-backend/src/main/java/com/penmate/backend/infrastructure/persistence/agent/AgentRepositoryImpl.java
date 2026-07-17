@@ -40,6 +40,11 @@ public class AgentRepositoryImpl implements AgentRepository {
     }
 
     @Override
+    public List<AgentMessage> listMessagesBeforeTurn(Long conversationId, Long turnId) {
+        return agentMapper.listMessagesBeforeTurn(conversationId, turnId);
+    }
+
+    @Override
     public int nextMessageSeq(Long conversationId) {
         agentSessionMapper.lockSessionForTurnAppend(null, conversationId);
         return agentMapper.maxMessageSeq(conversationId) + 1;

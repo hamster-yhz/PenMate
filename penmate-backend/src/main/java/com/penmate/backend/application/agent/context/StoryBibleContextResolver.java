@@ -59,7 +59,8 @@ public class StoryBibleContextResolver {
                     ? request.epochCatalog()
                     : request.epochCatalog().stream().filter(item -> candidateById.containsKey(item.nodeId())).toList();
             selection = selectorGateway.select(new StoryBibleSelectorGateway.SelectorRequest(
-                    request.routingMode(), request.userMessage(), selectorCatalog, request.workingSetNodeIds()),
+                    request.routingMode(), request.userMessage(), selectorCatalog, request.workingSetNodeIds(),
+                    request.conversationWindow()),
                     request.selectorExecutionConfig());
             selected = new ArrayList<>(selection.nodeIds());
             reasons.putAll(selection.reasons());

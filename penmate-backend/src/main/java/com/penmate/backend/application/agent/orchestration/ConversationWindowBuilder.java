@@ -22,7 +22,19 @@ public class ConversationWindowBuilder {
             return List.of();
         }
 
-        List<AgentMessage> sortedMessages = agentRepository.listMessages(conversationId).stream()
+        return build(agentRepository.listMessages(conversationId), currentPrompt, contextWindowTurns);
+    }
+
+    public List<AgentLlmMessage> buildBeforeTurn(Long conversationId, Long turnId, Integer contextWindowTurns) {
+        if (conversationId == null || turnId == null || contextWindowTurns == null || contextWindowTurns <= 0) {
+            return List.of();
+        }
+
+        return build(agentRepository.listMessagesBeforeTurn(conversationId, turnId), null, contextWindowTurns);
+    }
+
+    private List<AgentLlmMessage> build(List<AgentMessage> messages, String currentPrompt, int contextWindowTurns) {
+        List<AgentMessage> sortedMessages = (messages == null ? List.<AgentMessage>of() : messages).stream()
                 .filter(this::isUsableConversationMessage)
                 .sorted(Comparator.comparing(AgentMessage::getSeqNo, Comparator.nullsLast(Integer::compareTo))
                         .thenComparing(AgentMessage::getId, Comparator.nullsLast(Long::compareTo)))

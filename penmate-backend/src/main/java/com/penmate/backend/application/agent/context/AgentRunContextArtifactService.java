@@ -8,6 +8,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -86,8 +87,9 @@ public class AgentRunContextArtifactService {
         return load(row.artifactId());
     }
 
-    public ArtifactRef savePromptPlan(Long runId, PromptPlan plan, PromptManifest manifest) {
-        String json = json(new PromptArtifact(1, plan, manifest));
+    public ArtifactRef savePromptPlan(Long runId, PromptPlan plan, PromptManifest manifest,
+                                      List<AgentLlmMessage> messages) {
+        String json = json(new PromptArtifact(2, plan, manifest, messages));
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         String hash = sha256(bytes);
         Long artifactId = ids.nextId();
@@ -100,6 +102,10 @@ public class AgentRunContextArtifactService {
         ArtifactRef ref = new ArtifactRef(artifactId, key, hash, bytes.length);
         artifacts.save(new AgentArtifact(artifactId, runId, null, "prompt.composed", json(ref), bytes.length, null));
         return ref;
+    }
+
+    public ArtifactRef savePromptPlan(Long runId, PromptPlan plan, PromptManifest manifest) {
+        return savePromptPlan(runId, plan, manifest, List.of());
     }
 
     public PromptArtifact loadPromptPlan(Long artifactId) {
@@ -187,7 +193,15 @@ public class AgentRunContextArtifactService {
             String toolCatalogHash
     ) {
     }
-    public record PromptArtifact(int schemaVersion, PromptPlan plan, PromptManifest manifest) {
+    public record PromptArtifact(int schemaVersion, PromptPlan plan, PromptManifest manifest,
+                                 List<AgentLlmMessage> messages) {
+        public PromptArtifact {
+            messages = List.copyOf(messages == null ? List.of() : messages);
+        }
+
+        public PromptArtifact(int schemaVersion, PromptPlan plan, PromptManifest manifest) {
+            this(schemaVersion, plan, manifest, List.of());
+        }
     }
     public record PromptManifest(Long contextEpochId, String promptBundleHash, String toolCatalogHash,
                                  String skillCatalogHash, String storyBibleCoreHash,

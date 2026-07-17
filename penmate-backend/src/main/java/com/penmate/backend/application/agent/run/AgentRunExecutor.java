@@ -142,6 +142,8 @@ public class AgentRunExecutor {
         state = stateReducer.apply(state, evt);
 
         PromptPlan promptPlan = promptComposer.compose(taskProfile, contextResult.contextPackage(), input.promptSnapshot());
+        List<AgentLlmMessage> executionMessages = promptMessages(
+                promptPlan, input.promptSnapshot(), contextResult.conversationWindow());
         var promptRef = contextArtifacts.savePromptPlan(runId, promptPlan,
                 new AgentRunContextArtifactService.PromptManifest(
                         contextResult.epochBinding().epoch().epochId(),
@@ -150,7 +152,7 @@ public class AgentRunExecutor {
                         contextResult.catalogHashes().skillCatalogHash(),
                         contextResult.storyBibleCoreHash(),
                         sha256(promptPlan.stablePrefix()), sha256(promptPlan.dynamicContext())
-                ));
+                ), executionMessages);
         evt = eventPublisher.publish(runId, "prompt.composed", Map.of(
                 "artifactId", promptRef.artifactId(), "sha256", promptRef.sha256(), "sizeBytes", promptRef.sizeBytes()
         ));
@@ -166,7 +168,7 @@ public class AgentRunExecutor {
                 sessionId,
                 turnId,
                 traceId,
-                promptMessages(promptPlan, input.promptSnapshot()),
+                executionMessages,
                 executionConfig,
                 userId,
                 lease.executionToken()
@@ -290,6 +292,9 @@ public class AgentRunExecutor {
         }
         if (!continueIfDependenciesCurrent(run, input, contextArtifact, lease, traceId)) return;
         var promptArtifact = contextArtifacts.loadPromptPlanForRun(runId, state.artifactRefs());
+        if (promptArtifact.schemaVersion() < 2 || promptArtifact.messages().isEmpty()) {
+            throw new IllegalStateException("Run prompt artifact has no recoverable conversation snapshot: " + runId);
+        }
         Long modelConfigId = extractModelConfigIdFromSnapshot(input.modelSnapshotJson());
         AgentLlmExecutionConfig executionConfig = modelConfigId == null
                 ? AgentLlmExecutionConfig.builder().build()
@@ -297,7 +302,7 @@ public class AgentRunExecutor {
         leaseService.assertOwned(lease);
         AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
-                promptMessages(promptArtifact.plan(), input.promptSnapshot()), executionConfig, run.ownerUserId(),
+                promptArtifact.messages(), executionConfig, run.ownerUserId(),
                 lease.executionToken());
         AgentRunLoopResult result = continuations.loadLatestForRun(runId, state.artifactRefs())
                 .map(continuation -> llmLoop.resume(loopRequest, continuation))
@@ -347,10 +352,12 @@ public class AgentRunExecutor {
         leaseService.complete(lease);
     }
 
-    private List<AgentLlmMessage> promptMessages(PromptPlan plan, String userRequest) {
+    private List<AgentLlmMessage> promptMessages(PromptPlan plan, String userRequest,
+                                                 List<AgentLlmMessage> conversationWindow) {
         List<AgentLlmMessage> messages = new java.util.ArrayList<>();
         messages.add(AgentLlmMessage.system(plan.stablePrefix()));
         if (!plan.dynamicContext().isBlank()) messages.add(AgentLlmMessage.system(plan.dynamicContext()));
+        messages.addAll(conversationWindow == null ? List.of() : conversationWindow);
         messages.add(AgentLlmMessage.user(userRequest));
         return List.copyOf(messages);
     }

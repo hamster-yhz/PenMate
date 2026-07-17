@@ -2,6 +2,8 @@ package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.application.agent.prompt.PromptPlan;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
@@ -11,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 class AgentRunContextArtifactServiceTest {
 
@@ -73,5 +77,37 @@ class AgentRunContextArtifactServiceTest {
                 .hasMessageContaining("verification failed");
 
         verify(artifacts, never()).save(any());
+    }
+
+    @Test
+    void should_round_trip_the_exact_prompt_conversation_snapshot() {
+        AgentArtifactRepository artifacts = mock(AgentArtifactRepository.class);
+        ObjectStorageService storage = mock(ObjectStorageService.class);
+        BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        AgentRunContextArtifactService service = new AgentRunContextArtifactService(artifacts, ids, storage, mapper);
+        AtomicReference<String> storedContent = new AtomicReference<>();
+        when(ids.nextId()).thenReturn(88L);
+        when(storage.putText(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+            String content = invocation.getArgument(1);
+            storedContent.set(content);
+            return new ObjectStorageService.PutObjectResult("etag",
+                    (long) content.getBytes(StandardCharsets.UTF_8).length, null);
+        });
+        when(storage.readText(anyString())).thenAnswer(invocation -> storedContent.get());
+        List<AgentLlmMessage> messages = List.of(
+                AgentLlmMessage.system("stable"), AgentLlmMessage.user("earlier"),
+                AgentLlmMessage.assistant("answer", List.of()), AgentLlmMessage.user("current"));
+
+        var ref = service.savePromptPlan(70001L,
+                new PromptPlan(List.of(), List.of(), "default", "stable"), null, messages);
+        ArgumentCaptor<AgentArtifact> row = ArgumentCaptor.forClass(AgentArtifact.class);
+        verify(artifacts).save(row.capture());
+        when(artifacts.findById(ref.artifactId())).thenReturn(row.getValue());
+
+        var loaded = service.loadPromptPlan(ref.artifactId());
+
+        assertThat(loaded.schemaVersion()).isEqualTo(2);
+        assertThat(loaded.messages()).isEqualTo(messages);
     }
 }

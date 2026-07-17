@@ -11,6 +11,7 @@ import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
@@ -35,6 +36,7 @@ import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -69,7 +71,7 @@ class AgentRunExecutorTest {
                 .thenReturn(AgentLlmExecutionConfig.builder().build());
         when(contextResolutionService.resolveInitial(any(), any(), any(), any(), any())).thenReturn(contextRoutingResult());
         when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
-        when(contextArtifacts.savePromptPlan(anyLong(), any(), any()))
+        when(contextArtifacts.savePromptPlan(anyLong(), any(), any(), anyList()))
                 .thenReturn(new AgentRunContextArtifactService.ArtifactRef(89L, "prompt", "hash", 10));
         when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("completed", new LlmTokenUsage(10, 5, 15)));
         when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
@@ -84,6 +86,10 @@ class AgentRunExecutorTest {
         ArgumentCaptor<AgentRunLoopRequest> loopRequest = ArgumentCaptor.forClass(AgentRunLoopRequest.class);
         verify(llmLoop).execute(loopRequest.capture());
         org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().executionToken()).isEqualTo(2L);
+        org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().messages())
+                .extracting(AgentLlmMessage::content)
+                .containsSubsequence("assembled prompt", "Earlier user request", "Earlier assistant answer",
+                        "Write a suspense opening.");
     }
 
     @Test
@@ -94,7 +100,7 @@ class AgentRunExecutorTest {
         when(runRepository.findRun(70001L)).thenReturn(run());
         when(contextResolutionService.resolveInitial(any(), any(), any(), any(), any())).thenReturn(contextRoutingResult());
         when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
-        when(contextArtifacts.savePromptPlan(anyLong(), any(), any()))
+        when(contextArtifacts.savePromptPlan(anyLong(), any(), any(), anyList()))
                 .thenReturn(new AgentRunContextArtifactService.ArtifactRef(89L, "prompt", "hash", 10));
         when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("completed", new LlmTokenUsage(10, 5, 15)));
         when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
@@ -194,7 +200,8 @@ class AgentRunExecutorTest {
         when(recoveryService.recover(70001L)).thenReturn(state);
         when(contextArtifacts.loadContextForRun(70001L, state.artifactRefs())).thenReturn(context);
         when(contextArtifacts.loadPromptPlanForRun(70001L, state.artifactRefs())).thenReturn(
-                new AgentRunContextArtifactService.PromptArtifact(1, promptPlan(), null));
+                new AgentRunContextArtifactService.PromptArtifact(2, promptPlan(), null,
+                        List.of(AgentLlmMessage.system("assembled prompt"), AgentLlmMessage.user("hello"))));
         when(dependencyValidator.validate(running, input, context)).thenReturn(
                 new AgentRunDependencyValidator.Validation(true, context.dependencies(), context.dependencies(), List.of()));
         when(modelRoutingService.resolveExecutionConfig(anyLong(), anyLong(), anyString()))
@@ -269,7 +276,9 @@ class AgentRunExecutorTest {
                         false, 0L, true, List.of()),
                 new AgentRunContextArtifactService.ArtifactRef(88L, "key", "hash", 10),
                 new com.penmate.backend.application.agent.context.AgentContextCatalogHashService.Hashes("p", "s", "t"),
-                "core");
+                "core",
+                List.of(AgentLlmMessage.user("Earlier user request"),
+                        AgentLlmMessage.assistant("Earlier assistant answer", List.of())));
     }
 
     private PromptPlan promptPlan() {

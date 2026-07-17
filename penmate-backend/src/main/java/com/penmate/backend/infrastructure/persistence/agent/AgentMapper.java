@@ -86,6 +86,30 @@ public interface AgentMapper {
     List<AgentMessage> listMessages(@Param("conversationId") Long conversationId);
 
     @Select("""
+            SELECT m.id,
+                   m.message_id,
+                   m.session_id AS conversation_id,
+                   m.role,
+                   m.message_kind AS user_message_type,
+                   m.content_markdown AS content_md,
+                   CAST(m.render_blocks_json AS CHAR) AS attachments_json,
+                   NULL AS tool_calls_json,
+                   m.seq_no,
+                   m.created_at
+            FROM agent_messages m
+            JOIN agent_turns current_turn
+              ON current_turn.session_id = m.session_id AND current_turn.turn_id = #{turnId}
+            JOIN agent_turns message_turn
+              ON message_turn.session_id = m.session_id
+             AND (message_turn.user_message_id = m.message_id OR message_turn.assistant_message_id = m.message_id)
+            WHERE m.session_id = #{conversationId}
+              AND message_turn.turn_seq &lt; current_turn.turn_seq
+            ORDER BY m.seq_no ASC, m.id ASC
+            """)
+    List<AgentMessage> listMessagesBeforeTurn(@Param("conversationId") Long conversationId,
+                                              @Param("turnId") Long turnId);
+
+    @Select("""
             SELECT COALESCE(MAX(seq_no), 0)
             FROM agent_messages
             WHERE session_id = #{conversationId}
