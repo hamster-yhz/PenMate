@@ -27,6 +27,8 @@ import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -89,11 +91,16 @@ class AgentContextEpochConcurrencyTest {
         AtomicLong ids = new AtomicLong(900L);
         BusinessIdGenerator idGenerator = ids::incrementAndGet;
         ObjectStorageService storage = mock(ObjectStorageService.class);
+        Map<String, String> storedObjects = new ConcurrentHashMap<>();
         when(storage.putText(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+            String objectKey = invocation.getArgument(0);
             String content = invocation.getArgument(1);
+            storedObjects.put(objectKey, content);
             return new ObjectStorageService.PutObjectResult(
                     "etag", (long) content.getBytes(StandardCharsets.UTF_8).length, null);
         });
+        when(storage.readText(anyString())).thenAnswer(invocation ->
+                storedObjects.get(invocation.getArgument(0, String.class)));
         AgentContextEpochService service = new AgentContextEpochService(
                 repository, idGenerator, storage, new ObjectMapper(), mock(ContextEpochSnapshotCache.class));
         TransactionTemplate transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
