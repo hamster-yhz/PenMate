@@ -284,7 +284,7 @@ public class StoryBibleController {
         return ApiResponse.success("deleted", traceId);
     }
 
-    @GetMapping({"/changesets", "/changes"})
+    @GetMapping("/changesets")
     public ApiResponse<Object> recentChanges(@PathVariable String projectId, @RequestParam(defaultValue = "50") int limit,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.recentChanges(id(projectId, "projectId"), limit), traceId);
