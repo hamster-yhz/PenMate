@@ -33,6 +33,7 @@
         <StoryBibleProgressionsTab
           v-else-if="activeTab === 'progressions' && draft.nodeId"
           :chapter-id="chapterId"
+          :chapters="chapters"
           :progressions="progressions"
           :effective-state="effectiveState"
           @create="emit('createProgression', $event)"
@@ -59,11 +60,13 @@ import StoryBibleBaseTab from './StoryBibleBaseTab.vue'
 import StoryBibleHistoryTab from './StoryBibleHistoryTab.vue'
 import StoryBibleProgressionsTab from './StoryBibleProgressionsTab.vue'
 import StoryBibleRelationsTab from './StoryBibleRelationsTab.vue'
+import type { StoryBibleChapterOption } from './storyBibleTypes'
 
 defineProps<{
   draft: StoryBibleNodeDraft | null
   saving: boolean
   chapterId?: string
+  chapters: StoryBibleChapterOption[]
   nodeTypes: StoryBibleNodeType[]
   nodes: StoryBibleNode[]
   categories: StoryBibleCategory[]

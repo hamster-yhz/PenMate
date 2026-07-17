@@ -79,6 +79,7 @@
         :user-id="session.userId"
         :session-id="currentConversationId || undefined"
         :chapter-id="activeChapter"
+        :chapters="storyBibleChapters"
         :project-title="novelTitle"
         :initial-node-id="storyBibleNodeId"
       />
@@ -151,6 +152,7 @@ import WorkbenchLeftPanel from '@/components/workbench/WorkbenchLeftPanel.vue'
 import WorkbenchEditorPanel from '@/components/workbench/WorkbenchEditorPanel.vue'
 import WorkbenchRightPanel from '@/components/workbench/WorkbenchRightPanel.vue'
 import StoryBibleWorkspace from '@/components/workbench/story-bible/StoryBibleWorkspace.vue'
+import type { StoryBibleChapterOption } from '@/components/workbench/story-bible/storyBibleTypes'
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
@@ -229,6 +231,7 @@ const showPluginWorkshop = ref(false)
 const showModelSettings = ref(false)
 const chatRef = ref<HTMLElement | null>(null)
 const chapterContents = ref<Record<string, string>>({})
+const storyBibleChapters = ref<StoryBibleChapterOption[]>([])
 const activeLeftTab = ref('outline')
 const leftTabs = ref([
   { key: 'outline', label: '大纲', icon: iconOutline },
@@ -805,6 +808,16 @@ const loadWorkbenchData = async (projectId: string) => {
   if (!projectId) return
   const outlineResp = pickBusinessArray<Record<string, unknown>>(await outlineApi.listOutlineTree(projectId))
   const chapterResp = pickBusinessArray<Record<string, unknown>>(await novelApi.listChapters(projectId))
+  storyBibleChapters.value = chapterResp.flatMap((chapter) => {
+    const chapterId = normalizeBusinessId(chapter.chapterId)
+    const displayNo = Number(chapter.displayNo)
+    if (!chapterId || !Number.isInteger(displayNo) || displayNo < 1) return []
+    return [{
+      chapterId,
+      displayNo,
+      title: String(chapter.title ?? '').trim() || '未命名章节',
+    }]
+  })
   const chapterByOutlineNodeId = Object.fromEntries(
     chapterResp
       .map((chapter: Record<string, unknown>) => {

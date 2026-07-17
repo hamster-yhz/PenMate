@@ -56,6 +56,7 @@
         :draft="story.draft.value"
         :saving="story.saving.value"
         :chapter-id="chapterId"
+        :chapters="chapters"
         :node-types="story.nodeTypes.value"
         :nodes="story.nodes.value"
         :categories="story.categories.value"
@@ -114,6 +115,7 @@ import StoryBibleNodeList from './StoryBibleNodeList.vue'
 import StoryBibleRoutingSettings from './StoryBibleRoutingSettings.vue'
 import StoryBibleSearchToolbar from './StoryBibleSearchToolbar.vue'
 import StoryBibleTypeEditor from './StoryBibleTypeEditor.vue'
+import type { StoryBibleChapterOption } from './storyBibleTypes'
 
 const props = defineProps<{
   projectId: string
@@ -121,6 +123,7 @@ const props = defineProps<{
   userId?: string
   sessionId?: string
   chapterId?: string
+  chapters: StoryBibleChapterOption[]
   projectTitle?: string
   initialNodeId?: string
 }>()

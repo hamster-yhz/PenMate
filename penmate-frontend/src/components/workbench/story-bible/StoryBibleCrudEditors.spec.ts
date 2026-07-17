@@ -33,6 +33,10 @@ describe('Story Bible CRUD editors', () => {
     const wrapper = mount(StoryBibleProgressionsTab, {
       props: {
         chapterId: '301',
+        chapters: [
+          { chapterId: '301', displayNo: 1, title: 'Opening' },
+          { chapterId: '302', displayNo: 2, title: 'Reveal' },
+        ],
         effectiveState: null,
         progressions: [{ progressionId: '92', storyBibleId: '11', nodeId: '71', anchorChapterId: '301', endChapterId: null, storyEventNodeId: null, patchJson: '[]', summary: 'Old', revision: 4 }],
       },
@@ -46,6 +50,25 @@ describe('Story Bible CRUD editors', () => {
       progressionId: '92',
       update: expect.objectContaining({ expectedRevision: 4, summary: 'New' }),
     }])
+  })
+
+  it('shows progression anchors with full-book chapter numbers instead of business ids', () => {
+    const wrapper = mount(StoryBibleProgressionsTab, {
+      props: {
+        chapterId: '301',
+        chapters: [
+          { chapterId: '301', displayNo: 1, title: 'Opening' },
+          { chapterId: '302', displayNo: 2, title: 'Reveal' },
+        ],
+        effectiveState: null,
+        progressions: [{ progressionId: '92', storyBibleId: '11', nodeId: '71', anchorChapterId: '301', endChapterId: '302', storyEventNodeId: null, patchJson: '[]', summary: 'Changed', revision: 4 }],
+      },
+    })
+
+    expect(wrapper.text()).toContain('第 1 章 · Opening')
+    expect(wrapper.text()).toContain('第 2 章 · Reveal')
+    expect(wrapper.find('.anchor').text()).not.toContain('301')
+    expect(wrapper.find('.anchor').text()).not.toContain('302')
   })
 
   it('supports editing types categories and tags from structure management', async () => {
