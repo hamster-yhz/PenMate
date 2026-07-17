@@ -19,15 +19,18 @@ public class AgentProjectionUpdater {
     private final AgentSessionRepository agentSessionRepository;
     private final BusinessIdGenerator businessIdGenerator;
     private final ObjectMapper objectMapper;
+    private final AgentEventPayloadResolver payloadResolver;
 
     public AgentProjectionUpdater(AgentRunProjectionRepository runProjectionRepository,
                                   AgentSessionRepository agentSessionRepository,
                                   BusinessIdGenerator businessIdGenerator,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  AgentEventPayloadResolver payloadResolver) {
         this.runProjectionRepository = runProjectionRepository;
         this.agentSessionRepository = agentSessionRepository;
         this.businessIdGenerator = businessIdGenerator;
         this.objectMapper = objectMapper;
+        this.payloadResolver = payloadResolver;
     }
 
     @Transactional
@@ -36,7 +39,7 @@ public class AgentProjectionUpdater {
         if (latestSequence != null && event.sequence() <= latestSequence) {
             return;
         }
-        JsonNode payload = readPayload(event.payloadJson());
+        JsonNode payload = readPayload(payloadResolver.resolve(event).payloadJson());
         switch (event.eventType()) {
             case "run.started" -> runProjectionRepository.updateRunState(
                     event.runId(), "RUNNING", text(payload, "phase", "routing"), null, event.sequence(), null, null);

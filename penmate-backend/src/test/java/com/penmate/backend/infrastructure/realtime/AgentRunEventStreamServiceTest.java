@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.realtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.agent.run.AgentEventPayloadResolver;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
@@ -89,7 +90,8 @@ class AgentRunEventStreamServiceTest {
                                                InMemoryAgentRunEventBus bus,
                                                CapturingEmitter emitter) {
         return new AgentRunEventStreamService(
-                events, bus, mock(AgentArtifactRepository.class), new ObjectMapper()) {
+                events, bus, new AgentEventPayloadResolver(
+                mock(AgentArtifactRepository.class), new ObjectMapper())) {
             @Override
             protected SseEmitter createEmitter() {
                 return emitter;

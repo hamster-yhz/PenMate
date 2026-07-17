@@ -70,7 +70,8 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper()
+                new ObjectMapper(),
+                payloadResolver()
         );
 
         updater.apply(event(70001L, 5L, "message.delta", Map.of("text", "abc")));
@@ -91,7 +92,8 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper()
+                new ObjectMapper(),
+                payloadResolver()
         );
 
         updater.apply(event(70001L, 9L, "message.completed", Map.of(
@@ -115,7 +117,8 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper()
+                new ObjectMapper(),
+                payloadResolver()
         );
 
         updater.apply(event(70001L, 9L, "message.completed", Map.of(
@@ -134,7 +137,8 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper()
+                new ObjectMapper(),
+                payloadResolver()
         );
 
         updater.apply(event(70001L, 9L, "run.failed", Map.of(
@@ -148,6 +152,33 @@ class AgentRunEventPublisherTest {
                 errorCodeCaptor.capture(), errorMessageCaptor.capture());
         assertThat(errorCodeCaptor.getValue()).hasSizeLessThanOrEqualTo(96);
         assertThat(errorMessageCaptor.getValue()).hasSizeLessThanOrEqualTo(500);
+    }
+
+    @Test
+    void projection_resolves_large_completed_message_artifact_before_persisting_history() {
+        String text = "x".repeat(70_000);
+        String payload = "{\"schemaVersion\":1,\"role\":\"assistant\",\"text\":\"" + text + "\"}";
+        when(runProjectionRepository.findLatestSequence(70001L)).thenReturn(8L);
+        when(artifactRepository.findById(88001L)).thenReturn(
+                new com.penmate.backend.domain.agent.run.model.AgentArtifact(
+                        88001L, 70001L, null, "message.completed", payload,
+                        payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, null));
+        when(businessIdGenerator.nextId()).thenReturn(99001L);
+        when(agentSessionRepository.nextMessageSeq(90001L)).thenReturn(4);
+        when(agentSessionRepository.insertSessionMessage(
+                90001L, 50001L, 99001L, "assistant", "CHAT", text, 4)).thenReturn(1);
+        AgentProjectionUpdater updater = new AgentProjectionUpdater(
+                runProjectionRepository, agentSessionRepository, businessIdGenerator,
+                new ObjectMapper(), payloadResolver());
+        AgentEvent event = new AgentEvent(
+                9L, 70001L, 101L, 90001L, 50001L, 9L, 1, "message.completed",
+                "{\"artifactRef\":\"88001\",\"sizeBytes\":" + payload.length() + "}", null);
+
+        updater.apply(event);
+
+        verify(agentSessionRepository).insertSessionMessage(
+                90001L, 50001L, 99001L, "assistant", "CHAT", text, 4);
+        verify(runProjectionRepository).setCurrentAssistantMessage(70001L, 99001L, 9L);
     }
 
     @Test
@@ -179,5 +210,9 @@ class AgentRunEventPublisherTest {
         } catch (Exception ex) {
             throw new AssertionError(ex);
         }
+    }
+
+    private AgentEventPayloadResolver payloadResolver() {
+        return new AgentEventPayloadResolver(artifactRepository, new ObjectMapper());
     }
 }

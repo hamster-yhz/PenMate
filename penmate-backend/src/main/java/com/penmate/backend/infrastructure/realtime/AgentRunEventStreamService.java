@@ -1,11 +1,8 @@
 package com.penmate.backend.infrastructure.realtime;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.domain.agent.run.model.AgentArtifact;
+import com.penmate.backend.application.agent.run.AgentEventPayloadResolver;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
-import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentStreamResetDto;
@@ -29,19 +26,16 @@ public class AgentRunEventStreamService {
 
     private final AgentRunEventRepository eventRepository;
     private final InMemoryAgentRunEventBus eventBus;
-    private final AgentArtifactRepository artifactRepository;
-    private final ObjectMapper objectMapper;
+    private final AgentEventPayloadResolver payloadResolver;
     private final AtomicLong streamIds = new AtomicLong();
     private final Map<Long, StreamConnection> activeStreams = new ConcurrentHashMap<>();
 
     public AgentRunEventStreamService(AgentRunEventRepository eventRepository,
                                       InMemoryAgentRunEventBus eventBus,
-                                      AgentArtifactRepository artifactRepository,
-                                      ObjectMapper objectMapper) {
+                                      AgentEventPayloadResolver payloadResolver) {
         this.eventRepository = eventRepository;
         this.eventBus = eventBus;
-        this.artifactRepository = artifactRepository;
-        this.objectMapper = objectMapper;
+        this.payloadResolver = payloadResolver;
     }
 
     public SseEmitter openStream(Long runId, Long after) {
@@ -95,7 +89,7 @@ public class AgentRunEventStreamService {
                 }
                 for (AgentEvent event : eventRepository.listAfter(connection.runId, cursor)) {
                     if (event.sequence() == null || event.sequence() <= connection.cursor.get()) continue;
-                    AgentEvent resolved = resolveArtifact(event);
+                    AgentEvent resolved = payloadResolver.resolve(event);
                     if (!sendEvent(connection, resolved)) return;
                     connection.cursor.set(event.sequence());
                     if (isTerminal(resolved)) {
@@ -111,26 +105,6 @@ public class AgentRunEventStreamService {
                 close(connection);
             }
         }
-    }
-
-    private AgentEvent resolveArtifact(AgentEvent event) {
-        String payload = event.payloadJson();
-        if (payload == null || !payload.contains("artifactRef")) {
-            return event;
-        }
-        try {
-            JsonNode node = objectMapper.readTree(payload);
-            if (node.has("artifactRef")) {
-                Long artifactId = node.get("artifactRef").asLong();
-                AgentArtifact artifact = artifactRepository.findById(artifactId);
-                if (artifact != null && artifact.payloadJson() != null) {
-                    return AgentEvent.forReplay(event, artifact.payloadJson());
-                }
-            }
-        } catch (Exception ex) {
-            log.warn("Failed to resolve artifact ref: runId={}, sequence={}", event.runId(), event.sequence(), ex);
-        }
-        return event;
     }
 
     private boolean sendEvent(StreamConnection connection, AgentEvent event) {
