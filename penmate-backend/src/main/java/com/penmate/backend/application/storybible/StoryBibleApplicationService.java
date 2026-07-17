@@ -398,10 +398,14 @@ public class StoryBibleApplicationService {
                 .anyMatch(item -> Objects.equals(item.getParentCategoryId(), categoryId))) {
             throw BusinessException.conflict("Category still has child categories");
         }
+        List<ChangeDraft> drafts = new ArrayList<>();
+        drafts.add(draft("CATEGORY", categoryId, StoryBibleChangeOperation.DELETE, category, null));
+        repository.findNodeCategoriesByCategory(root.getStoryBibleId(), categoryId).stream()
+                .map(StoryBibleNodeCategory::getNodeId).distinct().sorted()
+                .forEach(nodeId -> addMembershipRemovalDraft(drafts, root, nodeId, categoryId, true));
         requireOne(repository.softDeleteCategory(root.getStoryBibleId(), categoryId), "Failed to delete Story Bible category");
         repository.deleteNodeCategoriesByCategory(root.getStoryBibleId(), categoryId);
-        append(root, actorType, actorId, sourceRunId, "Deleted category",
-                draft("CATEGORY", categoryId, StoryBibleChangeOperation.DELETE, category, null));
+        append(root, actorType, actorId, sourceRunId, "Deleted category", drafts);
     }
 
     public List<StoryBibleTag> listTags(Long projectId) {
@@ -459,10 +463,14 @@ public class StoryBibleApplicationService {
                           Long actorId, Long sourceRunId) {
         StoryBible root = get(projectId);
         StoryBibleTag tag = requireTag(root, tagId);
+        List<ChangeDraft> drafts = new ArrayList<>();
+        drafts.add(draft("TAG", tagId, StoryBibleChangeOperation.DELETE, tag, null));
+        repository.findNodeTagsByTag(root.getStoryBibleId(), tagId).stream()
+                .map(StoryBibleNodeTag::getNodeId).distinct().sorted()
+                .forEach(nodeId -> addMembershipRemovalDraft(drafts, root, nodeId, tagId, false));
         requireOne(repository.softDeleteTag(root.getStoryBibleId(), tagId), "Failed to delete Story Bible tag");
         repository.deleteNodeTagsByTag(root.getStoryBibleId(), tagId);
-        append(root, actorType, actorId, sourceRunId, "Deleted tag",
-                draft("TAG", tagId, StoryBibleChangeOperation.DELETE, tag, null));
+        append(root, actorType, actorId, sourceRunId, "Deleted tag", drafts);
     }
 
     public List<StoryBibleRelation> listRelations(Long projectId, List<Long> nodeIds) {
@@ -704,6 +712,18 @@ public class StoryBibleApplicationService {
         if (Objects.equals(before, after)) return;
         drafts.add(new ChangeDraft("NODE", nodeId, operation, path,
                 asJson(before), asJson(after)));
+    }
+
+    private void addMembershipRemovalDraft(List<ChangeDraft> drafts, StoryBible root, Long nodeId,
+                                           Long membershipId, boolean category) {
+        List<Long> before = category
+                ? repository.findNodeCategories(root.getStoryBibleId(), nodeId).stream()
+                        .map(StoryBibleNodeCategory::getCategoryId).distinct().sorted().toList()
+                : repository.findNodeTags(root.getStoryBibleId(), nodeId).stream()
+                        .map(StoryBibleNodeTag::getTagId).distinct().sorted().toList();
+        List<Long> after = before.stream().filter(id -> !Objects.equals(id, membershipId)).toList();
+        addOrganizationDraft(drafts, nodeId, category ? "/categoryIds" : "/tagIds",
+                before, after, StoryBibleChangeOperation.UPDATE);
     }
 
     private StoryBibleNode requireNode(StoryBible root, Long nodeId) {

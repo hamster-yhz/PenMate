@@ -57,6 +57,7 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int softDeleteCategory(Long storyBibleId, Long categoryId) { return mapper.softDeleteCategory(storyBibleId, categoryId); }
     @Override public int insertNodeCategory(StoryBibleNodeCategory membership) { return mapper.insertNodeCategory(membership); }
     @Override public List<StoryBibleNodeCategory> findNodeCategories(Long storyBibleId, Long nodeId) { return mapper.findNodeCategories(storyBibleId, nodeId); }
+    @Override public List<StoryBibleNodeCategory> findNodeCategoriesByCategory(Long storyBibleId, Long categoryId) { return mapper.findNodeCategoriesByCategory(storyBibleId, categoryId); }
     @Override public int deleteNodeCategories(Long storyBibleId, Long nodeId) { return mapper.deleteNodeCategories(storyBibleId, nodeId); }
     @Override public int deleteNodeCategoriesByCategory(Long storyBibleId, Long categoryId) { return mapper.deleteNodeCategoriesByCategory(storyBibleId, categoryId); }
     @Override public List<StoryBibleTag> findTags(Long storyBibleId) { return mapper.findTags(storyBibleId); }
@@ -65,6 +66,7 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int softDeleteTag(Long storyBibleId, Long tagId) { return mapper.softDeleteTag(storyBibleId, tagId); }
     @Override public int insertNodeTag(StoryBibleNodeTag membership) { return mapper.insertNodeTag(membership); }
     @Override public List<StoryBibleNodeTag> findNodeTags(Long storyBibleId, Long nodeId) { return mapper.findNodeTags(storyBibleId, nodeId); }
+    @Override public List<StoryBibleNodeTag> findNodeTagsByTag(Long storyBibleId, Long tagId) { return mapper.findNodeTagsByTag(storyBibleId, tagId); }
     @Override public int deleteNodeTags(Long storyBibleId, Long nodeId) { return mapper.deleteNodeTags(storyBibleId, nodeId); }
     @Override public int deleteNodeTagsByTag(Long storyBibleId, Long tagId) { return mapper.deleteNodeTagsByTag(storyBibleId, tagId); }
     @Override public List<StoryBibleRelation> findRelations(Long storyBibleId, List<Long> nodeIds) { return mapper.findRelations(storyBibleId, nodeIds); }

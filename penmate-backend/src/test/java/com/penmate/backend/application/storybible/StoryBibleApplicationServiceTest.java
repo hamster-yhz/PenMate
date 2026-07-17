@@ -11,10 +11,13 @@ import com.penmate.backend.domain.storybible.model.StoryBibleChangeItem;
 import com.penmate.backend.domain.storybible.model.StoryBibleChangeset;
 import com.penmate.backend.domain.storybible.model.StoryBibleInclusionPolicy;
 import com.penmate.backend.domain.storybible.model.StoryBibleNode;
+import com.penmate.backend.domain.storybible.model.StoryBibleNodeCategory;
+import com.penmate.backend.domain.storybible.model.StoryBibleNodeTag;
 import com.penmate.backend.domain.storybible.model.StoryBibleNodeType;
 import com.penmate.backend.domain.storybible.model.StoryBibleProgression;
 import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.domain.storybible.model.StoryBibleSemanticFamily;
+import com.penmate.backend.domain.storybible.model.StoryBibleTag;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -208,6 +211,72 @@ class StoryBibleApplicationServiceTest {
                 eq("Deleted Story Bible node"), drafts.capture());
         assertThat(drafts.getValue()).extracting(StoryBibleChangesetService.ChangeDraft::entityType)
                 .containsExactly("NODE", "RELATION", "PROGRESSION");
+    }
+
+    @Test
+    void should_record_category_membership_removals_in_the_category_changeset() {
+        StoryBible root = root();
+        StoryBibleCategory category = new StoryBibleCategory();
+        category.setCategoryId(31L);
+        StoryBibleNodeCategory affected = nodeCategory(71L, 31L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findCategories(10L)).thenReturn(List.of(category));
+        when(repository.findNodeCategoriesByCategory(10L, 31L)).thenReturn(List.of(affected));
+        when(repository.findNodeCategories(10L, 71L)).thenReturn(List.of(affected, nodeCategory(71L, 32L)));
+        when(repository.softDeleteCategory(10L, 31L)).thenReturn(1);
+
+        service.deleteCategory(20L, 31L, 9L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StoryBibleChangesetService.ChangeDraft>> drafts = ArgumentCaptor.forClass(List.class);
+        verify(changesetService).append(eq(root), eq(StoryBibleActorType.USER), eq(9L), eq(null),
+                eq("Deleted category"), drafts.capture());
+        assertThat(drafts.getValue()).hasSize(2);
+        assertThat(drafts.getValue().get(1)).extracting(
+                StoryBibleChangesetService.ChangeDraft::entityType,
+                StoryBibleChangesetService.ChangeDraft::entityId,
+                StoryBibleChangesetService.ChangeDraft::fieldPath,
+                StoryBibleChangesetService.ChangeDraft::beforeJson,
+                StoryBibleChangesetService.ChangeDraft::afterJson)
+                .containsExactly("NODE", 71L, "/categoryIds", "[31,32]", "[32]");
+    }
+
+    @Test
+    void should_record_tag_membership_removals_in_the_tag_changeset() {
+        StoryBible root = root();
+        StoryBibleTag tag = new StoryBibleTag();
+        tag.setTagId(41L);
+        StoryBibleNodeTag affected = nodeTag(71L, 41L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findTags(10L)).thenReturn(List.of(tag));
+        when(repository.findNodeTagsByTag(10L, 41L)).thenReturn(List.of(affected));
+        when(repository.findNodeTags(10L, 71L)).thenReturn(List.of(affected, nodeTag(71L, 42L)));
+        when(repository.softDeleteTag(10L, 41L)).thenReturn(1);
+
+        service.deleteTag(20L, 41L, 9L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StoryBibleChangesetService.ChangeDraft>> drafts = ArgumentCaptor.forClass(List.class);
+        verify(changesetService).append(eq(root), eq(StoryBibleActorType.USER), eq(9L), eq(null),
+                eq("Deleted tag"), drafts.capture());
+        assertThat(drafts.getValue()).hasSize(2);
+        assertThat(drafts.getValue().get(1).fieldPath()).isEqualTo("/tagIds");
+        assertThat(drafts.getValue().get(1).beforeJson()).isEqualTo("[41,42]");
+        assertThat(drafts.getValue().get(1).afterJson()).isEqualTo("[42]");
+    }
+
+    private StoryBibleNodeCategory nodeCategory(Long nodeId, Long categoryId) {
+        StoryBibleNodeCategory membership = new StoryBibleNodeCategory();
+        membership.setNodeId(nodeId);
+        membership.setCategoryId(categoryId);
+        return membership;
+    }
+
+    private StoryBibleNodeTag nodeTag(Long nodeId, Long tagId) {
+        StoryBibleNodeTag membership = new StoryBibleNodeTag();
+        membership.setNodeId(nodeId);
+        membership.setTagId(tagId);
+        return membership;
     }
 
     private StoryBible root() {

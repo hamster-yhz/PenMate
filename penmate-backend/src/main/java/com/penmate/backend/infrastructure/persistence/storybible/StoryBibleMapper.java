@@ -349,6 +349,15 @@ public interface StoryBibleMapper {
     List<StoryBibleNodeCategory> findNodeCategories(@Param("storyBibleId") Long storyBibleId,
                                                     @Param("nodeId") Long nodeId);
 
+    @Select("""
+            SELECT id, story_bible_id, node_id, category_id, created_at
+            FROM story_bible_node_categories
+            WHERE story_bible_id = #{storyBibleId} AND category_id = #{categoryId}
+            ORDER BY node_id, id
+            """)
+    List<StoryBibleNodeCategory> findNodeCategoriesByCategory(@Param("storyBibleId") Long storyBibleId,
+                                                              @Param("categoryId") Long categoryId);
+
     @org.apache.ibatis.annotations.Delete("""
             DELETE FROM story_bible_node_categories WHERE story_bible_id = #{storyBibleId} AND node_id = #{nodeId}
             """)
@@ -400,6 +409,15 @@ public interface StoryBibleMapper {
             """)
     List<StoryBibleNodeTag> findNodeTags(@Param("storyBibleId") Long storyBibleId,
                                          @Param("nodeId") Long nodeId);
+
+    @Select("""
+            SELECT id, story_bible_id, node_id, tag_id, created_at
+            FROM story_bible_node_tags
+            WHERE story_bible_id = #{storyBibleId} AND tag_id = #{tagId}
+            ORDER BY node_id, id
+            """)
+    List<StoryBibleNodeTag> findNodeTagsByTag(@Param("storyBibleId") Long storyBibleId,
+                                              @Param("tagId") Long tagId);
 
     @org.apache.ibatis.annotations.Delete("""
             DELETE FROM story_bible_node_tags WHERE story_bible_id = #{storyBibleId} AND node_id = #{nodeId}
