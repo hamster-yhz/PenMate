@@ -40,7 +40,7 @@ public class AgentRunExecutor {
     private final AgentRunRecoveryService recoveryService;
     private final AgentRunLeaseService leaseService;
     private final AgentRunDependencyValidator dependencyValidator;
-    private final AgentRunSuccessorService successorService;
+    private final AgentRunStateTransitionService stateTransitions;
     private final AgentRunContinuationArtifactService continuations;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
@@ -56,7 +56,7 @@ public class AgentRunExecutor {
                             AgentRunRecoveryService recoveryService,
                             AgentRunLeaseService leaseService,
                             AgentRunDependencyValidator dependencyValidator,
-                            AgentRunSuccessorService successorService,
+                            AgentRunStateTransitionService stateTransitions,
                             AgentRunContinuationArtifactService continuations) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
@@ -71,7 +71,7 @@ public class AgentRunExecutor {
         this.recoveryService = recoveryService;
         this.leaseService = leaseService;
         this.dependencyValidator = dependencyValidator;
-        this.successorService = successorService;
+        this.stateTransitions = stateTransitions;
         this.continuations = continuations;
     }
 
@@ -208,33 +208,24 @@ public class AgentRunExecutor {
         ));
 
         if (loopResult.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
-            evt = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", loopResult.approvalId()));
+            evt = stateTransitions.waitingApproval(lease, loopResult.approvalId(), null).stateEvent();
             state = stateReducer.apply(state, evt);
             checkpointService.checkpointIfNeeded(evt, state);
-            if (lease != null) leaseService.waitingApproval(lease, loopResult.approvalId());
             return;
         }
         if (loopResult.status() == AgentRunLoopResult.Status.FAILED) {
-            evt = eventPublisher.publish(runId, "run.failed", Map.of("phase", "failed", "message", loopResult.finalAssistantText()));
+            evt = stateTransitions.failed(lease, loopResult.finalAssistantText(), null).stateEvent();
             state = stateReducer.apply(state, evt);
             checkpointService.checkpointIfNeeded(evt, state);
-            if (lease != null) leaseService.failTerminal(lease, "AGENT_RUN_FAILED", loopResult.finalAssistantText());
             return;
         }
 
-        evt = eventPublisher.publish(runId, "message.completed", Map.of(
-                "role", "assistant",
-                "text", loopResult.finalAssistantText()
-        ));
-        state = stateReducer.apply(state, evt);
-
-        evt = eventPublisher.publish(runId, "run.completed", Map.of(
-                "phase", "completed",
-                "tokenUsage", loopResult.tokenUsage()
-        ));
+        var outcome = stateTransitions.completed(
+                lease, loopResult.finalAssistantText(), loopResult.tokenUsage(), false, null);
+        state = stateReducer.apply(state, outcome.messageEvent());
+        evt = outcome.stateEvent();
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
-        if (lease != null) leaseService.complete(lease);
     }
 
     private void resume(Long runId, String traceId, AgentRunLease lease) {
@@ -271,28 +262,23 @@ public class AgentRunExecutor {
         AgentRunLoopResult result = llmLoop.resumeApproved(new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId, List.of(), executionConfig,
                 run.ownerUserId(), lease.executionToken()), pending);
-        pendingApprovals.markStatus(pending.approvalId(), "APPROVED", "COMPLETED");
         if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
-            AgentEvent waiting = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", result.approvalId()));
+            AgentEvent waiting = stateTransitions.waitingApproval(
+                    lease, result.approvalId(), pending.approvalId()).stateEvent();
             checkpointService.checkpointIfNeeded(waiting, stateReducer.apply(state, waiting));
-            if (lease != null) leaseService.waitingApproval(lease, result.approvalId());
             return;
         }
         if (result.status() == AgentRunLoopResult.Status.FAILED) {
-            AgentEvent failed = eventPublisher.publish(runId, "run.failed", Map.of("phase", "failed", "message", result.finalAssistantText()));
+            AgentEvent failed = stateTransitions.failed(
+                    lease, result.finalAssistantText(), pending.approvalId()).stateEvent();
             checkpointService.checkpointIfNeeded(failed, stateReducer.apply(state, failed));
-            if (lease != null) leaseService.failTerminal(lease, "AGENT_RUN_FAILED", result.finalAssistantText());
             return;
         }
-        if (!state.assistantMessageCompleted()) {
-            AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
-                    "role", "assistant", "text", result.finalAssistantText()));
-            state = stateReducer.apply(state, message);
-        }
-        AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
-                "phase", "completed", "tokenUsage", result.tokenUsage()));
+        var outcome = stateTransitions.completed(lease, result.finalAssistantText(), result.tokenUsage(),
+                state.assistantMessageCompleted(), pending.approvalId());
+        if (outcome.messageEvent() != null) state = stateReducer.apply(state, outcome.messageEvent());
+        AgentEvent completed = outcome.stateEvent();
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
-        if (lease != null) leaseService.complete(lease);
     }
 
     public void recover(Long runId, String traceId, AgentRunLease lease) {
@@ -348,41 +334,27 @@ public class AgentRunExecutor {
                                                   AgentRunLease lease, String traceId) {
         var validation = dependencyValidator.validate(run, input, artifact);
         if (validation.current()) return true;
-        String fields = String.join(",", validation.changedFields());
-        pendingApprovals.invalidateOpenByRunId(run.runId());
-        leaseService.supersede(lease, "Run dependencies changed: " + fields);
-        eventPublisher.publish(run.runId(), "run.superseded", Map.of(
-                "errorCode", "AGENT_RUN_DEPENDENCY_CHANGED",
-                "errorMessage", "Run dependencies changed",
-                "changedFields", validation.changedFields()));
-        successorService.create(run, input, traceId);
+        stateTransitions.supersede(lease, run, input, traceId, validation.changedFields());
         return false;
     }
 
     private void finishRecoveredRun(Long runId, AgentRunLoopResult result,
                                     AgentRuntimeState state, AgentRunLease lease) {
         if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
-            AgentEvent waiting = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", result.approvalId()));
+            AgentEvent waiting = stateTransitions.waitingApproval(lease, result.approvalId(), null).stateEvent();
             checkpointService.checkpointIfNeeded(waiting, stateReducer.apply(state, waiting));
-            leaseService.waitingApproval(lease, result.approvalId());
             return;
         }
         if (result.status() == AgentRunLoopResult.Status.FAILED) {
-            AgentEvent failed = eventPublisher.publish(runId, "run.failed", Map.of(
-                    "phase", "failed", "message", result.finalAssistantText()));
+            AgentEvent failed = stateTransitions.failed(lease, result.finalAssistantText(), null).stateEvent();
             checkpointService.checkpointIfNeeded(failed, stateReducer.apply(state, failed));
-            leaseService.failTerminal(lease, "AGENT_RUN_FAILED", result.finalAssistantText());
             return;
         }
-        if (!state.assistantMessageCompleted()) {
-            AgentEvent message = eventPublisher.publish(runId, "message.completed", Map.of(
-                    "role", "assistant", "text", result.finalAssistantText()));
-            state = stateReducer.apply(state, message);
-        }
-        AgentEvent completed = eventPublisher.publish(runId, "run.completed", Map.of(
-                "phase", "completed", "tokenUsage", result.tokenUsage()));
+        var outcome = stateTransitions.completed(lease, result.finalAssistantText(), result.tokenUsage(),
+                state.assistantMessageCompleted(), null);
+        if (outcome.messageEvent() != null) state = stateReducer.apply(state, outcome.messageEvent());
+        AgentEvent completed = outcome.stateEvent();
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
-        leaseService.complete(lease);
     }
 
     private List<AgentLlmMessage> promptMessages(PromptPlan plan, String userRequest,

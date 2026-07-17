@@ -138,6 +138,7 @@ class AgentRunExecutorTest {
                 1L, 2L, 3L, 70001L, 10001L, 20001L, 30001L, "call-1", "story_bible_update",
                 "{}", "{}", "[]", "key", "APPROVED", 920001L, "trace-1", null, null);
         when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(pending);
+        when(pendingApprovals.markStatus(3L, "APPROVED", "COMPLETED")).thenReturn(1);
         when(modelRoutingService.resolveExecutionConfig(anyLong(), anyLong(), anyString()))
                 .thenReturn(AgentLlmExecutionConfig.builder().build());
         when(llmLoop.resumeApproved(any(), eq(pending)))
@@ -246,9 +247,11 @@ class AgentRunExecutorTest {
     }
 
     private AgentRunExecutor executor() {
+        AgentRunStateTransitionService stateTransitions = new AgentRunStateTransitionService(
+                leaseService, eventPublisher, pendingApprovals, successorService);
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
-                recoveryService, leaseService, dependencyValidator, successorService, continuations);
+                recoveryService, leaseService, dependencyValidator, stateTransitions, continuations);
     }
 
     private AgentRun run() {
