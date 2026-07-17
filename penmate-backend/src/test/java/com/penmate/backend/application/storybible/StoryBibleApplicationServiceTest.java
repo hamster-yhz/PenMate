@@ -44,7 +44,8 @@ class StoryBibleApplicationServiceTest {
             objectMapper,
             schemaValidator,
             new StoryBiblePatchValidator(objectMapper, schemaValidator),
-            mock(StoryBibleEffectiveStateResolver.class)
+            mock(StoryBibleEffectiveStateResolver.class),
+            mock(StoryBibleProgressionReferenceValidator.class)
     );
 
     @Test

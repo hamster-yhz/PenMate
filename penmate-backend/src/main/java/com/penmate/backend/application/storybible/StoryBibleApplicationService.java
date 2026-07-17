@@ -48,6 +48,7 @@ public class StoryBibleApplicationService {
     private final StoryBibleSchemaValidator schemaValidator;
     private final StoryBiblePatchValidator patchValidator;
     private final StoryBibleEffectiveStateResolver effectiveStateResolver;
+    private final StoryBibleProgressionReferenceValidator progressionReferenceValidator;
 
     public StoryBibleApplicationService(
             StoryBibleRepository repository,
@@ -56,7 +57,8 @@ public class StoryBibleApplicationService {
             ObjectMapper objectMapper,
             StoryBibleSchemaValidator schemaValidator,
             StoryBiblePatchValidator patchValidator,
-            StoryBibleEffectiveStateResolver effectiveStateResolver
+            StoryBibleEffectiveStateResolver effectiveStateResolver,
+            StoryBibleProgressionReferenceValidator progressionReferenceValidator
     ) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.changesetService = Objects.requireNonNull(changesetService, "changesetService");
@@ -65,6 +67,8 @@ public class StoryBibleApplicationService {
         this.schemaValidator = Objects.requireNonNull(schemaValidator, "schemaValidator");
         this.patchValidator = Objects.requireNonNull(patchValidator, "patchValidator");
         this.effectiveStateResolver = Objects.requireNonNull(effectiveStateResolver, "effectiveStateResolver");
+        this.progressionReferenceValidator = Objects.requireNonNull(
+                progressionReferenceValidator, "progressionReferenceValidator");
     }
 
     public StoryBible get(Long projectId) {
@@ -526,6 +530,8 @@ public class StoryBibleApplicationService {
         StoryBibleNode node = requireNode(root, command.nodeId());
         StoryBibleNodeType nodeType = requireNodeType(root, node.getTypeId());
         patchValidator.validate(command.patchJson(), nodeType.getFieldSchemaJson());
+        progressionReferenceValidator.validate(projectId, root, command.anchorChapterId(),
+                command.endChapterId(), command.storyEventNodeId());
         StoryBibleProgression progression = new StoryBibleProgression();
         progression.setProgressionId(idGenerator.nextId());
         progression.setStoryBibleId(root.getStoryBibleId());
@@ -551,6 +557,8 @@ public class StoryBibleApplicationService {
         StoryBibleNode node = requireNode(root, progression.getNodeId());
         StoryBibleNodeType nodeType = requireNodeType(root, node.getTypeId());
         patchValidator.validate(command.patchJson(), nodeType.getFieldSchemaJson());
+        progressionReferenceValidator.validate(projectId, root, command.anchorChapterId(),
+                command.endChapterId(), command.storyEventNodeId());
         String before = json(progression);
         progression.setAnchorChapterId(Objects.requireNonNull(command.anchorChapterId(), "anchorChapterId"));
         progression.setEndChapterId(command.endChapterId());
