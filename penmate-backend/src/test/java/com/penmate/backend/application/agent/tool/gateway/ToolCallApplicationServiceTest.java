@@ -10,6 +10,7 @@ import com.penmate.backend.application.agent.tool.definition.ToolOperationPolicy
 import com.penmate.backend.application.agent.tool.definition.ToolPresentation;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
+import com.penmate.backend.application.agent.tool.runtime.AgentToolMutationGuard;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
@@ -18,9 +19,12 @@ import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
+import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,13 +70,26 @@ class ToolCallApplicationServiceTest {
     @Mock
     private AgentToolHandler handler;
 
+    @Mock
+    private AgentToolCallExecutionRepository executionRepository;
+
+    @Mock
+    private BusinessIdGenerator businessIdGenerator;
+
+    @Mock
+    private AgentToolMutationGuard mutationGuard;
+
     private ToolCallApplicationService toolCallApplicationService;
 
     private ToolCallExecutionService toolCallExecutionService;
 
     @BeforeEach
     void setUp() {
-        toolCallExecutionService = new ToolCallExecutionService(List.of(handler));
+        toolCallExecutionService = new ToolCallExecutionService(List.of(handler), executionRepository,
+                businessIdGenerator, mutationGuard, new ObjectMapper());
+        lenient().when(businessIdGenerator.nextId()).thenReturn(99001L);
+        lenient().when(executionRepository.tryInsertStarted(any())).thenReturn(true);
+        lenient().when(executionRepository.markFinished(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         toolCallApplicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
@@ -100,7 +118,8 @@ class ToolCallApplicationServiceTest {
                 "[{\"id\":\"call-1\"}]",
                 "[{\"role\":\"user\"}]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud",
@@ -125,6 +144,7 @@ class ToolCallApplicationServiceTest {
         approvalRequest.setApprovalRequestId(88001L);
 
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
+        when(handler.toolCode()).thenReturn("book_crud");
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(decision);
         when(toolApprovalViewFactory.create(descriptor, decision)).thenReturn(approvalView);
         when(approvalApplicationService.create(any(CreateApprovalCommand.class), eq("trace-approval"))).thenReturn(approvalRequest);
@@ -167,7 +187,8 @@ class ToolCallApplicationServiceTest {
                 "[]",
                 "[]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
 
         when(toolDefinitionSource.getRequired("missing_handler_tool")).thenReturn(new AgentToolDescriptor(
@@ -204,7 +225,8 @@ class ToolCallApplicationServiceTest {
                 "[]",
                 "[]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "context_enhancer",
@@ -245,7 +267,8 @@ class ToolCallApplicationServiceTest {
                 "[]",
                 "[]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "context_enhancer",

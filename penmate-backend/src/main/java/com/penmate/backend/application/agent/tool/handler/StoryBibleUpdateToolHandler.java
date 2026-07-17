@@ -23,6 +23,11 @@ public class StoryBibleUpdateToolHandler implements AgentToolHandler {
     }
 
     @Override
+    public boolean mutatesState(ToolCallRequest request) {
+        return true;
+    }
+
+    @Override
     public void validate(ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");

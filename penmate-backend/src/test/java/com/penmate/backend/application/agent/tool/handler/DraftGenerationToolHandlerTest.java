@@ -14,6 +14,7 @@ import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalViewFactory;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
+import com.penmate.backend.application.agent.tool.runtime.AgentToolMutationGuard;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
@@ -21,9 +22,12 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
+import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -328,7 +332,7 @@ class DraftGenerationToolHandlerTest {
         AgentRepository agentRepository = mock(AgentRepository.class);
         RealtimeEventService realtimeEventService = mock(RealtimeEventService.class);
         AgentToolHandler handler = mock(AgentToolHandler.class);
-        ToolCallExecutionService executionService = new ToolCallExecutionService(List.of(handler));
+        ToolCallExecutionService executionService = toolCallExecutionService(handler);
         ToolCallApplicationService applicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
@@ -373,7 +377,7 @@ class DraftGenerationToolHandlerTest {
         AgentRepository agentRepository = mock(AgentRepository.class);
         RealtimeEventService realtimeEventService = mock(RealtimeEventService.class);
         AgentToolHandler handler = mock(AgentToolHandler.class);
-        ToolCallExecutionService executionService = new ToolCallExecutionService(List.of(handler));
+        ToolCallExecutionService executionService = toolCallExecutionService(handler);
         ToolCallApplicationService applicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
@@ -419,7 +423,7 @@ class DraftGenerationToolHandlerTest {
         AgentRepository agentRepository = mock(AgentRepository.class);
         RealtimeEventService realtimeEventService = mock(RealtimeEventService.class);
         AgentToolHandler handler = mock(AgentToolHandler.class);
-        ToolCallExecutionService executionService = new ToolCallExecutionService(List.of(handler));
+        ToolCallExecutionService executionService = toolCallExecutionService(handler);
         ToolCallApplicationService applicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
@@ -450,6 +454,7 @@ class DraftGenerationToolHandlerTest {
         approvalRequest.setApprovalRequestId(55L);
 
         when(toolDefinitionSource.getRequired("draft_generation")).thenReturn(descriptor);
+        when(handler.toolCode()).thenReturn("draft_generation");
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(true, "DRAFT_REVIEW"));
         when(toolApprovalViewFactory.create(descriptor, new ApprovalPolicyDecision(true, "DRAFT_REVIEW"))).thenReturn(approvalView);
         when(approvalApplicationService.create(any(), eq("trace-1"))).thenReturn(approvalRequest);
@@ -477,8 +482,19 @@ class DraftGenerationToolHandlerTest {
                 "[{\"id\":\"" + toolCallId + "\"}]",
                 "[{\"role\":\"user\",\"content\":\"请处理正文\"}]",
                 "RESUME_LOOP",
-                null
+                null,
+                3L
         );
+    }
+
+    private ToolCallExecutionService toolCallExecutionService(AgentToolHandler handler) {
+        AgentToolCallExecutionRepository executions = mock(AgentToolCallExecutionRepository.class);
+        BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
+        AgentToolMutationGuard guard = mock(AgentToolMutationGuard.class);
+        when(ids.nextId()).thenReturn(99001L);
+        when(executions.tryInsertStarted(any())).thenReturn(true);
+        when(executions.markFinished(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
+        return new ToolCallExecutionService(List.of(handler), executions, ids, guard, new ObjectMapper());
     }
 
 

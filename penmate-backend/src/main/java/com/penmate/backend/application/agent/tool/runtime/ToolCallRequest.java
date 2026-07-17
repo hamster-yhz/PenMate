@@ -21,8 +21,30 @@ public record ToolCallRequest(
         String assistantToolCallsJson,
         String conversationMessagesJson,
         String resumeMode,
-        String approvalSummaryJson
+        String approvalSummaryJson,
+        Long executionToken
 ) {
+
+    public ToolCallRequest(Long projectId,
+                           Long runId,
+                           Long sessionId,
+                           Long turnId,
+                           String toolCode,
+                           String toolArgsJson,
+                           Long operatorId,
+                           String traceId,
+                           String contextJson,
+                           String idempotencyKey,
+                           Integer llmTurnIndex,
+                           String toolCallId,
+                           String assistantToolCallsJson,
+                           String conversationMessagesJson,
+                           String resumeMode,
+                           String approvalSummaryJson) {
+        this(projectId, runId, sessionId, turnId, toolCode, toolArgsJson, operatorId, traceId,
+                contextJson, idempotencyKey, llmTurnIndex, toolCallId, assistantToolCallsJson,
+                conversationMessagesJson, resumeMode, approvalSummaryJson, null);
+    }
 
     public ToolCallRequest(Long projectId,
                            Long runId,
@@ -43,6 +65,7 @@ public record ToolCallRequest(
                 traceId,
                 contextJson,
                 idempotencyKey,
+                null,
                 null,
                 null,
                 null,
@@ -82,6 +105,7 @@ public record ToolCallRequest(
                 assistantToolCallsJson,
                 conversationMessagesJson,
                 resumeMode,
-                approvalSummaryJson);
+                approvalSummaryJson,
+                null);
     }
 }

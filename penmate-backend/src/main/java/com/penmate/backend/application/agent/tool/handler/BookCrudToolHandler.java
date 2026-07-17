@@ -38,6 +38,12 @@ public class BookCrudToolHandler implements AgentToolHandler {
     }
 
     @Override
+    public boolean mutatesState(ToolCallRequest request) {
+        String operation = AgentJsonCodec.getString(AgentJsonCodec.parseObj(request.toolArgsJson()), "operation");
+        return !"list".equalsIgnoreCase(operation);
+    }
+
+    @Override
     public void validate(ToolCallRequest request) {
         try {
             JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());

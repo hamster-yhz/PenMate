@@ -72,6 +72,12 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     }
 
     @Override
+    public boolean ownsExecutionToken(Long runId, Long executionToken, LocalDateTime now) {
+        if (runId == null || executionToken == null || now == null) return false;
+        return agentRunMapper.ownsExecutionToken(runId, executionToken, now) == 1;
+    }
+
+    @Override
     public boolean transitionWithLease(AgentRunLease lease, AgentRunStatus target, String phase,
                                        Long activeApprovalId, LocalDateTime nextRetryAt,
                                        String errorCode, String errorMessage) {

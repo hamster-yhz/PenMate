@@ -22,4 +22,9 @@ public class AgentArtifactRepositoryImpl implements AgentArtifactRepository {
     public AgentArtifact findById(Long artifactId) {
         return artifactMapper.findById(artifactId);
     }
+
+    @Override
+    public AgentArtifact findLatest(Long runId, String artifactType) {
+        return artifactMapper.findLatest(runId, artifactType);
+    }
 }

@@ -14,7 +14,8 @@ public record AgentRunLoopRequest(
         String traceId,
         List<AgentLlmMessage> messages,
         AgentLlmExecutionConfig executionConfig,
-        Long operatorId
+        Long operatorId,
+        Long executionToken
 ) {
 
     public AgentRunLoopRequest {
@@ -25,10 +26,6 @@ public record AgentRunLoopRequest(
         traceId = traceId == null ? "" : traceId.trim();
         messages = List.copyOf(messages == null ? List.of() : messages);
         executionConfig = executionConfig == null ? AgentLlmExecutionConfig.builder().build() : executionConfig;
-    }
-
-    public AgentRunLoopRequest(Long runId, Long projectId, Long sessionId, Long turnId, String traceId,
-                               List<AgentLlmMessage> messages, AgentLlmExecutionConfig executionConfig) {
-        this(runId, projectId, sessionId, turnId, traceId, messages, executionConfig, null);
+        executionToken = Objects.requireNonNull(executionToken, "executionToken must not be null");
     }
 }

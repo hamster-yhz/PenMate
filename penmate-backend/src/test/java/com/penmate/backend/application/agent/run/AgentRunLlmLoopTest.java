@@ -60,7 +60,9 @@ class AgentRunLlmLoopTest {
                 50001L,
                 "trace-1",
                 List.of(AgentLlmMessage.user("Write")),
-                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build()
+                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(),
+                201L,
+                7L
         ));
 
         assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
@@ -105,7 +107,9 @@ class AgentRunLlmLoopTest {
                 50001L,
                 "trace-1",
                 List.of(AgentLlmMessage.user("Create a book")),
-                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build()
+                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(),
+                201L,
+                7L
         ));
 
         assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
@@ -128,6 +132,10 @@ class AgentRunLlmLoopTest {
         assertThat(secondTurnMessages.get(2).role()).isEqualTo(AgentLlmMessageRole.TOOL);
         assertThat(secondTurnMessages.get(2).toolCallId()).isEqualTo("call-1");
         assertThat(secondTurnMessages.get(2).content()).isEqualTo("Error: Unknown error");
+        ArgumentCaptor<com.penmate.backend.application.agent.tool.runtime.ToolCallRequest> toolRequest =
+                ArgumentCaptor.forClass(com.penmate.backend.application.agent.tool.runtime.ToolCallRequest.class);
+        verify(toolCallService).executeToolCall(toolRequest.capture());
+        assertThat(toolRequest.getValue().executionToken()).isEqualTo(7L);
     }
 
     @Test
@@ -160,7 +168,7 @@ class AgentRunLlmLoopTest {
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
-                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L
+                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L, 7L
         ), pending);
 
         assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
@@ -171,6 +179,9 @@ class AgentRunLlmLoopTest {
         assertThat(toolRequests.getAllValues()).extracting(
                 com.penmate.backend.application.agent.tool.runtime.ToolCallRequest::toolCallId)
                 .containsExactly("call-1", "call-2");
+        assertThat(toolRequests.getAllValues()).extracting(
+                com.penmate.backend.application.agent.tool.runtime.ToolCallRequest::executionToken)
+                .containsOnly(7L);
 
         ArgumentCaptor<AgentLlmTurnRequest> llmRequest = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(llmGateway).generateTurn(llmRequest.capture(), any());
@@ -206,7 +217,7 @@ class AgentRunLlmLoopTest {
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
-                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L
+                AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L, 7L
         ), pending);
 
         assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.WAITING_APPROVAL);
@@ -217,6 +228,7 @@ class AgentRunLlmLoopTest {
         verify(toolCallService, org.mockito.Mockito.times(2)).executeToolCall(requests.capture());
         var siblingRequest = requests.getAllValues().get(1);
         assertThat(siblingRequest.toolCallId()).isEqualTo("call-2");
+        assertThat(siblingRequest.executionToken()).isEqualTo(7L);
         assertThat(siblingRequest.conversationMessagesJson()).contains("call-1").contains("updated");
     }
 }

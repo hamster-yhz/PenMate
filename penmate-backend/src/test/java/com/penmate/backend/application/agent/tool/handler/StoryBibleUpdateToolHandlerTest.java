@@ -46,6 +46,7 @@ class StoryBibleUpdateToolHandlerTest {
         when(service.execute(request)).thenReturn(expected);
 
         assertThat(handler.toolCode()).isEqualTo("story_bible_update");
+        assertThat(handler.mutatesState(request)).isTrue();
         assertThat(handler.execute(request)).isSameAs(expected);
         verify(service).execute(request);
     }

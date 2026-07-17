@@ -146,6 +146,17 @@ public interface AgentRunMapper {
                   @Param("executionToken") Long executionToken,
                   @Param("now") LocalDateTime now);
 
+    @Select("""
+            SELECT COUNT(*)
+            FROM agent_runs
+            WHERE run_id = #{runId} AND run_status = 'RUNNING'
+              AND execution_token = #{executionToken}
+              AND lease_until >= #{now}
+            """)
+    int ownsExecutionToken(@Param("runId") Long runId,
+                           @Param("executionToken") Long executionToken,
+                           @Param("now") LocalDateTime now);
+
     @Update("""
             UPDATE agent_runs
             SET run_status = #{targetStatus},

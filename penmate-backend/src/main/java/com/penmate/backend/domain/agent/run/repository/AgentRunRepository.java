@@ -25,6 +25,8 @@ public interface AgentRunRepository {
 
     boolean ownsLease(AgentRunLease lease, LocalDateTime now);
 
+    boolean ownsExecutionToken(Long runId, Long executionToken, LocalDateTime now);
+
     boolean transitionWithLease(AgentRunLease lease, AgentRunStatus target, String phase,
                                 Long activeApprovalId, LocalDateTime nextRetryAt,
                                 String errorCode, String errorMessage);

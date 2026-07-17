@@ -24,6 +24,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRe
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatcher;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -71,13 +72,16 @@ class AgentRunExecutorTest {
         when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("completed", new LlmTokenUsage(10, 5, 15)));
         when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
 
-        executor().execute(70001L, "trace-1");
+        executor().execute(70001L, "trace-1", lease());
 
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("routing"));
         verify(eventPublisher).publish(eq(70001L), eq("run.phase.changed"), containsText("epoch_binding"));
         verify(eventPublisher).publish(eq(70001L), eq("context.epoch.bound"), any());
         verify(eventPublisher).publish(eq(70001L), eq("turn.route.completed"), any());
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
+        ArgumentCaptor<AgentRunLoopRequest> loopRequest = ArgumentCaptor.forClass(AgentRunLoopRequest.class);
+        verify(llmLoop).execute(loopRequest.capture());
+        org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().executionToken()).isEqualTo(2L);
     }
 
     @Test
@@ -93,7 +97,7 @@ class AgentRunExecutorTest {
         when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("completed", new LlmTokenUsage(10, 5, 15)));
         when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
 
-        executor().execute(70001L, "trace-1");
+        executor().execute(70001L, "trace-1", lease());
 
         verify(modelRoutingService, never()).resolveExecutionConfig(anyLong(), anyLong(), anyString());
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
@@ -114,6 +118,8 @@ class AgentRunExecutorTest {
                 1, 70001L, 99L,
                 new StoryBibleRouteDecision(StoryBibleRoutingMode.RETRIEVAL, List.of(1L), Map.of(), false, 0L, true, List.of()),
                 new ContextPackage(List.of(), List.of(), List.of(), List.of(), List.of(), "", "chapter:30001"), List.of()));
+        when(dependencyValidator.validate(any(), any(), any())).thenReturn(
+                new AgentRunDependencyValidator.Validation(true, null, null, List.of()));
         AgentRunPendingApproval pending = new AgentRunPendingApproval(
                 1L, 2L, 3L, 70001L, 10001L, 20001L, 30001L, "call-1", "story_bible_update",
                 "{}", "{}", "[]", "key", "APPROVED", 920001L, "trace-1", null, null);
@@ -124,7 +130,7 @@ class AgentRunExecutorTest {
                 .thenReturn(AgentRunLoopResult.completed("done", new LlmTokenUsage(1, 1, 2)));
         when(eventPublisher.publish(any(), any(), any())).thenReturn(event());
 
-        executor().resume(70001L, "trace-1");
+        executor().recover(70001L, "trace-1", lease());
 
         verify(contextResolutionService, never()).resolveInitial(any(), any(), any(), any(), any());
         verify(llmLoop).resumeApproved(any(), eq(pending));
@@ -172,6 +178,11 @@ class AgentRunExecutorTest {
     private AgentRun run() {
         return new AgentRun(70001L, 10001L, 20001L, 30001L, 920001L,
                 "PENDING", "created", null, null, 0L, null, "trace-1", null, null);
+    }
+
+    private AgentRunLease lease() {
+        return new AgentRunLease(70001L, "worker", 2L, 1,
+                AgentRunStatus.PENDING, LocalDateTime.now().plusMinutes(1));
     }
 
     private AgentRunInput runInput() {

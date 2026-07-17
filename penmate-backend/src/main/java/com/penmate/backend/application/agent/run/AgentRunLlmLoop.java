@@ -70,7 +70,8 @@ public class AgentRunLlmLoop {
                     pending.operatorId() == null ? request.operatorId() : pending.operatorId(),
                     request.traceId(), pending.toolContextJson(),
                     pending.idempotencyKey(), continuation.llmTurnIndex(), pending.toolCallId(), null,
-                    pending.resumePayloadJson(), "APPROVED", pending.approvalId().toString()
+                    pending.resumePayloadJson(), "APPROVED", pending.approvalId().toString(),
+                    request.executionToken()
             ));
             if (result == null || !"SUCCESS".equals(result.status())) {
                 String message = result == null ? "Approved tool call returned no result" : result.errorMessage();
@@ -102,7 +103,8 @@ public class AgentRunLlmLoop {
                         request.projectId(), request.runId(), request.sessionId(), request.turnId(),
                         sibling.functionName(), sibling.argumentsJson(), request.operatorId(), request.traceId(),
                         json(continuation), request.runId() + ":" + sibling.id(), continuation.llmTurnIndex(),
-                        sibling.id(), json(siblingCalls), json(messages), null, null
+                        sibling.id(), json(siblingCalls), json(messages), null, null,
+                        request.executionToken()
                 ));
                 if (siblingResult == null) {
                     siblingResult = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
@@ -223,7 +225,8 @@ public class AgentRunLlmLoop {
                         json(toolCallPayloads),
                         json(messages),
                         null,
-                        null
+                        null,
+                        request.executionToken()
                 ));
                 if (result == null) {
                     result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");

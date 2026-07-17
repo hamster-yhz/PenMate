@@ -77,6 +77,14 @@ public class AgentRunContextArtifactService {
         throw BusinessException.notFound("Run context artifact not found");
     }
 
+    public ResolvedArtifact loadLatestContextForRun(Long runId) {
+        AgentArtifact row = artifacts.findLatest(runId, "context.resolved");
+        if (row == null) {
+            throw BusinessException.notFound("Run context artifact not found");
+        }
+        return load(row.artifactId());
+    }
+
     public ArtifactRef savePromptPlan(Long runId, PromptPlan plan, PromptManifest manifest) {
         String json = json(new PromptArtifact(1, plan, manifest));
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);

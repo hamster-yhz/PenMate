@@ -70,12 +70,9 @@ public class AgentRunExecutor {
         this.successorService = successorService;
     }
 
-    public void execute(Long runId, String traceId) {
-        execute(runId, traceId, null);
-    }
-
     public void execute(Long runId, String traceId, AgentRunLease lease) {
         Objects.requireNonNull(runId, "runId must not be null");
+        Objects.requireNonNull(lease, "lease must not be null");
         AgentRunInput input = runRepository.findInput(runId);
         if (input == null) {
             throw new IllegalArgumentException("Agent run input not found: " + runId);
@@ -165,7 +162,8 @@ public class AgentRunExecutor {
                 traceId,
                 promptMessages(promptPlan, input.promptSnapshot()),
                 executionConfig,
-                userId
+                userId,
+                lease.executionToken()
         ));
 
         if (loopResult.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
@@ -198,11 +196,8 @@ public class AgentRunExecutor {
         if (lease != null) leaseService.complete(lease);
     }
 
-    public void resume(Long runId, String traceId) {
-        resume(runId, traceId, null);
-    }
-
     private void resume(Long runId, String traceId, AgentRunLease lease) {
+        Objects.requireNonNull(lease, "lease must not be null");
         AgentRun run = runRepository.findRun(runId);
         AgentRunInput input = runRepository.findInput(runId);
         if (run == null || input == null) throw new IllegalArgumentException("Agent run not found: " + runId);
@@ -225,7 +220,7 @@ public class AgentRunExecutor {
                 : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
         AgentRunLoopResult result = llmLoop.resumeApproved(new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId, List.of(), executionConfig,
-                run.ownerUserId()), pending);
+                run.ownerUserId(), lease.executionToken()), pending);
         pendingApprovals.markStatus(pending.approvalId(), "APPROVED", "COMPLETED");
         if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
             AgentEvent waiting = eventPublisher.publish(runId, "run.waiting_approval", Map.of("approvalId", result.approvalId()));
@@ -276,7 +271,8 @@ public class AgentRunExecutor {
         leaseService.assertOwned(lease);
         AgentRunLoopResult result = llmLoop.execute(new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
-                promptMessages(promptArtifact.plan(), input.promptSnapshot()), executionConfig, run.ownerUserId()));
+                promptMessages(promptArtifact.plan(), input.promptSnapshot()), executionConfig, run.ownerUserId(),
+                lease.executionToken()));
         finishRecoveredRun(runId, result, state, lease);
     }
 

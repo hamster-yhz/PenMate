@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
+import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
+import com.penmate.backend.application.todo.TodoCrudApplicationService;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
@@ -10,8 +12,21 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class TodoCrudToolHandlerTest {
+
+    @Test
+    void classifies_only_list_as_read_only() {
+        TodoCrudToolHandler handler = new TodoCrudToolHandler(mock(TodoCrudApplicationService.class));
+        ToolCallRequest list = new ToolCallRequest(1L, 11L, 2L, "todo_crud",
+                "{\"operation\":\"list\",\"sessionId\":2}", 4L, "trace", "{}", "idem");
+        ToolCallRequest create = new ToolCallRequest(1L, 11L, 2L, "todo_crud",
+                "{\"operation\":\"create\",\"sessionId\":2}", 4L, "trace", "{}", "idem");
+
+        assertThat(handler.mutatesState(list)).isFalse();
+        assertThat(handler.mutatesState(create)).isTrue();
+    }
 
     @Test
     void UT_APP_AGENT_TODO_CRUD_TOOL_DEFINITION_SHOULD_EXPOSE_PROVIDER_COMPATIBLE_TOP_LEVEL_SCHEMA_AND_NON_APPROVAL_GOVERNANCE() throws Exception {

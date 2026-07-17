@@ -52,6 +52,8 @@ public class ToolCallApplicationService {
         ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         String operationCode = extractOperationCode(request);
         if (decision.approvalRequired()) {
+            ToolCallResult validationFailure = toolCallExecutionService.validate(request);
+            if (validationFailure != null) return validationFailure;
             ToolApprovalView approvalView = toolApprovalViewFactory.create(descriptor, decision);
             ApprovalRequest approvalRequest = approvalApplicationService.create(new CreateApprovalCommand(
                     request.projectId(),

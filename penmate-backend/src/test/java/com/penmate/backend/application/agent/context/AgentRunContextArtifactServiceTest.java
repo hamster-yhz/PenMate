@@ -37,11 +37,14 @@ class AgentRunContextArtifactServiceTest {
                 89L, 70001L, null, "prompt.composed", "{}", 2, null));
         when(artifacts.findById(88L)).thenReturn(new AgentArtifact(
                 88L, 70001L, null, "context.resolved", objectMapper.writeValueAsString(ref), content.length(), null));
+        when(artifacts.findLatest(70001L, "context.resolved")).thenReturn(new AgentArtifact(
+                88L, 70001L, null, "context.resolved", objectMapper.writeValueAsString(ref), content.length(), null));
         when(storage.readText("context-key")).thenReturn(content);
 
         var loaded = service.loadContextForRun(70001L, List.of(88L, 89L));
 
         assertThat(loaded.runId()).isEqualTo(70001L);
         assertThat(loaded.contextEpochId()).isEqualTo(99L);
+        assertThat(service.loadLatestContextForRun(70001L)).isEqualTo(loaded);
     }
 }

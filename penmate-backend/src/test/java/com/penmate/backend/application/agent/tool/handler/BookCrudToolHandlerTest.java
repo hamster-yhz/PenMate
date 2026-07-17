@@ -20,6 +20,12 @@ class BookCrudToolHandlerTest {
     private final BookCrudToolHandler handler = new BookCrudToolHandler(novelApplicationService);
 
     @Test
+    void classifies_only_list_as_read_only() {
+        assertThat(handler.mutatesState(request("{\"operation\":\"list\"}"))).isFalse();
+        assertThat(handler.mutatesState(request("{\"operation\":\"create\"}"))).isTrue();
+    }
+
+    @Test
     void UT_APP_AGENT_BOOK_CRUD_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_WHEN_OPERATION_MISSING() {
         ToolCallRequest request = request("{}");
 
