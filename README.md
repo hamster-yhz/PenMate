@@ -2,185 +2,308 @@
 
 # ✒️ PenMate
 
-### AI 长篇小说创作工作台 · 从灵感、设定到正文交付的一体化写作伙伴
+### 面向长篇小说作者的 AI Agent 创作工作台
 
 <p>
-  <img alt="Java" src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" />
-  <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" />
-  <img alt="Vue" src="https://img.shields.io/badge/Vue-3-42B883?style=for-the-badge&logo=vuedotjs&logoColor=white" />
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-  <img alt="Docker" src="https://img.shields.io/badge/Docker_Compose-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+  <img alt="Agentic Writing" src="https://img.shields.io/badge/Agentic_Writing-Workbench-7C3AED?style=for-the-badge" />
+  <img alt="Story Bible" src="https://img.shields.io/badge/Story_Bible-Memory-2563EB?style=for-the-badge" />
+  <img alt="Human in the Loop" src="https://img.shields.io/badge/HITL-Approval-059669?style=for-the-badge" />
+  <img alt="RAG" src="https://img.shields.io/badge/RAG-Context-DC2626?style=for-the-badge" />
 </p>
 
-PenMate 是一个面向小说作者的 AI 创作系统：它把 **大纲、章节、故事圣经、文风、RAG 记忆、插件工具与人类审批** 连接到同一个 Workbench，让 AI 不只是“续写”，而是成为可控、可追溯、可迭代的写作协作者。
+PenMate 不是一个简单的“AI 续写框”。它更像一位懂长篇小说结构的创作搭档：能理解你的作品设定、章节进度、人物关系、文风偏好和历史上下文，并在需要修改关键设定时先向你确认。
 
-[功能亮点](#-功能亮点) · [技术架构](#-技术架构) · [快速开始](#-快速开始) · [部署](#-部署) · [项目结构](#-项目结构)
+**目标：让 AI 参与创作，但不夺走作者的控制权。**
+
+[用户体验](#-用户体验) · [Agent 架构](#-agent-架构) · [核心能力](#-核心能力) · [快速开始](#-快速开始) · [部署](#-部署)
 
 </div>
 
 ---
 
-## ✨ 功能亮点
+## 🌟 用户体验
 
-| 模块 | 能力 |
-| --- | --- |
-| 🧠 AI Agent 创作 | 基于上下文、章节草稿、风格约束与检索记忆进行智能生成，支持任务状态流转与生成链路追踪。 |
-| 📚 Story Bible 故事圣经 | 管理角色、地点、组织、世界观、关系与演化记录，帮助长篇创作保持一致性。 |
-| 🔎 RAG 记忆检索 | 接入向量数据库检索创作资料与历史设定，为 Agent 提供可追踪上下文。 |
-| 📝 Workbench 写作台 | 左侧大纲、中间编辑器、右侧 Agent 面板组合式工作流，覆盖构思、生成、编辑与应用。 |
-| ✅ HITL 人类审批 | 对高风险写入动作生成审批卡片，确认后再落库，避免 AI 自动破坏关键设定。 |
-| 🔌 插件与工具调用 | 支持工具调用日志、降级策略与质量审查/故事圣经更新等工具化能力。 |
-| 🔐 模型与密钥管理 | 支持模型配置、API Key 加密存储、用户偏好与安全设置。 |
-| 🚀 Docker 化部署 | 提供本地/生产 Compose、GHCR 镜像流水线、SSH 部署与回滚工作流。 |
+PenMate 围绕小说作者的真实工作流设计：
+
+### 1. 从作品开始，而不是从空白聊天开始
+
+作者可以先创建作品，维护卷、章、大纲和正文草稿。AI 每次生成时都会围绕当前作品上下文工作，而不是只依赖一条孤立 prompt。
+
+### 2. 在 Workbench 中边写边协作
+
+Workbench 将常见写作任务放在一个界面里：
+
+- 左侧：作品结构、卷章、大纲、故事圣经入口
+- 中间：正文编辑器与版本预览
+- 右侧：Agent 对话、生成进度、工具调用、审批卡片
+
+作者可以让 Agent 执行诸如：
+
+- “根据这一章大纲扩写正文”
+- “保持当前文风，补一段人物冲突”
+- “检查这段是否违反已有设定”
+- “把新出现的组织加入故事圣经，但先让我确认”
+- “参考前文伏笔，生成下一场戏”
+
+### 3. AI 可以建议，但关键写入需要作者点头
+
+长篇创作最怕 AI 自作主张改设定。PenMate 对高风险动作采用 **Human-in-the-Loop**：
+
+1. Agent 发现可能需要新增或修改世界观、角色、地点、关系等设定。
+2. 系统生成审批卡片。
+3. 作者确认后才写入 Story Bible 或正文。
+4. 所有变更都有状态和日志可追踪。
+
+### 4. 写得越久，Agent 越懂这本书
+
+PenMate 将长篇小说拆成可检索、可引用、可演化的上下文资产：
+
+- 已写章节
+- 大纲与章节摘要
+- Story Bible 设定
+- 角色关系与演化
+- 文风规则
+- Agent 历史对话与工具调用记录
+- RAG 检索片段
+
+这让 Agent 能在长篇创作中持续保持一致性。
 
 ---
 
-## 🧭 产品体验
+## 🧠 Agent 架构
 
-```mermaid
-flowchart LR
-  A["灵感 / 写作指令"] --> B["Agent 编排"]
-  B --> C["上下文构建"]
-  C --> C1["章节与大纲"]
-  C --> C2["Story Bible"]
-  C --> C3["RAG 检索"]
-  C --> C4["文风约束"]
-  B --> D["模型生成"]
-  D --> E["流式输出"]
-  E --> F["人工审阅"]
-  F --> G{"需要写入设定?"}
-  G -- 是 --> H["审批卡片"]
-  H --> I["确认后落库"]
-  G -- 否 --> J["应用到编辑器"]
-  I --> J
-```
-
----
-
-## 🏗 技术架构
-
-PenMate 采用前后端分离 + DDD 分层后端 + 容器化基础设施：
+PenMate 的核心是一个面向小说创作的 Agent 编排系统。它不追求“无限自治”，而是追求 **可控、可观测、可审批、可扩展**。
 
 ```mermaid
 flowchart TB
-  subgraph Client["前端 · penmate-frontend"]
-    Vue["Vue 3 + TypeScript + Vite"]
-    UI["Ant Design Vue"]
-    WB["Workbench / Bookshelf / Profile / Admin"]
-  end
+  User["作者指令"] --> Orchestrator["Main Orchestrator\n创作主编排器"]
 
-  subgraph Server["后端 · penmate-backend"]
-    API["REST API / SSE"]
-    App["Application Services"]
-    Domain["Domain Model"]
-    Infra["MyBatis / Flyway / Integrations"]
-    Agent["Agent Orchestrator"]
-  end
+  Orchestrator --> Preflight["Preflight\n任务预检"]
+  Orchestrator --> Context["Context Builder\n上下文构建"]
+  Orchestrator --> Planner["Generation Strategy\n生成策略"]
+  Orchestrator --> ToolRouter["Tool Router\n工具路由"]
+  Orchestrator --> Stream["Event Stream\n流式事件"]
 
-  subgraph Data["基础设施"]
-    MySQL[("MySQL 8.4")]
-    Redis[("Redis 7")]
-    Milvus[("Milvus Vector DB")]
-    S3[("S3 Compatible Storage")]
-    LLM["OpenAI-compatible / Anthropic / Gemini"]
-  end
+  Context --> NovelCtx["作品 / 卷 / 章"]
+  Context --> OutlineCtx["大纲与摘要"]
+  Context --> StyleCtx["文风约束"]
+  Context --> StoryBibleCtx["Story Bible"]
+  Context --> RagCtx["RAG 检索"]
+  Context --> SessionCtx["会话记忆"]
 
-  Vue --> UI --> WB --> API
-  API --> App --> Domain
-  App --> Agent
-  App --> Infra
-  Infra --> MySQL
-  Infra --> Redis
-  Infra --> Milvus
-  Infra --> S3
-  Agent --> LLM
+  ToolRouter --> ReviewTool["质量审查工具"]
+  ToolRouter --> BibleSearch["设定检索工具"]
+  ToolRouter --> BibleUpdate["设定更新工具"]
+  ToolRouter --> PluginTools["插件工具"]
+
+  Planner --> Model["LLM Provider"]
+  Model --> Stream
+
+  ToolRouter --> Approval{"高风险写入?"}
+  Approval -- 是 --> Hitl["审批卡片"]
+  Hitl --> Apply["作者确认后应用"]
+  Approval -- 否 --> Apply
+  Apply --> Persist["正文 / Story Bible / 日志"]
 ```
 
-### 技术栈
+### 架构原则
 
-**Frontend**
-
-- Vue 3 / Vue Router / TypeScript
-- Vite / Vitest / Vue Test Utils
-- Ant Design Vue / Axios / Less
-
-**Backend**
-
-- Java 21 / Spring Boot 3.3
-- Spring Security / JWT / SpringDoc OpenAPI
-- MyBatis / Flyway / MySQL
-- Redis / Actuator / Prometheus metrics
-- LangChain4j / 多模型 Provider 接入
-- S3 SDK / Milvus 向量检索
-
-**DevOps**
-
-- Docker Compose
-- GitHub Actions
-- GHCR 镜像发布
-- SSH 远程部署与回滚
+| 原则 | 说明 |
+| --- | --- |
+| 🎛 作者主权 | Agent 负责生成、建议和辅助决策，最终采用权仍属于作者。 |
+| 🧩 单主编排 | 以 Main Orchestrator 作为主链路入口，避免多个 Agent 抢控制权。 |
+| 🧠 上下文优先 | 生成前先构建作品、章节、文风、故事圣经、RAG 与会话上下文。 |
+| 🧰 工具可审计 | 工具调用有输入摘要、输出摘要、耗时、状态与任务关联。 |
+| ✅ 高风险审批 | 涉及设定落库、角色关系修改等动作进入审批流。 |
+| 📡 事件驱动体验 | 通过生成事件把 token、工具调用、等待审批、完成/失败状态同步到界面。 |
+| 🧱 可演进边界 | Agent 能力在既有 DDD 模块边界内增强，不以“重写系统”为代价。 |
 
 ---
 
-## 📦 项目结构
+## 🧬 Agent 运行链路
+
+一次创作请求大致会经历以下阶段：
+
+```mermaid
+sequenceDiagram
+  participant U as 作者
+  participant W as Workbench
+  participant A as Agent Orchestrator
+  participant C as Context Builder
+  participant T as Tool System
+  participant M as LLM
+  participant H as Approval
+  participant S as Storage
+
+  U->>W: 输入写作指令
+  W->>A: 创建生成任务
+  A->>C: 聚合上下文
+  C-->>A: 章节 / 大纲 / 文风 / Story Bible / RAG
+  A->>T: 可选工具调用
+  T-->>A: 工具结果与日志
+  A->>M: 发起生成
+  M-->>W: 流式 token / 事件
+  A->>H: 如需写入设定则创建审批
+  H-->>U: 展示审批卡片
+  U->>H: 通过或驳回
+  H->>S: 通过后写入正文或 Story Bible
+  S-->>W: 更新工作台状态
+```
+
+### Agent 状态模型
+
+```text
+pending -> running -> waiting_approval -> done -> applied
+                         |                 |
+                         v                 v
+                      cancelled          failed
+```
+
+这些状态让用户可以清楚知道：AI 是正在写、正在调用工具、等待作者确认，还是已经可应用到编辑器。
+
+---
+
+## 📚 Story Bible：Agent 的长期记忆
+
+Story Bible 是 PenMate 区别于普通 AI 写作工具的关键模块。它让 Agent 在长篇创作中记住并遵守作品事实。
+
+可承载的信息包括：
+
+- 角色：身份、动机、能力、关系、状态变化
+- 地点：地理位置、势力范围、历史事件
+- 组织：层级、目标、冲突关系
+- 世界观：规则、禁忌、力量体系、时代背景
+- 线索：伏笔、悬念、未回收信息
+- 演化：某个设定在章节推进中的变化轨迹
+
+Agent 在生成时可以检索 Story Bible，并在发现新设定时通过审批卡片建议写入。
+
+---
+
+## 🔎 RAG：让 Agent 带着证据写作
+
+PenMate 使用 RAG 为 Agent 提供可检索上下文，而不是把全部历史文本一次性塞进 prompt。
+
+适合进入 RAG 的内容：
+
+- 已完成章节
+- 人物设定与关系
+- 世界观资料
+- 历史对话摘要
+- 风格样例
+- 外部素材或研究笔记
+
+RAG 的目标不是“越多越好”，而是让 Agent 在生成前拿到与当前场景最相关的上下文片段，并留下检索记录，方便后续排查生成质量。
+
+---
+
+## 🛠 工具系统与审批机制
+
+PenMate 的 Agent 可以调用工具，但工具调用不是黑箱。
+
+### 工具类型示例
+
+| 工具 | 用途 |
+| --- | --- |
+| 设定检索工具 | 在 Story Bible 中查找角色、地点、组织、世界观规则。 |
+| 设定更新工具 | 生成新增/修改设定的候选变更，并交由作者审批。 |
+| 质量审查工具 | 检查剧情一致性、角色行为合理性、文风偏移等问题。 |
+| 插件工具 | 为特定创作场景扩展能力，例如资料查询、结构分析、文本改写。 |
+
+### 审批机制
+
+当 Agent 准备执行高风险写入时，系统会创建审批卡片：
+
+```mermaid
+flowchart LR
+  A["Agent 发现新设定"] --> B["生成变更候选"]
+  B --> C["审批卡片"]
+  C --> D{"作者决定"}
+  D -- 通过 --> E["写入 Story Bible"]
+  D -- 驳回 --> F["保留为对话上下文或丢弃"]
+```
+
+这使 PenMate 更适合严肃长篇创作：AI 可以主动辅助，但不会绕过作者修改作品事实。
+
+---
+
+## 🧩 核心能力
+
+| 用户问题 | PenMate 如何解决 |
+| --- | --- |
+| AI 忘记前文 | 通过 Story Bible、RAG 与章节上下文构建长期记忆。 |
+| AI 改坏设定 | 高风险写入进入审批流，作者确认后才落库。 |
+| 长篇人物关系复杂 | 结构化管理角色、组织、地点、关系与演化记录。 |
+| 不知道 AI 正在干嘛 | 生成任务、工具调用、审批状态、日志全部可追踪。 |
+| 文风容易飘 | 每次生成注入文风约束与样例上下文。 |
+| 生成内容难以落到正文 | Workbench 支持生成、预览、应用到编辑器的闭环。 |
+
+---
+
+## 🧱 系统组成
+
+这里只保留必要的工程信息，方便开发和部署：
 
 ```text
 PenMate/
-├─ penmate-frontend/          # Vue 3 + Vite 前端应用
-│  ├─ src/api/                # API 客户端与类型
-│  ├─ src/components/         # 业务组件：工作台、书架、登录、个人设置等
-│  ├─ src/composables/        # 组合式业务逻辑
-│  └─ src/views/              # 页面：Home / Login / MyBooks / Workbench / Profile / Admin
-├─ penmate-backend/           # Spring Boot 后端服务
-│  ├─ src/main/java/...       # DDD 分层：interfaces / application / domain / infrastructure
-│  └─ src/main/resources/     # application.yml、Flyway migration、Agent prompts
-├─ docs/                      # PRD、技术分析、部署文档与演进计划
-├─ scripts/                   # 部署脚本
-├─ docker-compose.yml         # 本地开发 Compose
-├─ docker-compose.prod.yml    # 生产部署 Compose
-└─ .github/workflows/         # CI、部署与回滚流水线
+├─ penmate-frontend/          # 作者工作台界面
+├─ penmate-backend/           # Agent 编排、业务服务、数据与集成层
+├─ docs/                      # PRD、架构分析、计划与部署文档
+├─ scripts/                   # 部署与运维脚本
+├─ docker-compose.yml         # 本地完整环境
+└─ docker-compose.prod.yml    # 生产部署环境
 ```
+
+核心依赖：
+
+- LLM：OpenAI-compatible / Anthropic / Gemini 等模型 Provider
+- 记忆：MySQL + Redis + Milvus + S3 兼容存储
+- 通信：REST API + 生成事件流
+- 部署：Docker Compose + GitHub Actions + GHCR
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 环境要求
-
-- JDK 21+
-- Maven 3.9+
-- Node.js 22+ / npm
-- Docker + Docker Compose
-- MySQL、Redis、Milvus 与 S3 兼容存储（可通过 Compose 或外部服务提供）
-
-### 2. 准备配置
+### 1. 准备配置
 
 ```bash
 cp .env.example .env
 ```
 
-按需填写 `.env` 中的数据库、Redis、S3、Milvus、LLM 与密钥配置。开发阶段可开启：
+开发阶段可以先使用 Mock LLM：
 
 ```env
 LLM_MOCK_ENABLED=true
 ```
 
-> 不要提交真实 `.env`、API Key、数据库密码或对象存储密钥。
+如需真实模型，填写：
 
-### 3. 启动后端
+```env
+LLM_PROVIDER=openai
+LLM_BASE_URL=https://api.openai.com
+LLM_API_KEY=<your-api-key>
+LLM_MODEL_NAME=gpt-4o-mini
+```
+
+### 2. 启动完整环境
+
+```bash
+docker compose --env-file .env up -d --build
+```
+
+访问：`http://localhost:8090`
+
+### 3. 本地开发模式
+
+后端：
 
 ```bash
 cd penmate-backend
 mvn spring-boot:run
 ```
 
-后端默认地址：
-
-- API: `http://localhost:8080/api`
-- Health: `http://localhost:8080/actuator/health`
-- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
-
-### 4. 启动前端
+前端：
 
 ```bash
 cd penmate-frontend
@@ -188,100 +311,53 @@ npm install
 npm run dev
 ```
 
-前端默认地址：`http://localhost:5173`
-
-### 5. 使用 Docker Compose
-
-如果你希望以容器方式启动完整应用：
-
-```bash
-docker compose --env-file .env up -d --build
-```
-
-默认访问：`http://localhost:8090`
-
-停止服务：
-
-```bash
-docker compose --env-file .env down
-```
-
 ---
 
-## 🧪 测试与质量门禁
-
-### 后端
+## 🧪 质量检查
 
 ```bash
+# backend
 cd penmate-backend
 mvn -B verify
-```
 
-### 前端
-
-```bash
+# frontend
 cd penmate-frontend
-npm run test:run
 npm run test:coverage
 npm run build
 ```
-
-GitHub Actions 中包含 TDD/覆盖率质量门禁、镜像构建、部署和回滚工作流。
 
 ---
 
 ## 🚢 部署
 
-生产环境推荐使用 `docker-compose.prod.yml` 搭配 GitHub Actions：
+生产部署使用 `docker-compose.prod.yml` 与 GitHub Actions：
 
-1. 配置 GitHub Secrets：`SSH_HOST`、`SSH_USER`、`SSH_PRIVATE_KEY`、`GHCR_USERNAME`、`GHCR_TOKEN` 等。
-2. 在服务器准备 `/opt/penmate/.env` 并填写生产密钥。
-3. 推送到 `master` / `main` 或手动触发 workflow。
-4. CI 构建前后端镜像并推送到 GHCR。
-5. 服务器通过 SSH 拉取镜像并重启 Compose 服务。
+1. CI 构建前后端镜像并推送到 GHCR。
+2. 服务器通过 SSH 拉取最新镜像。
+3. Compose 重启应用、数据库、Redis、Milvus 等服务。
+4. 支持手动 workflow 回滚到指定镜像版本。
 
-更多细节见：[`docs/deployment/docker-ssh.md`](docs/deployment/docker-ssh.md)
-
----
-
-## 🔐 安全提示
-
-- `.env`、生产密钥、模型 API Key 不应提交到 Git。
-- 生产环境务必替换 `JWT_SECRET` 与 `MODEL_KEY_ENCRYPTION_KEY_BASE64`。
-- 数据库、Redis、Milvus、对象存储建议仅暴露在内网或受控网络。
-- 高风险 AI 写入动作应通过审批卡片确认后再应用。
+详细说明：[`docs/deployment/docker-ssh.md`](docs/deployment/docker-ssh.md)
 
 ---
 
 ## 🗺 Roadmap
 
-- [x] 小说书架、章节编辑与工作台基础体验
-- [x] Agent 生成链路、工具调用与任务状态管理
-- [x] Story Bible 故事圣经管理
-- [x] RAG / Milvus 检索基础设施
-- [x] Docker Compose 与 GitHub Actions 部署
-- [ ] 更丰富的插件生态与质量评估工具
-- [ ] 更细粒度的成本、Token 与可观测性面板
-- [ ] 多作品、多团队协作与权限体验增强
-
----
-
-## 🤝 Contributing
-
-欢迎提交 Issue 和 Pull Request。建议先运行对应测试与构建命令，确保前后端质量门禁通过。
-
-```bash
-# backend
-cd penmate-backend && mvn -B verify
-
-# frontend
-cd penmate-frontend && npm run test:coverage && npm run build
-```
+- [x] 作者工作台：书架、章节编辑、Agent 面板
+- [x] Agent 生成任务与状态流转
+- [x] Story Bible 结构化设定管理
+- [x] RAG 检索与向量基础设施
+- [x] 工具调用与审批卡片
+- [x] Docker / CI / 远程部署
+- [ ] 更细粒度的 Agent 评估与质量评分
+- [ ] 更强的长篇剧情规划能力
+- [ ] 更完善的角色关系图谱与伏笔追踪
+- [ ] 多作品、多作者协作体验
 
 ---
 
 <div align="center">
 
-**PenMate · Write longer, remember better, revise smarter.**
+**PenMate · 让 AI 成为懂设定、守边界、可协作的小说创作伙伴。**
 
 </div>
