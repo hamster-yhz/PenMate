@@ -25,6 +25,10 @@
         <testcontainers.version>1.20.2</testcontainers.version>
         <langchain4j.version>0.35.0</langchain4j.version>
         <aws.sdk.version>2.30.31</aws.sdk.version>
+        <penmate.test.database.mode>local</penmate.test.database.mode>
+        <penmate.test.database.url>jdbc:postgresql://localhost:5432/penmate_test</penmate.test.database.url>
+        <penmate.test.database.username>postgres</penmate.test.database.username>
+        <penmate.test.database.password>postgres</penmate.test.database.password>
     </properties>
 
     <dependencies>
@@ -113,7 +117,7 @@
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-mysql</artifactId>
+            <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 <!--        <dependency>-->
 <!--            <groupId>org.springframework.boot</groupId>-->
@@ -151,8 +155,8 @@
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -212,11 +216,6 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
-        </dependency>
 <!--        <dependency>-->
 <!--            <groupId>org.springframework.amqp</groupId>-->
 <!--            <artifactId>spring-rabbit-test</artifactId>-->
@@ -236,7 +235,7 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>mysql</artifactId>
+            <artifactId>postgresql</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
@@ -256,6 +255,18 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <penmate.test.database.mode>${penmate.test.database.mode}</penmate.test.database.mode>
+                        <penmate.test.database.url>${penmate.test.database.url}</penmate.test.database.url>
+                        <penmate.test.database.username>${penmate.test.database.username}</penmate.test.database.username>
+                        <penmate.test.database.password>${penmate.test.database.password}</penmate.test.database.password>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -308,5 +319,23 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>local-postgresql-tests</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <penmate.test.database.mode>local</penmate.test.database.mode>
+            </properties>
+        </profile>
+        <profile>
+            <id>ci-postgresql-tests</id>
+            <properties>
+                <penmate.test.database.mode>container</penmate.test.database.mode>
+            </properties>
+        </profile>
+    </profiles>
 
 </project>

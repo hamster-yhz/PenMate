@@ -1,19 +1,15 @@
 services:
-  mysql:
-    image: mariadb:10.11
+  postgres:
+    image: postgres:18.4-alpine
     environment:
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASS}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
       TZ: ${TZ:-Asia/Shanghai}
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -106,19 +102,17 @@ services:
     image: ${BACKEND_IMAGE}
     environment:
       SERVER_PORT: 8080
-      DB_HOST: mysql
-      DB_PORT: 3306
+      DB_HOST: postgres
+      DB_PORT: 5432
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
-      DB_USE_SSL: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_USER: ${REDIS_USER:-}
       REDIS_PASS: ${REDIS_PASS:-}
       REDIS_DB: ${REDIS_DB:-0}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
-      FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-true}
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: ${JWT_ISSUER:-penmate}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
@@ -136,17 +130,19 @@ services:
       VECTOR_ENDPOINT: http://milvus:19530
       VECTOR_API_KEY: ${VECTOR_API_KEY:-}
       VECTOR_COLLECTION_PREFIX: ${VECTOR_COLLECTION_PREFIX:-penmate_}
-      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-gpt-4o-mini}
-      LLM_MOCK_ENABLED: ${LLM_MOCK_ENABLED:-true}
+      BOOTSTRAP_RECONCILE: ${BOOTSTRAP_RECONCILE:-false}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?BOOTSTRAP_ADMIN_EMAIL is required}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
+      BOOTSTRAP_MODEL_PROVIDER: ${BOOTSTRAP_MODEL_PROVIDER:?BOOTSTRAP_MODEL_PROVIDER is required}
+      BOOTSTRAP_MODEL_BASE_URL: ${BOOTSTRAP_MODEL_BASE_URL:?BOOTSTRAP_MODEL_BASE_URL is required}
+      BOOTSTRAP_MODEL_API_KEY: ${BOOTSTRAP_MODEL_API_KEY:?BOOTSTRAP_MODEL_API_KEY is required}
+      BOOTSTRAP_MODEL_NAME: ${BOOTSTRAP_MODEL_NAME:?BOOTSTRAP_MODEL_NAME is required}
       OPENAPI_ENABLED: ${OPENAPI_ENABLED:-false}
       SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-false}
       HEALTH_SHOW_DETAILS: ${HEALTH_SHOW_DETAILS:-never}
       JAVA_OPTS: ${JAVA_OPTS:-}
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -166,7 +162,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:
   etcd-data:
   milvus-data:

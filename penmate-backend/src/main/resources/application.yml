@@ -7,10 +7,10 @@ spring:
   application:
     name: penmate-backend
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:penmate}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=true
-    username: ${DB_USER:root}
-    password: ${DB_PASS:root}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:penmate}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+    driver-class-name: org.postgresql.Driver
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -22,7 +22,7 @@ spring:
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     locations: classpath:db/migration
-    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+    baseline-on-migrate: false
   rabbitmq:
     host: ${RABBIT_HOST:localhost}
     port: ${RABBIT_PORT:5672}
@@ -65,12 +65,16 @@ penmate:
     endpoint: ${VECTOR_ENDPOINT:http://localhost:19530}
     api-key: ${VECTOR_API_KEY:}
     collection-prefix: ${VECTOR_COLLECTION_PREFIX:penmate_}
-  llm:
-    provider: ${LLM_PROVIDER:openai}
-    base-url: ${LLM_BASE_URL:https://api.openai.com}
-    api-key: ${LLM_API_KEY:}
-    model-name: ${LLM_MODEL_NAME:gpt-4o-mini}
-    mock-enabled: ${LLM_MOCK_ENABLED:true}
+  bootstrap:
+    reconcile: ${BOOTSTRAP_RECONCILE:false}
+    admin:
+      email: ${BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    model:
+      provider: ${BOOTSTRAP_MODEL_PROVIDER:}
+      base-url: ${BOOTSTRAP_MODEL_BASE_URL:}
+      api-key: ${BOOTSTRAP_MODEL_API_KEY:}
+      model-name: ${BOOTSTRAP_MODEL_NAME:}
 
 mybatis:
   configuration:

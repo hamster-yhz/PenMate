@@ -29,7 +29,7 @@ Environment overrides:
   LOG_DIR            default: .codex-runtime/logs/start-local
 
 Prerequisites:
-  MySQL and Redis are already running locally.
+  PostgreSQL 18.4 and Redis are already running locally.
 EOF
 }
 
@@ -122,7 +122,7 @@ start_backend() {
   echo "Starting backend on port ${BACKEND_PORT}..."
   (
     cd "$BACKEND_DIR"
-    nohup mvn spring-boot:run >"$BACKEND_LOG" 2>&1 &
+    nohup mvn -Dspring-boot.run.profiles=local spring-boot:run >"$BACKEND_LOG" 2>&1 &
     echo $! >"${PID_DIR}/penmate-backend.pid"
   )
 }
@@ -138,7 +138,7 @@ start_frontend() {
 }
 
 echo "Starting PenMate local development services without Docker."
-echo "Assuming local MySQL and Redis are already running."
+echo "Assuming local PostgreSQL 18.4 and Redis are already running."
 
 [[ -d "$BACKEND_DIR" ]] || { echo "Backend directory not found: ${BACKEND_DIR}" >&2; exit 1; }
 [[ -d "$FRONTEND_DIR" ]] || { echo "Frontend directory not found: ${FRONTEND_DIR}" >&2; exit 1; }

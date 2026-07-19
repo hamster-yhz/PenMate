@@ -19,7 +19,7 @@ if "%~1"=="--help" goto :usage
 if "%~1"=="/?" goto :usage
 
 echo Starting PenMate local development services without Docker.
-echo Assuming local MySQL and Redis are already running.
+echo Assuming local PostgreSQL 18.4 and Redis are already running.
 
 if not exist "%BACKEND_DIR%\" (
   echo Backend directory not found: %BACKEND_DIR%
@@ -95,7 +95,7 @@ echo   WAIT_SECONDS       default: 90
 echo   LOG_DIR            default: .codex-runtime\logs\start-local
 echo.
 echo Prerequisites:
-echo   MySQL and Redis are already running locally.
+echo   PostgreSQL 18.4 and Redis are already running locally.
 exit /b 0
 
 :backend_healthy
@@ -113,7 +113,7 @@ exit /b %errorlevel%
 :start_backend
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>nul
 echo Starting backend on port %BACKEND_PORT%...
-start "PenMate Backend" cmd /k "cd /d ""%BACKEND_DIR%"" && mvn spring-boot:run 1^>^> ""%LOG_DIR%\backend.log"" 2^>^&1"
+start "PenMate Backend" cmd /k "cd /d ""%BACKEND_DIR%"" && mvn -Dspring-boot.run.profiles=local spring-boot:run 1^>^> ""%LOG_DIR%\backend.log"" 2^>^&1"
 exit /b 0
 
 :start_frontend

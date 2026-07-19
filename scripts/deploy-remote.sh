@@ -66,7 +66,7 @@ echo "BACKEND_IMAGE=${BACKEND_IMAGE:-<empty>}"
 echo "FRONTEND_IMAGE=${FRONTEND_IMAGE:-<empty>}"
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" pull
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d --remove-orphans
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d
 
 
 docker image prune -f

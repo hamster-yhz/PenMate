@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/penmate
+    username: postgres
+    password: postgres
+
+penmate:
+  bootstrap:
+    admin:
+      email: admin@penmate.local
+      password: change-me-local
+    model:
+      provider: openai-compatible
+      base-url: http://localhost:11434/v1
+      api-key: replace-me
+      model-name: replace-me
+  test-datasource:
+    url: jdbc:postgresql://localhost:5432/penmate_test
+    username: postgres
+    password: postgres
