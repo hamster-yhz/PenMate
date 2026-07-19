@@ -2,7 +2,6 @@ package com.penmate.backend.application.novel;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelMember;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
@@ -11,7 +10,6 @@ import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
-import com.penmate.backend.application.novel.command.NovelCommands.AddMemberCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterVersionCommand;
@@ -21,7 +19,6 @@ import com.penmate.backend.application.novel.command.NovelCommands.CreateVolumeC
 import com.penmate.backend.application.novel.command.NovelCommands.MoveOutlineNodeCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.MoveChapterCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateChapterCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.UpdateMemberCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateOutlineNodeCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateVolumeCommand;
@@ -429,84 +426,6 @@ public class NovelApplicationService {
         }
          
         log.info("发布章节成功: projectId={}, chapterId={}", projectId, chapterId);
-    }
-
-    /**
-     * 查询项目成员列表。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
-     */
-    public List<NovelMember> listMembers(Long projectId) {
-        List<NovelMember> members = novelGateway.findMembersByProjectId(projectId);
-        log.info("查询项目成员列表: projectId={}, count={}", projectId, members.size());
-        return members;
-    }
-
-    /**
-     * 新增项目成员。
-     *
-     * @param projectId 入参：projectId
-     * @param command 入参：command
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelMember addMember(Long projectId, AddMemberCommand command, Long operatorId, String traceId) {
-        log.info("新增项目成员: projectId={}, userId={}, role={}, operatorId={}", projectId, command.userId(), command.memberRole(), operatorId);
-        NovelMember member = new NovelMember();
-        member.setProjectId(projectId);
-        member.setUserId(command.userId());
-        member.setMemberRole(command.memberRole());
-        int affected = novelGateway.insertMember(member);
-        if (affected != 1) {
-            log.error("新增项目成员失败: projectId={}, userId={}", projectId, command.userId());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to add member");
-        }
-         
-        log.info("新增项目成员成功: projectId={}, userId={}", projectId, command.userId());
-        return listMembers(projectId).stream().filter(m -> command.userId().equals(m.getUserId())).findFirst().orElse(member);
-    }
-
-    /**
-     * 更新成员角色。
-     *
-     * @param projectId 入参：projectId
-     * @param userId 入参：userId
-     * @param command 入参：command
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelMember updateMember(Long projectId, Long userId, UpdateMemberCommand command, Long operatorId, String traceId) {
-        log.info("更新项目成员角色: projectId={}, userId={}, role={}, operatorId={}", projectId, userId, command.memberRole(), operatorId);
-        int affected = novelGateway.updateMemberRole(projectId, userId, command.memberRole());
-        if (affected != 1) {
-            log.warn("更新项目成员角色失败: projectId={}, userId={}, reason=not_found", projectId, userId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Member not found");
-        }
-         
-        log.info("更新项目成员角色成功: projectId={}, userId={}", projectId, userId);
-        return listMembers(projectId).stream().filter(m -> userId.equals(m.getUserId())).findFirst().orElseThrow();
-    }
-
-    /**
-     * 移除项目成员。
-     *
-     * @param projectId 入参：projectId
-     * @param userId 入参：userId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     */
-    public void removeMember(Long projectId, Long userId, Long operatorId, String traceId) {
-        log.info("移除项目成员: projectId={}, userId={}, operatorId={}", projectId, userId, operatorId);
-        int affected = novelGateway.deleteMember(projectId, userId);
-        if (affected != 1) {
-            log.warn("移除项目成员失败: projectId={}, userId={}, reason=not_found", projectId, userId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Member not found");
-        }
-         
-        log.info("移除项目成员成功: projectId={}, userId={}", projectId, userId);
     }
 
     /**

@@ -2,7 +2,6 @@ package com.penmate.backend.infrastructure.persistence.novel;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelMember;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
@@ -21,20 +20,17 @@ public class NovelGatewayImpl implements NovelGateway {
     private final NovelProjectMapper novelProjectMapper;
     private final NovelVolumeMapper novelVolumeMapper;
     private final NovelChapterMapper novelChapterMapper;
-    private final NovelMemberMapper novelMemberMapper;
     private final NovelChapterVersionMapper novelChapterVersionMapper;
     private final NovelOutlineNodeMapper novelOutlineNodeMapper;
 
     public NovelGatewayImpl(NovelProjectMapper novelProjectMapper,
                             NovelVolumeMapper novelVolumeMapper,
                             NovelChapterMapper novelChapterMapper,
-                            NovelMemberMapper novelMemberMapper,
                             NovelChapterVersionMapper novelChapterVersionMapper,
                             NovelOutlineNodeMapper novelOutlineNodeMapper) {
         this.novelProjectMapper = novelProjectMapper;
         this.novelVolumeMapper = novelVolumeMapper;
         this.novelChapterMapper = novelChapterMapper;
-        this.novelMemberMapper = novelMemberMapper;
         this.novelChapterVersionMapper = novelChapterVersionMapper;
         this.novelOutlineNodeMapper = novelOutlineNodeMapper;
     }
@@ -197,45 +193,6 @@ public class NovelGatewayImpl implements NovelGateway {
     public int updateChapterContentMeta(Long projectId, Long chapterId, String objectKey, String etag, Long size, String checksum, String storageProvider) {
         return novelChapterMapper.updateContentMeta(projectId, chapterId, objectKey, etag, size, checksum, storageProvider);
     }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelMemberMapper.findByProjectId(projectId 入参：novelMemberMapper.findByProjectId(projectId
-     * @return 出参：处理结果
-     */
-    @Override
-    public List<NovelMember> findMembersByProjectId(Long projectId) { return novelMemberMapper.findByProjectId(projectId); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelMemberMapper.insert(member 入参：novelMemberMapper.insert(member
-     * @return 出参：处理结果
-     */
-    @Override
-    public int insertMember(NovelMember member) { return novelMemberMapper.insert(member); }
-
-    /**
-     * 更新业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param userId 入参：userId
-     * @param memberRole 入参：memberRole
-     * @return 出参：处理结果
-     */
-    @Override
-    public int updateMemberRole(Long projectId, Long userId, String memberRole) { return novelMemberMapper.updateRole(projectId, userId, memberRole); }
-
-    /**
-     * 删除业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param userId 入参：userId
-     * @return 出参：处理结果
-     */
-    @Override
-    public int deleteMember(Long projectId, Long userId) { return novelMemberMapper.delete(projectId, userId); }
 
     /**
      * 处理业务请求。

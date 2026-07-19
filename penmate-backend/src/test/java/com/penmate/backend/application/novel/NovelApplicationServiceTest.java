@@ -526,15 +526,6 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_REMOVE_MEMBER_NOT_FOUND() {
-        when(novelGateway.deleteMember(920002L, 920005L)).thenReturn(0);
-
-        assertThatThrownBy(() -> novelApplicationService.removeMember(920002L, 920005L, 920001L, "trace-remove-member"))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Member not found");
-    }
-
-    @Test
     void UT_APP_NOVEL_LIST_CHAPTER_VERSIONS_SUCCESS() {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(920002L);

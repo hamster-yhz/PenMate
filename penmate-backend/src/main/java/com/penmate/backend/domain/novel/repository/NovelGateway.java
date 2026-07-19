@@ -2,7 +2,6 @@ package com.penmate.backend.domain.novel.repository;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelMember;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
@@ -50,14 +49,6 @@ public interface NovelGateway {
                                  Long size,
                                  String checksum,
                                  String storageProvider);
-
-    List<NovelMember> findMembersByProjectId(Long projectId);
-
-    int insertMember(NovelMember member);
-
-    int updateMemberRole(Long projectId, Long userId, String memberRole);
-
-    int deleteMember(Long projectId, Long userId);
 
     List<NovelChapterVersion> findVersionsByChapterId(Long chapterId);
 

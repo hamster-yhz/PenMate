@@ -12,17 +12,14 @@ import com.penmate.backend.interfaces.api.novel.dto.CreateChapterVersionDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelOutlineNodeDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelVolumeDto;
-import com.penmate.backend.interfaces.api.novel.dto.AddNovelMemberDto;
 import com.penmate.backend.interfaces.api.novel.dto.CommitChapterContentDto;
 import com.penmate.backend.interfaces.api.novel.dto.MoveNovelOutlineNodeDto;
-import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelMemberDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelChapterDto;
 import com.penmate.backend.interfaces.api.novel.dto.MoveNovelChapterDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelOutlineNodeDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelVolumeDto;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelMember;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -390,88 +387,6 @@ public class NovelController {
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         novelApplicationService.publishChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), requireLongId(operatorId, "operatorId"), traceId);
         return ApiResponse.success("published", traceId);
-    }
-
-    /**
-     * 查询项目成员列表。
-     * <p>流程：读取项目成员关系并返回。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/{projectId}/members")
-    public ApiResponse<List<NovelMember>> listMembers(@PathVariable String projectId,
-                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listMembers(requireLongId(projectId, "projectId")), traceId);
-    }
-
-    /**
-     * 新增项目成员。
-     * <p>流程：组装成员命令 -> 应用服务写入成员关系。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/members")
-    public ApiResponse<NovelMember> addMember(@PathVariable String projectId,
-                                               @Valid @RequestBody AddNovelMemberDto dto,
-                                               @RequestParam("operatorId") String operatorId,
-                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.addMember(
-                requireLongId(projectId, "projectId"),
-                new NovelCommands.AddMemberCommand(requireLongId(dto.getUserId(), "userId"), dto.getMemberRole()),
-                requireLongId(operatorId, "operatorId"),
-                traceId
-        ), traceId);
-    }
-
-    /**
-     * 更新成员角色。
-     * <p>流程：按用户ID更新成员角色与权限范围。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param userId 入参：userId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @org.springframework.web.bind.annotation.PatchMapping("/{projectId}/members/{userId}")
-    public ApiResponse<NovelMember> updateMember(@PathVariable String projectId,
-                                                  @PathVariable String userId,
-                                                   @Valid @RequestBody UpdateNovelMemberDto dto,
-                                                   @RequestParam("operatorId") String operatorId,
-                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.updateMember(
-                requireLongId(projectId, "projectId"),
-                requireLongId(userId, "userId"),
-                new NovelCommands.UpdateMemberCommand(dto.getMemberRole()),
-                requireLongId(operatorId, "operatorId"),
-                traceId
-        ), traceId);
-    }
-
-    /**
-     * 移除项目成员。
-     * <p>流程：校验操作者权限 -> 解除成员关系。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param userId 入参：userId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @DeleteMapping("/{projectId}/members/{userId}")
-    public ApiResponse<String> removeMember(@PathVariable String projectId,
-                                            @PathVariable String userId,
-                                            @RequestParam("operatorId") String operatorId,
-                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.removeMember(requireLongId(projectId, "projectId"), requireLongId(userId, "userId"), requireLongId(operatorId, "operatorId"), traceId);
-        return ApiResponse.success("removed", traceId);
     }
 
     /**
