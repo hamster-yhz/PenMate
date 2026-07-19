@@ -94,6 +94,7 @@ class AgentSessionSchemaMysqlContractTest {
 
         String v11Sql = Files.readString(Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"));
         String v12Sql = Files.readString(Path.of("src/main/resources/db/migration/V12__init_pending_tool_invocations.sql"));
+        String v25Sql = Files.readString(Path.of("src/main/resources/db/migration/V25__backfill_agent_artifact_schema.sql"));
         assertThat(v11Sql)
                 .contains("UNIQUE KEY uk_agent_turns_session_seq (session_id, turn_seq)")
                 .contains("UNIQUE KEY uk_agent_messages_session_seq (session_id, seq_no)")
@@ -109,6 +110,11 @@ class AgentSessionSchemaMysqlContractTest {
                 .contains("UNIQUE KEY uk_agent_run_pending_approvals_idempotency (idempotency_key)")
                 .contains("KEY idx_agent_run_pending_approvals_run_status (run_id, pending_status)")
                 .contains("KEY idx_agent_run_pending_approvals_session_status (session_id, pending_status)");
+        assertThat(v25Sql)
+                .contains("ADD COLUMN event_id BIGINT UNSIGNED NULL")
+                .contains("ADD COLUMN payload_json LONGTEXT NULL")
+                .contains("MODIFY COLUMN payload_json LONGTEXT NOT NULL")
+                .contains("content_type VARCHAR(100) NOT NULL DEFAULT 'application/json'");
     }
 
     private Set<String> columnsOf(String tableName) throws SQLException {
