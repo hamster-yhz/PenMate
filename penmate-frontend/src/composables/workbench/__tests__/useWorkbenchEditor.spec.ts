@@ -149,13 +149,13 @@ describe('useWorkbenchEditor', () => {
     await editor.insertPrefix('> ')
     expect(editor.editorContent.value).toBe('第一行\n> 第二行')
 
-    editor.mergeToEditor({ text: 'AI建议<br/>续写' } as ChatMessageLike)
-    expect(editor.editorContent.value).toContain('AI建议续写')
+    editor.mergeToEditor({ text: 'AI建议\n续写' } as ChatMessageLike)
+    expect(editor.editorContent.value).toContain('AI建议\n续写')
 
     textarea.value = editor.editorContent.value
     textarea.selectionStart = 0
     textarea.selectionEnd = 3
-    editor.replaceSelected({ text: '<b>序章</b>' } as ChatMessageLike)
+    editor.replaceSelected({ text: '序章' } as ChatMessageLike)
 
     expect(editor.editorContent.value.startsWith('序章')).toBe(true)
   })
@@ -194,9 +194,9 @@ describe('useWorkbenchEditor', () => {
     editor.editorContent.value = '当前正文'
     editor.onEditorInput()
 
-    editor.mergeToEditor({ text: 'AI建议<br/>续写' } as ChatMessageLike)
+    editor.mergeToEditor({ text: 'AI建议\n续写' } as ChatMessageLike)
 
-    expect(saveDraft).toHaveBeenLastCalledWith(101, '301', '当前正文\n\nAI建议续写')
+    expect(saveDraft).toHaveBeenLastCalledWith(101, '301', '当前正文\n\nAI建议\n续写')
 
     editor.editorUndo()
     expect(editor.editorContent.value).toBe('当前正文')
@@ -216,7 +216,7 @@ describe('useWorkbenchEditor', () => {
     editor.editorContent.value = textarea.value
     editor.onEditorInput()
 
-    editor.replaceSelected({ text: '<b>序章</b>' } as ChatMessageLike)
+    editor.replaceSelected({ text: '序章' } as ChatMessageLike)
 
     expect(saveDraft).toHaveBeenLastCalledWith(101, '301', '序章无恙')
 

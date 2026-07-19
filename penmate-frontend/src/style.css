@@ -10,10 +10,10 @@
   /* 古风配色 - Chinese Traditional Colors */
   --ink-black: #0a0e17;
   --xuan-paper: #f5edd6;
-  --cinnabar: #c03c2d;        /* 朱砂红 */
-  --amber-gold: #c9a96e;      /* 琥珀金 */
-  --jade-green: #5a9e6f;      /* 翡翠绿 */
-  --sky-cyan: #6ec5d4;        /* 天青色 */
+  --cinnabar: #c03c2d; /* 朱砂红 */
+  --amber-gold: #c9a96e; /* 琥珀金 */
+  --jade-green: #5a9e6f; /* 翡翠绿 */
+  --sky-cyan: #6ec5d4; /* 天青色 */
   --mist-white: rgba(245, 237, 214, 0.85);
   --shadow-ink: rgba(10, 14, 23, 0.6);
 
@@ -23,7 +23,7 @@
   --bg-card: rgba(17, 24, 39, 0.7);
   --bg-card-hover: rgba(26, 36, 56, 0.85);
   --bg-glass: rgba(17, 24, 39, 0.45);
-  
+
   /* Text */
   --text-primary: #e8dcc8;
   --text-secondary: #a39887;
@@ -114,7 +114,12 @@ img {
 }
 
 /* ---------- Typography ---------- */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   color: var(--xuan-paper);
   font-weight: 400;
@@ -173,24 +178,44 @@ p {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes floatSlow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
 }
 
 @keyframes floatMedium {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  33% { transform: translateY(-8px) rotate(1deg); }
-  66% { transform: translateY(-4px) rotate(-1deg); }
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+  66% {
+    transform: translateY(-4px) rotate(-1deg);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
 }
 
 @keyframes inkSpread {
@@ -205,11 +230,16 @@ p {
 }
 
 @keyframes pulse-gold {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(201, 169, 110, 0.2), 0 0 20px rgba(201, 169, 110, 0.1);
+  0%,
+  100% {
+    box-shadow:
+      0 0 8px rgba(201, 169, 110, 0.2),
+      0 0 20px rgba(201, 169, 110, 0.1);
   }
   50% {
-    box-shadow: 0 0 16px rgba(201, 169, 110, 0.4), 0 0 40px rgba(201, 169, 110, 0.2);
+    box-shadow:
+      0 0 16px rgba(201, 169, 110, 0.4),
+      0 0 40px rgba(201, 169, 110, 0.2);
   }
 }
 
@@ -231,7 +261,8 @@ p {
 }
 
 @keyframes borderGlow {
-  0%, 100% {
+  0%,
+  100% {
     border-color: rgba(201, 169, 110, 0.2);
   }
   50% {
@@ -270,7 +301,9 @@ p {
 .btn-ancient:hover {
   color: var(--xuan-paper);
   border-color: var(--border-glow);
-  box-shadow: var(--shadow-gold), inset 0 0 20px rgba(201, 169, 110, 0.05);
+  box-shadow:
+    var(--shadow-gold),
+    inset 0 0 20px rgba(201, 169, 110, 0.05);
   transform: translateY(-2px);
 }
 

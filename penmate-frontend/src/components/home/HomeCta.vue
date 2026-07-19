@@ -4,12 +4,7 @@
     <div class="cta-content">
       <h2 class="cta-title">提 笔 即 道</h2>
       <p class="cta-desc">加入PenMate，让AI成为你的创作伙伴</p>
-      <button
-        type="button"
-        class="btn-ancient btn-cta"
-        data-testid="home-cta-button"
-        @click="$emit('enter-workbench')"
-      >
+      <button type="button" class="btn-ancient btn-cta" data-testid="home-cta-button" @click="$emit('enter-workbench')">
         <span>开 启 创 作 之 旅</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M5 12h14M12 5l7 7-7 7" />

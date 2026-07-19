@@ -13,26 +13,24 @@ class FakeEventSource {
   }
 }
 
-const sseEvent = (data: Record<string, unknown>) => ({
-  data: JSON.stringify(data),
-}) as MessageEvent<string>
+const sseEvent = (data: Record<string, unknown>) =>
+  ({
+    data: JSON.stringify(data),
+  }) as MessageEvent<string>
 
-const agentRunEventDto = (
-  type: string,
-  payload: Record<string, unknown>,
-  sequence: string,
-) => sseEvent({
-  eventId: `event-${sequence}`,
-  runId: 'run-1',
-  projectId: 'project-1',
-  sessionId: 'session-1',
-  turnId: 'turn-1',
-  sequence,
-  schemaVersion: 1,
-  type,
-  payloadJson: JSON.stringify({ schemaVersion: 1, ...payload }),
-  createdAt: '2026-07-06T22:33:20.132Z',
-})
+const agentRunEventDto = (type: string, payload: Record<string, unknown>, sequence: string) =>
+  sseEvent({
+    eventId: `event-${sequence}`,
+    runId: 'run-1',
+    projectId: 'project-1',
+    sessionId: 'session-1',
+    turnId: 'turn-1',
+    sequence,
+    schemaVersion: 1,
+    type,
+    payloadJson: JSON.stringify({ schemaVersion: 1, ...payload }),
+    createdAt: '2026-07-06T22:33:20.132Z',
+  })
 
 const createRuntimeHarness = () => {
   const stream = new FakeEventSource()
@@ -115,27 +113,19 @@ describe('createAgentRunRuntime', () => {
     const harness = createRuntimeHarness()
     const consuming = harness.consume()
 
-    harness.stream.listeners.get('run.phase.changed')?.(agentRunEventDto(
-      'run.phase.changed',
-      { phase: 'executing', status: 'running', message: 'writing' },
-      '6',
-    ))
-    harness.stream.listeners.get('message.delta')?.(agentRunEventDto(
-      'message.delta',
-      { llmTurnIndex: 1, text: 'Hello' },
-      '-1',
-    ))
+    harness.stream.listeners.get('run.phase.changed')?.(
+      agentRunEventDto('run.phase.changed', { phase: 'executing', status: 'running', message: 'writing' }, '6'),
+    )
+    harness.stream.listeners.get('message.delta')?.(
+      agentRunEventDto('message.delta', { llmTurnIndex: 1, text: 'Hello' }, '-1'),
+    )
     expect(harness.latestSequence).toBe('6')
-    harness.stream.listeners.get('message.completed')?.(agentRunEventDto(
-      'message.completed',
-      { llmTurnIndex: 1, role: 'assistant', text: 'Hello final' },
-      '9',
-    ))
-    harness.stream.listeners.get('run.completed')?.(agentRunEventDto(
-      'run.completed',
-      { phase: 'completed', message: 'done' },
-      '11',
-    ))
+    harness.stream.listeners.get('message.completed')?.(
+      agentRunEventDto('message.completed', { llmTurnIndex: 1, role: 'assistant', text: 'Hello final' }, '9'),
+    )
+    harness.stream.listeners.get('run.completed')?.(
+      agentRunEventDto('run.completed', { phase: 'completed', message: 'done' }, '11'),
+    )
 
     await expect(consuming).resolves.toBe('completed')
     expect(harness.tokens).toEqual(['Hello'])
@@ -157,13 +147,15 @@ describe('createAgentRunRuntime', () => {
     const harness = createRuntimeHarness()
     const consuming = harness.consume()
 
-    harness.stream.listeners.get('stream.reset')?.(sseEvent({
-      runId: 'run-1',
-      requestedAfter: '2',
-      oldestAvailableSequence: '51',
-      latestSequence: '80',
-      reason: 'CURSOR_EXPIRED',
-    }))
+    harness.stream.listeners.get('stream.reset')?.(
+      sseEvent({
+        runId: 'run-1',
+        requestedAfter: '2',
+        oldestAvailableSequence: '51',
+        latestSequence: '80',
+        reason: 'CURSOR_EXPIRED',
+      }),
+    )
 
     await expect(consuming).resolves.toBe('completed')
     expect(harness.resetCount).toBe(1)

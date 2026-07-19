@@ -15,7 +15,8 @@ export const createChapterLoadGuard = () => {
     return currentRequestId
   }
 
-  const isCurrent = (chapterId: string, requestId: number) => currentChapterId === chapterId && currentRequestId === requestId
+  const isCurrent = (chapterId: string, requestId: number) =>
+    currentChapterId === chapterId && currentRequestId === requestId
 
   return {
     begin,

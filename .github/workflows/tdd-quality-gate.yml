@@ -34,7 +34,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Run backend tests + coverage gate
+      - name: Run backend tests
         run: mvn -B -Pci-postgresql-tests verify
 
   frontend-test:
@@ -53,8 +53,22 @@ jobs:
           cache-dependency-path: penmate-frontend/package-lock.json
       - name: Install
         run: npm ci
-      - name: Run frontend coverage gate
-        run: npm run test:coverage
+      - name: Lint frontend
+        run: npm run lint
+      - name: Type-check frontend
+        run: npm run typecheck
+      - name: Run frontend tests
+        run: npm run test:run
+      - name: Install browser for smoke tests
+        run: npx playwright install --with-deps chromium
+      - name: Run frontend browser smoke tests
+        run: npm run test:e2e -- --project=chromium
+      - name: Build frontend
+        run: npm run build
+      - name: Check frontend bundle budget
+        run: npm run budget
+      - name: Audit production dependencies
+        run: npm run audit:prod
 
   docker-build:
     needs: [changes, backend-test, frontend-test]

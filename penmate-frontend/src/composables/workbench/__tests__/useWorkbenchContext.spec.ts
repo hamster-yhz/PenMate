@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import {
-  LAST_OPERATOR_ID_KEY,
-  LAST_PROJECT_ID_KEY,
-  useWorkbenchContext,
-} from '../useWorkbenchContext'
+import { LAST_OPERATOR_ID_KEY, LAST_PROJECT_ID_KEY, useWorkbenchContext } from '../useWorkbenchContext'
 
 describe('useWorkbenchContext', () => {
   afterEach(() => {
@@ -127,12 +123,6 @@ describe('useWorkbenchContext', () => {
       },
     })
 
-    expect(Object.keys(context).sort()).toEqual([
-      'ensureContext',
-      'operatorId',
-      'projectId',
-      'userEmail',
-      'username',
-    ])
+    expect(Object.keys(context).sort()).toEqual(['ensureContext', 'operatorId', 'projectId', 'userEmail', 'username'])
   })
 })

@@ -7,16 +7,22 @@ import type { WorkbenchRecoverySnapshot } from '@/api/types'
  */
 export const useWorkbenchSessionRecovery = (deps: {
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<WorkbenchRecoverySnapshot>
-  resumeSession: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<WorkbenchRecoverySnapshot>
+  resumeSession: (
+    projectId: string,
+    sessionId: string,
+    payload: Record<string, unknown>,
+  ) => Promise<WorkbenchRecoverySnapshot>
   openRunStream: (projectId: string, runId: string, after?: string) => EventSource
   hydrateStore: (snapshot: WorkbenchRecoverySnapshot) => void
   resumeRunningRun?: (projectId: string, runId: string, after?: string) => Promise<void>
 }) => {
   const restore = async (projectId: string, sessionId: string, operatorId?: string) => {
-    const snapshot = pickBusinessRecord(await deps.resumeSession(projectId, sessionId, {
-      trigger: 'WORKBENCH_ENTER',
-      ...(operatorId != null ? { operatorId } : {}),
-    })) as WorkbenchRecoverySnapshot
+    const snapshot = pickBusinessRecord(
+      await deps.resumeSession(projectId, sessionId, {
+        trigger: 'WORKBENCH_ENTER',
+        ...(operatorId != null ? { operatorId } : {}),
+      }),
+    ) as WorkbenchRecoverySnapshot
     deps.hydrateStore(snapshot)
     const runId = snapshot?.activeRun?.runId
     const runStatus = String(snapshot?.activeRun?.runStatus ?? '').toUpperCase()

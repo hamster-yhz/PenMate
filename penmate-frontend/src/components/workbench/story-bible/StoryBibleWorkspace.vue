@@ -10,13 +10,23 @@
         <span v-if="story.errorMessage.value" class="error-text">{{ story.errorMessage.value }}</span>
         <ReloadOutlined v-if="story.loading.value" spin />
         <div class="mobile-tools">
-          <button type="button" title="打开 Story Bible 导航" @click="toggleMobilePanel('navigation')"><AppstoreOutlined /></button>
-          <button type="button" title="打开节点列表" @click="toggleMobilePanel('nodes')"><UnorderedListOutlined /></button>
+          <button type="button" title="打开 Story Bible 导航" @click="toggleMobilePanel('navigation')">
+            <AppstoreOutlined />
+          </button>
+          <button type="button" title="打开节点列表" @click="toggleMobilePanel('nodes')">
+            <UnorderedListOutlined />
+          </button>
         </div>
       </div>
     </div>
 
-    <button v-if="mobilePanel" type="button" class="mobile-backdrop" aria-label="关闭移动面板" @click="mobilePanel = ''"></button>
+    <button
+      v-if="mobilePanel"
+      type="button"
+      class="mobile-backdrop"
+      aria-label="关闭移动面板"
+      @click="mobilePanel = ''"
+    ></button>
 
     <div class="workspace-grid">
       <StoryBibleNavigator
@@ -145,7 +155,11 @@ const story = useStoryBible({
 })
 
 const run = async (action: () => Promise<unknown>) => {
-  try { await action() } catch (error) { message.error(String((error as Error)?.message || '操作失败')) }
+  try {
+    await action()
+  } catch (error) {
+    message.error(String((error as Error)?.message || '操作失败'))
+  }
 }
 const selectNode = async (nodeId: string) => {
   await story.selectNode(nodeId)
@@ -164,55 +178,197 @@ const reload = async () => {
 }
 
 onMounted(reload)
-watch(() => props.projectId, (next, previous) => { if (next && next !== previous) void reload() })
-watch(() => props.chapterId, () => {
-  if (story.selectedNodeId.value) void story.selectNode(story.selectedNodeId.value)
-})
-watch(() => props.initialNodeId, (nodeId) => { if (nodeId) void story.selectNode(nodeId) })
+watch(
+  () => props.projectId,
+  (next, previous) => {
+    if (next && next !== previous) void reload()
+  },
+)
+watch(
+  () => props.chapterId,
+  () => {
+    if (story.selectedNodeId.value) void story.selectNode(story.selectedNodeId.value)
+  },
+)
+watch(
+  () => props.initialNodeId,
+  (nodeId) => {
+    if (nodeId) void story.selectNode(nodeId)
+  },
+)
 let filterTimer: ReturnType<typeof setTimeout> | undefined
-watch([
-  () => story.selectedTypeId.value,
-  () => story.selectedCategoryId.value,
-  () => story.selectedTagId.value,
-  () => story.searchQuery.value,
-  () => story.canonFilter.value,
-], () => {
+watch(
+  [
+    () => story.selectedTypeId.value,
+    () => story.selectedCategoryId.value,
+    () => story.selectedTagId.value,
+    () => story.searchQuery.value,
+    () => story.canonFilter.value,
+  ],
+  () => {
+    if (filterTimer) clearTimeout(filterTimer)
+    filterTimer = setTimeout(() => {
+      void story.refreshNodes()
+    }, 180)
+  },
+)
+onBeforeUnmount(() => {
   if (filterTimer) clearTimeout(filterTimer)
-  filterTimer = setTimeout(() => { void story.refreshNodes() }, 180)
 })
-onBeforeUnmount(() => { if (filterTimer) clearTimeout(filterTimer) })
 
 defineExpose({ reload })
 </script>
 
 <style scoped lang="less">
-.story-bible-workspace { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: rgba(11, 17, 32, 0.58); box-shadow: var(--shadow-lg), var(--shadow-gold); }
-.workspace-statusbar { height: 42px; flex: 0 0 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--border-subtle); background: rgba(11, 17, 32, 0.88); }
-.workspace-statusbar div { min-width: 0; display: flex; align-items: center; gap: 8px; }
-.workspace-statusbar strong { color: var(--amber-gold); font-size: 0.82rem; }
-.workspace-statusbar span { color: var(--text-muted); font-size: 0.68rem; }
-.workspace-statusbar .error-text { overflow: hidden; color: #d19087; text-overflow: ellipsis; white-space: nowrap; }
-.status-actions { min-width: 0; flex: 1 1 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; overflow: hidden; }
-.status-actions .error-text { min-width: 0; flex: 1 1 auto; }
-.mobile-tools { display: none; }
-.mobile-tools button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--amber-gold); background: rgba(17, 24, 39, 0.9); cursor: pointer; }
-.mobile-backdrop { display: none; }
-.workspace-grid { min-height: 0; flex: 1; display: grid; grid-template-columns: minmax(150px, 180px) minmax(210px, 260px) minmax(360px, 1fr); }
-.node-browser { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border-subtle); background: rgba(17, 24, 39, 0.42); }
-.node-browser :deep(.sb-node-list) { flex: 1; }
-@media (max-width: 1080px) { .workspace-grid { grid-template-columns: 150px 220px minmax(340px, 1fr); } }
+.story-bible-workspace {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(11, 17, 32, 0.58);
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
+}
+.workspace-statusbar {
+  height: 42px;
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(11, 17, 32, 0.88);
+}
+.workspace-statusbar div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workspace-statusbar strong {
+  color: var(--amber-gold);
+  font-size: 0.82rem;
+}
+.workspace-statusbar span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+.workspace-statusbar .error-text {
+  overflow: hidden;
+  color: #d19087;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-actions {
+  min-width: 0;
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow: hidden;
+}
+.status-actions .error-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.mobile-tools {
+  display: none;
+}
+.mobile-tools button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--amber-gold);
+  background: rgba(17, 24, 39, 0.9);
+  cursor: pointer;
+}
+.mobile-backdrop {
+  display: none;
+}
+.workspace-grid {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(150px, 180px) minmax(210px, 260px) minmax(360px, 1fr);
+}
+.node-browser {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-subtle);
+  background: rgba(17, 24, 39, 0.42);
+}
+.node-browser :deep(.sb-node-list) {
+  flex: 1;
+}
 @media (max-width: 1080px) {
-  .story-bible-workspace { overflow: hidden; }
-  .workspace-statusbar { height: 46px; flex-basis: 46px; }
-  .workspace-statusbar > div:first-child span { display: none; }
-  .status-actions { padding-right: 76px; }
-  .mobile-tools { position: absolute; top: 7px; right: 8px; z-index: 2; display: flex; gap: 4px; }
-  .mobile-backdrop { position: absolute; inset: 46px 0 0; z-index: 20; display: block; width: 100%; height: auto; border: 0; background: rgba(3, 7, 16, 0.62); }
-  .workspace-grid { position: relative; display: block; min-height: 0; }
+  .workspace-grid {
+    grid-template-columns: 150px 220px minmax(340px, 1fr);
+  }
+}
+@media (max-width: 1080px) {
+  .story-bible-workspace {
+    overflow: hidden;
+  }
+  .workspace-statusbar {
+    height: 46px;
+    flex-basis: 46px;
+  }
+  .workspace-statusbar > div:first-child span {
+    display: none;
+  }
+  .status-actions {
+    padding-right: 76px;
+  }
+  .mobile-tools {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    z-index: 2;
+    display: flex;
+    gap: 4px;
+  }
+  .mobile-backdrop {
+    position: absolute;
+    inset: 46px 0 0;
+    z-index: 20;
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 0;
+    background: rgba(3, 7, 16, 0.62);
+  }
+  .workspace-grid {
+    position: relative;
+    display: block;
+    min-height: 0;
+  }
   .story-navigator-panel,
-  .node-browser { position: absolute; inset: 0 auto 0 0; z-index: 21; width: min(84vw, 310px); border-right: 1px solid var(--border-gold); background: rgba(11, 17, 32, 0.99); box-shadow: var(--shadow-lg); transform: translateX(-105%); transition: transform 0.2s var(--ease-silk); }
+  .node-browser {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 21;
+    width: min(84vw, 310px);
+    border-right: 1px solid var(--border-gold);
+    background: rgba(11, 17, 32, 0.99);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-105%);
+    transition: transform 0.2s var(--ease-silk);
+  }
   .story-navigator-panel.is-mobile-open,
-  .node-browser.is-mobile-open { transform: translateX(0); }
-  .workspace-grid > :last-child { width: 100%; height: 100%; }
+  .node-browser.is-mobile-open {
+    transform: translateX(0);
+  }
+  .workspace-grid > :last-child {
+    width: 100%;
+    height: 100%;
+  }
 }
 </style>

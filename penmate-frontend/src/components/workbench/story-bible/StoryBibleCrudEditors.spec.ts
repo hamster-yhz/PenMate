@@ -5,8 +5,26 @@ import StoryBibleRelationsTab from './StoryBibleRelationsTab.vue'
 import StoryBibleTypeEditor from './StoryBibleTypeEditor.vue'
 
 const nodes = [
-  { nodeId: '71', storyBibleId: '11', typeId: '21', title: 'Mira', attributesJson: '{}', inclusionPolicy: 'AUTO_RETRIEVE' as const, canonStatus: 'CANON' as const, revision: 1 },
-  { nodeId: '72', storyBibleId: '11', typeId: '21', title: 'Nox', attributesJson: '{}', inclusionPolicy: 'AUTO_RETRIEVE' as const, canonStatus: 'CANON' as const, revision: 1 },
+  {
+    nodeId: '71',
+    storyBibleId: '11',
+    typeId: '21',
+    title: 'Mira',
+    attributesJson: '{}',
+    inclusionPolicy: 'AUTO_RETRIEVE' as const,
+    canonStatus: 'CANON' as const,
+    revision: 1,
+  },
+  {
+    nodeId: '72',
+    storyBibleId: '11',
+    typeId: '21',
+    title: 'Nox',
+    attributesJson: '{}',
+    inclusionPolicy: 'AUTO_RETRIEVE' as const,
+    canonStatus: 'CANON' as const,
+    revision: 1,
+  },
 ]
 
 describe('Story Bible CRUD editors', () => {
@@ -15,7 +33,18 @@ describe('Story Bible CRUD editors', () => {
       props: {
         nodeId: '71',
         nodes,
-        relations: [{ relationId: '91', storyBibleId: '11', sourceNodeId: '71', targetNodeId: '72', relationType: 'ALLY_OF', description: 'Old', attributesJson: '{}', revision: 2 }],
+        relations: [
+          {
+            relationId: '91',
+            storyBibleId: '11',
+            sourceNodeId: '71',
+            targetNodeId: '72',
+            relationType: 'ALLY_OF',
+            description: 'Old',
+            attributesJson: '{}',
+            revision: 2,
+          },
+        ],
       },
     })
 
@@ -23,10 +52,12 @@ describe('Story Bible CRUD editors', () => {
     await wrapper.get('[aria-label="编辑关系说明"]').setValue('New')
     await wrapper.get('[title="保存关系"]').trigger('click')
 
-    expect(wrapper.emitted('update')?.[0]).toEqual([{
-      relationId: '91',
-      update: expect.objectContaining({ expectedRevision: 2, description: 'New' }),
-    }])
+    expect(wrapper.emitted('update')?.[0]).toEqual([
+      {
+        relationId: '91',
+        update: expect.objectContaining({ expectedRevision: 2, description: 'New' }),
+      },
+    ])
   })
 
   it('emits optimistic progression updates with the current revision', async () => {
@@ -38,7 +69,19 @@ describe('Story Bible CRUD editors', () => {
           { chapterId: '302', displayNo: 2, title: 'Reveal' },
         ],
         effectiveState: null,
-        progressions: [{ progressionId: '92', storyBibleId: '11', nodeId: '71', anchorChapterId: '301', endChapterId: null, storyEventNodeId: null, patchJson: '[]', summary: 'Old', revision: 4 }],
+        progressions: [
+          {
+            progressionId: '92',
+            storyBibleId: '11',
+            nodeId: '71',
+            anchorChapterId: '301',
+            endChapterId: null,
+            storyEventNodeId: null,
+            patchJson: '[]',
+            summary: 'Old',
+            revision: 4,
+          },
+        ],
       },
     })
 
@@ -46,10 +89,12 @@ describe('Story Bible CRUD editors', () => {
     await wrapper.get('[aria-label="编辑变化摘要"]').setValue('New')
     await wrapper.get('[title="保存状态演进"]').trigger('click')
 
-    expect(wrapper.emitted('update')?.[0]).toEqual([{
-      progressionId: '92',
-      update: expect.objectContaining({ expectedRevision: 4, summary: 'New' }),
-    }])
+    expect(wrapper.emitted('update')?.[0]).toEqual([
+      {
+        progressionId: '92',
+        update: expect.objectContaining({ expectedRevision: 4, summary: 'New' }),
+      },
+    ])
   })
 
   it('shows progression anchors with full-book chapter numbers instead of business ids', () => {
@@ -61,7 +106,19 @@ describe('Story Bible CRUD editors', () => {
           { chapterId: '302', displayNo: 2, title: 'Reveal' },
         ],
         effectiveState: null,
-        progressions: [{ progressionId: '92', storyBibleId: '11', nodeId: '71', anchorChapterId: '301', endChapterId: '302', storyEventNodeId: null, patchJson: '[]', summary: 'Changed', revision: 4 }],
+        progressions: [
+          {
+            progressionId: '92',
+            storyBibleId: '11',
+            nodeId: '71',
+            anchorChapterId: '301',
+            endChapterId: '302',
+            storyEventNodeId: null,
+            patchJson: '[]',
+            summary: 'Changed',
+            revision: 4,
+          },
+        ],
       },
     })
 
@@ -75,7 +132,19 @@ describe('Story Bible CRUD editors', () => {
     const wrapper = mount(StoryBibleTypeEditor, {
       props: {
         open: true,
-        nodeTypes: [{ typeId: '21', storyBibleId: '11', typeCode: 'CHARACTER', semanticFamily: 'CHARACTER', displayName: 'Character', iconCode: 'user', fieldSchemaJson: '{}', system: true, sortOrder: 1 }],
+        nodeTypes: [
+          {
+            typeId: '21',
+            storyBibleId: '11',
+            typeCode: 'CHARACTER',
+            semanticFamily: 'CHARACTER',
+            displayName: 'Character',
+            iconCode: 'user',
+            fieldSchemaJson: '{}',
+            system: true,
+            sortOrder: 1,
+          },
+        ],
         categories: [{ categoryId: '31', storyBibleId: '11', parentCategoryId: null, name: 'Cast', sortOrder: 1 }],
         tags: [{ tagId: '41', storyBibleId: '11', name: 'Lead', normalizedName: 'lead', color: '#112233' }],
         views: [],

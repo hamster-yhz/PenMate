@@ -3,18 +3,10 @@ import type { ChatMessage, ConversationItem } from '@/components/workbench/workb
 
 export type ChatRecord = Record<string, unknown>
 
-const htmlEntityPrefix = String.fromCharCode(38)
-
-export const escapeHtml = (value: string) => String(value || '')
-  .replaceAll('&', `${htmlEntityPrefix}amp;`)
-  .replaceAll('<', `${htmlEntityPrefix}lt;`)
-  .replaceAll('>', `${htmlEntityPrefix}gt;`)
-  .replaceAll('"', `${htmlEntityPrefix}quot;`)
-  .replaceAll("'", `${htmlEntityPrefix}#39;`)
-  .replaceAll('\n', '<br/>')
-
 export const toChatRole = (raw: unknown): ChatMessage['role'] => {
-  const role = String(raw || '').trim().toLowerCase()
+  const role = String(raw || '')
+    .trim()
+    .toLowerCase()
   if (role === 'assistant') return 'assistant'
   if (role === 'system' || role === 'tool') return 'system'
   return 'user'
@@ -28,12 +20,8 @@ const pickMessageId = (item: ChatRecord) => {
 const pickMessageRole = (item: ChatRecord) => item.role ?? item.messageRole ?? item.message_type
 
 const pickMessageText = (item: ChatRecord) => {
-  const rawText = item.contentMd
-    ?? item.contentMarkdown
-    ?? item.markdownContent
-    ?? item.content
-    ?? item.text
-    ?? item.message
+  const rawText =
+    item.contentMd ?? item.contentMarkdown ?? item.markdownContent ?? item.content ?? item.text ?? item.message
   return String(rawText ?? '')
 }
 
@@ -45,7 +33,9 @@ export const pickToolCallId = (item: ChatRecord): string | undefined => {
 }
 
 const normalizeApprovalResolution = (raw: unknown) => {
-  const status = String(raw || '').trim().toLowerCase()
+  const status = String(raw || '')
+    .trim()
+    .toLowerCase()
   if (status === 'approved') {
     return { resolved: true, resolvedAction: 'approved' as const }
   }
@@ -77,8 +67,9 @@ export const buildApprovalCard = (item: ChatRecord): ApprovalCardData | undefine
   const toolCode = String(item.toolCode || '').trim() || undefined
   const operationCode = String(item.operationCode || '').trim() || undefined
   const riskLevel = Number(item.riskLevel)
-  const approvalMessage = String(item.approvalMessage || '').trim()
-    || (toolDisplayName
+  const approvalMessage =
+    String(item.approvalMessage || '').trim() ||
+    (toolDisplayName
       ? `检测到待审批工具变更（${toolDisplayName}）`
       : approvalType
         ? `检测到待审批变更（${approvalType}）`
@@ -128,7 +119,7 @@ export const createChatTimeline = (deps: {
     return {
       id: messageId || deps.getMsgIdCounter(),
       role: toChatRole(pickMessageRole(item)),
-      text: escapeHtml(pickMessageText(item)),
+      text: pickMessageText(item),
       ...(toolCallId ? { toolCallId } : {}),
       ...(approval ? { approval } : {}),
     }

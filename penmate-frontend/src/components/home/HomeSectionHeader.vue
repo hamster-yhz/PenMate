@@ -1,6 +1,13 @@
 <template>
   <div class="section-header" data-testid="home-section-header">
-    <img :src="dividerImg" alt="" class="section-divider" data-testid="home-section-divider" />
+    <img
+      :src="dividerImg"
+      alt=""
+      class="section-divider"
+      data-testid="home-section-divider"
+      loading="lazy"
+      decoding="async"
+    />
     <h2 class="section-title">{{ title }}</h2>
     <p class="section-subtitle">{{ subtitle }}</p>
   </div>

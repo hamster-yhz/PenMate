@@ -9,7 +9,6 @@
 !**/src/test/**/build/
 **/dist/
 **/dist-ssr/
-**/coverage/
 
 ### Node / frontend dependencies and caches ###
 **/node_modules/
@@ -37,9 +36,6 @@ replay_pid*
 **/surefire-reports/
 **/failsafe-reports/
 **/test-results/
-**/jacoco.exec
-**/jacoco*.exec
-**/site/jacoco/
 
 ### Logs ###
 logs/
@@ -104,7 +100,6 @@ penmate-frontend/.env.development.local
 penmate-frontend/.env.test.local
 penmate-frontend/.env.production.local
 penmate-frontend/*.log
-penmate-frontend/coverage/
 
 ### Workspace tooling ###
 .artifacts/

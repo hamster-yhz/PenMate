@@ -2,25 +2,28 @@
 import { RedoOutlined, StopOutlined } from '@ant-design/icons-vue'
 import { computed } from 'vue'
 
-const props = withDefaults(defineProps<{
-  modelValue?: string
-  isGenerating?: boolean
-  canCancelRun?: boolean
-  isCancelling?: boolean
-  canRetryRun?: boolean
-  isRetrying?: boolean
-  currentModelName?: string
-  activePlugins?: string[]
-}>(), {
-  modelValue: '',
-  isGenerating: false,
-  canCancelRun: false,
-  isCancelling: false,
-  canRetryRun: false,
-  isRetrying: false,
-  currentModelName: '',
-  activePlugins: () => [],
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string
+    isGenerating?: boolean
+    canCancelRun?: boolean
+    isCancelling?: boolean
+    canRetryRun?: boolean
+    isRetrying?: boolean
+    currentModelName?: string
+    activePlugins?: string[]
+  }>(),
+  {
+    modelValue: '',
+    isGenerating: false,
+    canCancelRun: false,
+    isCancelling: false,
+    canRetryRun: false,
+    isRetrying: false,
+    currentModelName: '',
+    activePlugins: () => [],
+  },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -70,16 +73,14 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
 
     <div class="input-model-line">
       <span class="input-model-label">当前模型：</span>
-      <span
-        data-testid="current-model-value"
-        :class="['input-model-value', { empty: !currentModelName }]"
-      >
+      <span data-testid="current-model-value" :class="['input-model-value', { empty: !currentModelName }]">
         {{ displayModelName }}
       </span>
     </div>
 
     <div class="input-wrap">
       <textarea
+        aria-label="发送给 Agent 的消息"
         :value="modelValue"
         class="chat-textarea composer-textarea"
         data-testid="chat-input"
@@ -112,13 +113,7 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
       >
         <RedoOutlined />
       </button>
-      <button
-        type="button"
-        class="btn-send"
-        data-testid="chat-send"
-        :disabled="sendDisabled"
-        @click="emitSend"
-      >
+      <button type="button" class="btn-send" data-testid="chat-send" :disabled="sendDisabled" @click="emitSend">
         <span v-if="!isGenerating">发送</span>
         <span v-else>⏳</span>
       </button>
@@ -267,7 +262,6 @@ const handleCtrlEnter = (event: KeyboardEvent) => {
   cursor: not-allowed;
   opacity: 0.48;
 }
-
 
 .btn-stop[disabled] {
   cursor: wait;

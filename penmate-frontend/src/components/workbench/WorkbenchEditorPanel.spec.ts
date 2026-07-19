@@ -29,8 +29,14 @@ const EditorTextareaStub = defineComponent({
   },
 })
 
-const EditorStatusbarStub = defineComponent({ name: 'EditorStatusbar', setup: () => () => h('div', { 'data-testid': 'editor-statusbar-stub' }) })
-const VersionPreviewPaneStub = defineComponent({ name: 'VersionPreviewPane', setup: () => () => h('div', { 'data-testid': 'version-preview-pane-stub' }) })
+const EditorStatusbarStub = defineComponent({
+  name: 'EditorStatusbar',
+  setup: () => () => h('div', { 'data-testid': 'editor-statusbar-stub' }),
+})
+const VersionPreviewPaneStub = defineComponent({
+  name: 'VersionPreviewPane',
+  setup: () => () => h('div', { 'data-testid': 'version-preview-pane-stub' }),
+})
 
 describe('WorkbenchEditorPanel', () => {
   it('renders_editor_shell_and_forwards_toolbar_and_textarea_events', async () => {
@@ -81,5 +87,4 @@ describe('WorkbenchEditorPanel', () => {
     expect(wrapper.emitted('input')).toEqual([[]])
     expect(wrapper.emitted('cursor-activity')).toEqual([[]])
   })
-
 })

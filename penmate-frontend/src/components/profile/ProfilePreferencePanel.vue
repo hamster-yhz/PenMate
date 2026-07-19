@@ -15,7 +15,7 @@
         <span class="sr-label">自动保存间隔</span>
         <span class="sr-value">{{ autoSaveInterval }}秒</span>
       </div>
-      <select class="sr-select" :value="autoSaveInterval" @change="handleAutoSaveChange">
+      <select class="sr-select" :value="autoSaveInterval" aria-label="自动保存间隔" @change="handleAutoSaveChange">
         <option :value="15">15秒</option>
         <option :value="30">30秒</option>
         <option :value="60">60秒</option>
@@ -28,7 +28,7 @@
         <span class="sr-label">编辑器字体大小</span>
         <span class="sr-value">{{ fontSize }}px</span>
       </div>
-      <select class="sr-select" :value="fontSize" @change="handleFontSizeChange">
+      <select class="sr-select" :value="fontSize" aria-label="编辑器字体大小" @change="handleFontSizeChange">
         <option :value="14">14px</option>
         <option :value="16">16px</option>
         <option :value="18">18px</option>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   defaultStyle: string
   autoSaveInterval: number
   fontSize: number

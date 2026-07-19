@@ -16,7 +16,11 @@ const normalizeNamedEntity = (payload: AnyRecord, semanticIdKey: string): AnyRec
 
 const assertNoLegacyOnlyEntities = (items: AnyRecord[], semanticIdKey: string, errorMessage: string) => {
   const hasLegacyOnlyEntry = items.some(
-    (item) => item != null && typeof item === 'object' && 'id' in item && (typeof item[semanticIdKey] !== 'string' || item[semanticIdKey].trim() === '')
+    (item) =>
+      item != null &&
+      typeof item === 'object' &&
+      'id' in item &&
+      (typeof item[semanticIdKey] !== 'string' || item[semanticIdKey].trim() === ''),
   )
   if (hasLegacyOnlyEntry) {
     throw new Error(errorMessage)
@@ -87,6 +91,5 @@ export const rbacApi = {
   },
   listProfileMenus(userId: string) {
     return request.get<AnyRecord[]>(`/v1/profile/menus?userId=${userId}`)
-  }
+  },
 }
-

@@ -1,6 +1,11 @@
 <template>
   <aside class="panel panel-left glass-panel" :class="{ collapsed }">
-    <button class="panel-toggle" type="button" :title="collapsed ? '展开大纲' : '收起大纲'" @click="emit('toggle-collapse')">
+    <button
+      class="panel-toggle"
+      type="button"
+      :title="collapsed ? '展开大纲' : '收起大纲'"
+      @click="emit('toggle-collapse')"
+    >
       {{ collapsed ? '›' : '‹' }}
     </button>
     <div v-show="!collapsed" class="panel-content">
@@ -64,12 +69,51 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="less">
-.panel { position: relative; display: flex; flex-direction: column; transition: width 0.25s ease; }
-.panel-left { width: clamp(248px, 20vw, 320px); min-width: 0; min-height: 0; border-right: 1px solid var(--border-subtle); background: rgba(17, 24, 39, 0.72); box-shadow: var(--shadow-lg), var(--shadow-gold); }
-.panel-left.collapsed { width: 0; border-right: 0; }
-.panel-content { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.panel-toggle { position: absolute; top: 50%; right: -16px; z-index: 10; width: 16px; height: 40px; border: 1px solid var(--border-subtle); border-left: 0; border-radius: 0 4px 4px 0; color: var(--text-muted); background: rgba(17, 24, 39, 0.94); cursor: pointer; }
-.left-tabs { display: flex; gap: 8px; padding: 10px 8px 8px; border-bottom: 1px solid var(--border-subtle); }
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease;
+}
+.panel-left {
+  width: clamp(248px, 20vw, 320px);
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: rgba(17, 24, 39, 0.72);
+  box-shadow: var(--shadow-lg), var(--shadow-gold);
+}
+.panel-left.collapsed {
+  width: 0;
+  border-right: 0;
+}
+.panel-content {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-toggle {
+  position: absolute;
+  top: 50%;
+  right: -16px;
+  z-index: 10;
+  width: 16px;
+  height: 40px;
+  border: 1px solid var(--border-subtle);
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+  color: var(--text-muted);
+  background: rgba(17, 24, 39, 0.94);
+  cursor: pointer;
+}
+.left-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 8px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
 .ltab {
   flex: 1;
   height: 38px;
@@ -96,7 +140,20 @@ const emit = defineEmits<{
     box-shadow: 0 0 8px rgba(201, 169, 110, 0.1);
   }
 }
-.ltab-icon { width: 16px; height: 16px; object-fit: cover; }
-.tab-content { min-height: 0; flex: 1; overflow-y: auto; padding: 8px; }
-@media (max-width: 1360px) { .panel-left { width: 248px; } }
+.ltab-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: cover;
+}
+.tab-content {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+@media (max-width: 1360px) {
+  .panel-left {
+    width: 248px;
+  }
+}
 </style>

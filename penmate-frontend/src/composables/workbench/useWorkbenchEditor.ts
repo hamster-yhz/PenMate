@@ -12,8 +12,6 @@ type UseWorkbenchEditorDeps = {
 }
 
 const countWords = (content: string) => content.replace(/\s/g, '').length
-const stripHtml = (content: string) => String(content || '').replace(/<[^>]*>/g, '')
-
 export const useWorkbenchEditor = (deps: UseWorkbenchEditorDeps) => {
   const editorRef = ref<HTMLTextAreaElement | null>(null)
   const editorContent = ref('')
@@ -121,7 +119,7 @@ export const useWorkbenchEditor = (deps: UseWorkbenchEditorDeps) => {
   }
 
   const mergeToEditor = (msg: ChatMessageLike) => {
-    applyEditorChange(`${editorContent.value}\n\n${stripHtml(msg.text)}`)
+    applyEditorChange(`${editorContent.value}\n\n${msg.text}`)
   }
 
   const replaceSelected = (msg: ChatMessageLike) => {
@@ -130,8 +128,7 @@ export const useWorkbenchEditor = (deps: UseWorkbenchEditorDeps) => {
     const start = el.selectionStart
     const end = el.selectionEnd
     if (start === end) return
-    const plainText = stripHtml(msg.text)
-    applyEditorChange(editorContent.value.slice(0, start) + plainText + editorContent.value.slice(end))
+    applyEditorChange(editorContent.value.slice(0, start) + msg.text + editorContent.value.slice(end))
   }
 
   const saveContent = async () => {

@@ -33,7 +33,7 @@ const mountChatMessageItem = async (
       msg: {
         id: 1,
         role: 'assistant',
-        text: '你好<br/>世界',
+        text: '你好\n世界',
       },
       isGenerating: false,
       streamingAssistantMsgId: null,
@@ -49,17 +49,30 @@ describe('ChatMessageItem', () => {
       msg: {
         id: 7,
         role: 'assistant',
-        text: '你好<br/>世界',
+        text: '你好\n世界',
       },
     })
 
-    expect(wrapper.get('[data-testid="message-html"]').html()).toContain('你好<br>世界')
+    expect(wrapper.get('[data-testid="message-text"]').text()).toBe('你好\n世界')
 
     await wrapper.get('[data-testid="merge-to-editor"]').trigger('click')
     await wrapper.get('[data-testid="replace-selected"]').trigger('click')
 
-    expect(wrapper.emitted('merge-to-editor')).toEqual([[{ id: 7, role: 'assistant', text: '你好<br/>世界' }]])
-    expect(wrapper.emitted('replace-selected')).toEqual([[{ id: 7, role: 'assistant', text: '你好<br/>世界' }]])
+    expect(wrapper.emitted('merge-to-editor')).toEqual([[{ id: 7, role: 'assistant', text: '你好\n世界' }]])
+    expect(wrapper.emitted('replace-selected')).toEqual([[{ id: 7, role: 'assistant', text: '你好\n世界' }]])
+  })
+
+  it('renders_untrusted_message_content_as_text', async () => {
+    const wrapper = await mountChatMessageItem({
+      msg: {
+        id: 9,
+        role: 'assistant',
+        text: '<img src=x onerror="window.__xss=true">',
+      },
+    })
+
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="message-text"]').text()).toContain('<img')
   })
 
   it('shows_inline_typing_when_streaming_assistant_message_is_empty', async () => {

@@ -11,7 +11,12 @@ type UseWorkbenchVersionsFactory = (deps: any) => {
   viewSelectedVersion: () => Promise<void>
   restoreSelectedVersion: () => Promise<void>
   publishCurrentChapter: () => Promise<void>
-  refreshEditorFromRemote: (projectId: string, chapterId: string, requestId: number, options?: { preferRemote?: boolean }) => Promise<boolean>
+  refreshEditorFromRemote: (
+    projectId: string,
+    chapterId: string,
+    requestId: number,
+    options?: { preferRemote?: boolean },
+  ) => Promise<boolean>
   uploadAndCommitContent: (projectId: string, chapterId: string, content: string, operatorId: string) => Promise<void>
 }
 
@@ -64,7 +69,11 @@ describe('useWorkbenchVersions', () => {
       getContentUrl: vi.fn(async () => ({ downloadUrl: 'https://oss.example/read/chapter-301.txt' })),
       restoreVersion: vi.fn(async () => undefined),
       publishChapter: vi.fn(async () => undefined),
-      getContentUploadUrl: vi.fn(async () => ({ uploadUrl: 'https://oss.example/upload', objectKey: 'chapter-301.txt', storageProvider: 'OSS' })),
+      getContentUploadUrl: vi.fn(async () => ({
+        uploadUrl: 'https://oss.example/upload',
+        objectKey: 'chapter-301.txt',
+        storageProvider: 'OSS',
+      })),
       commitContent: vi.fn(async () => undefined),
       createVersion: vi.fn(async () => undefined),
       resolveUploadTarget: (payload: any) => payload,
@@ -109,7 +118,11 @@ describe('useWorkbenchVersions', () => {
       getContentUrl: vi.fn(async () => ({ downloadUrl: 'https://oss.example/read/chapter-301.txt' })),
       restoreVersion: vi.fn(async () => undefined),
       publishChapter: vi.fn(async () => undefined),
-      getContentUploadUrl: vi.fn(async () => ({ uploadUrl: 'https://oss.example/upload', objectKey: 'chapter-301.txt', storageProvider: 'OSS' })),
+      getContentUploadUrl: vi.fn(async () => ({
+        uploadUrl: 'https://oss.example/upload',
+        objectKey: 'chapter-301.txt',
+        storageProvider: 'OSS',
+      })),
       commitContent: vi.fn(async () => undefined),
       createVersion: vi.fn(async () => undefined),
       resolveUploadTarget: (payload: any) => payload,
@@ -158,7 +171,11 @@ describe('useWorkbenchVersions', () => {
       getContentUrl: vi.fn(async () => ({ downloadUrl: 'https://oss.example/read/chapter-301.txt' })),
       restoreVersion,
       publishChapter: vi.fn(async () => undefined),
-      getContentUploadUrl: vi.fn(async () => ({ uploadUrl: 'https://oss.example/upload', objectKey: 'chapter-301.txt', storageProvider: 'OSS' })),
+      getContentUploadUrl: vi.fn(async () => ({
+        uploadUrl: 'https://oss.example/upload',
+        objectKey: 'chapter-301.txt',
+        storageProvider: 'OSS',
+      })),
       commitContent: vi.fn(async () => undefined),
       createVersion: vi.fn(async () => undefined),
       resolveUploadTarget: (payload: any) => payload,

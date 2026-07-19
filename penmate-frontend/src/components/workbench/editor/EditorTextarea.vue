@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-withDefaults(defineProps<{
-  modelValue: string
-  placeholder?: string
-}>(), {
-  modelValue: '',
-  placeholder: '',
-})
+withDefaults(
+  defineProps<{
+    modelValue: string
+    placeholder?: string
+  }>(),
+  {
+    modelValue: '',
+    placeholder: '',
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
@@ -63,6 +66,7 @@ defineExpose({
 
 <template>
   <textarea
+    aria-label="章节正文编辑器"
     ref="textareaRef"
     data-testid="editor-textarea"
     class="main-editor workbench-editor-textarea"
@@ -84,9 +88,7 @@ defineExpose({
   border: none;
   outline: none;
   resize: none;
-  background:
-    linear-gradient(180deg, rgba(17, 24, 39, 0.3), rgba(11, 17, 32, 0.18)),
-    rgba(11, 17, 32, 0.22);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.3), rgba(11, 17, 32, 0.18)), rgba(11, 17, 32, 0.22);
   color: var(--text-primary);
   font-size: 1rem;
   line-height: 1.9;

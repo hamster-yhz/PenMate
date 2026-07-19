@@ -84,9 +84,9 @@
       </div>
     </div>
 
-    <a class="back-home btn-ancient" @click.prevent="router.push('/')">
+    <button type="button" class="back-home btn-ancient" @click="router.push('/')">
       <span>← 返回首页</span>
-    </a>
+    </button>
   </div>
 </template>
 
@@ -94,7 +94,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import loginBg from '@/assets/images/login-bg.png'
+import loginBg from '@/assets/images/login-bg.webp'
 import AuthCardShell from '@/components/auth/AuthCardShell.vue'
 import AuthModeTabs from '@/components/auth/AuthModeTabs.vue'
 import LoginForm, { type LoginFormSubmitPayload } from '@/components/auth/LoginForm.vue'
@@ -133,7 +133,8 @@ const toggleMode = () => {
   mode.value = mode.value === 'login' ? 'register' : 'login'
 }
 
-const pStyle = (_n: number) => {
+const pStyle = (index: number) => {
+  void index
   const size = Math.random() * 3 + 1
   const left = Math.random() * 100
   const dur = Math.random() * 12 + 12
@@ -213,7 +214,9 @@ const pStyle = (_n: number) => {
   background:
     linear-gradient(180deg, rgba(17, 24, 39, 0.62), rgba(11, 17, 32, 0.76)),
     radial-gradient(circle at top left, rgba(201, 169, 110, 0.08), transparent 45%);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28), 0 0 50px rgba(201, 169, 110, 0.06);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.28),
+    0 0 50px rgba(201, 169, 110, 0.06);
 }
 
 .showcase-badge {
@@ -403,5 +406,4 @@ const pStyle = (_n: number) => {
     font-size: 0.82rem;
   }
 }
-
 </style>

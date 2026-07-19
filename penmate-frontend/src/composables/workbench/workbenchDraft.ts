@@ -1,4 +1,5 @@
-export const getDraftStorageKey = (projectId: string, chapterId: string) => `penmate.chapterDraft.${projectId}.${chapterId}`
+export const getDraftStorageKey = (projectId: string, chapterId: string) =>
+  `penmate.chapterDraft.${projectId}.${chapterId}`
 
 export const saveChapterDraftLocal = (projectId: string, chapterId: string, content: string) => {
   try {

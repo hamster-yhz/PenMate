@@ -23,6 +23,5 @@ export const pluginApi = {
   },
   listCallLogs(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/plugins/call-logs`)
-  }
+  },
 }
-

@@ -3,7 +3,10 @@ export const normalizeObjectStorageUrl = (rawUrl: string) => {
   if (!url) return ''
   if (url.startsWith('//')) return `${window.location.protocol}${url}`
   if (url.startsWith('/')) return url
-  if (/^(localhost|127\.0\.0\.1|\[::1\]|[\w.-]+)(:\d+)?(\/|$)/i.test(url) && !/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(url)) {
+  if (
+    /^(localhost|127\.0\.0\.1|\[::1\]|[\w.-]+)(:\d+)?(\/|$)/i.test(url) &&
+    !/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(url)
+  ) {
     const defaultProtocol = String(import.meta.env.VITE_STORAGE_URL_PROTOCOL || 'https').replace(/:$/, '')
     return `${defaultProtocol}://${url}`
   }

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
-  currentContent: string
-  selectedVersionContent: string
-}>(), {
-  currentContent: '',
-  selectedVersionContent: '',
-})
+withDefaults(
+  defineProps<{
+    currentContent: string
+    selectedVersionContent: string
+  }>(),
+  {
+    currentContent: '',
+    selectedVersionContent: '',
+  },
+)
 </script>
 
 <template>
@@ -13,12 +16,14 @@ withDefaults(defineProps<{
     <div class="vp-title">版本对比预览（左：当前内容 / 右：所选版本）</div>
     <div class="vp-grid">
       <textarea
+        aria-label="当前章节内容"
         data-testid="version-preview-current"
         class="vp-box workbench-editor-textarea"
         :value="currentContent"
         readonly
       ></textarea>
       <textarea
+        aria-label="历史版本内容"
         data-testid="version-preview-selected"
         class="vp-box workbench-editor-textarea"
         :value="selectedVersionContent"

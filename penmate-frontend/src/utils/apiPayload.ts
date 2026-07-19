@@ -1,6 +1,7 @@
 type AnyRecord = Record<string, unknown>
 
-const isRecord = (value: unknown): value is AnyRecord => value != null && typeof value === 'object' && !Array.isArray(value)
+const isRecord = (value: unknown): value is AnyRecord =>
+  value != null && typeof value === 'object' && !Array.isArray(value)
 
 export const unwrapBusinessPayload = <T = unknown>(payload: T): T => {
   let current: unknown = payload

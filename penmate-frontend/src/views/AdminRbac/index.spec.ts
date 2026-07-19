@@ -366,10 +366,14 @@ describe('AdminRbac view', () => {
   })
 
   it('keeps_the_latest_selected_user_data_when_an_older_user_request_resolves_later', async () => {
-    const user1002Menus = createDeferred<Array<{ menuId: string, title: string, path: string, permissionCode: string, visible: boolean }>>()
-    const user1003Menus = createDeferred<Array<{ menuId: string, title: string, path: string, permissionCode: string, visible: boolean }>>()
-    const user1002Roles = createDeferred<Array<{ roleId: string, code: string, name: string, description: string, isSystem: boolean }>>()
-    const user1003Roles = createDeferred<Array<{ roleId: string, code: string, name: string, description: string, isSystem: boolean }>>()
+    const user1002Menus =
+      createDeferred<Array<{ menuId: string; title: string; path: string; permissionCode: string; visible: boolean }>>()
+    const user1003Menus =
+      createDeferred<Array<{ menuId: string; title: string; path: string; permissionCode: string; visible: boolean }>>()
+    const user1002Roles =
+      createDeferred<Array<{ roleId: string; code: string; name: string; description: string; isSystem: boolean }>>()
+    const user1003Roles =
+      createDeferred<Array<{ roleId: string; code: string; name: string; description: string; isSystem: boolean }>>()
 
     listUsersMock.mockResolvedValue([
       {
@@ -413,9 +417,7 @@ describe('AdminRbac view', () => {
     })
     listUserRolesMock.mockImplementation(async (userId: string) => {
       if (userId === '1001') {
-        return [
-          { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-        ]
+        return [{ roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true }]
       }
 
       if (userId === '1002') {
@@ -429,12 +431,8 @@ describe('AdminRbac view', () => {
       return []
     })
     listRolePermissionsMock
-      .mockResolvedValueOnce([
-        { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-      ])
-      .mockResolvedValue([
-        { permissionId: '3002', code: 'review.approve', name: '审核通过', module: 'review' },
-      ])
+      .mockResolvedValueOnce([{ permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' }])
+      .mockResolvedValue([{ permissionId: '3002', code: 'review.approve', name: '审核通过', module: 'review' }])
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
@@ -455,9 +453,7 @@ describe('AdminRbac view', () => {
     user1002Menus.resolve([
       { menuId: '4004', title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true },
     ])
-    user1002Roles.resolve([
-      { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
-    ])
+    user1002Roles.resolve([{ roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false }])
     await flushPromises()
 
     expect(wrapper.get('[data-testid="rbac-active-user-name"]').text()).toContain('审核C')
@@ -468,17 +464,17 @@ describe('AdminRbac view', () => {
   })
 
   it('keeps_the_latest_selected_role_permissions_when_an_older_role_request_resolves_later', async () => {
-    const role2001Permissions = createDeferred<Array<{ permissionId: string, code: string, name: string, module: string }>>()
-    const role2002Permissions = createDeferred<Array<{ permissionId: string, code: string, name: string, module: string }>>()
+    const role2001Permissions =
+      createDeferred<Array<{ permissionId: string; code: string; name: string; module: string }>>()
+    const role2002Permissions =
+      createDeferred<Array<{ permissionId: string; code: string; name: string; module: string }>>()
 
     listRolesMock.mockResolvedValue([
       { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
       { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
     ])
     listRolePermissionsMock
-      .mockResolvedValueOnce([
-        { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-      ])
+      .mockResolvedValueOnce([{ permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' }])
       .mockImplementationOnce(() => role2002Permissions.promise)
       .mockImplementationOnce(() => role2001Permissions.promise)
 
@@ -489,9 +485,7 @@ describe('AdminRbac view', () => {
     await wrapper.get('[data-testid="rbac-role-select-2002"]').trigger('click')
     await wrapper.get('[data-testid="rbac-role-select-2001"]').trigger('click')
 
-    role2001Permissions.resolve([
-      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-    ])
+    role2001Permissions.resolve([{ permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' }])
     await flushPromises()
 
     role2002Permissions.resolve([
@@ -505,7 +499,8 @@ describe('AdminRbac view', () => {
   })
 
   it('does_not_let_an_inflight_user_context_override_a_newer_manual_role_selection', async () => {
-    const user1002RolePermissions = createDeferred<Array<{ permissionId: string, code: string, name: string, module: string }>>()
+    const user1002RolePermissions =
+      createDeferred<Array<{ permissionId: string; code: string; name: string; module: string }>>()
 
     listRolesMock.mockResolvedValue([
       { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
@@ -534,15 +529,11 @@ describe('AdminRbac view', () => {
         ]
       }
 
-      return [
-        { menuId: '4004', title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true },
-      ]
+      return [{ menuId: '4004', title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true }]
     })
     listUserRolesMock.mockImplementation(async (userId: string) => {
       if (userId === '1001') {
-        return [
-          { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-        ]
+        return [{ roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true }]
       }
 
       return [
@@ -555,28 +546,23 @@ describe('AdminRbac view', () => {
         return user1002RolePermissions.promise
       }
 
-      return [
-        { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
-      ]
+      return [{ permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' }]
     })
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
-    user1002RolePermissions.resolve([
-      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-    ])
+    user1002RolePermissions.resolve([{ permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' }])
     await flushPromises()
 
-    const delayedUser1002RolePermissions = createDeferred<Array<{ permissionId: string, code: string, name: string, module: string }>>()
+    const delayedUser1002RolePermissions =
+      createDeferred<Array<{ permissionId: string; code: string; name: string; module: string }>>()
     listRolePermissionsMock.mockImplementation(async (roleId: string) => {
       if (roleId === '2001') {
         return delayedUser1002RolePermissions.promise
       }
 
-      return [
-        { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
-      ]
+      return [{ permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' }]
     })
 
     await wrapper.get('[data-testid="rbac-user-search-input"]').setValue('编辑')
@@ -834,9 +820,7 @@ describe('AdminRbac view', () => {
         { menuId: '4003', title: '发布中心', path: '/publish', permissionCode: 'content.publish', visible: true },
       ])
     listRolePermissionsMock
-      .mockResolvedValueOnce([
-        { permissionId: 'perm-3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-      ])
+      .mockResolvedValueOnce([{ permissionId: 'perm-3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' }])
       .mockResolvedValueOnce([
         { permissionId: 'perm-3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
         { permissionId: 'perm-3002', code: 'content.publish', name: '内容发布', module: 'content' },
@@ -871,9 +855,7 @@ describe('AdminRbac view', () => {
         { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
         { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
       ])
-      .mockResolvedValueOnce([
-        { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
-      ])
+      .mockResolvedValueOnce([{ permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' }])
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
@@ -1074,7 +1056,13 @@ describe('AdminRbac view', () => {
 
   it('filters_legacy_only_role_permission_and_menu_records_before_they_enter_page_state', async () => {
     listRolesMock.mockResolvedValueOnce([
-      { id: 'legacy-role-1', code: 'LEGACY_ROLE', name: '遗留角色', description: 'should be filtered', isSystem: false },
+      {
+        id: 'legacy-role-1',
+        code: 'LEGACY_ROLE',
+        name: '遗留角色',
+        description: 'should be filtered',
+        isSystem: false,
+      },
       { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
     ])
     listPermissionsMock.mockResolvedValueOnce([
@@ -1086,7 +1074,13 @@ describe('AdminRbac view', () => {
       { menuId: '4001', title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
     ])
     listUserRolesMock.mockResolvedValueOnce([
-      { id: 'legacy-role-2', code: 'LEGACY_USER_ROLE', name: '遗留用户角色', description: 'should be filtered', isSystem: false },
+      {
+        id: 'legacy-role-2',
+        code: 'LEGACY_USER_ROLE',
+        name: '遗留用户角色',
+        description: 'should be filtered',
+        isSystem: false,
+      },
       { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
     ])
     listRolePermissionsMock.mockResolvedValueOnce([
@@ -1094,7 +1088,13 @@ describe('AdminRbac view', () => {
       { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
     ])
     listProfileMenusMock.mockResolvedValueOnce([
-      { id: 'legacy-menu-2', title: '遗留个人菜单', path: '/legacy-profile', permissionCode: 'legacy.bound', visible: true },
+      {
+        id: 'legacy-menu-2',
+        title: '遗留个人菜单',
+        path: '/legacy-profile',
+        permissionCode: 'legacy.bound',
+        visible: true,
+      },
       { menuId: '4001', title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
     ])
 

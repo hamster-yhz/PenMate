@@ -25,7 +25,15 @@ const deleteBook = () => {
 </script>
 
 <template>
-  <div class="book-card" data-testid="book-card" @click="openBook">
+  <div
+    class="book-card"
+    data-testid="book-card"
+    role="button"
+    tabindex="0"
+    @click="openBook"
+    @keydown.enter="openBook"
+    @keydown.space.prevent="openBook"
+  >
     <div class="book-cover" :style="{ background: book.coverGradient }">
       <span class="cover-title">{{ book.title }}</span>
       <span class="cover-genre">{{ book.genre }}</span>
@@ -44,7 +52,9 @@ const deleteBook = () => {
     </div>
     <div class="book-actions" @click.stop>
       <button type="button" class="ba-btn" data-testid="book-card-edit" title="编辑" @click="editBook">✏️</button>
-      <button type="button" class="ba-btn danger" data-testid="book-card-delete" title="删除" @click="deleteBook">🗑️</button>
+      <button type="button" class="ba-btn danger" data-testid="book-card-delete" title="删除" @click="deleteBook">
+        🗑️
+      </button>
     </div>
   </div>
 </template>

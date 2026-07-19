@@ -13,9 +13,12 @@ export const outlineApi = {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`, payload)
   },
   moveNode(projectId: string, nodeId: string, operatorId: string, payload: AnyRecord) {
-    return request.patch<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}/move?operatorId=${operatorId}`, payload)
+    return request.patch<string>(
+      `/v1/novels/${projectId}/outlines/nodes/${nodeId}/move?operatorId=${operatorId}`,
+      payload,
+    )
   },
   deleteNode(projectId: string, nodeId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`)
-  }
+  },
 }

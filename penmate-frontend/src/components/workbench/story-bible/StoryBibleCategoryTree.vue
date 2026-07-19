@@ -33,7 +33,9 @@ const depth = (category: StoryBibleCategory) => {
 </script>
 
 <style scoped lang="less">
-.category-tree { display: grid; }
+.category-tree {
+  display: grid;
+}
 button {
   min-height: 30px;
   padding: 4px 10px;
@@ -44,5 +46,8 @@ button {
   cursor: pointer;
 }
 button:hover,
-button.active { color: var(--amber-gold); background: rgba(201, 169, 110, 0.08); }
+button.active {
+  color: var(--amber-gold);
+  background: rgba(201, 169, 110, 0.08);
+}
 </style>

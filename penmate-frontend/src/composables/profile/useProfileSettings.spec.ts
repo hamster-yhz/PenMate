@@ -1,22 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearSession, setSession } from '@/stores/session'
 
-const { getUserModelPreferencesMock, saveUserModelPreferencesMock } = vi.hoisted(() => ({
+const {
+  getUserModelPreferencesMock,
+  saveUserModelPreferencesMock,
+  listKeysMock,
+  meMock,
+  updateProfileMock,
+  changePasswordMock,
+} = vi.hoisted(() => ({
   getUserModelPreferencesMock: vi.fn(),
   saveUserModelPreferencesMock: vi.fn(),
+  listKeysMock: vi.fn(),
+  meMock: vi.fn(),
+  updateProfileMock: vi.fn(),
+  changePasswordMock: vi.fn(),
 }))
 
 vi.mock('@/api/modules/model.api', () => ({
   modelApi: {
     getUserModelPreferences: getUserModelPreferencesMock,
     saveUserModelPreferences: saveUserModelPreferencesMock,
+    listKeys: listKeysMock,
   },
+}))
+
+vi.mock('@/api/modules/auth.api', () => ({
+  authApi: { me: meMock, updateProfile: updateProfileMock, changePassword: changePasswordMock },
+}))
+
+vi.mock('@/api/modules/novel.api', () => ({
+  novelApi: { listProjects: vi.fn().mockResolvedValue([]) },
 }))
 
 describe('useProfileSettings', () => {
   beforeEach(() => {
     getUserModelPreferencesMock.mockReset()
     saveUserModelPreferencesMock.mockReset()
+    listKeysMock.mockReset()
+    meMock.mockReset()
+    updateProfileMock.mockReset()
+    changePasswordMock.mockReset()
+    listKeysMock.mockResolvedValue([])
     localStorage.clear()
     clearSession()
   })
@@ -26,7 +51,7 @@ describe('useProfileSettings', () => {
     const settings = useProfileSettings()
     const originalEmail = settings.profile.email
 
-    const result = settings.saveEmail(' @ ')
+    const result = await settings.saveEmail(' @ ')
 
     expect(result).toEqual({ success: false, error: '请输入有效邮箱地址' })
     expect(settings.profile.email).toBe(originalEmail)
@@ -36,13 +61,39 @@ describe('useProfileSettings', () => {
     const { useProfileSettings } = await import('./useProfileSettings')
     const settings = useProfileSettings()
 
-    const result = settings.savePassword({
+    const result = await settings.savePassword({
       old: ' ',
       new1: 'new-password',
       new2: 'new-password',
     })
 
     expect(result).toEqual({ success: false, error: '请输入当前密码' })
+  })
+
+  it('persists_profile_and_password_changes_through_authenticated_apis', async () => {
+    setSession({ userId: '1001' })
+    updateProfileMock.mockResolvedValue({
+      id: '1001',
+      displayName: '新笔名',
+      email: 'writer@example.com',
+      bio: '新简介',
+    })
+    changePasswordMock.mockResolvedValue('ok')
+    const { useProfileSettings } = await import('./useProfileSettings')
+    const settings = useProfileSettings()
+    settings.profile.email = 'writer@example.com'
+
+    await expect(settings.saveProfile({ name: ' 新笔名 ', bio: ' 新简介 ' })).resolves.toEqual({ success: true })
+    await expect(
+      settings.savePassword({ old: 'old-password', new1: 'new-password', new2: 'new-password' }),
+    ).resolves.toEqual({ success: true })
+
+    expect(updateProfileMock).toHaveBeenCalledWith({
+      displayName: '新笔名',
+      email: 'writer@example.com',
+      bio: '新简介',
+    })
+    expect(changePasswordMock).toHaveBeenCalledWith({ currentPassword: 'old-password', newPassword: 'new-password' })
   })
 
   it('loads_model_preferences_detail_when_session_user_exists', async () => {

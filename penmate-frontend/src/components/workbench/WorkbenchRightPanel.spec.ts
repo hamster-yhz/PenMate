@@ -7,10 +7,11 @@ const AgentSessionHeaderStub = defineComponent({
   name: 'AgentSessionHeader',
   emits: ['toggle-history', 'create-session'],
   setup(_, { emit }) {
-    return () => h('div', [
-      h('button', { 'data-testid': 'toggle-history', onClick: () => emit('toggle-history') }),
-      h('button', { 'data-testid': 'create-session', onClick: () => emit('create-session') }),
-    ])
+    return () =>
+      h('div', [
+        h('button', { 'data-testid': 'toggle-history', onClick: () => emit('toggle-history') }),
+        h('button', { 'data-testid': 'create-session', onClick: () => emit('create-session') }),
+      ])
   },
 })
 
@@ -18,10 +19,11 @@ const ConversationHistoryPanelStub = defineComponent({
   name: 'ConversationHistoryPanel',
   emits: ['select-conversation', 'close'],
   setup(_, { emit }) {
-    return () => h('div', [
-      h('button', { 'data-testid': 'select-conversation', onClick: () => emit('select-conversation', '77') }),
-      h('button', { 'data-testid': 'close-history', onClick: () => emit('close') }),
-    ])
+    return () =>
+      h('div', [
+        h('button', { 'data-testid': 'select-conversation', onClick: () => emit('select-conversation', '77') }),
+        h('button', { 'data-testid': 'close-history', onClick: () => emit('close') }),
+      ])
   },
 })
 
@@ -114,5 +116,4 @@ describe('WorkbenchRightPanel', () => {
     expect(wrapper.emitted('retry-run')).toEqual([[]])
     expect(wrapper.emitted('open-model-settings')).toEqual([[]])
   })
-
 })

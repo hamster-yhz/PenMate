@@ -1,11 +1,11 @@
 <template>
-  <a-config-provider>
+  <ConfigProvider>
     <router-view />
-  </a-config-provider>
+  </ConfigProvider>
 </template>
 
 <script setup lang="ts">
-// App root
+import { ConfigProvider } from 'ant-design-vue'
 </script>
 
 <style>

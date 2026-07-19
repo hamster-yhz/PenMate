@@ -18,7 +18,7 @@ export interface WorkbenchContextOptions {
   session: WorkbenchContextSession
 }
 
-const pickScalar = (value: unknown) => Array.isArray(value) ? value[0] : value
+const pickScalar = (value: unknown) => (Array.isArray(value) ? value[0] : value)
 
 const toBusinessId = (value: unknown) => {
   const normalized = String(pickScalar(value) ?? '').trim()

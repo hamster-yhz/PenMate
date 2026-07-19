@@ -1,10 +1,6 @@
 <template>
   <section id="about" class="preview-section" data-testid="home-preview">
-    <HomeSectionHeader
-      title="工 作 区 一 瞥"
-      subtitle="三栏联动 · IDE式创作体验"
-      :divider-img="dividerImg"
-    />
+    <HomeSectionHeader title="工 作 区 一 瞥" subtitle="三栏联动 · IDE式创作体验" :divider-img="dividerImg" />
 
     <div class="ide-preview">
       <div class="ide-topbar">
@@ -97,9 +93,15 @@ defineProps<{
   border-radius: 50%;
 }
 
-.dot.red { background: #ff5f57; }
-.dot.yellow { background: #febc2e; }
-.dot.green { background: #28c840; }
+.dot.red {
+  background: #ff5f57;
+}
+.dot.yellow {
+  background: #febc2e;
+}
+.dot.green {
+  background: #28c840;
+}
 
 .ide-title {
   font-size: 0.85rem;
@@ -230,12 +232,22 @@ defineProps<{
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
 
 @keyframes typingPulse {
-  0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
-  30% { opacity: 1; transform: scale(1.2); }
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 
 @media (max-width: 1024px) {

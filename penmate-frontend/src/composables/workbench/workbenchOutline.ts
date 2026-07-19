@@ -2,7 +2,7 @@ export type OutlineChapterNode = { title: string; key: string; chapterId?: strin
 export type OutlineVolumeNode = { title: string; key: string; expanded: boolean; children: OutlineChapterNode[] }
 
 export const mapOutlineTree = (
-  nodes: Array<Record<string, any>>,
+  nodes: Array<Record<string, unknown>>,
   chapterByOutlineNodeId: Record<string, string> = {},
 ): OutlineVolumeNode[] => {
   const volumeMap = new Map<string, OutlineVolumeNode>()

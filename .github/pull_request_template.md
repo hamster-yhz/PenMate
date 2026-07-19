@@ -31,5 +31,6 @@
 
 ## 测试清单
 - [ ] 后端 `mvn -q verify` 通过
-- [ ] 前端 `npm run test:coverage` 通过
+- [ ] 前端 `npm run lint && npm run typecheck && npm run test:run && npm run build && npm run budget` 通过
+- [ ] 前端 `npm run audit:prod` 通过
 - [ ] 新增/修改接口已更新对应测试

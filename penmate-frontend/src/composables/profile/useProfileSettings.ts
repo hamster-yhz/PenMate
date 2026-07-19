@@ -1,5 +1,7 @@
 import { reactive, ref } from 'vue'
 import { modelApi } from '@/api/modules/model.api'
+import { novelApi } from '@/api/modules/novel.api'
+import { authApi, type UserProfile } from '@/api/modules/auth.api'
 import { getSession } from '@/stores/session'
 import { pickBusinessRecord } from '@/utils/apiPayload'
 
@@ -9,8 +11,6 @@ export interface ProfileModel {
   bio: string
   bookCount: number
   totalWords: number
-  daysActive: number
-  streak: number
   defaultStyle: string
   autoSaveInterval: number
   fontSize: number
@@ -47,6 +47,21 @@ export interface ProfileModelConfigOption {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PREFERENCES_KEY = 'penmate.ui-preferences'
+
+const readUiPreferences = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PREFERENCES_KEY) || '{}') as Record<string, unknown>
+    return {
+      autoSaveInterval: [15, 30, 60, 120].includes(Number(parsed.autoSaveInterval))
+        ? Number(parsed.autoSaveInterval)
+        : 30,
+      fontSize: [14, 16, 18, 20].includes(Number(parsed.fontSize)) ? Number(parsed.fontSize) : 16,
+    }
+  } catch {
+    return { autoSaveInterval: 30, fontSize: 16 }
+  }
+}
 
 const extractPreferenceRecord = (payload: unknown): Record<string, unknown> => {
   if (!payload || typeof payload !== 'object') {
@@ -78,24 +93,19 @@ const buildParticleStyle = () => ({
 })
 
 export const useProfileSettings = () => {
+  const uiPreferences = readUiPreferences()
   const profile = reactive<ProfileModel>({
-    name: '墨客',
-    email: 'moke@penmate.com',
-    bio: '执笔问道，以墨寄情。热爱仙侠与悬疑交织的故事。',
-    bookCount: 3,
-    totalWords: 46370,
-    daysActive: 42,
-    streak: 7,
-    defaultStyle: '古风文言化 · 慢节奏',
-    autoSaveInterval: 30,
-    fontSize: 16,
+    name: '',
+    email: '',
+    bio: '',
+    bookCount: 0,
+    totalWords: 0,
+    defaultStyle: '按项目设置',
+    autoSaveInterval: uiPreferences.autoSaveInterval,
+    fontSize: uiPreferences.fontSize,
   })
 
-  const apiKeys = ref<ProfileApiKeyItem[]>([
-    { id: 'k1', name: 'DeepSeek', maskedKey: 'sk-****...7a2f', status: 'active' },
-    { id: 'k2', name: 'OpenAI', maskedKey: '未配置', status: 'none' },
-    { id: 'k3', name: 'Anthropic', maskedKey: '未配置', status: 'none' },
-  ])
+  const apiKeys = ref<ProfileApiKeyItem[]>([])
 
   const particleStyles = Array.from({ length: 10 }, buildParticleStyle)
   const session = getSession()
@@ -105,7 +115,37 @@ export const useProfileSettings = () => {
   })
   const modelConfigOptions = ref<ProfileModelConfigOption[]>([])
 
-  const saveProfile = (nextProfile: Pick<ProfileModel, 'name' | 'bio'>): ProfileActionResult => {
+  const applyProfile = (value: UserProfile) => {
+    profile.name = String(value.displayName ?? value.username ?? value.name ?? '').trim()
+    profile.email = String(value.email ?? '').trim()
+    profile.bio = String(value.bio ?? '').trim()
+  }
+
+  const loadProfile = async () => {
+    const current = await authApi.me()
+    applyProfile(current)
+
+    const [projectsResult, keysResult] = await Promise.allSettled([
+      novelApi.listProjects(),
+      session.userId ? modelApi.listKeys(session.userId) : Promise.resolve([]),
+    ])
+    if (projectsResult.status === 'fulfilled') {
+      const projects = Array.isArray(projectsResult.value) ? projectsResult.value : []
+      profile.bookCount = projects.length
+      profile.totalWords = projects.reduce((sum, item) => sum + Number(item.totalWords ?? item.wordCount ?? 0), 0)
+    }
+    if (keysResult.status === 'fulfilled') {
+      const keys = Array.isArray(keysResult.value) ? keysResult.value : []
+      apiKeys.value = keys.map((item, index) => ({
+        id: String(item.keyId ?? item.id ?? index),
+        name: String(item.providerName ?? item.providerCode ?? item.name ?? '模型服务'),
+        maskedKey: String(item.maskedKey ?? item.keyMask ?? '已配置'),
+        status: 'active' as const,
+      }))
+    }
+  }
+
+  const saveProfile = async (nextProfile: Pick<ProfileModel, 'name' | 'bio'>): Promise<ProfileActionResult> => {
     const name = nextProfile.name.trim()
     const bio = nextProfile.bio.trim()
 
@@ -113,25 +153,30 @@ export const useProfileSettings = () => {
       return { success: false, error: '请输入昵称' }
     }
 
-    profile.name = name
-    profile.bio = bio
-
-    return { success: true }
+    try {
+      applyProfile(await authApi.updateProfile({ displayName: name, email: profile.email, bio }))
+      return { success: true }
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : '保存资料失败' }
+    }
   }
 
-  const saveEmail = (email: string): ProfileActionResult => {
+  const saveEmail = async (email: string): Promise<ProfileActionResult> => {
     const normalizedEmail = email.trim()
 
     if (!emailPattern.test(normalizedEmail)) {
       return { success: false, error: '请输入有效邮箱地址' }
     }
 
-    profile.email = normalizedEmail
-
-    return { success: true }
+    try {
+      applyProfile(await authApi.updateProfile({ displayName: profile.name, email: normalizedEmail, bio: profile.bio }))
+      return { success: true }
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : '保存邮箱失败' }
+    }
   }
 
-  const savePassword = (payload: ProfilePasswordPayload): ProfileActionResult => {
+  const savePassword = async (payload: ProfilePasswordPayload): Promise<ProfileActionResult> => {
     const oldPassword = payload.old.trim()
     const nextPassword = payload.new1.trim()
     const confirmPassword = payload.new2.trim()
@@ -147,16 +192,27 @@ export const useProfileSettings = () => {
     if (nextPassword !== confirmPassword) {
       return { success: false, error: '两次输入的新密码不一致' }
     }
+    if (nextPassword.length < 8) return { success: false, error: '新密码至少需要8位' }
 
-    return { success: true }
+    try {
+      await authApi.changePassword({ currentPassword: oldPassword, newPassword: nextPassword })
+      return { success: true }
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : '修改密码失败' }
+    }
   }
 
   const updateAutoSaveInterval = (value: number) => {
     profile.autoSaveInterval = value
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ autoSaveInterval: value, fontSize: profile.fontSize }))
   }
 
   const updateFontSize = (value: number) => {
     profile.fontSize = value
+    localStorage.setItem(
+      PREFERENCES_KEY,
+      JSON.stringify({ autoSaveInterval: profile.autoSaveInterval, fontSize: value }),
+    )
   }
 
   const resetModelPreferenceState = () => {
@@ -185,8 +241,12 @@ export const useProfileSettings = () => {
     try {
       const detail = pickBusinessRecord(await modelApi.getUserModelPreferences(session.userId))
       const preferenceRecord = extractPreferenceRecord(detail)
-      const mainValue = typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId : null
-      const dirtyValue = typeof preferenceRecord.dirtyWorkAgentModelConfigId === 'string' ? preferenceRecord.dirtyWorkAgentModelConfigId : null
+      const mainValue =
+        typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId : null
+      const dirtyValue =
+        typeof preferenceRecord.dirtyWorkAgentModelConfigId === 'string'
+          ? preferenceRecord.dirtyWorkAgentModelConfigId
+          : null
 
       const candidateConfigs = Array.isArray(detail.candidateConfigs)
         ? detail.candidateConfigs
@@ -240,6 +300,7 @@ export const useProfileSettings = () => {
     apiKeys,
     modelPreferences,
     modelConfigOptions,
+    loadProfile,
     saveProfile,
     saveEmail,
     savePassword,

@@ -30,7 +30,6 @@ export const useLoginSubmit = () => {
 
       setSession({
         accessToken: String(tokenData?.accessToken || ''),
-        refreshToken: String(tokenData?.refreshToken || ''),
       })
 
       const profile = await authApi.me()

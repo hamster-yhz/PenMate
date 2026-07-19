@@ -1,10 +1,6 @@
 <template>
   <section id="workflow" class="workflow-section" data-testid="home-workflow">
-    <HomeSectionHeader
-      title="创 作 之 道"
-      subtitle="从落笔到成书，行云流水般的工作流"
-      :divider-img="dividerImg"
-    />
+    <HomeSectionHeader title="创 作 之 道" subtitle="从落笔到成书，行云流水般的工作流" :divider-img="dividerImg" />
 
     <div class="workflow-timeline">
       <div class="timeline-line"></div>

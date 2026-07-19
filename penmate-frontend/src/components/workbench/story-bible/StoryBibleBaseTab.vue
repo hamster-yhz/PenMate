@@ -82,19 +82,34 @@ import { computed } from 'vue'
 import type { StoryBibleCategory, StoryBibleNodeType, StoryBibleTag } from '@/api/modules/storyBible.api'
 import type { StoryBibleNodeDraft } from '@/composables/workbench/useStoryBible'
 
-const props = defineProps<{ draft: StoryBibleNodeDraft; nodeTypes: StoryBibleNodeType[]; categories: StoryBibleCategory[]; tags: StoryBibleTag[] }>()
+const props = defineProps<{
+  draft: StoryBibleNodeDraft
+  nodeTypes: StoryBibleNodeType[]
+  categories: StoryBibleCategory[]
+  tags: StoryBibleTag[]
+}>()
 
 const activeType = computed(() => props.nodeTypes.find((item) => item.typeId === props.draft.typeId))
 const schemaFields = computed(() => {
   try {
-    const schema = JSON.parse(activeType.value?.fieldSchemaJson || '{}') as { properties?: Record<string, { title?: string; type?: string }> }
-    return Object.entries(schema.properties || {}).map(([key, value]) => ({ key, title: value.title || key, type: value.type || 'string' }))
+    const schema = JSON.parse(activeType.value?.fieldSchemaJson || '{}') as {
+      properties?: Record<string, { title?: string; type?: string }>
+    }
+    return Object.entries(schema.properties || {}).map(([key, value]) => ({
+      key,
+      title: value.title || key,
+      type: value.type || 'string',
+    }))
   } catch {
     return []
   }
 })
 const attributes = () => {
-  try { return JSON.parse(props.draft.attributesJson || '{}') as Record<string, unknown> } catch { return {} }
+  try {
+    return JSON.parse(props.draft.attributesJson || '{}') as Record<string, unknown>
+  } catch {
+    return {}
+  }
 }
 const attributeValue = (key: string) => String(attributes()[key] ?? '')
 const setAttribute = (key: string, value: string, type: string) => {
@@ -103,25 +118,106 @@ const setAttribute = (key: string, value: string, type: string) => {
   props.draft.attributesJson = JSON.stringify(next)
 }
 const setAliases = (value: string) => {
-  props.draft.aliases = value.split(/[,，]/).map((item) => item.trim()).filter(Boolean)
+  props.draft.aliases = value
+    .split(/[,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 </script>
 
 <style scoped lang="less">
-.base-tab { display: grid; gap: 12px; padding: 16px; }
-label { display: grid; gap: 5px; min-width: 0; color: var(--text-secondary); font-size: 0.74rem; }
-input, textarea, select { width: 100%; min-width: 0; border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-primary); background: rgba(11, 17, 32, 0.68); outline: none; }
-input, select { height: 34px; padding: 0 9px; }
-textarea { resize: vertical; padding: 9px; line-height: 1.6; }
-input:focus, textarea:focus, select:focus { border-color: var(--border-gold); }
-.field-grid { display: grid; gap: 10px; }
-.two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.schema-fields { padding: 12px; border: 1px solid var(--border-subtle); border-radius: 4px; background: rgba(17, 24, 39, 0.4); }
-.schema-fields h3 { margin: 0 0 10px; color: var(--amber-gold); font-size: 0.78rem; }
-fieldset { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 4px; }
-legend { padding: 0 5px; color: var(--text-muted); font-size: 0.7rem; }
-.check-option { display: flex; grid-template-columns: none; flex-direction: row; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid var(--border-subtle); border-radius: 3px; }
-.check-option input { width: 14px; height: 14px; }
-.check-option i { width: 7px; height: 7px; border-radius: 50%; }
-@media (max-width: 720px) { .two-columns { grid-template-columns: 1fr; } }
+.base-tab {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+input,
+textarea,
+select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: rgba(11, 17, 32, 0.68);
+  outline: none;
+}
+input,
+select {
+  height: 34px;
+  padding: 0 9px;
+}
+textarea {
+  resize: vertical;
+  padding: 9px;
+  line-height: 1.6;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--border-gold);
+}
+.field-grid {
+  display: grid;
+  gap: 10px;
+}
+.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.schema-fields {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: rgba(17, 24, 39, 0.4);
+}
+.schema-fields h3 {
+  margin: 0 0 10px;
+  color: var(--amber-gold);
+  font-size: 0.78rem;
+}
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+legend {
+  padding: 0 5px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.check-option {
+  display: flex;
+  grid-template-columns: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+}
+.check-option input {
+  width: 14px;
+  height: 14px;
+}
+.check-option i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+@media (max-width: 720px) {
+  .two-columns {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

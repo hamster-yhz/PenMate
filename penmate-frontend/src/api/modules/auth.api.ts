@@ -5,17 +5,30 @@ export interface LoginPayload {
   password: string
 }
 
-export interface RefreshPayload {
-  refreshToken: string
-}
-
 export interface AuthTokenData {
   accessToken?: string
-  refreshToken?: string
   [key: string]: unknown
 }
 
-export type UserProfile = Record<string, unknown>
+export interface UserProfile {
+  id?: string
+  userId?: string
+  uid?: string
+  email?: string
+  userEmail?: string
+  displayName?: string
+  username?: string
+  name?: string
+  bio?: string
+  roles?: Array<Record<string, unknown>>
+  permissions?: Array<Record<string, unknown>>
+}
+
+export interface ProfileUpdatePayload {
+  displayName: string
+  email: string
+  bio: string
+}
 
 export function parseAuthErrorMessage(error: unknown): string {
   if (typeof error === 'object' && error !== null) {
@@ -38,16 +51,21 @@ export function parseAuthErrorMessage(error: unknown): string {
 
 export const authApi = {
   login(payload: LoginPayload) {
-    return request.post<AuthTokenData>('/v1/auth/login', payload)
+    return request.post<AuthTokenData>('/v1/auth/login', payload, { skipAuth: true })
   },
-  refresh(payload: RefreshPayload) {
-    return request.post<AuthTokenData>('/v1/auth/refresh', payload)
+  refresh() {
+    return request.post<AuthTokenData>('/v1/auth/refresh', undefined, { skipAuth: true })
   },
   logout() {
     return request.post<string>('/v1/auth/logout')
   },
   me() {
     return request.get<UserProfile>('/v1/auth/me')
-  }
+  },
+  updateProfile(payload: ProfileUpdatePayload) {
+    return request.patch<UserProfile>('/v1/auth/me', payload)
+  },
+  changePassword(payload: { currentPassword: string; newPassword: string }) {
+    return request.post<string>('/v1/auth/password', payload)
+  },
 }
-

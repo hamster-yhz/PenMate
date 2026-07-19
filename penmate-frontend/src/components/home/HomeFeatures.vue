@@ -1,16 +1,12 @@
 <template>
   <section id="features" class="features-section" data-testid="home-features">
-    <HomeSectionHeader
-      title="六 大 神 通"
-      subtitle="汇聚天地灵气，锻造写作神兵"
-      :divider-img="dividerImg"
-    />
+    <HomeSectionHeader title="六 大 神 通" subtitle="汇聚天地灵气，锻造写作神兵" :divider-img="dividerImg" />
 
     <div class="features-grid">
       <div v-for="feature in features" :key="feature.title" class="feature-card" data-testid="home-feature-card">
         <div class="card-glow"></div>
         <div class="card-img-wrap">
-          <img :src="feature.img" :alt="feature.title" class="card-img" />
+          <img :src="feature.img" :alt="feature.title" class="card-img" loading="lazy" decoding="async" />
         </div>
         <div class="card-content">
           <div class="card-icon-badge">{{ feature.icon }}</div>

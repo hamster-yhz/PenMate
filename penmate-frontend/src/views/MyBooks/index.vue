@@ -6,7 +6,9 @@
 
     <nav class="page-nav">
       <div class="nav-left">
-        <img :src="logoImg" alt="PenMate" class="nav-logo" @click="router.push('/')" />
+        <button type="button" class="nav-logo-button" aria-label="返回首页" @click="router.push('/')">
+          <img :src="logoImg" alt="" class="nav-logo" />
+        </button>
         <span class="nav-brand">笔友 · 书架</span>
       </div>
       <div class="nav-right">
@@ -67,7 +69,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import logoImg from '@/assets/images/logo.png'
+import logoImg from '@/assets/images/logo.webp'
 import { rbacApi } from '@/api/modules/rbac.api'
 import BookActionBar from '@/components/bookshelf/BookActionBar.vue'
 import BookCard from '@/components/bookshelf/BookCard.vue'
@@ -198,6 +200,14 @@ onMounted(() => {
   height: 32px;
   border-radius: 50%;
   object-fit: cover;
+  cursor: pointer;
+}
+
+.nav-logo-button {
+  display: inline-flex;
+  padding: 0;
+  background: transparent;
+  border: 0;
   cursor: pointer;
 }
 

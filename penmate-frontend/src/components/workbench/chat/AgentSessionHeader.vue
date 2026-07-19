@@ -1,18 +1,21 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
-  currentModelName?: string
-  generationStatusText?: string
-  agentStatusDetailText?: string
-  isGenerating?: boolean
-  generationPhase?: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
-  boundStyleName?: string
-}>(), {
-  currentModelName: '',
-  generationStatusText: '就绪',
-  agentStatusDetailText: '',
-  isGenerating: false,
-  generationPhase: 'idle',
-})
+withDefaults(
+  defineProps<{
+    currentModelName?: string
+    generationStatusText?: string
+    agentStatusDetailText?: string
+    isGenerating?: boolean
+    generationPhase?: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
+    boundStyleName?: string
+  }>(),
+  {
+    currentModelName: '',
+    generationStatusText: '就绪',
+    agentStatusDetailText: '',
+    isGenerating: false,
+    generationPhase: 'idle',
+  },
+)
 
 defineEmits<{
   'toggle-history': []
@@ -22,34 +25,16 @@ defineEmits<{
 
 <template>
   <div class="agent-header">
-    <button
-      type="button"
-      class="agent-history-btn"
-      data-testid="toggle-history"
-      @click="$emit('toggle-history')"
-    >
+    <button type="button" class="agent-history-btn" data-testid="toggle-history" @click="$emit('toggle-history')">
       历史会话
     </button>
-    <button
-      type="button"
-      class="agent-create-btn"
-      data-testid="create-session"
-      @click="$emit('create-session')"
-    >
+    <button type="button" class="agent-create-btn" data-testid="create-session" @click="$emit('create-session')">
       ＋
     </button>
-    <div
-      class="agent-model"
-      :class="{ empty: !currentModelName }"
-      data-testid="current-model"
-    >
+    <div class="agent-model" :class="{ empty: !currentModelName }" data-testid="current-model">
       {{ currentModelName || '未选择模型' }}
     </div>
-    <div
-      v-if="boundStyleName"
-      class="agent-style"
-      data-testid="bound-style"
-    >
+    <div v-if="boundStyleName" class="agent-style" data-testid="bound-style">
       {{ boundStyleName }}
     </div>
     <div

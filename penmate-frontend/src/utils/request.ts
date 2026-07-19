@@ -1,7 +1,11 @@
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 import { parse, isSafeNumber, toSafeNumberOrThrow } from 'lossless-json'
 import type { ApiEnvelope, ApiErrorPayload, AppError } from '@/api/types'
-import { clearSession, getSession, setSession } from '@/stores/session'
+import { expireSession, getSession, setSession } from '@/stores/session'
+
+export interface RequestOptions extends AxiosRequestConfig {
+  skipAuth?: boolean
+}
 
 interface RequestConfig extends InternalAxiosRequestConfig {
   skipAuth?: boolean
@@ -33,7 +37,8 @@ const parseJsonLosslessly = (raw: unknown) => {
 const requestRaw = axios.create({
   baseURL: import.meta.env.VITE_APP_API_BASE_URL || '/api',
   timeout: 10000,
-  transformResponse: [(data) => parseJsonLosslessly(data)]
+  withCredentials: true,
+  transformResponse: [(data) => parseJsonLosslessly(data)],
 })
 
 let refreshPromise: Promise<string> | null = null
@@ -54,22 +59,15 @@ const toAppError = (payload: ApiErrorPayload, fallbackStatus?: number): AppError
 }
 
 const refreshToken = async () => {
-  const session = getSession()
-  if (!session.refreshToken) {
-    throw new Error('缺少 refreshToken')
-  }
-  const response = await requestRaw.post<ApiEnvelope<Record<string, unknown>>>(
-    '/v1/auth/refresh',
-    { refreshToken: session.refreshToken },
-    { skipAuth: true } as AxiosRequestConfig
-  )
+  const response = await requestRaw.post<ApiEnvelope<Record<string, unknown>>>('/v1/auth/refresh', undefined, {
+    skipAuth: true,
+  } as AxiosRequestConfig)
   const tokenData = response.data?.data || {}
   const accessToken = String(tokenData.accessToken || '')
-  const nextRefreshToken = String(tokenData.refreshToken || session.refreshToken)
   if (!accessToken) {
     throw new Error('刷新令牌失败：缺少 accessToken')
   }
-  setSession({ accessToken, refreshToken: nextRefreshToken })
+  setSession({ accessToken })
   return accessToken
 }
 
@@ -85,7 +83,7 @@ requestRaw.interceptors.request.use(
     }
     return nextConfig
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 )
 
 requestRaw.interceptors.response.use(
@@ -106,34 +104,33 @@ requestRaw.interceptors.response.use(
         ;(config.headers as Record<string, string>).Authorization = `Bearer ${token}`
         return requestRaw(config)
       } catch (refreshErr) {
-        clearSession()
+        expireSession()
         return Promise.reject(refreshErr)
       }
     }
     const errorPayload = (error?.response?.data || {}) as ApiErrorPayload
     return Promise.reject(toAppError(errorPayload, status))
-  }
+  },
 )
 
 const unwrap = <T>(envelope: ApiEnvelope<T>) => envelope?.data
 
 const request = {
-  get<T>(url: string, config?: AxiosRequestConfig) {
+  get<T>(url: string, config?: RequestOptions) {
     return requestRaw.get<ApiEnvelope<T>>(url, config).then((res) => unwrap<T>(res.data))
   },
-  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+  post<T>(url: string, data?: unknown, config?: RequestOptions) {
     return requestRaw.post<ApiEnvelope<T>>(url, data, config).then((res) => unwrap<T>(res.data))
   },
-  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+  put<T>(url: string, data?: unknown, config?: RequestOptions) {
     return requestRaw.put<ApiEnvelope<T>>(url, data, config).then((res) => unwrap<T>(res.data))
   },
-  patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+  patch<T>(url: string, data?: unknown, config?: RequestOptions) {
     return requestRaw.patch<ApiEnvelope<T>>(url, data, config).then((res) => unwrap<T>(res.data))
   },
-  delete<T>(url: string, config?: AxiosRequestConfig) {
+  delete<T>(url: string, config?: RequestOptions) {
     return requestRaw.delete<ApiEnvelope<T>>(url, config).then((res) => unwrap<T>(res.data))
-  }
+  },
 }
 
 export default request
-

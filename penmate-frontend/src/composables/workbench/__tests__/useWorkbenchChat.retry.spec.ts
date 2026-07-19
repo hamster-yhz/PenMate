@@ -9,9 +9,10 @@ class FakeEventSource {
   close() {}
 }
 
-const event = (payload: Record<string, unknown>) => ({
-  data: JSON.stringify(payload),
-}) as MessageEvent<string>
+const event = (payload: Record<string, unknown>) =>
+  ({
+    data: JSON.stringify(payload),
+  }) as MessageEvent<string>
 
 describe('useWorkbenchChat terminal Run retry', () => {
   it('requests_one_successor_and_consumes_its_stream_in_the_existing_message_slot', async () => {

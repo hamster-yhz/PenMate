@@ -1,12 +1,13 @@
 import { ref } from 'vue'
 import type { ChatMessage } from '@/components/workbench/workbenchTypes'
+import { getErrorMessage } from '@/utils/errors'
 
 type ContextProfile = {
   projectId?: string | null
   operatorId?: string | null
 }
 
- type UseWorkbenchApprovalsDeps = {
+type UseWorkbenchApprovalsDeps = {
   getContext: () => ContextProfile
   getMessages: () => ChatMessage[]
   approve: (projectId: string, approvalId: string, payload: Record<string, unknown>) => Promise<unknown>
@@ -50,11 +51,8 @@ export const useWorkbenchApprovals = (deps: UseWorkbenchApprovalsDeps) => {
       })
       messageItem.approval.resolved = true
       messageItem.approval.resolvedAction = resolvedAction
-    } catch (error: any) {
-      const message = typeof error === 'string'
-        ? error
-        : error?.message || failureMessage
-      deps.notifyWarning?.(message)
+    } catch (error: unknown) {
+      deps.notifyWarning?.(getErrorMessage(error, failureMessage))
     } finally {
       approvalBusyIds.value = approvalBusyIds.value.filter((item) => item !== id)
     }

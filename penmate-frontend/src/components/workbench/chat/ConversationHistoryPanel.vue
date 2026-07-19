@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import type { ConversationItem } from '@/components/workbench/workbenchTypes'
 
-withDefaults(defineProps<{
-  visible?: boolean
-  loading?: boolean
-  conversations?: ConversationItem[]
-  currentConversationId?: string | null
-}>(), {
-  visible: false,
-  loading: false,
-  conversations: () => [],
-  currentConversationId: null,
-})
+withDefaults(
+  defineProps<{
+    visible?: boolean
+    loading?: boolean
+    conversations?: ConversationItem[]
+    currentConversationId?: string | null
+  }>(),
+  {
+    visible: false,
+    loading: false,
+    conversations: () => [],
+    currentConversationId: null,
+  },
+)
 
 const emit = defineEmits<{
   'select-conversation': [conversationId: string]
@@ -26,27 +29,16 @@ const handleSelect = (conversationId: string) => {
 <template>
   <div v-if="visible" class="conversation-panel" data-testid="conversation-panel">
     <div class="conversation-panel-header">
-      <button
-        type="button"
-        class="conversation-back"
-        data-testid="conversation-back"
-        @click="emit('close')"
-      >
+      <button type="button" class="conversation-back" data-testid="conversation-back" @click="emit('close')">
         ← 返回
       </button>
       <div class="conversation-panel-title">会话历史</div>
     </div>
 
     <div class="conversation-panel-body">
-      <div v-if="loading" class="conversation-empty" data-testid="conversation-loading">
-        加载中...
-      </div>
+      <div v-if="loading" class="conversation-empty" data-testid="conversation-loading">加载中...</div>
 
-      <div
-        v-else-if="!conversations.length"
-        class="conversation-empty"
-        data-testid="conversation-empty"
-      >
+      <div v-else-if="!conversations.length" class="conversation-empty" data-testid="conversation-empty">
         暂无历史会话
       </div>
 

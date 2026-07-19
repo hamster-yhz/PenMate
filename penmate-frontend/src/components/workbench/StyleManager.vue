@@ -1,12 +1,12 @@
 <template>
   <div class="style-manager" v-if="visible">
-    <div class="sm-backdrop" @click="$emit('close')"></div>
-    <div class="sm-drawer glass-panel">
+    <button type="button" class="sm-backdrop" aria-label="关闭文风设置" @click="$emit('close')"></button>
+    <div class="sm-drawer glass-panel" role="dialog" aria-modal="true" aria-labelledby="style-manager-title">
       <div class="sm-glow"></div>
 
       <div class="sm-header">
         <img :src="iconStyle" alt="" class="sm-icon" />
-        <h3>文风管控</h3>
+        <h3 id="style-manager-title">文风管控</h3>
         <button class="sm-close" @click="$emit('close')">✕</button>
       </div>
 
@@ -15,7 +15,7 @@
         <div class="sm-section">
           <div class="sm-label">当前文风</div>
           <div class="style-toolbar" v-if="styleOptions.length">
-            <select v-model="selectedStyleId" class="style-select" @change="handleStyleSelect">
+            <select v-model="selectedStyleId" class="style-select" aria-label="当前文风" @change="handleStyleSelect">
               <option v-for="item in styleOptions" :key="String(pickStyleId(item))" :value="String(pickStyleId(item))">
                 {{ String(item.name || `文风#${String(pickStyleId(item))}`) }}
               </option>
@@ -27,9 +27,7 @@
             <span class="badge-glow"></span>
             {{ currentStyle }}
           </div>
-          <div class="style-status" v-if="activeDefaultStyleId">
-            默认文风 ID：{{ activeDefaultStyleId }}
-          </div>
+          <div class="style-status" v-if="activeDefaultStyleId">默认文风 ID：{{ activeDefaultStyleId }}</div>
         </div>
 
         <!-- 节奏 -->
@@ -42,7 +40,9 @@
               class="opt-btn"
               :class="{ active: config.tempo === opt }"
               @click="config.tempo = opt"
-            >{{ opt }}</button>
+            >
+              {{ opt }}
+            </button>
           </div>
         </div>
 
@@ -56,7 +56,9 @@
               class="opt-btn"
               :class="{ active: config.tone === opt }"
               @click="config.tone = opt"
-            >{{ opt }}</button>
+            >
+              {{ opt }}
+            </button>
           </div>
         </div>
 
@@ -70,7 +72,9 @@
               class="opt-btn"
               :class="{ active: config.descPreference === opt }"
               @click="config.descPreference = opt"
-            >{{ opt }}</button>
+            >
+              {{ opt }}
+            </button>
           </div>
         </div>
 
@@ -79,14 +83,13 @@
           <div class="sm-label">范本学习</div>
           <p class="sm-hint">粘贴500字参考样文，系统自动解析文风</p>
           <textarea
+            aria-label="文风分析样本文本"
             v-model="sampleText"
             class="sm-textarea"
             placeholder="粘贴一段参考样文..."
             rows="5"
           ></textarea>
-          <button class="btn-analyze" @click="analyzeSample" :disabled="analyzing">
-            <span>🔍</span> 解析文风
-          </button>
+          <button class="btn-analyze" @click="analyzeSample" :disabled="analyzing"><span>🔍</span> 解析文风</button>
         </div>
 
         <!-- 切换警告 -->
@@ -111,9 +114,10 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import iconStyle from '@/assets/images/icon-style.png'
+import iconStyle from '@/assets/images/icon-style.webp'
 import { styleApi } from '@/api/modules/style.api'
 import { getSession } from '@/stores/session'
+import { getErrorMessage } from '@/utils/errors'
 
 const props = defineProps<{
   visible: boolean
@@ -131,7 +135,7 @@ const config = reactive({
   name: '默认文风',
   tempo: '适中',
   tone: '古风文言化',
-  descPreference: '心理多'
+  descPreference: '心理多',
 })
 
 const tempoOptions = ['快节奏', '适中', '慢节奏']
@@ -189,11 +193,12 @@ const loadStyles = async () => {
     if (defaultStyle) {
       const id = pickStyleId(defaultStyle) || ''
       selectedStyleId.value = id
-      activeDefaultStyleId.value = pickStyleId(styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle) || ''
+      activeDefaultStyleId.value =
+        pickStyleId(styleOptions.value.find((item) => Boolean(item.isDefault)) || defaultStyle) || ''
       applyStyleToForm(defaultStyle)
     }
-  } catch (error: any) {
-    message.warning(error?.message || '加载文风失败')
+  } catch (error: unknown) {
+    message.warning(getErrorMessage(error, '加载文风失败'))
   }
 }
 
@@ -223,15 +228,20 @@ const setAsDefault = async () => {
   saving.value = true
   try {
     const sessionId = getSessionId()
-    await styleApi.switchStyle(projectId, operatorId, {
-      toStyleId,
-      warningConfirmed: true,
-      reason: '手动设为默认文风'
-    }, sessionId)
+    await styleApi.switchStyle(
+      projectId,
+      operatorId,
+      {
+        toStyleId,
+        warningConfirmed: true,
+        reason: '手动设为默认文风',
+      },
+      sessionId,
+    )
     await loadStyles()
     message.success('默认文风已切换')
-  } catch (error: any) {
-    message.warning(error?.message || '默认文风切换失败')
+  } catch (error: unknown) {
+    message.warning(getErrorMessage(error, '默认文风切换失败'))
   } finally {
     saving.value = false
   }
@@ -255,8 +265,8 @@ const deleteSelectedStyle = async () => {
     await styleApi.deleteStyle(projectId, styleId, operatorId)
     await loadStyles()
     message.success('文风已删除')
-  } catch (error: any) {
-    message.warning(error?.message || '删除文风失败')
+  } catch (error: unknown) {
+    message.warning(getErrorMessage(error, '删除文风失败'))
   } finally {
     saving.value = false
   }
@@ -277,14 +287,14 @@ const analyzeSample = () => {
   styleApi
     .analyzeSample(projectId, operatorId, { sampleText: sampleText.value })
     .then((resp) => {
-      const result = ((resp || {}) as Record<string, unknown>)
+      const result = (resp || {}) as Record<string, unknown>
       config.tempo = String(result.pace || result.tempo || config.tempo)
       config.tone = String(result.tone || config.tone)
       config.descPreference = String(result.narrativeFocus || result.descPreference || config.descPreference)
       message.success('文风解析完成')
     })
-    .catch((error: any) => {
-      message.warning(error?.message || '文风解析失败')
+    .catch((error: unknown) => {
+      message.warning(getErrorMessage(error, '文风解析失败'))
     })
     .finally(() => {
       analyzing.value = false
@@ -315,7 +325,7 @@ const confirmChange = async (warningConfirmed = true) => {
       tone: config.tone,
       narrativeFocus: config.descPreference,
       promptTemplate: '',
-      sampleText: sampleText.value
+      sampleText: sampleText.value,
     }
 
     let styleId = selectedStyleId.value.trim()
@@ -324,24 +334,29 @@ const confirmChange = async (warningConfirmed = true) => {
     } else {
       const created = (await styleApi.createStyle(projectId, operatorId, {
         ...payload,
-        isDefault: true
+        isDefault: true,
       })) as Record<string, unknown>
       styleId = toBusinessId(created?.styleId) || ''
     }
 
     if (styleId) {
       const sessionId = getSessionId()
-      await styleApi.switchStyle(projectId, operatorId, {
-        toStyleId: styleId,
-        warningConfirmed,
-        reason: 'Workbench 文风切换'
-      }, sessionId)
+      await styleApi.switchStyle(
+        projectId,
+        operatorId,
+        {
+          toStyleId: styleId,
+          warningConfirmed,
+          reason: 'Workbench 文风切换',
+        },
+        sessionId,
+      )
     }
 
     await loadStyles()
     message.success('文风已保存')
-  } catch (error: any) {
-    message.warning(error?.message || '保存文风失败')
+  } catch (error: unknown) {
+    message.warning(getErrorMessage(error, '保存文风失败'))
   } finally {
     saving.value = false
   }
@@ -353,7 +368,7 @@ watch(
     if (visible) {
       void loadStyles()
     }
-  }
+  },
 )
 </script>
 
@@ -369,8 +384,11 @@ watch(
 .sm-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  padding: 0;
+  background: rgba(0, 0, 0, 0.5);
+  border: 0;
   backdrop-filter: blur(4px);
+  cursor: pointer;
 }
 
 .sm-drawer {
@@ -430,7 +448,7 @@ watch(
 
     &:hover {
       color: var(--amber-gold);
-      background: rgba(201,169,110,0.1);
+      background: rgba(201, 169, 110, 0.1);
     }
   }
 }
@@ -467,8 +485,8 @@ watch(
   display: inline-flex;
   align-items: center;
   padding: 8px 16px;
-  background: rgba(201,169,110,0.06);
-  border: 1px solid rgba(201,169,110,0.2);
+  background: rgba(201, 169, 110, 0.06);
+  border: 1px solid rgba(201, 169, 110, 0.2);
   border-radius: 6px;
   font-size: 0.9rem;
   color: var(--text-primary);
@@ -494,13 +512,15 @@ watch(
   max-width: 260px;
   height: 32px;
   padding: 0 10px;
-  background: rgba(11,17,32,0.6);
+  background: rgba(11, 17, 32, 0.6);
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   font-size: 0.8rem;
   outline: none;
-  &:focus { border-color: var(--border-gold); }
+  &:focus {
+    border-color: var(--border-gold);
+  }
 }
 
 .option-group {
@@ -514,7 +534,7 @@ watch(
   font-family: var(--font-body);
   font-size: 0.82rem;
   color: var(--text-secondary);
-  background: rgba(11,17,32,0.5);
+  background: rgba(11, 17, 32, 0.5);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   cursor: pointer;
@@ -528,16 +548,16 @@ watch(
 
   &.active {
     color: var(--amber-gold);
-    background: rgba(201,169,110,0.12);
+    background: rgba(201, 169, 110, 0.12);
     border-color: var(--border-gold);
-    box-shadow: 0 0 8px rgba(201,169,110,0.1);
+    box-shadow: 0 0 8px rgba(201, 169, 110, 0.1);
   }
 }
 
 .sm-textarea {
   width: 100%;
   padding: 12px;
-  background: rgba(11,17,32,0.6);
+  background: rgba(11, 17, 32, 0.6);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   color: var(--text-primary);
@@ -561,8 +581,8 @@ watch(
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: rgba(201,169,110,0.08);
-  border: 1px solid rgba(201,169,110,0.2);
+  background: rgba(201, 169, 110, 0.08);
+  border: 1px solid rgba(201, 169, 110, 0.2);
   border-radius: 6px;
   color: var(--amber-gold);
   font-size: 0.85rem;
@@ -571,7 +591,7 @@ watch(
   align-self: flex-start;
 
   &:hover {
-    background: rgba(201,169,110,0.15);
+    background: rgba(201, 169, 110, 0.15);
     border-color: var(--border-gold);
   }
 
@@ -601,14 +621,16 @@ watch(
 
 .btn-warn-confirm {
   padding: 6px 16px;
-  background: rgba(192,60,45,0.2);
-  border: 1px solid rgba(192,60,45,0.4);
+  background: rgba(192, 60, 45, 0.2);
+  border: 1px solid rgba(192, 60, 45, 0.4);
   border-radius: 4px;
   color: #e8a87c;
   cursor: pointer;
   font-size: 0.82rem;
 
-  &:hover { background: rgba(192,60,45,0.3); }
+  &:hover {
+    background: rgba(192, 60, 45, 0.3);
+  }
 }
 
 .btn-warn-cancel {
@@ -620,7 +642,10 @@ watch(
   cursor: pointer;
   font-size: 0.82rem;
 
-  &:hover { border-color: var(--border-gold); color: var(--text-secondary); }
+  &:hover {
+    border-color: var(--border-gold);
+    color: var(--text-secondary);
+  }
 }
 
 .sm-footer {
@@ -635,7 +660,7 @@ watch(
   font-size: 1rem;
   letter-spacing: 0.2em;
   color: var(--amber-gold);
-  background: linear-gradient(135deg, rgba(201,169,110,0.15), rgba(201,169,110,0.05));
+  background: linear-gradient(135deg, rgba(201, 169, 110, 0.15), rgba(201, 169, 110, 0.05));
   border: 1px solid var(--border-gold);
   border-radius: 8px;
   cursor: pointer;

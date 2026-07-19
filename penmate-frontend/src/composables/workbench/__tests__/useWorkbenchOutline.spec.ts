@@ -80,9 +80,7 @@ describe('useWorkbenchOutline', () => {
         key: 'node-10',
         title: '第一卷',
         expanded: true,
-        children: [
-          { key: 'node-11', title: '旧章名', chapterId: 'chapter-301' },
-        ],
+        children: [{ key: 'node-11', title: '旧章名', chapterId: 'chapter-301' }],
       },
     ]
     outline.activeChapter.value = 'chapter-301'
@@ -181,12 +179,20 @@ describe('useWorkbenchOutline', () => {
       children: [],
     })
 
-    expect(createOutlineNode).toHaveBeenCalledWith('project-101', 'operator-201', expect.objectContaining({
-      parentId: 'node-10',
-    }))
-    expect(createChapter).toHaveBeenCalledWith('project-101', 'operator-201', expect.objectContaining({
-      outlineNodeId: 'node-created-88',
-    }))
+    expect(createOutlineNode).toHaveBeenCalledWith(
+      'project-101',
+      'operator-201',
+      expect.objectContaining({
+        parentId: 'node-10',
+      }),
+    )
+    expect(createChapter).toHaveBeenCalledWith(
+      'project-101',
+      'operator-201',
+      expect.objectContaining({
+        outlineNodeId: 'node-created-88',
+      }),
+    )
   })
 
   it('clears_active_chapter_when_deleting_the_selected_chapter', async () => {
@@ -208,9 +214,7 @@ describe('useWorkbenchOutline', () => {
         key: 'node-10',
         title: '第一卷',
         expanded: true,
-        children: [
-          { key: 'node-11', title: '第一章', chapterId: 'chapter-301' },
-        ],
+        children: [{ key: 'node-11', title: '第一章', chapterId: 'chapter-301' }],
       },
     ]
     outline.activeChapter.value = 'chapter-301'
@@ -241,9 +245,7 @@ describe('useWorkbenchOutline', () => {
         key: '10',
         title: '第一卷',
         expanded: true,
-        children: [
-          { key: '11', title: '第一章', chapterId: '301' },
-        ],
+        children: [{ key: '11', title: '第一章', chapterId: '301' }],
       },
     ]
     outline.activeChapter.value = '301'
@@ -311,9 +313,7 @@ describe('useWorkbenchOutline', () => {
         key: '10',
         title: '第一卷',
         expanded: true,
-        children: [
-          { key: '11', title: '旧章名', chapterId: '301' },
-        ],
+        children: [{ key: '11', title: '旧章名', chapterId: '301' }],
       },
     ]
     outline.activeChapter.value = '301'
@@ -339,15 +339,17 @@ describe('useWorkbenchOutline', () => {
       moveOutlineNode: vi.fn(async () => undefined),
       moveChapter,
     })
-    outline.outlineData.value = [{
-      key: '10',
-      title: 'Volume',
-      expanded: true,
-      children: [
-        { key: '11', title: 'One', chapterId: '301' },
-        { key: '12', title: 'Two', chapterId: '302' },
-      ],
-    }]
+    outline.outlineData.value = [
+      {
+        key: '10',
+        title: 'Volume',
+        expanded: true,
+        children: [
+          { key: '11', title: 'One', chapterId: '301' },
+          { key: '12', title: 'Two', chapterId: '302' },
+        ],
+      },
+    ]
 
     await outline.moveNode({ nodeKey: '12', parentKey: '10', direction: -1 })
 

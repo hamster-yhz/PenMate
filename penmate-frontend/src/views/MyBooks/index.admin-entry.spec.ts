@@ -64,9 +64,7 @@ describe('MyBooks admin RBAC entry', () => {
   })
 
   it('shows the rbac admin entry when the backend menus contain the admin route', async () => {
-    listProfileMenusMock.mockResolvedValue([
-      { menuId: 4001, path: '/admin/rbac', title: 'RBAC 管理', visible: true },
-    ])
+    listProfileMenusMock.mockResolvedValue([{ menuId: 4001, path: '/admin/rbac', title: 'RBAC 管理', visible: true }])
 
     const wrapper = shallowMount(MyBooksView)
     await flushPromises()
@@ -76,9 +74,7 @@ describe('MyBooks admin RBAC entry', () => {
   })
 
   it('hides the rbac admin entry when the backend menus do not grant access', async () => {
-    listProfileMenusMock.mockResolvedValue([
-      { menuId: 1, path: '/profile', title: '个人中心', visible: true },
-    ])
+    listProfileMenusMock.mockResolvedValue([{ menuId: 1, path: '/profile', title: '个人中心', visible: true }])
 
     const wrapper = shallowMount(MyBooksView)
     await flushPromises()

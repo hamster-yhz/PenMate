@@ -6,7 +6,9 @@
 
     <nav class="page-nav">
       <div class="nav-left">
-        <img :src="logoImg" alt="PenMate" class="nav-logo" @click="router.push('/')" />
+        <button type="button" class="nav-logo-button" aria-label="返回首页" @click="router.push('/')">
+          <img :src="logoImg" alt="" class="nav-logo" />
+        </button>
         <span class="nav-brand">笔友 · 个人中心</span>
       </div>
       <div class="nav-right">
@@ -15,7 +17,8 @@
     </nav>
 
     <div class="page-body">
-      <ProfileHeroCard :profile="profile" @save-profile="saveProfile" />
+      <p v-if="profileLoadError" class="profile-error" role="alert">{{ profileLoadError }}</p>
+      <ProfileHeroCard :profile="profile" @save-profile="handleSaveProfile" />
 
       <div class="settings-grid">
         <ProfileSecurityPanel :email="profile.email" :save-email="saveEmail" :save-password="savePassword" />
@@ -49,8 +52,9 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import logoImg from '@/assets/images/logo.png'
+import logoImg from '@/assets/images/logo.webp'
 import ProfileApiKeyPanel from '@/components/profile/ProfileApiKeyPanel.vue'
 import ProfileDangerZone from '@/components/profile/ProfileDangerZone.vue'
 import ProfileModelPreferencePanel from '@/components/profile/ProfileModelPreferencePanel.vue'
@@ -58,6 +62,7 @@ import ProfileHeroCard from '@/components/profile/ProfileHeroCard.vue'
 import ProfilePreferencePanel from '@/components/profile/ProfilePreferencePanel.vue'
 import ProfileSecurityPanel from '@/components/profile/ProfileSecurityPanel.vue'
 import { useProfileSettings } from '@/composables/profile/useProfileSettings'
+import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
 
 const router = useRouter()
 
@@ -74,12 +79,19 @@ const {
   loadModelPreferences,
   saveModelPreferences,
   pStyle,
+  loadProfile,
 } = useProfileSettings()
 
 const modelPreferenceLoading = ref(false)
 const modelPreferenceSaving = ref(false)
 const modelPreferenceError = ref('')
 const modelPreferenceSuccessMessage = ref('')
+const profileLoadError = ref('')
+
+const handleSaveProfile = async (nextProfile: typeof profile) => {
+  const result = await saveProfile(nextProfile)
+  if (!result.success) message.error(result.error || '保存资料失败')
+}
 
 const handleLoadModelPreferences = async () => {
   modelPreferenceLoading.value = true
@@ -107,12 +119,18 @@ const handleSaveModelPreferences = async () => {
   }
 }
 
-onMounted(() => {
-  void handleLoadModelPreferences()
+onMounted(async () => {
+  profileLoadError.value = ''
+  try {
+    await Promise.all([loadProfile(), handleLoadModelPreferences()])
+  } catch (error: unknown) {
+    profileLoadError.value = error instanceof Error ? error.message : '个人资料加载失败'
+  }
 })
 
-const handleLogout = () => {
-  router.push('/login')
+const handleLogout = async () => {
+  await logoutCurrentSession()
+  await router.replace('/login')
 }
 </script>
 
@@ -196,5 +214,21 @@ const handleLogout = () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.nav-logo-button {
+  display: inline-flex;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.profile-error {
+  padding: 10px 12px;
+  color: #fff2f0;
+  background: #5c1d1d;
+  border: 1px solid #ff7875;
+  border-radius: 4px;
 }
 </style>

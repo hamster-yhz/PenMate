@@ -22,7 +22,12 @@
         {{ busy ? '处理中...' : '❌ 拒绝' }}
       </button>
     </div>
-    <button v-if="card.toolCode === 'story_bible_update'" type="button" class="btn-open-bible" @click="emit('open-story-bible', targetNodeId)">
+    <button
+      v-if="card.toolCode === 'story_bible_update'"
+      type="button"
+      class="btn-open-bible"
+      @click="emit('open-story-bible', targetNodeId)"
+    >
       <BookOutlined /> 打开 Story Bible
     </button>
     <div class="ac-resolved" v-else>
@@ -39,7 +44,7 @@ import { BookOutlined } from '@ant-design/icons-vue'
 import type { ApprovalCardData } from './approvalCard.types'
 
 const props = withDefaults(defineProps<{ card: ApprovalCardData; busy?: boolean }>(), {
-  busy: false
+  busy: false,
 })
 const emit = defineEmits<{
   (event: 'approve', id: string): void
@@ -140,7 +145,8 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
   gap: 8px;
 }
 
-.btn-approve, .btn-reject {
+.btn-approve,
+.btn-reject {
   flex: 1;
   padding: 7px 12px;
   font-size: 0.78rem;
@@ -178,8 +184,12 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
 .ac-resolved {
   font-size: 0.78rem;
 
-  .approved { color: var(--jade-green); }
-  .rejected { color: #e8a87c; }
+  .approved {
+    color: var(--jade-green);
+  }
+  .rejected {
+    color: #e8a87c;
+  }
 }
 
 .btn-open-bible {

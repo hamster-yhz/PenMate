@@ -17,7 +17,9 @@
     <div class="nav-section types">
       <div class="section-title">
         <span>节点类型</span>
-        <button class="mini-button" type="button" title="管理类型" @click="emit('manageTypes')"><SettingOutlined /></button>
+        <button class="mini-button" type="button" title="管理类型" @click="emit('manageTypes')">
+          <SettingOutlined />
+        </button>
       </div>
       <button
         v-for="type in nodeTypes"
@@ -59,7 +61,14 @@
 </template>
 
 <script setup lang="ts">
-import { BookOutlined, EnvironmentOutlined, FlagOutlined, GlobalOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons-vue'
+import {
+  BookOutlined,
+  EnvironmentOutlined,
+  FlagOutlined,
+  GlobalOutlined,
+  SettingOutlined,
+  UserOutlined,
+} from '@ant-design/icons-vue'
 import type { StoryBibleCategory, StoryBibleNodeType, StoryBibleTag } from '@/api/modules/storyBible.api'
 import StoryBibleCategoryTree from './StoryBibleCategoryTree.vue'
 
@@ -98,7 +107,10 @@ const families = [
   border-right: 1px solid var(--border-subtle);
   background: rgba(11, 17, 32, 0.72);
 }
-.nav-section { padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.nav-section {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
 .section-title {
   min-height: 28px;
   display: flex;
@@ -124,11 +136,51 @@ const families = [
   cursor: pointer;
 }
 .nav-section > button:hover,
-.nav-section > button.active { color: var(--amber-gold); background: rgba(201, 169, 110, 0.08); }
-.type-mark { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--border-subtle); border-radius: 3px; font-size: 0.65rem; }
-.mini-button { width: 26px; height: 26px; border: 0; color: var(--text-muted); background: transparent; cursor: pointer; }
-.tag-list { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 8px 8px; }
-.tag-chip { min-height: 26px; display: flex; align-items: center; gap: 5px; border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-secondary); background: rgba(17, 24, 39, 0.7); cursor: pointer; }
-.tag-chip.active { border-color: var(--border-gold); color: var(--amber-gold); }
-.tag-color { width: 7px; height: 7px; border-radius: 50%; }
+.nav-section > button.active {
+  color: var(--amber-gold);
+  background: rgba(201, 169, 110, 0.08);
+}
+.type-mark {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  font-size: 0.65rem;
+}
+.mini-button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 8px 8px;
+}
+.tag-chip {
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: rgba(17, 24, 39, 0.7);
+  cursor: pointer;
+}
+.tag-chip.active {
+  border-color: var(--border-gold);
+  color: var(--amber-gold);
+}
+.tag-color {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
 </style>

@@ -1,12 +1,12 @@
 <template>
   <div class="plugin-workshop" v-if="visible">
-    <div class="pw-backdrop" @click="$emit('close')"></div>
-    <div class="pw-modal glass-panel">
+    <button type="button" class="pw-backdrop" aria-label="关闭插件工坊" @click="$emit('close')"></button>
+    <div class="pw-modal glass-panel" role="dialog" aria-modal="true" aria-labelledby="plugin-workshop-title">
       <div class="pw-glow"></div>
 
       <div class="pw-header">
         <img :src="iconPlugin" alt="" class="pw-icon" />
-        <h3>插件工坊</h3>
+        <h3 id="plugin-workshop-title">插件工坊</h3>
         <button class="pw-close" @click="$emit('close')">✕</button>
       </div>
 
@@ -14,12 +14,7 @@
         <p class="pw-desc">为Agent增添神通，扩展AI工具链能力</p>
 
         <div class="plugin-grid">
-          <div
-            v-for="plugin in plugins"
-            :key="plugin.id"
-            class="plugin-card"
-            :class="{ installed: plugin.installed }"
-          >
+          <div v-for="plugin in plugins" :key="plugin.id" class="plugin-card" :class="{ installed: plugin.installed }">
             <div class="plugin-header">
               <span class="plugin-emoji">{{ plugin.emoji }}</span>
               <div class="plugin-meta">
@@ -57,9 +52,10 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import iconPlugin from '@/assets/images/feature-plugin.png'
+import iconPlugin from '@/assets/images/feature-plugin.webp'
 import { pluginApi } from '@/api/modules/plugin.api'
 import { getSession } from '@/stores/session'
+import { getErrorMessage } from '@/utils/errors'
 
 const props = defineProps<{ visible: boolean }>()
 defineEmits(['close'])
@@ -81,14 +77,15 @@ interface Plugin {
 
 const plugins = ref<Plugin[]>([])
 
-const installedCount = computed(() => plugins.value.filter(p => p.installed).length)
+const installedCount = computed(() => plugins.value.filter((p) => p.installed).length)
 
 const toBusinessId = (value: unknown) => {
   const normalized = String(value ?? '').trim()
   return normalized || null
 }
 const getProjectId = () => toBusinessId(route.query.projectId)
-const pickCatalogPluginId = (item: Record<string, unknown>, fallback: string) => String(item.pluginId ?? fallback).trim() || fallback
+const pickCatalogPluginId = (item: Record<string, unknown>, fallback: string) =>
+  String(item.pluginId ?? fallback).trim() || fallback
 const getOperatorId = () => {
   const sessionUserId = toBusinessId(session.userId)
   if (sessionUserId) return sessionUserId
@@ -112,7 +109,7 @@ const loadPlugins = async () => {
   try {
     const [catalogResp, installsResp] = await Promise.all([
       pluginApi.listCatalog(),
-      pluginApi.listProjectPlugins(projectId)
+      pluginApi.listProjectPlugins(projectId),
     ])
     const catalog = (catalogResp || []) as Array<Record<string, unknown>>
     const installs = (installsResp || []) as Array<Record<string, unknown>>
@@ -134,11 +131,11 @@ const loadPlugins = async () => {
         desc: String(item.description || item.desc || ''),
         tags: toTagList(item.tags),
         installed: Boolean(installed),
-        enabled: Boolean(installed?.enabled)
+        enabled: Boolean(installed?.enabled),
       }
     })
-  } catch (error: any) {
-    message.warning(error?.message || '加载插件列表失败')
+  } catch (error: unknown) {
+    message.warning(getErrorMessage(error, '加载插件列表失败'))
   }
 }
 
@@ -155,7 +152,7 @@ const togglePlugin = async (plugin: Plugin) => {
       await pluginApi.installPlugin(projectId, operatorId, {
         pluginCode: plugin.code,
         version: 'latest',
-        configJson: '{}'
+        configJson: '{}',
       })
       plugin.installed = true
       plugin.enabled = true
@@ -171,8 +168,8 @@ const togglePlugin = async (plugin: Plugin) => {
         message.success('插件已启用')
       }
     }
-  } catch (error: any) {
-    message.warning(error?.message || '插件操作失败')
+  } catch (error: unknown) {
+    message.warning(getErrorMessage(error, '插件操作失败'))
   } finally {
     plugin.loading = false
   }
@@ -184,7 +181,7 @@ watch(
     if (visible) {
       void loadPlugins()
     }
-  }
+  },
 )
 </script>
 
@@ -201,8 +198,11 @@ watch(
 .pw-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.6);
+  padding: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border: 0;
   backdrop-filter: blur(6px);
+  cursor: pointer;
 }
 
 .pw-modal {
@@ -212,7 +212,7 @@ watch(
   max-height: 85vh;
   background: rgba(17, 24, 39, 0.92);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(201,169,110,0.2);
+  border: 1px solid rgba(201, 169, 110, 0.2);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -264,7 +264,7 @@ watch(
 
     &:hover {
       color: var(--amber-gold);
-      background: rgba(201,169,110,0.1);
+      background: rgba(201, 169, 110, 0.1);
     }
   }
 }
@@ -290,15 +290,15 @@ watch(
 
 .plugin-card {
   padding: 18px;
-  background: rgba(11,17,32,0.5);
+  background: rgba(11, 17, 32, 0.5);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   transition: all 0.35s;
 
   &:hover {
     border-color: var(--border-gold);
-    background: rgba(17,24,39,0.7);
-    box-shadow: 0 0 16px rgba(201,169,110,0.06);
+    background: rgba(17, 24, 39, 0.7);
+    box-shadow: 0 0 16px rgba(201, 169, 110, 0.06);
   }
 
   &.installed {
@@ -358,8 +358,8 @@ watch(
   padding: 2px 8px;
   font-size: 0.68rem;
   color: var(--text-muted);
-  background: rgba(201,169,110,0.06);
-  border: 1px solid rgba(201,169,110,0.1);
+  background: rgba(201, 169, 110, 0.06);
+  border: 1px solid rgba(201, 169, 110, 0.1);
   border-radius: 8px;
 }
 
@@ -367,22 +367,22 @@ watch(
   padding: 5px 14px;
   font-size: 0.78rem;
   color: var(--amber-gold);
-  background: rgba(201,169,110,0.08);
-  border: 1px solid rgba(201,169,110,0.2);
+  background: rgba(201, 169, 110, 0.08);
+  border: 1px solid rgba(201, 169, 110, 0.2);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s;
   white-space: nowrap;
 
   &:hover:not(.active) {
-    background: rgba(201,169,110,0.15);
+    background: rgba(201, 169, 110, 0.15);
     border-color: var(--border-gold);
   }
 
   &.active {
     color: var(--jade-green);
-    background: rgba(90,158,111,0.1);
-    border-color: rgba(90,158,111,0.3);
+    background: rgba(90, 158, 111, 0.1);
+    border-color: rgba(90, 158, 111, 0.3);
     cursor: default;
   }
 }
@@ -407,7 +407,7 @@ watch(
   font-size: 0.95rem;
   letter-spacing: 0.2em;
   color: var(--amber-gold);
-  background: linear-gradient(135deg, rgba(201,169,110,0.12), rgba(201,169,110,0.04));
+  background: linear-gradient(135deg, rgba(201, 169, 110, 0.12), rgba(201, 169, 110, 0.04));
   border: 1px solid var(--border-gold);
   border-radius: 6px;
   cursor: pointer;

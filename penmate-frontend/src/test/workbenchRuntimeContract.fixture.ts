@@ -1,15 +1,11 @@
-import type {
-  WorkbenchRecoverySnapshot,
-  WorkbenchRuntimeEventSource,
-  WorkbenchRuntimeToolCall,
-} from '@/api/types'
+import type { WorkbenchRecoverySnapshot, WorkbenchRuntimeEventSource, WorkbenchRuntimeToolCall } from '@/api/types'
 
-const createTodoItems = () => ([
+const createTodoItems = () => [
   { todoId: 'todo-1', sessionId: '90001', title: '修复密令来源', status: 'pending', priority: 'HIGH' },
   { todoId: 'todo-2', sessionId: '90001', title: '补充侍从转述桥段', status: 'pending', priority: 'MEDIUM' },
-])
+]
 
-const createStoryBibleProposalItems = () => ([
+const createStoryBibleProposalItems = () => [
   {
     entryKey: 'maid.secret_order',
     entryType: 'CHARACTER_KNOWLEDGE',
@@ -20,7 +16,7 @@ const createStoryBibleProposalItems = () => ([
     sourceChapterId: 301,
     inferenceLevel: 'DIRECT',
   },
-])
+]
 
 const createDraftToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCallId: 'call-draft-1',
@@ -214,7 +210,11 @@ export const createRuntimeWaitingApprovalEvent = (): WorkbenchRuntimeEventSource
     planTitle: '第三章修订待办',
     planSummary: '补齐密令来源链路',
     recommendedNextAction: 'apply_todo_plan',
-    items: createTodoItems().map(({ todoId, sessionId, ...item }) => item),
+    items: createTodoItems().map(({ todoId, sessionId, ...item }) => {
+      void todoId
+      void sessionId
+      return item
+    }),
   },
   storyBibleApproval: {
     approvalId: '88001',

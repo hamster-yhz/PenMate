@@ -8,10 +8,8 @@
       <div class="pc-info">
         <div class="pc-name-row">
           <template v-if="isEditing">
-            <input v-model="draftName" class="name-input" data-testid="profile-hero-name-input" />
-            <button class="btn-save" type="button" data-testid="profile-hero-save" @click="handleSave">
-              保存资料
-            </button>
+            <input v-model="draftName" class="name-input" data-testid="profile-hero-name-input" aria-label="昵称" />
+            <button class="btn-save" type="button" data-testid="profile-hero-save" @click="handleSave">保存资料</button>
           </template>
           <template v-else>
             <h2 class="pc-name">{{ profile.name }}</h2>
@@ -22,6 +20,7 @@
         </div>
         <p class="pc-email">{{ profile.email }}</p>
         <textarea
+          aria-label="个人简介"
           v-if="isEditing"
           v-model="draftBio"
           class="bio-textarea"
@@ -42,16 +41,6 @@
       <div class="ps-item">
         <span class="ps-val">{{ profile.totalWords }}</span>
         <span class="ps-lbl">总字数</span>
-      </div>
-      <div class="ps-sep"></div>
-      <div class="ps-item">
-        <span class="ps-val">{{ profile.daysActive }}</span>
-        <span class="ps-lbl">创作天数</span>
-      </div>
-      <div class="ps-sep"></div>
-      <div class="ps-item">
-        <span class="ps-val">{{ profile.streak }}</span>
-        <span class="ps-lbl">连续创作</span>
       </div>
     </div>
   </div>

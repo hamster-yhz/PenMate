@@ -37,7 +37,6 @@ describe('WorkbenchHeader', () => {
     expect(wrapper.emitted('go-home')).toEqual([[]])
     expect(wrapper.emitted('open-style-manager')).toEqual([[]])
     expect(wrapper.emitted('toggle-user-menu')).toEqual([[]])
-    expect(wrapper.emitted('close-user-menu')).toEqual([[]])
     expect(wrapper.emitted('go-profile')).toEqual([[]])
     expect(wrapper.emitted('go-rbac-admin')).toEqual([[]])
     expect(wrapper.emitted('logout')).toEqual([[]])

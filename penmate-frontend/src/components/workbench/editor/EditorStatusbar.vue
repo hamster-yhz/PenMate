@@ -1,15 +1,18 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
-  selectedText: string
-  versionDiffSummary: string
-  currentLine: number
-  currentCol: number
-}>(), {
-  selectedText: '',
-  versionDiffSummary: '',
-  currentLine: 1,
-  currentCol: 1,
-})
+withDefaults(
+  defineProps<{
+    selectedText: string
+    versionDiffSummary: string
+    currentLine: number
+    currentCol: number
+  }>(),
+  {
+    selectedText: '',
+    versionDiffSummary: '',
+    currentLine: 1,
+    currentCol: 1,
+  },
+)
 </script>
 
 <template>

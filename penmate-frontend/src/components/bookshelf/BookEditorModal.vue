@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BookFormState } from '@/composables/bookshelf/useBookshelf'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 
 const props = defineProps<{
   visible: boolean
@@ -21,22 +22,37 @@ const close = () => {
   }
   emit('update:visible', false)
 }
+
+useEscapeKey(() => props.visible, close)
 </script>
 
 <template>
-  <div v-if="visible" class="modal-overlay" data-testid="book-editor-modal" @click.self="close">
-    <div class="modal-card glass-panel" role="dialog" aria-modal="true">
+  <div v-if="visible" class="modal-overlay" data-testid="book-editor-modal">
+    <div
+      class="modal-card glass-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="book-editor-title"
+      tabindex="-1"
+    >
       <div class="modal-glow"></div>
-      <h3 class="modal-title">{{ editing ? '编辑作品' : '创建新书' }}</h3>
+      <h3 id="book-editor-title" class="modal-title">{{ editing ? '编辑作品' : '创建新书' }}</h3>
 
       <div class="modal-form">
         <div class="form-row">
           <label>书名</label>
-          <input v-model="props.form.title" type="text" class="f-input" placeholder="为你的作品取一个名字" />
+          <input
+            v-model="props.form.title"
+            type="text"
+            class="f-input"
+            placeholder="为你的作品取一个名字"
+            aria-label="作品名称"
+          />
         </div>
         <div class="form-row">
           <label>简介</label>
           <textarea
+            aria-label="作品简介"
             v-model="props.form.description"
             class="f-input f-textarea"
             placeholder="简要描述你的故事..."
@@ -61,7 +77,13 @@ const close = () => {
         </div>
         <div class="form-row">
           <label>标签（逗号分隔）</label>
-          <input v-model="props.form.tagsStr" type="text" class="f-input" placeholder="修仙, 热血, 轻松" />
+          <input
+            v-model="props.form.tagsStr"
+            type="text"
+            class="f-input"
+            placeholder="修仙, 热血, 轻松"
+            aria-label="作品标签"
+          />
         </div>
       </div>
 

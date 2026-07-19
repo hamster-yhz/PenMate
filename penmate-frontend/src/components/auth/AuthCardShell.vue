@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import logoImg from '@/assets/images/logo.png'
+import logoImg from '@/assets/images/logo.webp'
 </script>
 
 <style scoped lang="less">
@@ -26,7 +26,9 @@ import logoImg from '@/assets/images/logo.png'
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(201, 169, 110, 0.18);
   border-radius: 24px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42), 0 0 60px rgba(201, 169, 110, 0.08);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.42),
+    0 0 60px rgba(201, 169, 110, 0.08);
 }
 
 .card-glow-top {

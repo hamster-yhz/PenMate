@@ -8,19 +8,22 @@ type ChapterVersionItem = {
   changeType?: string
 }
 
-const props = withDefaults(defineProps<{
-  currentChapterTitle: string
-  selectedVersionNo: string
-  versionBusy: boolean
-  activeChapter: string
-  versions: ChapterVersionItem[]
-}>(), {
-  currentChapterTitle: '',
-  selectedVersionNo: '',
-  versionBusy: false,
-  activeChapter: '',
-  versions: () => [],
-})
+const props = withDefaults(
+  defineProps<{
+    currentChapterTitle: string
+    selectedVersionNo: string
+    versionBusy: boolean
+    activeChapter: string
+    versions: ChapterVersionItem[]
+  }>(),
+  {
+    currentChapterTitle: '',
+    selectedVersionNo: '',
+    versionBusy: false,
+    activeChapter: '',
+    versions: () => [],
+  },
+)
 
 const emit = defineEmits<{
   (e: 'save'): void
@@ -49,14 +52,31 @@ const onVersionChange = (event: Event) => {
       <button data-testid="toolbar-save" class="toolbar-btn" type="button" @click="emit('save')">💾</button>
       <button data-testid="toolbar-undo" class="toolbar-btn" type="button" @click="emit('undo')">↩️</button>
       <button data-testid="toolbar-redo" class="toolbar-btn" type="button" @click="emit('redo')">↪️</button>
-      <button data-testid="toolbar-bold" class="toolbar-btn toolbar-btn-text" type="button" @click="emit('wrap-selection', '**', '**')">B</button>
-      <button data-testid="toolbar-italic" class="toolbar-btn toolbar-btn-text" type="button" @click="emit('wrap-selection', '*', '*')">I</button>
-      <button data-testid="toolbar-quote" class="toolbar-btn" type="button" @click="emit('insert-prefix', '> ')">❝</button>
+      <button
+        data-testid="toolbar-bold"
+        class="toolbar-btn toolbar-btn-text"
+        type="button"
+        @click="emit('wrap-selection', '**', '**')"
+      >
+        B
+      </button>
+      <button
+        data-testid="toolbar-italic"
+        class="toolbar-btn toolbar-btn-text"
+        type="button"
+        @click="emit('wrap-selection', '*', '*')"
+      >
+        I
+      </button>
+      <button data-testid="toolbar-quote" class="toolbar-btn" type="button" @click="emit('insert-prefix', '> ')">
+        ❝
+      </button>
     </div>
 
     <div class="toolbar-right">
       <span data-testid="chapter-label" class="toolbar-chapter">{{ currentChapterTitle }}</span>
       <select
+        aria-label="章节版本"
         data-testid="version-select"
         class="toolbar-select"
         :value="selectedVersionNo"

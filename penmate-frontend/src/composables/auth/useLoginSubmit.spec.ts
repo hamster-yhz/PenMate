@@ -56,7 +56,6 @@ describe('useLoginSubmit', () => {
   it('stores_session_and_returns_true_when_login_and_profile_succeed', async () => {
     loginMock.mockResolvedValue({
       accessToken: 'access-1',
-      refreshToken: 'refresh-1',
     })
     meMock.mockResolvedValue({
       userId: 8,
@@ -79,7 +78,6 @@ describe('useLoginSubmit', () => {
     })
     expect(getSession()).toMatchObject({
       accessToken: 'access-1',
-      refreshToken: 'refresh-1',
       userId: '8',
       userEmail: 'writer@example.com',
       userName: 'Writer',
@@ -88,7 +86,7 @@ describe('useLoginSubmit', () => {
   })
 
   it('rolls_back_session_and_resets_loading_when_profile_request_fails', async () => {
-    let resolveLogin: ((value: { accessToken: string; refreshToken: string }) => void) | undefined
+    let resolveLogin: ((value: { accessToken: string }) => void) | undefined
     loginMock.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -106,7 +104,7 @@ describe('useLoginSubmit', () => {
 
     expect(isLoading.value).toBe(true)
 
-    resolveLogin?.({ accessToken: 'access-2', refreshToken: 'refresh-2' })
+    resolveLogin?.({ accessToken: 'access-2' })
     const result = await pending
     await nextTick()
 
@@ -114,7 +112,9 @@ describe('useLoginSubmit', () => {
     expect(errorMock).toHaveBeenCalledWith('profile failed')
     expect(getSession()).toEqual({
       accessToken: '',
-      refreshToken: '',
+      userId: undefined,
+      userName: undefined,
+      userEmail: undefined,
     })
     expect(isLoading.value).toBe(false)
   })

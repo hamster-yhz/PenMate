@@ -69,5 +69,5 @@ export const agentApi = {
   },
   addStreamListener(stream: EventSource, eventName: string, listener: StreamListener) {
     stream.addEventListener(eventName, listener as EventListener)
-  }
+  },
 }

@@ -45,7 +45,11 @@
           @change="handleSelectChange('dirty-work-agent', $event)"
         >
           <option value="">未设置</option>
-          <option v-for="option in options" :key="`dirty-${option.modelConfigId}`" :value="String(option.modelConfigId)">
+          <option
+            v-for="option in options"
+            :key="`dirty-${option.modelConfigId}`"
+            :value="String(option.modelConfigId)"
+          >
             {{ formatOptionLabel(option) }}
           </option>
         </select>
@@ -60,23 +64,16 @@
 <script setup lang="ts">
 import type { ProfileModelConfigOption } from '@/composables/profile/useProfileSettings'
 
-const {
-  loading,
-  saving,
-  error,
-  successMessage,
-  options,
-  mainAgentModelConfigId,
-  dirtyWorkAgentModelConfigId,
-} = defineProps<{
-  loading: boolean
-  saving: boolean
-  error: string
-  successMessage: string
-  options: ProfileModelConfigOption[]
-  mainAgentModelConfigId: string | null
-  dirtyWorkAgentModelConfigId: string | null
-}>()
+const { loading, saving, error, successMessage, options, mainAgentModelConfigId, dirtyWorkAgentModelConfigId } =
+  defineProps<{
+    loading: boolean
+    saving: boolean
+    error: string
+    successMessage: string
+    options: ProfileModelConfigOption[]
+    mainAgentModelConfigId: string | null
+    dirtyWorkAgentModelConfigId: string | null
+  }>()
 
 const emit = defineEmits<{
   (event: 'update:main-agent-model-config-id', value: string | null): void

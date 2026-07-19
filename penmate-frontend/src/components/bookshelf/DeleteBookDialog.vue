@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BookshelfBook } from '@/composables/bookshelf/useBookshelf'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 
 const props = defineProps<{
   visible: boolean
@@ -25,12 +26,20 @@ const confirm = () => {
   }
   emit('confirm')
 }
+
+useEscapeKey(() => props.visible, close)
 </script>
 
 <template>
-  <div v-if="visible" class="modal-overlay" data-testid="delete-book-dialog" @click.self="close">
-    <div class="modal-card glass-panel small" role="dialog" aria-modal="true">
-      <h3 class="modal-title">确认删除</h3>
+  <div v-if="visible" class="modal-overlay" data-testid="delete-book-dialog">
+    <div
+      class="modal-card glass-panel small"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-book-title"
+      tabindex="-1"
+    >
+      <h3 id="delete-book-title" class="modal-title">确认删除</h3>
       <p class="delete-msg">确定要删除「{{ book?.title }}」吗？此操作不可撤销。</p>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" :disabled="deleting" @click="close">取消</button>

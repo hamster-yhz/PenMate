@@ -48,7 +48,7 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Run backend tests + coverage gate
+      - name: Run backend tests
         if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true' }}
         working-directory: penmate-backend
         run: mvn -B -Pci-postgresql-tests verify
@@ -65,10 +65,18 @@ jobs:
         working-directory: penmate-frontend
         run: npm ci
 
-      - name: Run frontend coverage gate
+      - name: Run frontend quality gate
         if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.frontend == 'true' }}
         working-directory: penmate-frontend
-        run: npm run test:coverage
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:run
+          npx playwright install --with-deps chromium
+          npm run test:e2e -- --project=chromium
+          npm run build
+          npm run budget
+          npm run audit:prod
 
   build-and-push:
     needs: [changes, verify]

@@ -3,7 +3,11 @@
     class="tree-item chapter"
     :class="{ active: isActive }"
     :data-testid="`chapter-node-${chapter.key}`"
+    role="button"
+    tabindex="0"
     @click="emit('select-chapter', chapter)"
+    @keydown.enter="emit('select-chapter', chapter)"
+    @keydown.space.prevent="emit('select-chapter', chapter)"
   >
     <span class="tree-dot">◇</span>
     <input
@@ -19,10 +23,22 @@
     />
     <span v-else class="tree-label" :data-testid="`chapter-label-${chapter.key}`">{{ chapter.title }}</span>
     <div class="tree-item-actions" @click.stop>
-      <button class="tree-act-btn" :data-testid="`rename-node-${chapter.key}`" title="重命名" @click="startRename">✏️</button>
-      <button class="tree-act-btn" :data-testid="`move-up-node-${chapter.key}`" title="上移" @click="emitMove(-1)">↑</button>
-      <button class="tree-act-btn" :data-testid="`move-down-node-${chapter.key}`" title="下移" @click="emitMove(1)">↓</button>
-      <button class="tree-act-btn danger" title="删除" @click="emit('delete-chapter', { nodeKey: chapter.key, parentKey })">✕</button>
+      <button class="tree-act-btn" :data-testid="`rename-node-${chapter.key}`" title="重命名" @click="startRename">
+        ✏️
+      </button>
+      <button class="tree-act-btn" :data-testid="`move-up-node-${chapter.key}`" title="上移" @click="emitMove(-1)">
+        ↑
+      </button>
+      <button class="tree-act-btn" :data-testid="`move-down-node-${chapter.key}`" title="下移" @click="emitMove(1)">
+        ↓
+      </button>
+      <button
+        class="tree-act-btn danger"
+        title="删除"
+        @click="emit('delete-chapter', { nodeKey: chapter.key, parentKey })"
+      >
+        ✕
+      </button>
     </div>
   </div>
 </template>
@@ -31,7 +47,11 @@
 import { nextTick, ref } from 'vue'
 
 import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
-import type { DeleteChapterPayload, MoveNodePayload, RenameNodePayload } from '@/composables/workbench/useWorkbenchOutline'
+import type {
+  DeleteChapterPayload,
+  MoveNodePayload,
+  RenameNodePayload,
+} from '@/composables/workbench/useWorkbenchOutline'
 
 const props = defineProps<{
   chapter: OutlineChapterNode

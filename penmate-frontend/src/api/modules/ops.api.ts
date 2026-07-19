@@ -17,6 +17,5 @@ export const opsApi = {
   },
   retryJob(jobId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/jobs/${jobId}/retry`, payload)
-  }
+  },
 }
-

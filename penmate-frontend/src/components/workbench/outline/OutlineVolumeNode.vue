@@ -1,6 +1,14 @@
 <template>
   <div class="tree-node">
-    <div class="tree-item volume" :class="{ expanded: expanded }" @click="toggleExpanded">
+    <div
+      class="tree-item volume"
+      :class="{ expanded: expanded }"
+      role="button"
+      tabindex="0"
+      @click="toggleExpanded"
+      @keydown.enter="toggleExpanded"
+      @keydown.space.prevent="toggleExpanded"
+    >
       <span class="tree-arrow">{{ expanded ? '▾' : '▸' }}</span>
       <input
         v-if="isEditing"
@@ -15,10 +23,16 @@
       />
       <span v-else class="tree-label" :data-testid="`volume-label-${volume.key}`">{{ volume.title }}</span>
       <div class="tree-item-actions" @click.stop>
-        <button class="tree-act-btn" :data-testid="`rename-node-${volume.key}`" title="重命名" @click="startRename">✏️</button>
+        <button class="tree-act-btn" :data-testid="`rename-node-${volume.key}`" title="重命名" @click="startRename">
+          ✏️
+        </button>
         <button class="tree-act-btn" title="添加章节" @click="emit('add-chapter', volume)">+</button>
-        <button class="tree-act-btn" :data-testid="`move-up-node-${volume.key}`" title="上移" @click="emitMove(-1)">↑</button>
-        <button class="tree-act-btn" :data-testid="`move-down-node-${volume.key}`" title="下移" @click="emitMove(1)">↓</button>
+        <button class="tree-act-btn" :data-testid="`move-up-node-${volume.key}`" title="上移" @click="emitMove(-1)">
+          ↑
+        </button>
+        <button class="tree-act-btn" :data-testid="`move-down-node-${volume.key}`" title="下移" @click="emitMove(1)">
+          ↓
+        </button>
         <button class="tree-act-btn danger" title="删除" @click="emit('delete-volume', volume.key)">✕</button>
       </div>
     </div>
@@ -43,7 +57,11 @@
 import { nextTick, ref, watch } from 'vue'
 
 import type { OutlineVolumeNode } from '@/composables/workbench/workbenchOutline'
-import type { DeleteChapterPayload, MoveNodePayload, RenameNodePayload } from '@/composables/workbench/useWorkbenchOutline'
+import type {
+  DeleteChapterPayload,
+  MoveNodePayload,
+  RenameNodePayload,
+} from '@/composables/workbench/useWorkbenchOutline'
 
 import OutlineChapterNode from './OutlineChapterNode.vue'
 

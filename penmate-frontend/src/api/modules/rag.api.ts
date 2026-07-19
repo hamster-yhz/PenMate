@@ -26,5 +26,5 @@ export const ragApi = {
   },
   retrievalLogs(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/rag/retrieval-logs`)
-  }
+  },
 }

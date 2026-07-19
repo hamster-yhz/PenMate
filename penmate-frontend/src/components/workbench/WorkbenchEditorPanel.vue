@@ -39,10 +39,7 @@
       :current-col="currentCol"
     />
 
-    <VersionPreviewPane
-      :current-content="editorContent"
-      :selected-version-content="selectedVersionContent"
-    />
+    <VersionPreviewPane :current-content="editorContent" :selected-version-content="selectedVersionContent" />
   </main>
 </template>
 

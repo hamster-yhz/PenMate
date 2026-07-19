@@ -255,7 +255,10 @@ describe('ModelSettings', () => {
   it('点击新增模型后展示 key 输入表单而不是 key 下拉，并直接提交 key 值', async () => {
     const wrapper = await mountComponent()
 
-    await wrapper.findAll('button').find((button) => button.text() === '新增模型')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增模型')!
+      .trigger('click')
     expect(wrapper.find('.api-form').exists()).toBe(true)
     expect(wrapper.text()).toContain('模型类别')
     expect(wrapper.text()).not.toContain('密钥来源')
@@ -271,7 +274,10 @@ describe('ModelSettings', () => {
     await selects[1].setValue('USER_KEY')
     await wrapper.find('input[placeholder="例如：sk-xxx"]').setValue('sk-direct-user-key')
 
-    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '保存模型配置')!
+      .trigger('click')
     await flushPromises()
 
     expect(mocks.createUserModelConfig).toHaveBeenCalledWith(
@@ -283,7 +289,7 @@ describe('ModelSettings', () => {
         baseUrl: 'https://api.example.com',
         modelCategory: 'USER_MODEL',
         apiKey: 'sk-direct-user-key',
-      })
+      }),
     )
     expect(mocks.createUserModelConfig.mock.calls[0][2]).not.toHaveProperty('keySourceType')
     expect(mocks.createUserModelConfig.mock.calls[0][2]).not.toHaveProperty('userKeyId')
@@ -328,14 +334,20 @@ describe('ModelSettings', () => {
     const wrapper = await mountComponent()
 
     expect(wrapper.text()).toContain('创建第一条配置')
-    await wrapper.findAll('button').find((button) => button.text() === '创建第一条配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '创建第一条配置')!
+      .trigger('click')
 
     const selects = wrapper.findAll('.api-form select')
     await selects[0].setValue('provider-openai-900719925474099312345')
     await wrapper.find('input[placeholder="例如：gpt-4o-mini"]').setValue('gpt-4.1-mini')
     await selects[1].setValue('USER_KEY')
     await wrapper.find('input[placeholder="例如：sk-xxx"]').setValue('sk-first-config-key')
-    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '保存模型配置')!
+      .trigger('click')
     await flushPromises()
 
     expect(mocks.createUserModelConfig).toHaveBeenCalledWith(
@@ -346,7 +358,7 @@ describe('ModelSettings', () => {
         modelName: 'gpt-4.1-mini',
         modelCategory: 'USER_MODEL',
         apiKey: 'sk-first-config-key',
-      })
+      }),
     )
     expect(mocks.createUserModelConfig.mock.calls[0][2]).not.toHaveProperty('keySourceType')
   })
@@ -374,7 +386,10 @@ describe('ModelSettings', () => {
     await selects[1].setValue('OFFICIAL_KEY')
     await wrapper.find('input[placeholder="例如：sk-xxx"]').setValue('sk-direct-official-key')
 
-    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '保存模型配置')!
+      .trigger('click')
     await flushPromises()
 
     expect(mocks.updateUserModelConfig).toHaveBeenCalledWith(
@@ -384,7 +399,7 @@ describe('ModelSettings', () => {
       expect.objectContaining({
         modelCategory: 'OFFICIAL_MODEL',
         apiKey: 'sk-direct-official-key',
-      })
+      }),
     )
     expect(mocks.updateUserModelConfig.mock.calls[0][3]).not.toHaveProperty('keySourceType')
     expect(mocks.updateUserModelConfig.mock.calls[0][3]).not.toHaveProperty('userKeyId')
@@ -399,7 +414,10 @@ describe('ModelSettings', () => {
     await flushPromises()
 
     await wrapper.find('input[placeholder="例如：gpt-4o-mini"]').setValue('gpt-4.1')
-    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '保存模型配置')!
+      .trigger('click')
     await flushPromises()
 
     expect(mocks.messageWarning).not.toHaveBeenCalledWith('请填写 Key')
@@ -409,7 +427,7 @@ describe('ModelSettings', () => {
       '101',
       expect.objectContaining({
         modelName: 'gpt-4.1',
-      })
+      }),
     )
     expect(mocks.updateUserModelConfig.mock.calls[0][3]).not.toHaveProperty('apiKey')
   })
@@ -422,7 +440,10 @@ describe('ModelSettings', () => {
     await flushPromises()
 
     await wrapper.find('input[placeholder="例如：gpt-4o-mini"]').setValue('gpt-4.1')
-    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '保存模型配置')!
+      .trigger('click')
     await flushPromises()
 
     expect(mocks.updateUserModelConfig).toHaveBeenCalledWith('101', 'mcfg-1001', '101', {
@@ -442,14 +463,20 @@ describe('ModelSettings', () => {
     mocks.createUserModelConfig.mockRejectedValueOnce(new Error('save fail'))
     const wrapper = await mountComponent()
 
-    await wrapper.findAll('button').find((button) => button.text() === '新增模型')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增模型')!
+      .trigger('click')
     const selects = wrapper.findAll('.api-form select')
     await selects[0].setValue('provider-openai-900719925474099312345')
     await wrapper.find('input[placeholder="例如：gpt-4o-mini"]').setValue('gpt-4.1-mini')
     await selects[1].setValue('USER_KEY')
     await wrapper.find('input[placeholder="例如：sk-xxx"]').setValue('sk-save-fail-key')
 
-    await wrapper.findAll('button').find((button) => button.text() === '保存模型配置')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '保存模型配置')!
+      .trigger('click')
     await flushPromises()
 
     expect(mocks.messageWarning).toHaveBeenCalledWith('模型配置保存失败，请稍后重试')
@@ -475,7 +502,10 @@ describe('ModelSettings', () => {
 
     const wrapper = await mountComponent()
 
-    await wrapper.findAll('button').find((button) => button.text() === '新增模型')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增模型')!
+      .trigger('click')
     await flushPromises()
 
     const providerOptions = wrapper.findAll('.api-form select').at(0)!.findAll('option')
@@ -503,7 +533,10 @@ describe('ModelSettings', () => {
 
     const wrapper = await mountComponent()
 
-    await wrapper.findAll('button').find((button) => button.text() === '新增模型')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增模型')!
+      .trigger('click')
     await flushPromises()
 
     const providerOptions = wrapper.findAll('.api-form select').at(0)!.findAll('option')

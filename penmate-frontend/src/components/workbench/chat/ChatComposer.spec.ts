@@ -79,9 +79,7 @@ describe('ChatComposer', () => {
     await textarea.setValue('请补充主角与反派对话')
     await textarea.trigger('keydown', { key: 'Enter', ctrlKey: true })
 
-    expect(wrapper.emitted('update:modelValue')).toEqual([
-      ['请补充主角与反派对话'],
-    ])
+    expect(wrapper.emitted('update:modelValue')).toEqual([['请补充主角与反派对话']])
     expect(wrapper.emitted('send')).toEqual([[]])
   }, 10_000)
 

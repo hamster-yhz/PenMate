@@ -19,12 +19,14 @@ export const styleApi = {
     return request.delete<string>(`/v1/novels/${projectId}/styles/${styleId}?operatorId=${operatorId}`)
   },
   switchStyle(projectId: string, operatorId: string, payload: AnyRecord, sessionId?: string | null) {
-    const sessionQuery = sessionId === undefined || sessionId === null || sessionId.trim() === ''
-      ? ''
-      : `&sessionId=${sessionId}`
-    return request.post<string>(`/v1/novels/${projectId}/styles/switch?operatorId=${operatorId}${sessionQuery}`, payload)
+    const sessionQuery =
+      sessionId === undefined || sessionId === null || sessionId.trim() === '' ? '' : `&sessionId=${sessionId}`
+    return request.post<string>(
+      `/v1/novels/${projectId}/styles/switch?operatorId=${operatorId}${sessionQuery}`,
+      payload,
+    )
   },
   analyzeSample(projectId: string, operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/styles/analyze-sample?operatorId=${operatorId}`, payload)
-  }
+  },
 }

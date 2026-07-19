@@ -171,9 +171,8 @@ export interface StoryBibleNodeUpdatePayload extends StoryBibleNodePayload {
 
 const base = (projectId: string) => `/v1/novels/${projectId}/story-bible`
 const operatorQuery = (operatorId: string) => `operatorId=${encodeURIComponent(operatorId)}`
-const optionalNodeIds = (nodeIds?: string[]) => nodeIds?.length
-  ? `?${nodeIds.map((id) => `nodeIds=${encodeURIComponent(id)}`).join('&')}`
-  : ''
+const optionalNodeIds = (nodeIds?: string[]) =>
+  nodeIds?.length ? `?${nodeIds.map((id) => `nodeIds=${encodeURIComponent(id)}`).join('&')}` : ''
 
 export const storyBibleApi = {
   get(projectId: string) {
@@ -194,22 +193,37 @@ export const storyBibleApi = {
   listNodeTypes(projectId: string) {
     return request.get<StoryBibleNodeType[]>(`${base(projectId)}/node-types`)
   },
-  createNodeType(projectId: string, operatorId: string, payload: Omit<StoryBibleNodeType, 'typeId' | 'storyBibleId' | 'system'>) {
+  createNodeType(
+    projectId: string,
+    operatorId: string,
+    payload: Omit<StoryBibleNodeType, 'typeId' | 'storyBibleId' | 'system'>,
+  ) {
     return request.post<StoryBibleNodeType>(`${base(projectId)}/node-types?${operatorQuery(operatorId)}`, payload)
   },
-  updateNodeType(projectId: string, typeId: string, operatorId: string, payload: Pick<StoryBibleNodeType, 'displayName' | 'iconCode' | 'fieldSchemaJson' | 'sortOrder'>) {
-    return request.patch<StoryBibleNodeType>(`${base(projectId)}/node-types/${typeId}?${operatorQuery(operatorId)}`, payload)
+  updateNodeType(
+    projectId: string,
+    typeId: string,
+    operatorId: string,
+    payload: Pick<StoryBibleNodeType, 'displayName' | 'iconCode' | 'fieldSchemaJson' | 'sortOrder'>,
+  ) {
+    return request.patch<StoryBibleNodeType>(
+      `${base(projectId)}/node-types/${typeId}?${operatorQuery(operatorId)}`,
+      payload,
+    )
   },
   archiveNodeType(projectId: string, typeId: string, operatorId: string) {
     return request.delete<string>(`${base(projectId)}/node-types/${typeId}?${operatorQuery(operatorId)}`)
   },
-  listNodes(projectId: string, filters: {
-    typeId?: string
-    status?: StoryBibleCanonStatus
-    query?: string
-    categoryId?: string
-    tagId?: string
-  } = {}) {
+  listNodes(
+    projectId: string,
+    filters: {
+      typeId?: string
+      status?: StoryBibleCanonStatus
+      query?: string
+      categoryId?: string
+      tagId?: string
+    } = {},
+  ) {
     const params = new URLSearchParams()
     if (filters.typeId) params.set('typeId', filters.typeId)
     if (filters.status) params.set('status', filters.status)
@@ -229,19 +243,35 @@ export const storyBibleApi = {
     return request.patch<StoryBibleNode>(`${base(projectId)}/nodes/${nodeId}?${operatorQuery(operatorId)}`, payload)
   },
   deleteNode(projectId: string, nodeId: string, operatorId: string, expectedRevision: number) {
-    return request.delete<string>(`${base(projectId)}/nodes/${nodeId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`)
+    return request.delete<string>(
+      `${base(projectId)}/nodes/${nodeId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`,
+    )
   },
   getEffectiveState(projectId: string, nodeId: string, chapterId: string) {
-    return request.get<Record<string, unknown>>(`${base(projectId)}/nodes/${nodeId}/effective-state?chapterId=${encodeURIComponent(chapterId)}`)
+    return request.get<Record<string, unknown>>(
+      `${base(projectId)}/nodes/${nodeId}/effective-state?chapterId=${encodeURIComponent(chapterId)}`,
+    )
   },
   listCategories(projectId: string) {
     return request.get<StoryBibleCategory[]>(`${base(projectId)}/categories`)
   },
-  createCategory(projectId: string, operatorId: string, payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'>) {
+  createCategory(
+    projectId: string,
+    operatorId: string,
+    payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'>,
+  ) {
     return request.post<StoryBibleCategory>(`${base(projectId)}/categories?${operatorQuery(operatorId)}`, payload)
   },
-  updateCategory(projectId: string, categoryId: string, operatorId: string, payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'>) {
-    return request.patch<StoryBibleCategory>(`${base(projectId)}/categories/${categoryId}?${operatorQuery(operatorId)}`, payload)
+  updateCategory(
+    projectId: string,
+    categoryId: string,
+    operatorId: string,
+    payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'>,
+  ) {
+    return request.patch<StoryBibleCategory>(
+      `${base(projectId)}/categories/${categoryId}?${operatorQuery(operatorId)}`,
+      payload,
+    )
   },
   deleteCategory(projectId: string, categoryId: string, operatorId: string) {
     return request.delete<string>(`${base(projectId)}/categories/${categoryId}?${operatorQuery(operatorId)}`)
@@ -261,26 +291,53 @@ export const storyBibleApi = {
   listRelations(projectId: string, nodeIds?: string[]) {
     return request.get<StoryBibleRelation[]>(`${base(projectId)}/relations${optionalNodeIds(nodeIds)}`)
   },
-  createRelation(projectId: string, operatorId: string, payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'revision'>) {
+  createRelation(
+    projectId: string,
+    operatorId: string,
+    payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'revision'>,
+  ) {
     return request.post<StoryBibleRelation>(`${base(projectId)}/relations?${operatorQuery(operatorId)}`, payload)
   },
   updateRelation(projectId: string, relationId: string, operatorId: string, payload: StoryBibleRelationUpdatePayload) {
-    return request.patch<StoryBibleRelation>(`${base(projectId)}/relations/${relationId}?${operatorQuery(operatorId)}`, payload)
+    return request.patch<StoryBibleRelation>(
+      `${base(projectId)}/relations/${relationId}?${operatorQuery(operatorId)}`,
+      payload,
+    )
   },
   deleteRelation(projectId: string, relationId: string, operatorId: string, expectedRevision: number) {
-    return request.delete<string>(`${base(projectId)}/relations/${relationId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`)
+    return request.delete<string>(
+      `${base(projectId)}/relations/${relationId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`,
+    )
   },
   listProgressions(projectId: string, nodeIds?: string[]) {
     return request.get<StoryBibleProgression[]>(`${base(projectId)}/progressions${optionalNodeIds(nodeIds)}`)
   },
-  createProgression(projectId: string, nodeId: string, operatorId: string, payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>) {
-    return request.post<StoryBibleProgression>(`${base(projectId)}/nodes/${nodeId}/progressions?${operatorQuery(operatorId)}`, payload)
+  createProgression(
+    projectId: string,
+    nodeId: string,
+    operatorId: string,
+    payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>,
+  ) {
+    return request.post<StoryBibleProgression>(
+      `${base(projectId)}/nodes/${nodeId}/progressions?${operatorQuery(operatorId)}`,
+      payload,
+    )
   },
-  updateProgression(projectId: string, progressionId: string, operatorId: string, payload: StoryBibleProgressionUpdatePayload) {
-    return request.patch<StoryBibleProgression>(`${base(projectId)}/progressions/${progressionId}?${operatorQuery(operatorId)}`, payload)
+  updateProgression(
+    projectId: string,
+    progressionId: string,
+    operatorId: string,
+    payload: StoryBibleProgressionUpdatePayload,
+  ) {
+    return request.patch<StoryBibleProgression>(
+      `${base(projectId)}/progressions/${progressionId}?${operatorQuery(operatorId)}`,
+      payload,
+    )
   },
   deleteProgression(projectId: string, progressionId: string, operatorId: string, expectedRevision: number) {
-    return request.delete<string>(`${base(projectId)}/progressions/${progressionId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`)
+    return request.delete<string>(
+      `${base(projectId)}/progressions/${progressionId}?expectedRevision=${expectedRevision}&${operatorQuery(operatorId)}`,
+    )
   },
   listChanges(projectId: string, limit = 50) {
     return request.get<StoryBibleChangeset[]>(`${base(projectId)}/changesets?limit=${limit}`)
@@ -292,15 +349,34 @@ export const storyBibleApi = {
     return request.get<StoryBibleChangeset[]>(`${base(projectId)}/nodes/${nodeId}/changesets?limit=${limit}`)
   },
   getUserRoutingPreference(projectId: string, userId: string) {
-    return request.get<StoryBibleRoutingPreference>(`/v1/novels/${projectId}/agent/routing-preference?userId=${encodeURIComponent(userId)}`)
+    return request.get<StoryBibleRoutingPreference>(
+      `/v1/novels/${projectId}/agent/routing-preference?userId=${encodeURIComponent(userId)}`,
+    )
   },
-  updateUserRoutingPreference(projectId: string, userId: string, payload: { mode: StoryBibleRoutingMode; routerModelConfigId?: string | null }) {
-    return request.put<StoryBibleRoutingPreference>(`/v1/novels/${projectId}/agent/routing-preference?userId=${encodeURIComponent(userId)}`, payload)
+  updateUserRoutingPreference(
+    projectId: string,
+    userId: string,
+    payload: { mode: StoryBibleRoutingMode; routerModelConfigId?: string | null },
+  ) {
+    return request.put<StoryBibleRoutingPreference>(
+      `/v1/novels/${projectId}/agent/routing-preference?userId=${encodeURIComponent(userId)}`,
+      payload,
+    )
   },
   getSessionRoutingPreference(projectId: string, sessionId: string, userId: string) {
-    return request.get<StoryBibleRoutingPreference>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/routing-preference?userId=${encodeURIComponent(userId)}`)
+    return request.get<StoryBibleRoutingPreference>(
+      `/v1/novels/${projectId}/agent/sessions/${sessionId}/routing-preference?userId=${encodeURIComponent(userId)}`,
+    )
   },
-  updateSessionRoutingPreference(projectId: string, sessionId: string, userId: string, payload: { mode: StoryBibleRoutingMode | null; routerModelConfigId?: string | null }) {
-    return request.put<StoryBibleRoutingPreference>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/routing-preference?userId=${encodeURIComponent(userId)}`, payload)
+  updateSessionRoutingPreference(
+    projectId: string,
+    sessionId: string,
+    userId: string,
+    payload: { mode: StoryBibleRoutingMode | null; routerModelConfigId?: string | null },
+  ) {
+    return request.put<StoryBibleRoutingPreference>(
+      `/v1/novels/${projectId}/agent/sessions/${sessionId}/routing-preference?userId=${encodeURIComponent(userId)}`,
+      payload,
+    )
   },
 }

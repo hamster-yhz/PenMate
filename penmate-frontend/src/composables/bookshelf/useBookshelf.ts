@@ -2,6 +2,7 @@ import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { novelApi, type AnyRecord } from '@/api/modules/novel.api'
 import { getSession } from '@/stores/session'
+import { getErrorMessage } from '@/utils/errors'
 
 export interface BookshelfBook {
   id: string
@@ -127,11 +128,9 @@ export const useBookshelf = () => {
     loading.value = true
     try {
       const list = await novelApi.listProjects()
-      books.value = (list || [])
-        .map((item, index) => toBook(item, index))
-        .filter((item) => Number(item.id) > 0)
-    } catch (error: any) {
-      message.error(error?.message || '加载书架失败')
+      books.value = (list || []).map((item, index) => toBook(item, index)).filter((item) => Number(item.id) > 0)
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '加载书架失败'))
     } finally {
       loading.value = false
     }
@@ -188,8 +187,8 @@ export const useBookshelf = () => {
 
       await loadBooks()
       closeEditor()
-    } catch (error: any) {
-      message.error(error?.message || '保存作品失败')
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '保存作品失败'))
     } finally {
       saving.value = false
     }
@@ -207,8 +206,8 @@ export const useBookshelf = () => {
       message.success('作品已删除')
       await loadBooks()
       closeDeleteDialog()
-    } catch (error: any) {
-      message.error(error?.message || '删除失败')
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '删除失败'))
     } finally {
       deleting.value = false
     }

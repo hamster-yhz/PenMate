@@ -17,8 +17,10 @@
       </button>
     </div>
     <div v-if="showEmailForm" class="setting-row-expand" data-testid="profile-security-email-form">
-      <input v-model="newEmail" class="f-input" placeholder="新邮箱地址" type="email" />
-      <button class="btn-sm" type="button" data-testid="profile-security-email-save" @click="handleSaveEmail">保存</button>
+      <input v-model="newEmail" class="f-input" placeholder="新邮箱地址" type="email" aria-label="新邮箱地址" />
+      <button class="btn-sm" type="button" data-testid="profile-security-email-save" @click="handleSaveEmail">
+        保存
+      </button>
       <p v-if="emailError" class="form-error">{{ emailError }}</p>
     </div>
 
@@ -36,20 +38,17 @@
         修改
       </button>
     </div>
-    <div
-      v-if="showPasswordForm"
-      class="setting-row-expand"
-      data-testid="profile-security-password-form"
-    >
-      <input v-model="passwords.old" class="f-input" placeholder="当前密码" type="password" />
-      <input v-model="passwords.new1" class="f-input" placeholder="新密码" type="password" />
-      <input v-model="passwords.new2" class="f-input" placeholder="确认新密码" type="password" />
-      <button
-        class="btn-sm"
-        type="button"
-        data-testid="profile-security-password-save"
-        @click="handleSavePassword"
-      >
+    <div v-if="showPasswordForm" class="setting-row-expand" data-testid="profile-security-password-form">
+      <input v-model="passwords.old" class="f-input" placeholder="当前密码" type="password" aria-label="当前密码" />
+      <input v-model="passwords.new1" class="f-input" placeholder="新密码" type="password" aria-label="新密码" />
+      <input
+        v-model="passwords.new2"
+        class="f-input"
+        placeholder="确认新密码"
+        type="password"
+        aria-label="确认新密码"
+      />
+      <button class="btn-sm" type="button" data-testid="profile-security-password-save" @click="handleSavePassword">
         保存
       </button>
       <p v-if="passwordError" class="form-error">{{ passwordError }}</p>
@@ -62,9 +61,7 @@ import { reactive, ref } from 'vue'
 import type { ProfileActionResult, ProfilePasswordPayload } from '@/composables/profile/useProfileSettings'
 
 type SaveEmailHandler = (email: string) => ProfileActionResult | Promise<ProfileActionResult>
-type SavePasswordHandler = (
-  payload: ProfilePasswordPayload,
-) => ProfileActionResult | Promise<ProfileActionResult>
+type SavePasswordHandler = (payload: ProfilePasswordPayload) => ProfileActionResult | Promise<ProfileActionResult>
 
 const props = defineProps<{
   email: string
@@ -82,9 +79,7 @@ const passwordError = ref('')
 const handleSaveEmail = async () => {
   emailError.value = ''
 
-  const result = props.saveEmail
-    ? await props.saveEmail(newEmail.value)
-    : { success: true as const }
+  const result = props.saveEmail ? await props.saveEmail(newEmail.value) : { success: true as const }
 
   if (!result.success) {
     emailError.value = result.error ?? '保存邮箱失败'
@@ -103,9 +98,7 @@ const handleSavePassword = async () => {
     return
   }
 
-  const result = props.savePassword
-    ? await props.savePassword({ ...passwords })
-    : { success: true as const }
+  const result = props.savePassword ? await props.savePassword({ ...passwords }) : { success: true as const }
 
   if (!result.success) {
     passwordError.value = result.error ?? '修改密码失败'

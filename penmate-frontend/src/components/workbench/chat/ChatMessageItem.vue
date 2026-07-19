@@ -2,16 +2,19 @@
 import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
 import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 
-const props = withDefaults(defineProps<{
-  msg: ChatMessage
-  isGenerating?: boolean
-  streamingAssistantMsgId?: string | number | null
-  approvalBusy?: boolean
-}>(), {
-  isGenerating: false,
-  streamingAssistantMsgId: null,
-  approvalBusy: false,
-})
+const props = withDefaults(
+  defineProps<{
+    msg: ChatMessage
+    isGenerating?: boolean
+    streamingAssistantMsgId?: string | number | null
+    approvalBusy?: boolean
+  }>(),
+  {
+    isGenerating: false,
+    streamingAssistantMsgId: null,
+    approvalBusy: false,
+  },
+)
 
 const emit = defineEmits<{
   'merge-to-editor': [msg: ChatMessage]
@@ -33,13 +36,10 @@ const emitReplace = () => {
 <template>
   <div
     class="chat-msg"
-    :class="[
-      msg.role,
-      { generating: msg.role === 'assistant' && msg.id === streamingAssistantMsgId && isGenerating },
-    ]"
+    :class="[msg.role, { generating: msg.role === 'assistant' && msg.id === streamingAssistantMsgId && isGenerating }]"
   >
     <div class="msg-bubble">
-      <div class="msg-text" data-testid="message-html" v-html="msg.text"></div>
+      <div class="msg-text" data-testid="message-text">{{ msg.text }}</div>
 
       <div
         v-if="msg.role === 'assistant' && msg.id === streamingAssistantMsgId && isGenerating && !msg.text"
@@ -53,22 +53,10 @@ const emitReplace = () => {
       </div>
 
       <div v-if="msg.role === 'assistant' && msg.text" class="msg-actions">
-        <button
-          type="button"
-          class="msg-btn"
-          data-testid="merge-to-editor"
-          title="合并至编辑器"
-          @click="emitMerge"
-        >
+        <button type="button" class="msg-btn" data-testid="merge-to-editor" title="合并至编辑器" @click="emitMerge">
           📥 合并
         </button>
-        <button
-          type="button"
-          class="msg-btn"
-          data-testid="replace-selected"
-          title="替换所选文本"
-          @click="emitReplace"
-        >
+        <button type="button" class="msg-btn" data-testid="replace-selected" title="替换所选文本" @click="emitReplace">
           🔄 替换所选
         </button>
       </div>
@@ -118,6 +106,7 @@ const emitReplace = () => {
 
 .msg-text {
   line-height: 1.8;
+  white-space: pre-wrap;
   word-break: break-word;
 }
 

@@ -2,12 +2,17 @@
   <div class="sb-search-toolbar">
     <SearchOutlined aria-hidden="true" />
     <input
+      aria-label="搜索 Story Bible 节点"
       :value="query"
       type="search"
       placeholder="搜索节点、别名或摘要"
       @input="emit('update:query', ($event.target as HTMLInputElement).value)"
     />
-    <select :value="status" aria-label="正史状态" @change="emit('update:status', ($event.target as HTMLSelectElement).value)">
+    <select
+      :value="status"
+      aria-label="正史状态"
+      @change="emit('update:status', ($event.target as HTMLSelectElement).value)"
+    >
       <option value="">全部状态</option>
       <option value="CANON">正史</option>
       <option value="DRAFT">草稿</option>
@@ -54,8 +59,12 @@ select {
   outline: none;
 }
 
-input { padding: 0 8px; }
-select { padding: 0 4px; }
+input {
+  padding: 0 8px;
+}
+select {
+  padding: 0 4px;
+}
 
 .icon-button {
   width: 32px;

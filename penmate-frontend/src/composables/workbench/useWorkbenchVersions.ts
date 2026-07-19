@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { getErrorMessage } from '@/utils/errors'
 
 type VersionRecord = Record<string, unknown>
 
@@ -33,7 +34,12 @@ type UseWorkbenchVersionsDeps = {
   restoreVersion: (projectId: string, chapterId: string, versionNo: number, operatorId: string) => Promise<void>
   publishChapter: (projectId: string, chapterId: string, operatorId: string) => Promise<void>
   getContentUploadUrl: (projectId: string, chapterId: string) => Promise<unknown>
-  commitContent: (projectId: string, chapterId: string, operatorId: string, payload: Record<string, unknown>) => Promise<void>
+  commitContent: (
+    projectId: string,
+    chapterId: string,
+    operatorId: string,
+    payload: Record<string, unknown>,
+  ) => Promise<void>
   createVersion: (projectId: string, chapterId: string, payload: Record<string, unknown>) => Promise<void>
   resolveUploadTarget: (payload: VersionRecord) => {
     uploadUrl: string
@@ -105,10 +111,10 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
       const versionLen = text.length
       const delta = versionLen - currentLen
       versionDiffSummary.value = `当前 ${currentLen} 字 / 版本 ${versionLen} 字 / 差值 ${delta >= 0 ? '+' : ''}${delta}`
-    } catch (error: any) {
+    } catch (error: unknown) {
       selectedVersionContent.value = ''
       versionDiffSummary.value = ''
-      deps.notify(error?.message || '查看版本失败')
+      deps.notify(getErrorMessage(error, '查看版本失败'))
     } finally {
       versionBusy.value = false
     }
@@ -151,8 +157,8 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
       selectedVersionContent.value = ''
       versionDiffSummary.value = ''
       deps.notifySuccess(`已恢复到版本 v${versionNo}`)
-    } catch (error: any) {
-      deps.notify(error?.message || '恢复版本失败')
+    } catch (error: unknown) {
+      deps.notify(getErrorMessage(error, '恢复版本失败'))
     } finally {
       versionBusy.value = false
     }
@@ -197,8 +203,8 @@ export const useWorkbenchVersions = (deps: UseWorkbenchVersionsDeps) => {
       await loadChapterVersions(projectId, String(chapterId))
       await deps.publishChapter(projectId, chapterId, operatorId)
       deps.notifySuccess('章节已发布')
-    } catch (error: any) {
-      deps.notify(error?.message || '发布章节失败')
+    } catch (error: unknown) {
+      deps.notify(getErrorMessage(error, '发布章节失败'))
     } finally {
       versionBusy.value = false
     }

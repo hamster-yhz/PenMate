@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const requestMock = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn(),
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  patch: vi.fn(),
+  delete: vi.fn(),
 }
 vi.mock('@/utils/request', () => ({ default: requestMock }))
 
@@ -39,11 +43,9 @@ describe('storyBibleApi', () => {
     await storyBibleApi.updateUserRoutingPreference('101', '7', { mode: 'RETRIEVAL' })
     await storyBibleApi.updateSessionRoutingPreference('101', '9001', '7', { mode: null })
 
-    expect(requestMock.put).toHaveBeenNthCalledWith(
-      1,
-      '/v1/novels/101/agent/routing-preference?userId=7',
-      { mode: 'RETRIEVAL' },
-    )
+    expect(requestMock.put).toHaveBeenNthCalledWith(1, '/v1/novels/101/agent/routing-preference?userId=7', {
+      mode: 'RETRIEVAL',
+    })
     expect(requestMock.put).toHaveBeenNthCalledWith(
       2,
       '/v1/novels/101/agent/sessions/9001/routing-preference?userId=7',
@@ -55,7 +57,10 @@ describe('storyBibleApi', () => {
     const { storyBibleApi } = await import('./storyBible.api')
 
     await storyBibleApi.listNodes('101', {
-      query: 'Captain', categoryId: '31', tagId: '41', status: 'CANON',
+      query: 'Captain',
+      categoryId: '31',
+      tagId: '41',
+      status: 'CANON',
     })
     await storyBibleApi.listChanges('101', 25)
     await storyBibleApi.getChangeset('101', '51')

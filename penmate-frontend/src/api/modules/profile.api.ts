@@ -8,5 +8,5 @@ export const profileApi = {
   },
   systemMenus() {
     return request.get<AnyRecord[]>('/v1/menus')
-  }
+  },
 }

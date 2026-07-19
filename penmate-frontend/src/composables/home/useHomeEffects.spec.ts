@@ -67,5 +67,4 @@ describe('useHomeEffects', () => {
 
     expect(removeEventListenerSpy).toHaveBeenCalledWith('scroll', scrollHandler)
   })
-
 })

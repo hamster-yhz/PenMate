@@ -63,7 +63,13 @@ const normalizeProviderPayload = (payload: AnyRecord): AnyRecord | null => {
 }
 
 const assertNoLegacyOnlyProviderEntries = (providers: AnyRecord[]) => {
-  const hasLegacyOnlyEntry = providers.some((item) => item != null && typeof item === 'object' && 'id' in item && normalizeBusinessStringId((item as AnyRecord).providerId) === null)
+  const hasLegacyOnlyEntry = providers.some(
+    (item) =>
+      item != null &&
+      typeof item === 'object' &&
+      'id' in item &&
+      normalizeBusinessStringId((item as AnyRecord).providerId) === null,
+  )
   if (hasLegacyOnlyEntry) {
     throw new Error('Invalid provider contract')
   }
@@ -108,17 +114,19 @@ export const modelApi = {
   createUserModelConfig(userId: string, operatorId: string, payload: AnyRecord) {
     return request.post<string>(
       `/v1/model/configs?userId=${userId}&operatorId=${operatorId}`,
-      normalizeUserModelConfigPayload(payload)
+      normalizeUserModelConfigPayload(payload),
     )
   },
   updateUserModelConfig(userId: string, businessModelConfigId: string, operatorId: string, payload: AnyRecord) {
     return request.put<string>(
       `/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`,
-      normalizeUserModelConfigPayload(payload)
+      normalizeUserModelConfigPayload(payload),
     )
   },
   deleteUserModelConfig(userId: string, businessModelConfigId: string, operatorId: string) {
-    return request.delete<string>(`/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`)
+    return request.delete<string>(
+      `/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`,
+    )
   },
   getUserModelPreferences(userId: string) {
     return request.get<AnyRecord>(`/v1/model/preferences?userId=${userId}`)
@@ -126,7 +134,7 @@ export const modelApi = {
   saveUserModelPreferences(userId: string, operatorId: string, payload: AnyRecord) {
     return request.post<string>(
       `/v1/model/preferences?userId=${userId}&operatorId=${operatorId}`,
-      normalizeUserModelPreferencePayload(payload)
+      normalizeUserModelPreferencePayload(payload),
     )
   },
 }

@@ -1,8 +1,13 @@
 <template>
   <aside class="panel panel-right glass-panel" :class="{ collapsed }">
-    <div class="panel-toggle right-toggle" @click="emit('toggle-collapse')">
+    <button
+      type="button"
+      class="panel-toggle right-toggle"
+      :aria-label="collapsed ? '展开对话面板' : '收起对话面板'"
+      @click="emit('toggle-collapse')"
+    >
       {{ collapsed ? '◂' : '▸' }}
-    </div>
+    </button>
 
     <div v-show="!collapsed" class="panel-content">
       <AgentSessionHeader
@@ -68,48 +73,51 @@ import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
 import ChatComposer from '@/components/workbench/chat/ChatComposer.vue'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
 
-const props = withDefaults(defineProps<{
-  collapsed: boolean
-  currentModelName?: string
-  generationStatusText?: string
-  agentStatusDetailText?: string
-  isGenerating?: boolean
-  canCancelRun?: boolean
-  isCancelling?: boolean
-  canRetryRun?: boolean
-  isRetrying?: boolean
-  generationPhase?: GenerationPhase
-  boundStyleName?: string
-  showConversationPanel?: boolean
-  conversationLoading?: boolean
-  conversationList?: ConversationItem[]
-  currentConversationId?: string | null
-  bindChatContainer: (element: HTMLElement | null) => void
-  messages?: ChatMessage[]
-  streamingAssistantMsgId?: string | number | null
-  isApprovalBusy: (approvalId: string) => boolean
-  chatInput?: string
-  activePlugins?: string[]
-}>(), {
-  currentModelName: '',
-  generationStatusText: '',
-  agentStatusDetailText: '',
-  isGenerating: false,
-  canCancelRun: false,
-  isCancelling: false,
-  canRetryRun: false,
-  isRetrying: false,
-  generationPhase: 'idle',
-  boundStyleName: '',
-  showConversationPanel: false,
-  conversationLoading: false,
-  conversationList: () => [],
-  currentConversationId: null,
-  messages: () => [],
-  streamingAssistantMsgId: null,
-  chatInput: '',
-  activePlugins: () => [],
-})
+const props = withDefaults(
+  defineProps<{
+    collapsed: boolean
+    currentModelName?: string
+    generationStatusText?: string
+    agentStatusDetailText?: string
+    isGenerating?: boolean
+    canCancelRun?: boolean
+    isCancelling?: boolean
+    canRetryRun?: boolean
+    isRetrying?: boolean
+    generationPhase?: GenerationPhase
+    boundStyleName?: string
+    showConversationPanel?: boolean
+    conversationLoading?: boolean
+    conversationList?: ConversationItem[]
+    currentConversationId?: string | null
+    bindChatContainer: (element: HTMLElement | null) => void
+    messages?: ChatMessage[]
+    streamingAssistantMsgId?: string | number | null
+    isApprovalBusy: (approvalId: string) => boolean
+    chatInput?: string
+    activePlugins?: string[]
+  }>(),
+  {
+    currentModelName: '',
+    generationStatusText: '',
+    agentStatusDetailText: '',
+    isGenerating: false,
+    canCancelRun: false,
+    isCancelling: false,
+    canRetryRun: false,
+    isRetrying: false,
+    generationPhase: 'idle',
+    boundStyleName: '',
+    showConversationPanel: false,
+    conversationLoading: false,
+    conversationList: () => [],
+    currentConversationId: null,
+    messages: () => [],
+    streamingAssistantMsgId: null,
+    chatInput: '',
+    activePlugins: () => [],
+  },
+)
 
 const emit = defineEmits<{
   (event: 'toggle-collapse'): void

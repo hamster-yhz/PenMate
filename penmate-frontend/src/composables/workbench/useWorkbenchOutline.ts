@@ -1,10 +1,6 @@
 import { ref } from 'vue'
 
-import {
-  mapOutlineTree,
-  type OutlineChapterNode,
-  type OutlineVolumeNode,
-} from './workbenchOutline'
+import { mapOutlineTree, type OutlineChapterNode, type OutlineVolumeNode } from './workbenchOutline'
 
 type ContextProfile = {
   projectId?: string | null
@@ -20,9 +16,24 @@ type UseWorkbenchOutlineDeps = {
   createChapter: (projectId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
   deleteOutlineNode: (projectId: string, nodeId: string, operatorId: string) => Promise<unknown>
   deleteChapter: (projectId: string, chapterId: string, operatorId: string) => Promise<unknown>
-  updateOutlineNode: (projectId: string, nodeId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
-  moveOutlineNode: (projectId: string, nodeId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
-  moveChapter?: (projectId: string, chapterId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
+  updateOutlineNode: (
+    projectId: string,
+    nodeId: string,
+    operatorId: string,
+    payload: OutlineApiPayload,
+  ) => Promise<unknown>
+  moveOutlineNode: (
+    projectId: string,
+    nodeId: string,
+    operatorId: string,
+    payload: OutlineApiPayload,
+  ) => Promise<unknown>
+  moveChapter?: (
+    projectId: string,
+    chapterId: string,
+    operatorId: string,
+    payload: OutlineApiPayload,
+  ) => Promise<unknown>
   notify?: (message: string) => void
   notifySuccess?: (message: string) => void
 }
@@ -59,7 +70,8 @@ const toBusinessId = (value: unknown) => {
 
 const pickOutlineNodeId = (item: Record<string, unknown>) => toBusinessId(item.outlineNodeId)
 
-const findVolumeIndexByKey = (volumes: OutlineVolumeNode[], nodeKey: string) => volumes.findIndex((item) => item.key === nodeKey)
+const findVolumeIndexByKey = (volumes: OutlineVolumeNode[], nodeKey: string) =>
+  volumes.findIndex((item) => item.key === nodeKey)
 
 const findVolumeByKey = (volumes: OutlineVolumeNode[], nodeKey: string) => volumes.find((item) => item.key === nodeKey)
 
@@ -75,10 +87,7 @@ const findNodeByKey = (volumes: OutlineVolumeNode[], nodeKey: string): OutlineTr
   return null
 }
 
-const clearSelection = (
-  activeChapter: { value: string },
-  currentChapterTitle: { value: string },
-) => {
+const clearSelection = (activeChapter: { value: string }, currentChapterTitle: { value: string }) => {
   activeChapter.value = ''
   currentChapterTitle.value = ''
 }
@@ -89,10 +98,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   const currentChapterTitle = ref('')
   const outlineOpBusy = ref(false)
 
-  const loadOutline = (
-    nodes: Array<Record<string, unknown>>,
-    chapterByOutlineNodeId: Record<string, string> = {},
-  ) => {
+  const loadOutline = (nodes: Array<Record<string, unknown>>, chapterByOutlineNodeId: Record<string, string> = {}) => {
     const mapped = mapOutlineTree(nodes, chapterByOutlineNodeId)
     outlineData.value = mapped
     return mapped
@@ -153,13 +159,13 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     outlineOpBusy.value = true
     let createdOutlineNodeId = ''
     try {
-      const createdOutline = await deps.createOutlineNode(projectId, operatorId, {
+      const createdOutline = (await deps.createOutlineNode(projectId, operatorId, {
         parentId: volumeNodeId,
         title,
         nodeType: 'CHAPTER',
         sortOrder: idx + 1,
         content: '',
-      }) as Record<string, unknown>
+      })) as Record<string, unknown>
       createdOutlineNodeId = pickOutlineNodeId(createdOutline)
 
       await deps.createChapter(projectId, operatorId, {
@@ -194,7 +200,9 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
       try {
         await deps.deleteOutlineNode(projectId, nodeKey, operatorId)
         outlineData.value.splice(volumeIndex, 1)
-        const removedActive = volume.children.some((chapter) => activeChapter.value === (chapter.chapterId || chapter.key))
+        const removedActive = volume.children.some(
+          (chapter) => activeChapter.value === (chapter.chapterId || chapter.key),
+        )
         if (removedActive) {
           clearSelection(activeChapter, currentChapterTitle)
         }

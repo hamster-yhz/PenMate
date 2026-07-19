@@ -20,12 +20,12 @@ export const chapterApi = {
   },
   restoreVersion(projectId: string, chapterId: string, versionNo: string, operatorId: string) {
     return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore?operatorId=${operatorId}`
+      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore?operatorId=${operatorId}`,
     )
   },
   getVersionSnapshotUrl(projectId: string, chapterId: string, versionNo: string) {
     return request.get<Record<string, string>>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`
+      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`,
     )
   },
   publishChapter(projectId: string, chapterId: string, operatorId: string) {
@@ -35,9 +35,12 @@ export const chapterApi = {
     return request.post<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-upload-url`)
   },
   commitContent(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/content-commit?operatorId=${operatorId}`, payload)
+    return request.post<AnyRecord>(
+      `/v1/novels/${projectId}/chapters/${chapterId}/content-commit?operatorId=${operatorId}`,
+      payload,
+    )
   },
   getContentUrl(projectId: string, chapterId: string) {
     return request.get<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-url`)
-  }
+  },
 }

@@ -4,6 +4,20 @@ const { listProfileMenusMock } = vi.hoisted(() => ({
   listProfileMenusMock: vi.fn(),
 }))
 
+const { refreshMock, meMock, clearSessionMock, setSessionMock } = vi.hoisted(() => ({
+  refreshMock: vi.fn(),
+  meMock: vi.fn(),
+  clearSessionMock: vi.fn(),
+  setSessionMock: vi.fn(),
+}))
+
+vi.mock('@/api/modules/auth.api', () => ({
+  authApi: {
+    refresh: refreshMock,
+    me: meMock,
+  },
+}))
+
 const { getSessionMock } = vi.hoisted(() => ({
   getSessionMock: vi.fn(),
 }))
@@ -16,6 +30,8 @@ vi.mock('@/api/modules/rbac.api', () => ({
 
 vi.mock('@/stores/session', () => ({
   getSession: getSessionMock,
+  clearSession: clearSessionMock,
+  setSession: setSessionMock,
 }))
 
 vi.mock('@/views/Home/index.vue', () => ({
@@ -52,6 +68,11 @@ describe('router admin rbac guard', () => {
     vi.resetModules()
     listProfileMenusMock.mockReset()
     getSessionMock.mockReset()
+    refreshMock.mockReset()
+    meMock.mockReset()
+    clearSessionMock.mockReset()
+    setSessionMock.mockReset()
+    refreshMock.mockRejectedValue(new Error('no refresh session'))
   })
 
   it('allows_non_admin_routes_without_querying_rbac_menus', async () => {
@@ -71,7 +92,8 @@ describe('router admin rbac guard', () => {
     await router.push('/admin/rbac')
 
     expect(listProfileMenusMock).not.toHaveBeenCalled()
-    expect(router.currentRoute.value.fullPath).toBe('/login')
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe('/admin/rbac')
   })
 
   it('redirects non admin users away from the admin rbac route', async () => {

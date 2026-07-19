@@ -52,7 +52,10 @@ export const novelApi = {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}?operatorId=${operatorId}`, payload)
   },
   moveChapter(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
-    return request.patch<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/position?operatorId=${operatorId}`, payload)
+    return request.patch<AnyRecord>(
+      `/v1/novels/${projectId}/chapters/${chapterId}/position?operatorId=${operatorId}`,
+      payload,
+    )
   },
   deleteChapter(projectId: string, chapterId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/chapters/${chapterId}?operatorId=${operatorId}`)
@@ -71,7 +74,7 @@ export const novelApi = {
   },
   restoreChapterVersion(projectId: string, chapterId: string, versionNo: number, operatorId: string) {
     return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore?operatorId=${operatorId}`
+      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore?operatorId=${operatorId}`,
     )
   },
   getChapterContentUrl(projectId: string, chapterId: string) {
@@ -81,11 +84,14 @@ export const novelApi = {
     return request.post<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-upload-url`)
   },
   commitChapterContent(projectId: string, chapterId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/content-commit?operatorId=${operatorId}`, payload)
+    return request.post<AnyRecord>(
+      `/v1/novels/${projectId}/chapters/${chapterId}/content-commit?operatorId=${operatorId}`,
+      payload,
+    )
   },
   getChapterVersionSnapshotUrl(projectId: string, chapterId: string, versionNo: number) {
     return request.get<Record<string, string>>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`
+      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`,
     )
   },
   listOutlineTree(projectId: string) {
@@ -98,10 +104,12 @@ export const novelApi = {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`, payload)
   },
   moveOutlineNode(projectId: string, nodeId: string, operatorId: string, payload: AnyRecord) {
-    return request.patch<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}/move?operatorId=${operatorId}`, payload)
+    return request.patch<string>(
+      `/v1/novels/${projectId}/outlines/nodes/${nodeId}/move?operatorId=${operatorId}`,
+      payload,
+    )
   },
   deleteOutlineNode(projectId: string, nodeId: string, operatorId: string) {
     return request.delete<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}?operatorId=${operatorId}`)
   },
 }
-

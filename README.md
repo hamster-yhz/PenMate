@@ -342,7 +342,9 @@ mvn -B verify
 
 # frontend
 cd penmate-frontend
-npm run test:coverage
+npm run lint
+npm run typecheck
+npm run test:run
 npm run build
 ```
 

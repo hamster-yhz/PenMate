@@ -4,15 +4,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearSession, setSession } from '@/stores/session'
 import ProfileIndex from './index.vue'
 
-const { pushMock, getUserModelPreferencesMock, saveUserModelPreferencesMock } = vi.hoisted(() => ({
+const {
+  pushMock,
+  replaceMock,
+  getUserModelPreferencesMock,
+  saveUserModelPreferencesMock,
+  listKeysMock,
+  meMock,
+  updateProfileMock,
+} = vi.hoisted(() => ({
   pushMock: vi.fn(),
+  replaceMock: vi.fn(),
   getUserModelPreferencesMock: vi.fn(),
   saveUserModelPreferencesMock: vi.fn(),
+  listKeysMock: vi.fn(),
+  meMock: vi.fn(),
+  updateProfileMock: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: pushMock,
+    replace: replaceMock,
   }),
 }))
 
@@ -24,23 +37,46 @@ vi.mock('@/api/modules/model.api', async () => {
       ...actual.modelApi,
       getUserModelPreferences: getUserModelPreferencesMock,
       saveUserModelPreferences: saveUserModelPreferencesMock,
+      listKeys: listKeysMock,
     },
   }
+})
+
+vi.mock('@/api/modules/auth.api', async () => {
+  const actual = await vi.importActual<typeof import('@/api/modules/auth.api')>('@/api/modules/auth.api')
+  return { ...actual, authApi: { ...actual.authApi, me: meMock, updateProfile: updateProfileMock } }
+})
+
+vi.mock('@/api/modules/novel.api', async () => {
+  const actual = await vi.importActual<typeof import('@/api/modules/novel.api')>('@/api/modules/novel.api')
+  return { ...actual, novelApi: { ...actual.novelApi, listProjects: vi.fn().mockResolvedValue([]) } }
 })
 
 describe('Profile index refactor', () => {
   beforeEach(() => {
     pushMock.mockReset()
+    replaceMock.mockReset()
     getUserModelPreferencesMock.mockReset()
     saveUserModelPreferencesMock.mockReset()
+    listKeysMock.mockReset()
+    meMock.mockReset()
+    updateProfileMock.mockReset()
     clearSession()
     setSession({ userId: '1001' })
+    listKeysMock.mockResolvedValue([])
+    meMock.mockResolvedValue({ id: '1001', displayName: '原笔名', email: 'writer@example.com', bio: '原简介' })
+    updateProfileMock.mockImplementation(async (payload) => ({ id: '1001', ...payload }))
     getUserModelPreferencesMock.mockResolvedValue({
       mainAgentModelConfigId: 'mcfg-9001',
       dirtyWorkAgentModelConfigId: 'mcfg-9002',
       candidateConfigs: [
         { modelConfigId: 'mcfg-9001', modelName: 'gpt-4o-mini', providerName: 'OpenAI', keySourceType: 'USER_KEY' },
-        { modelConfigId: 'mcfg-9002', modelName: 'deepseek-chat', providerName: 'DeepSeek', keySourceType: 'OFFICIAL_KEY' },
+        {
+          modelConfigId: 'mcfg-9002',
+          modelName: 'deepseek-chat',
+          providerName: 'DeepSeek',
+          keySourceType: 'OFFICIAL_KEY',
+        },
       ],
     })
     saveUserModelPreferencesMock.mockResolvedValue('updated')
@@ -69,9 +105,7 @@ describe('Profile index refactor', () => {
     expect(wrapper.text()).toContain('请输入有效邮箱地址')
     expect(wrapper.find('[data-testid="profile-security-email-form"]').exists()).toBe(true)
 
-    const openWorkbenchButton = wrapper
-      .findAll('button')
-      .find((button) => button.text() === '前往设置')
+    const openWorkbenchButton = wrapper.findAll('button').find((button) => button.text() === '前往设置')
 
     expect(openWorkbenchButton?.exists()).toBe(true)
 
@@ -117,5 +151,4 @@ describe('Profile index refactor', () => {
 
     expect(wrapper.text()).toContain('保存模型偏好失败')
   })
-
 })

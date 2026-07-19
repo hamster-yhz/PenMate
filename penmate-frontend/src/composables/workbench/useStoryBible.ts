@@ -95,9 +95,11 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const saving = ref(false)
   const errorMessage = ref('')
 
-  const visibleTypes = computed(() => nodeTypes.value
-    .filter((item) => !selectedFamily.value || item.semanticFamily === selectedFamily.value)
-    .sort((a, b) => a.sortOrder - b.sortOrder))
+  const visibleTypes = computed(() =>
+    nodeTypes.value
+      .filter((item) => !selectedFamily.value || item.semanticFamily === selectedFamily.value)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+  )
 
   const filteredNodes = computed(() => {
     return nodes.value.filter((node) => {
@@ -110,8 +112,11 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   })
 
   const selectedNode = computed(() => nodes.value.find((node) => node.nodeId === selectedNodeId.value) || null)
-  const selectedRelations = computed(() => relations.value.filter((relation) =>
-    relation.sourceNodeId === selectedNodeId.value || relation.targetNodeId === selectedNodeId.value))
+  const selectedRelations = computed(() =>
+    relations.value.filter(
+      (relation) => relation.sourceNodeId === selectedNodeId.value || relation.targetNodeId === selectedNodeId.value,
+    ),
+  )
   const selectedProgressions = computed(() => progressions.value.filter((item) => item.nodeId === selectedNodeId.value))
 
   const requireContext = () => {
@@ -310,9 +315,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
 
   const updateRelation = async (relationId: string, payload: StoryBibleRelationUpdatePayload) => {
     const context = requireContext()
-    const relation = await storyBibleApi.updateRelation(
-      context.projectId, relationId, context.operatorId, payload,
-    )
+    const relation = await storyBibleApi.updateRelation(context.projectId, relationId, context.operatorId, payload)
     const index = relations.value.findIndex((item) => item.relationId === relationId)
     if (index >= 0) relations.value.splice(index, 1, relation)
     await refreshRevisionAndHistory()
@@ -325,11 +328,16 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     await refreshRevisionAndHistory()
   }
 
-  const createProgression = async (payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>) => {
+  const createProgression = async (
+    payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>,
+  ) => {
     const context = requireContext()
     if (!selectedNodeId.value) return
     const progression = await storyBibleApi.createProgression(
-      context.projectId, selectedNodeId.value, context.operatorId, payload,
+      context.projectId,
+      selectedNodeId.value,
+      context.operatorId,
+      payload,
     )
     progressions.value.push(progression)
     await selectNode(selectedNodeId.value)
@@ -339,7 +347,10 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const updateProgression = async (progressionId: string, payload: StoryBibleProgressionUpdatePayload) => {
     const context = requireContext()
     const progression = await storyBibleApi.updateProgression(
-      context.projectId, progressionId, context.operatorId, payload,
+      context.projectId,
+      progressionId,
+      context.operatorId,
+      payload,
     )
     const index = progressions.value.findIndex((item) => item.progressionId === progressionId)
     if (index >= 0) progressions.value.splice(index, 1, progression)
@@ -350,14 +361,19 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const deleteProgression = async (progression: StoryBibleProgression) => {
     const context = requireContext()
     await storyBibleApi.deleteProgression(
-      context.projectId, progression.progressionId, context.operatorId, progression.revision,
+      context.projectId,
+      progression.progressionId,
+      context.operatorId,
+      progression.revision,
     )
     progressions.value = progressions.value.filter((item) => item.progressionId !== progression.progressionId)
     if (selectedNodeId.value) await selectNode(selectedNodeId.value)
     await refreshRevisionAndHistory()
   }
 
-  const saveNodeType = async (payload: Omit<StoryBibleNodeType, 'typeId' | 'storyBibleId' | 'system'> & { typeId?: string }) => {
+  const saveNodeType = async (
+    payload: Omit<StoryBibleNodeType, 'typeId' | 'storyBibleId' | 'system'> & { typeId?: string },
+  ) => {
     const context = requireContext()
     const { typeId, ...command } = payload
     const saved = typeId
@@ -376,7 +392,9 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     await refreshRevisionAndHistory()
   }
 
-  const saveCategory = async (payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'> & { categoryId?: string }) => {
+  const saveCategory = async (
+    payload: Pick<StoryBibleCategory, 'parentCategoryId' | 'name' | 'sortOrder'> & { categoryId?: string },
+  ) => {
     const context = requireContext()
     const { categoryId, ...command } = payload
     const saved = categoryId
@@ -425,18 +443,23 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const saveUserRoutingPreference = async (mode: StoryBibleRoutingMode, routerModelConfigId?: string | null) => {
     const { projectId, userId } = options.getContext()
     if (!projectId || !userId) return
-    userRoutingPreference.value = await storyBibleApi.updateUserRoutingPreference(
-      projectId, userId, { mode, routerModelConfigId },
-    )
+    userRoutingPreference.value = await storyBibleApi.updateUserRoutingPreference(projectId, userId, {
+      mode,
+      routerModelConfigId,
+    })
     if (sessionRoutingPreference.value?.inherited) await loadRoutingPreferences()
   }
 
-  const saveSessionRoutingPreference = async (mode: StoryBibleRoutingMode | null, routerModelConfigId?: string | null) => {
+  const saveSessionRoutingPreference = async (
+    mode: StoryBibleRoutingMode | null,
+    routerModelConfigId?: string | null,
+  ) => {
     const { projectId, userId, sessionId } = options.getContext()
     if (!projectId || !userId || !sessionId) return
-    sessionRoutingPreference.value = await storyBibleApi.updateSessionRoutingPreference(
-      projectId, sessionId, userId, { mode, routerModelConfigId },
-    )
+    sessionRoutingPreference.value = await storyBibleApi.updateSessionRoutingPreference(projectId, sessionId, userId, {
+      mode,
+      routerModelConfigId,
+    })
   }
 
   return {

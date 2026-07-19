@@ -1,17 +1,8 @@
 import { computed, ref } from 'vue'
-import type { WorkbenchRuntimeEventSource } from '@/api/types'
+import type { WorkbenchRecoverySnapshot, WorkbenchRuntimeEventSource } from '@/api/types'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
-import {
-  applyAssistantEventMetadata,
-  createChatTimeline,
-  escapeHtml,
-  type ChatRecord,
-} from './useWorkbenchChatTimeline'
-import {
-  createAgentRunRuntime,
-  normalizeRunStatus,
-  type AgentRunStatus,
-} from './useAgentRunRuntime'
+import { applyAssistantEventMetadata, createChatTimeline, type ChatRecord } from './useWorkbenchChatTimeline'
+import { createAgentRunRuntime, normalizeRunStatus, type AgentRunStatus } from './useAgentRunRuntime'
 import { pickBusinessRecord } from '@/utils/apiPayload'
 
 type ContextProfile = {
@@ -78,8 +69,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
   const canCancelRun = computed(() => {
     if (!currentActiveRun.value.runId) return false
-    return isGenerating.value || ['pending', 'running', 'waiting_approval', 'suspended']
-      .includes(generationTaskStatus.value)
+    return (
+      isGenerating.value || ['pending', 'running', 'waiting_approval', 'suspended'].includes(generationTaskStatus.value)
+    )
   })
   const canRetryRun = computed(() => {
     if (!currentActiveRun.value.runId || isGenerating.value || isRetrying.value) return false
@@ -119,7 +111,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return pickBusinessRecord(await deps.getSessionRecovery(projectId, sessionId))
   }
 
-  const createTurn = (projectId: string, sessionId: string, payload: Record<string, unknown>) => deps.createTurn(projectId, sessionId, payload)
+  const createTurn = (projectId: string, sessionId: string, payload: Record<string, unknown>) =>
+    deps.createTurn(projectId, sessionId, payload)
 
   const normalizeSessionRecord = (item: ChatRecord) => ({
     ...item,
@@ -184,12 +177,12 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     onToken: (token) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
       if (!assistantMsg) return
-      assistantMsg.text += escapeHtml(token)
+      assistantMsg.text += token
     },
     onMessageCompleted: (text) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
       if (!assistantMsg) return
-      assistantMsg.text = escapeHtml(text)
+      assistantMsg.text = text
     },
     onToolCall: (payload) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
@@ -205,9 +198,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       const projectId = deps.getCurrentProjectId()
       const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
       if (!projectId || !sessionId) return ''
-      const snapshot = await getSessionRecovery(projectId, sessionId) as Record<string, any>
+      const snapshot = (await getSessionRecovery(projectId, sessionId)) as WorkbenchRecoverySnapshot
       hydrateFromRecoverySnapshot(snapshot)
-      return normalizeRunStatus(snapshot?.activeRun?.runStatus ?? snapshot?.session?.lastRunStatus)
+      return normalizeRunStatus(snapshot?.activeRun?.runStatus)
     },
   })
 
@@ -232,10 +225,12 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const createSessionForSend = async (projectId: string, operatorId: string) => {
-    const created = pickBusinessRecord(await deps.createSession(projectId, {
-      userId: operatorId,
-      title: '新会话',
-    })) as ChatRecord
+    const created = pickBusinessRecord(
+      await deps.createSession(projectId, {
+        userId: operatorId,
+        title: '新会话',
+      }),
+    ) as ChatRecord
     const sessionId = String(created?.sessionId ?? '')
     if (!sessionId) return null
     currentConversationId.value = sessionId
@@ -250,7 +245,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return (await resolveCurrentSessionId(projectId)) || createSessionForSend(projectId, operatorId)
   }
 
-  function hydrateFromRecoverySnapshot(snapshot: Record<string, any> | null | undefined) {
+  function hydrateFromRecoverySnapshot(snapshot: WorkbenchRecoverySnapshot | null | undefined) {
     runtimeEventSource.value = null
     const normalizedSnapshot = pickBusinessRecord(snapshot) as {
       session?: { sessionId?: string | number | null }
@@ -265,7 +260,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     }
     const recoveryMessages = Array.isArray(normalizedSnapshot.messages) ? normalizedSnapshot.messages : []
     messages.value = recoveryMessages.map((item) => timeline.mapApiMessage(item as ChatRecord))
-    currentConversationId.value = normalizedSnapshot?.session?.sessionId == null ? null : String(normalizedSnapshot.session.sessionId)
+    currentConversationId.value =
+      normalizedSnapshot?.session?.sessionId == null ? null : String(normalizedSnapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
     recoveredSelectedText.value = String(normalizedSnapshot?.workbenchContext?.selectedText ?? '')
     currentActiveRun.value = {
@@ -298,7 +294,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const selectConversation = async (conversationId: string) => {
     const projectId = deps.getCurrentProjectId()
     if (!projectId || !conversationId) return
-    hydrateFromRecoverySnapshot((await getSessionRecovery(projectId, conversationId) || null) as Record<string, any> | null)
+    hydrateFromRecoverySnapshot(
+      ((await getSessionRecovery(projectId, conversationId)) || null) as WorkbenchRecoverySnapshot | null,
+    )
   }
 
   const toggleConversationPanel = async () => {
@@ -323,7 +321,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         preferredConversationId.value = null
         return
       }
-      hydrateFromRecoverySnapshot((await getSessionRecovery(projectId, latestSessionId) || null) as Record<string, any> | null)
+      hydrateFromRecoverySnapshot(
+        ((await getSessionRecovery(projectId, latestSessionId)) || null) as WorkbenchRecoverySnapshot | null,
+      )
       await loadConversationList(projectId)
     } catch {
       messages.value = []
@@ -334,16 +334,28 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
 
   const recoverAssistantTextFromSession = async (projectId: string, sessionId: string) => {
     try {
-      const snapshot = pickBusinessRecord(await getSessionRecovery(projectId, sessionId)) as { messages?: Array<Record<string, unknown>> }
-      const mappedMessages = (Array.isArray(snapshot?.messages) ? snapshot.messages : []).map((item) => timeline.mapApiMessage(item as ChatRecord))
-      return [...mappedMessages].reverse().find((item) => item.role === 'assistant' && String(item.text || '').trim())?.text || ''
+      const snapshot = pickBusinessRecord(await getSessionRecovery(projectId, sessionId)) as {
+        messages?: Array<Record<string, unknown>>
+      }
+      const mappedMessages = (Array.isArray(snapshot?.messages) ? snapshot.messages : []).map((item) =>
+        timeline.mapApiMessage(item as ChatRecord),
+      )
+      return (
+        [...mappedMessages].reverse().find((item) => item.role === 'assistant' && String(item.text || '').trim())
+          ?.text || ''
+      )
     } catch {
       return ''
     }
   }
 
   const resolveAssistantMessageForResume = (): ChatMessage => {
-    const existingAssistant = [...messages.value].reverse().find((item) => item.role === 'assistant' && !String(item.text || '').trim() && !item.approval && !item.toolCallId) || null
+    const existingAssistant =
+      [...messages.value]
+        .reverse()
+        .find(
+          (item) => item.role === 'assistant' && !String(item.text || '').trim() && !item.approval && !item.toolCallId,
+        ) || null
     if (existingAssistant) return existingAssistant
     const assistantMsg: ChatMessage = { id: msgIdCounter++, role: 'assistant', text: '' }
     messages.value.push(assistantMsg)
@@ -378,7 +390,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       if (!assistantMsg.text && !hasPendingApproval) {
         assistantMsg.text = await recoverAssistantTextFromSession(projectId, sessionId)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       const resolvedErrorMessage = runtime.getErrorMessage(error)
@@ -409,7 +421,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const sendMessage = async () => {
     if (!chatInput.value.trim() || isGenerating.value) return
     const userText = chatInput.value.trim()
-    messages.value.push({ id: msgIdCounter++, role: 'user', text: escapeHtml(userText) })
+    messages.value.push({ id: msgIdCounter++, role: 'user', text: userText })
     chatInput.value = ''
     runtimeEventSource.value = null
     debugChatState('user-send-start', { userTextLength: userText.length })
@@ -430,17 +442,19 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         throw new Error('未选择可用模型，请先保存并切换模型')
       }
       const selectedText = String(deps.getSelectedText?.() ?? '').trim() || recoveredSelectedText.value
-      const created = pickBusinessRecord(await createTurn(projectId, sessionId, {
-        operatorId,
-        userMessage: userText,
-        taskRequest: {
-          taskType: 'WRITE',
-          chapterId: deps.getActiveChapterKey() || null,
-          selectedText,
-          modelConfigId,
-          activePlugins: deps.getActivePlugins() || [],
-        },
-      })) as ChatRecord & {
+      const created = pickBusinessRecord(
+        await createTurn(projectId, sessionId, {
+          operatorId,
+          userMessage: userText,
+          taskRequest: {
+            taskType: 'WRITE',
+            chapterId: deps.getActiveChapterKey() || null,
+            selectedText,
+            modelConfigId,
+            activePlugins: deps.getActivePlugins() || [],
+          },
+        }),
+      ) as ChatRecord & {
         activeRun?: {
           runId?: string | number | null
           latestSequence?: string | number | null
@@ -451,7 +465,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         throw new Error('运行创建失败，缺少 runId')
       }
       await consumeRun(projectId, sessionId, String(runId), String(created.activeRun?.latestSequence ?? '0'))
-    } catch (error: any) {
+    } catch (error: unknown) {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       const resolvedErrorMessage = runtime.getErrorMessage(error)
@@ -480,7 +494,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationPhase.value = 'idle'
       agentStatusDetailText.value = ''
       if (!awaitingRunStream) isGenerating.value = false
-    } catch (error: any) {
+    } catch (error: unknown) {
       deps.notifyWarning?.(runtime.getErrorMessage(error))
     } finally {
       isCancelling.value = false
@@ -516,7 +530,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       currentActiveRun.value = { sessionId, runId: successorRunId, latestSequence, runStatus }
       prepareAssistantMessageForRetry()
       await consumeRun(projectId, sessionId, successorRunId, latestSequence)
-    } catch (error: any) {
+    } catch (error: unknown) {
       deps.notifyWarning?.(runtime.getErrorMessage(error))
     } finally {
       isRetrying.value = false
@@ -549,6 +563,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
+    dispose: runtime.closeRunStream,
     resumeRunningRun,
     consumeRunStream: runtime.consumeRunStream,
     scrollChat,

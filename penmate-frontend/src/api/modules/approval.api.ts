@@ -14,5 +14,5 @@ export const approvalApi = {
   },
   reject(projectId: string, approvalId: string, payload: AnyRecord) {
     return request.post<string>(`/v1/novels/${projectId}/approvals/${approvalId}/reject`, payload)
-  }
+  },
 }

@@ -6,6 +6,7 @@
         <span>用户名</span>
       </label>
       <input
+        aria-label="用户名"
         :value="username"
         type="text"
         class="form-input"
@@ -20,6 +21,7 @@
         <span>邮箱</span>
       </label>
       <input
+        aria-label="邮箱"
         :value="email"
         type="email"
         class="form-input"
@@ -34,6 +36,7 @@
         <span>密码</span>
       </label>
       <input
+        aria-label="密码"
         :value="password"
         type="password"
         class="form-input"
@@ -48,6 +51,7 @@
         <span>确认密码</span>
       </label>
       <input
+        aria-label="确认密码"
         :value="confirmPassword"
         type="password"
         class="form-input"
@@ -68,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import iconAgent from '@/assets/images/icon-agent.png'
+import iconAgent from '@/assets/images/icon-agent.webp'
 
 const props = defineProps<{
   username: string

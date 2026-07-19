@@ -22,8 +22,12 @@
 </template>
 
 <script setup lang="ts">
-import type { OutlineChapterNode, OutlineVolumeNode } from '@/composables/workbench/workbenchOutline'
-import type { DeleteChapterPayload, MoveNodePayload, RenameNodePayload } from '@/composables/workbench/useWorkbenchOutline'
+import type { OutlineChapterNode, OutlineVolumeNode as OutlineVolume } from '@/composables/workbench/workbenchOutline'
+import type {
+  DeleteChapterPayload,
+  MoveNodePayload,
+  RenameNodePayload,
+} from '@/composables/workbench/useWorkbenchOutline'
 
 import OutlineVolumeNodeItem from './OutlineVolumeNode.vue'
 
@@ -34,7 +38,7 @@ defineOptions({
 })
 
 defineProps<{
-  volumes: OutlineVolumeNode[]
+  volumes: OutlineVolume[]
   activeChapterKey: string
   busy: boolean
 }>()
@@ -44,12 +48,10 @@ const emit = defineEmits<{
   (event: 'rename-node', payload: RenameNodePayload): void
   (event: 'move-node', payload: MoveNodePayload): void
   (event: 'add-volume'): void
-  (event: 'add-chapter', volume: OutlineVolumeNode): void
+  (event: 'add-chapter', volume: OutlineVolume): void
   (event: 'delete-volume', nodeKey: string): void
   (event: 'delete-chapter', payload: DeleteChapterPayload): void
 }>()
-
-const OutlineVolumeNode = OutlineVolumeNodeItem
 </script>
 
 <style scoped lang="less">

@@ -1,19 +1,20 @@
-import type {
-  WorkbenchRuntimeApproval,
-  WorkbenchRuntimeEventSource,
-  WorkbenchRuntimeToolCall,
-} from '@/api/types'
+import type { WorkbenchRuntimeApproval, WorkbenchRuntimeEventSource, WorkbenchRuntimeToolCall } from '@/api/types'
 import type { GenerationPhase } from '@/components/workbench/workbenchTypes'
 import type { ChatRecord } from './useWorkbenchChatTimeline'
 
-export type AgentRunStatus = 'pending' | 'running' | 'waiting_approval' | 'suspended' | 'completed' | 'failed' | 'cancelled' | 'superseded'
+export type AgentRunStatus =
+  'pending' | 'running' | 'waiting_approval' | 'suspended' | 'completed' | 'failed' | 'cancelled' | 'superseded'
 
 type StreamListener = (event: MessageEvent<string>) => void
 
 export const normalizeRunStatus = (raw: unknown): AgentRunStatus | '' => {
-  const status = String(raw || '').trim().toLowerCase()
+  const status = String(raw || '')
+    .trim()
+    .toLowerCase()
   if (status === 'done') return 'completed'
-  return (['pending', 'running', 'waiting_approval', 'suspended', 'completed', 'failed', 'cancelled', 'superseded'] as const).includes(status as AgentRunStatus)
+  return (
+    ['pending', 'running', 'waiting_approval', 'suspended', 'completed', 'failed', 'cancelled', 'superseded'] as const
+  ).includes(status as AgentRunStatus)
     ? (status as AgentRunStatus)
     : ''
 }
@@ -73,7 +74,8 @@ const normalizeApproval = (value: unknown): WorkbenchRuntimeApproval | null => {
   }
 }
 
-const structuredRecord = (value: unknown) => (!value || typeof value !== 'object' ? null : value as Record<string, unknown>)
+const structuredRecord = (value: unknown) =>
+  !value || typeof value !== 'object' ? null : (value as Record<string, unknown>)
 
 const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown>): WorkbenchRuntimeEventSource => ({
   eventName,
@@ -93,9 +95,8 @@ const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown
   storyBibleApproval: structuredRecord(payload.storyBibleApproval),
 })
 
-const failureMessage = (payload: Record<string, unknown>) => String(
-  payload.errorMsg || payload.message || payload.errorCode || '运行失败',
-)
+const failureMessage = (payload: Record<string, unknown>) =>
+  String(payload.errorMsg || payload.message || payload.errorCode || '运行失败')
 
 export const createAgentRunRuntime = (deps: {
   getRunStatus: () => AgentRunStatus | ''
@@ -132,126 +133,129 @@ export const createAgentRunRuntime = (deps: {
     deps.setRuntimeEventSource?.(toRuntimeEventSource(eventName, payload))
   }
 
-  const consumeRunStream = (projectId: string, runId: string, after = '0') => new Promise<AgentRunStatus | ''>((resolve, reject) => {
-    closeRunStream()
-    const stream = deps.openRunStream(projectId, runId, after)
-    deps.setRunStream(stream)
-    let settled = false
-
-    const settleResolve = (status: AgentRunStatus | '') => {
-      if (settled) return
-      settled = true
+  const consumeRunStream = (projectId: string, runId: string, after = '0') =>
+    new Promise<AgentRunStatus | ''>((resolve, reject) => {
       closeRunStream()
-      resolve(status)
-    }
+      const stream = deps.openRunStream(projectId, runId, after)
+      deps.setRunStream(stream)
+      let settled = false
 
-    const settleReject = (error: Error) => {
-      if (settled) return
-      settled = true
-      closeRunStream()
-      reject(error)
-    }
+      const settleResolve = (status: AgentRunStatus | '') => {
+        if (settled) return
+        settled = true
+        closeRunStream()
+        resolve(status)
+      }
 
-    deps.addStreamListener(stream, 'stream.reset', async (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      const latestSequence = String(payload.latestSequence ?? after)
-      publish('stream.reset', { ...payload, sequence: latestSequence })
-      try {
-        const status = await deps.onStreamReset?.(payload) || ''
-        if (status === 'completed' || status === 'cancelled' || status === 'superseded') {
-          settleResolve(status)
-        } else if (status === 'failed') {
-          settleReject(new Error(failureMessage(payload)))
+      const settleReject = (error: Error) => {
+        if (settled) return
+        settled = true
+        closeRunStream()
+        reject(error)
+      }
+
+      deps.addStreamListener(stream, 'stream.reset', async (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        const latestSequence = String(payload.latestSequence ?? after)
+        publish('stream.reset', { ...payload, sequence: latestSequence })
+        try {
+          const status = (await deps.onStreamReset?.(payload)) || ''
+          if (status === 'completed' || status === 'cancelled' || status === 'superseded') {
+            settleResolve(status)
+          } else if (status === 'failed') {
+            settleReject(new Error(failureMessage(payload)))
+          }
+        } catch (error) {
+          settleReject(error instanceof Error ? error : new Error(String(error)))
         }
-      } catch (error) {
-        settleReject(error instanceof Error ? error : new Error(String(error)))
-      }
-    })
+      })
 
-    deps.addStreamListener(stream, 'run.started', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('run.started', payload)
-      deps.setRunPhase('streaming')
-      deps.setRunStatus('running')
-      deps.setAgentStatusDetailText(String(payload.message || ''))
-    })
-    deps.addStreamListener(stream, 'run.phase.changed', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('run.phase.changed', payload)
-      const status = normalizeRunStatus(payload.status)
-      if (status) deps.setRunStatus(status)
-      deps.setRunPhase(String(payload.phase || '').toLowerCase() === 'waiting_approval' ? 'waiting_approval' : 'streaming')
-      deps.setAgentStatusDetailText(String(payload.message || ''))
-    })
-    deps.addStreamListener(stream, 'message.delta', (event) => {
-      const payload = parseSseData(event)
-      publish('message.delta', payload as Record<string, unknown>)
-      const token = String(payload.text ?? payload.token ?? payload.content ?? '')
-      if (!token) return
-      deps.onToken?.(token)
-      deps.scrollChat()
-    })
-    deps.addStreamListener(stream, 'tool.call.started', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('tool.call.started', payload)
-      deps.onToolCall?.(payload)
-      deps.setRunPhase('streaming')
-      deps.scrollChat()
-    })
-    deps.addStreamListener(stream, 'tool.call.completed', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('tool.call.completed', payload)
-      deps.onToolCall?.(payload)
-      deps.scrollChat()
-    })
-    deps.addStreamListener(stream, 'tool.call.waiting_approval', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('tool.call.waiting_approval', payload)
-      deps.onWaitingApproval?.(payload)
-      deps.setRunPhase('waiting_approval')
-      deps.setRunStatus('waiting_approval')
-      deps.scrollChat()
-    })
-    deps.addStreamListener(stream, 'approval.requested', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('approval.requested', payload)
-      deps.onWaitingApproval?.(payload)
-      deps.setRunPhase('waiting_approval')
-      deps.setRunStatus('waiting_approval')
-      deps.scrollChat()
-    })
-    deps.addStreamListener(stream, 'message.completed', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('message.completed', payload)
-      const text = String(payload.text ?? payload.content ?? payload.message ?? '')
-      if (text) {
-        deps.onMessageCompleted?.(text)
+      deps.addStreamListener(stream, 'run.started', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('run.started', payload)
+        deps.setRunPhase('streaming')
+        deps.setRunStatus('running')
+        deps.setAgentStatusDetailText(String(payload.message || ''))
+      })
+      deps.addStreamListener(stream, 'run.phase.changed', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('run.phase.changed', payload)
+        const status = normalizeRunStatus(payload.status)
+        if (status) deps.setRunStatus(status)
+        deps.setRunPhase(
+          String(payload.phase || '').toLowerCase() === 'waiting_approval' ? 'waiting_approval' : 'streaming',
+        )
+        deps.setAgentStatusDetailText(String(payload.message || ''))
+      })
+      deps.addStreamListener(stream, 'message.delta', (event) => {
+        const payload = parseSseData(event)
+        publish('message.delta', payload as Record<string, unknown>)
+        const token = String(payload.text ?? payload.token ?? payload.content ?? '')
+        if (!token) return
+        deps.onToken?.(token)
         deps.scrollChat()
-      }
+      })
+      deps.addStreamListener(stream, 'tool.call.started', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('tool.call.started', payload)
+        deps.onToolCall?.(payload)
+        deps.setRunPhase('streaming')
+        deps.scrollChat()
+      })
+      deps.addStreamListener(stream, 'tool.call.completed', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('tool.call.completed', payload)
+        deps.onToolCall?.(payload)
+        deps.scrollChat()
+      })
+      deps.addStreamListener(stream, 'tool.call.waiting_approval', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('tool.call.waiting_approval', payload)
+        deps.onWaitingApproval?.(payload)
+        deps.setRunPhase('waiting_approval')
+        deps.setRunStatus('waiting_approval')
+        deps.scrollChat()
+      })
+      deps.addStreamListener(stream, 'approval.requested', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('approval.requested', payload)
+        deps.onWaitingApproval?.(payload)
+        deps.setRunPhase('waiting_approval')
+        deps.setRunStatus('waiting_approval')
+        deps.scrollChat()
+      })
+      deps.addStreamListener(stream, 'message.completed', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('message.completed', payload)
+        const text = String(payload.text ?? payload.content ?? payload.message ?? '')
+        if (text) {
+          deps.onMessageCompleted?.(text)
+          deps.scrollChat()
+        }
+      })
+      deps.addStreamListener(stream, 'run.completed', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('run.completed', payload)
+        deps.setRunStatus('completed')
+        deps.setAgentStatusDetailText(String(payload.message || ''))
+        settleResolve('completed')
+      })
+      deps.addStreamListener(stream, 'run.failed', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('run.failed', payload)
+        deps.setRunPhase('failed')
+        deps.setRunStatus('failed')
+        const message = failureMessage(payload)
+        deps.setAgentStatusDetailText(message)
+        settleReject(new Error(message))
+      })
+      deps.addStreamListener(stream, 'run.cancelled', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('run.cancelled', payload)
+        deps.setRunStatus('cancelled')
+        settleResolve('cancelled')
+      })
     })
-    deps.addStreamListener(stream, 'run.completed', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('run.completed', payload)
-      deps.setRunStatus('completed')
-      deps.setAgentStatusDetailText(String(payload.message || ''))
-      settleResolve('completed')
-    })
-    deps.addStreamListener(stream, 'run.failed', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('run.failed', payload)
-      deps.setRunPhase('failed')
-      deps.setRunStatus('failed')
-      const message = failureMessage(payload)
-      deps.setAgentStatusDetailText(message)
-      settleReject(new Error(message))
-    })
-    deps.addStreamListener(stream, 'run.cancelled', (event) => {
-      const payload = parseSseData(event) as Record<string, unknown>
-      publish('run.cancelled', payload)
-      deps.setRunStatus('cancelled')
-      settleResolve('cancelled')
-    })
-  })
 
   return {
     closeRunStream,
