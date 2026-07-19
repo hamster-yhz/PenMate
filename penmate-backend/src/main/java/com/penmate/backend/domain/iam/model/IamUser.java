@@ -18,6 +18,8 @@ public class IamUser {
     private String passwordHash;
     /** 展示昵称。 */
     private String displayName;
+    /** 个人简介。 */
+    private String bio;
     /** 用户状态（启用/禁用）。 */
     private Integer status;
     /** 认证方式（密码、三方登录等）。 */

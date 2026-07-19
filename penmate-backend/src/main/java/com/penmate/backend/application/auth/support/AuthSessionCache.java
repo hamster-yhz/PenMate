@@ -56,6 +56,20 @@ public class AuthSessionCache {
         stringRedisTemplate.delete(REFRESH_PREFIX + refreshJti.trim());
     }
 
+    public void updateSessionPayload(String accessJti, AuthUserSessionPayload payload) {
+        updatePayload(ACCESS_PREFIX + accessJti.trim(), payload);
+        if (payload.getRefreshJti() != null && !payload.getRefreshJti().isBlank()) {
+            updatePayload(REFRESH_PREFIX + payload.getRefreshJti().trim(), payload);
+        }
+    }
+
+    private void updatePayload(String key, AuthUserSessionPayload payload) {
+        Long ttlSeconds = stringRedisTemplate.getExpire(key);
+        if (ttlSeconds != null && ttlSeconds > 0) {
+            stringRedisTemplate.opsForValue().set(key, toJson(payload), Duration.ofSeconds(ttlSeconds));
+        }
+    }
+
     private String toJson(AuthUserSessionPayload payload) {
         try {
             return objectMapper.writeValueAsString(payload);

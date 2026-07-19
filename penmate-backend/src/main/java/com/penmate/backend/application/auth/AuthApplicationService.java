@@ -62,6 +62,7 @@ public class AuthApplicationService {
         payload.setUserId(user.getId());
         payload.setEmail(user.getEmail());
         payload.setDisplayName(user.getDisplayName());
+        payload.setBio(user.getBio());
         payload.setStatus(user.getStatus());
         payload.setRoles(toRoleMaps(roles));
         payload.setPermissions(toPermissionMaps(permissions));
@@ -159,6 +160,7 @@ public class AuthApplicationService {
         result.put("id", payload.getUserId());
         result.put("email", payload.getEmail());
         result.put("displayName", payload.getDisplayName());
+        result.put("bio", payload.getBio());
         result.put("roles", payload.getRoles());
         result.put("permissions", payload.getPermissions());
         log.info("查询当前用户成功: userId={}, roleCount={}, permissionCount={}",
@@ -166,6 +168,42 @@ public class AuthApplicationService {
                 payload.getRoles() == null ? 0 : payload.getRoles().size(),
                 payload.getPermissions() == null ? 0 : payload.getPermissions().size());
         return result;
+    }
+
+    public Map<String, Object> updateProfile(String authorization, String displayName, String email, String bio) {
+        ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
+        AuthUserSessionPayload payload = authSessionCache.getByAccessJti(parsed.tokenId());
+        if (payload == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Login required");
+        }
+
+        IamUser user = iamGateway.findUserByUserId(parsed.userId());
+        if (user == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
+        }
+        user.setDisplayName(displayName.trim());
+        user.setEmail(email.trim());
+        user.setBio(bio == null ? "" : bio.trim());
+        if (iamGateway.updateOwnProfile(user) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Profile update failed");
+        }
+
+        payload.setDisplayName(user.getDisplayName());
+        payload.setEmail(user.getEmail());
+        payload.setBio(user.getBio());
+        authSessionCache.updateSessionPayload(parsed.tokenId(), payload);
+        return me(authorization);
+    }
+
+    public void changePassword(String authorization, String currentPassword, String newPassword) {
+        ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
+        IamUser user = iamGateway.findUserByUserId(parsed.userId());
+        if (user == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Current password is incorrect");
+        }
+        if (iamGateway.updatePassword(parsed.userId(), passwordEncoder.encode(newPassword)) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Password update failed");
+        }
     }
 
     private String extractBearer(String authorization) {

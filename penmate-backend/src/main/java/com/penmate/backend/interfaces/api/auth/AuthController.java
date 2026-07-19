@@ -5,10 +5,18 @@ import com.penmate.backend.application.auth.command.LoginCommand;
 import com.penmate.backend.application.auth.command.RefreshCommand;
 import com.penmate.backend.interfaces.api.auth.dto.LoginDto;
 import com.penmate.backend.interfaces.api.auth.dto.RefreshDto;
+import com.penmate.backend.interfaces.api.auth.dto.ProfileUpdateDto;
+import com.penmate.backend.interfaces.api.auth.dto.PasswordChangeDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +32,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    private static final String REFRESH_COOKIE = "penmate_refresh";
+    private static final String ACCESS_COOKIE = "penmate_access";
 
     private final AuthApplicationService authApplicationService;
 
@@ -45,9 +56,12 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@Valid @RequestBody LoginDto dto,
-                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
+                                                  HttpServletRequest request,
+                                                  HttpServletResponse response) {
         LoginCommand command = new LoginCommand(dto.getEmail(), dto.getPassword());
-        return ApiResponse.success(authApplicationService.login(command, traceId), traceId);
+        Map<String, Object> tokens = authApplicationService.login(command, traceId);
+        return ApiResponse.success(writeAuthCookies(tokens, request, response), traceId);
     }
 
     /**
@@ -64,7 +78,10 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ApiResponse<String> logout(@RequestHeader("Authorization") String authorization,
-                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
+                                      HttpServletResponse response) {
+        clearRefreshCookie(response);
+        clearAccessCookie(response);
         authApplicationService.logout(authorization, traceId);
         return ApiResponse.success("ok", traceId);
     }
@@ -82,10 +99,20 @@ public class AuthController {
      * @return 出参：处理结果
      */
     @PostMapping("/refresh")
-    public ApiResponse<Map<String, Object>> refresh(@Valid @RequestBody RefreshDto dto,
-                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        RefreshCommand command = new RefreshCommand(dto.getRefreshToken());
-        return ApiResponse.success(authApplicationService.refresh(command, traceId), traceId);
+    public ApiResponse<Map<String, Object>> refresh(@RequestBody(required = false) RefreshDto dto,
+                                                    @CookieValue(value = REFRESH_COOKIE, required = false) String refreshCookie,
+                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
+                                                    HttpServletRequest request,
+                                                    HttpServletResponse response) {
+        String refreshToken = refreshCookie;
+        if ((refreshToken == null || refreshToken.isBlank()) && dto != null) {
+            refreshToken = dto.getRefreshToken();
+        }
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Refresh token is required");
+        }
+        Map<String, Object> tokens = authApplicationService.refresh(new RefreshCommand(refreshToken), traceId);
+        return ApiResponse.success(writeAuthCookies(tokens, request, response), traceId);
     }
 
     /**
@@ -112,6 +139,68 @@ public class AuthController {
         data.put("id", id);
         data.remove("userId");
         return data;
+    }
+
+    @PatchMapping("/me")
+    public ApiResponse<Map<String, Object>> updateProfile(@RequestHeader("Authorization") String authorization,
+                                                          @Valid @RequestBody ProfileUpdateDto dto,
+                                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(authApplicationService.updateProfile(
+                authorization, dto.getDisplayName(), dto.getEmail(), dto.getBio()), traceId);
+    }
+
+    @PostMapping("/password")
+    public ApiResponse<String> changePassword(@RequestHeader("Authorization") String authorization,
+                                              @Valid @RequestBody PasswordChangeDto dto,
+                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        authApplicationService.changePassword(authorization, dto.getCurrentPassword(), dto.getNewPassword());
+        return ApiResponse.success("ok", traceId);
+    }
+
+    private Map<String, Object> writeAuthCookies(Map<String, Object> source,
+                                                HttpServletRequest request,
+                                                HttpServletResponse response) {
+        Map<String, Object> publicTokens = new LinkedHashMap<>(source);
+        String refreshToken = String.valueOf(publicTokens.remove("refreshToken"));
+        ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_COOKIE, refreshToken)
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .sameSite("Strict")
+                .path("/api/v1/auth")
+                .maxAge(java.time.Duration.ofDays(30))
+                .build();
+        ResponseCookie accessCookie = ResponseCookie.from(ACCESS_COOKIE, String.valueOf(publicTokens.get("accessToken")))
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .sameSite("Strict")
+                .path("/api/v1/novels")
+                .maxAge(java.time.Duration.ofMinutes(20))
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+        return publicTokens;
+    }
+
+    private void clearRefreshCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Strict")
+                .path("/api/v1/auth")
+                .maxAge(java.time.Duration.ZERO)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private void clearAccessCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from(ACCESS_COOKIE, "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Strict")
+                .path("/api/v1/novels")
+                .maxAge(java.time.Duration.ZERO)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }
 

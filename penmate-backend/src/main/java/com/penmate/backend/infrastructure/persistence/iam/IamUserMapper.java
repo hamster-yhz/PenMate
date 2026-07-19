@@ -20,7 +20,7 @@ import java.util.List;
 public interface IamUserMapper {
 
     @Select("""
-            SELECT id, user_id, email, password_hash, display_name, status, auth_method,
+            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method,
                    main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
             FROM iam_users
             WHERE lower(email) = lower(#{email}) AND deleted_at IS NULL
@@ -28,7 +28,7 @@ public interface IamUserMapper {
     IamUser findByEmail(@Param("email") String email);
 
     @Select("""
-            SELECT id, user_id, email, password_hash, display_name, status, auth_method,
+            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method,
                    main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
             FROM iam_users
             WHERE user_id = #{userId} AND deleted_at IS NULL
@@ -43,7 +43,7 @@ public interface IamUserMapper {
     int touchLastLoginByUserId(@Param("userId") Long userId);
 
     @Select("""
-            SELECT id, user_id, email, password_hash, display_name, status, auth_method,
+            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method,
                    main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
             FROM iam_users
             WHERE deleted_at IS NULL
@@ -88,6 +88,20 @@ public interface IamUserMapper {
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
     int updateBasic(IamUser user);
+
+    @Update("""
+            UPDATE iam_users
+            SET display_name = #{displayName}, email = #{email}, bio = #{bio}
+            WHERE user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int updateOwnProfile(IamUser user);
+
+    @Update("""
+            UPDATE iam_users
+            SET password_hash = #{passwordHash}
+            WHERE user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int updatePassword(@Param("userId") Long userId, @Param("passwordHash") String passwordHash);
 
     @Update("""
             UPDATE iam_users

@@ -118,6 +118,16 @@ public class IamGatewayImpl implements IamGateway {
         return iamUserMapper.updateBasic(user);
     }
 
+    @Override
+    public int updateOwnProfile(IamUser user) {
+        return iamUserMapper.updateOwnProfile(user);
+    }
+
+    @Override
+    public int updatePassword(Long userId, String passwordHash) {
+        return iamUserMapper.updatePassword(userId, passwordHash);
+    }
+
     /**
      * 处理业务请求。
      *

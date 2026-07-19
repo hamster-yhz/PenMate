@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,7 +61,8 @@ class AuthControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").value("atk_1"))
-                .andExpect(jsonPath("$.data.refreshToken").value("rtk_1"))
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId))
                 .andExpect(jsonPath("$.meta.timestamp").exists());
     }
@@ -158,7 +160,8 @@ class AuthControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").value("atk_2"))
-                .andExpect(jsonPath("$.data.refreshToken").value("rtk_2"))
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 
@@ -191,10 +194,9 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.status").value(400))
-                .andExpect(jsonPath("$.data.errorCode").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.data.details[0].field").value("refreshToken"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.data.status").value(422))
+                .andExpect(jsonPath("$.data.message").value("Refresh token is required"))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 

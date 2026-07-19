@@ -14,6 +14,8 @@ public class AuthUserSessionPayload {
 
     private String displayName;
 
+    private String bio;
+
     private Integer status;
 
     private List<Map<String, Object>> roles;

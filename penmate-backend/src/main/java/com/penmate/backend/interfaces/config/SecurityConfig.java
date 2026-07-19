@@ -27,9 +27,11 @@ import java.util.Objects;
 public class SecurityConfig {
 
     private final TraceIdFilter traceIdFilter;
+    private final BearerAuthenticationFilter bearerAuthenticationFilter;
 
-    public SecurityConfig(TraceIdFilter traceIdFilter) {
+    public SecurityConfig(TraceIdFilter traceIdFilter, BearerAuthenticationFilter bearerAuthenticationFilter) {
         this.traceIdFilter = Objects.requireNonNull(traceIdFilter, "traceIdFilter");
+        this.bearerAuthenticationFilter = Objects.requireNonNull(bearerAuthenticationFilter, "bearerAuthenticationFilter");
     }
 
     /**
@@ -55,10 +57,15 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/api/v1/auth/**"
+                                "/actuator/health",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh"
                         ).permitAll()
-                        .anyRequest().permitAll())
-                .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class);
+                        .requestMatchers("/api/v1/users/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/menus/**")
+                        .hasAuthority("rbac:admin:access")
+                        .anyRequest().authenticated())
+                .addFilterBefore(bearerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(traceIdFilter, BearerAuthenticationFilter.class);
 
         return http.build();
     }
@@ -81,7 +88,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", TraceIdFilter.TRACE_ID_HEADER));
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -25,6 +25,10 @@ public interface IamGateway {
 
     int updateUserBasic(IamUser user);
 
+    int updateOwnProfile(IamUser user);
+
+    int updatePassword(Long userId, String passwordHash);
+
     int softDeleteUserByUserId(Long userId);
 
     int assignRoleToUser(Long userId, Long roleId);

@@ -122,5 +122,63 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(result).containsEntry("id", 1001L).containsEntry("email", "author@penmate.ai");
     }
+
+    @Test
+    void UT_APP_AUTH_UPDATE_PROFILE_PERSISTS_AND_REFRESHES_SESSION() {
+        when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
+        AuthUserSessionPayload payload = new AuthUserSessionPayload();
+        payload.setUserId(1001L);
+        payload.setRoles(List.of());
+        payload.setPermissions(List.of());
+        when(authSessionCache.getByAccessJti("ajti_1")).thenReturn(payload);
+
+        IamUser user = new IamUser();
+        user.setId(1001L);
+        when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
+        when(iamGateway.updateOwnProfile(user)).thenReturn(1);
+
+        Map<String, Object> result = authApplicationService.updateProfile(
+                "Bearer atk_1", "  作者乙  ", " writer@example.com ", "  简介  ");
+
+        assertThat(user.getDisplayName()).isEqualTo("作者乙");
+        assertThat(user.getEmail()).isEqualTo("writer@example.com");
+        assertThat(user.getBio()).isEqualTo("简介");
+        assertThat(result)
+                .containsEntry("displayName", "作者乙")
+                .containsEntry("email", "writer@example.com")
+                .containsEntry("bio", "简介");
+        verify(authSessionCache).updateSessionPayload("ajti_1", payload);
+    }
+
+    @Test
+    void UT_APP_AUTH_CHANGE_PASSWORD_REJECTS_WRONG_CURRENT_PASSWORD() {
+        when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
+        IamUser user = new IamUser();
+        user.setId(1001L);
+        user.setPasswordHash("stored-hash");
+        when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
+        when(passwordEncoder.matches("wrong-password", "stored-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> authApplicationService.changePassword(
+                "Bearer atk_1", "wrong-password", "new-password"))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("Current password is incorrect");
+    }
+
+    @Test
+    void UT_APP_AUTH_CHANGE_PASSWORD_PERSISTS_ENCODED_PASSWORD() {
+        when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
+        IamUser user = new IamUser();
+        user.setId(1001L);
+        user.setPasswordHash("stored-hash");
+        when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
+        when(passwordEncoder.matches("current-password", "stored-hash")).thenReturn(true);
+        when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+        when(iamGateway.updatePassword(1001L, "new-hash")).thenReturn(1);
+
+        authApplicationService.changePassword("Bearer atk_1", "current-password", "new-password");
+
+        verify(iamGateway).updatePassword(1001L, "new-hash");
+    }
 }
 
