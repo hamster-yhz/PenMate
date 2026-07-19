@@ -116,11 +116,24 @@ class AgentBaseSeedSqlContractTest {
 
         executeBlock(sql, "-- 小说核心", "-- 基础 seed");
 
-        assertThat(countRows("story_bibles")).isEqualTo(1);
+        assertThat(countRows("story_bibles")).isEqualTo(4);
         assertThat(countRows("story_bible_nodes")).isEqualTo(4);
         assertThat(countRows("story_bible_relations")).isEqualTo(1);
         assertThat(countRows("story_bible_progressions")).isEqualTo(1);
         assertThat(countRows("story_bible_changesets")).isEqualTo(1);
+
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("""
+                     SELECT COUNT(*)
+                     FROM novel_projects p
+                     LEFT JOIN story_bibles b ON b.project_id = p.project_id
+                     WHERE p.project_id BETWEEN 920001 AND 920999
+                       AND b.story_bible_id IS NULL
+                     """)) {
+            resultSet.next();
+            assertThat(resultSet.getLong(1)).isZero();
+        }
 
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement();

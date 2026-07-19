@@ -10,6 +10,7 @@ import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
+import com.penmate.backend.application.storybible.StoryBibleApplicationService;
 import com.penmate.backend.application.novel.command.NovelCommands.AddMemberCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterCommand;
@@ -46,15 +47,18 @@ public class NovelApplicationService {
     private final BusinessIdGenerator businessIdGenerator;
     private final RealtimeEventService realtimeEventService;
     private final ObjectStorageService objectStorageService;
+    private final StoryBibleApplicationService storyBibleApplicationService;
 
     public NovelApplicationService(NovelGateway novelGateway,
                                    BusinessIdGenerator businessIdGenerator,
                                    RealtimeEventService realtimeEventService,
-                                   ObjectStorageService objectStorageService) {
+                                   ObjectStorageService objectStorageService,
+                                   StoryBibleApplicationService storyBibleApplicationService) {
         this.novelGateway = novelGateway;
         this.businessIdGenerator = businessIdGenerator;
         this.realtimeEventService = realtimeEventService;
         this.objectStorageService = objectStorageService;
+        this.storyBibleApplicationService = storyBibleApplicationService;
     }
 
     /**
@@ -92,6 +96,7 @@ public class NovelApplicationService {
      * @param traceId 入参：traceId
      * @return 出参：处理结果
      */
+    @Transactional
     public NovelProject createProject(CreateProjectCommand command, String traceId) {
         log.info("创建小说项目: ownerUserId={}, title={}", command.ownerUserId(), command.title());
         NovelProject project = new NovelProject();
@@ -106,6 +111,11 @@ public class NovelApplicationService {
             log.error("创建小说项目失败: ownerUserId={}, title={}", command.ownerUserId(), command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create project");
         }
+        storyBibleApplicationService.bootstrap(
+                project.getProjectId(),
+                project.getTitle(),
+                command.ownerUserId()
+        );
          
         log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getProjectId(), command.ownerUserId());
         return project;

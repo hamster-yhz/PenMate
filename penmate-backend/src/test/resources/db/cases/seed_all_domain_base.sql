@@ -29,19 +29,69 @@ DELETE FROM plugin_catalog          WHERE plugin_id BETWEEN 920001 AND 920999;
 DELETE FROM style_switch_logs       WHERE style_switch_log_id BETWEEN 920001 AND 920999;
 DELETE FROM style_profiles          WHERE style_id BETWEEN 920001 AND 920999;
 
-DELETE FROM story_bible_change_items WHERE change_item_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_changesets  WHERE changeset_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_view_preferences WHERE story_bible_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_progressions WHERE progression_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_relations   WHERE relation_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_node_tags   WHERE story_bible_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_tags        WHERE tag_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_node_categories WHERE story_bible_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_categories  WHERE category_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_aliases     WHERE alias_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_nodes       WHERE node_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bible_node_types  WHERE type_id BETWEEN 920001 AND 920999;
-DELETE FROM story_bibles            WHERE story_bible_id BETWEEN 920001 AND 920999;
+DELETE FROM story_bible_change_items
+WHERE change_item_id BETWEEN 920001 AND 920999
+   OR changeset_id IN (
+       SELECT changeset_id FROM story_bible_changesets
+       WHERE story_bible_id IN (
+           SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+       )
+   );
+DELETE FROM story_bible_changesets
+WHERE changeset_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_view_preferences
+WHERE story_bible_id IN (
+    SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+);
+DELETE FROM story_bible_progressions
+WHERE progression_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_relations
+WHERE relation_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_node_tags
+WHERE story_bible_id IN (
+    SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+);
+DELETE FROM story_bible_tags
+WHERE tag_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_node_categories
+WHERE story_bible_id IN (
+    SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+);
+DELETE FROM story_bible_categories
+WHERE category_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_aliases
+WHERE alias_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_nodes
+WHERE node_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bible_node_types
+WHERE type_id BETWEEN 920001 AND 920999
+   OR story_bible_id IN (
+       SELECT story_bible_id FROM story_bibles WHERE project_id BETWEEN 920001 AND 920999
+   );
+DELETE FROM story_bibles
+WHERE story_bible_id BETWEEN 920001 AND 920999
+   OR project_id BETWEEN 920001 AND 920999;
 DELETE FROM novel_outline_nodes     WHERE outline_node_id BETWEEN 920001 AND 920999;
 DELETE FROM novel_chapter_versions  WHERE chapter_version_id BETWEEN 920001 AND 920999;
 DELETE FROM novel_chapters          WHERE chapter_id BETWEEN 920001 AND 920999;
@@ -130,7 +180,10 @@ INSERT INTO novel_chapter_versions (id, chapter_version_id, chapter_id, version_
 (920003, 920003, 920002, 1, 'create',  '初稿',     'dbcase/projects/920001/chapters/920002/v1.json', 'etag-v-920002-1', 2048, 'sha256-v-920002-1', 920002, NOW(3));
 
 INSERT INTO story_bibles (id, story_bible_id, project_id, title, description, content_revision, created_at, updated_at, deleted_at) VALUES
-(920001, 920001, 920001, '长夜行 Story Bible', 'Current canonical story context', 1, NOW(3), NOW(3), NULL);
+(920001, 920001, 920001, '长夜行 Story Bible', 'Current canonical story context', 1, NOW(3), NOW(3), NULL),
+(920002, 920002, 920002, 'DBCASE Project 920002 Story Bible', '', 1, NOW(3), NOW(3), NULL),
+(920003, 920003, 920003, 'DBCASE Project 920003 Story Bible', '', 1, NOW(3), NOW(3), NULL),
+(920004, 920004, 920004, 'DBCASE Project 920004 Story Bible', '', 1, NOW(3), NOW(3), NULL);
 
 INSERT INTO story_bible_node_types (id, type_id, story_bible_id, type_code, semantic_family, display_name, icon_code, field_schema_json, is_system, sort_order, created_at, updated_at, archived_at) VALUES
 (920101, 920101, 920001, 'CHARACTER', 'CHARACTER', 'Character', 'user', JSON_OBJECT('type', 'object'), 1, 10, NOW(3), NOW(3), NULL),

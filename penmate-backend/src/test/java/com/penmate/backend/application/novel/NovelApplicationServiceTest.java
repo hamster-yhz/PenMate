@@ -4,6 +4,7 @@ import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateOutlineNodeCommand;
+import com.penmate.backend.application.storybible.StoryBibleApplicationService;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
@@ -47,6 +48,9 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private ObjectStorageService objectStorageService;
+
+    @Mock
+    private StoryBibleApplicationService storyBibleApplicationService;
 
     @InjectMocks
     private NovelApplicationService novelApplicationService;
@@ -113,6 +117,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         assertThat(created.getProjectId()).isEqualTo(900001L);
         assertThat(created.getStatus()).isEqualTo(1);
         verify(novelGateway).insertProject(any(NovelProject.class));
+        verify(storyBibleApplicationService).bootstrap(900001L, created.getTitle(), 920001L);
     }
 
     @Test
@@ -126,6 +131,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         ))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("Failed to create project");
+        verifyNoInteractions(storyBibleApplicationService);
     }
 
     @Test
