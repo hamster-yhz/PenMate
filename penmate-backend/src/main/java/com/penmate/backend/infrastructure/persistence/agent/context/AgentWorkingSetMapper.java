@@ -44,7 +44,7 @@ public interface AgentWorkingSetMapper {
             JOIN agent_turns current_turn ON current_turn.turn_id = #{currentTurnId}
             WHERE ws.session_id = #{sessionId} AND ws.pinned = 0
               AND current_turn.session_id = ws.session_id
-              AND current_turn.turn_seq - used_turn.turn_seq &gt;= #{retentionTurns}
+              AND current_turn.turn_seq - used_turn.turn_seq >= #{retentionTurns}
             """)
     int evictExpired(@Param("sessionId") Long sessionId, @Param("currentTurnId") Long currentTurnId,
                      @Param("retentionTurns") int retentionTurns);

@@ -154,6 +154,38 @@ class AgentTurnPersistenceContractTest {
         }
     }
 
+    @Test
+    void should_list_only_messages_before_the_current_turn() throws Exception {
+        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("""
+                    INSERT INTO agent_messages(
+                        message_id, session_id, role, message_kind, content_markdown, seq_no
+                    ) VALUES
+                        (930101, 920002, 'user', 'CHAT', 'Earlier request', 1),
+                        (930102, 920002, 'assistant', 'CHAT', 'Earlier answer', 2),
+                        (930103, 920002, 'user', 'CHAT', 'Current request', 3)
+                    """);
+            statement.execute("""
+                    INSERT INTO agent_turns(
+                        turn_id, session_id, turn_seq, user_message_id, assistant_message_id,
+                        turn_status
+                    ) VALUES
+                        (940101, 920002, 1, 930101, 930102, 'COMPLETED'),
+                        (940102, 920002, 2, 930103, NULL, 'PENDING')
+                    """);
+        }
+
+        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            var messages = sqlSession.getMapper(AgentMapper.class)
+                    .listMessagesBeforeTurn(920002L, 940102L);
+
+            assertThat(messages)
+                    .extracting("messageId")
+                    .containsExactly(930101L, 930102L);
+        }
+    }
+
     private static SqlSessionFactory buildSqlSessionFactory() {
         DataSource dataSource = new org.apache.ibatis.datasource.unpooled.UnpooledDataSource(
                 "org.h2.Driver",

@@ -103,7 +103,7 @@ public interface AgentMapper {
               ON message_turn.session_id = m.session_id
              AND (message_turn.user_message_id = m.message_id OR message_turn.assistant_message_id = m.message_id)
             WHERE m.session_id = #{conversationId}
-              AND message_turn.turn_seq &lt; current_turn.turn_seq
+              AND message_turn.turn_seq < current_turn.turn_seq
             ORDER BY m.seq_no ASC, m.id ASC
             """)
     List<AgentMessage> listMessagesBeforeTurn(@Param("conversationId") Long conversationId,

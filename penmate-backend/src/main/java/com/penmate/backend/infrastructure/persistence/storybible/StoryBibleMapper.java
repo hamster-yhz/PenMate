@@ -642,7 +642,7 @@ public interface StoryBibleMapper {
             SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
                    source_run_id, change_summary, created_at
             FROM story_bible_changesets
-            WHERE story_bible_id = #{storyBibleId} AND created_at &lt; #{cutoff}
+            WHERE story_bible_id = #{storyBibleId} AND created_at < #{cutoff}
               AND changeset_id NOT IN (
                   SELECT changeset_id FROM story_bible_changesets
                   WHERE story_bible_id = #{storyBibleId}
@@ -659,7 +659,7 @@ public interface StoryBibleMapper {
                             sb.content_revision, sb.created_at, sb.updated_at, sb.deleted_at
             FROM story_bibles sb
             JOIN story_bible_changesets sc ON sc.story_bible_id = sb.story_bible_id
-            WHERE sb.deleted_at IS NULL AND sc.created_at &lt; #{cutoff}
+            WHERE sb.deleted_at IS NULL AND sc.created_at < #{cutoff}
             ORDER BY sb.id
             """)
     List<StoryBible> findStoryBiblesWithChangesetsBefore(@Param("cutoff") LocalDateTime cutoff);
