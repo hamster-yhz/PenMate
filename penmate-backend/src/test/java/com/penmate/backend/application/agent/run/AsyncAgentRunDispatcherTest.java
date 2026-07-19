@@ -4,7 +4,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunLease;
 import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
@@ -23,7 +23,7 @@ class AsyncAgentRunDispatcherTest {
         AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
         AgentRunLeaseService leaseService = mock(AgentRunLeaseService.class);
         AgentRunLease lease = new AgentRunLease(70001L, "worker", 1L, 3,
-                AgentRunStatus.PENDING, LocalDateTime.now().plusMinutes(1));
+                AgentRunStatus.PENDING, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
         when(leaseService.tryAcquire(70001L)).thenReturn(Optional.of(lease));
         when(leaseService.handleFailure(eq(lease), any())).thenReturn(AgentRunStatus.FAILED);
         doThrow(new IllegalStateException("boom")).when(executor).execute(70001L, "trace-1", lease);

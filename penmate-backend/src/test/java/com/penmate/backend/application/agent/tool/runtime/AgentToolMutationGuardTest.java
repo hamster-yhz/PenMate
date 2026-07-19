@@ -11,7 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -38,7 +38,7 @@ class AgentToolMutationGuardTest {
     @Test
     void rejects_lost_execution_token_before_loading_dependencies() {
         ToolCallRequest request = request();
-        when(runs.ownsExecutionToken(any(), any(), any(LocalDateTime.class))).thenReturn(false);
+        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(false);
 
         assertThatThrownBy(() -> guard.assertExecutable(request, true))
                 .isInstanceOf(AgentToolMutationGuard.Rejection.class)
@@ -49,7 +49,7 @@ class AgentToolMutationGuardTest {
 
     @Test
     void read_only_call_only_requires_current_execution_token() {
-        when(runs.ownsExecutionToken(any(), any(), any(LocalDateTime.class))).thenReturn(true);
+        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(true);
 
         assertThatCode(() -> guard.assertExecutable(request(), false)).doesNotThrowAnyException();
 
@@ -63,7 +63,7 @@ class AgentToolMutationGuardTest {
         AgentRun run = run();
         AgentRunInput input = input();
         var artifact = artifact();
-        when(runs.ownsExecutionToken(any(), any(), any(LocalDateTime.class))).thenReturn(true);
+        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(true);
         when(runs.findRun(11L)).thenReturn(run);
         when(runs.findInput(11L)).thenReturn(input);
         when(contextArtifacts.loadLatestContextForRun(11L)).thenReturn(artifact);
@@ -84,7 +84,7 @@ class AgentToolMutationGuardTest {
         AgentRun run = run();
         AgentRunInput input = input();
         var artifact = artifact();
-        when(runs.ownsExecutionToken(any(), any(), any(LocalDateTime.class))).thenReturn(true);
+        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(true);
         when(runs.findRun(11L)).thenReturn(run);
         when(runs.findInput(11L)).thenReturn(input);
         when(contextArtifacts.loadLatestContextForRun(11L)).thenReturn(artifact);

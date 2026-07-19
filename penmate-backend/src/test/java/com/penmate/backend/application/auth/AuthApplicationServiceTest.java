@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,9 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
     @Mock
     private AuthSessionCache authSessionCache;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private AuthApplicationService authApplicationService;
 
@@ -52,6 +56,7 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         user.setMainAgentModelConfigId(9001L);
         user.setDirtyWorkAgentModelConfigId(9002L);
         when(iamGateway.findUserByEmail("author@penmate.ai")).thenReturn(user);
+        when(passwordEncoder.matches("StrongPass!23", "StrongPass!23")).thenReturn(true);
         when(iamGateway.findRolesByUserId(1001L)).thenReturn(List.of());
         when(iamGateway.findPermissionsByUserId(1001L)).thenReturn(List.of());
         when(authTokenService.issueTokens(any(AuthUserSessionPayload.class))).thenReturn(new AuthTokenBundle(

@@ -13,7 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -62,10 +62,14 @@ class AgentRunEventStreamServiceTest {
                 .map(AgentRunEventDto.class::cast)
                 .extracting(AgentRunEventDto::sequence)
                 .containsExactly("1");
+        assertThat(emitter.payloads()).filteredOn(AgentRunEventDto.class::isInstance)
+                .map(AgentRunEventDto.class::cast)
+                .extracting(AgentRunEventDto::createdAt)
+                .containsExactly("2026-07-17T00:00:00Z");
     }
 
     @Test
-    void bus_notification_wakes_mysql_replay_in_sequence_order() {
+    void bus_notification_wakes_database_replay_in_sequence_order() {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
         ArgumentCaptor<Consumer<AgentEvent>> subscriber = ArgumentCaptor.forClass(Consumer.class);
@@ -101,7 +105,7 @@ class AgentRunEventStreamServiceTest {
 
     private AgentEvent event(long sequence, String type) {
         return new AgentEvent(100L + sequence, 70L, 10L, 20L, 30L, sequence,
-                1, type, "{}", LocalDateTime.of(2026, 7, 17, 0, 0));
+                1, type, "{}", java.time.LocalDateTime.of(2026, 7, 17, 0, 0).toInstant(java.time.ZoneOffset.UTC));
     }
 
     private static final class CapturingEmitter extends SseEmitter {

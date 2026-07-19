@@ -8,7 +8,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRep
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -64,7 +64,7 @@ class ToolCallExecutionServiceTest {
     @Test
     void started_call_from_older_execution_token_becomes_ambiguous_and_is_not_rerun() {
         executions.tryInsertStarted(AgentToolCallExecution.started(
-                900L, 11L, "call-3", "test_tool", "a".repeat(64), 6L, LocalDateTime.now()));
+                900L, 11L, "call-3", "test_tool", "a".repeat(64), 6L, Instant.now()));
         AgentToolHandler handler = handler(false, request -> ToolCallResult.success("should-not-run"));
         ToolCallExecutionService service = service(handler);
         ToolCallRequest request = request("call-3", "{}", 7L);
@@ -212,7 +212,7 @@ class ToolCallExecutionServiceTest {
         @Override
         public int markFinished(Long executionId, Long executionToken, AgentToolCallExecutionStatus status,
                                 String resultJson, String errorCode, String errorMessage,
-                                LocalDateTime finishedAt) {
+                                Instant finishedAt) {
             AtomicInteger changed = new AtomicInteger();
             values.computeIfPresent(findKey(executionId), (key, current) -> {
                 if (!current.executionToken().equals(executionToken)

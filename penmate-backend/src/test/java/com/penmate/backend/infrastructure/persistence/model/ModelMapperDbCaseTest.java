@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.persistence.model;
 
+import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
@@ -23,18 +24,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ModelMapperDbCaseTest {
 
-    private static final String H2_URL = "jdbc:h2:mem:model_mapper_dbcase;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
-
     private static SqlSessionFactory sqlSessionFactory;
 
     @BeforeAll
     static void setUpDatabase() {
-        sqlSessionFactory = buildSqlSessionFactory();
+        sqlSessionFactory = buildSqlSessionFactory(
+                PostgreSqlTestDatabase.migratedDataSource("model_mapper_dbcase"));
     }
 
     @BeforeEach
     void resetSchema() throws Exception {
-        recreateSchema();
+        resetRows();
         seedRows();
     }
 
@@ -83,13 +83,7 @@ class ModelMapperDbCaseTest {
         }
     }
 
-    private static SqlSessionFactory buildSqlSessionFactory() {
-        DataSource dataSource = new org.apache.ibatis.datasource.unpooled.UnpooledDataSource(
-                "org.h2.Driver",
-                H2_URL,
-                "sa",
-                "");
-
+    private static SqlSessionFactory buildSqlSessionFactory(DataSource dataSource) {
         Environment environment = new Environment("test", new JdbcTransactionFactory(), dataSource);
         Configuration configuration = new Configuration(environment);
         configuration.setMapUnderscoreToCamelCase(true);
@@ -97,67 +91,14 @@ class ModelMapperDbCaseTest {
         return new SqlSessionFactoryBuilder().build(configuration);
     }
 
-    private static void recreateSchema() throws Exception {
+    private static void resetRows() throws Exception {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
-            statement.execute("DROP TABLE IF EXISTS model_user_configurations");
-            statement.execute("DROP TABLE IF EXISTS model_official_api_keys");
-            statement.execute("DROP TABLE IF EXISTS model_user_api_keys");
-            statement.execute("""
-                    CREATE TABLE model_user_api_keys (
-                        id BIGINT PRIMARY KEY,
-                        user_api_key_id BIGINT NOT NULL,
-                        user_id BIGINT NOT NULL,
-                        provider_id BIGINT NOT NULL,
-                        key_name VARCHAR(120) NOT NULL,
-                        encrypted_api_key VARCHAR(255) NOT NULL,
-                        masked_api_key VARCHAR(40) NULL,
-                        is_default TINYINT NOT NULL,
-                        last_used_at TIMESTAMP NULL,
-                        status VARCHAR(20) NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        deleted_at TIMESTAMP NULL
-                    )
-                    """);
-            statement.execute("""
-                    CREATE TABLE model_official_api_keys (
-                        id BIGINT PRIMARY KEY,
-                        official_api_key_id BIGINT NOT NULL,
-                        provider_id BIGINT NOT NULL,
-                        key_name VARCHAR(120) NOT NULL,
-                        encrypted_api_key VARCHAR(255) NOT NULL,
-                        masked_api_key VARCHAR(40) NULL,
-                        is_default TINYINT NOT NULL,
-                        last_used_at TIMESTAMP NULL,
-                        status VARCHAR(20) NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        deleted_at TIMESTAMP NULL
-                    )
-                    """);
-            statement.execute("""
-                    CREATE TABLE model_user_configurations (
-                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                        model_config_id BIGINT NOT NULL,
-                        user_id BIGINT NOT NULL,
-                        provider_id BIGINT NOT NULL,
-                        model_name VARCHAR(120) NOT NULL,
-                        base_url VARCHAR(255) NULL,
-                        key_source_type VARCHAR(20) NOT NULL,
-                        user_key_id BIGINT NULL,
-                        official_key_id BIGINT NULL,
-                        context_window_turns INT NOT NULL,
-                        max_context_tokens INT NOT NULL,
-                        status VARCHAR(20) NOT NULL,
-                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        deleted_at TIMESTAMP NULL
-                    )
-                    """);
+            statement.execute("DELETE FROM model_user_configurations WHERE model_config_id BETWEEN 920000 AND 920999");
+            statement.execute("DELETE FROM model_official_api_keys WHERE official_api_key_id BETWEEN 920000 AND 920999");
+            statement.execute("DELETE FROM model_user_api_keys WHERE user_api_key_id BETWEEN 920000 AND 920999");
         }
     }
-
     private static void seedRows() throws Exception {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
@@ -167,7 +108,7 @@ class ModelMapperDbCaseTest {
                         masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at
                     ) VALUES (
                         920001, 920011, 920002, 1, 'DBCASE Owner OpenAI 主 Key', 'cipher-user-openai-920011',
-                        '****92011', 1, CURRENT_TIMESTAMP, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL
+                        '****92011', TRUE, CURRENT_TIMESTAMP, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL
                     )
                     """);
             statement.execute("""

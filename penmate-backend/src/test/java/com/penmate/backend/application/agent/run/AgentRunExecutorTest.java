@@ -33,7 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -163,7 +163,7 @@ class AgentRunExecutorTest {
                 new AgentRunContextArtifactService.DependencyManifest(
                         1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, 0L, "p", "s", "t"));
         AgentRunLease lease = new AgentRunLease(70001L, "worker", 2L, 1,
-                AgentRunStatus.SUSPENDED, LocalDateTime.now().plusMinutes(1));
+                AgentRunStatus.SUSPENDED, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
         when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(null);
         when(runRepository.findRun(70001L)).thenReturn(stale);
         when(runRepository.findInput(70001L)).thenReturn(input);
@@ -261,7 +261,7 @@ class AgentRunExecutorTest {
 
     private AgentRunLease lease() {
         return new AgentRunLease(70001L, "worker", 2L, 1,
-                AgentRunStatus.PENDING, LocalDateTime.now().plusMinutes(1));
+                AgentRunStatus.PENDING, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
     }
 
     private AgentRunInput runInput() {

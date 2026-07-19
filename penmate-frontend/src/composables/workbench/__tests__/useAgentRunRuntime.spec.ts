@@ -31,7 +31,7 @@ const agentRunEventDto = (
   schemaVersion: 1,
   type,
   payloadJson: JSON.stringify({ schemaVersion: 1, ...payload }),
-  createdAt: '2026-07-06T22:33:20.132',
+  createdAt: '2026-07-06T22:33:20.132Z',
 })
 
 const createRuntimeHarness = () => {

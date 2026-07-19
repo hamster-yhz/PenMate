@@ -4,10 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-class MysqlDriverClasspathTest {
+class PostgreSqlDriverClasspathTest {
 
     @Test
-    void mysqlDriverIsAvailableAtRuntime() {
-        assertDoesNotThrow(() -> Class.forName("com.mysql.cj.jdbc.Driver"));
+    void postgreSqlDriverIsAvailableAtRuntime() {
+        assertDoesNotThrow(() -> Class.forName("org.postgresql.Driver"));
     }
 }

@@ -12,7 +12,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -756,16 +756,16 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
                 Map<String, Object> row = findMutableRow(args);
                 if (row != null) {
                     row.put("todoStatus", "DONE");
-                    row.put("completedAt", LocalDateTime.now());
-                    row.put("updatedAt", LocalDateTime.now());
+                    row.put("completedAt", Instant.now());
+                    row.put("updatedAt", Instant.now());
                 }
                 return adaptWriteReturn(method.getReturnType(), row, row == null ? 0 : 1);
             }
             if (normalizedMethodName.contains("delete")) {
                 Map<String, Object> row = findMutableRow(args);
                 if (row != null) {
-                    row.put("deletedAt", LocalDateTime.now());
-                    row.put("updatedAt", LocalDateTime.now());
+                    row.put("deletedAt", Instant.now());
+                    row.put("updatedAt", Instant.now());
                 }
                 return adaptWriteReturn(method.getReturnType(), row, row == null ? 0 : 1);
             }
@@ -834,8 +834,8 @@ class TodoCrudApplicationServiceTest extends BaseApplicationServiceTest {
             row.putIfAbsent("description", "");
             row.putIfAbsent("sourceType", "USER_REQUEST");
             row.putIfAbsent("todoStatus", "TODO");
-            row.put("updatedAt", LocalDateTime.now());
-            row.putIfAbsent("createdAt", LocalDateTime.now());
+            row.put("updatedAt", Instant.now());
+            row.putIfAbsent("createdAt", Instant.now());
             rowsByTodoId.put(String.valueOf(row.get("todoId")), row);
             return row;
         }

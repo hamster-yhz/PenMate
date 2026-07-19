@@ -17,7 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -55,15 +55,15 @@ class StoryBibleHistoryArchiveServiceTest {
     @Test
     void should_archive_monthly_gzip_verify_it_and_only_then_delete_hot_rows() throws Exception {
         StoryBible root = root();
-        StoryBibleChangeset changeset = changeset(501L, LocalDateTime.of(2025, 1, 12, 10, 30));
+        StoryBibleChangeset changeset = changeset(501L, java.time.LocalDateTime.of(2025, 1, 12, 10, 30).toInstant(java.time.ZoneOffset.UTC));
         StoryBibleChangeItem item = item(601L, 501L);
-        when(repository.findChangesetsBefore(11L, LocalDateTime.of(2025, 2, 1, 0, 0), 5_000))
+        when(repository.findChangesetsBefore(11L, java.time.LocalDateTime.of(2025, 2, 1, 0, 0).toInstant(java.time.ZoneOffset.UTC), 5_000))
                 .thenReturn(List.of(changeset));
         when(repository.findChangeItemsByChangesetIds(List.of(501L))).thenReturn(List.of(item));
         when(storage.exists("story-bible-history/22/2025-01.jsonl.gz")).thenReturn(false);
         wireSuccessfulStorage("story-bible-history/22/2025-01.jsonl.gz");
 
-        var summary = service.archiveStoryBible(root, LocalDateTime.of(2025, 2, 1, 0, 0));
+        var summary = service.archiveStoryBible(root, java.time.LocalDateTime.of(2025, 2, 1, 0, 0).toInstant(java.time.ZoneOffset.UTC));
 
         assertThat(summary).isEqualTo(new StoryBibleHistoryArchiveService.ArchiveSummary(1, 1, 1));
         String jsonl = ungzip(uploaded.get());
@@ -78,7 +78,7 @@ class StoryBibleHistoryArchiveServiceTest {
     @Test
     void should_merge_with_an_existing_month_archive_instead_of_overwriting_it() throws Exception {
         StoryBible root = root();
-        StoryBibleChangeset changeset = changeset(502L, LocalDateTime.of(2025, 1, 20, 9, 0));
+        StoryBibleChangeset changeset = changeset(502L, java.time.LocalDateTime.of(2025, 1, 20, 9, 0).toInstant(java.time.ZoneOffset.UTC));
         byte[] existing = gzip("""
                 {"schemaVersion":1,"projectId":"22","storyBibleId":"11","changeset":{"changesetId":501},"items":[]}
                 """);
@@ -93,7 +93,7 @@ class StoryBibleHistoryArchiveServiceTest {
             return new ObjectStorageService.PutObjectResult("etag", (long) bytes.length, null);
         });
 
-        service.archiveStoryBible(root, LocalDateTime.of(2025, 2, 1, 0, 0));
+        service.archiveStoryBible(root, java.time.LocalDateTime.of(2025, 2, 1, 0, 0).toInstant(java.time.ZoneOffset.UTC));
 
         String jsonl = ungzip(uploaded.get());
         assertThat(jsonl).contains("\"changesetId\":501").contains("\"changesetId\":502");
@@ -101,9 +101,9 @@ class StoryBibleHistoryArchiveServiceTest {
     }
 
     @Test
-    void should_keep_mysql_history_when_uploaded_bytes_fail_verification() {
+    void should_keep_database_history_when_uploaded_bytes_fail_verification() {
         StoryBible root = root();
-        StoryBibleChangeset changeset = changeset(501L, LocalDateTime.of(2025, 1, 12, 10, 30));
+        StoryBibleChangeset changeset = changeset(501L, java.time.LocalDateTime.of(2025, 1, 12, 10, 30).toInstant(java.time.ZoneOffset.UTC));
         String key = "story-bible-history/22/2025-01.jsonl.gz";
         when(repository.findChangesetsBefore(eq(11L), any(), eq(5_000))).thenReturn(List.of(changeset));
         when(repository.findChangeItemsByChangesetIds(List.of(501L))).thenReturn(List.of());
@@ -114,7 +114,7 @@ class StoryBibleHistoryArchiveServiceTest {
         });
         when(storage.readBytes(key)).thenReturn(new byte[]{1, 2, 3});
 
-        assertThatThrownBy(() -> service.archiveStoryBible(root, LocalDateTime.of(2025, 2, 1, 0, 0)))
+        assertThatThrownBy(() -> service.archiveStoryBible(root, java.time.LocalDateTime.of(2025, 2, 1, 0, 0).toInstant(java.time.ZoneOffset.UTC)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("checksum mismatch");
         verify(deletionService, never()).deleteVerifiedArchive(any(), any(), any(Integer.class));
@@ -122,13 +122,13 @@ class StoryBibleHistoryArchiveServiceTest {
 
     @Test
     void should_select_only_rows_outside_both_hot_retention_windows() {
-        LocalDateTime now = LocalDateTime.of(2026, 7, 16, 4, 0);
+        Instant now = java.time.LocalDateTime.of(2026, 7, 16, 4, 0).toInstant(java.time.ZoneOffset.UTC);
         StoryBible root = root();
-        when(repository.findStoryBiblesWithChangesetsBefore(now.minusDays(180))).thenReturn(List.of(root));
-        when(repository.findChangesetsBefore(11L, now.minusDays(180), 5_000)).thenReturn(List.of());
+        when(repository.findStoryBiblesWithChangesetsBefore(now.minus(180, java.time.temporal.ChronoUnit.DAYS))).thenReturn(List.of(root));
+        when(repository.findChangesetsBefore(11L, now.minus(180, java.time.temporal.ChronoUnit.DAYS), 5_000)).thenReturn(List.of());
 
         assertThat(service.archiveEligibleHistory(now).changesetCount()).isZero();
-        verify(repository).findChangesetsBefore(11L, now.minusDays(180), 5_000);
+        verify(repository).findChangesetsBefore(11L, now.minus(180, java.time.temporal.ChronoUnit.DAYS), 5_000);
     }
 
     private void wireSuccessfulStorage(String key) {
@@ -147,7 +147,7 @@ class StoryBibleHistoryArchiveServiceTest {
         return root;
     }
 
-    private StoryBibleChangeset changeset(Long id, LocalDateTime createdAt) {
+    private StoryBibleChangeset changeset(Long id, Instant createdAt) {
         StoryBibleChangeset changeset = new StoryBibleChangeset();
         changeset.setChangesetId(id);
         changeset.setStoryBibleId(11L);

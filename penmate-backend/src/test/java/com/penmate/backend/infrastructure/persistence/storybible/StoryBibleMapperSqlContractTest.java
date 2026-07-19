@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StoryBibleMapperSqlContractTest {
 
     @Test
-    void node_type_queries_quote_the_mysql_reserved_system_alias() throws Exception {
+    void node_type_queries_use_a_non_reserved_system_alias() throws Exception {
         assertSystemAliasIsQuoted(method("findNodeTypes", Long.class));
         assertSystemAliasIsQuoted(method("findNodeType", Long.class, Long.class));
     }
@@ -22,7 +22,7 @@ class StoryBibleMapperSqlContractTest {
     private void assertSystemAliasIsQuoted(Method method) {
         String sql = String.join("\n", method.getAnnotation(Select.class).value());
         assertThat(sql)
-                .contains("is_system AS `system`")
+                .contains("is_system AS \"system\"")
                 .doesNotContain("is_system AS system");
     }
 }

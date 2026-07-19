@@ -51,7 +51,7 @@ jobs:
       - name: Run backend tests + coverage gate
         if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true' }}
         working-directory: penmate-backend
-        run: mvn -B verify
+        run: mvn -B -Pci-postgresql-tests verify
 
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.frontend == 'true' }}

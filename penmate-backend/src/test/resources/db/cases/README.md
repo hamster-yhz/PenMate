@@ -1,47 +1,18 @@
-# PenMate DB Case 造数说明
+# PostgreSQL Demo And Test Cases
 
-## 1. 文件清单
+These files are explicit demo/test data and are not Flyway migrations. Flyway V7 contains only required non-secret system metadata; administrator and model credentials are created by application bootstrap.
 
-- [`seed_all_domain_base.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_base.sql)
-  - 全域主路径基础数据（覆盖当前 Flyway 实际业务表）
-- [`seed_all_domain_conflict_boundary.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_conflict_boundary.sql)
-  - 边界/异常可执行样本 + 冲突/非法模板（默认注释）
-- [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
-  - 并发、幂等、回滚模板数据
-- [`cleanup_all_domain_cases.sql`](penmate-backend/src/test/resources/db/cases/cleanup_all_domain_cases.sql)
-  - 统一清理脚本（ID段 920001~922999）
+## Seed Order
 
-## 2. 推荐执行顺序
+1. `seed/01_book_and_story_bible.sql`
+2. `seed/02_agent.sql`
+3. `seed/03_rag_and_storage.sql`
+4. `seed/04_plugin.sql`
+5. `seed/05_boundary.sql`
+6. `seed/06_concurrency.sql`
 
-1. 执行 [`seed_all_domain_base.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_base.sql)
-2. 执行 [`seed_all_domain_conflict_boundary.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_conflict_boundary.sql)
-3. 执行 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
-4. 测试完成后执行 [`cleanup_all_domain_cases.sql`](penmate-backend/src/test/resources/db/cases/cleanup_all_domain_cases.sql)
+The first four files form one inspectable book workflow. Boundary and concurrency rows are independent fixtures for focused testing. All case IDs use the `920000` to `922999` range.
 
-## 3. 覆盖矩阵（按当前迁移表）
+Run all files through `scripts/db/seed-demo.ps1` or `scripts/db/seed-demo.sh`. Remove only these rows with the matching cleanup script, which executes `cleanup.sql`.
 
-| 领域 | 表 | 覆盖脚本 |
-|---|---|---|
-| IAM | iam_users / iam_roles / iam_permissions / iam_user_roles / iam_role_permissions / iam_menus | base + conflict_boundary |
-| 小说 | novel_projects / novel_members / novel_volumes / novel_chapters / novel_chapter_versions / novel_outline_nodes / novel_cards / novel_card_relations | base + conflict_boundary + concurrency_rollback |
-| 文风 | style_profiles / style_switch_logs | base + conflict_boundary |
-| 插件 | plugin_catalog / plugin_project_installs / plugin_call_logs | base + conflict_boundary |
-| Agent审批 | agent_conversations / agent_messages / agent_generation_tasks / agent_approval_requests / agent_approval_actions | base + conflict_boundary + concurrency_rollback |
-| RAG/存储 | rag_documents / rag_chunks / storage_objects | base + conflict_boundary |
-| 运维 | ops_async_jobs / ops_migrations | base + conflict_boundary + concurrency_rollback |
-
-## 4. 约束与异常覆盖说明
-
-- 唯一键冲突模板：见 [`seed_all_domain_conflict_boundary.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_conflict_boundary.sql)
-  - 如 `iam_users.email`、`novel_chapter_versions(chapter_id,version_no)`、`plugin_project_installs(project_id,plugin_id)`、`novel_members(project_id,user_id)`、`rag_chunks(vector_id,vector_store)`
-- 并发/乐观锁模板：见 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
-- 事务回滚模板：见 [`seed_all_domain_concurrency_rollback.sql`](penmate-backend/src/test/resources/db/cases/seed_all_domain_concurrency_rollback.sql)
-- 按约定不包含模型与密钥造数：`model_providers` / `model_provider_models` / `model_user_api_keys`
-
-## 5. 注意事项
-
-- 以上脚本对齐当前 Flyway 表结构（V1~V11），优先保证可执行。
-- 造数与清理已按“物理主键 `id` + 业务语义 ID 列”执行，涉及删除与幂等定位时优先使用 `*_id` 语义列（如 `project_id`、`conversation_id`、`approval_request_id`）。
-- 文档 v1.1 中新增但尚未落地迁移的表（如 `plugin_versions`、`model_invocation_logs`、`rag_retrieval_logs` 等）未写入可执行 SQL。
-- 若后续迁移补齐这些表，请在对应脚本中新增样本并同步更新本说明。
-
+The scripts expect an already migrated PostgreSQL database. They refuse non-local hosts by default; use PowerShell `-AllowRemote` or Bash `PENMATE_ALLOW_REMOTE_DB=true` only after checking the target. They do not create databases, run Flyway, reset schemas, or modify CI/CD deployment state.

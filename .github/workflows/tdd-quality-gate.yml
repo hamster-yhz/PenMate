@@ -35,7 +35,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Run backend tests + coverage gate
-        run: mvn -B verify
+        run: mvn -B -Pci-postgresql-tests verify
 
   frontend-test:
     needs: changes

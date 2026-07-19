@@ -5,12 +5,11 @@ import com.penmate.backend.application.agent.context.AgentContextEpochService;
 import com.penmate.backend.application.agent.context.ContextEpochSnapshotCache;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
-import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
+import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -21,9 +20,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
@@ -42,34 +38,11 @@ import static org.mockito.Mockito.when;
 
 class AgentContextEpochConcurrencyTest {
 
-    private static final String JDBC_URL = "jdbc:h2:mem:context_epoch_concurrency;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
-    private static final String MIGRATION_DIR = "target/test-migrations/context-epoch-concurrency";
     private static DataSource dataSource;
 
     @BeforeAll
     static void setUpSchema() throws Exception {
-        dataSource = new UnpooledDataSource("org.h2.Driver", JDBC_URL, "sa", "");
-        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
-            statement.execute("DROP ALL OBJECTS");
-        }
-        Path migrationDir = Path.of(MIGRATION_DIR);
-        Files.createDirectories(migrationDir);
-        Files.copy(
-                Path.of("src/main/resources/db/migration/V4__init_novel_volume_and_chapter.sql"),
-                migrationDir.resolve("V4__init_novel_volume_and_chapter.sql"),
-                StandardCopyOption.REPLACE_EXISTING
-        );
-        Files.copy(
-                Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"),
-                migrationDir.resolve("V11__init_agent_and_ops_domains.sql"),
-                StandardCopyOption.REPLACE_EXISTING
-        );
-        Files.copy(
-                Path.of("src/main/resources/db/migration/V18__add_agent_run_dependency_revisions.sql"),
-                migrationDir.resolve("V18__add_agent_run_dependency_revisions.sql"),
-                StandardCopyOption.REPLACE_EXISTING
-        );
-        Flyway.configure().dataSource(dataSource).locations("filesystem:" + MIGRATION_DIR).load().migrate();
+        dataSource = PostgreSqlTestDatabase.migratedDataSource("context_epoch_concurrency");
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
             statement.execute("""
                     INSERT INTO agent_sessions(session_id, project_id, owner_user_id, title)

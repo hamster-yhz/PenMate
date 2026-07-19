@@ -3,13 +3,12 @@ package com.penmate.backend.infrastructure.persistence.agent.run;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
-import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
+import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -18,7 +17,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
@@ -32,17 +30,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AgentRunEventRepositoryImplTest {
 
-    private static final String JDBC_URL = "jdbc:h2:mem:agent_run_event_repository;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
-    private static final String MIGRATION_DIR = "target/test-migrations/agent-run-event-repository";
-
     private AgentRunEventRepositoryImpl repository;
     private SqlSessionFactory sqlSessionFactory;
 
     @BeforeEach
     void setUp() throws Exception {
-        DataSource dataSource = new UnpooledDataSource("org.h2.Driver", JDBC_URL, "sa", "");
+        DataSource dataSource = PostgreSqlTestDatabase.migratedDataSource(
+                "agent_run_event_repository");
         sqlSessionFactory = buildSqlSessionFactory(dataSource);
-        recreateSchema(dataSource);
+        executeSqlResource(dataSource, "src/test/resources/db/cases/seed_agent_run_runtime_base.sql");
         repository = new AgentRunEventRepositoryImpl(
                 sqlSessionFactory,
                 new TransactionTemplate(new DataSourceTransactionManager(dataSource)),
@@ -108,32 +104,8 @@ class AgentRunEventRepositoryImplTest {
         return new SqlSessionFactoryBuilder().build(configuration);
     }
 
-    private void recreateSchema(DataSource dataSource) throws Exception {
-        try (Connection connection = dataSource.getConnection();
-            Statement statement = connection.createStatement()) {
-            statement.execute("DROP ALL OBJECTS");
-        }
-        prepareMigration();
-        Flyway.configure()
-                .dataSource(dataSource)
-                .locations("filesystem:" + MIGRATION_DIR)
-                .load()
-                .migrate();
-        executeSqlResource(dataSource, "src/test/resources/db/cases/seed_agent_run_runtime_base.sql");
-    }
-
-    private void prepareMigration() throws Exception {
-        Path migrationDir = Path.of(MIGRATION_DIR);
-        Files.createDirectories(migrationDir);
-        Files.copy(
-                Path.of("src/main/resources/db/migration/V11__init_agent_and_ops_domains.sql"),
-                migrationDir.resolve("V11__init_agent_and_ops_domains.sql"),
-                StandardCopyOption.REPLACE_EXISTING
-        );
-    }
-
     private void executeSqlResource(DataSource dataSource, String path) throws Exception {
-        String sql = Files.readString(Path.of(path)).replace("NOW(3)", "CURRENT_TIMESTAMP");
+        String sql = Files.readString(Path.of(path));
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             for (String statementSql : sql.split(";")) {

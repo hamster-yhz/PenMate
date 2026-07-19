@@ -10,7 +10,7 @@ import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -26,8 +26,8 @@ class AgentEventArchiveServiceTest {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         AgentEventArchiveRepository archives = mock(AgentEventArchiveRepository.class);
         ObjectStorageService storage = mock(ObjectStorageService.class);
-        LocalDateTime now = LocalDateTime.of(2026, 7, 17, 3, 0);
-        when(events.findTerminalRunIdsWithEventsBefore(now.minusDays(7), 100)).thenReturn(List.of(70L));
+        Instant now = java.time.LocalDateTime.of(2026, 7, 17, 3, 0).toInstant(java.time.ZoneOffset.UTC);
+        when(events.findTerminalRunIdsWithEventsBefore(now.minus(7, java.time.temporal.ChronoUnit.DAYS), 100)).thenReturn(List.of(70L));
         when(events.listAfter(70L, 0L)).thenReturn(List.of(event(1L), event(2L)));
         when(archives.upsertUploaded(any())).thenReturn(1);
         when(archives.markVerified(99L, now)).thenReturn(1);
@@ -57,8 +57,8 @@ class AgentEventArchiveServiceTest {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         AgentEventArchiveRepository archives = mock(AgentEventArchiveRepository.class);
         ObjectStorageService storage = mock(ObjectStorageService.class);
-        LocalDateTime now = LocalDateTime.of(2026, 7, 17, 3, 0);
-        when(events.findTerminalRunIdsWithEventsBefore(now.minusDays(7), 100)).thenReturn(List.of(70L));
+        Instant now = java.time.LocalDateTime.of(2026, 7, 17, 3, 0).toInstant(java.time.ZoneOffset.UTC);
+        when(events.findTerminalRunIdsWithEventsBefore(now.minus(7, java.time.temporal.ChronoUnit.DAYS), 100)).thenReturn(List.of(70L));
         when(events.listAfter(70L, 0L)).thenReturn(List.of(event(1L)));
         when(storage.putBytes(any(), any(), any())).thenAnswer(invocation -> {
             byte[] bytes = invocation.getArgument(1);
@@ -80,10 +80,10 @@ class AgentEventArchiveServiceTest {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         AgentEventArchiveRepository archives = mock(AgentEventArchiveRepository.class);
         ObjectStorageService storage = mock(ObjectStorageService.class);
-        LocalDateTime now = LocalDateTime.of(2026, 10, 15, 3, 0);
+        Instant now = java.time.LocalDateTime.of(2026, 10, 15, 3, 0).toInstant(java.time.ZoneOffset.UTC);
         AgentEventArchive archive = new AgentEventArchive(
                 99L, 70L, 1L, 2L, 2, "agent-runs/70/events/1-2.jsonl.gz",
-                100L, "hash", "VERIFIED", now.minusDays(90), now, now.minusDays(90));
+                100L, "hash", "VERIFIED", now.minus(90, java.time.temporal.ChronoUnit.DAYS), now, now.minus(90, java.time.temporal.ChronoUnit.DAYS));
         when(archives.findExpiredVerified(now, 100)).thenReturn(List.of(archive));
         when(archives.delete(99L)).thenReturn(1);
 
@@ -99,6 +99,6 @@ class AgentEventArchiveServiceTest {
     private AgentEvent event(long sequence) {
         return new AgentEvent(100L + sequence, 70L, 10L, 20L, 30L, sequence,
                 1, sequence == 2 ? "run.completed" : "run.started", "{}",
-                LocalDateTime.of(2026, 7, 1, 0, 0).plusSeconds(sequence));
+                java.time.LocalDateTime.of(2026, 7, 1, 0, 0).toInstant(java.time.ZoneOffset.UTC).plusSeconds(sequence));
     }
 }

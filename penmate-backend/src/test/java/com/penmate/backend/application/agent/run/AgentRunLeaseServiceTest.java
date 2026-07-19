@@ -6,7 +6,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,6 +61,6 @@ class AgentRunLeaseServiceTest {
 
     private AgentRunLease lease(int attempt) {
         return new AgentRunLease(70001L, "worker", 2L, attempt,
-                AgentRunStatus.SUSPENDED, LocalDateTime.now().plusMinutes(1));
+                AgentRunStatus.SUSPENDED, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
     }
 }

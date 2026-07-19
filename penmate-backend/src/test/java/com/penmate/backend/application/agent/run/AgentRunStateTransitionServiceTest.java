@@ -8,7 +8,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRe
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,6 +56,6 @@ class AgentRunStateTransitionServiceTest {
 
     private AgentRunLease lease() {
         return new AgentRunLease(70001L, "worker", 2L, 1,
-                AgentRunStatus.RUNNING, LocalDateTime.now().plusMinutes(1));
+                AgentRunStatus.RUNNING, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
     }
 }

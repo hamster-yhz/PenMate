@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.novel;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
+import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
@@ -20,14 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class NovelChapterMapperDbCaseTest {
 
-    private static final String H2_URL = "jdbc:h2:mem:novel_chapter_order;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
     private static SqlSessionFactory sqlSessionFactory;
 
     @BeforeAll
     static void setUpDatabase() {
-        DataSource dataSource = new org.apache.ibatis.datasource.unpooled.UnpooledDataSource(
-                "org.h2.Driver", H2_URL, "sa", ""
-        );
+        DataSource dataSource = PostgreSqlTestDatabase.migratedDataSource("novel_chapter_order");
         Environment environment = new Environment("test", new JdbcTransactionFactory(), dataSource);
         Configuration configuration = new Configuration(environment);
         configuration.setMapUnderscoreToCamelCase(true);
@@ -39,41 +37,12 @@ class NovelChapterMapperDbCaseTest {
     void resetSchema() throws Exception {
         try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
              Statement statement = connection.createStatement()) {
-            statement.execute("DROP ALL OBJECTS");
+            statement.execute("DELETE FROM novel_chapters WHERE project_id = 77");
+            statement.execute("DELETE FROM novel_volumes WHERE project_id = 77");
             statement.execute("""
-                    CREATE TABLE novel_volumes (
-                        id BIGINT PRIMARY KEY,
-                        volume_id BIGINT NOT NULL,
-                        project_id BIGINT NOT NULL,
-                        sort_order INT NOT NULL,
-                        deleted_at TIMESTAMP NULL
-                    )
+                    INSERT INTO novel_volumes(id, volume_id, project_id, title, sort_order)
+                    VALUES (1, 101, 77, 'Volume 2', 20), (2, 102, 77, 'Volume 1', 10)
                     """);
-            statement.execute("""
-                    CREATE TABLE novel_chapters (
-                        id BIGINT PRIMARY KEY,
-                        chapter_id BIGINT NOT NULL,
-                        project_id BIGINT NOT NULL,
-                        volume_id BIGINT NULL,
-                        outline_node_id BIGINT NULL,
-                        title VARCHAR(200) NOT NULL,
-                        sort_order INT NOT NULL,
-                        status INT NOT NULL,
-                        word_count INT NOT NULL,
-                        excerpt VARCHAR(2000) NULL,
-                        content_object_key VARCHAR(500) NOT NULL,
-                        content_etag VARCHAR(128) NULL,
-                        content_size BIGINT NULL,
-                        content_checksum VARCHAR(128) NULL,
-                        content_revision BIGINT NOT NULL DEFAULT 1,
-                        storage_provider VARCHAR(32) NOT NULL,
-                        last_generated_at TIMESTAMP NULL,
-                        created_at TIMESTAMP NOT NULL,
-                        updated_at TIMESTAMP NOT NULL,
-                        deleted_at TIMESTAMP NULL
-                    )
-                    """);
-            statement.execute("INSERT INTO novel_volumes VALUES (1, 101, 77, 20, NULL), (2, 102, 77, 10, NULL)");
             insertChapter(statement, 5, 5005, 101L, 1);
             insertChapter(statement, 4, 5004, 102L, 100);
             insertChapter(statement, 3, 5003, 102L, 5);

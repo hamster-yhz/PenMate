@@ -6,7 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -145,8 +145,8 @@ class AuthSessionCacheTest {
                 "refresh-token",
                 "  access-jti-save  ",
                 "refresh-jti-save",
-                LocalDateTime.now().plusMinutes(5),
-                LocalDateTime.now().plusDays(7)
+                Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES),
+                Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS)
         );
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -186,7 +186,7 @@ class AuthSessionCacheTest {
                 "access-jti-save-3",
                 "refresh-jti-save-3",
                 null,
-                LocalDateTime.now().plusDays(7)
+                Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS)
         );
 
         assertThatThrownBy(() -> cache.saveSession(payload, bundle))
@@ -211,8 +211,8 @@ class AuthSessionCacheTest {
                 "refresh-token",
                 "access-jti-save-2",
                 "  refresh-jti-save-2  ",
-                LocalDateTime.now().plusMinutes(5),
-                LocalDateTime.now().plusDays(7)
+                Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES),
+                Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS)
         );
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
