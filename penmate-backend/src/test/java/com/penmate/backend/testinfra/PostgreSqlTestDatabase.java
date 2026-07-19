@@ -3,6 +3,7 @@ package com.penmate.backend.testinfra;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
 import org.flywaydb.core.Flyway;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -80,7 +81,9 @@ public final class PostgreSqlTestDatabase {
 
     private static PostgreSQLContainer<?> createContainer() {
         if (!"container".equalsIgnoreCase(MODE)) return null;
-        PostgreSQLContainer<?> container = new PostgreSQLContainer<>("postgres:18.4-alpine")
+        DockerImageName image = DockerImageName.parse("pgvector/pgvector:0.8.5-pg18")
+                .asCompatibleSubstituteFor("postgres");
+        PostgreSQLContainer<?> container = new PostgreSQLContainer<>(image)
                 .withDatabaseName("penmate_test")
                 .withUsername("penmate")
                 .withPassword("penmate");
@@ -100,7 +103,8 @@ public final class PostgreSqlTestDatabase {
 
     private static void recreateSchema(DataSource dataSource, String schema) {
         try (Connection connection = dataSource.getConnection();
-             Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
+            statement.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public");
             statement.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
             statement.execute("CREATE SCHEMA " + schema);
         } catch (SQLException exception) {
@@ -112,7 +116,7 @@ public final class PostgreSqlTestDatabase {
     }
 
     private static String appendCurrentSchema(String url, String schema) {
-        return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+        return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema + ",public";
     }
 
     private static String schemaNameFromConnection(Connection connection) throws SQLException {

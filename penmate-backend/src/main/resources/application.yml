@@ -60,21 +60,36 @@ penmate:
     region: ${STORAGE_REGION:us-east-1}
     secure: ${STORAGE_SECURE:false}
     presign-expire-minutes: ${STORAGE_PRESIGN_EXPIRE_MINUTES:15}
-  vector:
-    provider: ${VECTOR_PROVIDER:milvus}
-    endpoint: ${VECTOR_ENDPOINT:http://localhost:19530}
-    api-key: ${VECTOR_API_KEY:}
-    collection-prefix: ${VECTOR_COLLECTION_PREFIX:penmate_}
+  indexing:
+    chunk-target-characters: ${INDEX_CHUNK_TARGET_CHARACTERS:800}
+    chunk-overlap-characters: ${INDEX_CHUNK_OVERLAP_CHARACTERS:120}
+    chunk-max-characters: ${INDEX_CHUNK_MAX_CHARACTERS:1200}
+    embedding-batch-size: ${INDEX_EMBEDDING_BATCH_SIZE:32}
+    embedding-batch-max-characters: ${INDEX_EMBEDDING_BATCH_MAX_CHARACTERS:30000}
+    embedding-connect-timeout: ${INDEX_EMBEDDING_CONNECT_TIMEOUT:10s}
+    embedding-response-timeout: ${INDEX_EMBEDDING_RESPONSE_TIMEOUT:60s}
+    retrieval-candidates: ${INDEX_RETRIEVAL_CANDIDATES:30}
+    retrieval-top-k: ${INDEX_RETRIEVAL_TOP_K:8}
+    retrieval-max-per-source: ${INDEX_RETRIEVAL_MAX_PER_SOURCE:3}
+    hnsw-ef-search: ${INDEX_HNSW_EF_SEARCH:100}
+    max-upload-bytes: ${INDEX_MAX_UPLOAD_BYTES:10485760}
+    max-chunks-per-source: ${INDEX_MAX_CHUNKS_PER_SOURCE:20000}
+    max-chunks-per-project: ${INDEX_MAX_CHUNKS_PER_PROJECT:100000}
   bootstrap:
     reconcile: ${BOOTSTRAP_RECONCILE:false}
     admin:
       email: ${BOOTSTRAP_ADMIN_EMAIL:}
       password: ${BOOTSTRAP_ADMIN_PASSWORD:}
-    model:
-      provider: ${BOOTSTRAP_MODEL_PROVIDER:}
-      base-url: ${BOOTSTRAP_MODEL_BASE_URL:}
-      api-key: ${BOOTSTRAP_MODEL_API_KEY:}
-      model-name: ${BOOTSTRAP_MODEL_NAME:}
+    chat:
+      provider: ${BOOTSTRAP_CHAT_PROVIDER:}
+      base-url: ${BOOTSTRAP_CHAT_BASE_URL:}
+      api-key: ${BOOTSTRAP_CHAT_API_KEY:}
+      model-name: ${BOOTSTRAP_CHAT_MODEL_NAME:}
+    embedding:
+      provider: ${BOOTSTRAP_EMBEDDING_PROVIDER:}
+      base-url: ${BOOTSTRAP_EMBEDDING_BASE_URL:}
+      api-key: ${BOOTSTRAP_EMBEDDING_API_KEY:}
+      model-name: ${BOOTSTRAP_EMBEDDING_MODEL_NAME:}
 
 mybatis:
   configuration:

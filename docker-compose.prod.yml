@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18.4-alpine
+    image: pgvector/pgvector:0.8.5-pg18
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -33,53 +33,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
-
-  etcd:
-    image: quay.io/coreos/etcd:v3.5.18
-    environment:
-      ETCD_AUTO_COMPACTION_MODE: revision
-      ETCD_AUTO_COMPACTION_RETENTION: "1000"
-      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
-      ETCD_SNAPSHOT_COUNT: "50000"
-    command: >
-      etcd
-      --advertise-client-urls=http://127.0.0.1:2379
-      --listen-client-urls=http://0.0.0.0:2379
-      --data-dir=/etcd
-    volumes:
-      - etcd-data:/etcd
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  milvus:
-    image: milvusdb/milvus:v2.5.7
-    command: ["milvus", "run", "standalone"]
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: ${MILVUS_S3_ADDRESS:?MILVUS_S3_ADDRESS is required}
-      MINIO_PORT: ${MILVUS_S3_PORT:-443}
-      MINIO_ACCESS_KEY_ID: ${MILVUS_S3_ACCESS_KEY:?MILVUS_S3_ACCESS_KEY is required}
-      MINIO_SECRET_ACCESS_KEY: ${MILVUS_S3_SECRET_KEY:?MILVUS_S3_SECRET_KEY is required}
-      MINIO_USE_SSL: ${MILVUS_S3_USE_SSL:-true}
-      MINIO_BUCKET_NAME: ${MILVUS_S3_BUCKET:?MILVUS_S3_BUCKET is required}
-      MINIO_ROOT_PATH: ${MILVUS_S3_ROOT_PATH:-milvus}
-      MINIO_CLOUD_PROVIDER: ${MILVUS_S3_CLOUD_PROVIDER:-aws}
-    depends_on:
-      etcd:
-        condition: service_healthy
-    volumes:
-      - milvus-data:/var/lib/milvus
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9091/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
     restart: unless-stopped
 
   rabbitmq:
@@ -126,17 +79,17 @@ services:
       STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
       STORAGE_SECURE: ${STORAGE_SECURE:-true}
       STORAGE_PRESIGN_EXPIRE_MINUTES: ${STORAGE_PRESIGN_EXPIRE_MINUTES:-15}
-      VECTOR_PROVIDER: ${VECTOR_PROVIDER:-milvus}
-      VECTOR_ENDPOINT: http://milvus:19530
-      VECTOR_API_KEY: ${VECTOR_API_KEY:-}
-      VECTOR_COLLECTION_PREFIX: ${VECTOR_COLLECTION_PREFIX:-penmate_}
       BOOTSTRAP_RECONCILE: ${BOOTSTRAP_RECONCILE:-false}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:?BOOTSTRAP_ADMIN_EMAIL is required}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
-      BOOTSTRAP_MODEL_PROVIDER: ${BOOTSTRAP_MODEL_PROVIDER:?BOOTSTRAP_MODEL_PROVIDER is required}
-      BOOTSTRAP_MODEL_BASE_URL: ${BOOTSTRAP_MODEL_BASE_URL:?BOOTSTRAP_MODEL_BASE_URL is required}
-      BOOTSTRAP_MODEL_API_KEY: ${BOOTSTRAP_MODEL_API_KEY:?BOOTSTRAP_MODEL_API_KEY is required}
-      BOOTSTRAP_MODEL_NAME: ${BOOTSTRAP_MODEL_NAME:?BOOTSTRAP_MODEL_NAME is required}
+      BOOTSTRAP_CHAT_PROVIDER: ${BOOTSTRAP_CHAT_PROVIDER:-}
+      BOOTSTRAP_CHAT_BASE_URL: ${BOOTSTRAP_CHAT_BASE_URL:-}
+      BOOTSTRAP_CHAT_API_KEY: ${BOOTSTRAP_CHAT_API_KEY:-}
+      BOOTSTRAP_CHAT_MODEL_NAME: ${BOOTSTRAP_CHAT_MODEL_NAME:-}
+      BOOTSTRAP_EMBEDDING_PROVIDER: ${BOOTSTRAP_EMBEDDING_PROVIDER:-}
+      BOOTSTRAP_EMBEDDING_BASE_URL: ${BOOTSTRAP_EMBEDDING_BASE_URL:-}
+      BOOTSTRAP_EMBEDDING_API_KEY: ${BOOTSTRAP_EMBEDDING_API_KEY:-}
+      BOOTSTRAP_EMBEDDING_MODEL_NAME: ${BOOTSTRAP_EMBEDDING_MODEL_NAME:-}
       OPENAPI_ENABLED: ${OPENAPI_ENABLED:-false}
       SWAGGER_UI_ENABLED: ${SWAGGER_UI_ENABLED:-false}
       HEALTH_SHOW_DETAILS: ${HEALTH_SHOW_DETAILS:-never}
@@ -145,8 +98,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      milvus:
         condition: service_healthy
     restart: unless-stopped
 
@@ -164,6 +115,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
-  etcd-data:
-  milvus-data:
   rabbitmq-data:

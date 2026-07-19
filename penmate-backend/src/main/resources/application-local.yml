@@ -9,11 +9,16 @@ penmate:
     admin:
       email: admin@penmate.local
       password: change-me-local
-    model:
+    chat:
       provider: openai-compatible
       base-url: http://localhost:11434/v1
       api-key: replace-me
-      model-name: replace-me
+      model-name: replace-with-chat-model
+    embedding:
+      provider: openai-compatible
+      base-url: http://localhost:11434/v1
+      api-key: replace-me
+      model-name: replace-with-embedding-model
   test-datasource:
     url: jdbc:postgresql://localhost:5432/penmate_test
     username: postgres
