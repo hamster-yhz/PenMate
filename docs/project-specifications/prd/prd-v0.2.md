@@ -153,7 +153,7 @@ public String searchHistoricalFact(String query) { ... }
 ```
 
 ### 5.2 RAG记忆检索体系实现
-底层以Redis、MySQL配搭Pinecone/Milvus向量数据库：
+底层以Redis、PostgreSQL配搭Pinecone/Milvus向量数据库：
 ```java
 // 结合文风System Message与动态知识库检索配置
 Assistant assistant = AiServices.builder(Assistant.class)

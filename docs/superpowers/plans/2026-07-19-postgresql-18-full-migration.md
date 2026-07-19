@@ -6,6 +6,8 @@
 
 **Tech Stack:** PostgreSQL 18.4, Spring Boot 3.3, Java 21, MyBatis 3, Flyway 10, Testcontainers PostgreSQL, Docker Compose, GitHub Actions.
 
+**Implementation Status (2026-07-19):** Tasks 1-10 are implemented. Full local PostgreSQL verification (506 backend tests), backend packaging, JAR driver inspection, 170 frontend tests, frontend build, YAML parsing, and active-source scans pass. Testcontainers and Docker Compose runtime resolution are delegated to CI because Docker tooling is unavailable on this workstation.
+
 ---
 
 ## Confirmed Decisions
@@ -52,7 +54,7 @@
 - Modify: `penmate-backend/src/main/resources/application.yml`
 - Create: `penmate-backend/src/main/resources/application-local.yml`
 - Modify: `.env.example`
-- Modify: `penmate-backend/.envexample`
+- Rename and modify: `penmate-backend/.envexample` to `penmate-backend/.env.example`
 
 - [ ] Replace `mysql-connector-j` with the PostgreSQL JDBC driver.
 - [ ] Replace `flyway-mysql` with `flyway-database-postgresql`.
@@ -183,12 +185,12 @@
 ## Task 9: Add Explicit Local Demo Case Scripts
 
 **Files:**
-- Create: `scripts/seed-local-demo.ps1`
-- Create: `scripts/seed-local-demo.sh`
-- Create: `scripts/cleanup-local-demo.ps1`
-- Create: `scripts/cleanup-local-demo.sh`
+- Create: `scripts/db/seed-demo.ps1`
+- Create: `scripts/db/seed-demo.sh`
+- Create: `scripts/db/cleanup-demo.ps1`
+- Create: `scripts/db/cleanup-demo.sh`
 
-- [ ] Load `src/test/resources/db/cases/seed_all_domain_base.sql` only on explicit invocation.
+- [ ] Load the ordered `src/test/resources/db/cases/seed/*.sql` files only on explicit invocation.
 - [ ] Default to local `localhost:5432/penmate` settings.
 - [ ] Allow connection overrides without reading production deployment state.
 - [ ] Refuse non-local hosts unless the operator explicitly overrides a safety guard.

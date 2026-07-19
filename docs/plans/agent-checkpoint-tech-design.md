@@ -13,7 +13,7 @@ This document describes the current Run recovery contract. It supersedes the for
 3. The resolved context and composed prompt are durable artifacts. Mutable Story Bible state is never read to reconstruct an existing Run.
 4. Approval resume continues from the persisted LLM messages and tool-call position. It does not call the initial execution path.
 5. Redis is an optional read-through cache. Redis expiry or loss does not change Run identity or Context Epoch identity.
-6. Durable events and the latest MySQL checkpoint remain the recovery source of truth.
+6. Durable events and the latest PostgreSQL checkpoint remain the recovery source of truth.
 
 ## Initial Execution
 
@@ -76,7 +76,7 @@ Artifact metadata is stored in `agent_artifacts`. Every load verifies object byt
 
 `AgentCheckpointService` writes a checkpoint for Run start, route completion, resolved context, composed prompt, approval wait, and terminal events. It also writes every fifteenth event as a bounded replay checkpoint.
 
-The checkpoint is written to MySQL first. Redis key `agent:checkpoint:{runId}:latest` caches the same serialized state for 30 minutes. A Redis miss falls back to the latest MySQL checkpoint.
+The checkpoint is written to PostgreSQL first. Redis key `agent:checkpoint:{runId}:latest` caches the same serialized state for 30 minutes. A Redis miss falls back to the latest PostgreSQL checkpoint.
 
 ## Event Replay
 

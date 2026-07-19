@@ -52,7 +52,7 @@ sequenceDiagram
     profiles:
       active: dev
     datasource:
-      url: jdbc:mysql://localhost:3306/db
+      url: jdbc:postgresql://localhost:5432/db
       username: root
       password: pass
   ```
@@ -194,7 +194,7 @@ sequenceDiagram
 ## 关键设计决策
 
 1. **使用Spring Framework（可选）**：建议采用Spring Boot构建微服务项目，它提供了自动配置、依赖注入、Web层、数据层和安全等模块。也可考虑Spring Cloud微服务组件。非Spring方案（如纯Java EE、Quarkus等）也可实现DDD分层，关键在于通过接口+实现分离、DI管理依赖。  
-2. **分层隔离与接口分离**：领域层定义所有业务接口，基础设施层实现。这遵循依赖倒置原则，“细节依赖于抽象”。例如，`AppRepository`在领域层定义，基础层通过Spring Data JPA类实现。这样可随时切换实现（如从MySQL切换到MongoDB只需更换实现类）。  
+2. **分层隔离与接口分离**：领域层定义所有业务接口，基础设施层实现。这遵循依赖倒置原则，“细节依赖于抽象”。例如，`AppRepository`在领域层定义，基础层通过Spring Data JPA类实现。这样可随时切换实现（如从PostgreSQL切换到MongoDB只需更换实现类）。
 3. **聚合设计**：每个聚合由一个根实体和值对象组成，聚合内的一致性规则由根实体负责维护。所有对聚合的修改都应通过聚合根的方法完成。领域事件可在聚合根方法中创建，用于通知系统其他组件。  
 4. **领域事件**：系统内部通过领域事件（Domain Events）解耦复杂业务流程。可使用Spring的事件机制或消息中间件来分发事件。例如，订单创建后发布`OrderCreatedEvent`，消费者异步发送通知。  
 5. **事务管理**：在应用服务层使用`@Transactional`管理事务，确保多个仓储操作的一致性。避免在领域层使用事务注解，保持领域层纯粹。  
@@ -315,7 +315,7 @@ order-service/
   ```yaml
   spring:
     datasource:
-      url: jdbc:mysql://${DB_HOST:localhost}:3306/mydb
+      url: jdbc:postgresql://${DB_HOST:localhost}:5432/mydb
       username: ${DB_USER:root}
       password: ${DB_PASS:pass}
     jpa:

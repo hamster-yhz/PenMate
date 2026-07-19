@@ -257,7 +257,7 @@ PenMate/
 核心依赖：
 
 - LLM：OpenAI-compatible / Anthropic / Gemini 等模型 Provider
-- 记忆：MySQL + Redis + Milvus + S3 兼容存储
+- 记忆：PostgreSQL 18.4 + Redis + Milvus + S3 兼容存储
 - 通信：REST API + 生成事件流
 - 部署：Docker Compose + GitHub Actions + GHCR
 
@@ -271,19 +271,15 @@ PenMate/
 cp .env.example .env
 ```
 
-开发阶段可以先使用 Mock LLM：
+首次启动需要填写管理员和默认模型配置：
 
 ```env
-LLM_MOCK_ENABLED=true
-```
-
-如需真实模型，填写：
-
-```env
-LLM_PROVIDER=openai
-LLM_BASE_URL=https://api.openai.com
-LLM_API_KEY=<your-api-key>
-LLM_MODEL_NAME=gpt-4o-mini
+BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+BOOTSTRAP_ADMIN_PASSWORD=<strong-admin-password>
+BOOTSTRAP_MODEL_PROVIDER=openai
+BOOTSTRAP_MODEL_BASE_URL=https://api.openai.com/v1
+BOOTSTRAP_MODEL_API_KEY=<your-api-key>
+BOOTSTRAP_MODEL_NAME=gpt-4o-mini
 ```
 
 ### 2. 启动完整环境
@@ -296,11 +292,20 @@ docker compose --env-file .env up -d --build
 
 ### 3. 本地开发模式
 
+先用本机 PostgreSQL 18 创建开发库和测试库：
+
+```bash
+createdb -U postgres penmate
+createdb -U postgres penmate_test
+```
+
+本地占位账号、管理员和模型配置位于 `penmate-backend/src/main/resources/application-local.yml`，按本机环境修改即可，不要求存在 `.env`。
+
 后端：
 
 ```bash
 cd penmate-backend
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 前端：
@@ -311,6 +316,20 @@ npm install
 npm run dev
 ```
 
+需要本地演示数据时显式执行：
+
+```powershell
+.\scripts\db\seed-demo.ps1
+.\scripts\db\cleanup-demo.ps1
+```
+
+```bash
+./scripts/db/seed-demo.sh
+./scripts/db/cleanup-demo.sh
+```
+
+脚本只处理 `920000` 到 `922999` 的 case 数据，并默认拒绝非本机数据库。远程目标必须用 PowerShell `-AllowRemote` 或 Bash `PENMATE_ALLOW_REMOTE_DB=true` 显式确认。
+
 ---
 
 ## 🧪 质量检查
@@ -318,6 +337,7 @@ npm run dev
 ```bash
 # backend
 cd penmate-backend
+# 默认连接本机 PostgreSQL 的 penmate_test 数据库；连接参数可用 -Dpenmate.test.database.* 覆盖
 mvn -B verify
 
 # frontend
