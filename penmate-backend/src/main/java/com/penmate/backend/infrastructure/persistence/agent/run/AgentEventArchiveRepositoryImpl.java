@@ -4,7 +4,7 @@ import com.penmate.backend.domain.agent.run.model.AgentEventArchive;
 import com.penmate.backend.domain.agent.run.repository.AgentEventArchiveRepository;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Repository
@@ -17,7 +17,7 @@ public class AgentEventArchiveRepositoryImpl implements AgentEventArchiveReposit
 
     @Override public AgentEventArchive findByRunId(Long runId) { return mapper.findByRunId(runId); }
     @Override public int upsertUploaded(AgentEventArchive archive) { return mapper.upsertUploaded(archive); }
-    @Override public int markVerified(Long archiveId, LocalDateTime verifiedAt) { return mapper.markVerified(archiveId, verifiedAt); }
-    @Override public List<AgentEventArchive> findExpiredVerified(LocalDateTime now, int limit) { return mapper.findExpiredVerified(now, limit); }
+    @Override public int markVerified(Long archiveId, Instant verifiedAt) { return mapper.markVerified(archiveId, verifiedAt); }
+    @Override public List<AgentEventArchive> findExpiredVerified(Instant now, int limit) { return mapper.findExpiredVerified(now, limit); }
     @Override public int delete(Long archiveId) { return mapper.delete(archiveId); }
 }

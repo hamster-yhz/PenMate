@@ -2,7 +2,7 @@ package com.penmate.backend.domain.storybible.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 public class StoryBibleNodeType {
@@ -16,7 +16,7 @@ public class StoryBibleNodeType {
     private String fieldSchemaJson;
     private Boolean system;
     private Integer sortOrder;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime archivedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
+    private Instant archivedAt;
 }

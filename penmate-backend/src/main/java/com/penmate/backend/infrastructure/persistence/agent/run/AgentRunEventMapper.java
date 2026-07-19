@@ -3,7 +3,7 @@ package com.penmate.backend.infrastructure.persistence.agent.run;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import org.apache.ibatis.annotations.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +32,7 @@ public interface AgentRunEventMapper {
             )
             VALUES(
                 #{eventId}, #{runId}, #{projectId}, #{sessionId}, #{turnId},
-                #{sequence}, #{schemaVersion}, #{eventType}, #{payloadJson}
+                #{sequence}, #{schemaVersion}, #{eventType}, #{payloadJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}
             )
             """)
     int insert(AgentEvent event);
@@ -63,7 +63,7 @@ public interface AgentRunEventMapper {
             @Arg(column = "schema_version", javaType = Integer.class),
             @Arg(column = "event_type", javaType = String.class),
             @Arg(column = "payload_json", javaType = String.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
     List<AgentEvent> listAfter(@Param("runId") Long runId, @Param("after") Long after);
 
@@ -76,7 +76,7 @@ public interface AgentRunEventMapper {
             ORDER BY r.run_id
             LIMIT #{limit}
             """)
-    List<Long> findTerminalRunIdsWithEventsBefore(@Param("cutoff") LocalDateTime cutoff,
+    List<Long> findTerminalRunIdsWithEventsBefore(@Param("cutoff") Instant cutoff,
                                                    @Param("limit") int limit);
 
     @Delete("DELETE FROM agent_events WHERE run_id = #{runId} AND sequence <= #{maxSequence}")

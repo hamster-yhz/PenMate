@@ -3,7 +3,7 @@ package com.penmate.backend.domain.novel.model;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -37,7 +37,7 @@ public class NovelChapterVersion {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long createdBy;
     /** 版本创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
 }
 

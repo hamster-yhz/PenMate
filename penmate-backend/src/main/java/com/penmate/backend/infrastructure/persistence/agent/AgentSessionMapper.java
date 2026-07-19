@@ -120,7 +120,7 @@ public interface AgentSessionMapper {
     @Select("""
             SELECT id
             FROM agent_sessions
-            WHERE (#{projectId} IS NULL OR project_id = #{projectId})
+            WHERE (#{projectId,jdbcType=BIGINT} IS NULL OR project_id = #{projectId,jdbcType=BIGINT})
               AND session_id = #{sessionId}
               AND deleted_at IS NULL
             LIMIT 1

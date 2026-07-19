@@ -2,7 +2,7 @@ package com.penmate.backend.domain.storybible.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 public class StoryBibleViewPreference {
@@ -13,5 +13,5 @@ public class StoryBibleViewPreference {
     private Boolean hidden;
     private Integer sortOrder;
     private Long updatedBy;
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }

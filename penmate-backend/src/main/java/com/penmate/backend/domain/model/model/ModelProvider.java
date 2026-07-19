@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.model.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -23,9 +23,9 @@ public class ModelProvider {
     /** 提供商状态。 */
     private String status;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
 }
 

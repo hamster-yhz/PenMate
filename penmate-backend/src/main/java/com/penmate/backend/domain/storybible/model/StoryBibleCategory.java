@@ -2,7 +2,7 @@ package com.penmate.backend.domain.storybible.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 public class StoryBibleCategory {
@@ -12,7 +12,7 @@ public class StoryBibleCategory {
     private Long parentCategoryId;
     private String name;
     private Integer sortOrder;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime deletedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
+    private Instant deletedAt;
 }

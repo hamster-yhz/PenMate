@@ -3,7 +3,7 @@ package com.penmate.backend.domain.ops.model;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -24,13 +24,13 @@ public class OpsAsyncJob {
     /** 失败错误信息。 */
     private String errorMsg;
     /** 开始执行时间。 */
-    private LocalDateTime startedAt;
+    private Instant startedAt;
     /** 结束执行时间。 */
-    private LocalDateTime finishedAt;
+    private Instant finishedAt;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
 }
 

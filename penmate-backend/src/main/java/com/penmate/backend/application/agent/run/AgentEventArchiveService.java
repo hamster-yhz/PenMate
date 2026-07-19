@@ -15,7 +15,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
@@ -47,11 +48,11 @@ public class AgentEventArchiveService {
         this.objectMapper = objectMapper;
     }
 
-    public ArchiveSummary archiveEligible(LocalDateTime now) {
+    public ArchiveSummary archiveEligible(Instant now) {
         int archivedRuns = 0;
         int archivedEvents = 0;
         for (Long runId : events.findTerminalRunIdsWithEventsBefore(
-                now.minusDays(HOT_RETENTION_DAYS), BATCH_SIZE)) {
+                now.minus(HOT_RETENTION_DAYS, ChronoUnit.DAYS), BATCH_SIZE)) {
             try {
                 int count = archiveRun(runId, now);
                 if (count > 0) archivedRuns++;
@@ -63,7 +64,7 @@ public class AgentEventArchiveService {
         return new ArchiveSummary(archivedRuns, archivedEvents, 0);
     }
 
-    int archiveRun(Long runId, LocalDateTime now) {
+    int archiveRun(Long runId, Instant now) {
         List<AgentEvent> runEvents = events.listAfter(runId, 0L);
         if (runEvents.isEmpty()) return 0;
         AgentEventArchive existing = archives.findByRunId(runId);
@@ -88,7 +89,7 @@ public class AgentEventArchiveService {
         AgentEventArchive uploaded = new AgentEventArchive(
                 archiveId, runId, firstSequence, lastSequence, runEvents.size(), key,
                 (long) payload.length, hash, "UPLOADED", null,
-                now.plusDays(COLD_RETENTION_DAYS), null);
+                now.plus(COLD_RETENTION_DAYS, ChronoUnit.DAYS), null);
         requirePositive(archives.upsertUploaded(uploaded), "Failed to persist Agent Event archive manifest");
         requireOne(archives.markVerified(archiveId, now), "Failed to verify Agent Event archive manifest");
         events.deleteThrough(runId, lastSequence);
@@ -97,7 +98,7 @@ public class AgentEventArchiveService {
         return runEvents.size();
     }
 
-    public ArchiveSummary purgeExpired(LocalDateTime now) {
+    public ArchiveSummary purgeExpired(Instant now) {
         int purged = 0;
         for (AgentEventArchive archive : archives.findExpiredVerified(now, BATCH_SIZE)) {
             try {

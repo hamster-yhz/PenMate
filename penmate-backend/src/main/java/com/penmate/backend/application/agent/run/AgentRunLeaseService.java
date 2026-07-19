@@ -7,7 +7,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,18 +25,18 @@ public class AgentRunLeaseService {
     }
 
     public Optional<AgentRunLease> tryAcquire(Long runId) {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         return runs.tryAcquireLease(runId, workerId, now, now.plus(LEASE_DURATION));
     }
 
     public void assertOwned(AgentRunLease lease) {
-        if (!runs.ownsLease(lease, LocalDateTime.now())) {
+        if (!runs.ownsLease(lease, Instant.now())) {
             throw new AgentRunLeaseLostException(lease.runId(), lease.executionToken());
         }
     }
 
     public boolean renew(AgentRunLease lease) {
-        return runs.renewLease(lease, LocalDateTime.now().plus(LEASE_DURATION));
+        return runs.renewLease(lease, Instant.now().plus(LEASE_DURATION));
     }
 
     public void waitingApproval(AgentRunLease lease, Long approvalId) {
@@ -67,8 +67,8 @@ public class AgentRunLeaseService {
         AgentRunStatus target = terminal || lease.attemptCount() >= MAX_ATTEMPTS
                 ? AgentRunStatus.FAILED
                 : AgentRunStatus.SUSPENDED;
-        LocalDateTime retryAt = target == AgentRunStatus.SUSPENDED
-                ? LocalDateTime.now().plusSeconds(5L << Math.max(0, lease.attemptCount() - 1))
+        Instant retryAt = target == AgentRunStatus.SUSPENDED
+                ? Instant.now().plusSeconds(5L << Math.max(0, lease.attemptCount() - 1))
                 : null;
         transition(lease, target, target == AgentRunStatus.SUSPENDED ? "suspended" : "failed",
                 null, retryAt, errorCode(failure), message);
@@ -76,7 +76,7 @@ public class AgentRunLeaseService {
     }
 
     private void transition(AgentRunLease lease, AgentRunStatus target, String phase,
-                            Long approvalId, LocalDateTime retryAt, String errorCode, String errorMessage) {
+                            Long approvalId, Instant retryAt, String errorCode, String errorMessage) {
         assertOwned(lease);
         if (!runs.transitionWithLease(lease, target, phase, approvalId, retryAt,
                 errorCode, truncate(errorMessage, 500))) {

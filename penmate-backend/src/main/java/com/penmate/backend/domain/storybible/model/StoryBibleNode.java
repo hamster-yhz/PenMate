@@ -2,7 +2,7 @@ package com.penmate.backend.domain.storybible.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 public class StoryBibleNode {
@@ -19,8 +19,8 @@ public class StoryBibleNode {
     private Long revision;
     private Long createdBy;
     private Long updatedBy;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime archivedAt;
-    private LocalDateTime deletedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
+    private Instant archivedAt;
+    private Instant deletedAt;
 }

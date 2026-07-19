@@ -6,7 +6,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRep
 import org.springframework.stereotype.Repository;
 
 import java.sql.SQLException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Repository
 public class AgentToolCallExecutionRepositoryImpl implements AgentToolCallExecutionRepository {
@@ -34,7 +34,7 @@ public class AgentToolCallExecutionRepositoryImpl implements AgentToolCallExecut
 
     @Override
     public int markFinished(Long executionId, Long executionToken, AgentToolCallExecutionStatus status,
-                            String resultJson, String errorCode, String errorMessage, LocalDateTime finishedAt) {
+                            String resultJson, String errorCode, String errorMessage, Instant finishedAt) {
         if (status == null || !status.isTerminal()) {
             throw new IllegalArgumentException("Tool call execution target must be terminal");
         }

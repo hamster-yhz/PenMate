@@ -38,7 +38,7 @@ public interface StyleProfileMapper {
             SELECT id, style_id, project_id, name, is_default, pace, tone, narrative_focus,
                    prompt_template, sample_text, created_at, updated_at, deleted_at
             FROM style_profiles
-            WHERE project_id = #{projectId} AND is_default = 1 AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND is_default = TRUE AND deleted_at IS NULL
             LIMIT 1
             """)
     StyleProfile findDefaultByProjectId(@Param("projectId") Long projectId);
@@ -65,21 +65,21 @@ public interface StyleProfileMapper {
     @Update("""
             UPDATE style_profiles
             SET deleted_at = CURRENT_TIMESTAMP(3),
-                is_default = 0
+                is_default = FALSE
             WHERE project_id = #{projectId} AND style_id = #{styleId} AND deleted_at IS NULL
             """)
     int softDelete(@Param("projectId") Long projectId, @Param("styleId") Long styleId);
 
     @Update("""
             UPDATE style_profiles
-            SET is_default = 0
+            SET is_default = FALSE
             WHERE project_id = #{projectId} AND deleted_at IS NULL
             """)
     int clearDefaultByProjectId(@Param("projectId") Long projectId);
 
     @Update("""
             UPDATE style_profiles
-            SET is_default = 1
+            SET is_default = TRUE
             WHERE project_id = #{projectId} AND style_id = #{styleId} AND deleted_at IS NULL
             """)
     int setDefault(@Param("projectId") Long projectId, @Param("styleId") Long styleId);

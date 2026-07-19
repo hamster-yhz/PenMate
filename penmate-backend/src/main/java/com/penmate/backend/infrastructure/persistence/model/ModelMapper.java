@@ -64,14 +64,14 @@ public interface ModelMapper {
 
     @Update("""
             UPDATE model_user_api_keys
-            SET is_default = 0
+            SET is_default = FALSE
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
     int clearDefaultUserKey(@Param("userId") Long userId);
 
     @Update("""
             UPDATE model_official_api_keys
-            SET is_default = 0,
+            SET is_default = FALSE,
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE provider_id = #{providerId} AND deleted_at IS NULL
             """)
@@ -115,7 +115,7 @@ public interface ModelMapper {
     @Update("""
             UPDATE model_user_api_keys
             SET deleted_at = CURRENT_TIMESTAMP(3),
-                is_default = 0,
+                is_default = FALSE,
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE user_id = #{userId} AND user_api_key_id = #{keyId} AND deleted_at IS NULL
             """)
@@ -124,7 +124,7 @@ public interface ModelMapper {
     @Update("""
             UPDATE model_official_api_keys
             SET deleted_at = CURRENT_TIMESTAMP(3),
-                is_default = 0,
+                is_default = FALSE,
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE official_api_key_id = #{keyId} AND deleted_at IS NULL
             """)
@@ -160,7 +160,7 @@ public interface ModelMapper {
             SELECT id, official_api_key_id, provider_id, key_name, encrypted_api_key, masked_api_key,
                    is_default, last_used_at, status, created_at, updated_at, deleted_at
             FROM model_official_api_keys
-            WHERE provider_id = #{providerId} AND is_default = 1 AND deleted_at IS NULL
+            WHERE provider_id = #{providerId} AND is_default = TRUE AND deleted_at IS NULL
             ORDER BY id DESC
             LIMIT 1
             """)

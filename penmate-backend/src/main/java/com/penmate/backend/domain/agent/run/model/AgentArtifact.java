@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record AgentArtifact(
         Long artifactId,
@@ -9,5 +9,5 @@ public record AgentArtifact(
         String artifactType,
         String payloadJson,
         Integer sizeBytes,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {}

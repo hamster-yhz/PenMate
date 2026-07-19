@@ -3,7 +3,7 @@ package com.penmate.backend.domain.agent.run.repository;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecution;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecutionStatus;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public interface AgentToolCallExecutionRepository {
 
@@ -12,5 +12,5 @@ public interface AgentToolCallExecutionRepository {
     boolean tryInsertStarted(AgentToolCallExecution execution);
 
     int markFinished(Long executionId, Long executionToken, AgentToolCallExecutionStatus status,
-                     String resultJson, String errorCode, String errorMessage, LocalDateTime finishedAt);
+                     String resultJson, String errorCode, String errorMessage, Instant finishedAt);
 }

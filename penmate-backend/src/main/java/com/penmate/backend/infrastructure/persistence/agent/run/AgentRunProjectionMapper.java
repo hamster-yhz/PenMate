@@ -60,21 +60,19 @@ public interface AgentRunProjectionMapper {
             INSERT INTO agent_run_projections(
                 run_id, project_id, session_id, turn_id, run_status, run_phase, latest_sequence
             )
-            SELECT * FROM (
-                SELECT r.run_id, r.project_id, r.session_id, r.turn_id,
-                       COALESCE(#{status}, r.run_status),
-                       COALESCE(#{phase}, r.run_phase),
-                       #{sequence}
-                FROM agent_runs r
-                WHERE r.run_id = #{runId}
-            ) t
-            ON DUPLICATE KEY UPDATE
-                run_status = COALESCE(#{status}, run_status),
-                run_phase = COALESCE(#{phase}, run_phase),
-                active_approval_id = COALESCE(#{activeApprovalId}, active_approval_id),
+            SELECT r.run_id, r.project_id, r.session_id, r.turn_id,
+                   COALESCE(#{status}, r.run_status),
+                   COALESCE(#{phase}, r.run_phase),
+                   #{sequence}
+            FROM agent_runs r
+            WHERE r.run_id = #{runId}
+            ON CONFLICT (run_id) DO UPDATE SET
+                run_status = COALESCE(#{status}, agent_run_projections.run_status),
+                run_phase = COALESCE(#{phase}, agent_run_projections.run_phase),
+                active_approval_id = COALESCE(#{activeApprovalId}, agent_run_projections.active_approval_id),
                 last_error_code = #{errorCode},
                 last_error_message = #{errorMessage},
-                latest_sequence = GREATEST(latest_sequence, #{sequence}),
+                latest_sequence = GREATEST(agent_run_projections.latest_sequence, #{sequence}),
                 updated_at = CURRENT_TIMESTAMP(3)
             """)
     int upsertRunState(@Param("runId") Long runId,
@@ -117,20 +115,20 @@ public interface AgentRunProjectionMapper {
             )
             VALUES(
                 #{runId}, #{toolCallId}, #{toolCode}, #{toolName}, #{status}, #{iteration},
-                #{argumentsPreviewJson}, #{outputPreview}, #{outputArtifactId},
+                #{argumentsPreviewJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{outputPreview}, #{outputArtifactId},
                 #{approvalId}, #{errorCode}, #{errorMessage}
             )
-            ON DUPLICATE KEY UPDATE
-                tool_code = VALUES(tool_code),
-                tool_name = VALUES(tool_name),
-                status = VALUES(status),
-                iteration = VALUES(iteration),
-                arguments_preview_json = VALUES(arguments_preview_json),
-                output_preview = VALUES(output_preview),
-                output_artifact_id = VALUES(output_artifact_id),
-                approval_id = VALUES(approval_id),
-                error_code = VALUES(error_code),
-                error_message = VALUES(error_message),
+            ON CONFLICT (run_id, tool_call_id) DO UPDATE SET
+                tool_code = EXCLUDED.tool_code,
+                tool_name = EXCLUDED.tool_name,
+                status = EXCLUDED.status,
+                iteration = EXCLUDED.iteration,
+                arguments_preview_json = EXCLUDED.arguments_preview_json,
+                output_preview = EXCLUDED.output_preview,
+                output_artifact_id = EXCLUDED.output_artifact_id,
+                approval_id = EXCLUDED.approval_id,
+                error_code = EXCLUDED.error_code,
+                error_message = EXCLUDED.error_message,
                 updated_at = CURRENT_TIMESTAMP(3)
             """)
     int upsertToolCall(@Param("runId") Long runId,
@@ -155,13 +153,13 @@ public interface AgentRunProjectionMapper {
                 #{runId}, #{todoId}, #{title}, #{status}, #{sortOrder},
                 #{blockedReason}, #{errorSummary}, #{completedSummary}
             )
-            ON DUPLICATE KEY UPDATE
-                title = VALUES(title),
-                status = VALUES(status),
-                sort_order = VALUES(sort_order),
-                blocked_reason = VALUES(blocked_reason),
-                error_summary = VALUES(error_summary),
-                completed_summary = VALUES(completed_summary),
+            ON CONFLICT (run_id, todo_id) DO UPDATE SET
+                title = EXCLUDED.title,
+                status = EXCLUDED.status,
+                sort_order = EXCLUDED.sort_order,
+                blocked_reason = EXCLUDED.blocked_reason,
+                error_summary = EXCLUDED.error_summary,
+                completed_summary = EXCLUDED.completed_summary,
                 updated_at = CURRENT_TIMESTAMP(3)
             """)
     int upsertTodo(@Param("runId") Long runId,

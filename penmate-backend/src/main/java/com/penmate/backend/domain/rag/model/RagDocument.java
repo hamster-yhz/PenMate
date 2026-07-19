@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.rag.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -31,9 +31,9 @@ public class RagDocument {
     /** 索引状态。 */
     private String indexStatus;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
 }
 

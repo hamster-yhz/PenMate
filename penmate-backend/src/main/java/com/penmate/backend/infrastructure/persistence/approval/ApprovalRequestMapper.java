@@ -21,7 +21,7 @@ public interface ApprovalRequestMapper {
             INSERT INTO agent_approval_requests
             (approval_request_id, project_id, run_id, approval_type, payload_json, risk_level, status, requested_by)
             VALUES
-            (#{approvalRequestId}, #{projectId}, #{runId}, #{approvalType}, #{payloadJson}, #{riskLevel}, 'pending', #{requestedBy})
+            (#{approvalRequestId}, #{projectId}, #{runId}, #{approvalType}, #{payloadJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{riskLevel}, 'pending', #{requestedBy})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(ApprovalRequest approvalRequest);

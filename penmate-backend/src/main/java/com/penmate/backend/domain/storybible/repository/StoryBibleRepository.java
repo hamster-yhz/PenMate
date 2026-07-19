@@ -14,7 +14,7 @@ import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.domain.storybible.model.StoryBibleTag;
 import com.penmate.backend.domain.storybible.model.StoryBibleViewPreference;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public interface StoryBibleRepository {
@@ -134,9 +134,9 @@ public interface StoryBibleRepository {
 
     List<StoryBibleChangeset> findChangesetsForNode(Long storyBibleId, Long nodeId, int limit);
 
-    List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, LocalDateTime cutoff, int retainCount);
+    List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, Instant cutoff, int retainCount);
 
-    List<StoryBible> findStoryBiblesWithChangesetsBefore(LocalDateTime cutoff);
+    List<StoryBible> findStoryBiblesWithChangesetsBefore(Instant cutoff);
 
     List<StoryBibleChangeItem> findChangeItemsByChangesetIds(List<Long> changesetIds);
 

@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Update;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Mapper
@@ -23,7 +23,7 @@ public interface AgentCheckpointMapper {
                 cold_archived_at, expires_at
             )
             VALUES(
-                #{checkpointId}, #{runId}, #{checkpointNo}, #{lastEventSeq}, #{stateJson}, #{stateSizeBytes},
+                #{checkpointId}, #{runId}, #{checkpointNo}, #{lastEventSeq}, #{stateJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{stateSizeBytes},
                 #{stateSchemaVersion}, #{stateSha256}, #{stateObjectKey}, #{storageTier},
                 #{coldArchivedAt}, #{expiresAt}
             )
@@ -50,9 +50,9 @@ public interface AgentCheckpointMapper {
             @Arg(column = "state_sha256", javaType = String.class),
             @Arg(column = "state_object_key", javaType = String.class),
             @Arg(column = "storage_tier", javaType = String.class),
-            @Arg(column = "cold_archived_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "expires_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "cold_archived_at", javaType = java.time.Instant.class),
+            @Arg(column = "expires_at", javaType = java.time.Instant.class),
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
     AgentCheckpoint findLatest(@Param("runId") Long runId);
 
@@ -76,9 +76,9 @@ public interface AgentCheckpointMapper {
             @Arg(column = "state_sha256", javaType = String.class),
             @Arg(column = "state_object_key", javaType = String.class),
             @Arg(column = "storage_tier", javaType = String.class),
-            @Arg(column = "cold_archived_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "expires_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "cold_archived_at", javaType = java.time.Instant.class),
+            @Arg(column = "expires_at", javaType = java.time.Instant.class),
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
     List<AgentCheckpoint> findLatestLimit(@Param("runId") Long runId, @Param("limit") int limit);
 
@@ -89,7 +89,7 @@ public interface AgentCheckpointMapper {
                   SELECT threshold.checkpoint_no FROM (
                       SELECT checkpoint_no FROM agent_checkpoints
                       WHERE run_id = #{runId}
-                      ORDER BY checkpoint_no DESC LIMIT #{keep}, 1
+                      ORDER BY checkpoint_no DESC LIMIT 1 OFFSET #{keep}
                   ) threshold
               )
             """)
@@ -118,16 +118,16 @@ public interface AgentCheckpointMapper {
             @Arg(column = "state_sha256", javaType = String.class),
             @Arg(column = "state_object_key", javaType = String.class),
             @Arg(column = "storage_tier", javaType = String.class),
-            @Arg(column = "cold_archived_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "expires_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "cold_archived_at", javaType = java.time.Instant.class),
+            @Arg(column = "expires_at", javaType = java.time.Instant.class),
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
-    List<AgentCheckpoint> findTerminalHotBefore(@Param("cutoff") LocalDateTime cutoff,
+    List<AgentCheckpoint> findTerminalHotBefore(@Param("cutoff") Instant cutoff,
                                                 @Param("limit") int limit);
 
     @Update("""
             UPDATE agent_checkpoints
-            SET state_json = #{stateJson}, state_object_key = #{stateObjectKey},
+            SET state_json = #{stateJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, state_object_key = #{stateObjectKey},
                 state_sha256 = #{stateSha256}, storage_tier = 'COLD',
                 cold_archived_at = #{archivedAt}, expires_at = #{expiresAt}
             WHERE checkpoint_id = #{checkpointId} AND storage_tier = 'HOT'
@@ -136,8 +136,8 @@ public interface AgentCheckpointMapper {
                  @Param("stateJson") String stateJson,
                  @Param("stateObjectKey") String stateObjectKey,
                  @Param("stateSha256") String stateSha256,
-                 @Param("archivedAt") LocalDateTime archivedAt,
-                 @Param("expiresAt") LocalDateTime expiresAt);
+                 @Param("archivedAt") Instant archivedAt,
+                 @Param("expiresAt") Instant expiresAt);
 
     @Select("""
             SELECT checkpoint_id, run_id, checkpoint_no, last_event_seq, state_json, state_size_bytes,
@@ -159,11 +159,11 @@ public interface AgentCheckpointMapper {
             @Arg(column = "state_sha256", javaType = String.class),
             @Arg(column = "state_object_key", javaType = String.class),
             @Arg(column = "storage_tier", javaType = String.class),
-            @Arg(column = "cold_archived_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "expires_at", javaType = java.time.LocalDateTime.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "cold_archived_at", javaType = java.time.Instant.class),
+            @Arg(column = "expires_at", javaType = java.time.Instant.class),
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
-    List<AgentCheckpoint> findExpiredCold(@Param("now") LocalDateTime now, @Param("limit") int limit);
+    List<AgentCheckpoint> findExpiredCold(@Param("now") Instant now, @Param("limit") int limit);
 
     @Delete("DELETE FROM agent_checkpoints WHERE checkpoint_id = #{checkpointId} AND storage_tier = 'COLD'")
     int deleteCold(@Param("checkpointId") Long checkpointId);

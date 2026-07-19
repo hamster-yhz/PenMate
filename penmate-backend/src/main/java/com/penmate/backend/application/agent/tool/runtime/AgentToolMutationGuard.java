@@ -7,7 +7,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Component
 public class AgentToolMutationGuard {
@@ -26,7 +26,7 @@ public class AgentToolMutationGuard {
 
     public void assertExecutable(ToolCallRequest request, boolean mutatesState) {
         if (request.runId() == null || request.executionToken() == null
-                || !runs.ownsExecutionToken(request.runId(), request.executionToken(), LocalDateTime.now())) {
+                || !runs.ownsExecutionToken(request.runId(), request.executionToken(), Instant.now())) {
             throw new Rejection("AGENT_RUN_EXECUTION_FENCED",
                     "Agent Run no longer owns the current execution token");
         }

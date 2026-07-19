@@ -15,9 +15,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -54,11 +56,11 @@ public class StoryBibleHistoryArchiveService {
 
     @Scheduled(cron = "${penmate.story-bible.history-archive-cron:0 30 3 * * ?}")
     public void archiveEligibleHistory() {
-        archiveEligibleHistory(LocalDateTime.now());
+        archiveEligibleHistory(Instant.now());
     }
 
-    public ArchiveSummary archiveEligibleHistory(LocalDateTime now) {
-        LocalDateTime cutoff = now.minusDays(HOT_RETENTION_DAYS);
+    public ArchiveSummary archiveEligibleHistory(Instant now) {
+        Instant cutoff = now.minus(HOT_RETENTION_DAYS, ChronoUnit.DAYS);
         int projectCount = 0;
         int changesetCount = 0;
         int archiveCount = 0;
@@ -76,7 +78,7 @@ public class StoryBibleHistoryArchiveService {
         return new ArchiveSummary(projectCount, archiveCount, changesetCount);
     }
 
-    ArchiveSummary archiveStoryBible(StoryBible storyBible, LocalDateTime cutoff) {
+    ArchiveSummary archiveStoryBible(StoryBible storyBible, Instant cutoff) {
         List<StoryBibleChangeset> eligible = repository.findChangesetsBefore(
                 storyBible.getStoryBibleId(), cutoff, HOT_RETENTION_COUNT);
         Map<YearMonth, List<StoryBibleChangeset>> byMonth = new TreeMap<>();
@@ -84,7 +86,9 @@ public class StoryBibleHistoryArchiveService {
             if (changeset.getCreatedAt() == null) {
                 throw new IllegalStateException("Story Bible changeset is missing createdAt");
             }
-            byMonth.computeIfAbsent(YearMonth.from(changeset.getCreatedAt()), ignored -> new ArrayList<>())
+            byMonth.computeIfAbsent(
+                            YearMonth.from(changeset.getCreatedAt().atZone(ZoneOffset.UTC)),
+                            ignored -> new ArrayList<>())
                     .add(changeset);
         }
 

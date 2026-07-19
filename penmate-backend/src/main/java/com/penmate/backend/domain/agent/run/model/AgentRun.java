@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 public record AgentRun(
@@ -15,17 +15,17 @@ public record AgentRun(
         Long contextEpochId,
         Long activeApprovalId,
         String leaseOwner,
-        LocalDateTime leaseUntil,
+        Instant leaseUntil,
         Long executionToken,
         Integer attemptCount,
-        LocalDateTime nextRetryAt,
+        Instant nextRetryAt,
         String lastErrorCode,
         String lastErrorMessage,
         Long latestEventSeq,
         Long latestCheckpointId,
         String traceId,
-        LocalDateTime startedAt,
-        LocalDateTime finishedAt
+        Instant startedAt,
+        Instant finishedAt
 ) {
 
     public AgentRun {
@@ -44,7 +44,7 @@ public record AgentRun(
     public AgentRun(Long runId, Long projectId, Long sessionId, Long turnId, Long ownerUserId,
                     String runStatus, String runPhase, Long contextEpochId, Long activeApprovalId,
                     Long latestEventSeq, Long latestCheckpointId, String traceId,
-                    LocalDateTime startedAt, LocalDateTime finishedAt) {
+                    Instant startedAt, Instant finishedAt) {
         this(runId, projectId, sessionId, turnId, ownerUserId, null, runStatus, runPhase, contextEpochId,
                 activeApprovalId, null, null, 0L, 0, null, null, null, latestEventSeq,
                 latestCheckpointId, traceId, startedAt, finishedAt);

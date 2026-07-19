@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.model.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -25,14 +25,14 @@ public class ModelUserApiKey {
     /** 是否默认密钥。 */
     private Boolean isDefault;
     /** 最近使用时间。 */
-    private LocalDateTime lastUsedAt;
+    private Instant lastUsedAt;
     /** 密钥状态。 */
     private String status;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
     /** 逻辑删除时间。 */
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 
 }

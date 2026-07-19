@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +73,7 @@ public class ToolCallExecutionService {
         String requestSha256 = requestSha256(request);
         AgentToolCallExecution candidate = AgentToolCallExecution.started(
                 ids.nextId(), request.runId(), request.toolCallId(), request.toolCode(), requestSha256,
-                request.executionToken(), LocalDateTime.now());
+                request.executionToken(), Instant.now());
 
         if (!executions.tryInsertStarted(candidate)) {
             return resolveExisting(request, requestSha256);
@@ -138,7 +138,7 @@ public class ToolCallExecutionService {
 
         executions.markFinished(existing.executionId(), existing.executionToken(),
                 AgentToolCallExecutionStatus.AMBIGUOUS, null, "TOOL_CALL_AMBIGUOUS",
-                "Previous execution lost ownership before recording an outcome", LocalDateTime.now());
+                "Previous execution lost ownership before recording an outcome", Instant.now());
         AgentToolCallExecution resolved = executions.find(request.runId(), request.toolCallId());
         if (resolved != null && (resolved.status() == AgentToolCallExecutionStatus.SUCCEEDED
                 || resolved.status() == AgentToolCallExecutionStatus.FAILED)) {
@@ -162,14 +162,14 @@ public class ToolCallExecutionService {
                            ToolCallResult result) {
         return executions.markFinished(execution.executionId(), execution.executionToken(), status,
                 json(result), truncate(result.errorCode(), 96), truncate(result.errorMessage(), 500),
-                LocalDateTime.now()) == 1;
+                Instant.now()) == 1;
     }
 
     private void markAmbiguous(AgentToolCallExecution execution, Exception failure) {
         String message = rootMessage(failure);
         executions.markFinished(execution.executionId(), execution.executionToken(),
                 AgentToolCallExecutionStatus.AMBIGUOUS, null, "TOOL_CALL_AMBIGUOUS",
-                truncate(message, 500), LocalDateTime.now());
+                truncate(message, 500), Instant.now());
         log.error("tool call outcome is ambiguous: runId={}, toolCallId={}, toolCode={}",
                 execution.runId(), execution.toolCallId(), execution.toolCode(), failure);
     }

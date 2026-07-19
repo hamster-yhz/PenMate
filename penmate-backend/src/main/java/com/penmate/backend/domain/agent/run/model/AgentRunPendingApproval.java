@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 public record AgentRunPendingApproval(
@@ -20,8 +20,8 @@ public record AgentRunPendingApproval(
         String pendingStatus,
         Long operatorId,
         String traceId,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
 
     public AgentRunPendingApproval {

@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.context.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record AgentContextEpoch(
         Long epochId,
@@ -21,15 +21,15 @@ public record AgentContextEpoch(
         String snapshotObjectKey,
         String snapshotHash,
         Long snapshotSizeBytes,
-        LocalDateTime createdAt,
-        LocalDateTime supersededAt
+        Instant createdAt,
+        Instant supersededAt
 ) {
     public AgentContextEpoch(Long epochId, Long sessionId, Integer epochNo, String fingerprint,
                              Long storyBibleRevision, Long manuscriptRevision, Long activeChapterId,
                              Long styleBindingRevision, String routingMode, Long routerModelConfigId,
                              Long routerModelConfigRevision, String promptBundleHash, String skillCatalogHash,
                              String toolCatalogHash, String snapshotObjectKey, String snapshotHash,
-                             Long snapshotSizeBytes, LocalDateTime createdAt, LocalDateTime supersededAt) {
+                             Long snapshotSizeBytes, Instant createdAt, Instant supersededAt) {
         this(epochId, sessionId, epochNo, fingerprint, storyBibleRevision, manuscriptRevision,
                 activeChapterId, 0L, styleBindingRevision, routingMode, routerModelConfigId,
                 routerModelConfigRevision, promptBundleHash, skillCatalogHash, toolCatalogHash,

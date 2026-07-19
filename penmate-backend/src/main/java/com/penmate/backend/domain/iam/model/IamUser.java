@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.iam.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -27,7 +27,7 @@ public class IamUser {
     /** Dirty Work Agent 当前模型配置 ID。 */
     private Long dirtyWorkAgentModelConfigId;
     /** 最近一次登录时间。 */
-    private LocalDateTime lastLoginAt;
+    private Instant lastLoginAt;
 
 }
 

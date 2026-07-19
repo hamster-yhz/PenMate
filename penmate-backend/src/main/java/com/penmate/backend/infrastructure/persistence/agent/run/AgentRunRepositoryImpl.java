@@ -7,7 +7,10 @@ import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +56,7 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
 
     @Override
     public Optional<AgentRunLease> tryAcquireLease(Long runId, String owner,
-                                                   LocalDateTime now, LocalDateTime leaseUntil) {
+                                                   Instant now, Instant leaseUntil) {
         AgentRun before = agentRunMapper.findRun(runId);
         if (before == null || agentRunMapper.acquireLease(runId, owner, now, leaseUntil) != 1) {
             return Optional.empty();
@@ -65,31 +68,31 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
                 longValue(row.get("executionToken")),
                 intValue(row.get("attemptCount")),
                 before.status(),
-                localDateTime(row.get("expiresAt"))
+                instant(row.get("expiresAt"))
         ));
     }
 
     @Override
-    public boolean renewLease(AgentRunLease lease, LocalDateTime leaseUntil) {
+    public boolean renewLease(AgentRunLease lease, Instant leaseUntil) {
         return agentRunMapper.renewLease(
                 lease.runId(), lease.owner(), lease.executionToken(), leaseUntil) == 1;
     }
 
     @Override
-    public boolean ownsLease(AgentRunLease lease, LocalDateTime now) {
+    public boolean ownsLease(AgentRunLease lease, Instant now) {
         return agentRunMapper.ownsLease(
                 lease.runId(), lease.owner(), lease.executionToken(), now) == 1;
     }
 
     @Override
-    public boolean ownsExecutionToken(Long runId, Long executionToken, LocalDateTime now) {
+    public boolean ownsExecutionToken(Long runId, Long executionToken, Instant now) {
         if (runId == null || executionToken == null || now == null) return false;
         return agentRunMapper.ownsExecutionToken(runId, executionToken, now) == 1;
     }
 
     @Override
     public boolean transitionWithLease(AgentRunLease lease, AgentRunStatus target, String phase,
-                                       Long activeApprovalId, LocalDateTime nextRetryAt,
+                                       Long activeApprovalId, Instant nextRetryAt,
                                        String errorCode, String errorMessage) {
         if (!AgentRunStatus.RUNNING.canTransitionTo(target)) {
             throw new IllegalArgumentException("Invalid RUNNING transition to " + target);
@@ -115,12 +118,12 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     }
 
     @Override
-    public int suspendExpiredRuns(LocalDateTime now, LocalDateTime nextRetryAt, int maxAttempts) {
+    public int suspendExpiredRuns(Instant now, Instant nextRetryAt, int maxAttempts) {
         return agentRunMapper.suspendExpiredRuns(now, nextRetryAt, maxAttempts);
     }
 
     @Override
-    public List<Long> findClaimableRunIds(LocalDateTime now, int limit) {
+    public List<Long> findClaimableRunIds(Instant now, int limit) {
         return agentRunMapper.findClaimableRunIds(now, limit);
     }
 
@@ -132,9 +135,14 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
         return value instanceof Number number ? number.intValue() : Integer.parseInt(String.valueOf(value));
     }
 
-    private LocalDateTime localDateTime(Object value) {
-        if (value instanceof LocalDateTime time) return time;
-        if (value instanceof java.sql.Timestamp timestamp) return timestamp.toLocalDateTime();
-        return LocalDateTime.parse(String.valueOf(value).replace(' ', 'T'));
+    private Instant instant(Object value) {
+        if (value instanceof Instant time) return time;
+        if (value instanceof java.sql.Timestamp timestamp) return timestamp.toInstant();
+        String normalized = String.valueOf(value).replace(' ', 'T');
+        try {
+            return Instant.parse(normalized);
+        } catch (DateTimeParseException ignored) {
+            return LocalDateTime.parse(normalized).toInstant(ZoneOffset.UTC);
+        }
     }
 }

@@ -5,7 +5,7 @@ import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.model.AgentRunLease;
 import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,16 +23,16 @@ public interface AgentRunRepository {
 
     AgentRun findSuccessor(Long predecessorRunId);
 
-    Optional<AgentRunLease> tryAcquireLease(Long runId, String owner, LocalDateTime now, LocalDateTime leaseUntil);
+    Optional<AgentRunLease> tryAcquireLease(Long runId, String owner, Instant now, Instant leaseUntil);
 
-    boolean renewLease(AgentRunLease lease, LocalDateTime leaseUntil);
+    boolean renewLease(AgentRunLease lease, Instant leaseUntil);
 
-    boolean ownsLease(AgentRunLease lease, LocalDateTime now);
+    boolean ownsLease(AgentRunLease lease, Instant now);
 
-    boolean ownsExecutionToken(Long runId, Long executionToken, LocalDateTime now);
+    boolean ownsExecutionToken(Long runId, Long executionToken, Instant now);
 
     boolean transitionWithLease(AgentRunLease lease, AgentRunStatus target, String phase,
-                                Long activeApprovalId, LocalDateTime nextRetryAt,
+                                Long activeApprovalId, Instant nextRetryAt,
                                 String errorCode, String errorMessage);
 
     boolean transitionExpected(Long runId, AgentRunStatus expected, AgentRunStatus target,
@@ -40,7 +40,7 @@ public interface AgentRunRepository {
 
     boolean cancelRecoverable(Long runId, String errorCode, String errorMessage);
 
-    int suspendExpiredRuns(LocalDateTime now, LocalDateTime nextRetryAt, int maxAttempts);
+    int suspendExpiredRuns(Instant now, Instant nextRetryAt, int maxAttempts);
 
-    List<Long> findClaimableRunIds(LocalDateTime now, int limit);
+    List<Long> findClaimableRunIds(Instant now, int limit);
 }

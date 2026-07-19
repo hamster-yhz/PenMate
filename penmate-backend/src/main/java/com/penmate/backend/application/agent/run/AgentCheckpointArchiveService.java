@@ -8,7 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 
 @Service
@@ -29,10 +30,10 @@ public class AgentCheckpointArchiveService {
         this.storage = storage;
     }
 
-    public ArchiveSummary archiveEligible(LocalDateTime now) {
+    public ArchiveSummary archiveEligible(Instant now) {
         int archived = 0;
         for (AgentCheckpoint checkpoint : checkpoints.findTerminalHotBefore(
-                now.minusDays(HOT_RETENTION_DAYS), BATCH_SIZE)) {
+                now.minus(HOT_RETENTION_DAYS, ChronoUnit.DAYS), BATCH_SIZE)) {
             try {
                 archive(checkpoint, now);
                 archived++;
@@ -44,7 +45,7 @@ public class AgentCheckpointArchiveService {
         return new ArchiveSummary(archived, 0);
     }
 
-    private void archive(AgentCheckpoint checkpoint, LocalDateTime now) {
+    private void archive(AgentCheckpoint checkpoint, Instant now) {
         byte[] state = loadHotState(checkpoint);
         String hash = sha256(state);
         verifyState(checkpoint, state, hash);
@@ -66,7 +67,7 @@ public class AgentCheckpointArchiveService {
 
         int affected = checkpoints.markCold(
                 checkpoint.checkpointId(), EXTERNAL_STATE_MARKER, objectKey, hash,
-                now, now.plusDays(COLD_RETENTION_DAYS));
+                now, now.plus(COLD_RETENTION_DAYS, ChronoUnit.DAYS));
         if (affected != 1) {
             throw new IllegalStateException("Failed to mark Agent checkpoint cold");
         }
@@ -74,7 +75,7 @@ public class AgentCheckpointArchiveService {
                 checkpoint.runId(), checkpoint.checkpointId(), objectKey, hash);
     }
 
-    public ArchiveSummary purgeExpired(LocalDateTime now) {
+    public ArchiveSummary purgeExpired(Instant now) {
         int purged = 0;
         for (AgentCheckpoint checkpoint : checkpoints.findExpiredCold(now, BATCH_SIZE)) {
             try {

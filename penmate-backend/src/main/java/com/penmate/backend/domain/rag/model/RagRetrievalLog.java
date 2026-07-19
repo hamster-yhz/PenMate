@@ -2,7 +2,7 @@ package com.penmate.backend.domain.rag.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -30,6 +30,6 @@ public class RagRetrievalLog {
     /** 全链路追踪 ID。 */
     private String traceId;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }
 

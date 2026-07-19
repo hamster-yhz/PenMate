@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.plugin.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -25,9 +25,9 @@ public class PluginCatalogItem {
     /** 最新版本号。 */
     private String latestVersion;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
 }
 

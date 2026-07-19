@@ -2,7 +2,7 @@ package com.penmate.backend.domain.agent.run.repository;
 
 import com.penmate.backend.domain.agent.run.model.AgentCheckpoint;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public interface AgentCheckpointRepository {
@@ -15,12 +15,12 @@ public interface AgentCheckpointRepository {
 
     int deleteOlderThanLatest(Long runId, int keep);
 
-    List<AgentCheckpoint> findTerminalHotBefore(LocalDateTime cutoff, int limit);
+    List<AgentCheckpoint> findTerminalHotBefore(Instant cutoff, int limit);
 
     int markCold(Long checkpointId, String stateJson, String stateObjectKey, String stateSha256,
-                 LocalDateTime archivedAt, LocalDateTime expiresAt);
+                 Instant archivedAt, Instant expiresAt);
 
-    List<AgentCheckpoint> findExpiredCold(LocalDateTime now, int limit);
+    List<AgentCheckpoint> findExpiredCold(Instant now, int limit);
 
     int deleteCold(Long checkpointId);
 }

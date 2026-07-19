@@ -20,7 +20,7 @@ public interface AgentRunPendingApprovalMapper {
             )
             VALUES(
                 #{pendingApprovalId}, #{approvalId}, #{runId}, #{projectId}, #{sessionId}, #{turnId},
-                #{toolCallId}, #{toolCode}, #{toolArgsJson}, #{toolContextJson}, #{resumePayloadJson},
+                #{toolCallId}, #{toolCode}, #{toolArgsJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{toolContextJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{resumePayloadJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 #{idempotencyKey}, #{pendingStatus}, #{operatorId}, #{traceId}
             )
             """)
@@ -135,7 +135,7 @@ public interface AgentRunPendingApprovalMapper {
                 updated_at AS updatedAt
             FROM agent_run_pending_approvals
             WHERE pending_status IN ('RESUMING', 'APPROVED')
-              AND updated_at < DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL #{timeoutMinutes} MINUTE)
+              AND updated_at < CURRENT_TIMESTAMP(3) - (#{timeoutMinutes} * INTERVAL '1 minute')
             ORDER BY updated_at ASC
             LIMIT #{limit}
             """)

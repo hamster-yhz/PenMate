@@ -6,7 +6,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Repository
@@ -47,7 +47,7 @@ public class AgentCheckpointRepositoryImpl implements AgentCheckpointRepository 
     }
 
     @Override
-    public List<AgentCheckpoint> findTerminalHotBefore(LocalDateTime cutoff, int limit) {
+    public List<AgentCheckpoint> findTerminalHotBefore(Instant cutoff, int limit) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             return session.getMapper(AgentCheckpointMapper.class).findTerminalHotBefore(cutoff, limit);
         }
@@ -55,7 +55,7 @@ public class AgentCheckpointRepositoryImpl implements AgentCheckpointRepository 
 
     @Override
     public int markCold(Long checkpointId, String stateJson, String stateObjectKey, String stateSha256,
-                        LocalDateTime archivedAt, LocalDateTime expiresAt) {
+                        Instant archivedAt, Instant expiresAt) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             return session.getMapper(AgentCheckpointMapper.class).markCold(
                     checkpointId, stateJson, stateObjectKey, stateSha256, archivedAt, expiresAt);
@@ -63,7 +63,7 @@ public class AgentCheckpointRepositoryImpl implements AgentCheckpointRepository 
     }
 
     @Override
-    public List<AgentCheckpoint> findExpiredCold(LocalDateTime now, int limit) {
+    public List<AgentCheckpoint> findExpiredCold(Instant now, int limit) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             return session.getMapper(AgentCheckpointMapper.class).findExpiredCold(now, limit);
         }

@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.Param;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +36,7 @@ public interface AgentRunMapper {
             )
             VALUES(
                 #{runId}, #{promptSnapshot}, #{taskType}, #{chapterId}, #{selectedText},
-                #{styleSnapshotJson}, #{modelSnapshotJson}, #{pluginBindingsJson}, #{inputHash}
+                #{styleSnapshotJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{modelSnapshotJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{pluginBindingsJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{inputHash}
             )
             """)
     int insertInput(AgentRunInput input);
@@ -172,8 +172,8 @@ public interface AgentRunMapper {
             """)
     int acquireLease(@Param("runId") Long runId,
                      @Param("owner") String owner,
-                     @Param("now") LocalDateTime now,
-                     @Param("leaseUntil") LocalDateTime leaseUntil);
+                     @Param("now") Instant now,
+                     @Param("leaseUntil") Instant leaseUntil);
 
     @Select("""
             SELECT run_id AS runId, lease_owner AS owner, execution_token AS executionToken,
@@ -192,7 +192,7 @@ public interface AgentRunMapper {
     int renewLease(@Param("runId") Long runId,
                    @Param("owner") String owner,
                    @Param("executionToken") Long executionToken,
-                   @Param("leaseUntil") LocalDateTime leaseUntil);
+                   @Param("leaseUntil") Instant leaseUntil);
 
     @Select("""
             SELECT COUNT(*)
@@ -204,7 +204,7 @@ public interface AgentRunMapper {
     int ownsLease(@Param("runId") Long runId,
                   @Param("owner") String owner,
                   @Param("executionToken") Long executionToken,
-                  @Param("now") LocalDateTime now);
+                  @Param("now") Instant now);
 
     @Select("""
             SELECT COUNT(*)
@@ -215,7 +215,7 @@ public interface AgentRunMapper {
             """)
     int ownsExecutionToken(@Param("runId") Long runId,
                            @Param("executionToken") Long executionToken,
-                           @Param("now") LocalDateTime now);
+                           @Param("now") Instant now);
 
     @Update("""
             UPDATE agent_runs
@@ -238,7 +238,7 @@ public interface AgentRunMapper {
                             @Param("targetStatus") String targetStatus,
                             @Param("phase") String phase,
                             @Param("activeApprovalId") Long activeApprovalId,
-                            @Param("nextRetryAt") LocalDateTime nextRetryAt,
+                            @Param("nextRetryAt") Instant nextRetryAt,
                             @Param("errorCode") String errorCode,
                             @Param("errorMessage") String errorMessage,
                             @Param("terminal") boolean terminal);
@@ -286,8 +286,8 @@ public interface AgentRunMapper {
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE run_status = 'RUNNING' AND lease_until < #{now}
             """)
-    int suspendExpiredRuns(@Param("now") LocalDateTime now,
-                           @Param("nextRetryAt") LocalDateTime nextRetryAt,
+    int suspendExpiredRuns(@Param("now") Instant now,
+                           @Param("nextRetryAt") Instant nextRetryAt,
                            @Param("maxAttempts") int maxAttempts);
 
     @Select("""
@@ -305,5 +305,5 @@ public interface AgentRunMapper {
             ORDER BY r.updated_at ASC
             LIMIT #{limit}
             """)
-    List<Long> findClaimableRunIds(@Param("now") LocalDateTime now, @Param("limit") int limit);
+    List<Long> findClaimableRunIds(@Param("now") Instant now, @Param("limit") int limit);
 }

@@ -8,7 +8,7 @@ public interface AgentArtifactMapper {
 
     @Insert("""
             INSERT INTO agent_artifacts(artifact_id, run_id, event_id, artifact_type, payload_json, size_bytes)
-            VALUES(#{artifactId}, #{runId}, #{eventId}, #{artifactType}, #{payloadJson}, #{sizeBytes})
+            VALUES(#{artifactId}, #{runId}, #{eventId}, #{artifactType}, #{payloadJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{sizeBytes})
             """)
     int insert(AgentArtifact artifact);
 
@@ -24,7 +24,7 @@ public interface AgentArtifactMapper {
             @Arg(column = "artifact_type", javaType = String.class),
             @Arg(column = "payload_json", javaType = String.class),
             @Arg(column = "size_bytes", javaType = Integer.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
     AgentArtifact findById(@Param("artifactId") Long artifactId);
 
@@ -42,7 +42,7 @@ public interface AgentArtifactMapper {
             @Arg(column = "artifact_type", javaType = String.class),
             @Arg(column = "payload_json", javaType = String.class),
             @Arg(column = "size_bytes", javaType = Integer.class),
-            @Arg(column = "created_at", javaType = java.time.LocalDateTime.class)
+            @Arg(column = "created_at", javaType = java.time.Instant.class)
     })
     AgentArtifact findLatest(@Param("runId") Long runId, @Param("artifactType") String artifactType);
 }

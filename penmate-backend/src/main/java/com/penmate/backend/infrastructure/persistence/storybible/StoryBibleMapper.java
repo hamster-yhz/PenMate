@@ -21,7 +21,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Mapper
@@ -55,7 +55,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, type_id, story_bible_id, type_code, semantic_family, display_name, icon_code,
-                   CAST(field_schema_json AS CHAR) AS field_schema_json, is_system AS `system`, sort_order,
+                   CAST(field_schema_json AS TEXT) AS field_schema_json, is_system AS "system", sort_order,
                    created_at, updated_at, archived_at
             FROM story_bible_node_types
             WHERE (story_bible_id = #{storyBibleId} OR story_bible_id IS NULL)
@@ -66,7 +66,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, type_id, story_bible_id, type_code, semantic_family, display_name, icon_code,
-                   CAST(field_schema_json AS CHAR) AS field_schema_json, is_system AS `system`, sort_order,
+                   CAST(field_schema_json AS TEXT) AS field_schema_json, is_system AS "system", sort_order,
                    created_at, updated_at, archived_at
             FROM story_bible_node_types
             WHERE type_id = #{typeId}
@@ -82,7 +82,7 @@ public interface StoryBibleMapper {
                 field_schema_json, is_system, sort_order
             ) VALUES (
                 #{typeId}, #{storyBibleId}, #{typeCode}, #{semanticFamily}, #{displayName}, #{iconCode},
-                #{fieldSchemaJson}, #{system}, #{sortOrder}
+                #{fieldSchemaJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{system}, #{sortOrder}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -90,7 +90,7 @@ public interface StoryBibleMapper {
 
     @Update("""
             UPDATE story_bible_node_types
-            SET display_name = #{displayName}, icon_code = #{iconCode}, field_schema_json = #{fieldSchemaJson},
+            SET display_name = #{displayName}, icon_code = #{iconCode}, field_schema_json = #{fieldSchemaJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 sort_order = #{sortOrder}
             WHERE story_bible_id = #{storyBibleId} AND type_id = #{typeId} AND archived_at IS NULL
             """)
@@ -105,7 +105,7 @@ public interface StoryBibleMapper {
     @Select("""
             <script>
             SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
-                   CAST(attributes_json AS CHAR) AS attributes_json, inclusion_policy, canon_status, revision,
+                   CAST(attributes_json AS TEXT) AS attributes_json, inclusion_policy, canon_status, revision,
                    created_by, updated_by, created_at, updated_at, archived_at, deleted_at
             FROM story_bible_nodes
             WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL
@@ -127,7 +127,7 @@ public interface StoryBibleMapper {
     @Select("""
             <script>
             SELECT n.id, n.node_id, n.story_bible_id, n.type_id, n.title, n.summary, n.body_markdown,
-                   CAST(n.attributes_json AS CHAR) AS attributes_json, n.inclusion_policy, n.canon_status, n.revision,
+                   CAST(n.attributes_json AS TEXT) AS attributes_json, n.inclusion_policy, n.canon_status, n.revision,
                    n.created_by, n.updated_by, n.created_at, n.updated_at, n.archived_at, n.deleted_at
             FROM story_bible_nodes n
             WHERE n.story_bible_id = #{storyBibleId} AND n.deleted_at IS NULL
@@ -174,7 +174,7 @@ public interface StoryBibleMapper {
     @Select("""
             <script>
             SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
-                   CAST(attributes_json AS CHAR) AS attributes_json, inclusion_policy, canon_status, revision,
+                   CAST(attributes_json AS TEXT) AS attributes_json, inclusion_policy, canon_status, revision,
                    created_by, updated_by, created_at, updated_at, archived_at, deleted_at
             FROM story_bible_nodes
             WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL AND canon_status = 'CANON'
@@ -194,7 +194,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
-                   CAST(attributes_json AS CHAR) AS attributes_json, inclusion_policy, canon_status, revision,
+                   CAST(attributes_json AS TEXT) AS attributes_json, inclusion_policy, canon_status, revision,
                    created_by, updated_by, created_at, updated_at, archived_at, deleted_at
             FROM story_bible_nodes
             WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL
@@ -206,7 +206,7 @@ public interface StoryBibleMapper {
     @Select("""
             <script>
             SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
-                   CAST(attributes_json AS CHAR) AS attributes_json, inclusion_policy, canon_status, revision,
+                   CAST(attributes_json AS TEXT) AS attributes_json, inclusion_policy, canon_status, revision,
                    created_by, updated_by, created_at, updated_at, archived_at, deleted_at
             FROM story_bible_nodes
             WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL AND node_id IN
@@ -219,7 +219,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
-                   CAST(attributes_json AS CHAR) AS attributes_json, inclusion_policy, canon_status, revision,
+                   CAST(attributes_json AS TEXT) AS attributes_json, inclusion_policy, canon_status, revision,
                    created_by, updated_by, created_at, updated_at, archived_at, deleted_at
             FROM story_bible_nodes
             WHERE story_bible_id = #{storyBibleId} AND node_id = #{nodeId} AND deleted_at IS NULL
@@ -232,7 +232,7 @@ public interface StoryBibleMapper {
                 node_id, story_bible_id, type_id, title, summary, body_markdown, attributes_json,
                 inclusion_policy, canon_status, revision, created_by, updated_by
             ) VALUES (
-                #{nodeId}, #{storyBibleId}, #{typeId}, #{title}, #{summary}, #{bodyMarkdown}, #{attributesJson},
+                #{nodeId}, #{storyBibleId}, #{typeId}, #{title}, #{summary}, #{bodyMarkdown}, #{attributesJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 #{inclusionPolicy}, #{canonStatus}, #{revision}, #{createdBy}, #{updatedBy}
             )
             """)
@@ -242,7 +242,7 @@ public interface StoryBibleMapper {
     @Update("""
             UPDATE story_bible_nodes
             SET type_id = #{node.typeId}, title = #{node.title}, summary = #{node.summary},
-                body_markdown = #{node.bodyMarkdown}, attributes_json = #{node.attributesJson},
+                body_markdown = #{node.bodyMarkdown}, attributes_json = #{node.attributesJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 inclusion_policy = #{node.inclusionPolicy}, canon_status = #{node.canonStatus},
                 revision = revision + 1, updated_by = #{node.updatedBy},
                 archived_at = CASE WHEN #{node.canonStatus} = 'ARCHIVED' THEN CURRENT_TIMESTAMP(3) ELSE NULL END
@@ -293,8 +293,9 @@ public interface StoryBibleMapper {
 
     @Insert("""
             INSERT INTO story_bible_aliases(alias_id, story_bible_id, node_id, alias, normalized_alias)
-            VALUES(#{aliasId}, #{storyBibleId}, #{nodeId}, #{alias}, #{normalizedAlias}) AS incoming
-            ON DUPLICATE KEY UPDATE alias = incoming.alias, deleted_at = NULL
+            VALUES(#{aliasId}, #{storyBibleId}, #{nodeId}, #{alias}, #{normalizedAlias})
+            ON CONFLICT (story_bible_id, normalized_alias, node_id) DO UPDATE
+            SET alias = EXCLUDED.alias, deleted_at = NULL
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertAlias(StoryBibleAlias alias);
@@ -434,7 +435,7 @@ public interface StoryBibleMapper {
     @Select("""
             <script>
             SELECT id, relation_id, story_bible_id, source_node_id, relation_type, target_node_id, description,
-                   CAST(attributes_json AS CHAR) AS attributes_json, revision, created_by, updated_by,
+                   CAST(attributes_json AS TEXT) AS attributes_json, revision, created_by, updated_by,
                    created_at, updated_at, deleted_at
             FROM story_bible_relations
             WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL
@@ -452,7 +453,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, relation_id, story_bible_id, source_node_id, relation_type, target_node_id, description,
-                   CAST(attributes_json AS CHAR) AS attributes_json, revision, created_by, updated_by,
+                   CAST(attributes_json AS TEXT) AS attributes_json, revision, created_by, updated_by,
                    created_at, updated_at, deleted_at
             FROM story_bible_relations
             WHERE story_bible_id = #{storyBibleId} AND relation_id = #{relationId} AND deleted_at IS NULL
@@ -466,7 +467,7 @@ public interface StoryBibleMapper {
                 attributes_json, revision, created_by, updated_by
             ) VALUES (
                 #{relationId}, #{storyBibleId}, #{sourceNodeId}, #{relationType}, #{targetNodeId}, #{description},
-                #{attributesJson}, #{revision}, #{createdBy}, #{updatedBy}
+                #{attributesJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{revision}, #{createdBy}, #{updatedBy}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -475,7 +476,7 @@ public interface StoryBibleMapper {
     @Update("""
             UPDATE story_bible_relations
             SET relation_type = #{relation.relationType}, target_node_id = #{relation.targetNodeId},
-                description = #{relation.description}, attributes_json = #{relation.attributesJson},
+                description = #{relation.description}, attributes_json = #{relation.attributesJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 revision = revision + 1, updated_by = #{relation.updatedBy}
             WHERE story_bible_id = #{relation.storyBibleId} AND relation_id = #{relation.relationId}
               AND revision = #{expectedRevision} AND deleted_at IS NULL
@@ -496,7 +497,7 @@ public interface StoryBibleMapper {
     @Select("""
             <script>
             SELECT id, progression_id, story_bible_id, node_id, anchor_chapter_id, end_chapter_id,
-                   story_event_node_id, CAST(patch_json AS CHAR) AS patch_json, summary, revision,
+                   story_event_node_id, CAST(patch_json AS TEXT) AS patch_json, summary, revision,
                    created_by, updated_by, created_at, updated_at, deleted_at
             FROM story_bible_progressions
             WHERE story_bible_id = #{storyBibleId} AND deleted_at IS NULL
@@ -512,7 +513,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, progression_id, story_bible_id, node_id, anchor_chapter_id, end_chapter_id,
-                   story_event_node_id, CAST(patch_json AS CHAR) AS patch_json, summary, revision,
+                   story_event_node_id, CAST(patch_json AS TEXT) AS patch_json, summary, revision,
                    created_by, updated_by, created_at, updated_at, deleted_at
             FROM story_bible_progressions
             WHERE story_bible_id = #{storyBibleId} AND progression_id = #{progressionId} AND deleted_at IS NULL
@@ -527,7 +528,7 @@ public interface StoryBibleMapper {
                 story_event_node_id, patch_json, summary, revision, created_by, updated_by
             ) VALUES (
                 #{progressionId}, #{storyBibleId}, #{nodeId}, #{anchorChapterId}, #{endChapterId},
-                #{storyEventNodeId}, #{patchJson}, #{summary}, #{revision}, #{createdBy}, #{updatedBy}
+                #{storyEventNodeId}, #{patchJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{summary}, #{revision}, #{createdBy}, #{updatedBy}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -536,7 +537,7 @@ public interface StoryBibleMapper {
     @Update("""
             UPDATE story_bible_progressions
             SET anchor_chapter_id = #{progression.anchorChapterId}, end_chapter_id = #{progression.endChapterId},
-                story_event_node_id = #{progression.storyEventNodeId}, patch_json = #{progression.patchJson},
+                story_event_node_id = #{progression.storyEventNodeId}, patch_json = #{progression.patchJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 summary = #{progression.summary}, revision = revision + 1, updated_by = #{progression.updatedBy}
             WHERE story_bible_id = #{progression.storyBibleId} AND progression_id = #{progression.progressionId}
               AND revision = #{expectedRevision} AND deleted_at IS NULL
@@ -566,9 +567,13 @@ public interface StoryBibleMapper {
                 story_bible_id, view_code, display_name, hidden, sort_order, updated_by
             ) VALUES (
                 #{storyBibleId}, #{viewCode}, #{displayName}, #{hidden}, #{sortOrder}, #{updatedBy}
-            ) AS new
-            ON DUPLICATE KEY UPDATE display_name = new.display_name, hidden = new.hidden,
-                                    sort_order = new.sort_order, updated_by = new.updated_by
+            )
+            ON CONFLICT (story_bible_id, view_code) DO UPDATE
+            SET display_name = EXCLUDED.display_name,
+                hidden = EXCLUDED.hidden,
+                sort_order = EXCLUDED.sort_order,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = CURRENT_TIMESTAMP(3)
             """)
     int upsertViewPreference(StoryBibleViewPreference preference);
 
@@ -588,7 +593,7 @@ public interface StoryBibleMapper {
                 field_path, before_json, after_json
             ) VALUES (
                 #{changeItemId}, #{changesetId}, #{entityType}, #{entityId}, #{operation},
-                #{fieldPath}, #{beforeJson}, #{afterJson}
+                #{fieldPath}, #{beforeJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{afterJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -651,7 +656,7 @@ public interface StoryBibleMapper {
             ORDER BY created_at, id
             """)
     List<StoryBibleChangeset> findChangesetsBefore(@Param("storyBibleId") Long storyBibleId,
-                                                   @Param("cutoff") LocalDateTime cutoff,
+                                                   @Param("cutoff") Instant cutoff,
                                                    @Param("retainCount") int retainCount);
 
     @Select("""
@@ -662,13 +667,13 @@ public interface StoryBibleMapper {
             WHERE sb.deleted_at IS NULL AND sc.created_at < #{cutoff}
             ORDER BY sb.id
             """)
-    List<StoryBible> findStoryBiblesWithChangesetsBefore(@Param("cutoff") LocalDateTime cutoff);
+    List<StoryBible> findStoryBiblesWithChangesetsBefore(@Param("cutoff") Instant cutoff);
 
     @Select("""
             <script>
             SELECT id, change_item_id, changeset_id, entity_type, entity_id, operation,
-                   field_path, CAST(before_json AS CHAR) AS before_json,
-                   CAST(after_json AS CHAR) AS after_json, created_at
+                   field_path, CAST(before_json AS TEXT) AS before_json,
+                   CAST(after_json AS TEXT) AS after_json, created_at
             FROM story_bible_change_items
             WHERE changeset_id IN
               <foreach collection="changesetIds" item="id" open="(" separator="," close=")">#{id}</foreach>

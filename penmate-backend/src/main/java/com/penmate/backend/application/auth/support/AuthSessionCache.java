@@ -31,9 +31,9 @@ public class AuthSessionCache {
         Objects.requireNonNull(bundle.accessExpiresAt(), "accessExpiresAt must not be null");
         String json = toJson(payload);
         stringRedisTemplate.opsForValue().set(ACCESS_PREFIX + bundle.accessJti().trim(), json,
-                Duration.between(java.time.LocalDateTime.now(), bundle.accessExpiresAt()));
+                Duration.between(java.time.Instant.now(), bundle.accessExpiresAt()));
         stringRedisTemplate.opsForValue().set(REFRESH_PREFIX + bundle.refreshJti().trim(), json,
-                Duration.between(java.time.LocalDateTime.now(), bundle.refreshExpiresAt()));
+                Duration.between(java.time.Instant.now(), bundle.refreshExpiresAt()));
     }
 
     public AuthUserSessionPayload getByAccessJti(String accessJti) {

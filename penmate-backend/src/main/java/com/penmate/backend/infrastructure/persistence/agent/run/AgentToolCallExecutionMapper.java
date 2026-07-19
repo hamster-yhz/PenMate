@@ -3,7 +3,7 @@ package com.penmate.backend.infrastructure.persistence.agent.run;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecution;
 import org.apache.ibatis.annotations.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Mapper
 public interface AgentToolCallExecutionMapper {
@@ -26,8 +26,8 @@ public interface AgentToolCallExecutionMapper {
             @Arg(column = "result_json", javaType = String.class),
             @Arg(column = "error_code", javaType = String.class),
             @Arg(column = "error_message", javaType = String.class),
-            @Arg(column = "started_at", javaType = LocalDateTime.class),
-            @Arg(column = "finished_at", javaType = LocalDateTime.class)
+            @Arg(column = "started_at", javaType = Instant.class),
+            @Arg(column = "finished_at", javaType = Instant.class)
     })
     AgentToolCallExecution find(@Param("runId") Long runId, @Param("toolCallId") String toolCallId);
 
@@ -44,7 +44,7 @@ public interface AgentToolCallExecutionMapper {
 
     @Update("""
             UPDATE agent_tool_call_executions
-            SET execution_status = #{status}, result_json = #{resultJson},
+            SET execution_status = #{status}, result_json = #{resultJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 error_code = #{errorCode}, error_message = #{errorMessage},
                 finished_at = #{finishedAt}, updated_at = CURRENT_TIMESTAMP(3)
             WHERE execution_id = #{executionId}
@@ -57,5 +57,5 @@ public interface AgentToolCallExecutionMapper {
                      @Param("resultJson") String resultJson,
                      @Param("errorCode") String errorCode,
                      @Param("errorMessage") String errorMessage,
-                     @Param("finishedAt") LocalDateTime finishedAt);
+                     @Param("finishedAt") Instant finishedAt);
 }

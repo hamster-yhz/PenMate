@@ -14,6 +14,7 @@ import com.penmate.backend.domain.iam.repository.IamGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +33,7 @@ public class AuthApplicationService {
     private final IamGateway iamGateway;
     private final AuthTokenService authTokenService;
     private final AuthSessionCache authSessionCache;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 处理邮箱密码登录。
@@ -48,7 +50,7 @@ public class AuthApplicationService {
             log.warn("登录失败: email={}, reason=invalid_user_or_status", command.email());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }
-        if (!command.password().equals(user.getPasswordHash())) {
+        if (!passwordEncoder.matches(command.password(), user.getPasswordHash())) {
             log.warn("登录失败: userId={}, reason=invalid_password", user.getId());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }

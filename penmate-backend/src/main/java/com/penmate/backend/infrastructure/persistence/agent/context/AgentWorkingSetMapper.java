@@ -21,12 +21,20 @@ public interface AgentWorkingSetMapper {
 
     @Insert("""
             INSERT INTO agent_session_working_set(session_id, node_id, activation_score, last_used_turn_id, use_count, pinned)
-            VALUES(#{sessionId}, #{nodeId}, #{score}, #{turnId}, 1, 0) AS incoming
-            ON DUPLICATE KEY UPDATE
-              activation_score = IF(last_used_turn_id = incoming.last_used_turn_id,
-                                    activation_score, activation_score + incoming.activation_score),
-              use_count = IF(last_used_turn_id = incoming.last_used_turn_id, use_count, use_count + 1),
-              last_used_turn_id = incoming.last_used_turn_id
+            VALUES(#{sessionId}, #{nodeId}, #{score}, #{turnId}, 1, FALSE)
+            ON CONFLICT (session_id, node_id) DO UPDATE SET
+              activation_score = CASE
+                  WHEN agent_session_working_set.last_used_turn_id = EXCLUDED.last_used_turn_id
+                  THEN agent_session_working_set.activation_score
+                  ELSE agent_session_working_set.activation_score + EXCLUDED.activation_score
+              END,
+              use_count = CASE
+                  WHEN agent_session_working_set.last_used_turn_id = EXCLUDED.last_used_turn_id
+                  THEN agent_session_working_set.use_count
+                  ELSE agent_session_working_set.use_count + 1
+              END,
+              last_used_turn_id = EXCLUDED.last_used_turn_id,
+              updated_at = CURRENT_TIMESTAMP(3)
             """)
     int promote(@Param("sessionId") Long sessionId, @Param("nodeId") Long nodeId,
                 @Param("score") BigDecimal score, @Param("turnId") Long turnId);
@@ -39,10 +47,11 @@ public interface AgentWorkingSetMapper {
                   @Param("pinned") boolean pinned);
 
     @Delete("""
-            DELETE ws FROM agent_session_working_set ws
-            JOIN agent_turns used_turn ON used_turn.turn_id = ws.last_used_turn_id
-            JOIN agent_turns current_turn ON current_turn.turn_id = #{currentTurnId}
-            WHERE ws.session_id = #{sessionId} AND ws.pinned = 0
+            DELETE FROM agent_session_working_set ws
+            USING agent_turns used_turn, agent_turns current_turn
+            WHERE ws.session_id = #{sessionId} AND ws.pinned = FALSE
+              AND used_turn.turn_id = ws.last_used_turn_id
+              AND current_turn.turn_id = #{currentTurnId}
               AND current_turn.session_id = ws.session_id
               AND current_turn.turn_seq - used_turn.turn_seq >= #{retentionTurns}
             """)
@@ -54,9 +63,9 @@ public interface AgentWorkingSetMapper {
             DELETE FROM agent_session_working_set WHERE id IN (
               SELECT id FROM (
                 SELECT id FROM agent_session_working_set
-                WHERE session_id = #{sessionId} AND pinned = 0
+                WHERE session_id = #{sessionId} AND pinned = FALSE
                 ORDER BY activation_score DESC, updated_at DESC, id DESC
-                LIMIT 18446744073709551615 OFFSET #{automaticCap}
+                OFFSET #{automaticCap}
               ) overflow_rows
             )
             </script>

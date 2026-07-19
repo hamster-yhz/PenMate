@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Service
 @Slf4j
@@ -29,7 +29,7 @@ public class AgentRunReconciler {
 
     @Scheduled(fixedDelayString = "${penmate.agent.reconcile-delay:PT30S}")
     public void reconcile() {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         int expired = runs.suspendExpiredRuns(now, now.plusSeconds(5), AgentRunLeaseService.MAX_ATTEMPTS);
         if (expired > 0) log.warn("agent.run.leases.expired: count={}", expired);
 

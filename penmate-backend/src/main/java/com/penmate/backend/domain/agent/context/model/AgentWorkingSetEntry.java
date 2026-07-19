@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.agent.context.model;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record AgentWorkingSetEntry(
         Long sessionId,
@@ -10,6 +10,6 @@ public record AgentWorkingSetEntry(
         Long lastUsedTurnId,
         Integer useCount,
         Boolean pinned,
-        LocalDateTime updatedAt
+        Instant updatedAt
 ) {
 }

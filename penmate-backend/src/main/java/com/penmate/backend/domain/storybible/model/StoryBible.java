@@ -2,7 +2,7 @@ package com.penmate.backend.domain.storybible.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Story Bible 聚合根。
@@ -24,9 +24,9 @@ public class StoryBible {
     /** 当前激活版本号。 */
     private Long contentRevision;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
     /** 逻辑删除时间。 */
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 }

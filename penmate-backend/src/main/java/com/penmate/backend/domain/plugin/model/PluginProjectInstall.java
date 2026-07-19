@@ -3,7 +3,7 @@ package com.penmate.backend.domain.plugin.model;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -35,9 +35,9 @@ public class PluginProjectInstall {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long installedBy;
     /** 安装时间。 */
-    private LocalDateTime installedAt;
+    private Instant installedAt;
     /** 最近更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
 }
 

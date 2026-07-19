@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 
@@ -36,9 +36,9 @@ public class AuthTokenService {
     }
 
     public AuthTokenBundle issueTokens(AuthUserSessionPayload payload) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime accessExpiresAt = now.plusMinutes(accessTokenExpireMinutes);
-        LocalDateTime refreshExpiresAt = now.plusDays(refreshTokenExpireDays);
+        Instant now = Instant.now();
+        Instant accessExpiresAt = now.plus(accessTokenExpireMinutes, ChronoUnit.MINUTES);
+        Instant refreshExpiresAt = now.plus(refreshTokenExpireDays, ChronoUnit.DAYS);
         String accessJti = UUID.randomUUID().toString();
         String refreshJti = UUID.randomUUID().toString();
 
@@ -82,9 +82,9 @@ public class AuthTokenService {
         }
     }
 
-    private String buildToken(Long userId, String jti, String tokenType, LocalDateTime expiresAt) {
+    private String buildToken(Long userId, String jti, String tokenType, Instant expiresAt) {
         Date now = new Date();
-        Date exp = Date.from(expiresAt.toInstant(ZoneOffset.UTC));
+        Date exp = Date.from(expiresAt);
         return Jwts.builder()
                 .id(jti)
                 .issuer(issuer)

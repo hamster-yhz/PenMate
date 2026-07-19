@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 public record AgentRunLease(
@@ -9,7 +9,7 @@ public record AgentRunLease(
         Long executionToken,
         int attemptCount,
         AgentRunStatus acquiredFrom,
-        LocalDateTime expiresAt
+        Instant expiresAt
 ) {
     public AgentRunLease {
         runId = Objects.requireNonNull(runId, "runId must not be null");

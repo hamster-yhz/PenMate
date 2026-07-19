@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,7 +57,7 @@ public class TodoCrudApplicationService {
         sessionTodo.setTodoStatus(normalize(candidate == null ? null : candidate.getTodoStatus()));
         validateTodo(sessionTodo);
         if ("DONE".equals(sessionTodo.getTodoStatus())) {
-            sessionTodo.setCompletedAt(LocalDateTime.now());
+            sessionTodo.setCompletedAt(Instant.now());
         }
         try {
             int affected = sessionTodoRepository.insert(sessionTodo);
@@ -132,7 +132,7 @@ public class TodoCrudApplicationService {
         existing.setSourceType(normalize(candidate == null ? null : candidate.getSourceType()));
         existing.setTodoStatus(normalize(candidate == null ? null : candidate.getTodoStatus()));
         validateTodo(existing);
-        existing.setCompletedAt("DONE".equals(existing.getTodoStatus()) ? LocalDateTime.now() : null);
+        existing.setCompletedAt("DONE".equals(existing.getTodoStatus()) ? Instant.now() : null);
         try {
             int affected = sessionTodoRepository.update(existing);
             if (affected != 1) {

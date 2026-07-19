@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record AgentEventArchive(
         Long archiveId,
@@ -12,9 +12,9 @@ public record AgentEventArchive(
         Long sizeBytes,
         String sha256,
         String archiveStatus,
-        LocalDateTime verifiedAt,
-        LocalDateTime expiresAt,
-        LocalDateTime createdAt
+        Instant verifiedAt,
+        Instant expiresAt,
+        Instant createdAt
 ) {
     public boolean verified() {
         return "VERIFIED".equals(archiveStatus);

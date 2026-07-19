@@ -29,8 +29,10 @@ public interface OpsMapper {
     @Select("""
             SELECT id, job_id, job_type, biz_key, status, error_msg, started_at, finished_at, created_at, updated_at
             FROM ops_async_jobs
-            WHERE (#{bizKey} IS NULL OR #{bizKey} = '' OR biz_key = #{bizKey})
-              AND (#{jobType} IS NULL OR #{jobType} = '' OR job_type = #{jobType})
+            WHERE (#{bizKey,jdbcType=VARCHAR} IS NULL OR #{bizKey,jdbcType=VARCHAR} = ''
+                   OR biz_key = #{bizKey,jdbcType=VARCHAR})
+              AND (#{jobType,jdbcType=VARCHAR} IS NULL OR #{jobType,jdbcType=VARCHAR} = ''
+                   OR job_type = #{jobType,jdbcType=VARCHAR})
             ORDER BY id DESC
             LIMIT 100
             """)
@@ -59,7 +61,7 @@ public interface OpsMapper {
 
     @Insert("""
             INSERT INTO ops_migrations(migration_id, migration_type, status, progress_pct, summary_json, error_msg, started_at, finished_at)
-            VALUES (#{migrationId}, #{migrationType}, #{status}, #{progressPct}, #{summaryJson}, #{errorMsg}, #{startedAt}, #{finishedAt})
+            VALUES (#{migrationId}, #{migrationType}, #{status}, #{progressPct}, #{summaryJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{errorMsg}, #{startedAt}, #{finishedAt})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertMigration(OpsMigrationTask task);
@@ -76,7 +78,7 @@ public interface OpsMapper {
             UPDATE ops_migrations
             SET status = #{status},
                 progress_pct = #{progressPct},
-                summary_json = #{summaryJson},
+                summary_json = #{summaryJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
                 error_msg = #{errorMsg},
                 finished_at = CASE WHEN #{status} IN ('done', 'failed') THEN CURRENT_TIMESTAMP(3) ELSE finished_at END,
                 updated_at = CURRENT_TIMESTAMP(3)

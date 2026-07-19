@@ -3,7 +3,7 @@ package com.penmate.backend.domain.novel.model;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -19,7 +19,7 @@ public class NovelMember {
     /** 成员角色。 */
     private String memberRole;
     /** 加入项目时间。 */
-    private LocalDateTime joinedAt;
+    private Instant joinedAt;
 
 }
 

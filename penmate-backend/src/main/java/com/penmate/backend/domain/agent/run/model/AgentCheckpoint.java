@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 public record AgentCheckpoint(
@@ -14,9 +14,9 @@ public record AgentCheckpoint(
         String stateSha256,
         String stateObjectKey,
         String storageTier,
-        LocalDateTime coldArchivedAt,
-        LocalDateTime expiresAt,
-        LocalDateTime createdAt
+        Instant coldArchivedAt,
+        Instant expiresAt,
+        Instant createdAt
 ) {
 
     public AgentCheckpoint {
@@ -38,13 +38,13 @@ public record AgentCheckpoint(
 
     public AgentCheckpoint(Long checkpointId, Long runId, Long checkpointNo, Long lastEventSeq,
                            String stateJson, Integer stateSizeBytes, Integer stateSchemaVersion,
-                           String stateSha256, String stateObjectKey, LocalDateTime createdAt) {
+                           String stateSha256, String stateObjectKey, Instant createdAt) {
         this(checkpointId, runId, checkpointNo, lastEventSeq, stateJson, stateSizeBytes,
                 stateSchemaVersion, stateSha256, stateObjectKey, "HOT", null, null, createdAt);
     }
 
     public AgentCheckpoint(Long checkpointId, Long runId, Long checkpointNo, Long lastEventSeq,
-                           String stateJson, Integer stateSizeBytes, LocalDateTime createdAt) {
+                           String stateJson, Integer stateSizeBytes, Instant createdAt) {
         this(checkpointId, runId, checkpointNo, lastEventSeq, stateJson, stateSizeBytes,
                 2, null, null, "HOT", null, null, createdAt);
     }

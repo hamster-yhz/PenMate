@@ -75,7 +75,7 @@ public interface AgentMapper {
                    role,
                    message_kind AS user_message_type,
                    content_markdown AS content_md,
-                   CAST(render_blocks_json AS CHAR) AS attachments_json,
+                   CAST(render_blocks_json AS TEXT) AS attachments_json,
                    NULL AS tool_calls_json,
                    seq_no,
                    created_at
@@ -92,7 +92,7 @@ public interface AgentMapper {
                    m.role,
                    m.message_kind AS user_message_type,
                    m.content_markdown AS content_md,
-                   CAST(m.render_blocks_json AS CHAR) AS attachments_json,
+                   CAST(m.render_blocks_json AS TEXT) AS attachments_json,
                    NULL AS tool_calls_json,
                    m.seq_no,
                    m.created_at
@@ -123,7 +123,7 @@ public interface AgentMapper {
             ) VALUES (
                 #{messageId}, #{conversationId}, NULL, #{role},
                 COALESCE(#{userMessageType}, 'CHAT'), #{contentMd},
-                #{attachmentsJson}, NULL, NULL, 'FINAL', #{seqNo}
+                #{attachmentsJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, NULL, NULL, 'FINAL', #{seqNo}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")

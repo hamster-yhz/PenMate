@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.lang.reflect.Field;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -240,16 +240,14 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
         return value == null ? null : String.valueOf(value);
     }
 
-    private LocalDateTime localDateTime(Object value) {
+    private Instant localDateTime(Object value) {
         if (value == null) {
             return null;
         }
-        if (value instanceof LocalDateTime localDateTime) {
+        if (value instanceof Instant localDateTime) {
             return localDateTime;
         }
-        if (value instanceof Timestamp timestamp) {
-            return timestamp.toLocalDateTime();
-        }
+        if (value instanceof Timestamp timestamp) return timestamp.toInstant();
         return null;
     }
 

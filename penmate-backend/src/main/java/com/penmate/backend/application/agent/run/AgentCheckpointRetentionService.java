@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Service
 @Slf4j
@@ -18,7 +18,7 @@ public class AgentCheckpointRetentionService {
 
     @Scheduled(cron = "${penmate.agent.checkpoint-retention-cron:0 15 3 * * ?}")
     public void scheduledCleanup() {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         var archived = archiveService.archiveEligible(now);
         var purged = archiveService.purgeExpired(now);
         log.info("Agent checkpoint retention complete: archived={}, purged={}",

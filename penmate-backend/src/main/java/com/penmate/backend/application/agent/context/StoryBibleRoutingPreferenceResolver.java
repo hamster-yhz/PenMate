@@ -10,8 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
@@ -84,7 +83,7 @@ public class StoryBibleRoutingPreferenceResolver {
         }
         Object updatedAt = config.get("updatedAt");
         if (updatedAt instanceof Timestamp timestamp) return timestamp.toInstant().toEpochMilli();
-        if (updatedAt instanceof LocalDateTime dateTime) return dateTime.toInstant(ZoneOffset.UTC).toEpochMilli();
+        if (updatedAt instanceof Instant dateTime) return dateTime.toEpochMilli();
         return 0L;
     }
 

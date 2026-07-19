@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public class AgentSession {
 
@@ -17,9 +17,9 @@ public class AgentSession {
     private Long lastTurnId;
     private Long lastRunId;
     private String lastRunStatus;
-    private LocalDateTime resumedAt;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant resumedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 
     private AgentSession(Long sessionId, Long projectId, Long ownerUserId, String title, String sessionStatus) {
         this.sessionId = sessionId;
@@ -134,15 +134,15 @@ public class AgentSession {
         return lastRunStatus;
     }
 
-    public LocalDateTime getResumedAt() {
+    public Instant getResumedAt() {
         return resumedAt;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 }

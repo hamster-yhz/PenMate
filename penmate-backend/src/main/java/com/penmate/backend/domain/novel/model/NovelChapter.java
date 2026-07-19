@@ -3,7 +3,7 @@ package com.penmate.backend.domain.novel.model;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -48,13 +48,13 @@ public class NovelChapter {
     /** 存储服务提供商。 */
     private String storageProvider;
     /** 最近一次 AI 生成时间。 */
-    private LocalDateTime lastGeneratedAt;
+    private Instant lastGeneratedAt;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
     /** 逻辑删除时间。 */
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 
 }
 

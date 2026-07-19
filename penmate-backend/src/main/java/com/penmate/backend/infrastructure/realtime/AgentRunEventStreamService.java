@@ -172,7 +172,7 @@ public class AgentRunEventStreamService {
                 event.schemaVersion(),
                 event.eventType(),
                 event.payloadJson(),
-                event.createdAt() == null ? null : DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(event.createdAt())
+                event.createdAt() == null ? null : DateTimeFormatter.ISO_INSTANT.format(event.createdAt())
         );
     }
 

@@ -6,7 +6,7 @@ import com.penmate.backend.domain.ops.repository.OpsRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -93,7 +93,7 @@ public class OpsApplicationService {
         task.setStatus("running");
         task.setProgressPct(0);
         task.setSummaryJson(null);
-        task.setStartedAt(LocalDateTime.now());
+        task.setStartedAt(Instant.now());
         int affected = opsRepository.insertMigration(task);
         if (affected != 1) {
             log.error("发起内容迁移任务失败: operatorId={}, reason=insert_failed", operatorId);

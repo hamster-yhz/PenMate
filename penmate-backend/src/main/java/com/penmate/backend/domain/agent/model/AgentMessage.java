@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.agent.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -27,7 +27,7 @@ public class AgentMessage {
     /** 会话内顺序号。 */
     private Integer seqNo;
     /** 消息创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
 }
 

@@ -17,7 +17,7 @@ public interface IamMenuMapper {
     @Select("""
             SELECT id, menu_id, parent_id, title, path, sort_order, permission_code, visible
             FROM iam_menus
-            WHERE deleted_at IS NULL AND visible = 1
+            WHERE deleted_at IS NULL AND visible = TRUE
             ORDER BY sort_order ASC, id ASC
             """)
     List<IamMenu> findVisibleAll();
@@ -26,7 +26,7 @@ public interface IamMenuMapper {
             SELECT m.id, m.menu_id, m.parent_id, m.title, m.path, m.sort_order, m.permission_code, m.visible
             FROM iam_menus m
             WHERE m.deleted_at IS NULL
-              AND m.visible = 1
+              AND m.visible = TRUE
               AND (
                     m.permission_code IS NULL
                     OR EXISTS (

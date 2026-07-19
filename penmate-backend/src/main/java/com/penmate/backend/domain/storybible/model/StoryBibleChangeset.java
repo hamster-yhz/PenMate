@@ -2,7 +2,7 @@ package com.penmate.backend.domain.storybible.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 public class StoryBibleChangeset {
@@ -14,5 +14,5 @@ public class StoryBibleChangeset {
     private Long actorId;
     private Long sourceRunId;
     private String changeSummary;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

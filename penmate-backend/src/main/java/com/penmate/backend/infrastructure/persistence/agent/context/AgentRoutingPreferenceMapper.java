@@ -16,9 +16,11 @@ public interface AgentRoutingPreferenceMapper {
 
     @Insert("""
             INSERT INTO agent_user_preferences(user_id, story_bible_routing_mode, router_model_config_id)
-            VALUES(#{userId}, #{storyBibleRoutingMode}, #{routerModelConfigId}) AS incoming
-            ON DUPLICATE KEY UPDATE story_bible_routing_mode = incoming.story_bible_routing_mode,
-                                    router_model_config_id = incoming.router_model_config_id
+            VALUES(#{userId}, #{storyBibleRoutingMode}, #{routerModelConfigId})
+            ON CONFLICT (user_id) DO UPDATE SET
+                story_bible_routing_mode = EXCLUDED.story_bible_routing_mode,
+                router_model_config_id = EXCLUDED.router_model_config_id,
+                updated_at = CURRENT_TIMESTAMP(3)
             """)
     int upsertUserPreference(AgentRoutingPreference preference);
 

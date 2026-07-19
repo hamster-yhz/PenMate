@@ -23,7 +23,7 @@ public interface IamUserMapper {
             SELECT id, user_id, email, password_hash, display_name, status, auth_method,
                    main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
             FROM iam_users
-            WHERE email = #{email} AND deleted_at IS NULL
+            WHERE lower(email) = lower(#{email}) AND deleted_at IS NULL
             """)
     IamUser findByEmail(@Param("email") String email);
 

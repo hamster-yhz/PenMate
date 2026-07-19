@@ -1,7 +1,7 @@
 package com.penmate.backend.domain.plugin.model;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 /**
@@ -31,7 +31,7 @@ public class PluginCallLog {
     /** 失败错误信息。 */
     private String errorMsg;
     /** 日志创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
 }
 

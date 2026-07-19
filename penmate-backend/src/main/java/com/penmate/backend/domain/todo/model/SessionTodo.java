@@ -2,7 +2,7 @@ package com.penmate.backend.domain.todo.model;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 会话级 Todo 实体。
@@ -29,11 +29,11 @@ public class SessionTodo {
     /** 待办状态。 */
     private String todoStatus;
     /** 完成时间。 */
-    private LocalDateTime completedAt;
+    private Instant completedAt;
     /** 创建时间。 */
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     /** 更新时间。 */
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
     /** 逻辑删除时间。 */
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 }

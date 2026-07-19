@@ -9,7 +9,7 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,7 +68,7 @@ public class AgentRunEventRepositoryImpl implements AgentRunEventRepository {
     }
 
     @Override
-    public List<Long> findTerminalRunIdsWithEventsBefore(LocalDateTime cutoff, int limit) {
+    public List<Long> findTerminalRunIdsWithEventsBefore(Instant cutoff, int limit) {
         try (SqlSession session = sqlSessionFactory.openSession(true)) {
             return session.getMapper(AgentRunEventMapper.class).findTerminalRunIdsWithEventsBefore(cutoff, limit);
         }

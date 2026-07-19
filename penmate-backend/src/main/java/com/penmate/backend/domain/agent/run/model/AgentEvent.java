@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 public record AgentEvent(
@@ -13,7 +13,7 @@ public record AgentEvent(
         Integer schemaVersion,
         String eventType,
         String payloadJson,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {
 
     public AgentEvent {

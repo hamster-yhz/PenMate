@@ -16,7 +16,7 @@ import com.penmate.backend.domain.storybible.model.StoryBibleViewPreference;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
@@ -86,8 +86,8 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public List<StoryBibleChangeset> findRecentChangesets(Long storyBibleId, int limit) { return mapper.findRecentChangesets(storyBibleId, limit); }
     @Override public StoryBibleChangeset findChangeset(Long storyBibleId, Long changesetId) { return mapper.findChangeset(storyBibleId, changesetId); }
     @Override public List<StoryBibleChangeset> findChangesetsForNode(Long storyBibleId, Long nodeId, int limit) { return mapper.findChangesetsForNode(storyBibleId, nodeId, limit); }
-    @Override public List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, LocalDateTime cutoff, int retainCount) { return mapper.findChangesetsBefore(storyBibleId, cutoff, retainCount); }
-    @Override public List<StoryBible> findStoryBiblesWithChangesetsBefore(LocalDateTime cutoff) { return mapper.findStoryBiblesWithChangesetsBefore(cutoff); }
+    @Override public List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, Instant cutoff, int retainCount) { return mapper.findChangesetsBefore(storyBibleId, cutoff, retainCount); }
+    @Override public List<StoryBible> findStoryBiblesWithChangesetsBefore(Instant cutoff) { return mapper.findStoryBiblesWithChangesetsBefore(cutoff); }
     @Override public List<StoryBibleChangeItem> findChangeItemsByChangesetIds(List<Long> changesetIds) { return empty(changesetIds) ? List.of() : mapper.findChangeItemsByChangesetIds(changesetIds); }
     @Override public int deleteChangeItemsByChangesetIds(List<Long> changesetIds) { return empty(changesetIds) ? 0 : mapper.deleteChangeItemsByChangesetIds(changesetIds); }
     @Override public int deleteChangesetsByIds(Long storyBibleId, List<Long> changesetIds) { return empty(changesetIds) ? 0 : mapper.deleteChangesetsByIds(storyBibleId, changesetIds); }

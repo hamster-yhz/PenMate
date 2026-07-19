@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.run.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 public record AgentToolCallExecution(
@@ -14,8 +14,8 @@ public record AgentToolCallExecution(
         String resultJson,
         String errorCode,
         String errorMessage,
-        LocalDateTime startedAt,
-        LocalDateTime finishedAt
+        Instant startedAt,
+        Instant finishedAt
 ) {
     public AgentToolCallExecution {
         executionId = Objects.requireNonNull(executionId, "executionId must not be null");
@@ -45,7 +45,7 @@ public record AgentToolCallExecution(
 
     public static AgentToolCallExecution started(Long executionId, Long runId, String toolCallId,
                                                  String toolCode, String requestSha256,
-                                                 Long executionToken, LocalDateTime startedAt) {
+                                                 Long executionToken, Instant startedAt) {
         return new AgentToolCallExecution(executionId, runId, toolCallId, toolCode, requestSha256,
                 executionToken, AgentToolCallExecutionStatus.STARTED.name(), null, null, null,
                 startedAt, null);

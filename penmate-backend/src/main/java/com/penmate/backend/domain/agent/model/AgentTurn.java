@@ -1,6 +1,6 @@
 package com.penmate.backend.domain.agent.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public class AgentTurn {
 
@@ -13,7 +13,7 @@ public class AgentTurn {
     private String turnStatus;
     private Long runId;
     private String resumeToken;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     public Long getId() {
         return id;
@@ -51,7 +51,7 @@ public class AgentTurn {
         return resumeToken;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 }
