@@ -1,97 +1,60 @@
 package com.penmate.backend.domain.model.repository;
 
-import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
+import com.penmate.backend.domain.model.model.ModelConfiguration;
+import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelUserApiKey;
+import com.penmate.backend.domain.model.model.ModelProviderCapability;
+import com.penmate.backend.domain.model.model.ModelUserPreferences;
 
 import java.util.List;
-import java.util.Map;
 
 public interface ModelRepository {
 
-    List<ModelUserApiKey> listUserKeys(Long userId);
-
-    List<ModelOfficialApiKey> listOfficialKeys();
-
-    int insertUserKey(Long userApiKeyId,
-                      Long userId,
-                      Long providerId,
-                      String keyName,
-                      String encryptedApiKey,
-                      String maskedApiKey,
-                      boolean isDefault,
-                      String status);
-
-    int insertOfficialKey(Long officialApiKeyId,
-                          Long providerId,
-                          String keyName,
-                          String encryptedApiKey,
-                          String maskedApiKey,
-                          boolean isDefault,
-                          String status);
-
-    int clearDefaultUserKey(Long userId);
-
-    int clearDefaultOfficialKey(Long providerId);
-
-    int updateUserKey(Long userId,
-                      Long keyId,
-                      String keyName,
-                      String encryptedApiKey,
-                      String maskedApiKey,
-                      Boolean isDefault,
-                      String status);
-
-    int updateOfficialKey(Long keyId,
-                          String keyName,
-                          String encryptedApiKey,
-                          String maskedApiKey,
-                          Boolean isDefault,
-                          String status);
-
-    int softDeleteUserKey(Long userId, Long keyId);
-
-    int softDeleteOfficialKey(Long keyId);
+    List<ModelProvider> listProviders();
 
     ModelProvider findProvider(Long providerId);
 
-    ModelUserApiKey findUserKey(Long userKeyId);
+    List<ModelProviderCapability> listCapabilities(Long providerId);
 
-    ModelOfficialApiKey findOfficialKey(Long officialKeyId);
+    ModelProviderCapability findCapability(Long providerId, String capabilityCode);
 
-    ModelOfficialApiKey findDefaultOfficialKey(Long providerId);
+    List<ModelConfiguration> listAccessibleConfigurations(Long userId);
 
-    List<Map<String, Object>> listUserModelConfigs(Long userId);
+    ModelConfiguration findAccessibleConfiguration(Long userId, Long modelConfigId);
 
-    Map<String, Object> findUserModelConfig(Long userId, Long modelConfigId);
+    ModelConfiguration findOwnedConfigurationForUpdate(Long actorUserId, Long modelConfigId, boolean systemScope);
 
-    int insertUserModelConfig(Long modelConfigId,
-                              Long userId,
-                              Long providerId,
-                              String modelName,
-                              String baseUrl,
-                              String keySourceType,
-                              Long userKeyId,
-                              Long officialKeyId,
-                              Integer contextWindowTurns,
-                              Integer maxContextTokens,
-                              String status);
+    ModelCredential findCredential(ModelConfiguration configuration);
 
-    int updateUserModelConfig(Long userId,
-                              Long modelConfigId,
-                              Long providerId,
-                              String modelName,
-                              String baseUrl,
-                              String keySourceType,
-                              Long userKeyId,
-                              Long officialKeyId,
-                              Integer contextWindowTurns,
-                              Integer maxContextTokens,
-                              String status);
+    int insertConfiguration(ModelConfiguration configuration);
 
-    int softDeleteUserModelConfig(Long userId, Long modelConfigId);
+    int updateConfiguration(ModelConfiguration configuration);
 
-    int updateUserModelPreferences(Long userId, Long mainAgentModelConfigId, Long dirtyWorkAgentModelConfigId);
+    int insertCredential(ModelConfiguration configuration, ModelCredential credential);
 
-    boolean existsUsableModelConfig(Long userId, Long modelConfigId);
+    int updateCredential(ModelConfiguration configuration, ModelCredential credential);
+
+    int softDeleteConfiguration(ModelConfiguration configuration, Long actorUserId);
+
+    int softDeleteCredential(ModelConfiguration configuration);
+
+    boolean hasNonterminalRunReference(Long modelConfigId);
+
+    List<Long> listDependentProjectIds(Long modelConfigId);
+
+    List<Long> lockDependentProjectIds(Long modelConfigId);
+
+    int markDependentProjectsReindexRequired(Long modelConfigId, String reason);
+
+    int unbindDependentProjects(Long modelConfigId);
+
+    int clearUserDefaultReferences(Long modelConfigId);
+
+    boolean hasAnyReference(Long modelConfigId);
+
+    ModelUserPreferences findUserPreferences(Long userId);
+
+    int upsertUserPreferences(ModelUserPreferences preferences);
+
+    boolean existsAccessibleActiveConfiguration(Long userId, Long modelConfigId, String modelType);
 }

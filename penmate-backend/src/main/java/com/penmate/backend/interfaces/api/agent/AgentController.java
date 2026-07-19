@@ -26,6 +26,7 @@ import com.penmate.backend.interfaces.api.agent.dto.StoryBibleRoutingPreferenceD
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -74,45 +75,20 @@ public class AgentController {
 
     @GetMapping("/routing-preference")
     public ApiResponse<StoryBibleRoutingPreferenceDto.View> getUserRoutingPreference(
-            @PathVariable String projectId, @RequestParam String userId,
+            @PathVariable String projectId, Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        requireLongId(projectId, "projectId");
-        var result = routingPreferences.getUserDefault(requireLongId(userId, "userId"));
-        return ApiResponse.success(toRoutingView(result, false), traceId);
+        var result = routingPreferences.resolveProject(requireLongId(projectId, "projectId"), principalId(authentication));
+        return ApiResponse.success(toRoutingView(result), traceId);
     }
 
     @PutMapping("/routing-preference")
     public ApiResponse<StoryBibleRoutingPreferenceDto.View> updateUserRoutingPreference(
-            @PathVariable String projectId, @RequestParam String userId,
+            @PathVariable String projectId, Authentication authentication,
             @RequestBody StoryBibleRoutingPreferenceDto.Update dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        requireLongId(projectId, "projectId");
-        Long parsedUserId = requireLongId(userId, "userId");
-        routingPreferences.saveUserDefault(parsedUserId, dto.mode(), optionalLongId(dto.routerModelConfigId(), "routerModelConfigId"));
-        return ApiResponse.success(toRoutingView(routingPreferences.getUserDefault(parsedUserId), false), traceId);
-    }
-
-    @GetMapping("/sessions/{sessionId}/routing-preference")
-    public ApiResponse<StoryBibleRoutingPreferenceDto.View> getSessionRoutingPreference(
-            @PathVariable String projectId, @PathVariable String sessionId, @RequestParam String userId,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        var result = routingPreferences.resolve(requireLongId(projectId, "projectId"),
-                requireLongId(sessionId, "sessionId"), requireLongId(userId, "userId"));
-        return ApiResponse.success(toRoutingView(result, !result.sessionOverride()), traceId);
-    }
-
-    @PutMapping("/sessions/{sessionId}/routing-preference")
-    public ApiResponse<StoryBibleRoutingPreferenceDto.View> updateSessionRoutingPreference(
-            @PathVariable String projectId, @PathVariable String sessionId, @RequestParam String userId,
-            @RequestBody StoryBibleRoutingPreferenceDto.Update dto,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        Long parsedProjectId = requireLongId(projectId, "projectId");
-        Long parsedSessionId = requireLongId(sessionId, "sessionId");
-        Long parsedUserId = requireLongId(userId, "userId");
-        routingPreferences.saveSessionOverride(parsedProjectId, parsedSessionId, parsedUserId, dto.mode(),
-                optionalLongId(dto.routerModelConfigId(), "routerModelConfigId"));
-        var result = routingPreferences.resolve(parsedProjectId, parsedSessionId, parsedUserId);
-        return ApiResponse.success(toRoutingView(result, !result.sessionOverride()), traceId);
+        var result = routingPreferences.saveProject(requireLongId(projectId, "projectId"), principalId(authentication),
+                dto.mode(), optionalLongId(dto.routerModelConfigId(), "routerModelConfigId"));
+        return ApiResponse.success(toRoutingView(result), traceId);
     }
 
     /**
@@ -318,9 +294,13 @@ public class AgentController {
     }
 
     private StoryBibleRoutingPreferenceDto.View toRoutingView(
-            StoryBibleRoutingPreferenceResolver.EffectivePreference value, boolean inherited) {
-        return new StoryBibleRoutingPreferenceDto.View(value.mode(), stringifyBusinessId(value.routerModelConfigId()),
-                value.routerModelConfigRevision(), inherited);
+            StoryBibleRoutingPreferenceResolver.EffectivePreference value) {
+        return new StoryBibleRoutingPreferenceDto.View(value.mode(), stringifyBusinessId(value.routerModelConfigId()));
+    }
+
+    private Long principalId(Authentication authentication) {
+        if (authentication == null) throw com.penmate.backend.application.common.exception.BusinessException.of("Login required");
+        return requireLongId(authentication.getName(), "principal userId");
     }
 
     private AgentRecoverySnapshotDto toRecoveryDto(AgentRunRecoveryResult result) {

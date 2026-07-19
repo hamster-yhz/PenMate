@@ -1,316 +1,335 @@
 package com.penmate.backend.infrastructure.persistence.model;
 
-import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
+import com.penmate.backend.domain.model.model.ModelConfiguration;
+import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelUserApiKey;
+import com.penmate.backend.domain.model.model.ModelProviderCapability;
+import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
-import java.util.Map;
 
-/**
- * ModelMapper。
- * <p>基建层：负责持久化、实时通信、配置与外部依赖实现。</p>
- */
-@Mapper
 public interface ModelMapper {
 
-    @Select("""
-            SELECT id, user_api_key_id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key,
-                   is_default, last_used_at, status, created_at, updated_at, deleted_at
-            FROM model_user_api_keys
-            WHERE user_id = #{userId} AND deleted_at IS NULL
-            ORDER BY is_default DESC, id DESC
-            """)
-    List<ModelUserApiKey> listUserKeys(@Param("userId") Long userId);
-
-    @Select("""
-            SELECT id, official_api_key_id, provider_id, key_name, encrypted_api_key, masked_api_key,
-                   is_default, last_used_at, status, created_at, updated_at, deleted_at
-            FROM model_official_api_keys
-            WHERE deleted_at IS NULL
-            ORDER BY provider_id ASC, is_default DESC, id DESC
-            """)
-    List<ModelOfficialApiKey> listOfficialKeys();
-
-    @Insert("""
-            INSERT INTO model_user_api_keys(user_api_key_id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, status)
-            VALUES (#{userApiKeyId}, #{userId}, #{providerId}, #{keyName}, #{encryptedApiKey}, #{maskedApiKey}, #{isDefault}, #{status})
-            """)
-    int insertUserKey(@Param("userApiKeyId") Long userApiKeyId,
-                      @Param("userId") Long userId,
-                      @Param("providerId") Long providerId,
-                      @Param("keyName") String keyName,
-                      @Param("encryptedApiKey") String encryptedApiKey,
-                      @Param("maskedApiKey") String maskedApiKey,
-                      @Param("isDefault") boolean isDefault,
-                      @Param("status") String status);
-
-    @Insert("""
-            INSERT INTO model_official_api_keys(official_api_key_id, provider_id, key_name, encrypted_api_key, masked_api_key, is_default, status)
-            VALUES (#{officialApiKeyId}, #{providerId}, #{keyName}, #{encryptedApiKey}, #{maskedApiKey}, #{isDefault}, #{status})
-            """)
-    int insertOfficialKey(@Param("officialApiKeyId") Long officialApiKeyId,
-                          @Param("providerId") Long providerId,
-                          @Param("keyName") String keyName,
-                          @Param("encryptedApiKey") String encryptedApiKey,
-                          @Param("maskedApiKey") String maskedApiKey,
-                          @Param("isDefault") boolean isDefault,
-                          @Param("status") String status);
-
-    @Update("""
-            UPDATE model_user_api_keys
-            SET is_default = FALSE
-            WHERE user_id = #{userId} AND deleted_at IS NULL
-            """)
-    int clearDefaultUserKey(@Param("userId") Long userId);
-
-    @Update("""
-            UPDATE model_official_api_keys
-            SET is_default = FALSE,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE provider_id = #{providerId} AND deleted_at IS NULL
-            """)
-    int clearDefaultOfficialKey(@Param("providerId") Long providerId);
-
-    @Update("""
-            UPDATE model_user_api_keys
-            SET key_name = COALESCE(#{keyName}, key_name),
-                encrypted_api_key = COALESCE(#{encryptedApiKey}, encrypted_api_key),
-                masked_api_key = COALESCE(#{maskedApiKey}, masked_api_key),
-                is_default = COALESCE(#{isDefault}, is_default),
-                status = COALESCE(#{status}, status),
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{userId} AND user_api_key_id = #{keyId} AND deleted_at IS NULL
-            """)
-    int updateUserKey(@Param("userId") Long userId,
-                      @Param("keyId") Long keyId,
-                      @Param("keyName") String keyName,
-                      @Param("encryptedApiKey") String encryptedApiKey,
-                      @Param("maskedApiKey") String maskedApiKey,
-                      @Param("isDefault") Boolean isDefault,
-                      @Param("status") String status);
-
-    @Update("""
-            UPDATE model_official_api_keys
-            SET key_name = COALESCE(#{keyName}, key_name),
-                encrypted_api_key = COALESCE(#{encryptedApiKey}, encrypted_api_key),
-                masked_api_key = COALESCE(#{maskedApiKey}, masked_api_key),
-                is_default = COALESCE(#{isDefault}, is_default),
-                status = COALESCE(#{status}, status),
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE official_api_key_id = #{keyId} AND deleted_at IS NULL
-            """)
-    int updateOfficialKey(@Param("keyId") Long keyId,
-                          @Param("keyName") String keyName,
-                          @Param("encryptedApiKey") String encryptedApiKey,
-                          @Param("maskedApiKey") String maskedApiKey,
-                          @Param("isDefault") Boolean isDefault,
-                          @Param("status") String status);
-
-    @Update("""
-            UPDATE model_user_api_keys
-            SET deleted_at = CURRENT_TIMESTAMP(3),
-                is_default = FALSE,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{userId} AND user_api_key_id = #{keyId} AND deleted_at IS NULL
-            """)
-    int softDeleteUserKey(@Param("userId") Long userId, @Param("keyId") Long keyId);
-
-    @Update("""
-            UPDATE model_official_api_keys
-            SET deleted_at = CURRENT_TIMESTAMP(3),
-                is_default = FALSE,
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE official_api_key_id = #{keyId} AND deleted_at IS NULL
-            """)
-    int softDeleteOfficialKey(@Param("keyId") Long keyId);
+    String CONFIG_SELECT = """
+            SELECT mc.model_config_id, mc.scope_type, mc.owner_user_id, mc.provider_id,
+                   p.code AS provider_code, p.name AS provider_name, p.base_url AS provider_base_url,
+                   p.auth_type AS provider_auth_type, cap.protocol_code,
+                   mc.display_name, mc.model_type, mc.model_name, mc.base_url, mc.distance_metric,
+                   mc.context_window_turns, mc.max_context_tokens,
+                   COALESCE(uak.masked_api_key, oak.masked_api_key) AS masked_api_key,
+                   COALESCE(uak.status, oak.status,
+                            CASE WHEN p.auth_type = 'NONE' THEN 'ACTIVE' ELSE NULL END) AS credential_status,
+                   mc.status, mc.created_by, mc.updated_by, mc.created_at, mc.updated_at
+            FROM model_configurations mc
+            JOIN model_providers p ON p.provider_id = mc.provider_id AND p.deleted_at IS NULL
+            JOIN model_provider_capabilities cap
+              ON cap.provider_id = mc.provider_id
+             AND cap.capability_code = mc.model_type
+             AND cap.status = 'ACTIVE' AND cap.deleted_at IS NULL
+            LEFT JOIN model_user_api_keys uak
+              ON uak.model_config_id = mc.model_config_id AND uak.deleted_at IS NULL
+            LEFT JOIN model_official_api_keys oak
+              ON oak.model_config_id = mc.model_config_id AND oak.deleted_at IS NULL
+            """;
 
     @Select("""
             SELECT id, provider_id, code, name, base_url, auth_type, status, created_at, updated_at
             FROM model_providers
-            WHERE provider_id = #{providerId}
-            LIMIT 1
+            WHERE deleted_at IS NULL AND status = 'ACTIVE'
+            ORDER BY name, provider_id
             """)
-    ModelProvider findProvider(@Param("providerId") Long providerId);
+    List<ModelProvider> listProviders();
 
     @Select("""
-            SELECT id, user_api_key_id, user_id, provider_id, key_name, encrypted_api_key, masked_api_key,
-                   is_default, last_used_at, status, created_at, updated_at, deleted_at
+            SELECT id, provider_id, code, name, base_url, auth_type, status, created_at, updated_at
+            FROM model_providers
+            WHERE provider_id = #{providerId} AND deleted_at IS NULL
+            """)
+    ModelProvider findProvider(Long providerId);
+
+    @Select("""
+            SELECT provider_capability_id, provider_id, capability_code, protocol_code, status
+            FROM model_provider_capabilities
+            WHERE provider_id = #{providerId} AND deleted_at IS NULL AND status = 'ACTIVE'
+            ORDER BY capability_code
+            """)
+    List<ModelProviderCapability> listCapabilities(Long providerId);
+
+    @Select("""
+            SELECT provider_capability_id, provider_id, capability_code, protocol_code, status
+            FROM model_provider_capabilities
+            WHERE provider_id = #{providerId} AND capability_code = #{capabilityCode}
+              AND deleted_at IS NULL AND status = 'ACTIVE'
+            """)
+    ModelProviderCapability findCapability(@Param("providerId") Long providerId,
+                                           @Param("capabilityCode") String capabilityCode);
+
+    @Select(CONFIG_SELECT + """
+            WHERE mc.deleted_at IS NULL
+              AND (mc.scope_type = 'SYSTEM' OR (mc.scope_type = 'USER' AND mc.owner_user_id = #{userId}))
+            ORDER BY mc.model_type, mc.scope_type, mc.display_name, mc.model_config_id
+            """)
+    List<ModelConfiguration> listAccessibleConfigurations(Long userId);
+
+    @Select(CONFIG_SELECT + """
+            WHERE mc.model_config_id = #{modelConfigId} AND mc.deleted_at IS NULL
+              AND (mc.scope_type = 'SYSTEM' OR (mc.scope_type = 'USER' AND mc.owner_user_id = #{userId}))
+            """)
+    ModelConfiguration findAccessibleConfiguration(@Param("userId") Long userId,
+                                                   @Param("modelConfigId") Long modelConfigId);
+
+    @Select(CONFIG_SELECT + """
+            WHERE mc.model_config_id = #{modelConfigId} AND mc.scope_type = 'USER'
+              AND mc.owner_user_id = #{userId} AND mc.deleted_at IS NULL
+            FOR UPDATE OF mc
+            """)
+    ModelConfiguration findUserConfigurationForUpdate(@Param("userId") Long userId,
+                                                      @Param("modelConfigId") Long modelConfigId);
+
+    @Select(CONFIG_SELECT + """
+            WHERE mc.model_config_id = #{modelConfigId} AND mc.scope_type = 'SYSTEM'
+              AND mc.deleted_at IS NULL
+            FOR UPDATE OF mc
+            """)
+    ModelConfiguration findSystemConfigurationForUpdate(Long modelConfigId);
+
+    @Select("""
+            SELECT user_api_key_id AS credential_id, model_config_id, user_id AS owner_user_id,
+                   provider_id, encrypted_api_key, masked_api_key, status
             FROM model_user_api_keys
-            WHERE user_api_key_id = #{userKeyId} AND deleted_at IS NULL
-            LIMIT 1
+            WHERE model_config_id = #{modelConfigId} AND user_id = #{ownerUserId} AND deleted_at IS NULL
             """)
-    ModelUserApiKey findUserKey(@Param("userKeyId") Long userKeyId);
+    ModelCredential findUserCredential(@Param("ownerUserId") Long ownerUserId,
+                                       @Param("modelConfigId") Long modelConfigId);
 
     @Select("""
-            SELECT id, official_api_key_id, provider_id, key_name, encrypted_api_key, masked_api_key,
-                   is_default, last_used_at, status, created_at, updated_at, deleted_at
+            SELECT official_api_key_id AS credential_id, model_config_id, NULL::BIGINT AS owner_user_id,
+                   provider_id, encrypted_api_key, masked_api_key, status
             FROM model_official_api_keys
-            WHERE official_api_key_id = #{officialKeyId} AND deleted_at IS NULL
-            LIMIT 1
+            WHERE model_config_id = #{modelConfigId} AND deleted_at IS NULL
             """)
-    ModelOfficialApiKey findOfficialKey(@Param("officialKeyId") Long officialKeyId);
-
-    @Select("""
-            SELECT id, official_api_key_id, provider_id, key_name, encrypted_api_key, masked_api_key,
-                   is_default, last_used_at, status, created_at, updated_at, deleted_at
-            FROM model_official_api_keys
-            WHERE provider_id = #{providerId} AND is_default = TRUE AND deleted_at IS NULL
-            ORDER BY id DESC
-            LIMIT 1
-            """)
-    ModelOfficialApiKey findDefaultOfficialKey(@Param("providerId") Long providerId);
-
-    @Select("""
-            SELECT muc.model_config_id AS modelConfigId,
-                   muc.user_id AS userId,
-                   muc.provider_id AS providerId,
-                   muc.model_name AS modelName,
-                   muc.base_url AS baseUrl,
-                   muc.key_source_type AS keySourceType,
-                   muc.user_key_id AS userKeyId,
-                   muc.official_key_id AS officialKeyId,
-                   muc.context_window_turns AS contextWindowTurns,
-                   muc.max_context_tokens AS maxContextTokens,
-                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
-                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
-                   muc.status AS status,
-                   muc.updated_at AS updatedAt
-            FROM model_user_configurations muc
-            LEFT JOIN model_user_api_keys muk
-                   ON muc.user_key_id = muk.user_api_key_id
-                  AND muk.deleted_at IS NULL
-            LEFT JOIN model_official_api_keys mok
-                   ON muc.official_key_id = mok.official_api_key_id
-                  AND mok.deleted_at IS NULL
-            WHERE muc.user_id = #{userId}
-              AND muc.deleted_at IS NULL
-            ORDER BY muc.id DESC
-            """)
-    List<Map<String, Object>> listUserModelConfigs(@Param("userId") Long userId);
-
-    @Select("""
-            SELECT muc.model_config_id AS modelConfigId,
-                   muc.user_id AS userId,
-                   muc.provider_id AS providerId,
-                   muc.model_name AS modelName,
-                   muc.base_url AS baseUrl,
-                   muc.key_source_type AS keySourceType,
-                   muc.user_key_id AS userKeyId,
-                   muc.official_key_id AS officialKeyId,
-                   muc.context_window_turns AS contextWindowTurns,
-                   muc.max_context_tokens AS maxContextTokens,
-                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.key_name ELSE mok.key_name END AS keyName,
-                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.encrypted_api_key ELSE mok.encrypted_api_key END AS encryptedApiKey,
-                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.masked_api_key ELSE mok.masked_api_key END AS maskedApiKey,
-                   CASE WHEN muc.key_source_type = 'USER_KEY' THEN muk.status ELSE mok.status END AS keyStatus,
-                   muc.status AS status
-            FROM model_user_configurations muc
-            LEFT JOIN model_user_api_keys muk
-                   ON muc.user_key_id = muk.user_api_key_id
-                  AND muk.deleted_at IS NULL
-            LEFT JOIN model_official_api_keys mok
-                   ON muc.official_key_id = mok.official_api_key_id
-                  AND mok.deleted_at IS NULL
-            WHERE muc.user_id = #{userId}
-              AND muc.model_config_id = #{modelConfigId}
-              AND muc.deleted_at IS NULL
-            LIMIT 1
-            """)
-    Map<String, Object> findUserModelConfig(@Param("userId") Long userId,
-                                            @Param("modelConfigId") Long modelConfigId);
+    ModelCredential findOfficialCredential(Long modelConfigId);
 
     @Insert("""
-            INSERT INTO model_user_configurations(
-                model_config_id, user_id, provider_id, model_name, base_url,
-                key_source_type, user_key_id, official_key_id, context_window_turns, max_context_tokens, status
+            INSERT INTO model_configurations(
+                model_config_id, scope_type, owner_user_id, provider_id, display_name,
+                model_type, model_name, base_url, distance_metric, context_window_turns,
+                max_context_tokens, status, created_by, updated_by
+            ) VALUES (
+                #{modelConfigId}, #{scopeType}, #{ownerUserId}, #{providerId}, #{displayName},
+                #{modelType}, #{modelName}, #{baseUrl}, #{distanceMetric}, #{contextWindowTurns},
+                #{maxContextTokens}, #{status}, #{createdBy}, #{updatedBy}
             )
-            VALUES (
-                #{modelConfigId}, #{userId}, #{providerId}, #{modelName}, #{baseUrl},
-                #{keySourceType}, #{userKeyId}, #{officialKeyId}, #{contextWindowTurns}, #{maxContextTokens}, #{status}
+            """)
+    int insertConfiguration(ModelConfiguration configuration);
+
+    @Update("""
+            UPDATE model_configurations
+            SET provider_id = #{providerId}, display_name = #{displayName}, model_name = #{modelName},
+                base_url = #{baseUrl}, distance_metric = #{distanceMetric},
+                context_window_turns = #{contextWindowTurns}, max_context_tokens = #{maxContextTokens},
+                status = #{status}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE model_config_id = #{modelConfigId} AND scope_type = #{scopeType}
+              AND (#{scopeType} = 'SYSTEM' OR owner_user_id = #{ownerUserId}) AND deleted_at IS NULL
+            """)
+    int updateConfiguration(ModelConfiguration configuration);
+
+    @Insert("""
+            INSERT INTO model_user_api_keys(
+                user_api_key_id, model_config_id, user_id, provider_id,
+                encrypted_api_key, masked_api_key, status
+            ) VALUES (
+                #{credential.credentialId}, #{configuration.modelConfigId}, #{configuration.ownerUserId},
+                #{configuration.providerId}, #{credential.encryptedApiKey}, #{credential.maskedApiKey}, #{credential.status}
             )
             """)
-    int insertUserModelConfig(@Param("modelConfigId") Long modelConfigId,
-                              @Param("userId") Long userId,
-                              @Param("providerId") Long providerId,
-                              @Param("modelName") String modelName,
-                              @Param("baseUrl") String baseUrl,
-                              @Param("keySourceType") String keySourceType,
-                              @Param("userKeyId") Long userKeyId,
-                              @Param("officialKeyId") Long officialKeyId,
-                              @Param("contextWindowTurns") Integer contextWindowTurns,
-                              @Param("maxContextTokens") Integer maxContextTokens,
-                              @Param("status") String status);
+    int insertUserCredential(@Param("configuration") ModelConfiguration configuration,
+                             @Param("credential") ModelCredential credential);
+
+    @Insert("""
+            INSERT INTO model_official_api_keys(
+                official_api_key_id, model_config_id, provider_id,
+                encrypted_api_key, masked_api_key, status
+            ) VALUES (
+                #{credential.credentialId}, #{configuration.modelConfigId}, #{configuration.providerId},
+                #{credential.encryptedApiKey}, #{credential.maskedApiKey}, #{credential.status}
+            )
+            """)
+    int insertOfficialCredential(@Param("configuration") ModelConfiguration configuration,
+                                 @Param("credential") ModelCredential credential);
 
     @Update("""
-            UPDATE model_user_configurations
-            SET provider_id = COALESCE(#{providerId}, provider_id),
-                model_name = COALESCE(#{modelName}, model_name),
-                base_url = COALESCE(#{baseUrl}, base_url),
-                key_source_type = COALESCE(#{keySourceType}, key_source_type),
-                user_key_id = #{userKeyId},
-                official_key_id = #{officialKeyId},
-                context_window_turns = COALESCE(#{contextWindowTurns}, context_window_turns),
-                max_context_tokens = COALESCE(#{maxContextTokens}, max_context_tokens),
-                status = COALESCE(#{status}, status),
+            UPDATE model_user_api_keys
+            SET provider_id = #{configuration.providerId}, encrypted_api_key = #{credential.encryptedApiKey},
+                masked_api_key = #{credential.maskedApiKey}, status = #{credential.status},
                 updated_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{userId} AND model_config_id = #{modelConfigId} AND deleted_at IS NULL
+            WHERE model_config_id = #{configuration.modelConfigId}
+              AND user_id = #{configuration.ownerUserId} AND deleted_at IS NULL
             """)
-    int updateUserModelConfig(@Param("userId") Long userId,
-                              @Param("modelConfigId") Long modelConfigId,
-                              @Param("providerId") Long providerId,
-                              @Param("modelName") String modelName,
-                              @Param("baseUrl") String baseUrl,
-                              @Param("keySourceType") String keySourceType,
-                              @Param("userKeyId") Long userKeyId,
-                              @Param("officialKeyId") Long officialKeyId,
-                              @Param("contextWindowTurns") Integer contextWindowTurns,
-                              @Param("maxContextTokens") Integer maxContextTokens,
-                              @Param("status") String status);
+    int updateUserCredential(@Param("configuration") ModelConfiguration configuration,
+                             @Param("credential") ModelCredential credential);
 
     @Update("""
-            UPDATE model_user_configurations
-            SET deleted_at = CURRENT_TIMESTAMP(3),
+            UPDATE model_official_api_keys
+            SET provider_id = #{configuration.providerId}, encrypted_api_key = #{credential.encryptedApiKey},
+                masked_api_key = #{credential.maskedApiKey}, status = #{credential.status},
                 updated_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{userId} AND model_config_id = #{modelConfigId} AND deleted_at IS NULL
+            WHERE model_config_id = #{configuration.modelConfigId} AND deleted_at IS NULL
             """)
-    int softDeleteUserModelConfig(@Param("userId") Long userId,
-                                  @Param("modelConfigId") Long modelConfigId);
+    int updateOfficialCredential(@Param("configuration") ModelConfiguration configuration,
+                                 @Param("credential") ModelCredential credential);
 
     @Update("""
-            UPDATE iam_users
-            SET main_agent_model_config_id = #{mainAgentModelConfigId},
-                dirty_work_agent_model_config_id = #{dirtyWorkAgentModelConfigId},
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE user_id = #{userId} AND deleted_at IS NULL
+            UPDATE model_configurations
+            SET deleted_at = CURRENT_TIMESTAMP(3), updated_by = #{actorUserId}, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE model_config_id = #{configuration.modelConfigId} AND scope_type = #{configuration.scopeType}
+              AND (#{configuration.scopeType} = 'SYSTEM' OR owner_user_id = #{configuration.ownerUserId})
+              AND deleted_at IS NULL
             """)
-    int updateUserModelPreferences(@Param("userId") Long userId,
-                                   @Param("mainAgentModelConfigId") Long mainAgentModelConfigId,
-                                   @Param("dirtyWorkAgentModelConfigId") Long dirtyWorkAgentModelConfigId);
+    int softDeleteConfiguration(@Param("configuration") ModelConfiguration configuration,
+                                @Param("actorUserId") Long actorUserId);
+
+    @Update("""
+            UPDATE model_user_api_keys
+            SET deleted_at = CURRENT_TIMESTAMP(3), status = 'DELETED', updated_at = CURRENT_TIMESTAMP(3)
+            WHERE model_config_id = #{modelConfigId} AND deleted_at IS NULL
+            """)
+    int softDeleteUserCredential(Long modelConfigId);
+
+    @Update("""
+            UPDATE model_official_api_keys
+            SET deleted_at = CURRENT_TIMESTAMP(3), status = 'DELETED', updated_at = CURRENT_TIMESTAMP(3)
+            WHERE model_config_id = #{modelConfigId} AND deleted_at IS NULL
+            """)
+    int softDeleteOfficialCredential(Long modelConfigId);
 
     @Select("""
-            SELECT COUNT(1)
-            FROM model_user_configurations muc
-            LEFT JOIN model_user_api_keys muk
-                   ON muc.user_key_id = muk.user_api_key_id
-                  AND muk.deleted_at IS NULL
-            LEFT JOIN model_official_api_keys mok
-                   ON muc.official_key_id = mok.official_api_key_id
-                  AND mok.deleted_at IS NULL
-            WHERE muc.user_id = #{userId}
-              AND muc.model_config_id = #{modelConfigId}
-              AND muc.deleted_at IS NULL
-              AND muc.status = 'active'
-              AND (
-                  (muc.key_source_type = 'USER_KEY' AND muk.status = 'active' AND muk.encrypted_api_key IS NOT NULL AND muk.encrypted_api_key <> '')
-                  OR (muc.key_source_type = 'OFFICIAL_KEY' AND mok.status = 'active' AND mok.encrypted_api_key IS NOT NULL AND mok.encrypted_api_key <> '')
-              )
+            SELECT COUNT(*)
+            FROM agent_run_model_bindings b
+            JOIN agent_runs r ON r.run_id = b.run_id
+            WHERE b.model_config_id = #{modelConfigId}
+              AND r.run_status IN ('PENDING', 'RUNNING', 'WAITING_APPROVAL', 'SUSPENDED')
             """)
-    int countUsableModelConfig(@Param("userId") Long userId,
-                               @Param("modelConfigId") Long modelConfigId);
+    int countNonterminalRunReferences(Long modelConfigId);
+
+    @Select("""
+            SELECT project_id
+            FROM project_ai_configurations
+            WHERE embedding_model_config_id = #{modelConfigId}
+               OR router_model_config_id = #{modelConfigId}
+            ORDER BY project_id
+            """)
+    List<Long> listDependentProjectIds(Long modelConfigId);
+
+    @Select("""
+            SELECT project_id
+            FROM project_ai_configurations
+            WHERE embedding_model_config_id = #{modelConfigId}
+               OR router_model_config_id = #{modelConfigId}
+            ORDER BY project_id
+            FOR UPDATE
+            """)
+    List<Long> lockDependentProjectIds(Long modelConfigId);
+
+    @Update("""
+            UPDATE project_ai_configurations
+            SET story_bible_routing_mode = 'LLM_SELECTOR', index_status = 'REINDEX_REQUIRED',
+                active_index_build_id = NULL, last_error_code = 'EMBEDDING_CONFIG_CHANGED',
+                last_error_message = #{reason}, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE embedding_model_config_id = #{modelConfigId}
+            """)
+    int markDependentProjectsReindexRequired(@Param("modelConfigId") Long modelConfigId,
+                                             @Param("reason") String reason);
+
+    @Update("""
+            UPDATE project_ai_configurations
+            SET embedding_model_config_id = CASE WHEN embedding_model_config_id = #{modelConfigId} THEN NULL ELSE embedding_model_config_id END,
+                router_model_config_id = CASE WHEN router_model_config_id = #{modelConfigId} THEN NULL ELSE router_model_config_id END,
+                story_bible_routing_mode = 'LLM_SELECTOR', index_status = 'UNBOUND',
+                active_index_build_id = NULL, last_error_code = NULL, last_error_message = NULL,
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE embedding_model_config_id = #{modelConfigId}
+               OR router_model_config_id = #{modelConfigId}
+            """)
+    int unbindDependentProjects(Long modelConfigId);
+
+    @Update("""
+            UPDATE model_user_preferences
+            SET default_main_chat_model_config_id = CASE WHEN default_main_chat_model_config_id = #{modelConfigId} THEN NULL ELSE default_main_chat_model_config_id END,
+                default_worker_chat_model_config_id = CASE WHEN default_worker_chat_model_config_id = #{modelConfigId} THEN NULL ELSE default_worker_chat_model_config_id END,
+                default_embedding_model_config_id = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN NULL ELSE default_embedding_model_config_id END,
+                default_router_model_config_id = CASE WHEN default_router_model_config_id = #{modelConfigId} THEN NULL ELSE default_router_model_config_id END,
+                default_story_bible_routing_mode = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN 'LLM_SELECTOR' ELSE default_story_bible_routing_mode END,
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE default_main_chat_model_config_id = #{modelConfigId}
+               OR default_worker_chat_model_config_id = #{modelConfigId}
+               OR default_embedding_model_config_id = #{modelConfigId}
+               OR default_router_model_config_id = #{modelConfigId}
+            """)
+    int clearUserDefaultReferences(Long modelConfigId);
+
+    @Select("""
+            SELECT (
+                (SELECT COUNT(*) FROM project_ai_configurations
+                 WHERE embedding_model_config_id = #{modelConfigId} OR router_model_config_id = #{modelConfigId})
+                +
+                (SELECT COUNT(*) FROM model_user_preferences
+                 WHERE default_main_chat_model_config_id = #{modelConfigId}
+                    OR default_worker_chat_model_config_id = #{modelConfigId}
+                    OR default_embedding_model_config_id = #{modelConfigId}
+                    OR default_router_model_config_id = #{modelConfigId})
+                +
+                (SELECT COUNT(*) FROM agent_run_model_bindings WHERE model_config_id = #{modelConfigId})
+            )
+            """)
+    int countAllReferences(Long modelConfigId);
+
+    @Select("""
+            SELECT user_id, default_main_chat_model_config_id, default_worker_chat_model_config_id,
+                   default_embedding_model_config_id, default_router_model_config_id,
+                   default_story_bible_routing_mode, default_chunk_target_characters,
+                   default_chunk_overlap_characters, default_chunk_max_characters
+            FROM model_user_preferences WHERE user_id = #{userId}
+            """)
+    ModelUserPreferences findUserPreferences(Long userId);
+
+    @Insert("""
+            INSERT INTO model_user_preferences(
+                user_id, default_main_chat_model_config_id, default_worker_chat_model_config_id,
+                default_embedding_model_config_id, default_router_model_config_id,
+                default_story_bible_routing_mode, default_chunk_target_characters,
+                default_chunk_overlap_characters, default_chunk_max_characters
+            ) VALUES (
+                #{userId}, #{defaultMainChatModelConfigId}, #{defaultWorkerChatModelConfigId},
+                #{defaultEmbeddingModelConfigId}, #{defaultRouterModelConfigId},
+                #{defaultStoryBibleRoutingMode}, #{defaultChunkTargetCharacters},
+                #{defaultChunkOverlapCharacters}, #{defaultChunkMaxCharacters}
+            )
+            ON CONFLICT (user_id) DO UPDATE SET
+                default_main_chat_model_config_id = EXCLUDED.default_main_chat_model_config_id,
+                default_worker_chat_model_config_id = EXCLUDED.default_worker_chat_model_config_id,
+                default_embedding_model_config_id = EXCLUDED.default_embedding_model_config_id,
+                default_router_model_config_id = EXCLUDED.default_router_model_config_id,
+                default_story_bible_routing_mode = EXCLUDED.default_story_bible_routing_mode,
+                default_chunk_target_characters = EXCLUDED.default_chunk_target_characters,
+                default_chunk_overlap_characters = EXCLUDED.default_chunk_overlap_characters,
+                default_chunk_max_characters = EXCLUDED.default_chunk_max_characters,
+                updated_at = CURRENT_TIMESTAMP(3)
+            """)
+    int upsertUserPreferences(ModelUserPreferences preferences);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM model_configurations mc
+            WHERE mc.model_config_id = #{modelConfigId} AND mc.model_type = #{modelType}
+              AND mc.status = 'ACTIVE' AND mc.deleted_at IS NULL
+              AND (mc.scope_type = 'SYSTEM' OR (mc.scope_type = 'USER' AND mc.owner_user_id = #{userId}))
+            """)
+    int countAccessibleActiveConfiguration(@Param("userId") Long userId,
+                                           @Param("modelConfigId") Long modelConfigId,
+                                           @Param("modelType") String modelType);
 }

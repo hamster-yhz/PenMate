@@ -5,102 +5,91 @@ import com.penmate.backend.domain.agent.context.model.AgentRoutingPreference;
 import com.penmate.backend.domain.agent.context.repository.AgentRoutingPreferenceRepository;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
+import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.repository.ModelRepository;
+import com.penmate.backend.domain.novel.model.NovelProject;
+import com.penmate.backend.domain.novel.repository.NovelGateway;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.Map;
 import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class StoryBibleRoutingPreferenceResolver {
 
     private final AgentRoutingPreferenceRepository preferences;
     private final AgentSessionRepository sessions;
     private final ModelRepository models;
-
-    public StoryBibleRoutingPreferenceResolver(AgentRoutingPreferenceRepository preferences,
-                                                AgentSessionRepository sessions,
-                                                ModelRepository models) {
-        this.preferences = Objects.requireNonNull(preferences, "preferences");
-        this.sessions = Objects.requireNonNull(sessions, "sessions");
-        this.models = Objects.requireNonNull(models, "models");
-    }
+    private final NovelGateway novels;
 
     public EffectivePreference resolve(Long projectId, Long sessionId, Long userId) {
+        requireOwnedSession(projectId, sessionId, userId);
+        return resolveProject(projectId, userId);
+    }
+
+    public EffectivePreference resolveProject(Long projectId, Long userId) {
+        requireOwnedProject(projectId, userId);
+        AgentRoutingPreference preference = preferences.findProjectPreference(projectId);
+        if (preference == null) {
+            return new EffectivePreference(StoryBibleRoutingMode.LLM_SELECTOR, null);
+        }
+        StoryBibleRoutingMode mode = parseMode(preference.storyBibleRoutingMode());
+        boolean activeEmbedding = preference.embeddingModelConfigId() != null
+                && "ACTIVE".equalsIgnoreCase(preference.indexStatus());
+        if (!activeEmbedding && mode != StoryBibleRoutingMode.LLM_SELECTOR) {
+            mode = StoryBibleRoutingMode.LLM_SELECTOR;
+        }
+        validateRouterModel(userId, preference.routerModelConfigId());
+        return new EffectivePreference(mode, preference.routerModelConfigId());
+    }
+
+    @Transactional
+    public EffectivePreference saveProject(Long projectId, Long userId,
+                                           StoryBibleRoutingMode mode, Long routerModelConfigId) {
+        requireOwnedProject(projectId, userId);
+        AgentRoutingPreference current = preferences.findProjectPreference(projectId);
+        if (current == null) throw BusinessException.notFound("Project AI configuration not found");
+        StoryBibleRoutingMode requested = Objects.requireNonNull(mode, "mode");
+        if (requested != StoryBibleRoutingMode.LLM_SELECTOR
+                && (current.embeddingModelConfigId() == null || !"ACTIVE".equalsIgnoreCase(current.indexStatus()))) {
+            throw BusinessException.badRequest("An active Embedding index is required for retrieval routing");
+        }
+        validateRouterModel(userId, routerModelConfigId);
+        if (preferences.updateProjectPreference(projectId, requested.name(), routerModelConfigId) != 1) {
+            throw BusinessException.of("Failed to save project Story Bible routing preference");
+        }
+        return new EffectivePreference(requested, routerModelConfigId);
+    }
+
+    private void requireOwnedSession(Long projectId, Long sessionId, Long userId) {
         AgentSession session = sessions.findSession(projectId, sessionId);
         if (session == null || !Objects.equals(session.getOwnerUserId(), userId)) {
             throw BusinessException.notFound("Agent session not found");
         }
-        AgentRoutingPreference user = preferences.findUserPreference(userId);
-        String rawMode = firstNonBlank(session.getStoryBibleRoutingMode(),
-                user == null ? null : user.storyBibleRoutingMode(), StoryBibleRoutingMode.RETRIEVAL_THEN_LLM.name());
-        StoryBibleRoutingMode mode = parseMode(rawMode);
-        Long modelId = session.getRouterModelConfigId() != null
-                ? session.getRouterModelConfigId() : user == null ? null : user.routerModelConfigId();
-        long modelRevision = validateModel(userId, modelId);
-        return new EffectivePreference(mode, modelId, modelRevision,
-                session.getStoryBibleRoutingMode() != null || session.getRouterModelConfigId() != null);
     }
 
-    public EffectivePreference getUserDefault(Long userId) {
-        AgentRoutingPreference user = preferences.findUserPreference(userId);
-        StoryBibleRoutingMode mode = parseMode(user == null || user.storyBibleRoutingMode() == null
-                ? StoryBibleRoutingMode.RETRIEVAL_THEN_LLM.name() : user.storyBibleRoutingMode());
-        Long modelId = user == null ? null : user.routerModelConfigId();
-        return new EffectivePreference(mode, modelId, validateModel(userId, modelId), false);
-    }
-
-    @Transactional
-    public void saveUserDefault(Long userId, StoryBibleRoutingMode mode, Long modelConfigId) {
-        validateModel(userId, modelConfigId);
-        if (preferences.upsertUserPreference(new AgentRoutingPreference(userId,
-                Objects.requireNonNull(mode, "mode").name(), modelConfigId)) != 1) {
-            throw BusinessException.of("Failed to save Story Bible routing preference");
+    private void requireOwnedProject(Long projectId, Long userId) {
+        NovelProject project = novels.findProjectById(projectId);
+        if (project == null || !Objects.equals(project.getOwnerUserId(), userId)) {
+            throw BusinessException.notFound("Novel project not found");
         }
     }
 
-    @Transactional
-    public void saveSessionOverride(Long projectId, Long sessionId, Long userId,
-                                    StoryBibleRoutingMode mode, Long modelConfigId) {
-        AgentSession session = sessions.findSession(projectId, sessionId);
-        if (session == null || !Objects.equals(session.getOwnerUserId(), userId)) {
-            throw BusinessException.notFound("Agent session not found");
-        }
-        validateModel(userId, modelConfigId);
-        if (preferences.updateSessionOverride(projectId, sessionId, mode == null ? null : mode.name(), modelConfigId) != 1) {
-            throw BusinessException.of("Failed to save session Story Bible routing override");
-        }
-    }
-
-    private long validateModel(Long userId, Long modelConfigId) {
-        if (modelConfigId == null) return 0L;
-        Map<String, Object> config = models.findUserModelConfig(userId, modelConfigId);
-        if (config == null || !"ACTIVE".equalsIgnoreCase(String.valueOf(config.get("status")))) {
+    private void validateRouterModel(Long userId, Long modelConfigId) {
+        if (modelConfigId == null) return;
+        ModelConfiguration config = models.findAccessibleConfiguration(userId, modelConfigId);
+        if (config == null || !"CHAT".equals(config.getModelType()) || !"ACTIVE".equalsIgnoreCase(config.getStatus())) {
             throw BusinessException.badRequest("Router model configuration is unavailable");
         }
-        Object updatedAt = config.get("updatedAt");
-        if (updatedAt instanceof Timestamp timestamp) return timestamp.toInstant().toEpochMilli();
-        if (updatedAt instanceof Instant dateTime) return dateTime.toEpochMilli();
-        return 0L;
     }
 
     private StoryBibleRoutingMode parseMode(String value) {
-        try {
-            return StoryBibleRoutingMode.valueOf(value);
-        } catch (RuntimeException ex) {
-            throw BusinessException.badRequest("Unsupported Story Bible routing mode");
-        }
+        try { return StoryBibleRoutingMode.valueOf(value); }
+        catch (RuntimeException exception) { throw BusinessException.badRequest("Unsupported Story Bible routing mode"); }
     }
 
-    private String firstNonBlank(String... values) {
-        for (String value : values) if (value != null && !value.isBlank()) return value.trim();
-        throw new IllegalStateException("Routing mode fallback missing");
-    }
-
-    public record EffectivePreference(StoryBibleRoutingMode mode, Long routerModelConfigId,
-                                      long routerModelConfigRevision, boolean sessionOverride) {
+    public record EffectivePreference(StoryBibleRoutingMode mode, Long routerModelConfigId) {
     }
 }

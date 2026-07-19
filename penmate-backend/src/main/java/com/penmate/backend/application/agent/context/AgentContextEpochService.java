@@ -70,7 +70,7 @@ public class AgentContextEpochService {
                 request.manuscriptRevision(), request.activeChapterId(), request.activeChapterContentRevision(),
                 request.styleBindingRevision(),
                 required(request.routingMode(), "routingMode"), request.routerModelConfigId(),
-                request.routerModelConfigRevision(), required(request.promptBundleHash(), "promptBundleHash"),
+                required(request.promptBundleHash(), "promptBundleHash"),
                 required(request.skillCatalogHash(), "skillCatalogHash"), required(request.toolCatalogHash(), "toolCatalogHash"),
                 objectKey, snapshotHash, (long) snapshot.length, null, null
         );
@@ -110,7 +110,6 @@ public class AgentContextEpochService {
         fields.put("styleBindingRevision", request.styleBindingRevision());
         fields.put("routingMode", request.routingMode());
         fields.put("routerModelConfigId", request.routerModelConfigId());
-        fields.put("routerModelConfigRevision", request.routerModelConfigRevision());
         fields.put("promptBundleHash", request.promptBundleHash());
         fields.put("skillCatalogHash", request.skillCatalogHash());
         fields.put("toolCatalogHash", request.toolCatalogHash());
@@ -152,7 +151,6 @@ public class AgentContextEpochService {
             Long styleBindingRevision,
             String routingMode,
             Long routerModelConfigId,
-            Long routerModelConfigRevision,
             String promptBundleHash,
             String skillCatalogHash,
             String toolCatalogHash,
@@ -160,11 +158,11 @@ public class AgentContextEpochService {
     ) {
         public BindRequest(Long sessionId, Long runId, Long storyBibleRevision, Long manuscriptRevision,
                            Long activeChapterId, Long styleBindingRevision, String routingMode,
-                           Long routerModelConfigId, Long routerModelConfigRevision, String promptBundleHash,
+                           Long routerModelConfigId, String promptBundleHash,
                            String skillCatalogHash, String toolCatalogHash, String snapshotJson) {
             this(sessionId, runId, storyBibleRevision, manuscriptRevision, activeChapterId, 0L,
-                    styleBindingRevision, routingMode, routerModelConfigId, routerModelConfigRevision,
-                    promptBundleHash, skillCatalogHash, toolCatalogHash, snapshotJson);
+                    styleBindingRevision, routingMode, routerModelConfigId, promptBundleHash,
+                    skillCatalogHash, toolCatalogHash, snapshotJson);
         }
     }
 

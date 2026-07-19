@@ -5,35 +5,21 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * 新增用户模型配置入参。
- */
 @Data
-public class CreateUserModelConfigDto {
-
+public class CreateModelConfigurationDto {
     @NotBlank
     @Pattern(regexp = "^[1-9]\\d*$", message = "providerId must be greater than 0")
     @JsonDeserialize(using = StringIdOnlyDeserializer.class)
     private String providerId;
-
-    @NotBlank
-    private String modelName;
-
-    private String baseUrl;
-
-    @NotBlank
-    private String modelCategory;
-
-    @NotBlank
+    @NotBlank @Size(max = 120) private String displayName;
+    @NotBlank @Pattern(regexp = "CHAT|EMBEDDING") private String modelType;
+    @NotBlank @Size(max = 120) private String modelName;
+    @Size(max = 500) private String baseUrl;
+    @Pattern(regexp = "COSINE|INNER_PRODUCT|L2") private String distanceMetric;
     private String apiKey;
-
-    @PositiveOrZero
-    private Integer contextWindowTurns;
-
-    @Positive
-    private Integer maxContextTokens;
-
-    private String status;
+    @PositiveOrZero private Integer contextWindowTurns;
+    @Positive private Integer maxContextTokens;
 }

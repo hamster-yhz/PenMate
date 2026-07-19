@@ -198,7 +198,6 @@ public class AgentRunContextArtifactService {
             Long styleBindingRevision,
             String routingMode,
             Long routerModelConfigId,
-            Long routerModelConfigRevision,
             String promptBundleHash,
             String skillCatalogHash,
             String toolCatalogHash

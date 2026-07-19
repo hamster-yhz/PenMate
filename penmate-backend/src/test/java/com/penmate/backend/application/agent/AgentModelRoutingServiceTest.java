@@ -1,6 +1,8 @@
 package com.penmate.backend.application.agent;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.domain.model.model.ModelConfiguration;
+import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.repository.ModelRepository;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import org.junit.jupiter.api.Test;
@@ -8,8 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -28,14 +28,21 @@ class AgentModelRoutingServiceTest {
 
     @Test
     void should_carry_context_window_turns_into_execution_config() {
-        when(modelRepository.findUserModelConfig(1001L, 9001L)).thenReturn(Map.of(
-                "providerId", 1L,
-                "modelName", "gpt-4o-mini",
-                "baseUrl", "https://api.openai.com/v1",
-                "encryptedApiKey", "cipher-key",
-                "keyStatus", "active",
-                "contextWindowTurns", 8
-        ));
+        ModelConfiguration model = new ModelConfiguration();
+        model.setModelConfigId(9001L);
+        model.setModelType("CHAT");
+        model.setStatus("ACTIVE");
+        model.setProviderCode("openai");
+        model.setProviderAuthType("API_KEY");
+        model.setModelName("gpt-4o-mini");
+        model.setBaseUrl("https://api.openai.com/v1");
+        model.setContextWindowTurns(8);
+        ModelCredential credential = new ModelCredential();
+        credential.setModelConfigId(9001L);
+        credential.setEncryptedApiKey("cipher-key");
+        credential.setStatus("ACTIVE");
+        when(modelRepository.findAccessibleConfiguration(1001L, 9001L)).thenReturn(model);
+        when(modelRepository.findCredential(model)).thenReturn(credential);
         when(secretCryptoService.decrypt("cipher-key")).thenReturn("sk-live");
 
         AgentLlmExecutionConfig config = agentModelRoutingService.resolveExecutionConfig(1001L, 9001L, "trace-ctx-window");

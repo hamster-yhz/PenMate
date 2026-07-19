@@ -1,5 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.model;
 
+import com.penmate.backend.domain.model.model.ModelConfiguration;
+import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
@@ -13,12 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,52 +32,50 @@ class ModelMapperDbCaseTest {
 
     @BeforeEach
     void resetSchema() throws Exception {
-        resetRows();
-        seedRows();
+        execute("DELETE FROM model_user_api_keys WHERE model_config_id BETWEEN 920000 AND 920999");
+        execute("DELETE FROM model_official_api_keys WHERE model_config_id BETWEEN 920000 AND 920999");
+        execute("DELETE FROM model_configurations WHERE model_config_id BETWEEN 920000 AND 920999");
+        seedConfiguration();
     }
 
     @Test
-    void should_read_max_context_tokens_from_model_user_configuration_queries() {
-        try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
-            ModelMapper mapper = sqlSession.getMapper(ModelMapper.class);
+    void readsUnifiedUserConfigurationAndMaskedCredential() {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            ModelMapper mapper = session.getMapper(ModelMapper.class);
 
-            List<Map<String, Object>> listed = mapper.listUserModelConfigs(920002L);
-            Map<String, Object> found = mapper.findUserModelConfig(920002L, 920021L);
+            List<ModelConfiguration> listed = mapper.listAccessibleConfigurations(920002L);
+            ModelConfiguration found = mapper.findAccessibleConfiguration(920002L, 920021L);
 
-            assertThat(listed)
-                    .singleElement()
-                    .satisfies(item -> assertThat(normalizeKeys(item))
-                            .containsEntry("modelconfigid", 920021L)
-                            .containsEntry("maxcontexttokens", 64000));
-            assertThat(normalizeKeys(found))
-                    .containsEntry("modelconfigid", 920021L)
-                    .containsEntry("maxcontexttokens", 64000)
-                    .containsEntry("keyname", "DBCASE Owner OpenAI 主 Key")
-                    .containsEntry("maskedapikey", "****92011");
+            assertThat(listed).anySatisfy(item -> assertThat(item.getModelConfigId()).isEqualTo(920021L));
+            assertThat(found).satisfies(item -> {
+                assertThat(item.getScopeType()).isEqualTo("USER");
+                assertThat(item.getOwnerUserId()).isEqualTo(920002L);
+                assertThat(item.getMaxContextTokens()).isEqualTo(64000);
+                assertThat(item.getMaskedApiKey()).isEqualTo("****2011");
+                assertThat(item.getProtocolCode()).isEqualTo("OPENAI_CHAT_COMPLETIONS");
+            });
         }
     }
 
     @Test
-    void should_persist_max_context_tokens_when_inserting_user_model_config() throws Exception {
-        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
-            ModelMapper mapper = sqlSession.getMapper(ModelMapper.class);
+    void insertsAndUpdatesUnifiedConfigurationWithCredential() throws Exception {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            ModelMapper mapper = session.getMapper(ModelMapper.class);
+            ModelConfiguration configuration = configuration(920031L, 200000);
+            ModelCredential credential = new ModelCredential();
+            credential.setCredentialId(920032L);
+            credential.setEncryptedApiKey("cipher-920032");
+            credential.setMaskedApiKey("****0032");
+            credential.setStatus("ACTIVE");
 
-            assertThat(mapper.insertUserModelConfig(920031L, 920002L, 1L, "gpt-4.1", null, "USER_KEY", 920011L, null, 8, 200000, "active"))
-                    .isEqualTo(1);
-            assertThat(singleLong("SELECT max_context_tokens FROM model_user_configurations WHERE model_config_id = 920031"))
-                    .isEqualTo(200000L);
-        }
-    }
+            assertThat(mapper.insertConfiguration(configuration)).isEqualTo(1);
+            assertThat(mapper.insertUserCredential(configuration, credential)).isEqualTo(1);
+            configuration.setMaxContextTokens(32000);
+            assertThat(mapper.updateConfiguration(configuration)).isEqualTo(1);
 
-    @Test
-    void should_persist_max_context_tokens_when_updating_user_model_config() throws Exception {
-        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
-            ModelMapper mapper = sqlSession.getMapper(ModelMapper.class);
-
-            assertThat(mapper.updateUserModelConfig(920002L, 920021L, 1L, "gpt-4o-mini", null, "USER_KEY", 920011L, null, 6, 32000, "active"))
-                    .isEqualTo(1);
-            assertThat(singleLong("SELECT max_context_tokens FROM model_user_configurations WHERE model_config_id = 920021"))
+            assertThat(singleLong("SELECT max_context_tokens FROM model_configurations WHERE model_config_id = 920031"))
                     .isEqualTo(32000L);
+            assertThat(mapper.findUserCredential(920002L, 920031L).getMaskedApiKey()).isEqualTo("****0032");
         }
     }
 
@@ -91,52 +87,60 @@ class ModelMapperDbCaseTest {
         return new SqlSessionFactoryBuilder().build(configuration);
     }
 
-    private static void resetRows() throws Exception {
-        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
-             Statement statement = connection.createStatement()) {
-            statement.execute("DELETE FROM model_user_configurations WHERE model_config_id BETWEEN 920000 AND 920999");
-            statement.execute("DELETE FROM model_official_api_keys WHERE official_api_key_id BETWEEN 920000 AND 920999");
-            statement.execute("DELETE FROM model_user_api_keys WHERE user_api_key_id BETWEEN 920000 AND 920999");
-        }
+    private static void seedConfiguration() throws Exception {
+        execute("""
+                INSERT INTO model_configurations(
+                    model_config_id, scope_type, owner_user_id, provider_id, display_name,
+                    model_type, model_name, base_url, distance_metric, context_window_turns,
+                    max_context_tokens, status, created_by, updated_by
+                ) VALUES (
+                    920021, 'USER', 920002, 1, 'DBCASE Chat',
+                    'CHAT', 'gpt-4o-mini', NULL, NULL, 6,
+                    64000, 'ACTIVE', 920002, 920002
+                )
+                """);
+        execute("""
+                INSERT INTO model_user_api_keys(
+                    user_api_key_id, model_config_id, user_id, provider_id,
+                    encrypted_api_key, masked_api_key, status
+                ) VALUES (920011, 920021, 920002, 1, 'cipher-920011', '****2011', 'ACTIVE')
+                """);
     }
-    private static void seedRows() throws Exception {
-        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
-             Statement statement = connection.createStatement()) {
-            statement.execute("""
-                    INSERT INTO model_user_api_keys(
-                        id, user_api_key_id, user_id, provider_id, key_name, encrypted_api_key,
-                        masked_api_key, is_default, last_used_at, status, created_at, updated_at, deleted_at
-                    ) VALUES (
-                        920001, 920011, 920002, 1, 'DBCASE Owner OpenAI 主 Key', 'cipher-user-openai-920011',
-                        '****92011', TRUE, CURRENT_TIMESTAMP, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL
-                    )
-                    """);
-            statement.execute("""
-                    INSERT INTO model_user_configurations(
-                        id, model_config_id, user_id, provider_id, model_name, base_url,
-                        key_source_type, user_key_id, official_key_id, context_window_turns,
-                        max_context_tokens, status, created_at, updated_at, deleted_at
-                    ) VALUES (
-                        920001, 920021, 920002, 1, 'gpt-4o-mini', NULL,
-                        'USER_KEY', 920011, NULL, 6,
-                        64000, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL
-                    )
-                    """);
-        }
+
+    private static ModelConfiguration configuration(Long id, int maxTokens) {
+        ModelConfiguration configuration = new ModelConfiguration();
+        configuration.setModelConfigId(id);
+        configuration.setScopeType("USER");
+        configuration.setOwnerUserId(920002L);
+        configuration.setProviderId(1L);
+        configuration.setDisplayName("Inserted Chat");
+        configuration.setModelType("CHAT");
+        configuration.setModelName("gpt-4.1");
+        configuration.setContextWindowTurns(8);
+        configuration.setMaxContextTokens(maxTokens);
+        configuration.setStatus("ACTIVE");
+        configuration.setCreatedBy(920002L);
+        configuration.setUpdatedBy(920002L);
+        return configuration;
     }
 
     private static long singleLong(String sql) throws Exception {
-        try (Connection connection = sqlSessionFactory.getConfiguration().getEnvironment().getDataSource().getConnection();
+        try (Connection connection = dataSource().getConnection();
              Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(sql)) {
-            resultSet.next();
-            return resultSet.getLong(1);
+             var result = statement.executeQuery(sql)) {
+            result.next();
+            return result.getLong(1);
         }
     }
 
-    private static Map<String, Object> normalizeKeys(Map<String, Object> source) {
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        source.forEach((key, value) -> normalized.put(key.toLowerCase(Locale.ROOT), value));
-        return normalized;
+    private static void execute(String sql) throws Exception {
+        try (Connection connection = dataSource().getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
+    }
+
+    private static DataSource dataSource() {
+        return sqlSessionFactory.getConfiguration().getEnvironment().getDataSource();
     }
 }

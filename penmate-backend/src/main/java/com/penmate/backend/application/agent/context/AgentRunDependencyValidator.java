@@ -40,7 +40,7 @@ public class AgentRunDependencyValidator {
         var current = new AgentRunContextArtifactService.DependencyManifest(
                 snapshot.storyBibleRevision(), snapshot.manuscriptRevision(), input.chapterId(),
                 snapshot.activeChapterContentRevision(), styleRevision == null ? 0L : styleRevision,
-                preference.mode().name(), preference.routerModelConfigId(), preference.routerModelConfigRevision(),
+                preference.mode().name(), preference.routerModelConfigId(),
                 hashes.promptBundleHash(), hashes.skillCatalogHash(), hashes.toolCatalogHash());
         var expected = artifact.dependencies() == null ? fromEpoch(artifact.contextEpochId()) : artifact.dependencies();
         List<String> changed = differences(expected, current);
@@ -52,7 +52,7 @@ public class AgentRunDependencyValidator {
         return new AgentRunContextArtifactService.DependencyManifest(
                 epoch.storyBibleRevision(), epoch.manuscriptRevision(), epoch.activeChapterId(),
                 epoch.activeChapterContentRevision(), epoch.styleBindingRevision(), epoch.routingMode(),
-                epoch.routerModelConfigId(), epoch.routerModelConfigRevision(), epoch.promptBundleHash(),
+                epoch.routerModelConfigId(), epoch.promptBundleHash(),
                 epoch.skillCatalogHash(), epoch.toolCatalogHash());
     }
 
@@ -66,7 +66,6 @@ public class AgentRunDependencyValidator {
         compare(changed, "styleBindingRevision", expected.styleBindingRevision(), current.styleBindingRevision());
         compare(changed, "routingMode", expected.routingMode(), current.routingMode());
         compare(changed, "routerModelConfigId", expected.routerModelConfigId(), current.routerModelConfigId());
-        compare(changed, "routerModelConfigRevision", expected.routerModelConfigRevision(), current.routerModelConfigRevision());
         compare(changed, "promptBundleHash", expected.promptBundleHash(), current.promptBundleHash());
         compare(changed, "skillCatalogHash", expected.skillCatalogHash(), current.skillCatalogHash());
         compare(changed, "toolCatalogHash", expected.toolCatalogHash(), current.toolCatalogHash());

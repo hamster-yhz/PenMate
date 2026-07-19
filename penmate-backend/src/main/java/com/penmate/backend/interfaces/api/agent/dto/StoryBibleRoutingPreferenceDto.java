@@ -9,7 +9,6 @@ public final class StoryBibleRoutingPreferenceDto {
     public record Update(StoryBibleRoutingMode mode, String routerModelConfigId) {
     }
 
-    public record View(StoryBibleRoutingMode mode, String routerModelConfigId,
-                       Long routerModelConfigRevision, boolean inherited) {
+    public record View(StoryBibleRoutingMode mode, String routerModelConfigId) {
     }
 }

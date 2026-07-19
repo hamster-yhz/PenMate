@@ -77,7 +77,7 @@ public class AgentRunContextResolutionService {
                 input.chapterId(), newSnapshot.activeChapterContentRevision(),
                 styleBindingRevision == null ? 0L : styleBindingRevision,
                 preference.mode().name(), preference.routerModelConfigId(),
-                preference.routerModelConfigRevision(), catalogHashes.promptBundleHash(), catalogHashes.skillCatalogHash(),
+                catalogHashes.promptBundleHash(), catalogHashes.skillCatalogHash(),
                 catalogHashes.toolCatalogHash(), snapshotJson));
         ContextEpochSnapshotCodec.Snapshot boundSnapshot = snapshotCodec.decode(
                 epochs.loadVerifiedSnapshot(binding.epoch().epochId()));
@@ -96,7 +96,7 @@ public class AgentRunContextResolutionService {
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
                 newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(), input.chapterId(),
                 newSnapshot.activeChapterContentRevision(), styleBindingRevision == null ? 0L : styleBindingRevision,
-                preference.mode().name(), preference.routerModelConfigId(), preference.routerModelConfigRevision(),
+                preference.mode().name(), preference.routerModelConfigId(),
                 catalogHashes.promptBundleHash(), catalogHashes.skillCatalogHash(), catalogHashes.toolCatalogHash());
         var durable = new AgentRunContextArtifactService.ResolvedArtifact(
                 3, run.runId(), binding.epoch().epochId(), resolved.decision(), contextPackage, workingSetIds, manifest,

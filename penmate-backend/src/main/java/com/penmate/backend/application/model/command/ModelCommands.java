@@ -5,59 +5,41 @@ public final class ModelCommands {
     private ModelCommands() {
     }
 
-    public record CreateModelKeyCommand(Long providerId,
-                                        String keyName,
-                                        String apiKey,
-                                        Boolean isDefault,
-                                        String status,
-                                        Long operatorId) {
+    public record CreateConfigurationCommand(
+            Long providerId,
+            String displayName,
+            String modelType,
+            String modelName,
+            String baseUrl,
+            String distanceMetric,
+            String apiKey,
+            Integer contextWindowTurns,
+            Integer maxContextTokens
+    ) {
     }
 
-    public record UpdateModelKeyCommand(String keyName,
-                                        String apiKey,
-                                        Boolean isDefault,
-                                        String status,
-                                        Long operatorId) {
+    public record UpdateConfigurationCommand(
+            Long providerId,
+            String displayName,
+            String modelName,
+            String baseUrl,
+            String distanceMetric,
+            String apiKey,
+            Integer contextWindowTurns,
+            Integer maxContextTokens,
+            String status
+    ) {
     }
 
-    public record CreateOfficialModelKeyCommand(Long providerId,
-                                                String keyName,
-                                                String apiKey,
-                                                Boolean isDefault,
-                                                String status,
-                                                Long operatorId) {
-    }
-
-    public record UpdateOfficialModelKeyCommand(String keyName,
-                                                String apiKey,
-                                                Boolean isDefault,
-                                                String status,
-                                                Long operatorId) {
-    }
-
-    public record CreateUserModelConfigCommand(Long providerId,
-                                               String modelName,
-                                               String baseUrl,
-                                               String keySourceType,
-                                               String apiKey,
-                                               Integer contextWindowTurns,
-                                               Integer maxContextTokens,
-                                               String status,
-                                               Long operatorId) {
-    }
-
-    public record UpdateUserModelConfigCommand(Long providerId,
-                                               String modelName,
-                                               String baseUrl,
-                                               String keySourceType,
-                                               String apiKey,
-                                               Integer contextWindowTurns,
-                                               Integer maxContextTokens,
-                                               String status,
-                                               Long operatorId) {
-    }
-
-    public record SaveUserModelPreferencesCommand(Long mainAgentModelConfigId,
-                                                  Long dirtyWorkAgentModelConfigId) {
+    public record SaveUserModelPreferencesCommand(
+            Long defaultMainChatModelConfigId,
+            Long defaultWorkerChatModelConfigId,
+            Long defaultEmbeddingModelConfigId,
+            Long defaultRouterModelConfigId,
+            String defaultStoryBibleRoutingMode,
+            Integer defaultChunkTargetCharacters,
+            Integer defaultChunkOverlapCharacters,
+            Integer defaultChunkMaxCharacters
+    ) {
     }
 }

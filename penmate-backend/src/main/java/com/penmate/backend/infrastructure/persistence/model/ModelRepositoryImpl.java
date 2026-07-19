@@ -1,196 +1,81 @@
 package com.penmate.backend.infrastructure.persistence.model;
 
-import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
+import com.penmate.backend.domain.model.model.ModelConfiguration;
+import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelUserApiKey;
+import com.penmate.backend.domain.model.model.ModelProviderCapability;
+import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Map;
 
-/**
- * 模型配置仓储实现。
- */
 @Repository
+@RequiredArgsConstructor
 public class ModelRepositoryImpl implements ModelRepository {
 
-    private final ModelMapper modelMapper;
+    private final ModelMapper mapper;
 
-    public ModelRepositoryImpl(ModelMapper modelMapper) {
-        this.modelMapper = modelMapper;
+    @Override public List<ModelProvider> listProviders() { return mapper.listProviders(); }
+    @Override public ModelProvider findProvider(Long providerId) { return mapper.findProvider(providerId); }
+    @Override public List<ModelProviderCapability> listCapabilities(Long providerId) { return mapper.listCapabilities(providerId); }
+    @Override public ModelProviderCapability findCapability(Long providerId, String capabilityCode) {
+        return mapper.findCapability(providerId, capabilityCode);
     }
-
-    @Override
-    public List<ModelUserApiKey> listUserKeys(Long userId) {
-        return modelMapper.listUserKeys(userId);
+    @Override public List<ModelConfiguration> listAccessibleConfigurations(Long userId) {
+        return mapper.listAccessibleConfigurations(userId);
     }
-
-    @Override
-    public List<ModelOfficialApiKey> listOfficialKeys() {
-        return modelMapper.listOfficialKeys();
+    @Override public ModelConfiguration findAccessibleConfiguration(Long userId, Long modelConfigId) {
+        return mapper.findAccessibleConfiguration(userId, modelConfigId);
     }
-
-    @Override
-    public int insertUserKey(Long userApiKeyId,
-                             Long userId,
-                             Long providerId,
-                             String keyName,
-                             String encryptedApiKey,
-                             String maskedApiKey,
-                             boolean isDefault,
-                             String status) {
-        return modelMapper.insertUserKey(userApiKeyId, userId, providerId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
+    @Override public ModelConfiguration findOwnedConfigurationForUpdate(Long actorUserId, Long modelConfigId, boolean systemScope) {
+        return systemScope ? mapper.findSystemConfigurationForUpdate(modelConfigId)
+                : mapper.findUserConfigurationForUpdate(actorUserId, modelConfigId);
     }
-
-    @Override
-    public int insertOfficialKey(Long officialApiKeyId,
-                                 Long providerId,
-                                 String keyName,
-                                 String encryptedApiKey,
-                                 String maskedApiKey,
-                                 boolean isDefault,
-                                 String status) {
-        return modelMapper.insertOfficialKey(officialApiKeyId, providerId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
+    @Override public ModelCredential findCredential(ModelConfiguration configuration) {
+        return "SYSTEM".equals(configuration.getScopeType())
+                ? mapper.findOfficialCredential(configuration.getModelConfigId())
+                : mapper.findUserCredential(configuration.getOwnerUserId(), configuration.getModelConfigId());
     }
-
-    @Override
-    public int clearDefaultUserKey(Long userId) {
-        return modelMapper.clearDefaultUserKey(userId);
+    @Override public int insertConfiguration(ModelConfiguration configuration) { return mapper.insertConfiguration(configuration); }
+    @Override public int updateConfiguration(ModelConfiguration configuration) { return mapper.updateConfiguration(configuration); }
+    @Override public int insertCredential(ModelConfiguration configuration, ModelCredential credential) {
+        return "SYSTEM".equals(configuration.getScopeType())
+                ? mapper.insertOfficialCredential(configuration, credential)
+                : mapper.insertUserCredential(configuration, credential);
     }
-
-    @Override
-    public int clearDefaultOfficialKey(Long providerId) {
-        return modelMapper.clearDefaultOfficialKey(providerId);
+    @Override public int updateCredential(ModelConfiguration configuration, ModelCredential credential) {
+        return "SYSTEM".equals(configuration.getScopeType())
+                ? mapper.updateOfficialCredential(configuration, credential)
+                : mapper.updateUserCredential(configuration, credential);
     }
-
-    @Override
-    public int updateUserKey(Long userId,
-                             Long keyId,
-                             String keyName,
-                             String encryptedApiKey,
-                             String maskedApiKey,
-                             Boolean isDefault,
-                             String status) {
-        return modelMapper.updateUserKey(userId, keyId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
+    @Override public int softDeleteConfiguration(ModelConfiguration configuration, Long actorUserId) {
+        return mapper.softDeleteConfiguration(configuration, actorUserId);
     }
-
-    @Override
-    public int updateOfficialKey(Long keyId,
-                                 String keyName,
-                                 String encryptedApiKey,
-                                 String maskedApiKey,
-                                 Boolean isDefault,
-                                 String status) {
-        return modelMapper.updateOfficialKey(keyId, keyName, encryptedApiKey, maskedApiKey, isDefault, status);
+    @Override public int softDeleteCredential(ModelConfiguration configuration) {
+        return "SYSTEM".equals(configuration.getScopeType())
+                ? mapper.softDeleteOfficialCredential(configuration.getModelConfigId())
+                : mapper.softDeleteUserCredential(configuration.getModelConfigId());
     }
-
-    @Override
-    public int softDeleteUserKey(Long userId, Long keyId) {
-        return modelMapper.softDeleteUserKey(userId, keyId);
+    @Override public boolean hasNonterminalRunReference(Long modelConfigId) {
+        return mapper.countNonterminalRunReferences(modelConfigId) > 0;
     }
-
-    @Override
-    public int softDeleteOfficialKey(Long keyId) {
-        return modelMapper.softDeleteOfficialKey(keyId);
+    @Override public List<Long> listDependentProjectIds(Long modelConfigId) {
+        return mapper.listDependentProjectIds(modelConfigId);
     }
-
-    @Override
-    public ModelProvider findProvider(Long providerId) {
-        return modelMapper.findProvider(providerId);
+    @Override public List<Long> lockDependentProjectIds(Long modelConfigId) {
+        return mapper.lockDependentProjectIds(modelConfigId);
     }
-
-    @Override
-    public ModelUserApiKey findUserKey(Long userKeyId) {
-        return modelMapper.findUserKey(userKeyId);
+    @Override public int markDependentProjectsReindexRequired(Long modelConfigId, String reason) {
+        return mapper.markDependentProjectsReindexRequired(modelConfigId, reason);
     }
-
-    @Override
-    public ModelOfficialApiKey findOfficialKey(Long officialKeyId) {
-        return modelMapper.findOfficialKey(officialKeyId);
-    }
-
-    @Override
-    public ModelOfficialApiKey findDefaultOfficialKey(Long providerId) {
-        return modelMapper.findDefaultOfficialKey(providerId);
-    }
-
-    @Override
-    public List<Map<String, Object>> listUserModelConfigs(Long userId) {
-        return modelMapper.listUserModelConfigs(userId);
-    }
-
-    @Override
-    public Map<String, Object> findUserModelConfig(Long userId, Long modelConfigId) {
-        return modelMapper.findUserModelConfig(userId, modelConfigId);
-    }
-
-    @Override
-    public int insertUserModelConfig(Long modelConfigId,
-                                     Long userId,
-                                     Long providerId,
-                                     String modelName,
-                                     String baseUrl,
-                                     String keySourceType,
-                                     Long userKeyId,
-                                     Long officialKeyId,
-                                     Integer contextWindowTurns,
-                                     Integer maxContextTokens,
-                                     String status) {
-        return modelMapper.insertUserModelConfig(
-                modelConfigId,
-                userId,
-                providerId,
-                modelName,
-                baseUrl,
-                keySourceType,
-                userKeyId,
-                officialKeyId,
-                contextWindowTurns,
-                maxContextTokens,
-                status
-        );
-    }
-
-    @Override
-    public int updateUserModelConfig(Long userId,
-                                     Long modelConfigId,
-                                     Long providerId,
-                                     String modelName,
-                                     String baseUrl,
-                                     String keySourceType,
-                                     Long userKeyId,
-                                     Long officialKeyId,
-                                     Integer contextWindowTurns,
-                                     Integer maxContextTokens,
-                                     String status) {
-        return modelMapper.updateUserModelConfig(
-                userId,
-                modelConfigId,
-                providerId,
-                modelName,
-                baseUrl,
-                keySourceType,
-                userKeyId,
-                officialKeyId,
-                contextWindowTurns,
-                maxContextTokens,
-                status
-        );
-    }
-
-    @Override
-    public int softDeleteUserModelConfig(Long userId, Long modelConfigId) {
-        return modelMapper.softDeleteUserModelConfig(userId, modelConfigId);
-    }
-
-    @Override
-    public int updateUserModelPreferences(Long userId, Long mainAgentModelConfigId, Long dirtyWorkAgentModelConfigId) {
-        return modelMapper.updateUserModelPreferences(userId, mainAgentModelConfigId, dirtyWorkAgentModelConfigId);
-    }
-
-    @Override
-    public boolean existsUsableModelConfig(Long userId, Long modelConfigId) {
-        return modelMapper.countUsableModelConfig(userId, modelConfigId) > 0;
+    @Override public int unbindDependentProjects(Long modelConfigId) { return mapper.unbindDependentProjects(modelConfigId); }
+    @Override public int clearUserDefaultReferences(Long modelConfigId) { return mapper.clearUserDefaultReferences(modelConfigId); }
+    @Override public boolean hasAnyReference(Long modelConfigId) { return mapper.countAllReferences(modelConfigId) > 0; }
+    @Override public ModelUserPreferences findUserPreferences(Long userId) { return mapper.findUserPreferences(userId); }
+    @Override public int upsertUserPreferences(ModelUserPreferences preferences) { return mapper.upsertUserPreferences(preferences); }
+    @Override public boolean existsAccessibleActiveConfiguration(Long userId, Long modelConfigId, String modelType) {
+        return mapper.countAccessibleActiveConfiguration(userId, modelConfigId, modelType) > 0;
     }
 }

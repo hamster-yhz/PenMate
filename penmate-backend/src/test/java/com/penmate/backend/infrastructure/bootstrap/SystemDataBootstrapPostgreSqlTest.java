@@ -37,7 +37,7 @@ class SystemDataBootstrapPostgreSqlTest {
         assertThat(passwordEncoder.matches("first-password", jdbc.queryForObject(
                 "SELECT password_hash FROM iam_users WHERE user_id = 1", String.class))).isTrue();
         assertThat(jdbc.queryForObject(
-                "SELECT model_name FROM model_user_configurations WHERE model_config_id = 1", String.class))
+                "SELECT model_name FROM model_configurations WHERE model_config_id = 1", String.class))
                 .isEqualTo("first-model");
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM iam_user_roles WHERE user_id = 1 AND role_id = 1", Integer.class))
@@ -45,14 +45,14 @@ class SystemDataBootstrapPostgreSqlTest {
 
         properties.getAdmin().setEmail("second@penmate.local");
         properties.getAdmin().setPassword("second-password");
-        properties.getModel().setApiKey("second-key");
-        properties.getModel().setModelName("second-model");
+        properties.getChat().setApiKey("second-key");
+        properties.getChat().setModelName("second-model");
         bootstrap.run(mock(ApplicationArguments.class));
 
         assertThat(jdbc.queryForObject("SELECT email FROM iam_users WHERE user_id = 1", String.class))
                 .isEqualTo("admin@penmate.local");
         assertThat(jdbc.queryForObject(
-                "SELECT model_name FROM model_user_configurations WHERE model_config_id = 1", String.class))
+                "SELECT model_name FROM model_configurations WHERE model_config_id = 1", String.class))
                 .isEqualTo("first-model");
 
         properties.setReconcile(true);
@@ -63,7 +63,7 @@ class SystemDataBootstrapPostgreSqlTest {
         assertThat(passwordEncoder.matches("second-password", jdbc.queryForObject(
                 "SELECT password_hash FROM iam_users WHERE user_id = 1", String.class))).isTrue();
         assertThat(jdbc.queryForObject(
-                "SELECT model_name FROM model_user_configurations WHERE model_config_id = 1", String.class))
+                "SELECT model_name FROM model_configurations WHERE model_config_id = 1", String.class))
                 .isEqualTo("second-model");
         assertThat(jdbc.queryForObject(
                 "SELECT encrypted_api_key FROM model_official_api_keys WHERE official_api_key_id = 1", String.class))
@@ -75,10 +75,10 @@ class SystemDataBootstrapPostgreSqlTest {
         SystemBootstrapProperties properties = new SystemBootstrapProperties();
         properties.getAdmin().setEmail(email);
         properties.getAdmin().setPassword(password);
-        properties.getModel().setProvider("openai-compatible");
-        properties.getModel().setBaseUrl("http://localhost:11434/v1");
-        properties.getModel().setApiKey(apiKey);
-        properties.getModel().setModelName(modelName);
+        properties.getChat().setProvider("openai-compatible");
+        properties.getChat().setBaseUrl("http://localhost:11434/v1");
+        properties.getChat().setApiKey(apiKey);
+        properties.getChat().setModelName(modelName);
         return properties;
     }
 }

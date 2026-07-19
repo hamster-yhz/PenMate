@@ -11,7 +11,8 @@ public class SystemBootstrapProperties {
 
     private boolean reconcile;
     private Admin admin = new Admin();
-    private Model model = new Model();
+    private ModelGroup chat = new ModelGroup();
+    private ModelGroup embedding = new ModelGroup();
 
     @Data
     public static class Admin {
@@ -20,7 +21,7 @@ public class SystemBootstrapProperties {
     }
 
     @Data
-    public static class Model {
+    public static class ModelGroup {
         private String provider;
         private String baseUrl;
         private String apiKey;

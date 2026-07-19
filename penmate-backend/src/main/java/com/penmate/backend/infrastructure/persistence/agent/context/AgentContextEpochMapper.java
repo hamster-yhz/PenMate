@@ -19,7 +19,7 @@ public interface AgentContextEpochMapper {
             SELECT e.epoch_id, e.session_id, e.epoch_no, e.fingerprint, e.story_bible_revision,
                    e.manuscript_revision, e.active_chapter_id, e.active_chapter_content_revision,
                    e.style_binding_revision, e.routing_mode,
-                   e.router_model_config_id, e.router_model_config_revision, e.prompt_bundle_hash,
+                   e.router_model_config_id, e.prompt_bundle_hash,
                    e.skill_catalog_hash, e.tool_catalog_hash, e.snapshot_object_key, e.snapshot_hash,
                    e.snapshot_size_bytes, e.created_at, e.superseded_at
             FROM agent_context_epochs e
@@ -33,7 +33,7 @@ public interface AgentContextEpochMapper {
     @Select("""
             SELECT epoch_id, session_id, epoch_no, fingerprint, story_bible_revision, manuscript_revision,
                    active_chapter_id, active_chapter_content_revision, style_binding_revision, routing_mode, router_model_config_id,
-                   router_model_config_revision, prompt_bundle_hash, skill_catalog_hash, tool_catalog_hash,
+                   prompt_bundle_hash, skill_catalog_hash, tool_catalog_hash,
                    snapshot_object_key, snapshot_hash, snapshot_size_bytes, created_at, superseded_at
             FROM agent_context_epochs WHERE epoch_id = #{epochId} LIMIT 1
             """)
@@ -46,12 +46,12 @@ public interface AgentContextEpochMapper {
             INSERT INTO agent_context_epochs(
                 epoch_id, session_id, epoch_no, fingerprint, story_bible_revision, manuscript_revision,
                 active_chapter_id, active_chapter_content_revision, style_binding_revision, routing_mode, router_model_config_id,
-                router_model_config_revision, prompt_bundle_hash, skill_catalog_hash, tool_catalog_hash,
+                prompt_bundle_hash, skill_catalog_hash, tool_catalog_hash,
                 snapshot_object_key, snapshot_hash, snapshot_size_bytes
             ) VALUES (
                 #{epochId}, #{sessionId}, #{epochNo}, #{fingerprint}, #{storyBibleRevision}, #{manuscriptRevision},
                 #{activeChapterId}, #{activeChapterContentRevision}, #{styleBindingRevision}, #{routingMode}, #{routerModelConfigId},
-                #{routerModelConfigRevision}, #{promptBundleHash}, #{skillCatalogHash}, #{toolCatalogHash},
+                #{promptBundleHash}, #{skillCatalogHash}, #{toolCatalogHash},
                 #{snapshotObjectKey}, #{snapshotHash}, #{snapshotSizeBytes}
             )
             """)

@@ -3,415 +3,262 @@ package com.penmate.backend.interfaces.api.model;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.ModelApplicationService;
 import com.penmate.backend.application.model.command.ModelCommands;
-import com.penmate.backend.domain.model.model.ModelOfficialApiKey;
-import com.penmate.backend.domain.model.model.ModelProvider;
-import com.penmate.backend.domain.model.model.ModelUserApiKey;
+import com.penmate.backend.domain.model.model.ModelConfiguration;
+import com.penmate.backend.domain.model.model.ModelProviderCapability;
+import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
-import com.penmate.backend.interfaces.api.model.dto.CreateModelKeyDto;
-import com.penmate.backend.interfaces.api.model.dto.CreateOfficialModelKeyDto;
-import com.penmate.backend.interfaces.api.model.dto.CreateUserModelConfigDto;
-import com.penmate.backend.interfaces.api.model.dto.SaveUserModelPreferencesDto;
-import com.penmate.backend.interfaces.api.model.dto.UpdateModelKeyDto;
-import com.penmate.backend.interfaces.api.model.dto.UpdateOfficialModelKeyDto;
-import com.penmate.backend.interfaces.api.model.dto.UpdateUserModelConfigDto;
+import com.penmate.backend.interfaces.api.model.dto.CreateModelConfigurationDto;
+import com.penmate.backend.interfaces.api.model.dto.SaveModelPreferencesDto;
+import com.penmate.backend.interfaces.api.model.dto.UpdateModelConfigurationDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.temporal.TemporalAccessor;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/model")
 @RequiredArgsConstructor
 public class ModelController {
 
-    private static final Set<String> BUSINESS_ID_KEYS = Set.of(
-            "id",
-            "userId",
-            "providerId",
-            "modelConfigId",
-            "mainAgentModelConfigId",
-            "dirtyWorkAgentModelConfigId"
-    );
+    private final ModelApplicationService service;
 
-    private final ModelApplicationService modelApplicationService;
-
-    @GetMapping("/model/providers")
+    @GetMapping("/providers")
     public ApiResponse<List<Map<String, Object>>> listProviders(
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = modelApplicationService.listProviders().stream()
-                .filter(provider -> provider.getProviderId() != null && provider.getProviderId() > 0)
-                .map(this::toProviderView)
-                .toList();
-        return ApiResponse.success(items, traceId);
+        return ApiResponse.success(service.listProviders().stream().map(this::providerView).toList(), traceId);
     }
 
-    @GetMapping("/model/keys")
-    public ApiResponse<List<Map<String, Object>>> listKeys(
-            @RequestParam("userId") String userId,
+    @GetMapping("/configurations")
+    public ApiResponse<List<Map<String, Object>>> listConfigurations(
+            Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = modelApplicationService.listUserKeys(requirePositiveLongId(userId, "userId")).stream()
-                .map(this::toUserKeyView)
-                .toList();
-        return ApiResponse.success(items, traceId);
+        return ApiResponse.success(service.listAccessibleConfigurations(actor(authentication)).stream()
+                .map(this::configurationView).toList(), traceId);
     }
 
-    @PostMapping("/model/keys")
-    public ApiResponse<String> createKey(
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
-            @Valid @RequestBody CreateModelKeyDto dto,
+    @PostMapping("/configurations")
+    public ApiResponse<Map<String, Object>> createUserConfiguration(
+            Authentication authentication,
+            @Valid @RequestBody CreateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.createKey(
-                requirePositiveLongId(userId, "userId"),
-                new ModelCommands.CreateModelKeyCommand(
-                        requirePositiveLongId(dto.getProviderId(), "providerId"),
-                        dto.getKeyName(),
-                        dto.getApiKey(),
-                        dto.getIsDefault(),
-                        dto.getStatus(),
-                        requirePositiveLongId(operatorId, "operatorId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("created", traceId);
+        return ApiResponse.success(configurationView(service.createConfiguration(
+                actor(authentication), false, createCommand(dto))), traceId);
     }
 
-    @PatchMapping("/model/keys/{keyId}")
-    public ApiResponse<String> updateKey(
-            @PathVariable String keyId,
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
-            @RequestBody UpdateModelKeyDto dto,
+    @PostMapping("/system-configurations")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<Map<String, Object>> createSystemConfiguration(
+            Authentication authentication,
+            @Valid @RequestBody CreateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.updateKey(
-                requirePositiveLongId(userId, "userId"),
-                requirePositiveLongId(keyId, "keyId"),
-                new ModelCommands.UpdateModelKeyCommand(
-                        dto.getKeyName(),
-                        dto.getApiKey(),
-                        dto.getIsDefault(),
-                        dto.getStatus(),
-                        requirePositiveLongId(operatorId, "operatorId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("updated", traceId);
+        return ApiResponse.success(configurationView(service.createConfiguration(
+                actor(authentication), true, createCommand(dto))), traceId);
     }
 
-    @DeleteMapping("/model/keys/{keyId}")
-    public ApiResponse<String> deleteKey(
-            @PathVariable String keyId,
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.deleteKey(
-                requirePositiveLongId(userId, "userId"),
-                requirePositiveLongId(keyId, "keyId"),
-                requirePositiveLongId(operatorId, "operatorId"),
-                traceId
-        );
-        return ApiResponse.success("deleted", traceId);
-    }
-
-    @GetMapping("/model/official-keys")
-    public ApiResponse<List<Map<String, Object>>> listOfficialKeys(
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = modelApplicationService.listOfficialKeys().stream()
-                .map(this::toOfficialKeyView)
-                .toList();
-        return ApiResponse.success(items, traceId);
-    }
-
-    @PostMapping("/model/official-keys")
-    public ApiResponse<String> createOfficialKey(
-            @RequestParam("operatorId") String operatorId,
-            @Valid @RequestBody CreateOfficialModelKeyDto dto,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.createOfficialKey(
-                new ModelCommands.CreateOfficialModelKeyCommand(
-                        requirePositiveLongId(dto.getProviderId(), "providerId"),
-                        dto.getKeyName(),
-                        dto.getApiKey(),
-                        dto.getIsDefault(),
-                        dto.getStatus(),
-                        requirePositiveLongId(operatorId, "operatorId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("created", traceId);
-    }
-
-    @PatchMapping("/model/official-keys/{keyId}")
-    public ApiResponse<String> updateOfficialKey(
-            @PathVariable String keyId,
-            @RequestParam("operatorId") String operatorId,
-            @RequestBody UpdateOfficialModelKeyDto dto,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.updateOfficialKey(
-                requirePositiveLongId(keyId, "keyId"),
-                new ModelCommands.UpdateOfficialModelKeyCommand(
-                        dto.getKeyName(),
-                        dto.getApiKey(),
-                        dto.getIsDefault(),
-                        dto.getStatus(),
-                        requirePositiveLongId(operatorId, "operatorId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("updated", traceId);
-    }
-
-    @DeleteMapping("/model/official-keys/{keyId}")
-    public ApiResponse<String> deleteOfficialKey(
-            @PathVariable String keyId,
-            @RequestParam("operatorId") String operatorId,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.deleteOfficialKey(
-                requirePositiveLongId(keyId, "keyId"),
-                requirePositiveLongId(operatorId, "operatorId"),
-                traceId
-        );
-        return ApiResponse.success("deleted", traceId);
-    }
-
-    @GetMapping("/model/configs")
-    public ApiResponse<List<Map<String, Object>>> listUserModelConfigs(
-            @RequestParam("userId") String userId,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = modelApplicationService.listUserModelConfigs(requirePositiveLongId(userId, "userId")).stream()
-                .map(this::stringifyBusinessIds)
-                .toList();
-        return ApiResponse.success(items, traceId);
-    }
-
-    @PostMapping("/model/configs")
-    public ApiResponse<String> createUserModelConfig(
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
-            @Valid @RequestBody CreateUserModelConfigDto dto,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.createUserModelConfig(
-                requirePositiveLongId(userId, "userId"),
-                new ModelCommands.CreateUserModelConfigCommand(
-                        requirePositiveLongId(dto.getProviderId(), "providerId"),
-                        dto.getModelName(),
-                        dto.getBaseUrl(),
-                        mapModelCategoryToKeySourceType(dto.getModelCategory()),
-                        dto.getApiKey(),
-                        dto.getContextWindowTurns(),
-                        dto.getMaxContextTokens(),
-                        dto.getStatus(),
-                        requirePositiveLongId(operatorId, "operatorId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("created", traceId);
-    }
-
-    @PutMapping("/model/configs/{modelConfigId}")
-    public ApiResponse<String> updateUserModelConfig(
+    @PostMapping("/configurations/{modelConfigId}/impact")
+    public ApiResponse<Map<String, Object>> previewUserUpdate(
+            Authentication authentication,
             @PathVariable String modelConfigId,
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
-            @Valid @RequestBody UpdateUserModelConfigDto dto,
+            @Valid @RequestBody UpdateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.updateUserModelConfig(
-                requirePositiveLongId(userId, "userId"),
-                requirePositiveLongId(modelConfigId, "modelConfigId"),
-                new ModelCommands.UpdateUserModelConfigCommand(
-                        optionalPositiveLongId(dto.getProviderId(), "providerId"),
-                        dto.getModelName(),
-                        dto.getBaseUrl(),
-                        mapModelCategoryToKeySourceType(dto.getModelCategory()),
-                        dto.getApiKey(),
-                        dto.getContextWindowTurns(),
-                        dto.getMaxContextTokens(),
-                        dto.getStatus(),
-                        requirePositiveLongId(operatorId, "operatorId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("updated", traceId);
+        return ApiResponse.success(impactView(service.previewUpdate(actor(authentication),
+                id(modelConfigId, "modelConfigId"), false, updateCommand(dto))), traceId);
     }
 
-    @DeleteMapping("/model/configs/{modelConfigId}")
-    public ApiResponse<String> deleteUserModelConfig(
+    @PostMapping("/system-configurations/{modelConfigId}/impact")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<Map<String, Object>> previewSystemUpdate(
+            Authentication authentication,
             @PathVariable String modelConfigId,
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
+            @Valid @RequestBody UpdateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.deleteUserModelConfig(
-                requirePositiveLongId(userId, "userId"),
-                requirePositiveLongId(modelConfigId, "modelConfigId"),
-                requirePositiveLongId(operatorId, "operatorId"),
-                traceId
-        );
+        return ApiResponse.success(impactView(service.previewUpdate(actor(authentication),
+                id(modelConfigId, "modelConfigId"), true, updateCommand(dto))), traceId);
+    }
+
+    @PutMapping("/configurations/{modelConfigId}")
+    public ApiResponse<Map<String, Object>> updateUserConfiguration(
+            Authentication authentication,
+            @PathVariable String modelConfigId,
+            @Valid @RequestBody UpdateModelConfigurationDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(configurationView(service.updateConfiguration(actor(authentication),
+                id(modelConfigId, "modelConfigId"), false, updateCommand(dto))), traceId);
+    }
+
+    @PutMapping("/system-configurations/{modelConfigId}")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<Map<String, Object>> updateSystemConfiguration(
+            Authentication authentication,
+            @PathVariable String modelConfigId,
+            @Valid @RequestBody UpdateModelConfigurationDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(configurationView(service.updateConfiguration(actor(authentication),
+                id(modelConfigId, "modelConfigId"), true, updateCommand(dto))), traceId);
+    }
+
+    @PostMapping("/configurations/{modelConfigId}/unbind")
+    public ApiResponse<Map<String, Object>> unbindUserConfiguration(
+            Authentication authentication,
+            @PathVariable String modelConfigId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        int count = service.unbindAll(actor(authentication), id(modelConfigId, "modelConfigId"), false);
+        return ApiResponse.success(Map.of("unboundProjectCount", count), traceId);
+    }
+
+    @PostMapping("/system-configurations/{modelConfigId}/unbind")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<Map<String, Object>> unbindSystemConfiguration(
+            Authentication authentication,
+            @PathVariable String modelConfigId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        int count = service.unbindAll(actor(authentication), id(modelConfigId, "modelConfigId"), true);
+        return ApiResponse.success(Map.of("unboundProjectCount", count), traceId);
+    }
+
+    @DeleteMapping("/configurations/{modelConfigId}")
+    public ApiResponse<String> deleteUserConfiguration(Authentication authentication,
+                                                       @PathVariable String modelConfigId,
+                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        service.deleteConfiguration(actor(authentication), id(modelConfigId, "modelConfigId"), false);
         return ApiResponse.success("deleted", traceId);
     }
 
-    private Map<String, Object> toProviderView(ModelProvider provider) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("providerId", stringifyId(provider.getProviderId()));
-        data.put("code", provider.getCode());
-        data.put("name", provider.getName());
-        data.put("baseUrl", provider.getBaseUrl());
-        data.put("authType", provider.getAuthType());
-        data.put("status", provider.getStatus());
-        return data;
+    @DeleteMapping("/system-configurations/{modelConfigId}")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<String> deleteSystemConfiguration(Authentication authentication,
+                                                         @PathVariable String modelConfigId,
+                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        service.deleteConfiguration(actor(authentication), id(modelConfigId, "modelConfigId"), true);
+        return ApiResponse.success("deleted", traceId);
     }
 
-    private Map<String, Object> toUserKeyView(ModelUserApiKey key) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", stringifyId(key.getUserApiKeyId()));
-        data.put("userId", stringifyId(key.getUserId()));
-        data.put("providerId", stringifyId(key.getProviderId()));
-        data.put("keyName", key.getKeyName());
-        data.put("maskedApiKey", key.getMaskedApiKey());
-        data.put("isDefault", key.getIsDefault());
-        data.put("lastUsedAt", key.getLastUsedAt());
-        data.put("status", key.getStatus());
-        data.put("createdAt", key.getCreatedAt());
-        data.put("updatedAt", key.getUpdatedAt());
-        return data;
-    }
-
-    private Map<String, Object> toOfficialKeyView(ModelOfficialApiKey key) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", stringifyId(key.getOfficialApiKeyId()));
-        data.put("providerId", stringifyId(key.getProviderId()));
-        data.put("keyName", key.getKeyName());
-        data.put("maskedApiKey", key.getMaskedApiKey());
-        data.put("isDefault", key.getIsDefault());
-        data.put("lastUsedAt", key.getLastUsedAt());
-        data.put("status", key.getStatus());
-        data.put("createdAt", key.getCreatedAt());
-        data.put("updatedAt", key.getUpdatedAt());
-        return data;
-    }
-
-    @GetMapping("/model/preferences")
-    public ApiResponse<Map<String, Object>> getUserModelPreferences(
-            @RequestParam("userId") String userId,
+    @GetMapping("/preferences")
+    public ApiResponse<Map<String, Object>> getPreferences(
+            Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(
-                stringifyBusinessIds(modelApplicationService.getUserModelPreferencesDetail(requirePositiveLongId(userId, "userId"))),
-                traceId
-        );
+        return ApiResponse.success(preferencesView(service.getUserPreferences(actor(authentication))), traceId);
     }
 
-    @PostMapping("/model/preferences")
-    public ApiResponse<String> saveUserModelPreferences(
-            @RequestParam("userId") String userId,
-            @RequestParam("operatorId") String operatorId,
-            @Valid @RequestBody SaveUserModelPreferencesDto dto,
+    @PutMapping("/preferences")
+    public ApiResponse<Map<String, Object>> savePreferences(
+            Authentication authentication,
+            @Valid @RequestBody SaveModelPreferencesDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        modelApplicationService.saveUserModelPreferences(
-                requirePositiveLongId(userId, "userId"),
-                requirePositiveLongId(operatorId, "operatorId"),
-                new ModelCommands.SaveUserModelPreferencesCommand(
-                        optionalPositiveLongId(dto.getMainAgentModelConfigId(), "mainAgentModelConfigId"),
-                        optionalPositiveLongId(dto.getDirtyWorkAgentModelConfigId(), "dirtyWorkAgentModelConfigId")
-                ),
-                traceId
-        );
-        return ApiResponse.success("updated", traceId);
+        ModelCommands.SaveUserModelPreferencesCommand command = new ModelCommands.SaveUserModelPreferencesCommand(
+                optionalId(dto.getDefaultMainChatModelConfigId(), "defaultMainChatModelConfigId"),
+                optionalId(dto.getDefaultWorkerChatModelConfigId(), "defaultWorkerChatModelConfigId"),
+                optionalId(dto.getDefaultEmbeddingModelConfigId(), "defaultEmbeddingModelConfigId"),
+                optionalId(dto.getDefaultRouterModelConfigId(), "defaultRouterModelConfigId"),
+                dto.getDefaultStoryBibleRoutingMode(), dto.getDefaultChunkTargetCharacters(),
+                dto.getDefaultChunkOverlapCharacters(), dto.getDefaultChunkMaxCharacters());
+        return ApiResponse.success(preferencesView(service.saveUserPreferences(actor(authentication), command)), traceId);
     }
 
-    private String mapModelCategoryToKeySourceType(String modelCategory) {
-        if (modelCategory == null) {
-            return null;
-        }
-        return switch (modelCategory.trim().toUpperCase()) {
-            case "OFFICIAL_MODEL" -> "OFFICIAL_KEY";
-            case "USER_MODEL" -> "USER_KEY";
-            default -> modelCategory.trim();
-        };
+    private ModelCommands.CreateConfigurationCommand createCommand(CreateModelConfigurationDto dto) {
+        return new ModelCommands.CreateConfigurationCommand(id(dto.getProviderId(), "providerId"), dto.getDisplayName(),
+                dto.getModelType(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(), dto.getApiKey(),
+                dto.getContextWindowTurns(), dto.getMaxContextTokens());
     }
 
-    private Long requirePositiveLongId(String rawValue, String fieldName) {
-        if (rawValue == null || rawValue.trim().isEmpty()) {
-            throw BusinessException.of(fieldName + " is required");
-        }
-        return parsePositiveLongValue(rawValue, fieldName);
+    private ModelCommands.UpdateConfigurationCommand updateCommand(UpdateModelConfigurationDto dto) {
+        return new ModelCommands.UpdateConfigurationCommand(optionalId(dto.getProviderId(), "providerId"),
+                dto.getDisplayName(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(), dto.getApiKey(),
+                dto.getContextWindowTurns(), dto.getMaxContextTokens(), dto.getStatus());
     }
 
-    private Long optionalPositiveLongId(String rawValue, String fieldName) {
-        if (rawValue == null || rawValue.trim().isEmpty()) {
-            return null;
-        }
-        return parsePositiveLongValue(rawValue, fieldName);
-    }
-
-    private Long parsePositiveLongValue(String rawValue, String fieldName) {
-        String normalized = rawValue.trim();
-        if (!normalized.matches("^[1-9]\\d*$")) {
-            throw BusinessException.of(fieldName + " must be greater than 0");
-        }
-        try {
-            return Long.parseLong(normalized);
-        } catch (NumberFormatException ex) {
-            throw BusinessException.of(fieldName + " must be greater than 0");
-        }
-    }
-
-    private String stringifyId(Long value) {
-        return value == null ? null : value.toString();
-    }
-
-    private Map<String, Object> stringifyBusinessIds(Map<String, Object> source) {
+    private Map<String, Object> providerView(ModelApplicationService.ProviderView view) {
         Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
-            result.put(entry.getKey(), stringifyValue(entry.getKey(), entry.getValue()));
-        }
+        result.put("providerId", string(view.provider().getProviderId()));
+        result.put("code", view.provider().getCode());
+        result.put("name", view.provider().getName());
+        result.put("baseUrl", view.provider().getBaseUrl());
+        result.put("authType", view.provider().getAuthType());
+        result.put("capabilities", view.capabilities().stream().map(this::capabilityView).toList());
         return result;
     }
 
-    private Object stringifyValue(String key, Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (BUSINESS_ID_KEYS.contains(key) && value instanceof Number number) {
-            return String.valueOf(number.longValue());
-        }
-        if (value instanceof Map<?, ?> mapValue) {
-            Map<String, Object> nested = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> nestedEntry : mapValue.entrySet()) {
-                nested.put(String.valueOf(nestedEntry.getKey()), stringifyValue(String.valueOf(nestedEntry.getKey()), nestedEntry.getValue()));
-            }
-            return nested;
-        }
-        if (value instanceof List<?> listValue) {
-            return listValue.stream().map(item -> {
-                if (item instanceof Map<?, ?> mapItem) {
-                    Map<String, Object> nested = new LinkedHashMap<>();
-                    for (Map.Entry<?, ?> nestedEntry : mapItem.entrySet()) {
-                        nested.put(String.valueOf(nestedEntry.getKey()), stringifyValue(String.valueOf(nestedEntry.getKey()), nestedEntry.getValue()));
-                    }
-                    return nested;
-                }
-                return item;
-            }).toList();
-        }
-        if (value instanceof TemporalAccessor) {
-            return value;
-        }
-        return value;
+    private Map<String, Object> capabilityView(ModelProviderCapability capability) {
+        return Map.of("capabilityCode", capability.getCapabilityCode(), "protocolCode", capability.getProtocolCode());
     }
+
+    private Map<String, Object> configurationView(ModelConfiguration configuration) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("modelConfigId", string(configuration.getModelConfigId()));
+        result.put("scopeType", configuration.getScopeType());
+        result.put("ownerUserId", string(configuration.getOwnerUserId()));
+        result.put("providerId", string(configuration.getProviderId()));
+        result.put("providerCode", configuration.getProviderCode());
+        result.put("providerName", configuration.getProviderName());
+        result.put("protocolCode", configuration.getProtocolCode());
+        result.put("displayName", configuration.getDisplayName());
+        result.put("modelType", configuration.getModelType());
+        result.put("modelName", configuration.getModelName());
+        result.put("baseUrl", configuration.getBaseUrl());
+        result.put("distanceMetric", configuration.getDistanceMetric());
+        result.put("contextWindowTurns", configuration.getContextWindowTurns());
+        result.put("maxContextTokens", configuration.getMaxContextTokens());
+        result.put("maskedApiKey", configuration.getMaskedApiKey());
+        result.put("credentialConfigured", configuration.getMaskedApiKey() != null
+                || "NONE".equalsIgnoreCase(configuration.getProviderAuthType()));
+        result.put("status", configuration.getStatus());
+        result.put("createdAt", configuration.getCreatedAt());
+        result.put("updatedAt", configuration.getUpdatedAt());
+        return result;
+    }
+
+    private Map<String, Object> preferencesView(ModelUserPreferences preferences) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("userId", string(preferences.getUserId()));
+        result.put("defaultMainChatModelConfigId", string(preferences.getDefaultMainChatModelConfigId()));
+        result.put("defaultWorkerChatModelConfigId", string(preferences.getDefaultWorkerChatModelConfigId()));
+        result.put("defaultEmbeddingModelConfigId", string(preferences.getDefaultEmbeddingModelConfigId()));
+        result.put("defaultRouterModelConfigId", string(preferences.getDefaultRouterModelConfigId()));
+        result.put("defaultStoryBibleRoutingMode", preferences.getDefaultStoryBibleRoutingMode());
+        result.put("defaultChunkTargetCharacters", preferences.getDefaultChunkTargetCharacters());
+        result.put("defaultChunkOverlapCharacters", preferences.getDefaultChunkOverlapCharacters());
+        result.put("defaultChunkMaxCharacters", preferences.getDefaultChunkMaxCharacters());
+        return result;
+    }
+
+    private Map<String, Object> impactView(ModelApplicationService.ImpactPreview impact) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("modelConfigId", string(impact.modelConfigId()));
+        result.put("modelType", impact.modelType());
+        result.put("embeddingIdentityChange", impact.embeddingIdentityChange());
+        result.put("affectedProjectCount", impact.projectIds().size());
+        result.put("affectedProjectIds", impact.projectIds().stream().map(String::valueOf).toList());
+        result.put("blockedByRun", impact.blockedByRun());
+        return result;
+    }
+
+    private Long actor(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) throw BusinessException.of("Login required");
+        return id(authentication.getName(), "principal userId");
+    }
+
+    private Long optionalId(String value, String field) {
+        return value == null || value.isBlank() ? null : id(value, field);
+    }
+
+    private Long id(String value, String field) {
+        if (value == null || !value.trim().matches("^[1-9]\\d*$")) throw BusinessException.of(field + " is invalid");
+        try { return Long.parseLong(value.trim()); }
+        catch (NumberFormatException exception) { throw BusinessException.of(field + " is invalid"); }
+    }
+
+    private String string(Long value) { return value == null ? null : value.toString(); }
 }
-
-

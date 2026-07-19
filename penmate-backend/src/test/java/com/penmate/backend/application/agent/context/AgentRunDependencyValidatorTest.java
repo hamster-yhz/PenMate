@@ -25,11 +25,11 @@ class AgentRunDependencyValidatorTest {
                 1, 10L, 20L, 3L, 7L, 40L, 12L, List.of(), List.of()));
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
-                        StoryBibleRoutingMode.RETRIEVAL, null, 0L, false));
+                        StoryBibleRoutingMode.RETRIEVAL, null));
         when(hashes.hashes(anyString())).thenReturn(new AgentContextCatalogHashService.Hashes("p", "s", "t"));
         when(sessions.findActiveStyleBindingRevision(30L)).thenReturn(9L);
         var expected = new AgentRunContextArtifactService.DependencyManifest(
-                3L, 7L, 40L, 11L, 9L, "RETRIEVAL", null, 0L, "p", "s", "t");
+                3L, 7L, 40L, 11L, 9L, "RETRIEVAL", null, "p", "s", "t");
         var artifact = new AgentRunContextArtifactService.ResolvedArtifact(
                 2, 60L, 70L, null, null, List.of(), expected);
 
@@ -51,11 +51,11 @@ class AgentRunDependencyValidatorTest {
                 1, 10L, 20L, 3L, 7L, 40L, 11L, List.of(), List.of()));
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
-                        StoryBibleRoutingMode.RETRIEVAL, null, 0L, false));
+                        StoryBibleRoutingMode.RETRIEVAL, null));
         when(hashes.hashes(anyString())).thenReturn(new AgentContextCatalogHashService.Hashes("p", "s", "t"));
         when(sessions.findActiveStyleBindingRevision(30L)).thenReturn(9L);
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
-                3L, 7L, 40L, 11L, 9L, "RETRIEVAL", null, 0L, "p", "s", "t");
+                3L, 7L, 40L, 11L, 9L, "RETRIEVAL", null, "p", "s", "t");
 
         var result = new AgentRunDependencyValidator(snapshots, preferences, hashes, sessions, epochs)
                 .validate(run(), input(), new AgentRunContextArtifactService.ResolvedArtifact(

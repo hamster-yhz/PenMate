@@ -106,7 +106,7 @@ class AgentContextEpochConcurrencyTest {
 
     private AgentContextEpochService.BindRequest request(Long runId) {
         return new AgentContextEpochService.BindRequest(
-                20L, runId, 4L, 3L, 40L, 2L, "RETRIEVAL", null, 0L,
+                20L, runId, 4L, 3L, 40L, 2L, 0L, "RETRIEVAL", null,
                 "prompt", "skills", "tools", "{\"catalog\":[]}"
         );
     }

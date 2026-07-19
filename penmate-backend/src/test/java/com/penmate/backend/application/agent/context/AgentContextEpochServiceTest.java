@@ -52,8 +52,9 @@ class AgentContextEpochServiceTest {
     @Test
     void should_reuse_current_epoch_on_exact_fingerprint_even_if_dynamic_snapshot_differs() {
         AgentContextEpoch current = new AgentContextEpoch(
-                900L, 20L, 1, "ignored", 4L, 3L, 40L, 2L, "RETRIEVAL_THEN_LLM",
-                null, 0L, "prompt", "skills", "tools", "key", "hash", 2L, null, null);
+                900L, 20L, 1, "ignored", 4L, 3L, 40L, 2L, 0L,
+                "RETRIEVAL_THEN_LLM", null, "prompt", "skills", "tools",
+                "key", "hash", 2L, null, null);
         when(repository.lockSession(20L)).thenReturn(20L);
         when(repository.findCurrentByFingerprint(any(), anyString())).thenReturn(current);
         when(repository.bindRun(30L, 900L)).thenReturn(1);
@@ -86,8 +87,8 @@ class AgentContextEpochServiceTest {
 
     private AgentContextEpochService.BindRequest request(String snapshotJson) {
         return new AgentContextEpochService.BindRequest(
-                20L, 30L, 4L, 3L, 40L, 2L, "RETRIEVAL_THEN_LLM", null, 0L,
-                "prompt", "skills", "tools", snapshotJson
+                20L, 30L, 4L, 3L, 40L, 2L, 0L, "RETRIEVAL_THEN_LLM",
+                null, "prompt", "skills", "tools", snapshotJson
         );
     }
 }

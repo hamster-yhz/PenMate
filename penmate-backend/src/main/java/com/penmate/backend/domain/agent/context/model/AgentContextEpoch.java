@@ -14,7 +14,6 @@ public record AgentContextEpoch(
         Long styleBindingRevision,
         String routingMode,
         Long routerModelConfigId,
-        Long routerModelConfigRevision,
         String promptBundleHash,
         String skillCatalogHash,
         String toolCatalogHash,
@@ -27,12 +26,12 @@ public record AgentContextEpoch(
     public AgentContextEpoch(Long epochId, Long sessionId, Integer epochNo, String fingerprint,
                              Long storyBibleRevision, Long manuscriptRevision, Long activeChapterId,
                              Long styleBindingRevision, String routingMode, Long routerModelConfigId,
-                             Long routerModelConfigRevision, String promptBundleHash, String skillCatalogHash,
+                             String promptBundleHash, String skillCatalogHash,
                              String toolCatalogHash, String snapshotObjectKey, String snapshotHash,
                              Long snapshotSizeBytes, Instant createdAt, Instant supersededAt) {
         this(epochId, sessionId, epochNo, fingerprint, storyBibleRevision, manuscriptRevision,
                 activeChapterId, 0L, styleBindingRevision, routingMode, routerModelConfigId,
-                routerModelConfigRevision, promptBundleHash, skillCatalogHash, toolCatalogHash,
+                promptBundleHash, skillCatalogHash, toolCatalogHash,
                 snapshotObjectKey, snapshotHash, snapshotSizeBytes, createdAt, supersededAt);
     }
 }

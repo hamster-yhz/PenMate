@@ -19,8 +19,10 @@ public class SystemDataBootstrap implements ApplicationRunner {
 
     private static final long ADMIN_USER_ID = 1L;
     private static final long ADMIN_ROLE_ID = 1L;
-    private static final long OFFICIAL_KEY_ID = 1L;
-    private static final long MODEL_CONFIG_ID = 1L;
+    private static final long CHAT_CONFIG_ID = 1L;
+    private static final long EMBEDDING_CONFIG_ID = 2L;
+    private static final long CHAT_KEY_ID = 1L;
+    private static final long EMBEDDING_KEY_ID = 2L;
 
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
@@ -31,21 +33,19 @@ public class SystemDataBootstrap implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         validate();
-        long providerId = requireProviderId(properties.getModel().getProvider());
         bootstrapAdmin();
-        bootstrapModel(providerId);
         jdbcTemplate.update("""
                 INSERT INTO iam_user_roles(user_id, role_id) VALUES (?, ?)
                 ON CONFLICT (user_id, role_id) DO NOTHING
                 """, ADMIN_USER_ID, ADMIN_ROLE_ID);
-        jdbcTemplate.update("""
-                UPDATE iam_users
-                SET main_agent_model_config_id = ?, dirty_work_agent_model_config_id = ?,
-                    updated_at = CURRENT_TIMESTAMP(3)
-                WHERE user_id = ? AND deleted_at IS NULL
-                """, MODEL_CONFIG_ID, MODEL_CONFIG_ID, ADMIN_USER_ID);
-        log.info("system.bootstrap.completed: reconcile={}, adminUserId={}, modelConfigId={}",
-                properties.isReconcile(), ADMIN_USER_ID, MODEL_CONFIG_ID);
+
+        Long chatConfigId = bootstrapOptionalModel(
+                properties.getChat(), "CHAT", CHAT_CONFIG_ID, CHAT_KEY_ID, null);
+        Long embeddingConfigId = bootstrapOptionalModel(
+                properties.getEmbedding(), "EMBEDDING", EMBEDDING_CONFIG_ID, EMBEDDING_KEY_ID, "COSINE");
+        bootstrapAdminPreferences(chatConfigId, embeddingConfigId);
+        log.info("system.bootstrap.completed: reconcile={}, adminUserId={}, chat={}, embedding={}",
+                properties.isReconcile(), ADMIN_USER_ID, chatConfigId != null, embeddingConfigId != null);
     }
 
     private void bootstrapAdmin() {
@@ -68,69 +68,104 @@ public class SystemDataBootstrap implements ApplicationRunner {
             return;
         }
         jdbcTemplate.update("""
-                INSERT INTO iam_users(user_id, email, password_hash, display_name, status, auth_method)
-                VALUES (?, ?, ?, 'Admin', 1, 'local')
+                INSERT INTO iam_users(user_id, email, password_hash, display_name, bio, status, auth_method)
+                VALUES (?, ?, ?, 'Admin', '', 1, 'local')
                 """, ADMIN_USER_ID, email, passwordHash);
     }
 
-    private void bootstrapModel(long providerId) {
-        String encryptedApiKey = secretCryptoService.encrypt(properties.getModel().getApiKey());
-        String maskedApiKey = mask(properties.getModel().getApiKey());
-        Integer keyCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM model_official_api_keys WHERE official_api_key_id = ? AND deleted_at IS NULL",
+    private Long bootstrapOptionalModel(SystemBootstrapProperties.ModelGroup group,
+                                        String modelType,
+                                        long modelConfigId,
+                                        long officialKeyId,
+                                        String distanceMetric) {
+        if (isEmpty(group)) {
+            return null;
+        }
+        long providerId = requireProviderId(group.getProvider(), modelType);
+        Integer configCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM model_configurations WHERE model_config_id = ? AND deleted_at IS NULL",
                 Integer.class,
-                OFFICIAL_KEY_ID
+                modelConfigId
+        );
+        if (configCount == null || configCount == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO model_configurations(
+                        model_config_id, scope_type, owner_user_id, provider_id, display_name,
+                        model_type, model_name, base_url, distance_metric, context_window_turns,
+                        max_context_tokens, status, created_by, updated_by
+                    ) VALUES (?, 'SYSTEM', NULL, ?, ?, ?, ?, ?, ?, 6, 128000, 'ACTIVE', ?, ?)
+                    """, modelConfigId, providerId, bootstrapDisplayName(modelType, group.getModelName()),
+                    modelType, group.getModelName().trim(), group.getBaseUrl().trim(), distanceMetric,
+                    ADMIN_USER_ID, ADMIN_USER_ID);
+        } else if (properties.isReconcile()) {
+            jdbcTemplate.update("""
+                    UPDATE model_configurations
+                    SET provider_id = ?, display_name = ?, model_name = ?, base_url = ?,
+                        distance_metric = ?, status = 'ACTIVE', updated_by = ?,
+                        updated_at = CURRENT_TIMESTAMP(3)
+                    WHERE model_config_id = ? AND scope_type = 'SYSTEM' AND deleted_at IS NULL
+                    """, providerId, bootstrapDisplayName(modelType, group.getModelName()),
+                    group.getModelName().trim(), group.getBaseUrl().trim(), distanceMetric,
+                    ADMIN_USER_ID, modelConfigId);
+        }
+
+        String encryptedApiKey = secretCryptoService.encrypt(group.getApiKey());
+        String maskedApiKey = mask(group.getApiKey());
+        Integer keyCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM model_official_api_keys WHERE model_config_id = ? AND deleted_at IS NULL",
+                Integer.class,
+                modelConfigId
         );
         if (keyCount == null || keyCount == 0) {
             jdbcTemplate.update("""
                     INSERT INTO model_official_api_keys(
-                        official_api_key_id, provider_id, key_name, encrypted_api_key,
-                        masked_api_key, is_default, status
-                    ) VALUES (?, ?, 'Bootstrap key', ?, ?, TRUE, 'active')
-                    """, OFFICIAL_KEY_ID, providerId, encryptedApiKey, maskedApiKey);
+                        official_api_key_id, model_config_id, provider_id, encrypted_api_key,
+                        masked_api_key, status
+                    ) VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+                    """, officialKeyId, modelConfigId, providerId, encryptedApiKey, maskedApiKey);
         } else if (properties.isReconcile()) {
             jdbcTemplate.update("""
                     UPDATE model_official_api_keys
                     SET provider_id = ?, encrypted_api_key = ?, masked_api_key = ?,
-                        is_default = TRUE, status = 'active', updated_at = CURRENT_TIMESTAMP(3)
-                    WHERE official_api_key_id = ? AND deleted_at IS NULL
-                    """, providerId, encryptedApiKey, maskedApiKey, OFFICIAL_KEY_ID);
+                        status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP(3)
+                    WHERE model_config_id = ? AND deleted_at IS NULL
+                    """, providerId, encryptedApiKey, maskedApiKey, modelConfigId);
         }
+        return modelConfigId;
+    }
 
-        Integer configCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM model_user_configurations WHERE model_config_id = ? AND deleted_at IS NULL",
-                Integer.class,
-                MODEL_CONFIG_ID
-        );
-        if (configCount == null || configCount == 0) {
+    private void bootstrapAdminPreferences(Long chatConfigId, Long embeddingConfigId) {
+        jdbcTemplate.update("""
+                INSERT INTO model_user_preferences(
+                    user_id, default_main_chat_model_config_id, default_worker_chat_model_config_id,
+                    default_embedding_model_config_id, default_story_bible_routing_mode
+                ) VALUES (?, ?, ?, ?, 'LLM_SELECTOR')
+                ON CONFLICT (user_id) DO NOTHING
+                """, ADMIN_USER_ID, chatConfigId, chatConfigId, embeddingConfigId);
+        if (properties.isReconcile()) {
             jdbcTemplate.update("""
-                    INSERT INTO model_user_configurations(
-                        model_config_id, user_id, provider_id, model_name, base_url,
-                        key_source_type, official_key_id, context_window_turns,
-                        max_context_tokens, status
-                    ) VALUES (?, ?, ?, ?, ?, 'OFFICIAL_KEY', ?, 6, 128000, 'active')
-                    """, MODEL_CONFIG_ID, ADMIN_USER_ID, providerId,
-                    properties.getModel().getModelName().trim(), properties.getModel().getBaseUrl().trim(), OFFICIAL_KEY_ID);
-        } else if (properties.isReconcile()) {
-            jdbcTemplate.update("""
-                    UPDATE model_user_configurations
-                    SET provider_id = ?, model_name = ?, base_url = ?, key_source_type = 'OFFICIAL_KEY',
-                        user_key_id = NULL, official_key_id = ?, status = 'active',
-                        updated_at = CURRENT_TIMESTAMP(3)
-                    WHERE model_config_id = ? AND user_id = ? AND deleted_at IS NULL
-                    """, providerId, properties.getModel().getModelName().trim(),
-                    properties.getModel().getBaseUrl().trim(), OFFICIAL_KEY_ID, MODEL_CONFIG_ID, ADMIN_USER_ID);
+                    UPDATE model_user_preferences
+                    SET default_main_chat_model_config_id = ?, default_worker_chat_model_config_id = ?,
+                        default_embedding_model_config_id = ?, updated_at = CURRENT_TIMESTAMP(3)
+                    WHERE user_id = ?
+                    """, chatConfigId, chatConfigId, embeddingConfigId, ADMIN_USER_ID);
         }
     }
 
-    private long requireProviderId(String providerCode) {
-        Long providerId = jdbcTemplate.query(
-                "SELECT provider_id FROM model_providers WHERE lower(code) = lower(?) AND status = 'active'",
+    private long requireProviderId(String providerCode, String capability) {
+        Long providerId = jdbcTemplate.query("""
+                        SELECT p.provider_id
+                        FROM model_providers p
+                        JOIN model_provider_capabilities c ON c.provider_id = p.provider_id
+                        WHERE lower(p.code) = lower(?)
+                          AND p.status = 'ACTIVE' AND p.deleted_at IS NULL
+                          AND c.capability_code = ? AND c.status = 'ACTIVE' AND c.deleted_at IS NULL
+                        """,
                 resultSet -> resultSet.next() ? resultSet.getLong(1) : null,
-                providerCode.trim()
-        );
+                providerCode.trim(), capability);
         if (providerId == null) {
-            throw new IllegalStateException("Unsupported bootstrap model provider: " + providerCode);
+            throw new IllegalStateException(
+                    "Unsupported bootstrap " + capability.toLowerCase(Locale.ROOT) + " provider: " + providerCode);
         }
         return providerId;
     }
@@ -138,16 +173,39 @@ public class SystemDataBootstrap implements ApplicationRunner {
     private void validate() {
         requireText(properties.getAdmin().getEmail(), "BOOTSTRAP_ADMIN_EMAIL");
         requireText(properties.getAdmin().getPassword(), "BOOTSTRAP_ADMIN_PASSWORD");
-        requireText(properties.getModel().getProvider(), "BOOTSTRAP_MODEL_PROVIDER");
-        requireText(properties.getModel().getBaseUrl(), "BOOTSTRAP_MODEL_BASE_URL");
-        requireText(properties.getModel().getApiKey(), "BOOTSTRAP_MODEL_API_KEY");
-        requireText(properties.getModel().getModelName(), "BOOTSTRAP_MODEL_NAME");
+        validateOptionalGroup(properties.getChat(), "BOOTSTRAP_CHAT");
+        validateOptionalGroup(properties.getEmbedding(), "BOOTSTRAP_EMBEDDING");
+    }
+
+    private void validateOptionalGroup(SystemBootstrapProperties.ModelGroup group, String prefix) {
+        if (isEmpty(group)) {
+            return;
+        }
+        requireText(group.getProvider(), prefix + "_PROVIDER");
+        requireText(group.getBaseUrl(), prefix + "_BASE_URL");
+        requireText(group.getApiKey(), prefix + "_API_KEY");
+        requireText(group.getModelName(), prefix + "_MODEL_NAME");
+    }
+
+    private boolean isEmpty(SystemBootstrapProperties.ModelGroup group) {
+        return isBlank(group.getProvider())
+                && isBlank(group.getBaseUrl())
+                && isBlank(group.getApiKey())
+                && isBlank(group.getModelName());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void requireText(String value, String environmentName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException(environmentName + " is required");
+        if (isBlank(value)) {
+            throw new IllegalStateException(environmentName + " is required when its bootstrap group is configured");
         }
+    }
+
+    private String bootstrapDisplayName(String modelType, String modelName) {
+        return "Bootstrap " + ("CHAT".equals(modelType) ? "Chat" : "Embedding") + " - " + modelName.trim();
     }
 
     private String mask(String apiKey) {

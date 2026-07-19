@@ -161,7 +161,7 @@ class AgentRunExecutorTest {
         var artifact = new AgentRunContextArtifactService.ResolvedArtifact(
                 2, 70001L, 99L, null, null, List.of(),
                 new AgentRunContextArtifactService.DependencyManifest(
-                        1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, 0L, "p", "s", "t"));
+                        1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, "p", "s", "t"));
         AgentRunLease lease = new AgentRunLease(70001L, "worker", 2L, 1,
                 AgentRunStatus.SUSPENDED, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
         when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(null);
@@ -197,7 +197,7 @@ class AgentRunExecutorTest {
         var context = new AgentRunContextArtifactService.ResolvedArtifact(
                 2, 70001L, 99L, null, null, List.of(),
                 new AgentRunContextArtifactService.DependencyManifest(
-                        1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, 0L, "p", "s", "t"));
+                        1L, 1L, 30001L, 1L, 0L, "RETRIEVAL", null, "p", "s", "t"));
         AgentRunContinuation continuation = AgentRunContinuation.completed(
                 70001L, List.of(), 2, 1, "durable answer", new LlmTokenUsage(3, 2, 5));
         AgentRunLease lease = lease();
@@ -275,8 +275,8 @@ class AgentRunExecutorTest {
 
     private AgentRunContextResolutionService.Resolution contextRoutingResult() {
         var epoch = new com.penmate.backend.domain.agent.context.model.AgentContextEpoch(
-                99L, 20001L, 1, "hash", 1L, 1L, 30001L, 0L, "RETRIEVAL", null, 0L,
-                "prompt", "skills", "tools", "key", "hash", 10L, null, null);
+                99L, 20001L, 1, "hash", 1L, 1L, 30001L, 0L, 0L,
+                "RETRIEVAL", null, "prompt", "skills", "tools", "key", "hash", 10L, null, null);
         return new AgentRunContextResolutionService.Resolution(
                 new AgentContextEpochService.Binding(epoch, false),
                 new ContextPackage(List.of("story-bible"), List.of(), List.of(), List.of(), List.of(),
