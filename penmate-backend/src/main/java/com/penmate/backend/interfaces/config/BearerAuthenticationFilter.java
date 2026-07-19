@@ -10,6 +10,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class BearerAuthenticationFilter extends OncePerRequestFilter {
@@ -49,12 +51,18 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
         try {
             ParsedToken parsed = authTokenService.parseAccessToken(token);
             AuthUserSessionPayload session = authSessionCache.getByAccessJti(parsed.tokenId());
-            if (session != null) {
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        String.valueOf(session.getUserId()), null, authorities(session));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (session == null || !Objects.equals(parsed.userId(), session.getUserId())) {
+                SecurityContextHolder.clearContext();
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access session is missing or revoked");
+                return;
             }
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    String.valueOf(session.getUserId()), null, authorities(session));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
             filterChain.doFilter(request, response);
+        } catch (DataAccessException error) {
+            SecurityContextHolder.clearContext();
+            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Authentication session store unavailable");
         } catch (RuntimeException error) {
             SecurityContextHolder.clearContext();
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired access token");

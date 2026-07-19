@@ -20,16 +20,14 @@ import java.util.List;
 public interface IamUserMapper {
 
     @Select("""
-            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method,
-                   main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
+            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method, last_login_at
             FROM iam_users
             WHERE lower(email) = lower(#{email}) AND deleted_at IS NULL
             """)
     IamUser findByEmail(@Param("email") String email);
 
     @Select("""
-            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method,
-                   main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
+            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method, last_login_at
             FROM iam_users
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
@@ -43,8 +41,7 @@ public interface IamUserMapper {
     int touchLastLoginByUserId(@Param("userId") Long userId);
 
     @Select("""
-            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method,
-                   main_agent_model_config_id, dirty_work_agent_model_config_id, last_login_at
+            SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method, last_login_at
             FROM iam_users
             WHERE deleted_at IS NULL
             ORDER BY id DESC
@@ -71,10 +68,8 @@ public interface IamUserMapper {
     List<IamPermission> findPermissionsByUserId(@Param("userId") Long userId);
 
     @Insert("""
-            INSERT INTO iam_users(user_id, email, password_hash, display_name, status, auth_method,
-                                  main_agent_model_config_id, dirty_work_agent_model_config_id)
-            VALUES(#{userId}, #{email}, #{passwordHash}, #{displayName}, #{status}, #{authMethod},
-                   #{mainAgentModelConfigId}, #{dirtyWorkAgentModelConfigId})
+            INSERT INTO iam_users(user_id, email, password_hash, display_name, bio, status, auth_method)
+            VALUES(#{userId}, #{email}, #{passwordHash}, #{displayName}, #{bio}, #{status}, #{authMethod})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(IamUser user);
@@ -82,9 +77,7 @@ public interface IamUserMapper {
     @Update("""
             UPDATE iam_users
             SET display_name = #{displayName},
-                status = #{status},
-                main_agent_model_config_id = #{mainAgentModelConfigId},
-                dirty_work_agent_model_config_id = #{dirtyWorkAgentModelConfigId}
+                status = #{status}
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
     int updateBasic(IamUser user);

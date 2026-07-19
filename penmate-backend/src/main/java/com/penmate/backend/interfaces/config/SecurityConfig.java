@@ -3,6 +3,7 @@ package com.penmate.backend.interfaces.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,6 +21,7 @@ import java.util.Objects;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 /**
  * Spring Security 基础配置。
  * <p>当前以无状态模式运行，开放鉴权与文档端点，并接入 TraceId 过滤器用于全链路日志追踪。</p>

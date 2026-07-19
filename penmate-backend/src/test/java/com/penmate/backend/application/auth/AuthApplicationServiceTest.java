@@ -53,8 +53,6 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         user.setEmail("author@penmate.ai");
         user.setStatus(1);
         user.setPasswordHash("StrongPass!23");
-        user.setMainAgentModelConfigId(9001L);
-        user.setDirtyWorkAgentModelConfigId(9002L);
         when(iamGateway.findUserByEmail("author@penmate.ai")).thenReturn(user);
         when(passwordEncoder.matches("StrongPass!23", "StrongPass!23")).thenReturn(true);
         when(iamGateway.findRolesByUserId(1001L)).thenReturn(List.of());
@@ -68,8 +66,8 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         ArgumentCaptor<AuthUserSessionPayload> payloadCaptor = ArgumentCaptor.forClass(AuthUserSessionPayload.class);
         verify(authSessionCache).saveSession(payloadCaptor.capture(), any(AuthTokenBundle.class));
         verify(iamGateway).touchLastLoginByUserId(1001L);
-        assertThat(payloadCaptor.getValue().getMainAgentModelConfigId()).isNotNull();
-        assertThat(payloadCaptor.getValue().getDirtyWorkAgentModelConfigId()).isNotNull();
+        assertThat(payloadCaptor.getValue().getUserId()).isEqualTo(1001L);
+        assertThat(payloadCaptor.getValue().getEmail()).isEqualTo("author@penmate.ai");
         assertThat(result).containsKeys("accessToken", "refreshToken");
     }
 
