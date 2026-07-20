@@ -1,11 +1,13 @@
 package com.penmate.backend.interfaces.api.rag;
 
 import com.penmate.backend.application.rag.RagApplicationService;
+import com.penmate.backend.application.rag.ProjectAiConfigurationService;
 import com.penmate.backend.application.rag.command.CreateRagDocumentCommand;
 import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
 import com.penmate.backend.domain.rag.model.RagDocument;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.rag.dto.CreateRagDocumentDto;
+import com.penmate.backend.interfaces.api.rag.dto.UpdateProjectAiConfigurationDto;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,9 +34,45 @@ import java.util.Objects;
 public class RagController {
 
     private final RagApplicationService ragApplicationService;
+    private final ProjectAiConfigurationService projectAiConfigurationService;
 
-    public RagController(RagApplicationService ragApplicationService) {
+    public RagController(RagApplicationService ragApplicationService,
+                         ProjectAiConfigurationService projectAiConfigurationService) {
         this.ragApplicationService = ragApplicationService;
+        this.projectAiConfigurationService = projectAiConfigurationService;
+    }
+
+    @GetMapping("/configuration")
+    public ApiResponse<Map<String, Object>> getConfiguration(@PathVariable String projectId,
+                                                              Authentication authentication,
+                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(configurationView(projectAiConfigurationService.get(
+                requireLongId(projectId, "projectId"), actor(authentication))), traceId);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/configuration")
+    public ApiResponse<Map<String, Object>> updateConfiguration(@PathVariable String projectId,
+                                                                 Authentication authentication,
+                                                                 @Valid @RequestBody UpdateProjectAiConfigurationDto dto,
+                                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var request = new ProjectAiConfigurationService.UpdateRequest(
+                optionalLongId(dto.getEmbeddingModelConfigId(), "embeddingModelConfigId"),
+                dto.getStoryBibleRoutingMode(),
+                optionalLongId(dto.getRouterModelConfigId(), "routerModelConfigId"),
+                dto.getChunkTargetCharacters(), dto.getChunkOverlapCharacters(), dto.getChunkMaxCharacters(),
+                dto.getRetrievalCandidates(), dto.getRetrievalTopK(), dto.getRetrievalMaxPerSource(),
+                dto.getHnswEfSearch(), dto.getSimilarityThreshold());
+        return ApiResponse.success(configurationView(projectAiConfigurationService.update(
+                requireLongId(projectId, "projectId"), actor(authentication), request)), traceId);
+    }
+
+    @PostMapping("/rebuild")
+    public ApiResponse<Map<String, Object>> rebuild(@PathVariable String projectId,
+                                                     Authentication authentication,
+                                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var job = projectAiConfigurationService.requestRebuild(
+                requireLongId(projectId, "projectId"), actor(authentication));
+        return ApiResponse.success(Map.of("jobId", String.valueOf(job.getJobId()), "status", job.getStatus()), traceId);
     }
 
     /**
@@ -224,6 +263,37 @@ public class RagController {
         } catch (NumberFormatException ex) {
             throw new IllegalArgumentException(fieldName + " must be a valid numeric string business id", ex);
         }
+    }
+
+    private Long optionalLongId(String rawValue, String fieldName) {
+        return rawValue == null || rawValue.isBlank() ? null : requireLongId(rawValue, fieldName);
+    }
+
+    private Long actor(Authentication authentication) {
+        if (authentication == null) throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
+        return requireLongId(authentication.getName(), "principal userId");
+    }
+
+    private Map<String, Object> configurationView(com.penmate.backend.domain.rag.model.ProjectAiConfiguration value) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("projectAiConfigId", String.valueOf(value.getProjectAiConfigId()));
+        result.put("projectId", String.valueOf(value.getProjectId()));
+        result.put("embeddingModelConfigId", value.getEmbeddingModelConfigId() == null ? null : String.valueOf(value.getEmbeddingModelConfigId()));
+        result.put("storyBibleRoutingMode", value.getStoryBibleRoutingMode());
+        result.put("routerModelConfigId", value.getRouterModelConfigId() == null ? null : String.valueOf(value.getRouterModelConfigId()));
+        result.put("chunkTargetCharacters", value.getChunkTargetCharacters());
+        result.put("chunkOverlapCharacters", value.getChunkOverlapCharacters());
+        result.put("chunkMaxCharacters", value.getChunkMaxCharacters());
+        result.put("retrievalCandidates", value.getRetrievalCandidates());
+        result.put("retrievalTopK", value.getRetrievalTopK());
+        result.put("retrievalMaxPerSource", value.getRetrievalMaxPerSource());
+        result.put("hnswEfSearch", value.getHnswEfSearch());
+        result.put("similarityThreshold", value.getSimilarityThreshold());
+        result.put("indexStatus", value.getIndexStatus());
+        result.put("activeIndexBuildId", value.getActiveIndexBuildId() == null ? null : String.valueOf(value.getActiveIndexBuildId()));
+        result.put("lastErrorCode", value.getLastErrorCode());
+        result.put("lastErrorMessage", value.getLastErrorMessage());
+        return result;
     }
 
     private String stringifyBusinessId(Long value) {

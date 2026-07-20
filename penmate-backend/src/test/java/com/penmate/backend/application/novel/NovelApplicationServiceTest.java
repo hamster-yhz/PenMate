@@ -5,6 +5,7 @@ import com.penmate.backend.application.novel.command.NovelCommands.CommitChapter
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateOutlineNodeCommand;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
+import com.penmate.backend.application.rag.ProjectAiConfigurationService;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelChapterVersion;
 import com.penmate.backend.domain.novel.model.NovelOutlineNode;
@@ -51,6 +52,9 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private StoryBibleApplicationService storyBibleApplicationService;
+
+    @Mock
+    private ProjectAiConfigurationService projectAiConfigurationService;
 
     @InjectMocks
     private NovelApplicationService novelApplicationService;

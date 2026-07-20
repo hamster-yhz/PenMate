@@ -10,6 +10,7 @@ import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
+import com.penmate.backend.application.rag.ProjectAiConfigurationService;
 import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterVersionCommand;
@@ -45,17 +46,20 @@ public class NovelApplicationService {
     private final RealtimeEventService realtimeEventService;
     private final ObjectStorageService objectStorageService;
     private final StoryBibleApplicationService storyBibleApplicationService;
+    private final ProjectAiConfigurationService projectAiConfigurationService;
 
     public NovelApplicationService(NovelGateway novelGateway,
                                    BusinessIdGenerator businessIdGenerator,
                                    RealtimeEventService realtimeEventService,
                                    ObjectStorageService objectStorageService,
-                                   StoryBibleApplicationService storyBibleApplicationService) {
+                                   StoryBibleApplicationService storyBibleApplicationService,
+                                   ProjectAiConfigurationService projectAiConfigurationService) {
         this.novelGateway = novelGateway;
         this.businessIdGenerator = businessIdGenerator;
         this.realtimeEventService = realtimeEventService;
         this.objectStorageService = objectStorageService;
         this.storyBibleApplicationService = storyBibleApplicationService;
+        this.projectAiConfigurationService = projectAiConfigurationService;
     }
 
     /**
@@ -113,6 +117,7 @@ public class NovelApplicationService {
                 project.getTitle(),
                 command.ownerUserId()
         );
+        projectAiConfigurationService.initializeProject(project.getProjectId(), command.ownerUserId());
          
         log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getProjectId(), command.ownerUserId());
         return project;
