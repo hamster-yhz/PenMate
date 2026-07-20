@@ -32,6 +32,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.List;
 import java.util.Map;
@@ -72,8 +74,9 @@ public class NovelController {
      * @return 出参：处理结果
      */
     @GetMapping
-    public ApiResponse<List<NovelProject>> listProjects(@RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listProjects(), traceId);
+    public ApiResponse<List<NovelProject>> listProjects(Authentication authentication,
+                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.listProjects(id(authentication)), traceId);
     }
 
     /**
@@ -86,10 +89,11 @@ public class NovelController {
      */
     @PostMapping
     public ApiResponse<NovelProject> createProject(@Valid @RequestBody CreateNovelProjectDto dto,
+                                                   Authentication authentication,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createProject(
                 new NovelCommands.CreateProjectCommand(
-                        requireLongId(dto.getOwnerUserId(), "ownerUserId"),
+                        id(authentication),
                         dto.getTitle(),
                         dto.getSummary(),
                         dto.getStatus()
@@ -143,9 +147,9 @@ public class NovelController {
      */
     @DeleteMapping("/{projectId}")
     public ApiResponse<String> deleteProject(@PathVariable String projectId,
-                                             @RequestParam("operatorId") String operatorId,
+                                             Authentication authentication,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteProject(requireLongId(projectId, "projectId"), requireLongId(operatorId, "operatorId"), traceId);
+        novelApplicationService.deleteProject(requireLongId(projectId, "projectId"), id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -176,12 +180,12 @@ public class NovelController {
     @PostMapping("/{projectId}/volumes")
     public ApiResponse<NovelVolume> createVolume(@PathVariable String projectId,
                                                    @Valid @RequestBody CreateNovelVolumeDto dto,
-                                                   @RequestParam("operatorId") String operatorId,
+                                                   Authentication authentication,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createVolume(
                 requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateVolumeCommand(dto.getTitle(), dto.getSortOrder(), dto.getDescription()),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -201,13 +205,13 @@ public class NovelController {
     public ApiResponse<NovelVolume> updateVolume(@PathVariable String projectId,
                                                   @PathVariable String volumeId,
                                                    @Valid @RequestBody UpdateNovelVolumeDto dto,
-                                                   @RequestParam("operatorId") String operatorId,
+                                                   Authentication authentication,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateVolume(
                 requireLongId(projectId, "projectId"),
                 requireLongId(volumeId, "volumeId"),
                 new NovelCommands.UpdateVolumeCommand(dto.getTitle(), dto.getSortOrder(), dto.getDescription()),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -225,9 +229,9 @@ public class NovelController {
     @DeleteMapping("/{projectId}/volumes/{volumeId}")
     public ApiResponse<String> deleteVolume(@PathVariable String projectId,
                                             @PathVariable String volumeId,
-                                            @RequestParam("operatorId") String operatorId,
+                                            Authentication authentication,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteVolume(requireLongId(projectId, "projectId"), requireLongId(volumeId, "volumeId"), requireLongId(operatorId, "operatorId"), traceId);
+        novelApplicationService.deleteVolume(requireLongId(projectId, "projectId"), requireLongId(volumeId, "volumeId"), id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -258,7 +262,7 @@ public class NovelController {
     @PostMapping("/{projectId}/chapters")
     public ApiResponse<NovelChapter> createChapter(@PathVariable String projectId,
                                                      @Valid @RequestBody CreateNovelChapterDto dto,
-                                                     @RequestParam("operatorId") String operatorId,
+                                                     Authentication authentication,
                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createChapter(
                 requireLongId(projectId, "projectId"),
@@ -276,7 +280,7 @@ public class NovelController {
                         dto.getContentChecksum(),
                         dto.getStorageProvider()
                 ),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -312,7 +316,7 @@ public class NovelController {
     public ApiResponse<NovelChapter> updateChapter(@PathVariable String projectId,
                                                     @PathVariable String chapterId,
                                                      @Valid @RequestBody UpdateNovelChapterDto dto,
-                                                     @RequestParam("operatorId") String operatorId,
+                                                     Authentication authentication,
                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateChapter(
                 requireLongId(projectId, "projectId"),
@@ -331,7 +335,7 @@ public class NovelController {
                         dto.getContentChecksum(),
                         dto.getStorageProvider()
                 ),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -340,13 +344,13 @@ public class NovelController {
     public ApiResponse<NovelChapter> moveChapter(@PathVariable String projectId,
                                                  @PathVariable String chapterId,
                                                  @Valid @RequestBody MoveNovelChapterDto dto,
-                                                 @RequestParam("operatorId") String operatorId,
+                                                 Authentication authentication,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.moveChapter(
                 requireLongId(projectId, "projectId"),
                 requireLongId(chapterId, "chapterId"),
                 new NovelCommands.MoveChapterCommand(optionalLongId(dto.getVolumeId()), dto.getSortOrder()),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -364,9 +368,9 @@ public class NovelController {
     @DeleteMapping("/{projectId}/chapters/{chapterId}")
     public ApiResponse<String> deleteChapter(@PathVariable String projectId,
                                              @PathVariable String chapterId,
-                                             @RequestParam("operatorId") String operatorId,
+                                             Authentication authentication,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), requireLongId(operatorId, "operatorId"), traceId);
+        novelApplicationService.deleteChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -383,9 +387,9 @@ public class NovelController {
     @PostMapping("/{projectId}/chapters/{chapterId}/publish")
     public ApiResponse<String> publishChapter(@PathVariable String projectId,
                                               @PathVariable String chapterId,
-                                              @RequestParam("operatorId") String operatorId,
+                                              Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.publishChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), requireLongId(operatorId, "operatorId"), traceId);
+        novelApplicationService.publishChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), id(authentication), traceId);
         return ApiResponse.success("published", traceId);
     }
 
@@ -461,9 +465,9 @@ public class NovelController {
     public ApiResponse<NovelChapter> restoreChapterVersion(@PathVariable String projectId,
                                                            @PathVariable String chapterId,
                                                            @PathVariable Integer versionNo,
-                                                           @RequestParam("operatorId") String operatorId,
+                                                           Authentication authentication,
                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.restoreChapterVersion(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo, requireLongId(operatorId, "operatorId"), traceId), traceId);
+        return ApiResponse.success(novelApplicationService.restoreChapterVersion(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo, id(authentication), traceId), traceId);
     }
 
     /**
@@ -513,7 +517,7 @@ public class NovelController {
     public ApiResponse<NovelChapter> commitChapterContent(@PathVariable String projectId,
                                                            @PathVariable String chapterId,
                                                             @Valid @RequestBody CommitChapterContentDto dto,
-                                                            @RequestParam("operatorId") String operatorId,
+                                                            Authentication authentication,
                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.commitChapterContent(
                 requireLongId(projectId, "projectId"),
@@ -526,7 +530,7 @@ public class NovelController {
                         dto.getStorageProvider(),
                         dto.getContent()
                 ),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -576,7 +580,7 @@ public class NovelController {
     @PostMapping("/{projectId}/outlines/nodes")
     public ApiResponse<NovelOutlineNode> createOutlineNode(@PathVariable String projectId,
                                                              @Valid @RequestBody CreateNovelOutlineNodeDto dto,
-                                                             @RequestParam("operatorId") String operatorId,
+                                                             Authentication authentication,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.createOutlineNode(
                 requireLongId(projectId, "projectId"),
@@ -587,7 +591,7 @@ public class NovelController {
                         dto.getSortOrder(),
                         dto.getContent()
                 ),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -607,7 +611,7 @@ public class NovelController {
     public ApiResponse<NovelOutlineNode> updateOutlineNode(@PathVariable String projectId,
                                                             @PathVariable String nodeId,
                                                              @Valid @RequestBody UpdateNovelOutlineNodeDto dto,
-                                                             @RequestParam("operatorId") String operatorId,
+                                                             Authentication authentication,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.updateOutlineNode(
                 requireLongId(projectId, "projectId"),
@@ -619,7 +623,7 @@ public class NovelController {
                         dto.getSortOrder(),
                         dto.getContent()
                 ),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ), traceId);
     }
@@ -639,13 +643,13 @@ public class NovelController {
     public ApiResponse<String> moveOutlineNode(@PathVariable String projectId,
                                                 @PathVariable String nodeId,
                                                  @Valid @RequestBody MoveNovelOutlineNodeDto dto,
-                                                 @RequestParam("operatorId") String operatorId,
+                                                 Authentication authentication,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         novelApplicationService.moveOutlineNode(
                 requireLongId(projectId, "projectId"),
                 requireLongId(nodeId, "nodeId"),
                 new NovelCommands.MoveOutlineNodeCommand(optionalLongId(dto.getParentId()), dto.getSortOrder()),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         );
         return ApiResponse.success("moved", traceId);
@@ -664,9 +668,9 @@ public class NovelController {
     @DeleteMapping("/{projectId}/outlines/nodes/{nodeId}")
     public ApiResponse<String> deleteOutlineNode(@PathVariable String projectId,
                                                  @PathVariable String nodeId,
-                                                 @RequestParam("operatorId") String operatorId,
+                                                 Authentication authentication,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteOutlineNode(requireLongId(projectId, "projectId"), requireLongId(nodeId, "nodeId"), requireLongId(operatorId, "operatorId"), traceId);
+        novelApplicationService.deleteOutlineNode(requireLongId(projectId, "projectId"), requireLongId(nodeId, "nodeId"), id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 }

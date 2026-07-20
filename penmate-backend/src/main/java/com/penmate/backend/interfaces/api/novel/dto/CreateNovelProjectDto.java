@@ -8,9 +8,6 @@ import jakarta.validation.constraints.NotBlank;
 public class CreateNovelProjectDto {
 
     @NotBlank
-    private String ownerUserId;
-
-    @NotBlank
     private String title;
 
     private String summary;

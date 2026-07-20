@@ -73,6 +73,13 @@ public class NovelApplicationService {
         return projects;
     }
 
+    public List<NovelProject> listProjects(Long ownerUserId) {
+        Objects.requireNonNull(ownerUserId, "ownerUserId must not be null");
+        return novelGateway.findAllProjects().stream()
+                .filter(project -> Objects.equals(project.getOwnerUserId(), ownerUserId))
+                .toList();
+    }
+
     /**
      * 查询项目详情。
      *

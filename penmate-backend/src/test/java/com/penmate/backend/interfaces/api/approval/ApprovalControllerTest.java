@@ -10,11 +10,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.util.Map;
+import java.security.Principal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -56,6 +58,7 @@ class ApprovalControllerTest {
         when(approvalApplicationService.create(any(), eq(traceId))).thenReturn(created);
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals")
+                        .principal(principal("1001"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -124,6 +127,7 @@ class ApprovalControllerTest {
                 .when(approvalApplicationService).approve(eq(88001L), any(), eq(traceId));
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals/88001/approve")
+                        .principal(principal("2001"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -159,6 +163,7 @@ class ApprovalControllerTest {
         doNothing().when(approvalApplicationService).approve(eq(88001L), any(), eq(traceId));
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals/88001/approve")
+                        .principal(principal("2001"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -177,6 +182,7 @@ class ApprovalControllerTest {
         doNothing().when(approvalApplicationService).reject(eq(88001L), any(), eq(traceId));
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals/88001/reject")
+                        .principal(principal("2001"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -195,6 +201,10 @@ class ApprovalControllerTest {
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    private Principal principal(String userId) {
+        return new UsernamePasswordAuthenticationToken(userId, null, List.of());
     }
 }
 

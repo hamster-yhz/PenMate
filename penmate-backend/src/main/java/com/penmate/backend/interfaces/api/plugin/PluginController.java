@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.List;
 
@@ -114,11 +116,11 @@ public class PluginController {
     @PostMapping("/novels/{projectId}/plugins/install")
     public ApiResponse<String> install(@PathVariable String projectId,
                                        @Valid @RequestBody InstallPluginDto dto,
-                                       @RequestParam("operatorId") String operatorId,
+                                       Authentication authentication,
                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         pluginApplicationService.install(
                 requireLongId(projectId, "projectId"),
-                new PluginCommands.InstallPluginCommand(dto.getPluginCode(), dto.getVersion(), dto.getConfigJson(), requireLongId(operatorId, "operatorId")),
+                new PluginCommands.InstallPluginCommand(dto.getPluginCode(), dto.getVersion(), dto.getConfigJson(), id(authentication)),
                 traceId
         );
         return ApiResponse.success("installed", traceId);
@@ -144,12 +146,12 @@ public class PluginController {
     public ApiResponse<String> updateInstall(@PathVariable String projectId,
                                              @PathVariable String pluginCode,
                                              @RequestBody UpdatePluginInstallDto dto,
-                                             @RequestParam("operatorId") String operatorId,
+                                             Authentication authentication,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         pluginApplicationService.updateInstall(
                 requireLongId(projectId, "projectId"),
                 pluginCode,
-                new PluginCommands.UpdatePluginInstallCommand(dto.getEnabled(), dto.getConfigJson(), requireLongId(operatorId, "operatorId")),
+                new PluginCommands.UpdatePluginInstallCommand(dto.getEnabled(), dto.getConfigJson(), id(authentication)),
                 traceId
         );
         return ApiResponse.success("updated", traceId);
@@ -173,9 +175,9 @@ public class PluginController {
     @DeleteMapping("/novels/{projectId}/plugins/{pluginCode}")
     public ApiResponse<String> deleteInstall(@PathVariable String projectId,
                                              @PathVariable String pluginCode,
-                                             @RequestParam("operatorId") String operatorId,
+                                             Authentication authentication,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        pluginApplicationService.deleteInstall(requireLongId(projectId, "projectId"), pluginCode, requireLongId(operatorId, "operatorId"), traceId);
+        pluginApplicationService.deleteInstall(requireLongId(projectId, "projectId"), pluginCode, id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 

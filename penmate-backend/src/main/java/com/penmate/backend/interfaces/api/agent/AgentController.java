@@ -21,7 +21,6 @@ import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
-import com.penmate.backend.interfaces.api.agent.dto.RetryAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.StoryBibleRoutingPreferenceDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.validation.Valid;
@@ -112,11 +111,12 @@ public class AgentController {
     @PostMapping("/sessions")
     public ApiResponse<AgentSessionDto> createSession(@PathVariable String projectId,
                                                       @Valid @RequestBody CreateAgentConversationDto dto,
+                                                      Authentication authentication,
                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Create agent session request: projectId={}, userId={}, title={}, traceId={}",
-                projectId, dto.getUserId(), dto.getTitle(), traceId);
+                projectId, principalId(authentication), dto.getTitle(), traceId);
         return ApiResponse.success(
-                toSessionDto(agentConversationAppService.createConversation(requireLongId(projectId, "projectId"), toCommand(dto), traceId)),
+                toSessionDto(agentConversationAppService.createConversation(requireLongId(projectId, "projectId"), toCommand(dto, principalId(authentication)), traceId)),
                 traceId
         );
     }
@@ -157,14 +157,15 @@ public class AgentController {
     public ApiResponse<AgentRecoverySnapshotDto> resume(@PathVariable String projectId,
                                                         @PathVariable String sessionId,
                                                         @Valid @RequestBody ResumeAgentSessionDto dto,
+                                                        Authentication authentication,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Resume agent session request: projectId={}, sessionId={}, operatorId={}, trigger={}, traceId={}",
-                projectId, sessionId, dto.getOperatorId(), dto.getTrigger(), traceId);
+                projectId, sessionId, principalId(authentication), dto.getTrigger(), traceId);
         return ApiResponse.success(
                 toRecoveryDto(agentRunRecoveryAppService.resumeSession(
                         requireLongId(projectId, "projectId"),
                         requireLongId(sessionId, "sessionId"),
-                        requireLongId(dto.getOperatorId(), "operatorId"),
+                        principalId(authentication),
                         dto.getTrigger(),
                         traceId)),
                 traceId
@@ -179,13 +180,14 @@ public class AgentController {
     public ApiResponse<AgentRunDto> createTurn(@PathVariable String projectId,
                                                @PathVariable String sessionId,
                                                @Valid @RequestBody CreateAgentTurnDto dto,
+                                               Authentication authentication,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, taskType={}, traceId={}",
-                projectId, sessionId, dto.getOperatorId(), dto.getTaskRequest().getTaskType(), traceId);
+                projectId, sessionId, principalId(authentication), dto.getTaskRequest().getTaskType(), traceId);
         AgentTurnResult result = agentTurnAppService.createTurn(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
-                toCommand(dto),
+                toCommand(dto, principalId(authentication)),
                 traceId);
         return ApiResponse.success(toRunDto(result, requireLongId(sessionId, "sessionId")), traceId);
     }
@@ -209,11 +211,12 @@ public class AgentController {
             @PathVariable String projectId,
             @PathVariable String runId,
             @Valid @RequestBody CancelAgentRunDto dto,
+            Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         var run = runCancellationService.cancel(
                 requireLongId(projectId, "projectId"),
                 requireLongId(runId, "runId"),
-                requireLongId(dto.getOperatorId(), "operatorId"),
+                principalId(authentication),
                 dto.getReason());
         return ApiResponse.success(new AgentRunDto.ActiveRunDto(
                 stringifyBusinessId(run.turnId()),
@@ -227,12 +230,12 @@ public class AgentController {
     public ApiResponse<AgentRunDto.ActiveRunDto> retryRun(
             @PathVariable String projectId,
             @PathVariable String runId,
-            @Valid @RequestBody RetryAgentRunDto dto,
+            Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         var run = runRetryService.retry(
                 requireLongId(projectId, "projectId"),
                 requireLongId(runId, "runId"),
-                requireLongId(dto.getOperatorId(), "operatorId"),
+                principalId(authentication),
                 traceId);
         return ApiResponse.success(new AgentRunDto.ActiveRunDto(
                 stringifyBusinessId(run.turnId()),
@@ -242,8 +245,7 @@ public class AgentController {
                 stringifyBusinessId(run.latestEventSeq())), traceId);
     }
 
-    private CreateConversationCommand toCommand(CreateAgentConversationDto dto) {
-        Long userId = requireLongId(dto.getUserId(), "userId");
+    private CreateConversationCommand toCommand(CreateAgentConversationDto dto, Long userId) {
         return new CreateConversationCommand(
                 userId,
                 dto.getTitle(),
@@ -252,10 +254,10 @@ public class AgentController {
         );
     }
 
-    private AgentTurnCommand toCommand(CreateAgentTurnDto dto) {
+    private AgentTurnCommand toCommand(CreateAgentTurnDto dto, Long actorUserId) {
         CreateAgentTurnDto.TaskRequest request = dto.getTaskRequest();
         return new AgentTurnCommand(
-                requireLongId(dto.getOperatorId(), "operatorId"),
+                actorUserId,
                 dto.getUserMessage(),
                 request == null
                         ? null

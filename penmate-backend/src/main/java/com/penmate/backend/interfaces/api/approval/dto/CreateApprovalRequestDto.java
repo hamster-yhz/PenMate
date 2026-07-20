@@ -8,9 +8,6 @@ import jakarta.validation.constraints.NotNull;
 
 public class CreateApprovalRequestDto {
 
-    @NotBlank
-    private String projectId;
-
     private String runId;
 
     @NotBlank
@@ -21,9 +18,6 @@ public class CreateApprovalRequestDto {
 
     @NotNull
     private Integer riskLevel;
-
-    @NotBlank
-    private String requestedBy;
 
 }
 

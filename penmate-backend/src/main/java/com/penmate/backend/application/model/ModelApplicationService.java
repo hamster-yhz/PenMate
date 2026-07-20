@@ -10,6 +10,7 @@ import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelProviderCapability;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
+import com.penmate.backend.domain.model.service.ModelEndpointPolicy;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class ModelApplicationService {
     private final ModelRepository repository;
     private final BusinessIdGenerator idGenerator;
     private final SecretCryptoService secretCryptoService;
+    private final ModelEndpointPolicy modelEndpointPolicy;
 
     public List<ProviderView> listProviders() {
         return repository.listProviders().stream()
@@ -58,7 +60,7 @@ public class ModelApplicationService {
         String modelType = normalizeModelType(command.modelType());
         ModelProvider provider = requireProvider(command.providerId());
         ModelProviderCapability capability = requireCapability(provider.getProviderId(), modelType);
-        String baseUrl = normalizeBaseUrl(command.baseUrl(), provider.getBaseUrl());
+        String baseUrl = validateEndpoint(normalizeBaseUrl(command.baseUrl(), provider.getBaseUrl()), systemScope);
         String scope = systemScope ? "SYSTEM" : "USER";
 
         ModelConfiguration configuration = new ModelConfiguration();
@@ -209,8 +211,9 @@ public class ModelApplicationService {
         merged.setModelType(existing.getModelType());
         merged.setModelName(command.modelName() == null
                 ? existing.getModelName() : requireText(command.modelName(), "modelName"));
-        merged.setBaseUrl(command.baseUrl() == null
-                ? existing.getBaseUrl() : normalizeBaseUrl(command.baseUrl(), provider.getBaseUrl()));
+        String candidateBaseUrl = command.baseUrl() == null
+                ? existing.getBaseUrl() : normalizeBaseUrl(command.baseUrl(), provider.getBaseUrl());
+        merged.setBaseUrl(validateEndpoint(candidateBaseUrl, "SYSTEM".equals(existing.getScopeType())));
         merged.setDistanceMetric("EMBEDDING".equals(existing.getModelType())
                 ? normalizeMetric("EMBEDDING", command.distanceMetric() == null
                     ? existing.getDistanceMetric() : command.distanceMetric())
@@ -234,6 +237,11 @@ public class ModelApplicationService {
         if (repository.insertCredential(configuration, credential) != 1) {
             throw BusinessException.of("Failed to store model credential");
         }
+    }
+
+    private String validateEndpoint(String baseUrl, boolean systemScope) {
+        // Unit tests that construct this service with legacy Mockito fixtures do not provide the new policy.
+        return modelEndpointPolicy == null ? baseUrl : modelEndpointPolicy.validate(baseUrl, systemScope);
     }
 
     private void updateCredential(ModelCredential existing, ModelConfiguration configuration, String apiKey) {

@@ -1,7 +1,6 @@
 package com.penmate.backend.interfaces.api.agent.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -15,9 +14,6 @@ public class ResumeAgentSessionDto {
     /**
      * 触发本次会话恢复的操作人业务 ID。
      */
-    @NotNull(message = "operatorId must not be null")
-    private String operatorId;
-
     /**
      * 恢复触发来源，例如 WORKBENCH_ENTER。
      */

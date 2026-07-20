@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,6 +55,7 @@ public class ApprovalController {
     @PostMapping
     public ApiResponse<Map<String, Object>> create(@PathVariable String projectId,
                                                    @Valid @RequestBody CreateApprovalRequestDto dto,
+                                                   Authentication authentication,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         CreateApprovalCommand command = new CreateApprovalCommand(
                 requireLongId(projectId, "projectId"),
@@ -60,7 +63,7 @@ public class ApprovalController {
                 dto.getApprovalType(),
                 dto.getPayloadJson(),
                 dto.getRiskLevel(),
-                requireLongId(dto.getRequestedBy(), "requestedBy")
+                id(authentication)
         );
         ApprovalRequest created = approvalApplicationService.create(command, traceId);
         return ApiResponse.success(toApprovalView(created), traceId);
@@ -127,8 +130,9 @@ public class ApprovalController {
     @PostMapping("/{approvalId}/approve")
     public ApiResponse<String> approve(@PathVariable String approvalId,
                                        @Valid @RequestBody ReviewApprovalRequestDto dto,
+                                       Authentication authentication,
                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        ReviewApprovalCommand command = new ReviewApprovalCommand(requireLongId(dto.getReviewedBy(), "reviewedBy"), dto.getComment());
+        ReviewApprovalCommand command = new ReviewApprovalCommand(id(authentication), dto.getComment());
         approvalApplicationService.approve(requireLongId(approvalId, "approvalId"), command, traceId);
         return ApiResponse.success("approved", traceId);
     }
@@ -150,8 +154,9 @@ public class ApprovalController {
     @PostMapping("/{approvalId}/reject")
     public ApiResponse<String> reject(@PathVariable String approvalId,
                                       @Valid @RequestBody ReviewApprovalRequestDto dto,
+                                      Authentication authentication,
                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        ReviewApprovalCommand command = new ReviewApprovalCommand(requireLongId(dto.getReviewedBy(), "reviewedBy"), dto.getComment());
+        ReviewApprovalCommand command = new ReviewApprovalCommand(id(authentication), dto.getComment());
         approvalApplicationService.reject(requireLongId(approvalId, "approvalId"), command, traceId);
         return ApiResponse.success("rejected", traceId);
     }

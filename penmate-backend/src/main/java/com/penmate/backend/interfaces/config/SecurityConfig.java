@@ -65,6 +65,8 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/v1/users/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/menus/**")
                         .hasAuthority("rbac:admin:access")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/ops/**").hasAuthority("ops:job:read")
+                        .requestMatchers("/api/v1/ops/**").hasAuthority("ops:job:write")
                         .anyRequest().authenticated())
                 .addFilterBefore(bearerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(traceIdFilter, BearerAuthenticationFilter.class);

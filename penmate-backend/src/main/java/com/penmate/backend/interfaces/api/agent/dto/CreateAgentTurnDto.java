@@ -16,9 +16,6 @@ public class CreateAgentTurnDto {
     /**
      * 发起当前轮次的操作人业务 ID。
      */
-    @NotNull(message = "operatorId must not be null")
-    private String operatorId;
-
     /**
      * 用户输入的主消息内容。
      */

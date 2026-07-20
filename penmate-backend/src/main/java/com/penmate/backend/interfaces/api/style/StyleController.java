@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,7 +54,7 @@ public class StyleController {
     @PostMapping
     public ApiResponse<Map<String, Object>> createStyle(@PathVariable String projectId,
                                                         @Valid @RequestBody CreateStyleDto dto,
-                                                        @RequestParam("operatorId") String operatorId,
+                                                        Authentication authentication,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(toStyleView(styleApplicationService.createStyle(
                 requireLongId(projectId, "projectId"),
@@ -64,7 +66,7 @@ public class StyleController {
                         dto.getNarrativeFocus(),
                         dto.getPromptTemplate(),
                         dto.getSampleText(),
-                        requireLongId(operatorId, "operatorId")
+                        id(authentication)
                 ),
                 traceId
         )), traceId);
@@ -81,7 +83,7 @@ public class StyleController {
     public ApiResponse<Map<String, Object>> updateStyle(@PathVariable String projectId,
                                                         @PathVariable String styleId,
                                                         @Valid @RequestBody UpdateStyleDto dto,
-                                                        @RequestParam("operatorId") String operatorId,
+                                                        Authentication authentication,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(toStyleView(styleApplicationService.updateStyle(
                 requireLongId(projectId, "projectId"),
@@ -93,7 +95,7 @@ public class StyleController {
                         dto.getNarrativeFocus(),
                         dto.getPromptTemplate(),
                         dto.getSampleText(),
-                        requireLongId(operatorId, "operatorId")
+                        id(authentication)
                 ),
                 traceId
         )), traceId);
@@ -102,9 +104,9 @@ public class StyleController {
     @DeleteMapping("/{styleId}")
     public ApiResponse<String> deleteStyle(@PathVariable String projectId,
                                            @PathVariable String styleId,
-                                           @RequestParam("operatorId") String operatorId,
+                                           Authentication authentication,
                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        styleApplicationService.deleteStyle(requireLongId(projectId, "projectId"), requireLongId(styleId, "styleId"), requireLongId(operatorId, "operatorId"), traceId);
+        styleApplicationService.deleteStyle(requireLongId(projectId, "projectId"), requireLongId(styleId, "styleId"), id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -114,11 +116,11 @@ public class StyleController {
     @PostMapping("/switch")
     public ApiResponse<Map<String, Object>> switchStyle(@PathVariable String projectId,
                                                         @Valid @RequestBody SwitchStyleDto dto,
-                                                        @RequestParam("operatorId") String operatorId,
+                                                        Authentication authentication,
                                                         @RequestParam("sessionId") String sessionId,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         Long parsedProjectId = requireLongId(projectId, "projectId");
-        Long parsedOperatorId = requireLongId(operatorId, "operatorId");
+        Long parsedOperatorId = id(authentication);
         Long parsedSessionId = requireLongId(sessionId, "sessionId");
         StyleProfile switchedStyle = styleApplicationService.switchStyle(
                 parsedProjectId,
@@ -139,11 +141,11 @@ public class StyleController {
     @PostMapping("/analyze-sample")
     public ApiResponse<Map<String, Object>> analyzeSample(@PathVariable String projectId,
                                                           @Valid @RequestBody AnalyzeStyleSampleDto dto,
-                                                          @RequestParam("operatorId") String operatorId,
+                                                          Authentication authentication,
                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(styleApplicationService.analyzeSample(
                 requireLongId(projectId, "projectId"),
-                new StyleCommands.AnalyzeStyleCommand(dto.getSampleText(), requireLongId(operatorId, "operatorId")),
+                new StyleCommands.AnalyzeStyleCommand(dto.getSampleText(), id(authentication)),
                 traceId
         ), traceId);
     }

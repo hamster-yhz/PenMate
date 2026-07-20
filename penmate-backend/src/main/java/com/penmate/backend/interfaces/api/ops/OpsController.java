@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.List;
 
@@ -90,9 +92,9 @@ public class OpsController {
      */
     @PostMapping("/jobs/{jobId}/retry")
     public ApiResponse<OpsAsyncJob> retryJob(@PathVariable String jobId,
-                                             @RequestParam("operatorId") String operatorId,
+                                             Authentication authentication,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(opsApplicationService.retryJob(requireLongId(jobId, "jobId"), requireLongId(operatorId, "operatorId"), traceId), traceId);
+        return ApiResponse.success(opsApplicationService.retryJob(requireLongId(jobId, "jobId"), id(authentication), traceId), traceId);
     }
 
     /**
@@ -109,9 +111,9 @@ public class OpsController {
      * @return 出参：处理结果
      */
     @PostMapping("/migrations/content-to-object-storage")
-    public ApiResponse<OpsMigrationTask> runContentMigration(@RequestParam("operatorId") String operatorId,
+    public ApiResponse<OpsMigrationTask> runContentMigration(Authentication authentication,
                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(opsApplicationService.startContentToObjectStorageMigration(requireLongId(operatorId, "operatorId"), traceId), traceId);
+        return ApiResponse.success(opsApplicationService.startContentToObjectStorageMigration(id(authentication), traceId), traceId);
     }
 
     /**

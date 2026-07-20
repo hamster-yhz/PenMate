@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,9 +46,9 @@ public class StoryBibleController {
 
     @PostMapping
     public ApiResponse<Object> bootstrap(@PathVariable String projectId, @RequestBody StoryBibleDtos.Bootstrap dto,
-                                         @RequestParam String operatorId,
+                                         Authentication authentication,
                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return success(service.bootstrap(id(projectId, "projectId"), dto.projectTitle(), id(operatorId, "operatorId")), traceId);
+        return success(service.bootstrap(id(projectId, "projectId"), dto.projectTitle(), actor(authentication)), traceId);
     }
 
     @GetMapping("/views")
@@ -57,11 +58,11 @@ public class StoryBibleController {
 
     @PatchMapping("/views/{viewCode}")
     public ApiResponse<Object> updateView(@PathVariable String projectId, @PathVariable String viewCode,
-                                          @RequestBody StoryBibleDtos.UpdateView dto, @RequestParam String operatorId,
+                                          @RequestBody StoryBibleDtos.UpdateView dto, Authentication authentication,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateViewPreference(id(projectId, "projectId"),
                 new StoryBibleCommands.UpdateViewPreference(viewCode, dto.displayName(), dto.hidden(), dto.sortOrder()),
-                id(operatorId, "operatorId")), traceId);
+                actor(authentication)), traceId);
     }
 
     @GetMapping("/node-types")
@@ -71,27 +72,27 @@ public class StoryBibleController {
 
     @PostMapping("/node-types")
     public ApiResponse<Object> createNodeType(@PathVariable String projectId, @RequestBody StoryBibleDtos.CreateNodeType dto,
-                                              @RequestParam String operatorId,
+                                              Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.createNodeType(id(projectId, "projectId"), new StoryBibleCommands.CreateNodeType(
                 dto.typeCode(), dto.semanticFamily(), dto.displayName(), dto.iconCode(), dto.fieldSchemaJson(), dto.sortOrder()
-        ), id(operatorId, "operatorId")), traceId);
+        ), actor(authentication)), traceId);
     }
 
     @PatchMapping("/node-types/{typeId}")
     public ApiResponse<Object> updateNodeType(@PathVariable String projectId, @PathVariable String typeId,
-                                              @RequestBody StoryBibleDtos.UpdateNodeType dto, @RequestParam String operatorId,
+                                              @RequestBody StoryBibleDtos.UpdateNodeType dto, Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateNodeType(id(projectId, "projectId"), id(typeId, "typeId"),
                 new StoryBibleCommands.UpdateNodeType(dto.displayName(), dto.iconCode(), dto.fieldSchemaJson(), dto.sortOrder()),
-                id(operatorId, "operatorId")), traceId);
+                actor(authentication)), traceId);
     }
 
     @DeleteMapping("/node-types/{typeId}")
     public ApiResponse<String> archiveNodeType(@PathVariable String projectId, @PathVariable String typeId,
-                                               @RequestParam String operatorId,
+                                               Authentication authentication,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        service.archiveNodeType(id(projectId, "projectId"), id(typeId, "typeId"), id(operatorId, "operatorId"));
+        service.archiveNodeType(id(projectId, "projectId"), id(typeId, "typeId"), actor(authentication));
         return ApiResponse.success("archived", traceId);
     }
 
@@ -117,12 +118,12 @@ public class StoryBibleController {
 
     @PostMapping("/nodes")
     public ApiResponse<Object> createNode(@PathVariable String projectId, @RequestBody StoryBibleDtos.CreateNode dto,
-                                          @RequestParam String operatorId,
+                                          Authentication authentication,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.createNode(id(projectId, "projectId"), new StoryBibleCommands.CreateNode(
                 id(dto.typeId(), "typeId"), dto.title(), dto.summary(), dto.bodyMarkdown(), dto.attributesJson(),
                 dto.inclusionPolicy(), dto.canonStatus(), dto.aliases(), ids(dto.categoryIds(), "categoryIds"), ids(dto.tagIds(), "tagIds")
-        ), StoryBibleActorType.USER, id(operatorId, "operatorId"), null), traceId);
+        ), StoryBibleActorType.USER, actor(authentication), null), traceId);
     }
 
     @GetMapping("/nodes/{nodeId}")
@@ -133,20 +134,20 @@ public class StoryBibleController {
 
     @PatchMapping("/nodes/{nodeId}")
     public ApiResponse<Object> updateNode(@PathVariable String projectId, @PathVariable String nodeId,
-                                          @RequestBody StoryBibleDtos.UpdateNode dto, @RequestParam String operatorId,
+                                          @RequestBody StoryBibleDtos.UpdateNode dto, Authentication authentication,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateNode(id(projectId, "projectId"), id(nodeId, "nodeId"), new StoryBibleCommands.UpdateNode(
                 dto.expectedRevision(), id(dto.typeId(), "typeId"), dto.title(), dto.summary(), dto.bodyMarkdown(), dto.attributesJson(),
                 dto.inclusionPolicy(), dto.canonStatus(), dto.aliases(), ids(dto.categoryIds(), "categoryIds"), ids(dto.tagIds(), "tagIds")
-        ), StoryBibleActorType.USER, id(operatorId, "operatorId"), null), traceId);
+        ), StoryBibleActorType.USER, actor(authentication), null), traceId);
     }
 
     @DeleteMapping("/nodes/{nodeId}")
     public ApiResponse<String> deleteNode(@PathVariable String projectId, @PathVariable String nodeId,
-                                          @RequestParam Long expectedRevision, @RequestParam String operatorId,
+                                          @RequestParam Long expectedRevision, Authentication authentication,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         service.deleteNode(id(projectId, "projectId"), id(nodeId, "nodeId"), expectedRevision,
-                StoryBibleActorType.USER, id(operatorId, "operatorId"), null);
+                StoryBibleActorType.USER, actor(authentication), null);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -164,26 +165,26 @@ public class StoryBibleController {
 
     @PostMapping("/categories")
     public ApiResponse<Object> createCategory(@PathVariable String projectId, @RequestBody StoryBibleDtos.CreateCategory dto,
-                                              @RequestParam String operatorId,
+                                              Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.createCategory(id(projectId, "projectId"), new StoryBibleCommands.CreateCategory(
-                optionalId(dto.parentCategoryId(), "parentCategoryId"), dto.name(), dto.sortOrder()), id(operatorId, "operatorId")), traceId);
+                optionalId(dto.parentCategoryId(), "parentCategoryId"), dto.name(), dto.sortOrder()), actor(authentication)), traceId);
     }
 
     @PatchMapping("/categories/{categoryId}")
     public ApiResponse<Object> updateCategory(@PathVariable String projectId, @PathVariable String categoryId,
-                                              @RequestBody StoryBibleDtos.UpdateCategory dto, @RequestParam String operatorId,
+                                              @RequestBody StoryBibleDtos.UpdateCategory dto, Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateCategory(id(projectId, "projectId"), id(categoryId, "categoryId"),
                 new StoryBibleCommands.UpdateCategory(optionalId(dto.parentCategoryId(), "parentCategoryId"), dto.name(), dto.sortOrder()),
-                id(operatorId, "operatorId")), traceId);
+                actor(authentication)), traceId);
     }
 
     @DeleteMapping("/categories/{categoryId}")
     public ApiResponse<String> deleteCategory(@PathVariable String projectId, @PathVariable String categoryId,
-                                              @RequestParam String operatorId,
+                                              Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        service.deleteCategory(id(projectId, "projectId"), id(categoryId, "categoryId"), id(operatorId, "operatorId"));
+        service.deleteCategory(id(projectId, "projectId"), id(categoryId, "categoryId"), actor(authentication));
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -194,25 +195,25 @@ public class StoryBibleController {
 
     @PostMapping("/tags")
     public ApiResponse<Object> createTag(@PathVariable String projectId, @RequestBody StoryBibleDtos.CreateTag dto,
-                                         @RequestParam String operatorId,
+                                         Authentication authentication,
                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.createTag(id(projectId, "projectId"), new StoryBibleCommands.CreateTag(dto.name(), dto.color()),
-                id(operatorId, "operatorId")), traceId);
+                actor(authentication)), traceId);
     }
 
     @PatchMapping("/tags/{tagId}")
     public ApiResponse<Object> updateTag(@PathVariable String projectId, @PathVariable String tagId,
-                                         @RequestBody StoryBibleDtos.UpdateTag dto, @RequestParam String operatorId,
+                                         @RequestBody StoryBibleDtos.UpdateTag dto, Authentication authentication,
                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateTag(id(projectId, "projectId"), id(tagId, "tagId"),
-                new StoryBibleCommands.UpdateTag(dto.name(), dto.color()), id(operatorId, "operatorId")), traceId);
+                new StoryBibleCommands.UpdateTag(dto.name(), dto.color()), actor(authentication)), traceId);
     }
 
     @DeleteMapping("/tags/{tagId}")
     public ApiResponse<String> deleteTag(@PathVariable String projectId, @PathVariable String tagId,
-                                         @RequestParam String operatorId,
+                                         Authentication authentication,
                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        service.deleteTag(id(projectId, "projectId"), id(tagId, "tagId"), id(operatorId, "operatorId"));
+        service.deleteTag(id(projectId, "projectId"), id(tagId, "tagId"), actor(authentication));
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -224,28 +225,28 @@ public class StoryBibleController {
 
     @PostMapping("/relations")
     public ApiResponse<Object> createRelation(@PathVariable String projectId, @RequestBody StoryBibleDtos.CreateRelation dto,
-                                              @RequestParam String operatorId,
+                                              Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.createRelation(id(projectId, "projectId"), new StoryBibleCommands.CreateRelation(
                 id(dto.sourceNodeId(), "sourceNodeId"), dto.relationType(), id(dto.targetNodeId(), "targetNodeId"),
-                dto.description(), dto.attributesJson()), StoryBibleActorType.USER, id(operatorId, "operatorId"), null), traceId);
+                dto.description(), dto.attributesJson()), StoryBibleActorType.USER, actor(authentication), null), traceId);
     }
 
     @PatchMapping("/relations/{relationId}")
     public ApiResponse<Object> updateRelation(@PathVariable String projectId, @PathVariable String relationId,
-                                              @RequestBody StoryBibleDtos.UpdateRelation dto, @RequestParam String operatorId,
+                                              @RequestBody StoryBibleDtos.UpdateRelation dto, Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateRelation(id(projectId, "projectId"), id(relationId, "relationId"),
                 new StoryBibleCommands.UpdateRelation(dto.expectedRevision(), dto.relationType(), id(dto.targetNodeId(), "targetNodeId"),
-                        dto.description(), dto.attributesJson()), StoryBibleActorType.USER, id(operatorId, "operatorId"), null), traceId);
+                        dto.description(), dto.attributesJson()), StoryBibleActorType.USER, actor(authentication), null), traceId);
     }
 
     @DeleteMapping("/relations/{relationId}")
     public ApiResponse<String> deleteRelation(@PathVariable String projectId, @PathVariable String relationId,
-                                              @RequestParam Long expectedRevision, @RequestParam String operatorId,
+                                              @RequestParam Long expectedRevision, Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         service.deleteRelation(id(projectId, "projectId"), id(relationId, "relationId"), expectedRevision,
-                StoryBibleActorType.USER, id(operatorId, "operatorId"), null);
+                StoryBibleActorType.USER, actor(authentication), null);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -257,30 +258,30 @@ public class StoryBibleController {
 
     @PostMapping("/nodes/{nodeId}/progressions")
     public ApiResponse<Object> createProgression(@PathVariable String projectId, @PathVariable String nodeId,
-                                                 @RequestBody StoryBibleDtos.CreateProgression dto, @RequestParam String operatorId,
+                                                 @RequestBody StoryBibleDtos.CreateProgression dto, Authentication authentication,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.createProgression(id(projectId, "projectId"), new StoryBibleCommands.CreateProgression(
                 id(nodeId, "nodeId"), id(dto.anchorChapterId(), "anchorChapterId"), optionalId(dto.endChapterId(), "endChapterId"),
                 optionalId(dto.storyEventNodeId(), "storyEventNodeId"), dto.patchJson(), dto.summary()),
-                StoryBibleActorType.USER, id(operatorId, "operatorId"), null), traceId);
+                StoryBibleActorType.USER, actor(authentication), null), traceId);
     }
 
     @PatchMapping("/progressions/{progressionId}")
     public ApiResponse<Object> updateProgression(@PathVariable String projectId, @PathVariable String progressionId,
-                                                 @RequestBody StoryBibleDtos.UpdateProgression dto, @RequestParam String operatorId,
+                                                 @RequestBody StoryBibleDtos.UpdateProgression dto, Authentication authentication,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.updateProgression(id(projectId, "projectId"), id(progressionId, "progressionId"),
                 new StoryBibleCommands.UpdateProgression(dto.expectedRevision(), id(dto.anchorChapterId(), "anchorChapterId"),
                         optionalId(dto.endChapterId(), "endChapterId"), optionalId(dto.storyEventNodeId(), "storyEventNodeId"),
-                        dto.patchJson(), dto.summary()), StoryBibleActorType.USER, id(operatorId, "operatorId"), null), traceId);
+                        dto.patchJson(), dto.summary()), StoryBibleActorType.USER, actor(authentication), null), traceId);
     }
 
     @DeleteMapping("/progressions/{progressionId}")
     public ApiResponse<String> deleteProgression(@PathVariable String projectId, @PathVariable String progressionId,
-                                                 @RequestParam Long expectedRevision, @RequestParam String operatorId,
+                                                 @RequestParam Long expectedRevision, Authentication authentication,
                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         service.deleteProgression(id(projectId, "projectId"), id(progressionId, "progressionId"), expectedRevision,
-                StoryBibleActorType.USER, id(operatorId, "operatorId"), null);
+                StoryBibleActorType.USER, actor(authentication), null);
         return ApiResponse.success("deleted", traceId);
     }
 
@@ -340,6 +341,10 @@ public class StoryBibleController {
         Long value = optionalId(raw, field);
         if (value == null) throw BusinessException.badRequest(field + " is required and must be a string ID");
         return value;
+    }
+
+    private Long actor(Authentication authentication) {
+        return com.penmate.backend.interfaces.api.common.AuthenticatedActor.id(authentication);
     }
 
     private Long optionalId(String raw, String field) {

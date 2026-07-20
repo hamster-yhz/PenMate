@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,7 +52,7 @@ public class TodoController {
     public ApiResponse<Map<String, Object>> createTodo(@PathVariable String projectId,
                                                        @PathVariable String sessionId,
                                                        @Valid @RequestBody CreateTodoDto dto,
-                                                       @RequestParam("operatorId") String operatorId,
+                                                       Authentication authentication,
                                                        @RequestParam(value = "sourceRunId", required = false) String sourceRunId,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         SessionTodo candidate = toSessionTodo(dto);
@@ -59,7 +61,7 @@ public class TodoController {
                 requireLongId(sessionId, "sessionId"),
                 optionalLongId(sourceRunId, "sourceRunId"),
                 candidate,
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         );
         return ApiResponse.success(toView(created), traceId);
@@ -69,7 +71,7 @@ public class TodoController {
     public ApiResponse<List<Map<String, Object>>> batchCreateTodos(@PathVariable String projectId,
                                                                    @PathVariable String sessionId,
                                                                    @Valid @RequestBody List<CreateTodoDto> dtos,
-                                                                   @RequestParam("operatorId") String operatorId,
+                                                                   Authentication authentication,
                                                                    @RequestParam(value = "sourceRunId", required = false) String sourceRunId,
                                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         List<SessionTodo> todos = dtos == null ? List.of() : dtos.stream().map(this::toSessionTodo).toList();
@@ -78,7 +80,7 @@ public class TodoController {
                 requireLongId(sessionId, "sessionId"),
                 optionalLongId(sourceRunId, "sourceRunId"),
                 todos,
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         ).stream().map(this::toView).toList(), traceId);
     }
@@ -88,7 +90,7 @@ public class TodoController {
                                                        @PathVariable String sessionId,
                                                        @PathVariable String todoId,
                                                        @Valid @RequestBody UpdateTodoDto dto,
-                                                       @RequestParam("operatorId") String operatorId,
+                                                       Authentication authentication,
                                                        @RequestParam(value = "sourceRunId", required = false) String sourceRunId,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         SessionTodo candidate = toSessionTodo(dto);
@@ -98,7 +100,7 @@ public class TodoController {
                 requireLongId(todoId, "todoId"),
                 optionalLongId(sourceRunId, "sourceRunId"),
                 candidate,
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         );
         return ApiResponse.success(toView(updated), traceId);
@@ -108,13 +110,13 @@ public class TodoController {
     public ApiResponse<Map<String, Object>> completeTodo(@PathVariable String projectId,
                                                          @PathVariable String sessionId,
                                                          @PathVariable String todoId,
-                                                         @RequestParam("operatorId") String operatorId,
+                                                         Authentication authentication,
                                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         SessionTodo completed = todoCrudApplicationService.completeTodo(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
                 requireLongId(todoId, "todoId"),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         );
         return ApiResponse.success(toView(completed), traceId);
@@ -124,13 +126,13 @@ public class TodoController {
     public ApiResponse<String> deleteTodo(@PathVariable String projectId,
                                           @PathVariable String sessionId,
                                           @PathVariable String todoId,
-                                          @RequestParam("operatorId") String operatorId,
+                                          Authentication authentication,
                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         todoCrudApplicationService.deleteTodo(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
                 requireLongId(todoId, "todoId"),
-                requireLongId(operatorId, "operatorId"),
+                id(authentication),
                 traceId
         );
         return ApiResponse.success("deleted", traceId);

@@ -20,6 +20,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Map;
+import java.security.Principal;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -58,9 +60,9 @@ class AgentControllerRunContractTest {
 
         mockMvc().perform(post("/api/v1/novels/101/agent/sessions/90001/turns")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .principal(principal("201"))
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "operatorId", "201",
                                 "userMessage", "Write a suspense opening.",
                                 "taskRequest", Map.of(
                                         "taskType", "WRITE",
@@ -103,8 +105,9 @@ class AgentControllerRunContractTest {
 
         mockMvc().perform(post("/api/v1/novels/101/agent/runs/70001/retry")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .principal(principal("201"))
                         .header("X-Trace-Id", traceId)
-                        .content(objectMapper.writeValueAsString(Map.of("operatorId", "201"))))
+                        .content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.turnId").value("50001"))
                 .andExpect(jsonPath("$.data.runId").value("70002"))
@@ -125,5 +128,9 @@ class AgentControllerRunContractTest {
         return MockMvcBuilders.standaloneSetup(agentController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    private Principal principal(String userId) {
+        return new UsernamePasswordAuthenticationToken(userId, null);
     }
 }
