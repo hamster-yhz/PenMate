@@ -382,8 +382,6 @@ describe('ModelSettings', () => {
     await firstCardButtons[2].trigger('click')
     await flushPromises()
 
-    const selects = wrapper.findAll('.api-form select')
-    await selects[1].setValue('OFFICIAL_KEY')
     await wrapper.find('input[placeholder="例如：sk-xxx"]').setValue('sk-direct-official-key')
 
     await wrapper
@@ -397,7 +395,6 @@ describe('ModelSettings', () => {
       'mcfg-1001',
       '101',
       expect.objectContaining({
-        modelCategory: 'OFFICIAL_MODEL',
         apiKey: 'sk-direct-official-key',
       }),
     )

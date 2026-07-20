@@ -24,6 +24,14 @@ type AgentSessionSnapshot = AnyRecord & {
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 
+const withoutActorFields = (payload: AnyRecord) => {
+  const sanitized = { ...payload }
+  delete sanitized.operatorId
+  delete sanitized.userId
+  delete sanitized.ownerUserId
+  return sanitized
+}
+
 const resolveApiBaseUrl = () => {
   const configuredBase = String(import.meta.env.VITE_APP_API_BASE_URL || '/api').trim()
   if (!configuredBase) return '/api'
@@ -43,22 +51,29 @@ export const agentApi = {
     return request.get<AgentSessionRecord[]>(`/v1/novels/${projectId}/agent/sessions`)
   },
   createSession(projectId: string, payload: AnyRecord) {
-    return request.post<AgentSessionRecord>(`/v1/novels/${projectId}/agent/sessions`, payload)
+    return request.post<AgentSessionRecord>(`/v1/novels/${projectId}/agent/sessions`, withoutActorFields(payload))
   },
   getSessionRecovery(projectId: string, sessionId: string) {
     return request.get<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/recovery`)
   },
   resumeSession(projectId: string, sessionId: string, payload: AnyRecord) {
-    return request.post<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/resume`, payload)
+    return request.post<AgentSessionSnapshot>(
+      `/v1/novels/${projectId}/agent/sessions/${sessionId}/resume`,
+      withoutActorFields(payload),
+    )
   },
   createTurn(projectId: string, sessionId: string, payload: AnyRecord) {
-    return request.post<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`, payload)
+    return request.post<AgentSessionSnapshot>(
+      `/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`,
+      withoutActorFields(payload),
+    )
   },
   cancelRun(projectId: string, runId: string, payload: AnyRecord) {
-    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/cancel`, payload)
+    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/cancel`, withoutActorFields(payload))
   },
-  retryRun(projectId: string, runId: string, payload: AnyRecord) {
-    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/retry`, payload)
+  retryRun(projectId: string, runId: string, _payload: AnyRecord) {
+    void _payload
+    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/retry`)
   },
   getRunStreamUrl(projectId: string, runId: string, after = '0') {
     return buildRunStreamUrl(projectId, runId, after)

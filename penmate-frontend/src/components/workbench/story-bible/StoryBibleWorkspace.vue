@@ -105,11 +105,9 @@
     />
     <StoryBibleRoutingSettings
       v-if="showRoutingSettings"
-      :user-preference="story.userRoutingPreference.value"
-      :session-preference="story.sessionRoutingPreference.value"
+      :project-preference="story.projectRoutingPreference.value"
       @close="showRoutingSettings = false"
-      @save-user="run(() => story.saveUserRoutingPreference($event))"
-      @save-session="run(() => story.saveSessionRoutingPreference($event))"
+      @save="run(() => story.saveProjectRoutingPreference($event))"
     />
   </main>
 </template>

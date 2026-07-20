@@ -1,46 +1,26 @@
 <template>
   <section class="routing-settings">
     <header>
-      <div><strong>故事圣经注入方式</strong><span>用户默认与当前 Session</span></div>
+      <div><strong>故事圣经注入方式</strong><span>当前项目</span></div>
       <button type="button" class="icon-button" title="关闭" @click="emit('close')"><CloseOutlined /></button>
     </header>
 
     <div class="setting-section">
-      <label>用户默认</label>
+      <label>项目配置</label>
       <div class="mode-options">
         <button
           v-for="option in modeOptions"
           :key="option.value"
           type="button"
-          :class="{ active: userMode === option.value }"
-          @click="userMode = option.value"
+          :class="{ active: projectMode === option.value }"
+          @click="projectMode = option.value"
         >
           {{ option.label }}
         </button>
       </div>
-      <button type="button" class="save-button" @click="emit('saveUser', userMode)">
-        <SaveOutlined /> 保存默认设置
+      <button type="button" class="save-button" @click="emit('save', projectMode)">
+        <SaveOutlined /> 保存项目设置
       </button>
-    </div>
-
-    <div v-if="sessionPreference" class="setting-section">
-      <label class="toggle-line">
-        <input v-model="inheritUser" type="checkbox" />
-        <span>当前 Session 继承用户默认</span>
-      </label>
-      <div class="mode-options" :class="{ disabled: inheritUser }">
-        <button
-          v-for="option in modeOptions"
-          :key="option.value"
-          type="button"
-          :disabled="inheritUser"
-          :class="{ active: sessionMode === option.value }"
-          @click="sessionMode = option.value"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-      <button type="button" class="save-button" @click="saveSession"><SaveOutlined /> 保存 Session 设置</button>
     </div>
   </section>
 </template>
@@ -51,39 +31,25 @@ import { CloseOutlined, SaveOutlined } from '@ant-design/icons-vue'
 import type { StoryBibleRoutingMode, StoryBibleRoutingPreference } from '@/api/modules/storyBible.api'
 
 const props = defineProps<{
-  userPreference: StoryBibleRoutingPreference | null
-  sessionPreference: StoryBibleRoutingPreference | null
+  projectPreference: StoryBibleRoutingPreference | null
 }>()
 const emit = defineEmits<{
   (event: 'close'): void
-  (event: 'saveUser', mode: StoryBibleRoutingMode): void
-  (event: 'saveSession', mode: StoryBibleRoutingMode | null): void
+  (event: 'save', mode: StoryBibleRoutingMode): void
 }>()
 const modeOptions: Array<{ value: StoryBibleRoutingMode; label: string }> = [
   { value: 'RETRIEVAL', label: '规则匹配 + Embedding' },
   { value: 'LLM_SELECTOR', label: '直接使用 LLM' },
   { value: 'RETRIEVAL_THEN_LLM', label: '规则匹配 + Embedding，LLM 兜底' },
 ]
-const userMode = ref<StoryBibleRoutingMode>('RETRIEVAL_THEN_LLM')
-const sessionMode = ref<StoryBibleRoutingMode>('RETRIEVAL_THEN_LLM')
-const inheritUser = ref(true)
+const projectMode = ref<StoryBibleRoutingMode>('RETRIEVAL_THEN_LLM')
 watch(
-  () => props.userPreference,
+  () => props.projectPreference,
   (value) => {
-    if (value) userMode.value = value.mode
+    if (value) projectMode.value = value.mode
   },
   { immediate: true },
 )
-watch(
-  () => props.sessionPreference,
-  (value) => {
-    if (!value) return
-    sessionMode.value = value.mode
-    inheritUser.value = value.inherited
-  },
-  { immediate: true },
-)
-const saveSession = () => emit('saveSession', inheritUser.value ? null : sessionMode.value)
 </script>
 
 <style scoped lang="less">
@@ -154,14 +120,6 @@ header span {
 .mode-options button.active {
   color: var(--amber-gold);
   background: rgba(201, 169, 110, 0.12);
-}
-.mode-options.disabled {
-  opacity: 0.46;
-}
-.toggle-line {
-  display: flex;
-  align-items: center;
-  gap: 7px;
 }
 .save-button {
   width: max-content;

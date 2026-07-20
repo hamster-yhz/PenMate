@@ -70,15 +70,8 @@ describe('useStoryBible', () => {
     vi.spyOn(storyBibleApi, 'listProgressions').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listChanges').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listNodeChanges').mockResolvedValue([])
-    vi.spyOn(storyBibleApi, 'getUserRoutingPreference').mockResolvedValue({
+    vi.spyOn(storyBibleApi, 'getProjectRoutingPreference').mockResolvedValue({
       mode: 'RETRIEVAL',
-      routerModelConfigRevision: 0,
-      inherited: false,
-    })
-    vi.spyOn(storyBibleApi, 'getSessionRoutingPreference').mockResolvedValue({
-      mode: 'RETRIEVAL',
-      routerModelConfigRevision: 0,
-      inherited: true,
     })
     vi.spyOn(storyBibleApi, 'getNode').mockResolvedValue({
       node,

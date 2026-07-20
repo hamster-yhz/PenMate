@@ -6,12 +6,13 @@ describe('StoryBibleRoutingSettings', () => {
   it('preserves the approved routing option wording', () => {
     const wrapper = mount(StoryBibleRoutingSettings, {
       props: {
-        userPreference: { mode: 'RETRIEVAL_THEN_LLM', routerModelConfigRevision: 0, inherited: false },
-        sessionPreference: { mode: 'RETRIEVAL_THEN_LLM', routerModelConfigRevision: 0, inherited: true },
+        projectPreference: { mode: 'RETRIEVAL_THEN_LLM' },
       },
     })
     expect(wrapper.text()).toContain('规则匹配 + Embedding')
     expect(wrapper.text()).toContain('直接使用 LLM')
     expect(wrapper.text()).toContain('规则匹配 + Embedding，LLM 兜底')
+    expect(wrapper.text()).toContain('当前项目')
+    expect(wrapper.text()).not.toContain('Session')
   })
 })

@@ -37,7 +37,8 @@ const normalizeUserModelConfigPayload = (payload: AnyRecord) => {
   }
   delete next.id
   delete next.modelConfigId
-  delete next.modelType
+  next.displayName = typeof next.displayName === 'string' && next.displayName.trim() ? next.displayName.trim() : next.modelName
+  next.modelType = typeof next.modelType === 'string' ? next.modelType : 'CHAT'
   delete next.keyName
   delete next.selectedKeyId
   delete next.userKeyId
@@ -47,8 +48,14 @@ const normalizeUserModelConfigPayload = (payload: AnyRecord) => {
 }
 
 const normalizeUserModelPreferencePayload = (payload: AnyRecord) => ({
-  mainAgentModelConfigId: normalizeBusinessStringId(payload.mainAgentModelConfigId),
-  dirtyWorkAgentModelConfigId: normalizeBusinessStringId(payload.dirtyWorkAgentModelConfigId),
+  defaultMainChatModelConfigId: normalizeBusinessStringId(payload.mainAgentModelConfigId),
+  defaultWorkerChatModelConfigId: normalizeBusinessStringId(payload.dirtyWorkAgentModelConfigId),
+  defaultEmbeddingModelConfigId: normalizeBusinessStringId(payload.defaultEmbeddingModelConfigId),
+  defaultRouterModelConfigId: normalizeBusinessStringId(payload.defaultRouterModelConfigId),
+  defaultStoryBibleRoutingMode: payload.defaultStoryBibleRoutingMode ?? 'LLM_SELECTOR',
+  defaultChunkTargetCharacters: payload.defaultChunkTargetCharacters ?? 800,
+  defaultChunkOverlapCharacters: payload.defaultChunkOverlapCharacters ?? 120,
+  defaultChunkMaxCharacters: payload.defaultChunkMaxCharacters ?? 1200,
 })
 
 const normalizeProviderPayload = (payload: AnyRecord): AnyRecord | null => {
@@ -84,56 +91,40 @@ export const modelApi = {
       .map((item) => normalizeProviderPayload(item))
       .filter((item): item is AnyRecord => item !== null)
   },
-  listKeys(userId: string) {
-    return request.get<AnyRecord[]>(`/v1/model/keys?userId=${userId}`)
+  listKeys(_userId: string) {
+    void _userId
+    return request.get<AnyRecord[]>('/v1/model/configurations')
   },
-  createKey(userId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/model/keys?userId=${userId}&operatorId=${operatorId}`, payload)
+  listUserModelConfigs(_userId: string) {
+    void _userId
+    return request.get<AnyRecord[]>('/v1/model/configurations')
   },
-  updateKey(keyId: string, userId: string, operatorId: string, payload: AnyRecord) {
-    return request.patch<string>(`/v1/model/keys/${keyId}?userId=${userId}&operatorId=${operatorId}`, payload)
+  createUserModelConfig(_userId: string, _operatorId: string, payload: AnyRecord) {
+    return request.post<AnyRecord>('/v1/model/configurations', normalizeUserModelConfigPayload(payload))
   },
-  deleteKey(keyId: string, userId: string, operatorId: string) {
-    return request.delete<string>(`/v1/model/keys/${keyId}?userId=${userId}&operatorId=${operatorId}`)
-  },
-  listOfficialKeys() {
-    return request.get<AnyRecord[]>('/v1/model/official-keys')
-  },
-  createOfficialKey(operatorId: string, payload: AnyRecord) {
-    return request.post<string>(`/v1/model/official-keys?operatorId=${operatorId}`, payload)
-  },
-  updateOfficialKey(keyId: string, operatorId: string, payload: AnyRecord) {
-    return request.patch<string>(`/v1/model/official-keys/${keyId}?operatorId=${operatorId}`, payload)
-  },
-  deleteOfficialKey(keyId: string, operatorId: string) {
-    return request.delete<string>(`/v1/model/official-keys/${keyId}?operatorId=${operatorId}`)
-  },
-  listUserModelConfigs(userId: string) {
-    return request.get<AnyRecord[]>(`/v1/model/configs?userId=${userId}`)
-  },
-  createUserModelConfig(userId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<string>(
-      `/v1/model/configs?userId=${userId}&operatorId=${operatorId}`,
+  updateUserModelConfig(_userId: string, businessModelConfigId: string, _operatorId: string, payload: AnyRecord) {
+    return request.put<AnyRecord>(
+      `/v1/model/configurations/${businessModelConfigId}`,
       normalizeUserModelConfigPayload(payload),
     )
   },
-  updateUserModelConfig(userId: string, businessModelConfigId: string, operatorId: string, payload: AnyRecord) {
-    return request.put<string>(
-      `/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`,
-      normalizeUserModelConfigPayload(payload),
-    )
+  deleteUserModelConfig(_userId: string, businessModelConfigId: string, _operatorId: string) {
+    void _userId
+    void _operatorId
+    return request.delete<string>(`/v1/model/configurations/${businessModelConfigId}`)
   },
-  deleteUserModelConfig(userId: string, businessModelConfigId: string, operatorId: string) {
-    return request.delete<string>(
-      `/v1/model/configs/${businessModelConfigId}?userId=${userId}&operatorId=${operatorId}`,
-    )
+  async getUserModelPreferences(_userId: string) {
+    void _userId
+    const result = await request.get<AnyRecord>('/v1/model/preferences')
+    return {
+      ...result,
+      mainAgentModelConfigId: result.defaultMainChatModelConfigId,
+      dirtyWorkAgentModelConfigId: result.defaultWorkerChatModelConfigId,
+    }
   },
-  getUserModelPreferences(userId: string) {
-    return request.get<AnyRecord>(`/v1/model/preferences?userId=${userId}`)
-  },
-  saveUserModelPreferences(userId: string, operatorId: string, payload: AnyRecord) {
-    return request.post<string>(
-      `/v1/model/preferences?userId=${userId}&operatorId=${operatorId}`,
+  saveUserModelPreferences(_userId: string, _operatorId: string, payload: AnyRecord) {
+    return request.put<AnyRecord>(
+      '/v1/model/preferences',
       normalizeUserModelPreferencePayload(payload),
     )
   },

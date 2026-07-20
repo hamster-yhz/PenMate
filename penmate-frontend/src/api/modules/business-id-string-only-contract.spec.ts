@@ -46,18 +46,18 @@ describe('business id string-only API contracts', () => {
     expect(requestMock.get).toHaveBeenNthCalledWith(1, '/v1/novels/101/approvals/88001')
     expect(requestMock.post).toHaveBeenNthCalledWith(
       1,
-      '/v1/novels/101/chapters/301/versions/9/restore?operatorId=1001',
+      '/v1/novels/101/chapters/301/versions/9/restore',
     )
-    expect(requestMock.patch).toHaveBeenNthCalledWith(1, '/v1/novels/101/outlines/nodes/11/move?operatorId=1001', {
+    expect(requestMock.patch).toHaveBeenNthCalledWith(1, '/v1/novels/101/outlines/nodes/11/move', {
       direction: 'before',
     })
     expect(requestMock.delete).toHaveBeenNthCalledWith(
       1,
-      '/v1/novels/101/story-bible/relations/8?expectedRevision=3&operatorId=1001',
+      '/v1/novels/101/story-bible/relations/8?expectedRevision=3',
     )
     expect(requestMock.post).toHaveBeenNthCalledWith(
       2,
-      '/v1/novels/101/styles/switch?operatorId=1001&sessionId=90001',
+      '/v1/novels/101/styles/switch?sessionId=90001',
       { toStyleId: '81' },
     )
     expect(requestMock.get).toHaveBeenNthCalledWith(2, '/v1/novels/101/rag/documents/9001/index-status')

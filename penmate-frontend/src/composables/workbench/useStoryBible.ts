@@ -89,8 +89,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const canonFilter = ref<StoryBibleCanonStatus | ''>('')
   const draft = ref<StoryBibleNodeDraft | null>(null)
   const effectiveState = ref<Record<string, unknown> | null>(null)
-  const userRoutingPreference = ref<StoryBibleRoutingPreference | null>(null)
-  const sessionRoutingPreference = ref<StoryBibleRoutingPreference | null>(null)
+  const projectRoutingPreference = ref<StoryBibleRoutingPreference | null>(null)
   const loading = ref(false)
   const saving = ref(false)
   const errorMessage = ref('')
@@ -163,12 +162,9 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   }
 
   const loadRoutingPreferences = async () => {
-    const { projectId, userId, sessionId } = options.getContext()
-    if (!projectId || !userId) return
-    userRoutingPreference.value = await storyBibleApi.getUserRoutingPreference(projectId, userId)
-    sessionRoutingPreference.value = sessionId
-      ? await storyBibleApi.getSessionRoutingPreference(projectId, sessionId, userId)
-      : null
+    const { projectId } = options.getContext()
+    if (!projectId) return
+    projectRoutingPreference.value = await storyBibleApi.getProjectRoutingPreference(projectId)
   }
 
   const loadWorkspace = async () => {
@@ -440,23 +436,10 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     await refreshRevisionAndHistory()
   }
 
-  const saveUserRoutingPreference = async (mode: StoryBibleRoutingMode, routerModelConfigId?: string | null) => {
-    const { projectId, userId } = options.getContext()
-    if (!projectId || !userId) return
-    userRoutingPreference.value = await storyBibleApi.updateUserRoutingPreference(projectId, userId, {
-      mode,
-      routerModelConfigId,
-    })
-    if (sessionRoutingPreference.value?.inherited) await loadRoutingPreferences()
-  }
-
-  const saveSessionRoutingPreference = async (
-    mode: StoryBibleRoutingMode | null,
-    routerModelConfigId?: string | null,
-  ) => {
-    const { projectId, userId, sessionId } = options.getContext()
-    if (!projectId || !userId || !sessionId) return
-    sessionRoutingPreference.value = await storyBibleApi.updateSessionRoutingPreference(projectId, sessionId, userId, {
+  const saveProjectRoutingPreference = async (mode: StoryBibleRoutingMode, routerModelConfigId?: string | null) => {
+    const { projectId } = options.getContext()
+    if (!projectId) return
+    projectRoutingPreference.value = await storyBibleApi.updateProjectRoutingPreference(projectId, {
       mode,
       routerModelConfigId,
     })
@@ -487,8 +470,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     canonFilter,
     draft,
     effectiveState,
-    userRoutingPreference,
-    sessionRoutingPreference,
+    projectRoutingPreference,
     loading,
     saving,
     errorMessage,
@@ -512,8 +494,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     saveTag,
     deleteTag,
     saveViewPreference,
-    saveUserRoutingPreference,
-    saveSessionRoutingPreference,
+    saveProjectRoutingPreference,
   }
 }
 

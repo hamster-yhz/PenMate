@@ -48,6 +48,7 @@
                   <span class="config-type-badge" :class="item.keySourceType === 'OFFICIAL_KEY' ? 'official' : 'user'">
                     {{ item.keySourceType === 'OFFICIAL_KEY' ? '官方模型' : '用户模型' }}
                   </span>
+                  <span class="config-status">{{ item.modelType }}</span>
                   <span class="config-status">{{ item.status || 'active' }}</span>
                 </div>
               </div>
@@ -67,14 +68,14 @@
               </div>
 
               <div class="config-card-actions">
-                <button type="button" class="card-action-btn" @click="assignRole('main', item.modelConfigId)">
+                <button type="button" class="card-action-btn" :disabled="item.modelType !== 'CHAT'" @click="assignRole('main', item.modelConfigId)">
                   设为主 Agent
                 </button>
-                <button type="button" class="card-action-btn" @click="assignRole('dirty', item.modelConfigId)">
+                <button type="button" class="card-action-btn" :disabled="item.modelType !== 'CHAT'" @click="assignRole('dirty', item.modelConfigId)">
                   设为副 Agent
                 </button>
-                <button type="button" class="card-action-btn" @click="selectConfig(item)">编辑</button>
-                <button type="button" class="card-delete-btn" @click="deleteConfig(item.modelConfigId)">删除</button>
+                <button v-if="item.scopeType === 'USER'" type="button" class="card-action-btn" @click="selectConfig(item)">编辑</button>
+                <button v-if="item.scopeType === 'USER'" type="button" class="card-delete-btn" @click="deleteConfig(item.modelConfigId)">删除</button>
               </div>
             </article>
           </div>
@@ -105,6 +106,23 @@
               <input v-model="form.modelName" class="f-input" placeholder="例如：gpt-4o-mini" />
             </div>
 
+            <div class="form-row">
+              <label>模型能力</label>
+              <select v-model="form.modelType" class="f-input" aria-label="模型能力" :disabled="formMode === 'edit'">
+                <option value="CHAT">Chat</option>
+                <option value="EMBEDDING">Embedding</option>
+              </select>
+            </div>
+
+            <div v-if="form.modelType === 'EMBEDDING'" class="form-row">
+              <label>距离度量</label>
+              <select v-model="form.distanceMetric" class="f-input" aria-label="距离度量">
+                <option value="COSINE">Cosine</option>
+                <option value="INNER_PRODUCT">Inner product</option>
+                <option value="L2">L2</option>
+              </select>
+            </div>
+
             <div class="form-row form-row-full">
               <label>Base URL（可选）</label>
               <input v-model="form.baseUrl" class="f-input" placeholder="留空则使用提供商默认地址" />
@@ -114,7 +132,6 @@
               <label>模型类别</label>
               <select v-model="form.keySourceType" class="f-input" aria-label="密钥来源">
                 <option value="USER_KEY">用户模型</option>
-                <option value="OFFICIAL_KEY">官方模型</option>
               </select>
             </div>
 
@@ -178,6 +195,9 @@ type UserModelConfig = {
   keyName: string
   maskedApiKey: string
   status: string
+  modelType: 'CHAT' | 'EMBEDDING'
+  distanceMetric: 'COSINE' | 'INNER_PRODUCT' | 'L2' | null
+  scopeType: 'SYSTEM' | 'USER'
 }
 
 type FormMode = 'create' | 'edit' | null
@@ -198,6 +218,8 @@ const form = reactive({
   baseUrl: '',
   keySourceType: 'USER_KEY' as KeySourceType,
   apiKey: '',
+  modelType: 'CHAT' as 'CHAT' | 'EMBEDDING',
+  distanceMetric: 'COSINE' as 'COSINE' | 'INNER_PRODUCT' | 'L2',
 })
 
 const getUserId = () => {
@@ -208,7 +230,9 @@ const getOperatorId = () => getUserId()
 
 const isFormVisible = computed(() => formMode.value !== null)
 const deriveKeySourceType = (item: AnyRecord): KeySourceType =>
-  String(item.keySourceType ?? 'USER_KEY') === 'OFFICIAL_KEY' ? 'OFFICIAL_KEY' : 'USER_KEY'
+  String(item.scopeType ?? '') === 'SYSTEM' || String(item.keySourceType ?? '') === 'OFFICIAL_KEY'
+    ? 'OFFICIAL_KEY'
+    : 'USER_KEY'
 
 const formatKeySourceTypeLabel = (keySourceType: KeySourceType) =>
   keySourceType === 'OFFICIAL_KEY' ? '官方模型' : '用户模型'
@@ -258,6 +282,8 @@ const resetForm = () => {
   form.baseUrl = ''
   form.keySourceType = 'USER_KEY'
   form.apiKey = ''
+  form.modelType = 'CHAT'
+  form.distanceMetric = 'COSINE'
 }
 
 watch(
@@ -280,6 +306,8 @@ const selectConfig = (item: UserModelConfig) => {
   form.baseUrl = item.baseUrl
   form.keySourceType = item.keySourceType
   form.apiKey = ''
+  form.modelType = item.modelType
+  form.distanceMetric = item.distanceMetric ?? 'COSINE'
 }
 
 const startCreate = () => {
@@ -396,6 +424,12 @@ const loadData = async () => {
           keyName: String(item.keyName ?? ''),
           maskedApiKey: String(item.maskedApiKey ?? ''),
           status: String(item.status ?? 'active'),
+          modelType: String(item.modelType ?? 'CHAT') === 'EMBEDDING' ? 'EMBEDDING' : 'CHAT',
+          distanceMetric:
+            item.distanceMetric === 'INNER_PRODUCT' || item.distanceMetric === 'L2' || item.distanceMetric === 'COSINE'
+              ? item.distanceMetric
+              : null,
+          scopeType: String(item.scopeType ?? 'USER') === 'SYSTEM' ? 'SYSTEM' : 'USER',
         }
       })
       .filter((item): item is UserModelConfig => item !== null)
@@ -473,12 +507,17 @@ const saveConfig = async () => {
     if (form.apiKey.trim()) {
       payload.apiKey = form.apiKey
     }
+    if (form.modelType === 'EMBEDDING' && editingConfig.distanceMetric !== form.distanceMetric) {
+      payload.distanceMetric = form.distanceMetric
+    }
   } else {
     payload.providerId = form.providerId
     payload.modelName = form.modelName
     payload.baseUrl = form.baseUrl
     payload.modelCategory = toModelCategory(form.keySourceType)
     payload.status = 'active'
+    payload.modelType = form.modelType
+    if (form.modelType === 'EMBEDDING') payload.distanceMetric = form.distanceMetric
     if (form.apiKey.trim()) {
       payload.apiKey = form.apiKey
     }
