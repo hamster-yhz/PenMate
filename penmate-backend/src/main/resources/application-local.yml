@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/penmate
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:penmate}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
 
 penmate:
   rate-limit:
@@ -13,19 +13,19 @@ penmate:
       allow-private: true
   bootstrap:
     admin:
-      email: admin@penmate.local
-      password: change-me-local
+      email: ${BOOTSTRAP_ADMIN_EMAIL:admin@penmate.local}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:change-me-local}
     chat:
-      provider: openai-compatible
-      base-url: http://localhost:11434/v1
-      api-key: replace-me
-      model-name: replace-with-chat-model
+      provider: ${BOOTSTRAP_CHAT_PROVIDER:openai-compatible}
+      base-url: ${BOOTSTRAP_CHAT_BASE_URL:http://localhost:11434/v1}
+      api-key: ${BOOTSTRAP_CHAT_API_KEY:replace-me}
+      model-name: ${BOOTSTRAP_CHAT_MODEL_NAME:replace-with-chat-model}
     embedding:
-      provider: openai-compatible
-      base-url: http://localhost:11434/v1
-      api-key: replace-me
-      model-name: replace-with-embedding-model
+      provider: ${BOOTSTRAP_EMBEDDING_PROVIDER:openai-compatible}
+      base-url: ${BOOTSTRAP_EMBEDDING_BASE_URL:http://localhost:11434/v1}
+      api-key: ${BOOTSTRAP_EMBEDDING_API_KEY:replace-me}
+      model-name: ${BOOTSTRAP_EMBEDDING_MODEL_NAME:replace-with-embedding-model}
   test-datasource:
-    url: jdbc:postgresql://localhost:5432/penmate_test
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${TEST_DB_NAME:penmate_test}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
