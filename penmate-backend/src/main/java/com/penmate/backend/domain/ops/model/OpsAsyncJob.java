@@ -3,34 +3,45 @@ package com.penmate.backend.domain.ops.model;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
+
 import java.time.Instant;
 
 @Data
-/**
- * 异步运维任务实体。
- */
 public class OpsAsyncJob {
-    /** 数据库物理主键 ID。 */
     private Long id;
-    /** 异步任务业务 ID。 */
     @JsonSerialize(using = ToStringSerializer.class)
     private Long jobId;
-    /** 任务类型。 */
     private String jobType;
-    /** 业务键，用于关联业务对象。 */
     private String bizKey;
-    /** 任务状态。 */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long ownerUserId;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long projectId;
+    private String payloadJson;
+    private String resultJson;
     private String status;
-    /** 失败错误信息。 */
-    private String errorMsg;
-    /** 开始执行时间。 */
+    private Integer attemptCount;
+    private Integer maxAttempts;
+    private Instant scheduledAt;
+    private String leaseOwner;
+    private Instant leaseUntil;
+    private Instant heartbeatAt;
+    private Instant cancelRequestedAt;
+    private Long progressCurrent;
+    private Long progressTotal;
+    private String progressMessage;
+    private String lastErrorCode;
+    private String lastErrorMessage;
     private Instant startedAt;
-    /** 结束执行时间。 */
     private Instant finishedAt;
-    /** 创建时间。 */
     private Instant createdAt;
-    /** 更新时间。 */
     private Instant updatedAt;
 
-}
+    public boolean terminal() {
+        return "SUCCEEDED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status);
+    }
 
+    public boolean cancellationRequested() {
+        return cancelRequestedAt != null;
+    }
+}

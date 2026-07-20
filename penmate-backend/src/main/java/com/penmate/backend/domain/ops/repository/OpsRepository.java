@@ -9,11 +9,25 @@ public interface OpsRepository {
 
     OpsAsyncJob findJobById(Long jobId);
 
+    OpsAsyncJob findJobByBizKey(String bizKey);
+
     List<OpsAsyncJob> listJobs(String bizKey, String jobType);
 
     int insertJob(OpsAsyncJob job);
 
-    int updateJobStatus(Long jobId, String status, String errorMsg);
+    OpsAsyncJob claimNext(String workerId);
+
+    int heartbeat(Long jobId, String workerId, Long progressCurrent, Long progressTotal, String progressMessage);
+
+    int completeJob(Long jobId, String workerId, String resultJson);
+
+    int failJob(Long jobId, String workerId, String errorCode, String errorMessage);
+
+    int requestCancel(Long jobId);
+
+    int cancelClaimedJob(Long jobId, String workerId);
+
+    int resetForRetry(Long jobId);
 
     int insertMigration(OpsMigrationTask task);
 

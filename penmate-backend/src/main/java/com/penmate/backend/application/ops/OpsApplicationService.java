@@ -18,9 +18,11 @@ import java.util.List;
 public class OpsApplicationService {
 
     private final OpsRepository opsRepository;
+    private final AsyncJobQueueService queueService;
 
-    public OpsApplicationService(OpsRepository opsRepository) {
+    public OpsApplicationService(OpsRepository opsRepository, AsyncJobQueueService queueService) {
         this.opsRepository = opsRepository;
+        this.queueService = queueService;
     }
 
     /**
@@ -63,20 +65,10 @@ public class OpsApplicationService {
      */
     public OpsAsyncJob retryJob(Long jobId, Long operatorId, String traceId) {
         log.info("重试异步任务: sourceJobId={}, operatorId={}", jobId, operatorId);
-        OpsAsyncJob oldJob = getJob(jobId);
-        OpsAsyncJob newJob = new OpsAsyncJob();
-        newJob.setJobType(oldJob.getJobType());
-        newJob.setBizKey(oldJob.getBizKey());
-        newJob.setStatus("pending");
-        newJob.setErrorMsg(null);
-        int affected = opsRepository.insertJob(newJob);
-        if (affected != 1) {
-            log.error("重试异步任务失败: sourceJobId={}, operatorId={}, reason=insert_failed", jobId, operatorId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create retry job");
-        }
-        writeAudit(traceId, operatorId, "ops", "job:retry", "ops_async_jobs", String.valueOf(newJob.getId()), "{\"sourceJobId\":" + jobId + "}", 201);
-        log.info("重试异步任务成功: sourceJobId={}, newJobId={}", jobId, newJob.getId());
-        return getJob(newJob.getId());
+        getJob(jobId);
+        OpsAsyncJob retried = queueService.retry(jobId);
+        writeAudit(traceId, operatorId, "ops", "job:retry", "ops_async_jobs", String.valueOf(jobId), null, 200);
+        return retried;
     }
 
     /**

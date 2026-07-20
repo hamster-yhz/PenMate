@@ -26,6 +26,9 @@ class OpsApplicationServiceTest extends BaseApplicationServiceTest {
     @Mock
     private OpsRepository opsRepository;
 
+    @Mock
+    private AsyncJobQueueService queueService;
+
     @InjectMocks
     private OpsApplicationService opsApplicationService;
 
@@ -60,22 +63,18 @@ class OpsApplicationServiceTest extends BaseApplicationServiceTest {
         oldJob.setJobType("migration");
         oldJob.setBizKey("novel:1");
 
-        OpsAsyncJob createdJob = new OpsAsyncJob();
-        createdJob.setId(12L);
-        createdJob.setStatus("pending");
+        OpsAsyncJob retriedJob = new OpsAsyncJob();
+        retriedJob.setJobId(sourceJobId);
+        retriedJob.setStatus("QUEUED");
 
         when(opsRepository.findJobById(sourceJobId)).thenReturn(oldJob);
-        when(opsRepository.insertJob(any(OpsAsyncJob.class))).thenAnswer(invocation -> {
-            OpsAsyncJob arg = invocation.getArgument(0);
-            arg.setId(12L);
-            return 1;
-        });
-        when(opsRepository.findJobById(12L)).thenReturn(createdJob);
+        when(queueService.retry(sourceJobId)).thenReturn(retriedJob);
 
         OpsAsyncJob result = opsApplicationService.retryJob(sourceJobId, operatorId, traceId);
 
-        assertThat(result.getId()).isEqualTo(12L);
-        verify(opsRepository).insertJob(any(OpsAsyncJob.class));
+        assertThat(result.getJobId()).isEqualTo(sourceJobId);
+        assertThat(result.getStatus()).isEqualTo("QUEUED");
+        verify(queueService).retry(sourceJobId);
     }
 
     @Test

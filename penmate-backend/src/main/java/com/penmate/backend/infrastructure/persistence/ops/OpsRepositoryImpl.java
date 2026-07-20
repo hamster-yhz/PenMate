@@ -31,6 +31,9 @@ public class OpsRepositoryImpl implements OpsRepository {
         return opsMapper.findJobById(jobId);
     }
 
+    @Override
+    public OpsAsyncJob findJobByBizKey(String bizKey) { return opsMapper.findJobByBizKey(bizKey); }
+
     /**
      * 按业务键与任务类型筛选异步作业列表。
      *
@@ -63,9 +66,22 @@ public class OpsRepositoryImpl implements OpsRepository {
      * @return 受影响行数
      */
     @Override
-    public int updateJobStatus(Long jobId, String status, String errorMsg) {
-        return opsMapper.updateJobStatus(jobId, status, errorMsg);
+    public OpsAsyncJob claimNext(String workerId) { return opsMapper.claimNext(workerId); }
+
+    @Override
+    public int heartbeat(Long jobId, String workerId, Long progressCurrent, Long progressTotal, String progressMessage) {
+        return opsMapper.heartbeat(jobId, workerId, progressCurrent, progressTotal, progressMessage);
     }
+
+    @Override public int completeJob(Long jobId, String workerId, String resultJson) {
+        return opsMapper.completeJob(jobId, workerId, resultJson);
+    }
+    @Override public int failJob(Long jobId, String workerId, String errorCode, String errorMessage) {
+        return opsMapper.failJob(jobId, workerId, errorCode, errorMessage);
+    }
+    @Override public int requestCancel(Long jobId) { return opsMapper.requestCancel(jobId); }
+    @Override public int cancelClaimedJob(Long jobId, String workerId) { return opsMapper.cancelClaimedJob(jobId, workerId); }
+    @Override public int resetForRetry(Long jobId) { return opsMapper.resetForRetry(jobId); }
 
     /**
      * 新增内容迁移任务记录。
