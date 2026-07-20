@@ -257,7 +257,7 @@ PenMate/
 核心依赖：
 
 - LLM：OpenAI-compatible / Anthropic / Gemini 等模型 Provider
-- 记忆：PostgreSQL 18.4 + Redis + Milvus + S3 兼容存储
+- 记忆：PostgreSQL 18.4 + pgvector 0.8.5 + Redis + S3 兼容存储
 - 通信：REST API + 生成事件流
 - 部署：Docker Compose + GitHub Actions + GHCR
 
@@ -276,10 +276,16 @@ cp .env.example .env
 ```env
 BOOTSTRAP_ADMIN_EMAIL=admin@example.com
 BOOTSTRAP_ADMIN_PASSWORD=<strong-admin-password>
-BOOTSTRAP_MODEL_PROVIDER=openai
-BOOTSTRAP_MODEL_BASE_URL=https://api.openai.com/v1
-BOOTSTRAP_MODEL_API_KEY=<your-api-key>
-BOOTSTRAP_MODEL_NAME=gpt-4o-mini
+BOOTSTRAP_CHAT_PROVIDER=openai
+BOOTSTRAP_CHAT_BASE_URL=https://api.openai.com/v1
+BOOTSTRAP_CHAT_API_KEY=<your-api-key>
+BOOTSTRAP_CHAT_MODEL_NAME=gpt-4o-mini
+
+# Embedding 组可选；留空时项目只能使用非 RAG 模式
+BOOTSTRAP_EMBEDDING_PROVIDER=openai
+BOOTSTRAP_EMBEDDING_BASE_URL=https://api.openai.com/v1
+BOOTSTRAP_EMBEDDING_API_KEY=<your-api-key>
+BOOTSTRAP_EMBEDDING_MODEL_NAME=text-embedding-3-small
 ```
 
 ### 2. 启动完整环境
@@ -356,7 +362,7 @@ npm run build
 
 1. CI 构建前后端镜像并推送到 GHCR。
 2. 服务器通过 SSH 拉取最新镜像。
-3. Compose 重启应用、数据库、Redis、Milvus 等服务。
+3. Compose 重启应用、PostgreSQL/pgvector 和 Redis 等服务。
 4. 支持手动 workflow 回滚到指定镜像版本。
 
 详细说明：[`docs/deployment/docker-ssh.md`](docs/deployment/docker-ssh.md)

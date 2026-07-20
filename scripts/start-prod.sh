@@ -28,7 +28,7 @@ Environment overrides:
 
 Expected production env:
   Copy .env.example to .env and fill all required image, database, JWT,
-  storage, Milvus S3, and LLM settings before running this script.
+  storage, PostgreSQL/pgvector, and model settings before running this script.
 EOF
 }
 
