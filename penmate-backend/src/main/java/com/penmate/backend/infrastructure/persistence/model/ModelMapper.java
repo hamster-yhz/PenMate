@@ -19,6 +19,7 @@ public interface ModelMapper {
                    p.code AS provider_code, p.name AS provider_name, p.base_url AS provider_base_url,
                    p.auth_type AS provider_auth_type, cap.protocol_code,
                    mc.display_name, mc.model_type, mc.model_name, mc.base_url, mc.distance_metric,
+                   mc.embedding_dimensions,
                    mc.context_window_turns, mc.max_context_tokens,
                    COALESCE(uak.masked_api_key, oak.masked_api_key) AS masked_api_key,
                    COALESCE(uak.status, oak.status,
@@ -117,11 +118,11 @@ public interface ModelMapper {
     @Insert("""
             INSERT INTO model_configurations(
                 model_config_id, scope_type, owner_user_id, provider_id, display_name,
-                model_type, model_name, base_url, distance_metric, context_window_turns,
+                model_type, model_name, base_url, distance_metric, embedding_dimensions, context_window_turns,
                 max_context_tokens, status, created_by, updated_by
             ) VALUES (
                 #{modelConfigId}, #{scopeType}, #{ownerUserId}, #{providerId}, #{displayName},
-                #{modelType}, #{modelName}, #{baseUrl}, #{distanceMetric}, #{contextWindowTurns},
+                #{modelType}, #{modelName}, #{baseUrl}, #{distanceMetric}, #{embeddingDimensions}, #{contextWindowTurns},
                 #{maxContextTokens}, #{status}, #{createdBy}, #{updatedBy}
             )
             """)
@@ -131,6 +132,7 @@ public interface ModelMapper {
             UPDATE model_configurations
             SET provider_id = #{providerId}, display_name = #{displayName}, model_name = #{modelName},
                 base_url = #{baseUrl}, distance_metric = #{distanceMetric},
+                embedding_dimensions = #{embeddingDimensions},
                 context_window_turns = #{contextWindowTurns}, max_context_tokens = #{maxContextTokens},
                 status = #{status}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP(3)
             WHERE model_config_id = #{modelConfigId} AND scope_type = #{scopeType}

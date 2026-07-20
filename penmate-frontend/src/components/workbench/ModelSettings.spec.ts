@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   saveUserModelPreferences: vi.fn(),
   createUserModelConfig: vi.fn(),
   updateUserModelConfig: vi.fn(),
+  probeEmbeddingDimensions: vi.fn(),
   deleteUserModelConfig: vi.fn(),
 }))
 
@@ -40,6 +41,7 @@ vi.mock('@/api/modules/model.api', () => ({
     saveUserModelPreferences: mocks.saveUserModelPreferences,
     createUserModelConfig: mocks.createUserModelConfig,
     updateUserModelConfig: mocks.updateUserModelConfig,
+    probeEmbeddingDimensions: mocks.probeEmbeddingDimensions,
     deleteUserModelConfig: mocks.deleteUserModelConfig,
   },
 }))
@@ -121,6 +123,7 @@ describe('ModelSettings', () => {
     mocks.saveUserModelPreferences.mockResolvedValue({})
     mocks.createUserModelConfig.mockResolvedValue({})
     mocks.updateUserModelConfig.mockResolvedValue({})
+    mocks.probeEmbeddingDimensions.mockResolvedValue({ dimensions: 1536 })
     mocks.deleteUserModelConfig.mockResolvedValue({})
   })
 
@@ -539,5 +542,35 @@ describe('ModelSettings', () => {
     const providerOptions = wrapper.findAll('.api-form select').at(0)!.findAll('option')
     expect(providerOptions).toHaveLength(2)
     expect(providerOptions[1].text()).toBe('OpenAI')
+  })
+
+  it('supports probing and saving a custom Embedding dimension', async () => {
+    mocks.listUserModelConfigs.mockResolvedValueOnce([])
+    mocks.probeEmbeddingDimensions.mockResolvedValueOnce({ dimensions: 1024 })
+    const wrapper = await mountComponent()
+
+    await wrapper.findAll('.btn-save-api').at(0)!.trigger('click')
+    const selects = wrapper.findAll('.api-form select')
+    await selects[0].setValue('provider-openai-900719925474099312345')
+    await wrapper.findAll('.api-form input').at(0)!.setValue('text-embedding-model')
+    await selects[1].setValue('EMBEDDING')
+    await wrapper.findAll('.api-form input').at(-1)!.setValue('sk-embedding-key')
+    await wrapper.findAll('.dimension-mode button').at(1)!.trigger('click')
+    await wrapper.find('input[aria-label="自定义向量维度"]').setValue('1024')
+    await wrapper.find('.dimension-actions button').trigger('click')
+    await flushPromises()
+
+    expect(mocks.probeEmbeddingDimensions).toHaveBeenCalledWith(
+      expect.objectContaining({ embeddingDimensions: 1024, modelName: 'text-embedding-model' }),
+    )
+    expect(wrapper.find('.dimension-result').text()).toContain('1024')
+
+    await wrapper.find('.api-actions .btn-save-api').trigger('click')
+    await flushPromises()
+    expect(mocks.createUserModelConfig).toHaveBeenCalledWith(
+      '101',
+      '101',
+      expect.objectContaining({ modelType: 'EMBEDDING', embeddingDimensions: 1024 }),
+    )
   })
 })

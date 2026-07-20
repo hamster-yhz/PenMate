@@ -20,6 +20,7 @@ public class ModelConfiguration {
     private String modelName;
     private String baseUrl;
     private String distanceMetric;
+    private Integer embeddingDimensions;
     private Integer contextWindowTurns;
     private Integer maxContextTokens;
     private String maskedApiKey;

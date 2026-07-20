@@ -108,6 +108,12 @@ export const modelApi = {
       normalizeUserModelConfigPayload(payload),
     )
   },
+  probeEmbeddingDimensions(payload: AnyRecord, systemScope = false) {
+    const endpoint = systemScope
+      ? '/v1/model/system-embedding-dimension-probes'
+      : '/v1/model/embedding-dimension-probes'
+    return request.post<AnyRecord>(endpoint, payload)
+  },
   deleteUserModelConfig(_userId: string, businessModelConfigId: string, _operatorId: string) {
     void _userId
     void _operatorId

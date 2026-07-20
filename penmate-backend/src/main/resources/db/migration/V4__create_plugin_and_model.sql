@@ -46,6 +46,7 @@ CREATE TABLE model_configurations (
     model_name VARCHAR(120) NOT NULL,
     base_url VARCHAR(500) NULL,
     distance_metric VARCHAR(24) NULL,
+    embedding_dimensions INTEGER NULL,
     context_window_turns INTEGER NOT NULL DEFAULT 6,
     max_context_tokens INTEGER NOT NULL DEFAULT 128000,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
@@ -63,6 +64,10 @@ CREATE TABLE model_configurations (
     CONSTRAINT ck_model_configuration_metric CHECK (
         (model_type = 'CHAT' AND distance_metric IS NULL)
         OR (model_type = 'EMBEDDING' AND distance_metric IN ('COSINE', 'INNER_PRODUCT', 'L2'))
+    ),
+    CONSTRAINT ck_model_configuration_dimensions CHECK (
+        (model_type = 'CHAT' AND embedding_dimensions IS NULL)
+        OR (model_type = 'EMBEDDING' AND (embedding_dimensions IS NULL OR embedding_dimensions BETWEEN 1 AND 4000))
     )
 );
 

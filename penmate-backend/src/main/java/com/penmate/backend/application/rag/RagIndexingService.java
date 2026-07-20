@@ -229,8 +229,9 @@ public class RagIndexingService {
     }
 
     private List<float[]> embed(EmbeddingModelRoutingService.EmbeddingExecutionConfig model, Batch batch) {
-        return embeddings.embed(new EmbeddingGateway.EmbeddingRequest(model.baseUrl(), model.apiKey(), model.modelName(), model.systemScope(),
-                batch.chunks().stream().map(chunk -> chunk.write().content()).toList()));
+        return embeddings.embed(new EmbeddingGateway.EmbeddingRequest(model.baseUrl(), model.apiKey(), model.modelName(),
+                model.systemScope(), batch.chunks().stream().map(chunk -> chunk.write().content()).toList(),
+                model.embeddingDimensions()));
     }
 
     private List<RagIndexRepository.VectorWrite> vectorWrites(Batch batch, List<float[]> vectors) {

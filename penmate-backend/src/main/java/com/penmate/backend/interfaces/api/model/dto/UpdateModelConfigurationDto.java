@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.model.dto;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -16,8 +17,15 @@ public class UpdateModelConfigurationDto {
     @Size(max = 120) private String modelName;
     @Size(max = 500) private String baseUrl;
     @Pattern(regexp = "COSINE|INNER_PRODUCT|L2") private String distanceMetric;
+    @Positive @Max(4000) private Integer embeddingDimensions;
+    private boolean embeddingDimensionsSet;
     private String apiKey;
     @PositiveOrZero private Integer contextWindowTurns;
     @Positive private Integer maxContextTokens;
     @Pattern(regexp = "ACTIVE|DISABLED") private String status;
+
+    public void setEmbeddingDimensions(Integer embeddingDimensions) {
+        this.embeddingDimensions = embeddingDimensions;
+        this.embeddingDimensionsSet = true;
+    }
 }

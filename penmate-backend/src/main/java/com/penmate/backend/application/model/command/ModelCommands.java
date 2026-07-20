@@ -12,10 +12,17 @@ public final class ModelCommands {
             String modelName,
             String baseUrl,
             String distanceMetric,
+            Integer embeddingDimensions,
             String apiKey,
             Integer contextWindowTurns,
             Integer maxContextTokens
     ) {
+        public CreateConfigurationCommand(Long providerId, String displayName, String modelType,
+                                          String modelName, String baseUrl, String distanceMetric,
+                                          String apiKey, Integer contextWindowTurns, Integer maxContextTokens) {
+            this(providerId, displayName, modelType, modelName, baseUrl, distanceMetric, null,
+                    apiKey, contextWindowTurns, maxContextTokens);
+        }
     }
 
     public record UpdateConfigurationCommand(
@@ -24,11 +31,19 @@ public final class ModelCommands {
             String modelName,
             String baseUrl,
             String distanceMetric,
+            Integer embeddingDimensions,
+            boolean embeddingDimensionsSet,
             String apiKey,
             Integer contextWindowTurns,
             Integer maxContextTokens,
             String status
     ) {
+        public UpdateConfigurationCommand(Long providerId, String displayName, String modelName,
+                                          String baseUrl, String distanceMetric, String apiKey,
+                                          Integer contextWindowTurns, Integer maxContextTokens, String status) {
+            this(providerId, displayName, modelName, baseUrl, distanceMetric, null, false, apiKey,
+                    contextWindowTurns, maxContextTokens, status);
+        }
     }
 
     public record SaveUserModelPreferencesCommand(
@@ -40,6 +55,16 @@ public final class ModelCommands {
             Integer defaultChunkTargetCharacters,
             Integer defaultChunkOverlapCharacters,
             Integer defaultChunkMaxCharacters
+    ) {
+    }
+
+    public record ProbeEmbeddingDimensionCommand(
+            Long modelConfigId,
+            Long providerId,
+            String modelName,
+            String baseUrl,
+            Integer embeddingDimensions,
+            String apiKey
     ) {
     }
 }

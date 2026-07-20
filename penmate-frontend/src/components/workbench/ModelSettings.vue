@@ -123,6 +123,42 @@
               </select>
             </div>
 
+            <div v-if="form.modelType === 'EMBEDDING'" class="form-row form-row-full dimension-settings">
+              <label>向量维度</label>
+              <div class="dimension-mode" role="group" aria-label="向量维度模式">
+                <button
+                  type="button"
+                  :class="{ active: form.embeddingDimensionMode === 'native' }"
+                  @click="form.embeddingDimensionMode = 'native'"
+                >
+                  原生维度
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: form.embeddingDimensionMode === 'custom' }"
+                  @click="form.embeddingDimensionMode = 'custom'"
+                >
+                  自定义维度
+                </button>
+              </div>
+              <div class="dimension-actions">
+                <input
+                  v-if="form.embeddingDimensionMode === 'custom'"
+                  v-model="form.embeddingDimensions"
+                  class="f-input dimension-input"
+                  type="number"
+                  min="1"
+                  max="4000"
+                  step="1"
+                  aria-label="自定义向量维度"
+                />
+                <button type="button" class="btn-secondary" :disabled="probingDimensions" @click="probeDimensions">
+                  {{ probingDimensions ? '检测中...' : form.embeddingDimensionMode === 'native' ? '检测原生维度' : '验证当前维度' }}
+                </button>
+              </div>
+              <span v-if="dimensionProbeResult" class="dimension-result">{{ dimensionProbeResult }}</span>
+            </div>
+
             <div class="form-row form-row-full">
               <label>Base URL（可选）</label>
               <input v-model="form.baseUrl" class="f-input" placeholder="留空则使用提供商默认地址" />
@@ -197,6 +233,7 @@ type UserModelConfig = {
   status: string
   modelType: 'CHAT' | 'EMBEDDING'
   distanceMetric: 'COSINE' | 'INNER_PRODUCT' | 'L2' | null
+  embeddingDimensions: number | null
   scopeType: 'SYSTEM' | 'USER'
 }
 
@@ -211,6 +248,8 @@ const mainAgentModelConfigId = ref('')
 const dirtyWorkAgentModelConfigId = ref('')
 const editingConfigId = ref<string | null>(null)
 const formMode = ref<FormMode>(null)
+const probingDimensions = ref(false)
+const dimensionProbeResult = ref('')
 
 const form = reactive({
   providerId: '',
@@ -220,6 +259,8 @@ const form = reactive({
   apiKey: '',
   modelType: 'CHAT' as 'CHAT' | 'EMBEDDING',
   distanceMetric: 'COSINE' as 'COSINE' | 'INNER_PRODUCT' | 'L2',
+  embeddingDimensionMode: 'native' as 'native' | 'custom',
+  embeddingDimensions: '',
 })
 
 const getUserId = () => {
@@ -284,12 +325,22 @@ const resetForm = () => {
   form.apiKey = ''
   form.modelType = 'CHAT'
   form.distanceMetric = 'COSINE'
+  form.embeddingDimensionMode = 'native'
+  form.embeddingDimensions = ''
+  dimensionProbeResult.value = ''
 }
 
 watch(
   () => [form.providerId, form.keySourceType],
   () => {
     form.apiKey = ''
+  },
+)
+
+watch(
+  () => [form.providerId, form.modelName, form.baseUrl, form.apiKey, form.embeddingDimensionMode, form.embeddingDimensions],
+  () => {
+    dimensionProbeResult.value = ''
   },
 )
 
@@ -308,6 +359,9 @@ const selectConfig = (item: UserModelConfig) => {
   form.apiKey = ''
   form.modelType = item.modelType
   form.distanceMetric = item.distanceMetric ?? 'COSINE'
+  form.embeddingDimensionMode = item.embeddingDimensions == null ? 'native' : 'custom'
+  form.embeddingDimensions = item.embeddingDimensions == null ? '' : String(item.embeddingDimensions)
+  dimensionProbeResult.value = ''
 }
 
 const startCreate = () => {
@@ -429,6 +483,10 @@ const loadData = async () => {
             item.distanceMetric === 'INNER_PRODUCT' || item.distanceMetric === 'L2' || item.distanceMetric === 'COSINE'
               ? item.distanceMetric
               : null,
+          embeddingDimensions:
+            typeof item.embeddingDimensions === 'number' && Number.isInteger(item.embeddingDimensions)
+              ? item.embeddingDimensions
+              : null,
           scopeType: String(item.scopeType ?? 'USER') === 'SYSTEM' ? 'SYSTEM' : 'USER',
         }
       })
@@ -462,6 +520,45 @@ const loadData = async () => {
   }
 }
 
+const probeDimensions = async () => {
+  if (!form.providerId || !form.modelName.trim()) {
+    message.warning('请先选择供应商并填写模型名')
+    return
+  }
+  const requestedDimensions = Number(form.embeddingDimensions)
+  if (
+    form.embeddingDimensionMode === 'custom' &&
+    (!Number.isInteger(requestedDimensions) || requestedDimensions < 1 || requestedDimensions > 4000)
+  ) {
+    message.warning('向量维度必须是 1 到 4000 的整数')
+    return
+  }
+
+  probingDimensions.value = true
+  dimensionProbeResult.value = ''
+  try {
+    const payload: AnyRecord = {
+      modelConfigId: editingConfigId.value ?? undefined,
+      providerId: form.providerId,
+      modelName: form.modelName.trim(),
+      baseUrl: form.baseUrl.trim() || undefined,
+      embeddingDimensions: form.embeddingDimensionMode === 'custom' ? requestedDimensions : null,
+      apiKey: form.apiKey.trim() || undefined,
+    }
+    const result = pickBusinessRecord(await modelApi.probeEmbeddingDimensions(payload))
+    const dimensions = Number(result.dimensions)
+    if (!Number.isInteger(dimensions) || dimensions < 1) throw new Error('invalid dimensions')
+    dimensionProbeResult.value =
+      form.embeddingDimensionMode === 'native'
+        ? `检测到原生维度：${dimensions}`
+        : `验证通过：服务返回 ${dimensions} 维`
+  } catch {
+    message.warning(form.embeddingDimensionMode === 'native' ? '原生维度检测失败' : '当前维度验证失败')
+  } finally {
+    probingDimensions.value = false
+  }
+}
+
 const saveConfig = async () => {
   const userId = getUserId()
   const operatorId = getOperatorId()
@@ -471,6 +568,15 @@ const saveConfig = async () => {
   }
   if (!form.providerId || !form.modelName.trim()) {
     message.warning('请选择供应商并填写模型名')
+    return
+  }
+  const requestedDimensions = Number(form.embeddingDimensions)
+  if (
+    form.modelType === 'EMBEDDING' &&
+    form.embeddingDimensionMode === 'custom' &&
+    (!Number.isInteger(requestedDimensions) || requestedDimensions < 1 || requestedDimensions > 4000)
+  ) {
+    message.warning('向量维度必须是 1 到 4000 的整数')
     return
   }
 
@@ -510,6 +616,10 @@ const saveConfig = async () => {
     if (form.modelType === 'EMBEDDING' && editingConfig.distanceMetric !== form.distanceMetric) {
       payload.distanceMetric = form.distanceMetric
     }
+    if (form.modelType === 'EMBEDDING') {
+      const nextDimensions = form.embeddingDimensionMode === 'custom' ? requestedDimensions : null
+      if (editingConfig.embeddingDimensions !== nextDimensions) payload.embeddingDimensions = nextDimensions
+    }
   } else {
     payload.providerId = form.providerId
     payload.modelName = form.modelName
@@ -517,7 +627,10 @@ const saveConfig = async () => {
     payload.modelCategory = toModelCategory(form.keySourceType)
     payload.status = 'active'
     payload.modelType = form.modelType
-    if (form.modelType === 'EMBEDDING') payload.distanceMetric = form.distanceMetric
+    if (form.modelType === 'EMBEDDING') {
+      payload.distanceMetric = form.distanceMetric
+      payload.embeddingDimensions = form.embeddingDimensionMode === 'custom' ? requestedDimensions : null
+    }
     if (form.apiKey.trim()) {
       payload.apiKey = form.apiKey
     }
@@ -706,6 +819,44 @@ watch(
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   color: var(--text-primary);
+}
+.dimension-settings {
+  gap: 8px;
+}
+.dimension-mode {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(360px, 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.dimension-mode button {
+  min-height: 38px;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  background: rgba(11, 17, 32, 0.5);
+  cursor: pointer;
+}
+.dimension-mode button:last-child {
+  border-right: 0;
+}
+.dimension-mode button.active {
+  color: var(--amber-gold);
+  background: rgba(201, 169, 110, 0.14);
+}
+.dimension-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.dimension-input {
+  max-width: 220px;
+}
+.dimension-result {
+  color: #8bd3a8;
+  font-size: 0.8rem;
 }
 .api-actions {
   display: flex;

@@ -34,6 +34,7 @@ public class EmbeddingModelRoutingService {
         return new EmbeddingExecutionConfig(configuration.getModelConfigId(), configuration.getProviderId(),
                 configuration.getProtocolCode(), endpointPolicy.validate(baseUrl, "SYSTEM".equals(configuration.getScopeType())),
                 apiKey, configuration.getModelName(), configuration.getDistanceMetric(),
+                configuration.getEmbeddingDimensions(),
                 "SYSTEM".equals(configuration.getScopeType()));
     }
 
@@ -49,6 +50,7 @@ public class EmbeddingModelRoutingService {
 
     public record EmbeddingExecutionConfig(Long modelConfigId, Long providerId, String protocolCode,
                                            String baseUrl, String apiKey, String modelName,
-                                           String distanceMetric, boolean systemScope) {
+                                           String distanceMetric, Integer embeddingDimensions,
+                                           boolean systemScope) {
     }
 }

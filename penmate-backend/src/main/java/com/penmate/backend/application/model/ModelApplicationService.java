@@ -4,6 +4,7 @@ import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.command.ModelCommands.CreateConfigurationCommand;
 import com.penmate.backend.application.model.command.ModelCommands.SaveUserModelPreferencesCommand;
 import com.penmate.backend.application.model.command.ModelCommands.UpdateConfigurationCommand;
+import com.penmate.backend.application.model.command.ModelCommands.ProbeEmbeddingDimensionCommand;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.model.ModelProvider;
@@ -11,6 +12,7 @@ import com.penmate.backend.domain.model.model.ModelProviderCapability;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
 import com.penmate.backend.domain.model.service.ModelEndpointPolicy;
+import com.penmate.backend.domain.rag.service.EmbeddingDimensionProbeGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class ModelApplicationService {
     private final BusinessIdGenerator idGenerator;
     private final SecretCryptoService secretCryptoService;
     private final ModelEndpointPolicy modelEndpointPolicy;
+    private final EmbeddingDimensionProbeGateway embeddingDimensionProbeGateway;
 
     public List<ProviderView> listProviders() {
         return repository.listProviders().stream()
@@ -49,6 +52,46 @@ public class ModelApplicationService {
         Long userId = requireActor(actorUserId);
         ModelUserPreferences preferences = repository.findUserPreferences(userId);
         return preferences == null ? defaultPreferences(userId) : preferences;
+    }
+
+    public EmbeddingDimensionProbeResult probeEmbeddingDimensions(Long actorUserId, boolean systemScope,
+                                                                  ProbeEmbeddingDimensionCommand command) {
+        Long actor = requireActor(actorUserId);
+        Objects.requireNonNull(command, "command must not be null");
+        ModelConfiguration existing = command.modelConfigId() == null
+                ? null : repository.findAccessibleConfiguration(actor, command.modelConfigId());
+        if (command.modelConfigId() != null && (existing == null
+                || systemScope != "SYSTEM".equals(existing.getScopeType()))) {
+            throw BusinessException.notFound("Model configuration not found");
+        }
+        if (existing != null && !"EMBEDDING".equals(existing.getModelType())) {
+            throw BusinessException.of("Only Embedding model configurations can be probed");
+        }
+
+        Long providerId = command.providerId() != null ? command.providerId()
+                : existing == null ? null : existing.getProviderId();
+        ModelProvider provider = requireProvider(providerId);
+        requireCapability(providerId, "EMBEDDING");
+        String modelName = command.modelName() == null || command.modelName().isBlank()
+                ? existing == null ? null : existing.getModelName()
+                : command.modelName();
+        modelName = requireText(modelName, "modelName");
+        String requestedBaseUrl;
+        if (command.baseUrl() != null) {
+            requestedBaseUrl = normalizeBaseUrl(command.baseUrl(), provider.getBaseUrl());
+        } else if (existing != null && Objects.equals(existing.getProviderId(), providerId)) {
+            requestedBaseUrl = existing.getBaseUrl();
+        } else {
+            requestedBaseUrl = provider.getBaseUrl();
+        }
+        String baseUrl = validateEndpoint(normalizeBaseUrl(requestedBaseUrl, provider.getBaseUrl()), systemScope);
+        String apiKey = probeApiKey(provider, existing, providerId, command.apiKey());
+        Integer requestedDimensions = normalizeEmbeddingDimensions("EMBEDDING", command.embeddingDimensions());
+        int actualDimensions = embeddingDimensionProbeGateway.probe(
+                new EmbeddingDimensionProbeGateway.ProbeRequest(baseUrl, apiKey, modelName,
+                        systemScope, requestedDimensions));
+        return new EmbeddingDimensionProbeResult(actualDimensions, requestedDimensions,
+                requestedDimensions == null);
     }
 
     @Transactional
@@ -75,6 +118,7 @@ public class ModelApplicationService {
         configuration.setModelName(requireText(command.modelName(), "modelName"));
         configuration.setBaseUrl(baseUrl);
         configuration.setDistanceMetric(normalizeMetric(modelType, command.distanceMetric()));
+        configuration.setEmbeddingDimensions(normalizeEmbeddingDimensions(modelType, command.embeddingDimensions()));
         configuration.setContextWindowTurns(normalizeContextTurns(command.contextWindowTurns()));
         configuration.setMaxContextTokens(normalizeMaxTokens(command.maxContextTokens()));
         configuration.setStatus("ACTIVE");
@@ -218,6 +262,11 @@ public class ModelApplicationService {
                 ? normalizeMetric("EMBEDDING", command.distanceMetric() == null
                     ? existing.getDistanceMetric() : command.distanceMetric())
                 : null);
+        merged.setEmbeddingDimensions("EMBEDDING".equals(existing.getModelType())
+                ? (command.embeddingDimensionsSet()
+                    ? normalizeEmbeddingDimensions("EMBEDDING", command.embeddingDimensions())
+                    : existing.getEmbeddingDimensions())
+                : null);
         merged.setContextWindowTurns(command.contextWindowTurns() == null
                 ? existing.getContextWindowTurns() : normalizeContextTurns(command.contextWindowTurns()));
         merged.setMaxContextTokens(command.maxContextTokens() == null
@@ -237,6 +286,25 @@ public class ModelApplicationService {
         if (repository.insertCredential(configuration, credential) != 1) {
             throw BusinessException.of("Failed to store model credential");
         }
+    }
+
+    private String probeApiKey(ModelProvider provider, ModelConfiguration existing, Long providerId, String apiKey) {
+        if ("NONE".equalsIgnoreCase(provider.getAuthType())) return "";
+        if (apiKey != null && !apiKey.isBlank()) return apiKey.trim();
+        if (existing != null && Objects.equals(existing.getProviderId(), providerId)) {
+            return decryptCredential(repository.findCredential(existing));
+        }
+        throw BusinessException.of("apiKey is required for this provider");
+    }
+
+    private String decryptCredential(ModelCredential credential) {
+        if (credential == null || !"ACTIVE".equalsIgnoreCase(credential.getStatus())
+                || credential.getEncryptedApiKey() == null || credential.getEncryptedApiKey().isBlank()) {
+            throw BusinessException.of("Model credential is unavailable");
+        }
+        String value = secretCryptoService.decrypt(credential.getEncryptedApiKey());
+        if (value == null || value.isBlank()) throw BusinessException.of("Model credential cannot be decrypted");
+        return value;
     }
 
     private String validateEndpoint(String baseUrl, boolean systemScope) {
@@ -306,7 +374,8 @@ public class ModelApplicationService {
                 !Objects.equals(left.getProviderId(), right.getProviderId())
                 || !Objects.equals(normalized(left.getBaseUrl()), normalized(right.getBaseUrl()))
                 || !Objects.equals(left.getModelName(), right.getModelName())
-                || !Objects.equals(left.getDistanceMetric(), right.getDistanceMetric()));
+                || !Objects.equals(left.getDistanceMetric(), right.getDistanceMetric())
+                || !Objects.equals(left.getEmbeddingDimensions(), right.getEmbeddingDimensions()));
     }
 
     private String normalizeBaseUrl(String requested, String providerDefault) {
@@ -337,6 +406,15 @@ public class ModelApplicationService {
             throw BusinessException.of("Unsupported distanceMetric");
         }
         return metric;
+    }
+
+    private Integer normalizeEmbeddingDimensions(String modelType, Integer value) {
+        if (!"EMBEDDING".equals(modelType)) return null;
+        if (value == null) return null;
+        if (value < 1 || value > 4000) {
+            throw BusinessException.of("embeddingDimensions must be between 1 and 4000");
+        }
+        return value;
     }
 
     private String normalizeRoutingMode(String value) {
@@ -400,6 +478,9 @@ public class ModelApplicationService {
 
     public record ProviderView(ModelProvider provider, List<ModelProviderCapability> capabilities) {
         public ProviderView { capabilities = List.copyOf(capabilities); }
+    }
+
+    public record EmbeddingDimensionProbeResult(int dimensions, Integer requestedDimensions, boolean nativeMode) {
     }
 
     public record ImpactPreview(Long modelConfigId, String modelType, boolean embeddingIdentityChange,

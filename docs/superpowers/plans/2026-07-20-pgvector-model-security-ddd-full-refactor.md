@@ -50,6 +50,14 @@ interfaces -> application -> domain
 - RBAC/Ops/system-model endpoints require admin authority.
 - Admin may manage system models/jobs and alter project AI/index bindings, but may not read or edit user project content.
 
+### Sensitive API Rate Limits
+
+- Use an atomic Redis Lua token bucket with O(1) state for login email/IP, refresh token/IP, password changes, and Embedding dimension probes.
+- Interface adapters extract subjects; application services own policies and ports; infrastructure owns HMAC-SHA256 key encoding and Redis/Lua.
+- Consume all related buckets before returning so successful and failed requests both count. A successful login clears only its email bucket.
+- Return `429 RATE_LIMIT_EXCEEDED` with `Retry-After`; fail closed with `503 RATE_LIMIT_SERVICE_UNAVAILABLE` when Redis is unavailable.
+- Use an independent `RATE_LIMIT_KEY_SECRET`. Production trusts only Nginx-overwritten `X-Real-IP`; direct/local traffic uses `remoteAddr`.
+
 ### Project Ownership
 
 - A novel project has exactly one owner.
@@ -144,8 +152,10 @@ interfaces -> application -> domain
 - Connect timeout: 10 seconds. Response timeout: 60 seconds.
 - Retry a batch at most three attempts with 1/2/4 second exponential backoff plus jitter.
 - Retry connection errors, timeouts, 429, and 5xx. Do not retry 400/401/403/404 or malformed/vector-count errors.
-- Detect dimension lazily on the first successful indexing response; never ask the user to enter it.
-- Validate response count and uniform dimensions on every batch. A dimension change fails the entire build.
+- Model configurations store nullable `embeddingDimensions`: null uses the model's native dimension; custom values allow integers from 1 through 4000.
+- Saving never calls the provider. An optional one-shot probe detects native dimensions or validates the selected custom dimension with 5/15 second timeouts and no retry.
+- Runtime sends `dimensions` only for custom mode and never silently falls back to native mode.
+- Validate response count, uniform dimensions, and custom-dimension matches on every batch. A dimension change fails the entire build.
 - Dimensions 1-2000 use pgvector `vector` (float32). Dimensions 2001-4000 use `halfvec` (float16). Reject dimensions above 4000.
 
 ### Embedding Spaces And pgvector

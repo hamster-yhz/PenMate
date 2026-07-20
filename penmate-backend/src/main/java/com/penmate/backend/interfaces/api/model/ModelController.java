@@ -3,11 +3,14 @@ package com.penmate.backend.interfaces.api.model;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.ModelApplicationService;
 import com.penmate.backend.application.model.command.ModelCommands;
+import com.penmate.backend.application.ratelimit.RateLimitAction;
+import com.penmate.backend.application.ratelimit.RateLimitApplicationService;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.model.ModelProviderCapability;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.model.dto.CreateModelConfigurationDto;
+import com.penmate.backend.interfaces.api.model.dto.ProbeEmbeddingDimensionDto;
 import com.penmate.backend.interfaces.api.model.dto.SaveModelPreferencesDto;
 import com.penmate.backend.interfaces.api.model.dto.UpdateModelConfigurationDto;
 import jakarta.validation.Valid;
@@ -34,6 +37,7 @@ import java.util.Map;
 public class ModelController {
 
     private final ModelApplicationService service;
+    private final RateLimitApplicationService rateLimits;
 
     @GetMapping("/providers")
     public ApiResponse<List<Map<String, Object>>> listProviders(
@@ -56,6 +60,27 @@ public class ModelController {
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(configurationView(service.createConfiguration(
                 actor(authentication), false, createCommand(dto))), traceId);
+    }
+
+    @PostMapping("/embedding-dimension-probes")
+    public ApiResponse<Map<String, Object>> probeUserEmbeddingDimensions(
+            Authentication authentication,
+            @Valid @RequestBody ProbeEmbeddingDimensionDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        rateLimits.consume(RateLimitAction.EMBEDDING_DIMENSION_PROBE, actor(authentication).toString());
+        return ApiResponse.success(probeView(service.probeEmbeddingDimensions(
+                actor(authentication), false, probeCommand(dto))), traceId);
+    }
+
+    @PostMapping("/system-embedding-dimension-probes")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<Map<String, Object>> probeSystemEmbeddingDimensions(
+            Authentication authentication,
+            @Valid @RequestBody ProbeEmbeddingDimensionDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        rateLimits.consume(RateLimitAction.EMBEDDING_DIMENSION_PROBE, actor(authentication).toString());
+        return ApiResponse.success(probeView(service.probeEmbeddingDimensions(
+                actor(authentication), true, probeCommand(dto))), traceId);
     }
 
     @PostMapping("/system-configurations")
@@ -170,14 +195,31 @@ public class ModelController {
 
     private ModelCommands.CreateConfigurationCommand createCommand(CreateModelConfigurationDto dto) {
         return new ModelCommands.CreateConfigurationCommand(id(dto.getProviderId(), "providerId"), dto.getDisplayName(),
-                dto.getModelType(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(), dto.getApiKey(),
+                dto.getModelType(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(),
+                dto.getEmbeddingDimensions(), dto.getApiKey(),
                 dto.getContextWindowTurns(), dto.getMaxContextTokens());
     }
 
     private ModelCommands.UpdateConfigurationCommand updateCommand(UpdateModelConfigurationDto dto) {
         return new ModelCommands.UpdateConfigurationCommand(optionalId(dto.getProviderId(), "providerId"),
-                dto.getDisplayName(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(), dto.getApiKey(),
-                dto.getContextWindowTurns(), dto.getMaxContextTokens(), dto.getStatus());
+                dto.getDisplayName(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(),
+                dto.getEmbeddingDimensions(), dto.isEmbeddingDimensionsSet(), dto.getApiKey(), dto.getContextWindowTurns(),
+                dto.getMaxContextTokens(), dto.getStatus());
+    }
+
+    private ModelCommands.ProbeEmbeddingDimensionCommand probeCommand(ProbeEmbeddingDimensionDto dto) {
+        return new ModelCommands.ProbeEmbeddingDimensionCommand(
+                optionalId(dto.getModelConfigId(), "modelConfigId"),
+                optionalId(dto.getProviderId(), "providerId"), dto.getModelName(), dto.getBaseUrl(),
+                dto.getEmbeddingDimensions(), dto.getApiKey());
+    }
+
+    private Map<String, Object> probeView(ModelApplicationService.EmbeddingDimensionProbeResult result) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("dimensions", result.dimensions());
+        view.put("requestedDimensions", result.requestedDimensions());
+        view.put("nativeMode", result.nativeMode());
+        return view;
     }
 
     private Map<String, Object> providerView(ModelApplicationService.ProviderView view) {
@@ -209,6 +251,7 @@ public class ModelController {
         result.put("modelName", configuration.getModelName());
         result.put("baseUrl", configuration.getBaseUrl());
         result.put("distanceMetric", configuration.getDistanceMetric());
+        result.put("embeddingDimensions", configuration.getEmbeddingDimensions());
         result.put("contextWindowTurns", configuration.getContextWindowTurns());
         result.put("maxContextTokens", configuration.getMaxContextTokens());
         result.put("maskedApiKey", configuration.getMaskedApiKey());

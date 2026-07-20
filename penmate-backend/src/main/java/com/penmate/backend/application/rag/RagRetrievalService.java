@@ -83,7 +83,8 @@ public class RagRetrievalService {
         }
         var model = routing.resolve(ownerUserId, configuration.getEmbeddingModelConfigId());
         List<float[]> response = embeddings.embed(new EmbeddingGateway.EmbeddingRequest(
-                model.baseUrl(), model.apiKey(), model.modelName(), model.systemScope(), List.of(query.strip())));
+                model.baseUrl(), model.apiKey(), model.modelName(), model.systemScope(), List.of(query.strip()),
+                model.embeddingDimensions()));
         if (response.size() != 1 || response.getFirst().length != space.embeddingDimension()) {
             throw BusinessException.of("Query Embedding dimension does not match the active index");
         }
