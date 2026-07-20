@@ -279,7 +279,8 @@ public interface AgentRunMapper {
                 run_phase = CASE WHEN attempt_count >= #{maxAttempts} THEN 'failed' ELSE 'suspended' END,
                 lease_owner = NULL,
                 lease_until = NULL,
-                next_retry_at = CASE WHEN attempt_count >= #{maxAttempts} THEN NULL ELSE #{nextRetryAt} END,
+                next_retry_at = CASE WHEN attempt_count >= #{maxAttempts}
+                    THEN NULL ELSE CAST(#{nextRetryAt} AS TIMESTAMPTZ) END,
                 last_error_code = 'AGENT_RUN_LEASE_EXPIRED',
                 last_error_message = 'Agent worker lease expired before completion',
                 finished_at = CASE WHEN attempt_count >= #{maxAttempts} THEN CURRENT_TIMESTAMP(3) ELSE NULL END,

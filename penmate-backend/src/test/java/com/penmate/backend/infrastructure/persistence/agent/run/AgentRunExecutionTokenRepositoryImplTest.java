@@ -65,6 +65,20 @@ class AgentRunExecutionTokenRepositoryImplTest {
         }
     }
 
+    @Test
+    void suspending_an_expired_run_persists_the_postgresql_retry_timestamp() throws Exception {
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        Instant nextRetryAt = now.plusSeconds(5);
+        insertRun(now.minusSeconds(1));
+        try (SqlSession session = sessions.openSession(true)) {
+            AgentRunRepositoryImpl repository = new AgentRunRepositoryImpl(session.getMapper(AgentRunMapper.class));
+
+            assertThat(repository.suspendExpiredRuns(now, nextRetryAt, 3)).isEqualTo(1);
+            assertThat(runStatus()).isEqualTo("SUSPENDED");
+            assertThat(runNextRetryAt()).isEqualTo(nextRetryAt);
+        }
+    }
+
     private void insertRun(Instant leaseUntil) throws Exception {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -85,6 +99,16 @@ class AgentRunExecutionTokenRepositoryImplTest {
              ResultSet result = statement.executeQuery()) {
             assertThat(result.next()).isTrue();
             return result.getString(1);
+        }
+    }
+
+    private Instant runNextRetryAt() throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT next_retry_at FROM agent_runs WHERE run_id = 70001");
+             ResultSet result = statement.executeQuery()) {
+            assertThat(result.next()).isTrue();
+            return result.getTimestamp(1).toInstant();
         }
     }
 }
