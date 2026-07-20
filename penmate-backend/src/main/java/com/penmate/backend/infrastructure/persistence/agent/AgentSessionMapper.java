@@ -55,11 +55,11 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, story_bible_routing_mode, router_model_config_id, active_context_epoch_id,
+                bound_style_id, active_context_epoch_id,
                 last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{conversationId}, #{projectId}, #{userId}, #{title}, #{status},
-                NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+                NULL, NULL, NULL, NULL, NULL, NULL
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -73,8 +73,6 @@ public interface AgentSessionMapper {
                    title,
                    session_status,
                    bound_style_id,
-                   story_bible_routing_mode,
-                   router_model_config_id,
                    active_context_epoch_id,
                    last_turn_id,
                    last_run_id,
@@ -99,8 +97,6 @@ public interface AgentSessionMapper {
                    title AS title,
                    session_status AS sessionStatus,
                    bound_style_id AS boundStyleId,
-                   story_bible_routing_mode AS storyBibleRoutingMode,
-                   router_model_config_id AS routerModelConfigId,
                    active_context_epoch_id AS activeContextEpochId,
                    last_turn_id AS lastTurnId,
                    last_run_id AS lastRunId,
@@ -229,9 +225,11 @@ public interface AgentSessionMapper {
     @Select("""
             SELECT model_name AS modelName,
                    max_context_tokens AS maxContextTokens
-            FROM model_user_configurations
-            WHERE user_id = #{userId}
-              AND model_config_id = #{modelConfigId}
+            FROM model_configurations
+            WHERE model_config_id = #{modelConfigId}
+              AND model_type = 'CHAT'
+              AND status = 'ACTIVE'
+              AND (scope_type = 'SYSTEM' OR (scope_type = 'USER' AND owner_user_id = #{userId}))
               AND deleted_at IS NULL
             LIMIT 1
             """)
@@ -255,11 +253,11 @@ public interface AgentSessionMapper {
     @Insert("""
             INSERT INTO agent_sessions(
                 session_id, project_id, owner_user_id, title, session_status,
-                bound_style_id, story_bible_routing_mode, router_model_config_id, active_context_epoch_id,
+                bound_style_id, active_context_epoch_id,
                 last_turn_id, last_run_id, last_message_at, resumed_at
             ) VALUES (
                 #{sessionId}, #{projectId}, #{ownerUserId}, #{title}, #{sessionStatus},
-                #{boundStyleId}, #{storyBibleRoutingMode}, #{routerModelConfigId}, #{activeContextEpochId},
+                #{boundStyleId}, #{activeContextEpochId},
                 #{lastTurnId}, #{lastRunId}, NULL, #{resumedAt}
             )
             """)

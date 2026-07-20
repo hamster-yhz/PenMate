@@ -28,10 +28,10 @@ class AgentRunDependencyMigrationTest {
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_runs"))
                 .contains("predecessor_run_id");
         assertThat(PostgreSqlTestDatabase.indexesOf(dataSource, "agent_runs"))
-                .contains("idx_agent_runs_predecessor", "uk_agent_runs_predecessor");
+                .contains("uk_agent_runs_predecessor");
 
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V6__create_agent_execution_extensions.sql"));
+                "src/main/resources/db/migration/V5__create_agent_domain.sql"));
         assertThat(sql)
                 .contains("active_chapter_content_revision BIGINT NOT NULL DEFAULT 0")
                 .contains("predecessor_run_id BIGINT NULL")

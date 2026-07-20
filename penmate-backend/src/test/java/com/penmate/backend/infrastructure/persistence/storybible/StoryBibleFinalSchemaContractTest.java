@@ -49,16 +49,18 @@ class StoryBibleFinalSchemaContractTest {
 
     @Test
     void should_define_context_epoch_working_set_and_routing_preferences() {
-        assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_user_preferences"))
-                .contains("user_id", "story_bible_routing_mode", "router_model_config_id");
+        assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "project_ai_configurations"))
+                .contains("project_id", "story_bible_routing_mode", "router_model_config_id",
+                        "embedding_model_config_id", "index_status");
+        assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_user_preferences")).isEmpty();
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_sessions"))
-                .contains("story_bible_routing_mode", "router_model_config_id", "active_context_epoch_id")
-                .doesNotContain("active_context_version");
+                .contains("active_context_epoch_id")
+                .doesNotContain("story_bible_routing_mode", "router_model_config_id", "active_context_version");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_context_epochs"))
                 .contains(
                         "epoch_id", "session_id", "epoch_no", "fingerprint", "story_bible_revision",
                         "manuscript_revision", "active_chapter_id", "style_binding_revision", "routing_mode",
-                        "router_model_config_revision", "prompt_bundle_hash", "skill_catalog_hash", "tool_catalog_hash",
+                        "router_model_config_id", "prompt_bundle_hash", "skill_catalog_hash", "tool_catalog_hash",
                         "snapshot_object_key", "snapshot_hash", "snapshot_size_bytes", "superseded_at");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_session_working_set"))
                 .contains("session_id", "node_id", "activation_score", "last_used_turn_id", "use_count", "pinned");

@@ -23,8 +23,12 @@ DELETE FROM plugin_project_installs WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM plugin_catalog WHERE plugin_id BETWEEN 920000 AND 922999;
 
 DELETE FROM rag_chunks WHERE project_id BETWEEN 920000 AND 922999;
+DELETE FROM rag_index_sources WHERE project_id BETWEEN 920000 AND 922999;
+DELETE FROM rag_index_builds WHERE project_id BETWEEN 920000 AND 922999;
+DELETE FROM project_ai_configurations WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM rag_retrieval_logs WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM rag_documents WHERE project_id BETWEEN 920000 AND 922999;
+DELETE FROM rag_embedding_spaces WHERE embedding_space_id BETWEEN 920000 AND 922999;
 DELETE FROM storage_objects WHERE storage_object_id BETWEEN 920000 AND 922999;
 
 DELETE FROM story_bible_change_items WHERE change_item_id BETWEEN 920000 AND 922999;
@@ -47,7 +51,6 @@ DELETE FROM novel_chapter_versions WHERE chapter_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_chapters WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_outline_nodes WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_volumes WHERE project_id BETWEEN 920000 AND 922999;
-DELETE FROM novel_members WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_projects WHERE project_id BETWEEN 920000 AND 922999;
 
 DELETE FROM ops_async_jobs WHERE job_id BETWEEN 920000 AND 922999;

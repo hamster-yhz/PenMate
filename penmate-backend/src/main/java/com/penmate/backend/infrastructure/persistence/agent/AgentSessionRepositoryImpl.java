@@ -170,8 +170,6 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
         setField(session, "id", longValue(valueOf(row, "id")));
         setField(session, "sessionStatus", stringValue(valueOf(row, "sessionStatus")));
         setField(session, "boundStyleId", longValue(valueOf(row, "boundStyleId")));
-        setField(session, "storyBibleRoutingMode", stringValue(valueOf(row, "storyBibleRoutingMode")));
-        setField(session, "routerModelConfigId", longValue(valueOf(row, "routerModelConfigId")));
         setField(session, "activeContextEpochId", longValue(valueOf(row, "activeContextEpochId")));
         setField(session, "lastTurnId", longValue(valueOf(row, "lastTurnId")));
         setField(session, "lastRunId", longValue(valueOf(row, "lastRunId")));

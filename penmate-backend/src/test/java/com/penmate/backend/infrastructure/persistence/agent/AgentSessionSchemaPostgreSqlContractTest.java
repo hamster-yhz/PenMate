@@ -21,9 +21,10 @@ class AgentSessionSchemaPostgreSqlContractTest {
     void should_define_agent_session_run_recovery_tables() {
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_sessions"))
                 .contains(
-                        "session_id", "bound_style_id", "story_bible_routing_mode",
-                        "router_model_config_id", "active_context_epoch_id", "last_run_id",
+                        "session_id", "bound_style_id", "active_context_epoch_id", "last_run_id",
                         "resumed_at", "total_prompt_tokens", "total_completion_tokens", "total_tokens");
+        assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_sessions"))
+                .doesNotContain("story_bible_routing_mode", "router_model_config_id");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_turns"))
                 .contains("turn_id", "turn_seq", "run_id", "resume_token", "turn_status");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_runs"))

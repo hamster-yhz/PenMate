@@ -11,8 +11,6 @@ public class AgentSession {
     private String title;
     private String sessionStatus;
     private Long boundStyleId;
-    private String storyBibleRoutingMode;
-    private Long routerModelConfigId;
     private Long activeContextEpochId;
     private Long lastTurnId;
     private Long lastRunId;
@@ -43,8 +41,6 @@ public class AgentSession {
         );
         copied.id = source.id;
         copied.boundStyleId = source.boundStyleId;
-        copied.storyBibleRoutingMode = source.storyBibleRoutingMode;
-        copied.routerModelConfigId = source.routerModelConfigId;
         copied.activeContextEpochId = source.activeContextEpochId;
         copied.lastTurnId = source.lastTurnId;
         copied.lastRunId = source.lastRunId;
@@ -108,14 +104,6 @@ public class AgentSession {
 
     public Long getBoundStyle() {
         return boundStyleId;
-    }
-
-    public String getStoryBibleRoutingMode() {
-        return storyBibleRoutingMode;
-    }
-
-    public Long getRouterModelConfigId() {
-        return routerModelConfigId;
     }
 
     public Long getActiveContextEpochId() {
