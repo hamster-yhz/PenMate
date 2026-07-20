@@ -71,7 +71,7 @@ public class StoryBibleCandidateRetriever {
             }
         }
         StoryBibleSemanticRetriever.SemanticResult semantic = semanticRetriever.retrieve(
-                root.getStoryBibleId(), request.userMessage(), LIMIT);
+                request.projectId(), root.getStoryBibleId(), request.userMessage(), LIMIT);
         for (Candidate candidate : semantic.candidates()) {
             semanticIds.add(candidate.nodeId());
             for (String reason : candidate.reasons()) merge(merged, candidate.nodeId(), candidate.score(), reason);

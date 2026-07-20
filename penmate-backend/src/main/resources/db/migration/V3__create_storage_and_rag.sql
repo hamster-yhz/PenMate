@@ -27,12 +27,15 @@ CREATE TABLE rag_upload_sessions (
     upload_id BIGINT NOT NULL,
     project_id BIGINT NOT NULL,
     owner_user_id BIGINT NOT NULL,
+    doc_type VARCHAR(32) NOT NULL DEFAULT 'KNOWLEDGE_DOCUMENT',
+    title VARCHAR(200) NOT NULL,
     original_filename VARCHAR(255) NOT NULL,
     file_extension VARCHAR(16) NOT NULL,
     declared_mime_type VARCHAR(100) NOT NULL,
     expected_size BIGINT NOT NULL,
     expected_checksum VARCHAR(128) NULL,
     object_key VARCHAR(500) NOT NULL,
+    upload_token_hash CHAR(64) NOT NULL,
     upload_status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
     expires_at TIMESTAMPTZ(3) NOT NULL,
     completed_at TIMESTAMPTZ(3) NULL,
@@ -40,6 +43,7 @@ CREATE TABLE rag_upload_sessions (
     updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     CONSTRAINT uk_rag_upload_sessions_upload_id UNIQUE (upload_id),
     CONSTRAINT uk_rag_upload_sessions_object_key UNIQUE (object_key),
+    CONSTRAINT ck_rag_upload_status CHECK (upload_status IN ('PENDING', 'COMPLETED', 'EXPIRED', 'REJECTED')),
     CONSTRAINT ck_rag_upload_size CHECK (expected_size > 0 AND expected_size <= 10485760)
 );
 

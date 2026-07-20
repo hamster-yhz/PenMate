@@ -16,6 +16,9 @@ public interface ObjectStorageService {
     record PutObjectResult(String etag, Long size, String checksum) {
     }
 
+    record ObjectMetadata(String etag, Long size, String checksum, String contentType) {
+    }
+
     /**
      * 生成对象读取预签名 URL。
      *
@@ -54,6 +57,8 @@ public interface ObjectStorageService {
     String readText(String objectKey);
 
     byte[] readBytes(String objectKey);
+
+    ObjectMetadata head(String objectKey);
 
     boolean exists(String objectKey);
 

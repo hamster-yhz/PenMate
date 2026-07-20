@@ -63,5 +63,11 @@ public class RagDocumentRepositoryImpl implements RagDocumentRepository {
     public int updateStatuses(Long projectId, Long docId, String parseStatus, String indexStatus) {
         return ragDocumentMapper.updateStatuses(projectId, docId, parseStatus, indexStatus);
     }
+
+    @Override
+    public int updateProcessingState(Long projectId, Long docId, String parseStatus, String indexStatus,
+                                     String errorCode, String errorMessage) {
+        return ragDocumentMapper.updateProcessingState(projectId, docId, parseStatus, indexStatus, errorCode, errorMessage);
+    }
 }
 

@@ -19,7 +19,8 @@ public interface RagDocumentMapper {
 
     @Select("""
             SELECT id, document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
-                   mime_type, parse_status, index_status, created_at, updated_at
+                   origin_checksum, origin_size, file_extension, mime_type, source_revision,
+                   parse_status, index_status, last_error_code, last_error_message, created_at, updated_at
             FROM rag_documents
             WHERE project_id = #{projectId} AND deleted_at IS NULL
             ORDER BY id DESC
@@ -28,7 +29,8 @@ public interface RagDocumentMapper {
 
     @Select("""
             SELECT id, document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
-                   mime_type, parse_status, index_status, created_at, updated_at
+                   origin_checksum, origin_size, file_extension, mime_type, source_revision,
+                   parse_status, index_status, last_error_code, last_error_message, created_at, updated_at
             FROM rag_documents
             WHERE project_id = #{projectId} AND document_id = #{docId} AND deleted_at IS NULL
             """)
@@ -36,9 +38,11 @@ public interface RagDocumentMapper {
 
     @Insert("""
             INSERT INTO rag_documents(document_id, project_id, doc_type, title, source_ref, origin_object_key, origin_etag,
-                                      mime_type, parse_status, index_status)
+                                      origin_checksum, origin_size, file_extension, mime_type, source_revision,
+                                      parse_status, index_status)
             VALUES(#{documentId}, #{projectId}, #{docType}, #{title}, #{sourceRef}, #{originObjectKey}, #{originEtag},
-                   #{mimeType}, #{parseStatus}, #{indexStatus})
+                   #{originChecksum}, #{originSize}, #{fileExtension}, #{mimeType}, #{sourceRevision},
+                   #{parseStatus}, #{indexStatus})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(RagDocument document);
@@ -59,5 +63,19 @@ public interface RagDocumentMapper {
                        @Param("docId") Long docId,
                        @Param("parseStatus") String parseStatus,
                        @Param("indexStatus") String indexStatus);
+
+    @Update("""
+            UPDATE rag_documents
+            SET parse_status = #{parseStatus}, index_status = #{indexStatus},
+                last_error_code = #{errorCode}, last_error_message = #{errorMessage},
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId} AND document_id = #{docId} AND deleted_at IS NULL
+            """)
+    int updateProcessingState(@Param("projectId") Long projectId,
+                              @Param("docId") Long docId,
+                              @Param("parseStatus") String parseStatus,
+                              @Param("indexStatus") String indexStatus,
+                              @Param("errorCode") String errorCode,
+                              @Param("errorMessage") String errorMessage);
 }
 

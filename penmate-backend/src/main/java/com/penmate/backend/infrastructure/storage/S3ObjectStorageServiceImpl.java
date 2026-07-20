@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -139,6 +140,30 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
                             .key(objectKey)
                             .build())
                     .asByteArray();
+        }
+    }
+
+    @Override
+    public ObjectMetadata head(String objectKey) {
+        String endpoint = normalizedStorageEndpoint();
+        URI endpointUri = URI.create(endpoint);
+        try (S3Client client = S3Client.builder()
+                .endpointOverride(endpointUri)
+                .region(Region.of(storageRegion))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(storageAccessKey, storageSecretKey)))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(shouldUsePathStyle(endpointUri))
+                        .chunkedEncodingEnabled(false)
+                        .checksumValidationEnabled(false)
+                        .build())
+                .build()) {
+            HeadObjectResponse response = client.headObject(HeadObjectRequest.builder()
+                    .bucket(storageBucket)
+                    .key(objectKey)
+                    .build());
+            String checksum = response.checksumSHA256() == null ? response.checksumCRC32C() : response.checksumSHA256();
+            return new ObjectMetadata(response.eTag(), response.contentLength(), checksum, response.contentType());
         }
     }
 

@@ -15,5 +15,8 @@ public interface RagDocumentRepository {
     int softDelete(Long projectId, Long docId);
 
     int updateStatuses(Long projectId, Long docId, String parseStatus, String indexStatus);
+
+    int updateProcessingState(Long projectId, Long docId, String parseStatus, String indexStatus,
+                              String errorCode, String errorMessage);
 }
 

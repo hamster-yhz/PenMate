@@ -1,7 +1,6 @@
 package com.penmate.backend.infrastructure.persistence.rag;
 
 import com.penmate.backend.domain.rag.model.RagRetrievalLog;
-import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
 import com.penmate.backend.domain.rag.repository.RagRetrievalRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,11 +13,6 @@ public class RagRetrievalRepositoryImpl implements RagRetrievalRepository {
 
     public RagRetrievalRepositoryImpl(RagRetrievalMapper ragRetrievalMapper) {
         this.ragRetrievalMapper = ragRetrievalMapper;
-    }
-
-    @Override
-    public List<RagRetrievedChunk> searchChunks(Long projectId, String query, int limit) {
-        return ragRetrievalMapper.searchChunks(projectId, query, limit);
     }
 
     @Override

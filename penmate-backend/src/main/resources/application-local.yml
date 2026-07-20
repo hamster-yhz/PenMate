@@ -5,6 +5,9 @@ spring:
     password: postgres
 
 penmate:
+  security:
+    model-endpoint:
+      allow-private: true
   bootstrap:
     admin:
       email: admin@penmate.local

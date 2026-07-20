@@ -49,6 +49,9 @@ penmate:
       context-enabled: ${AGENT_STORY_BIBLE_CONTEXT_ENABLED:false}
   security:
     model-key-encryption-key-base64: ${MODEL_KEY_ENCRYPTION_KEY_BASE64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+    model-endpoint:
+      allow-private: ${MODEL_ENDPOINT_ALLOW_PRIVATE:false}
+      admin-private-host-allowlist: ${MODEL_ENDPOINT_ADMIN_PRIVATE_HOST_ALLOWLIST:}
   idempotency:
     key-prefix: ${IDEMPOTENCY_KEY_PREFIX:idempotency:}
     ttl-seconds: ${IDEMPOTENCY_TTL_SECONDS:86400}

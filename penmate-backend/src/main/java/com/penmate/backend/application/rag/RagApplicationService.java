@@ -1,257 +1,390 @@
 package com.penmate.backend.application.rag;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.ops.AsyncJobQueueService;
 import com.penmate.backend.application.rag.command.CreateRagDocumentCommand;
 import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
-import com.penmate.backend.domain.rag.model.RagRetrievalLog;
-import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
+import com.penmate.backend.domain.novel.model.NovelProject;
+import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.rag.model.RagDocument;
+import com.penmate.backend.domain.rag.model.RagRetrievalLog;
+import com.penmate.backend.domain.rag.model.RagUploadSession;
+import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
+import com.penmate.backend.domain.rag.repository.RagUploadSessionRepository;
+import com.penmate.backend.domain.rag.service.DocumentContentParser;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
-import lombok.extern.slf4j.Slf4j;
+import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
-/**
- * RAG 文档应用服务。
- * <p>负责项目知识文档的创建、删除、解析、向量化及索引状态查询。</p>
- */
 @Service
-@Slf4j
 public class RagApplicationService {
+    private static final Set<String> EXTENSIONS = Set.of("txt", "md", "markdown", "html", "htm");
 
-    private final RagDocumentRepository ragDocumentRepository;
-    private final BusinessIdGenerator businessIdGenerator;
-    private final RagRetrievalService ragRetrievalService;
-    private final String storageEndpoint;
+    private final RagDocumentRepository documents;
+    private final RagUploadSessionRepository uploads;
+    private final NovelGateway novels;
+    private final BusinessIdGenerator ids;
+    private final RagRetrievalService retrieval;
+    private final ObjectStorageService storage;
+    private final DocumentContentParser parser;
+    private final AsyncJobQueueService jobs;
+    private final ObjectMapper objectMapper;
+    @Value("${penmate.indexing.max-upload-bytes:10485760}")
+    private long maxUploadBytes = 10485760L;
+    @Value("${penmate.storage.presign-expire-minutes:15}")
+    private long uploadTtlMinutes = 15L;
 
-    public RagApplicationService(RagDocumentRepository ragDocumentRepository,
-                                 BusinessIdGenerator businessIdGenerator,
-                                 RagRetrievalService ragRetrievalService,
-                                 @Value("${penmate.storage.endpoint:http://localhost:9000}") String storageEndpoint) {
-        this.ragDocumentRepository = ragDocumentRepository;
-        this.businessIdGenerator = businessIdGenerator;
-        this.ragRetrievalService = ragRetrievalService;
-        this.storageEndpoint = storageEndpoint;
+    public RagApplicationService(RagDocumentRepository documents,
+                                 RagUploadSessionRepository uploads,
+                                 NovelGateway novels,
+                                 BusinessIdGenerator ids,
+                                 RagRetrievalService retrieval,
+                                 ObjectStorageService storage,
+                                 DocumentContentParser parser,
+                                 AsyncJobQueueService jobs,
+                                 ObjectMapper objectMapper) {
+        this.documents = documents;
+        this.uploads = uploads;
+        this.novels = novels;
+        this.ids = ids;
+        this.retrieval = retrieval;
+        this.storage = storage;
+        this.parser = parser;
+        this.jobs = jobs;
+        this.objectMapper = objectMapper;
     }
 
-    /**
-     * 查询项目下的 RAG 文档列表。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
-     */
-    public List<RagDocument> listDocuments(Long projectId) {
-        List<RagDocument> documents = ragDocumentRepository.findByProjectId(projectId);
-        log.info("查询RAG文档列表: projectId={}, count={}", projectId, documents.size());
-        return documents;
+    public List<RagDocument> listDocuments(Long projectId, Long actorUserId) {
+        requireOwner(projectId, actorUserId);
+        return documents.findByProjectId(projectId);
     }
 
-    /**
-     * 新建 RAG 文档记录。
-     *
-     * @param projectId 入参：projectId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public RagDocument createDocument(Long projectId, CreateRagDocumentCommand command, String traceId) {
-        log.info("创建RAG文档: projectId={}, title={}, docType={}, operatorId={}",
-                projectId, command.title(), command.docType(), command.operatorId());
+    public RagDocument getDocument(Long projectId, Long docId, Long actorUserId) {
+        requireOwner(projectId, actorUserId);
+        return requireDocument(projectId, docId);
+    }
+
+    @Transactional
+    public UploadInitialization initializeUpload(Long projectId, Long actorUserId, UploadRequest request) {
+        requireOwner(projectId, actorUserId);
+        Objects.requireNonNull(request, "request");
+        String filename = requireText(request.filename(), "filename");
+        String extension = extension(filename);
+        String mimeType = normalizeMime(request.mimeType());
+        validateUploadDeclaration(extension, mimeType, request.size());
+        String title = request.title() == null || request.title().isBlank()
+                ? stripExtension(filename) : request.title().strip();
+        if (title.length() > 200) throw BusinessException.badRequest("Document title is too long");
+
+        long uploadId = ids.nextId();
+        String token = UUID.randomUUID() + "." + UUID.randomUUID();
+        String objectKey = "novels/%d/rag/uploads/%d.%s".formatted(projectId, uploadId, extension);
+        RagUploadSession session = new RagUploadSession();
+        session.setUploadId(uploadId);
+        session.setProjectId(projectId);
+        session.setOwnerUserId(actorUserId);
+        session.setDocType("KNOWLEDGE_DOCUMENT");
+        session.setTitle(title);
+        session.setOriginalFilename(filename);
+        session.setFileExtension(extension);
+        session.setDeclaredMimeType(mimeType);
+        session.setExpectedSize(request.size());
+        session.setExpectedChecksum(normalizeChecksum(request.sha256()));
+        session.setObjectKey(objectKey);
+        session.setUploadTokenHash(sha256(token.getBytes(StandardCharsets.UTF_8)));
+        session.setUploadStatus("PENDING");
+        session.setExpiresAt(Instant.now().plus(Math.max(1, uploadTtlMinutes), ChronoUnit.MINUTES));
+        if (uploads.insert(session) != 1) throw BusinessException.of("Failed to initialize document upload");
+        return new UploadInitialization(String.valueOf(uploadId), token, objectKey,
+                storage.buildUploadUrl(objectKey, mimeType), session.getExpiresAt());
+    }
+
+    @Transactional
+    public RagDocument completeUpload(Long projectId, Long actorUserId, Long uploadId, String uploadToken) {
+        requireOwner(projectId, actorUserId);
+        RagUploadSession session = uploads.findByIdForUpdate(uploadId);
+        if (session == null || !Objects.equals(session.getProjectId(), projectId)
+                || !Objects.equals(session.getOwnerUserId(), actorUserId)) {
+            throw BusinessException.notFound("Upload session not found");
+        }
+        if (!"PENDING".equals(session.getUploadStatus())) throw BusinessException.conflict("Upload session is not pending");
+        if (session.getExpiresAt().isBefore(Instant.now())) throw BusinessException.conflict("Upload session has expired");
+        verifyToken(session, uploadToken);
+
+        try {
+            ObjectStorageService.ObjectMetadata metadata = storage.head(session.getObjectKey());
+            if (!Objects.equals(metadata.size(), session.getExpectedSize()) || metadata.size() <= 0 || metadata.size() > maxUploadBytes) {
+                throw BusinessException.badRequest("Uploaded object size does not match the initialized upload");
+            }
+            if (!normalizeMime(metadata.contentType()).equals(session.getDeclaredMimeType())) {
+                throw BusinessException.badRequest("Uploaded object content type does not match the initialized upload");
+            }
+            byte[] content = storage.readBytes(session.getObjectKey());
+            String contentChecksum = sha256(content);
+            if (session.getExpectedChecksum() != null && !session.getExpectedChecksum().equals(contentChecksum)) {
+                throw BusinessException.badRequest("Uploaded object checksum does not match");
+            }
+            DocumentContentParser.ParsedDocument parsed = parser.parse(
+                    session.getFileExtension(), session.getDeclaredMimeType(), content);
+
+            RagDocument document = new RagDocument();
+            document.setDocumentId(ids.nextId());
+            document.setProjectId(projectId);
+            document.setDocType(session.getDocType());
+            document.setTitle(session.getTitle());
+            document.setOriginObjectKey(session.getObjectKey());
+            document.setOriginEtag(normalizeEtag(metadata.etag()));
+            document.setOriginChecksum(contentChecksum);
+            document.setOriginSize(metadata.size());
+            document.setFileExtension(session.getFileExtension());
+            document.setMimeType(parsed.detectedMimeType());
+            document.setSourceRevision(1L);
+            document.setParseStatus("PENDING");
+            document.setIndexStatus("PENDING");
+            if (documents.insert(document) != 1 || uploads.markCompleted(uploadId) != 1) {
+                throw BusinessException.of("Failed to complete document upload");
+            }
+            enqueueParse(document, actorUserId);
+            return requireDocument(projectId, document.getDocumentId());
+        } catch (BusinessException exception) {
+            deleteInvalidObject(session.getObjectKey());
+            throw exception;
+        }
+    }
+
+    @Transactional
+    public void deleteDocument(Long projectId, Long docId, Long actorUserId) {
+        requireOwner(projectId, actorUserId);
+        RagDocument document = requireDocument(projectId, docId);
+        if (documents.softDelete(projectId, docId) != 1) throw BusinessException.notFound("Rag document not found");
+        jobs.enqueue("RAG_REINDEX_SOURCE", "rag:document:%d:delete:%d".formatted(docId, document.getSourceRevision()),
+                actorUserId, projectId, json(Map.of("projectId", projectId, "documentId", docId,
+                        "sourceRevision", document.getSourceRevision(), "operation", "DELETE")));
+    }
+
+    @Transactional
+    public RagDocument requestParse(Long projectId, Long docId, Long actorUserId) {
+        requireOwner(projectId, actorUserId);
+        RagDocument document = requireDocument(projectId, docId);
+        documents.updateProcessingState(projectId, docId, "PENDING", "PENDING", null, null);
+        enqueueParse(document, actorUserId);
+        return requireDocument(projectId, docId);
+    }
+
+    @Transactional
+    public RagDocument requestEmbedding(Long projectId, Long docId, Long actorUserId) {
+        requireOwner(projectId, actorUserId);
+        RagDocument document = requireDocument(projectId, docId);
+        if (!"DONE".equalsIgnoreCase(document.getParseStatus())) throw BusinessException.conflict("Document parse not finished");
+        jobs.enqueue("RAG_EMBED_DOCUMENT", "rag:document:%d:embed:%d".formatted(docId, document.getSourceRevision()),
+                actorUserId, projectId, documentPayload(document));
+        documents.updateProcessingState(projectId, docId, "DONE", "PENDING", null, null);
+        return requireDocument(projectId, docId);
+    }
+
+    public Map<String, Object> getIndexStatus(Long projectId, Long docId, Long actorUserId) {
+        RagDocument document = getDocument(projectId, docId, actorUserId);
+        return Map.of("documentId", String.valueOf(document.getDocumentId()),
+                "parseStatus", document.getParseStatus(), "indexStatus", document.getIndexStatus());
+    }
+
+    public List<Map<String, Object>> listRetrievalLogs(Long projectId, Long actorUserId) {
+        requireOwner(projectId, actorUserId);
+        return retrieval.listRetrievalLogs(projectId).stream().map(this::toRetrievalLogView).toList();
+    }
+
+    // Worker entrypoint: validates the immutable source again before parsing.
+    public DocumentContentParser.ParsedDocument loadAndParse(Long projectId, Long documentId, long sourceRevision) {
+        RagDocument document = requireDocument(projectId, documentId);
+        if (!Objects.equals(document.getSourceRevision(), sourceRevision)) {
+            throw BusinessException.conflict("Document revision is stale");
+        }
+        return parser.parse(document.getFileExtension(), document.getMimeType(), storage.readBytes(document.getOriginObjectKey()));
+    }
+
+    public void updateProcessingState(Long projectId, Long documentId, String parseStatus, String indexStatus,
+                                      String errorCode, String errorMessage) {
+        documents.updateProcessingState(projectId, documentId, parseStatus, indexStatus, errorCode, errorMessage);
+    }
+
+    private void enqueueParse(RagDocument document, Long ownerUserId) {
+        jobs.enqueue("RAG_PARSE_DOCUMENT",
+                "rag:document:%d:parse:%d".formatted(document.getDocumentId(), document.getSourceRevision()),
+                ownerUserId, document.getProjectId(), documentPayload(document));
+    }
+
+    private String documentPayload(RagDocument document) {
+        return json(Map.of("projectId", document.getProjectId(), "documentId", document.getDocumentId(),
+                "sourceRevision", document.getSourceRevision()));
+    }
+
+    private String json(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize async job payload", exception);
+        }
+    }
+
+    private void validateUploadDeclaration(String extension, String mimeType, Long size) {
+        if (!EXTENSIONS.contains(extension)) throw BusinessException.badRequest("Only TXT, Markdown, and HTML documents are supported");
+        if (size == null || size <= 0 || size > maxUploadBytes) throw BusinessException.badRequest("Document size must be between 1 byte and 10 MiB");
+        boolean html = Set.of("html", "htm").contains(extension);
+        boolean mimeMatches = html ? Set.of("text/html", "application/xhtml+xml").contains(mimeType)
+                : Set.of("text/plain", "text/markdown", "text/x-markdown").contains(mimeType);
+        if (!mimeMatches) throw BusinessException.badRequest("Filename extension and MIME type do not match");
+    }
+
+    private void verifyToken(RagUploadSession session, String token) {
+        if (token == null || !MessageDigest.isEqual(
+                session.getUploadTokenHash().getBytes(StandardCharsets.US_ASCII),
+                sha256(token.getBytes(StandardCharsets.UTF_8)).getBytes(StandardCharsets.US_ASCII))) {
+            throw BusinessException.forbidden("Invalid upload token");
+        }
+    }
+
+    private void deleteInvalidObject(String objectKey) {
+        try {
+            storage.delete(objectKey);
+        } catch (RuntimeException ignored) {
+            // The rejected object is unreachable and can be removed by storage lifecycle policy.
+        }
+    }
+
+    private RagDocument requireDocument(Long projectId, Long docId) {
+        RagDocument document = documents.findById(projectId, docId);
+        if (document == null) throw BusinessException.notFound("Rag document not found");
+        return document;
+    }
+
+    private void requireOwner(Long projectId, Long actorUserId) {
+        NovelProject project = novels.findProjectById(projectId);
+        if (project == null || !Objects.equals(project.getOwnerUserId(), actorUserId)) {
+            throw BusinessException.notFound("Novel project not found");
+        }
+    }
+
+    private String extension(String filename) {
+        int index = filename.lastIndexOf('.');
+        if (index < 1 || index == filename.length() - 1) throw BusinessException.badRequest("Filename must include a supported extension");
+        return filename.substring(index + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String stripExtension(String filename) {
+        int index = filename.lastIndexOf('.');
+        return (index <= 0 ? filename : filename.substring(0, index)).strip();
+    }
+
+    private String requireText(String value, String field) {
+        if (value == null || value.isBlank()) throw BusinessException.badRequest(field + " is required");
+        return value.strip();
+    }
+
+    private String normalizeMime(String value) {
+        if (value == null) return "";
+        return value.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeChecksum(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.strip().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("[0-9a-f]{64}")) throw BusinessException.badRequest("sha256 must be 64 lowercase hexadecimal characters");
+        return normalized;
+    }
+
+    private String normalizeEtag(String value) {
+        return value == null ? null : value.replace("\"", "").strip();
+    }
+
+    private String sha256(byte[] value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    private Map<String, Object> toRetrievalLogView(RagRetrievalLog log) {
+        return Map.of("id", String.valueOf(log.getRetrievalLogId()), "projectId", String.valueOf(log.getProjectId()),
+                "runId", log.getRunId() == null ? "" : String.valueOf(log.getRunId()),
+                "queryText", log.getQueryText() == null ? "" : log.getQueryText(),
+                "hitCount", log.getHitCount() == null ? 0 : log.getHitCount(),
+                "sourcesJson", log.getSourcesJson() == null ? "[]" : log.getSourcesJson(),
+                "latencyMs", log.getLatencyMs() == null ? 0 : log.getLatencyMs(),
+                "adopted", Boolean.TRUE.equals(log.getAdopted()),
+                "traceId", log.getTraceId() == null ? "" : log.getTraceId());
+    }
+
+    public record UploadRequest(String filename, String title, String mimeType, Long size, String sha256) {
+    }
+
+    public record UploadInitialization(String uploadId, String uploadToken, String objectKey,
+                                       String uploadUrl, Instant expiresAt) {
+    }
+
+    // Compatibility methods retained for application tests and internal callers during API migration.
+    List<RagDocument> listDocuments(Long projectId) { return documents.findByProjectId(projectId); }
+    RagDocument getDocument(Long projectId, Long docId) { return requireDocument(projectId, docId); }
+    RagDocument createDocument(Long projectId, CreateRagDocumentCommand command, String traceId) {
         RagDocument document = new RagDocument();
-        document.setDocumentId(businessIdGenerator.nextId());
+        document.setDocumentId(ids.nextId());
         document.setProjectId(projectId);
         document.setDocType(command.docType());
         document.setTitle(command.title());
         document.setSourceRef(command.sourceRef());
         document.setOriginObjectKey(command.originObjectKey());
         document.setOriginEtag(command.originEtag());
+        document.setFileExtension("md");
         document.setMimeType(command.mimeType());
-        document.setParseStatus("pending");
-        document.setIndexStatus("pending");
-        int affected = ragDocumentRepository.insert(document);
-        if (affected != 1) {
-            log.error("创建RAG文档失败: projectId={}, title={}, reason=insert_failed", projectId, command.title());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create rag document");
-        }
-        writeAudit(traceId, command.operatorId(), "rag", "create-document", "rag_documents", String.valueOf(document.getDocumentId()), command.title(), 201);
-        log.info("创建RAG文档成功: projectId={}, docId={}, title={}", projectId, document.getDocumentId(), document.getTitle());
+        document.setSourceRevision(1L);
+        document.setParseStatus("PENDING");
+        document.setIndexStatus("PENDING");
+        if (documents.insert(document) != 1) throw BusinessException.of("Failed to create rag document");
         return document;
     }
-
-    /**
-     * 查询单个 RAG 文档详情。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @return 出参：处理结果
-     */
-    public RagDocument getDocument(Long projectId, Long docId) {
-        log.info("查询RAG文档详情: projectId={}, docId={}", projectId, docId);
-        RagDocument document = ragDocumentRepository.findById(projectId, docId);
-        if (document == null) {
-            log.warn("查询RAG文档详情失败: projectId={}, docId={}, reason=not_found", projectId, docId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Rag document not found");
-        }
-        log.info("查询RAG文档详情成功: projectId={}, docId={}, parseStatus={}, indexStatus={}",
-                projectId, docId, document.getParseStatus(), document.getIndexStatus());
-        return document;
+    void deleteDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
+        if (documents.softDelete(projectId, docId) != 1) throw BusinessException.notFound("Rag document not found");
     }
-
-    /**
-     * 删除指定 RAG 文档。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     */
-    public void deleteDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
-        log.info("删除RAG文档: projectId={}, docId={}, operatorId={}", projectId, docId, command.operatorId());
-        int affected = ragDocumentRepository.softDelete(projectId, docId);
-        if (affected != 1) {
-            log.warn("删除RAG文档失败: projectId={}, docId={}, reason=not_found", projectId, docId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Rag document not found");
-        }
-        writeAudit(traceId, command.operatorId(), "rag", "delete-document", "rag_documents", String.valueOf(docId), null, 200);
-        log.info("删除RAG文档成功: projectId={}, docId={}", projectId, docId);
+    RagDocument parseDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
+        requireDocument(projectId, docId);
+        if (documents.updateStatuses(projectId, docId, "done", "pending") != 1) throw BusinessException.of("Failed to parse rag document");
+        return requireDocument(projectId, docId);
     }
-
-    /**
-     * 获取文档上传地址。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
-     */
-    public Map<String, String> getDocumentUploadUrl(Long projectId) {
-        String objectKey = "novels/" + projectId + "/rag/" + UUID.randomUUID();
-        log.info("生成RAG文档上传地址: projectId={}, objectKey={}", projectId, objectKey);
-        return Map.of(
-                "objectKey", objectKey,
-                "uploadUrl", buildObjectUploadUrl(objectKey)
-        );
+    RagDocument embedDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
+        RagDocument current = requireDocument(projectId, docId);
+        if (!"done".equalsIgnoreCase(current.getParseStatus())) throw BusinessException.of("Document parse not finished");
+        if (documents.updateStatuses(projectId, docId, "done", "done") != 1) throw BusinessException.of("Failed to embed rag document");
+        return requireDocument(projectId, docId);
     }
-
-    private String buildObjectUploadUrl(String objectKey) {
-        return normalizedStorageEndpoint() + "/upload/" + objectKey + "?token=" + UUID.randomUUID();
+    Map<String, Object> getIndexStatus(Long projectId, Long docId) {
+        RagDocument document = requireDocument(projectId, docId);
+        return Map.of("docId", document.getDocumentId(), "parseStatus", document.getParseStatus(), "indexStatus", document.getIndexStatus());
     }
-
-    private String normalizedStorageEndpoint() {
-        if (storageEndpoint.endsWith("/")) {
-            return storageEndpoint.substring(0, storageEndpoint.length() - 1);
-        }
-        return storageEndpoint;
-    }
-
-    /**
-     * 触发文档解析流程。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public RagDocument parseDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
-        log.info("触发RAG文档解析: projectId={}, docId={}, operatorId={}", projectId, docId, command.operatorId());
-        getDocument(projectId, docId);
-        int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "pending");
-        if (affected != 1) {
-            log.error("触发RAG文档解析失败: projectId={}, docId={}, reason=update_failed", projectId, docId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to parse rag document");
-        }
-        writeAudit(traceId, command.operatorId(), "rag", "parse-document", "rag_documents", String.valueOf(docId), null, 200);
-        log.info("触发RAG文档解析成功: projectId={}, docId={}", projectId, docId);
-        return getDocument(projectId, docId);
-    }
-
-    /**
-     * 触发文档向量化入库流程。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public RagDocument embedDocument(Long projectId, Long docId, OperateRagDocumentCommand command, String traceId) {
-        log.info("触发RAG文档向量化: projectId={}, docId={}, operatorId={}", projectId, docId, command.operatorId());
-        RagDocument current = getDocument(projectId, docId);
-        String parseStatus = current.getParseStatus() == null ? "pending" : current.getParseStatus();
-        if (!"done".equalsIgnoreCase(parseStatus)) {
-            log.warn("触发RAG文档向量化失败: projectId={}, docId={}, parseStatus={}", projectId, docId, parseStatus);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Document parse not finished");
-        }
-        int affected = ragDocumentRepository.updateStatuses(projectId, docId, "done", "done");
-        if (affected != 1) {
-            log.error("触发RAG文档向量化失败: projectId={}, docId={}, reason=update_failed", projectId, docId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to embed rag document");
-        }
-        writeAudit(traceId, command.operatorId(), "rag", "embed-document", "rag_documents", String.valueOf(docId), null, 200);
-        log.info("触发RAG文档向量化成功: projectId={}, docId={}", projectId, docId);
-        return getDocument(projectId, docId);
-    }
-
-    /**
-     * 查询文档解析/索引状态。
-     *
-     * @param projectId 入参：projectId
-     * @param docId 入参：docId
-     * @return 出参：处理结果
-     */
-    public Map<String, Object> getIndexStatus(Long projectId, Long docId) {
-        RagDocument document = getDocument(projectId, docId);
-        log.info("查询RAG索引状态: projectId={}, docId={}, parseStatus={}, indexStatus={}",
-                projectId, docId, document.getParseStatus(), document.getIndexStatus());
-        return Map.of(
-                "docId", document.getDocumentId(),
-                "parseStatus", document.getParseStatus(),
-                "indexStatus", document.getIndexStatus()
-        );
-    }
-
-    /**
-     * 查询项目检索日志（当前为占位实现）。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
-     */
-    public List<Map<String, Object>> listRetrievalLogs(Long projectId) {
-        List<Map<String, Object>> logs = ragRetrievalService.listRetrievalLogs(projectId)
-                .stream()
-                .map(this::toRetrievalLogView)
-                .toList();
-        log.info("查询RAG检索日志: projectId={}, count={}", projectId, logs.size());
-        return logs;
-    }
-
-    private Map<String, Object> toRetrievalLogView(RagRetrievalLog log) {
-        return Map.of(
-                "id", log.getRetrievalLogId(),
-                "projectId", log.getProjectId(),
-                "runId", log.getRunId(),
+    List<Map<String, Object>> listRetrievalLogs(Long projectId) {
+        return retrieval.listRetrievalLogs(projectId).stream().map(log -> Map.<String, Object>of(
+                "id", log.getRetrievalLogId(), "projectId", log.getProjectId(), "runId", log.getRunId(),
                 "queryText", log.getQueryText() == null ? "" : log.getQueryText(),
                 "hitCount", log.getHitCount() == null ? 0 : log.getHitCount(),
                 "sourcesJson", log.getSourcesJson() == null ? "[]" : log.getSourcesJson(),
                 "latencyMs", log.getLatencyMs() == null ? 0 : log.getLatencyMs(),
-                "adopted", log.getAdopted() != null && log.getAdopted(),
-                "traceId", log.getTraceId() == null ? "" : log.getTraceId(),
-                "createdAt", log.getCreatedAt() == null ? "" : log.getCreatedAt().toString()
-        );
-    }
-
-    private void writeAudit(String traceId,
-                            Long userId,
-                            String module,
-                            String action,
-                            String resourceType,
-                            String resourceId,
-                            String requestJson,
-                            int responseCode) {
-        // 审计模块已移除
+                "adopted", Boolean.TRUE.equals(log.getAdopted()),
+                "traceId", log.getTraceId() == null ? "" : log.getTraceId())).toList();
     }
 }
-
-

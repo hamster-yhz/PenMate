@@ -4,6 +4,7 @@ import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.rag.RagRetrievalService;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.springframework.stereotype.Component;
@@ -51,6 +52,8 @@ public class RagQueryToolHandler implements AgentToolHandler {
                     request.traceId()
             ).chunks();
             return ToolCallResult.success(formatChunks(chunks));
+        } catch (BusinessException ex) {
+            return new ToolCallResult("FAILED", null, null, ex.getErrorCode(), ex.getMessage());
         } catch (Exception ex) {
             String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "rag query execution failed"

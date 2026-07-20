@@ -15,5 +15,9 @@ public class RagRetrievedChunk {
     private Integer chunkNo;
     /** 片段正文内容。 */
     private String contentText;
+    private String sourceType;
+    private Long sourceId;
+    private String sourceTitle;
+    private Double distance;
 }
 

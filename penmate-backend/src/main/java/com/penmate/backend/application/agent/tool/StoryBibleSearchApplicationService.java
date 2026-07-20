@@ -8,10 +8,12 @@ import com.penmate.backend.application.agent.context.ContextEpochSnapshotCodec;
 import com.penmate.backend.application.agent.context.StoryBibleContextResolver;
 import com.penmate.backend.application.agent.context.StoryBibleRouteRequest;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
+import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,17 +27,27 @@ public class StoryBibleSearchApplicationService {
     private final StoryBibleContextResolver resolver;
     private final AgentWorkingSetPromotionService workingSetPromotions;
     private final ObjectMapper objectMapper;
+    private final AgentModelRoutingService modelRouting;
 
+    @Autowired
     public StoryBibleSearchApplicationService(AgentRunRepository runs, AgentContextEpochService epochs,
                                                ContextEpochSnapshotCodec codec, StoryBibleContextResolver resolver,
                                                AgentWorkingSetPromotionService workingSetPromotions,
-                                               ObjectMapper objectMapper) {
+                                               ObjectMapper objectMapper, AgentModelRoutingService modelRouting) {
         this.runs = runs;
         this.epochs = epochs;
         this.codec = codec;
         this.resolver = resolver;
         this.workingSetPromotions = workingSetPromotions;
         this.objectMapper = objectMapper;
+        this.modelRouting = modelRouting;
+    }
+
+    StoryBibleSearchApplicationService(AgentRunRepository runs, AgentContextEpochService epochs,
+                                       ContextEpochSnapshotCodec codec, StoryBibleContextResolver resolver,
+                                       AgentWorkingSetPromotionService workingSetPromotions,
+                                       ObjectMapper objectMapper) {
+        this(runs, epochs, codec, resolver, workingSetPromotions, objectMapper, null);
     }
 
     public ToolCallResult execute(ToolCallRequest request) {
@@ -48,9 +60,14 @@ public class StoryBibleSearchApplicationService {
         try { args = objectMapper.readValue(request.toolArgsJson(), SearchArgs.class); }
         catch (JsonProcessingException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_INVALID", "Invalid search arguments"); }
         var snapshot = codec.decode(epochs.loadVerifiedSnapshot(run.contextEpochId()));
+        var epoch = modelRouting == null ? null : epochs.get(run.contextEpochId());
+        StoryBibleRoutingMode routingMode = epoch == null ? StoryBibleRoutingMode.RETRIEVAL
+                : StoryBibleRoutingMode.valueOf(epoch.routingMode());
+        var selectorConfig = routingMode == StoryBibleRoutingMode.RETRIEVAL || modelRouting == null ? null
+                : modelRouting.resolveExecutionConfig(run.ownerUserId(), epoch.routerModelConfigId(), request.traceId());
         var resolved = resolver.resolve(new StoryBibleRouteRequest(
                 run.projectId(), run.sessionId(), run.runId(), input.chapterId(), args.query(), args.mentionedEntities(),
-                StoryBibleRoutingMode.RETRIEVAL, snapshot.storyBibleRevision(), snapshot.selectorCatalog(), List.of(), null));
+                routingMode, snapshot.storyBibleRevision(), snapshot.selectorCatalog(), List.of(), selectorConfig));
         List<Long> usedIds = resolved.nodes().stream().map(StoryBibleContextResolver.RenderedNode::nodeId).toList();
         workingSetPromotions.promoteBestEffort(run.sessionId(), run.turnId(), usedIds, BigDecimal.ONE);
         List<Map<String, Object>> results = resolved.nodes().stream().map(node -> Map.<String, Object>of(

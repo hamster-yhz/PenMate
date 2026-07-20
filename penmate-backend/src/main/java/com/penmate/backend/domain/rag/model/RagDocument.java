@@ -24,12 +24,18 @@ public class RagDocument {
     private String originObjectKey;
     /** 原始文件 ETag。 */
     private String originEtag;
+    private String originChecksum;
+    private Long originSize;
+    private String fileExtension;
     /** MIME 类型。 */
     private String mimeType;
     /** 解析状态。 */
     private String parseStatus;
     /** 索引状态。 */
     private String indexStatus;
+    private Long sourceRevision;
+    private String lastErrorCode;
+    private String lastErrorMessage;
     /** 创建时间。 */
     private Instant createdAt;
     /** 更新时间。 */
