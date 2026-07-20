@@ -10,7 +10,6 @@ import org.apache.ibatis.annotations.Param;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 @Mapper
 public interface AgentRunMapper {
@@ -146,42 +145,47 @@ public interface AgentRunMapper {
             """)
     AgentRun findSuccessor(Long predecessorRunId);
 
-    @Update("""
-            UPDATE agent_runs
-            SET run_status = 'RUNNING',
-                run_phase = CASE WHEN run_phase = 'created' THEN 'routing' ELSE run_phase END,
-                lease_owner = #{owner},
-                lease_until = #{leaseUntil},
-                execution_token = execution_token + 1,
-                attempt_count = attempt_count + 1,
-                next_retry_at = NULL,
-                last_error_code = NULL,
-                last_error_message = NULL,
-                started_at = COALESCE(started_at, #{now}),
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE run_id = #{runId}
-              AND (
-                run_status = 'PENDING'
-                OR (run_status = 'SUSPENDED' AND (next_retry_at IS NULL OR next_retry_at <= #{now}))
-                OR (run_status = 'WAITING_APPROVAL' AND EXISTS (
-                    SELECT 1 FROM agent_run_pending_approvals p
-                    WHERE p.run_id = agent_runs.run_id AND p.pending_status = 'APPROVED'
-                ))
-              )
-              AND (lease_until IS NULL OR lease_until < #{now})
-            """)
-    int acquireLease(@Param("runId") Long runId,
-                     @Param("owner") String owner,
-                     @Param("now") Instant now,
-                     @Param("leaseUntil") Instant leaseUntil);
-
     @Select("""
-            SELECT run_id AS runId, lease_owner AS owner, execution_token AS executionToken,
-                   attempt_count AS attemptCount, lease_until AS expiresAt
-            FROM agent_runs
-            WHERE run_id = #{runId}
+            WITH candidate AS MATERIALIZED (
+                SELECT run_id, run_status
+                FROM agent_runs
+                WHERE run_id = #{runId}
+                  AND (
+                    run_status = 'PENDING'
+                    OR (run_status = 'SUSPENDED' AND (next_retry_at IS NULL OR next_retry_at <= #{now}))
+                    OR (run_status = 'WAITING_APPROVAL' AND EXISTS (
+                        SELECT 1 FROM agent_run_pending_approvals p
+                        WHERE p.run_id = agent_runs.run_id AND p.pending_status = 'APPROVED'
+                    ))
+                  )
+                  AND (lease_until IS NULL OR lease_until < #{now})
+                FOR UPDATE
+            ),
+            updated AS (
+                UPDATE agent_runs r
+                SET run_status = 'RUNNING',
+                    run_phase = CASE WHEN r.run_phase = 'created' THEN 'routing' ELSE r.run_phase END,
+                    lease_owner = #{owner},
+                    lease_until = #{leaseUntil},
+                    execution_token = r.execution_token + 1,
+                    attempt_count = r.attempt_count + 1,
+                    next_retry_at = NULL,
+                    last_error_code = NULL,
+                    last_error_message = NULL,
+                    started_at = COALESCE(r.started_at, #{now}),
+                    updated_at = CURRENT_TIMESTAMP(3)
+                FROM candidate c
+                WHERE r.run_id = c.run_id
+                RETURNING r.run_id, r.lease_owner, r.execution_token,
+                          r.attempt_count, r.lease_until, c.run_status AS acquired_from
+            )
+            SELECT run_id, lease_owner, execution_token, attempt_count, lease_until, acquired_from
+            FROM updated
             """)
-    Map<String, Object> findLease(@Param("runId") Long runId);
+    AgentRunLeaseRow acquireLease(@Param("runId") Long runId,
+                                  @Param("owner") String owner,
+                                  @Param("now") Instant now,
+                                  @Param("leaseUntil") Instant leaseUntil);
 
     @Update("""
             UPDATE agent_runs

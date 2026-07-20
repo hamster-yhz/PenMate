@@ -8,11 +8,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -57,18 +53,15 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     @Override
     public Optional<AgentRunLease> tryAcquireLease(Long runId, String owner,
                                                    Instant now, Instant leaseUntil) {
-        AgentRun before = agentRunMapper.findRun(runId);
-        if (before == null || agentRunMapper.acquireLease(runId, owner, now, leaseUntil) != 1) {
-            return Optional.empty();
-        }
-        Map<String, Object> row = agentRunMapper.findLease(runId);
+        AgentRunLeaseRow row = agentRunMapper.acquireLease(runId, owner, now, leaseUntil);
+        if (row == null) return Optional.empty();
         return Optional.of(new AgentRunLease(
-                runId,
-                owner,
-                longValue(row.get("executionToken")),
-                intValue(row.get("attemptCount")),
-                before.status(),
-                instant(row.get("expiresAt"))
+                row.getRunId(),
+                row.getLeaseOwner(),
+                row.getExecutionToken(),
+                row.getAttemptCount(),
+                AgentRunStatus.valueOf(row.getAcquiredFrom()),
+                row.getLeaseUntil()
         ));
     }
 
@@ -127,22 +120,4 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
         return agentRunMapper.findClaimableRunIds(now, limit);
     }
 
-    private Long longValue(Object value) {
-        return value instanceof Number number ? number.longValue() : Long.valueOf(String.valueOf(value));
-    }
-
-    private int intValue(Object value) {
-        return value instanceof Number number ? number.intValue() : Integer.parseInt(String.valueOf(value));
-    }
-
-    private Instant instant(Object value) {
-        if (value instanceof Instant time) return time;
-        if (value instanceof java.sql.Timestamp timestamp) return timestamp.toInstant();
-        String normalized = String.valueOf(value).replace(' ', 'T');
-        try {
-            return Instant.parse(normalized);
-        } catch (DateTimeParseException ignored) {
-            return LocalDateTime.parse(normalized).toInstant(ZoneOffset.UTC);
-        }
-    }
 }
