@@ -5,6 +5,9 @@ spring:
     password: postgres
 
 penmate:
+  rate-limit:
+    key-secret: penmate-local-rate-limit-key-only
+    trust-proxy-headers: false
   security:
     model-endpoint:
       allow-private: true

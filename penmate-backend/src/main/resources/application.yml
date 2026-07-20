@@ -52,6 +52,12 @@ penmate:
     model-endpoint:
       allow-private: ${MODEL_ENDPOINT_ALLOW_PRIVATE:false}
       admin-private-host-allowlist: ${MODEL_ENDPOINT_ADMIN_PRIVATE_HOST_ALLOWLIST:}
+  rate-limit:
+    key-secret: ${RATE_LIMIT_KEY_SECRET:}
+    trust-proxy-headers: ${RATE_LIMIT_TRUST_PROXY_HEADERS:false}
+  model:
+    embedding-probe-connect-timeout: ${EMBEDDING_PROBE_CONNECT_TIMEOUT:5s}
+    embedding-probe-response-timeout: ${EMBEDDING_PROBE_RESPONSE_TIMEOUT:15s}
   idempotency:
     key-prefix: ${IDEMPOTENCY_KEY_PREFIX:idempotency:}
     ttl-seconds: ${IDEMPOTENCY_TTL_SECONDS:86400}

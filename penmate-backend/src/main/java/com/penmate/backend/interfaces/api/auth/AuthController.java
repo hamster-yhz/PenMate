@@ -3,16 +3,20 @@ package com.penmate.backend.interfaces.api.auth;
 import com.penmate.backend.application.auth.AuthApplicationService;
 import com.penmate.backend.application.auth.command.LoginCommand;
 import com.penmate.backend.application.auth.command.RefreshCommand;
+import com.penmate.backend.application.ratelimit.RateLimitAction;
+import com.penmate.backend.application.ratelimit.RateLimitApplicationService;
 import com.penmate.backend.interfaces.api.auth.dto.LoginDto;
 import com.penmate.backend.interfaces.api.auth.dto.RefreshDto;
 import com.penmate.backend.interfaces.api.auth.dto.ProfileUpdateDto;
 import com.penmate.backend.interfaces.api.auth.dto.PasswordChangeDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
+import com.penmate.backend.interfaces.api.common.ClientIpResolver;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * 认证与会话接口控制器。
@@ -37,9 +42,14 @@ public class AuthController {
     private static final String ACCESS_COOKIE = "penmate_access";
 
     private final AuthApplicationService authApplicationService;
+    private final RateLimitApplicationService rateLimits;
+    private final ClientIpResolver clientIpResolver;
 
-    public AuthController(AuthApplicationService authApplicationService) {
+    public AuthController(AuthApplicationService authApplicationService, RateLimitApplicationService rateLimits,
+                          ClientIpResolver clientIpResolver) {
         this.authApplicationService = authApplicationService;
+        this.rateLimits = rateLimits;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /**
@@ -60,7 +70,12 @@ public class AuthController {
                                                   HttpServletRequest request,
                                                   HttpServletResponse response) {
         LoginCommand command = new LoginCommand(dto.getEmail(), dto.getPassword());
+        String emailSubject = dto.getEmail().trim().toLowerCase(Locale.ROOT);
+        rateLimits.consumeAll(
+                new RateLimitApplicationService.Limit(RateLimitAction.LOGIN_EMAIL, emailSubject),
+                new RateLimitApplicationService.Limit(RateLimitAction.LOGIN_IP, clientIpResolver.resolve(request)));
         Map<String, Object> tokens = authApplicationService.login(command, traceId);
+        rateLimits.clear(RateLimitAction.LOGIN_EMAIL, emailSubject);
         return ApiResponse.success(writeAuthCookies(tokens, request, response), traceId);
     }
 
@@ -111,6 +126,9 @@ public class AuthController {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Refresh token is required");
         }
+        rateLimits.consumeAll(
+                new RateLimitApplicationService.Limit(RateLimitAction.REFRESH_TOKEN, refreshToken),
+                new RateLimitApplicationService.Limit(RateLimitAction.REFRESH_IP, clientIpResolver.resolve(request)));
         Map<String, Object> tokens = authApplicationService.refresh(new RefreshCommand(refreshToken), traceId);
         return ApiResponse.success(writeAuthCookies(tokens, request, response), traceId);
     }
@@ -152,7 +170,12 @@ public class AuthController {
     @PostMapping("/password")
     public ApiResponse<String> changePassword(@RequestHeader("Authorization") String authorization,
                                               @Valid @RequestBody PasswordChangeDto dto,
+                                              Authentication authentication,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        if (authentication == null || authentication.getName() == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
+        }
+        rateLimits.consume(RateLimitAction.PASSWORD_CHANGE, authentication.getName());
         authApplicationService.changePassword(authorization, dto.getCurrentPassword(), dto.getNewPassword());
         return ApiResponse.success("ok", traceId);
     }

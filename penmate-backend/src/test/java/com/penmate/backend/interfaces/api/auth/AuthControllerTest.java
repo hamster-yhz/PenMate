@@ -2,6 +2,8 @@ package com.penmate.backend.interfaces.api.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.auth.AuthApplicationService;
+import com.penmate.backend.application.ratelimit.RateLimitApplicationService;
+import com.penmate.backend.interfaces.api.common.ClientIpResolver;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +33,12 @@ class AuthControllerTest {
 
     @Mock
     private AuthApplicationService authApplicationService;
+
+    @Mock
+    private RateLimitApplicationService rateLimitApplicationService;
+
+    @Mock
+    private ClientIpResolver clientIpResolver;
 
     @InjectMocks
     private AuthController authController;

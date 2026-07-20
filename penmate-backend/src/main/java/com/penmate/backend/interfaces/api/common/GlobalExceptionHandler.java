@@ -4,6 +4,7 @@ import com.penmate.backend.application.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -100,7 +101,12 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(),
                 ex.getErrorCode(),
                 ex.getMessage());
-        return ResponseEntity.status(ex.getHttpStatus()).body(
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.getHttpStatus());
+        if ("RATE_LIMIT_EXCEEDED".equals(ex.getErrorCode()) && ex.getDetails() instanceof Map<?, ?> details) {
+            Object retryAfter = details.get("retryAfterSeconds");
+            if (retryAfter != null) response.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
+        }
+        return response.body(
                 ErrorResponse.of(
                         status,
                         ex.getErrorCode(),

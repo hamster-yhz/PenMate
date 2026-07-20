@@ -274,6 +274,10 @@ cp .env.example .env
 首次启动需要填写管理员和默认模型配置：
 
 ```env
+JWT_SECRET=<independent-strong-secret>
+MODEL_KEY_ENCRYPTION_KEY_BASE64=<base64-aes-key>
+RATE_LIMIT_KEY_SECRET=<independent-strong-secret>
+
 BOOTSTRAP_ADMIN_EMAIL=admin@example.com
 BOOTSTRAP_ADMIN_PASSWORD=<strong-admin-password>
 BOOTSTRAP_CHAT_PROVIDER=openai

@@ -90,6 +90,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void should_expose_retry_after_for_rate_limit_error() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
+        when(request.getAttribute("traceId")).thenReturn("trace-rate-limit");
+        BusinessException exception = BusinessException.of(HttpStatus.TOO_MANY_REQUESTS,
+                "RATE_LIMIT_EXCEEDED", "Too many requests", Map.of("retryAfterSeconds", 42L));
+
+        ResponseEntity<ErrorResponse> response = handler.handleBusiness(exception, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("42");
+    }
+
+    @Test
     void should_return_422_when_illegal_argument_exception() {
         HttpServletRequest request = mock(HttpServletRequest.class);
         IllegalArgumentException ex = new IllegalArgumentException("非法参数");

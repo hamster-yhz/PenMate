@@ -31,6 +31,7 @@ DB_USER=penmate
 DB_PASS=<strong-database-password>
 JWT_SECRET=<openssl-rand-base64-32>
 MODEL_KEY_ENCRYPTION_KEY_BASE64=<base64-encoded-16-24-or-32-byte-key>
+RATE_LIMIT_KEY_SECRET=<independent-openssl-rand-base64-32>
 BOOTSTRAP_ADMIN_EMAIL=admin@example.com
 BOOTSTRAP_ADMIN_PASSWORD=<strong-admin-password>
 BOOTSTRAP_CHAT_PROVIDER=openai
