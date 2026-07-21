@@ -71,6 +71,20 @@ const refreshToken = async () => {
   return accessToken
 }
 
+export const refreshAccessToken = () => {
+  if (!refreshPromise) {
+    refreshPromise = refreshToken()
+      .catch((error) => {
+        expireSession()
+        throw error
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
 requestRaw.interceptors.request.use(
   (config: RequestConfig) => {
     const nextConfig = config
@@ -94,17 +108,11 @@ requestRaw.interceptors.response.use(
     if (status === 401 && !config._retry && !config.skipAuth) {
       config._retry = true
       try {
-        if (!refreshPromise) {
-          refreshPromise = refreshToken().finally(() => {
-            refreshPromise = null
-          })
-        }
-        const token = await refreshPromise
+        const token = await refreshAccessToken()
         config.headers = config.headers || {}
         ;(config.headers as Record<string, string>).Authorization = `Bearer ${token}`
         return requestRaw(config)
       } catch (refreshErr) {
-        expireSession()
         return Promise.reject(refreshErr)
       }
     }
