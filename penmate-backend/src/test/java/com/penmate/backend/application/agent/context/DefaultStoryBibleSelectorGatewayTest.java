@@ -3,6 +3,8 @@ package com.penmate.backend.application.agent.context;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmCancellationPort;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,8 +27,10 @@ import static org.mockito.Mockito.when;
 
 class DefaultStoryBibleSelectorGatewayTest {
     private final AgentLlmGateway llm = mock(AgentLlmGateway.class);
+    private final AgentLlmCancellationPort cancellations = mock(AgentLlmCancellationPort.class);
     private final DefaultStoryBibleSelectorGateway gateway = new DefaultStoryBibleSelectorGateway(
-            llm, new ObjectMapper(), (stage, profile) -> new SystemPromptBundle(stage, profile, List.of(), "selector prompt"));
+            new AgentLlmInvocationService(llm, cancellations), new ObjectMapper(),
+            (stage, profile) -> new SystemPromptBundle(stage, profile, List.of(), "selector prompt"));
     private final AgentLlmExecutionConfig config = AgentLlmExecutionConfig.builder().providerCode("test").build();
 
     @Test
@@ -45,6 +50,7 @@ class DefaultStoryBibleSelectorGatewayTest {
         ArgumentCaptor<AgentLlmTurnRequest> request = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
         verify(llm).generateTurn(request.capture(), any());
         assertThat(request.getValue().toolChoice()).isEqualTo("required");
+        assertThat(request.getValue().timeout()).isEqualTo(Duration.ofSeconds(10));
         assertThat(request.getValue().tools()).singleElement()
                 .extracting(tool -> tool.toolCode()).isEqualTo("select_story_bible_context");
         assertThat(request.getValue().messages().getFirst().content()).contains("SELECTOR_CATALOG_JSON", "Mira");

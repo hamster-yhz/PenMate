@@ -3,7 +3,7 @@ package com.penmate.backend.application.agent.context;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
@@ -13,6 +13,7 @@ import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.Set;
 @Component
 public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGateway {
     private static final String TOOL_CODE = "select_story_bible_context";
+    private static final Duration SELECTOR_TIMEOUT = Duration.ofSeconds(10);
     private static final AgentLlmToolSchema OUTPUT_TOOL = new AgentLlmToolSchema(
             TOOL_CODE,
             "Return the validated Story Bible context selection",
@@ -41,13 +43,13 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
                     }
                     """);
 
-    private final AgentLlmGateway llmGateway;
+    private final AgentLlmInvocationService llmInvocations;
     private final ObjectMapper objectMapper;
     private final String systemPrompt;
 
-    public DefaultStoryBibleSelectorGateway(AgentLlmGateway llmGateway, ObjectMapper objectMapper,
+    public DefaultStoryBibleSelectorGateway(AgentLlmInvocationService llmInvocations, ObjectMapper objectMapper,
                                             SystemPromptProvider promptProvider) {
-        this.llmGateway = llmGateway;
+        this.llmInvocations = llmInvocations;
         this.objectMapper = objectMapper;
         this.systemPrompt = promptProvider.loadBundle("context-selector", "default").assembledPrompt();
     }
@@ -74,9 +76,9 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
         dynamic.append("CONVERSATION_WINDOW_JSON:\n").append(json(request.conversationWindow())).append("\n\n");
         dynamic.append("WORKING_SET_NODE_IDS:\n").append(json(request.workingSetNodeIds())).append("\n\n")
                 .append("USER_REQUEST:\n").append(request.userMessage());
-        var response = llmGateway.generateTurn(new AgentLlmTurnRequest(
+        var response = llmInvocations.invokeBuffered(new AgentLlmTurnRequest(
                 List.of(AgentLlmMessage.system(stableSystem), AgentLlmMessage.user(dynamic.toString())),
-                List.of(OUTPUT_TOOL), "required"), executionConfig);
+                List.of(OUTPUT_TOOL), "required", SELECTOR_TIMEOUT), executionConfig);
         List<AgentLlmToolCall> calls = response.toolCalls().stream()
                 .filter(item -> TOOL_CODE.equals(item.toolCode())).toList();
         if (response.toolCalls().size() != 1 || calls.size() != 1) {

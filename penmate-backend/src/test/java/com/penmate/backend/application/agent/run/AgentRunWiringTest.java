@@ -32,6 +32,7 @@ class AgentRunWiringTest {
             .withBean(AgentRunContextArtifactService.class, () -> mock(AgentRunContextArtifactService.class))
             .withBean(AgentRunRecoveryService.class, () -> mock(AgentRunRecoveryService.class))
             .withBean(AgentRunLeaseService.class, () -> mock(AgentRunLeaseService.class))
+            .withBean(AgentRunOutputEventService.class, () -> mock(AgentRunOutputEventService.class))
             .withBean(AgentRunDependencyValidator.class, () -> mock(AgentRunDependencyValidator.class))
             .withBean(AgentRunContinuationArtifactService.class,
                     () -> mock(AgentRunContinuationArtifactService.class))

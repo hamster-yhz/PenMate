@@ -51,6 +51,11 @@ public class AgentRunRepositoryImpl implements AgentRunRepository {
     }
 
     @Override
+    public List<AgentRun> listBySession(Long projectId, Long sessionId) {
+        return agentRunMapper.listBySession(projectId, sessionId);
+    }
+
+    @Override
     public Optional<AgentRunLease> tryAcquireLease(Long runId, String owner,
                                                    Instant now, Instant leaseUntil) {
         AgentRunLeaseRow row = agentRunMapper.acquireLease(runId, owner, now, leaseUntil);

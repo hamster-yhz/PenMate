@@ -50,6 +50,7 @@ class AgentRunExecutorTest {
 
     @Mock private AgentRunRepository runRepository;
     @Mock private AgentRunEventPublisher eventPublisher;
+    @Mock private AgentRunOutputEventService outputEvents;
     @Mock private AgentRunContextResolutionService contextResolutionService;
     @Mock private PromptComposer promptComposer;
     @Mock private AgentRunLlmLoop llmLoop;
@@ -248,7 +249,8 @@ class AgentRunExecutorTest {
 
     private AgentRunExecutor executor() {
         AgentRunStateTransitionService stateTransitions = new AgentRunStateTransitionService(
-                leaseService, eventPublisher, pendingApprovals, successorService);
+                leaseService, eventPublisher, pendingApprovals, successorService,
+                outputEvents);
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
                 recoveryService, leaseService, dependencyValidator, stateTransitions, continuations);

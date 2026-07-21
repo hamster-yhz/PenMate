@@ -1,6 +1,8 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationCancelledException;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.storybible.StoryBibleEffectiveStateResolver;
 import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleNode;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,6 +56,31 @@ class StoryBibleContextResolverTest {
         verify(selector).select(captor.capture(), any());
         assertThat(captor.getValue().catalog()).extracting(StoryBibleRouteRequest.CatalogEntry::nodeId)
                 .containsExactly(1L);
+    }
+
+    @Test
+    void selector_failure_should_fall_back_to_retrieval_without_failing_the_run() {
+        stubGraph();
+        when(selector.select(any(StoryBibleSelectorGateway.SelectorRequest.class), any()))
+                .thenThrow(BusinessException.of("selector timed out"));
+
+        var result = resolver.resolve(request(StoryBibleRoutingMode.RETRIEVAL_THEN_LLM));
+
+        assertThat(result.decision().selectorUsed()).isFalse();
+        assertThat(result.decision().selectedNodeIds()).containsExactly(1L);
+        assertThat(result.decision().missingFlags()).contains("SELECTOR_UNAVAILABLE");
+        assertThat(result.nodes()).extracting(StoryBibleContextResolver.RenderedNode::nodeId)
+                .containsExactly(1L, 2L);
+    }
+
+    @Test
+    void selector_cancellation_should_still_cancel_the_run() {
+        stubGraph();
+        when(selector.select(any(StoryBibleSelectorGateway.SelectorRequest.class), any()))
+                .thenThrow(new AgentLlmInvocationCancelledException());
+
+        assertThatThrownBy(() -> resolver.resolve(request(StoryBibleRoutingMode.RETRIEVAL_THEN_LLM)))
+                .isInstanceOf(AgentLlmInvocationCancelledException.class);
     }
 
     private void stubGraph() {

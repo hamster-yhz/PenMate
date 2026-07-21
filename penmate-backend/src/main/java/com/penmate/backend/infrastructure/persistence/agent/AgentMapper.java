@@ -130,6 +130,17 @@ public interface AgentMapper {
     int insertMessage(AgentMessage message);
 
     @Update("""
+            UPDATE agent_messages
+            SET turn_id = #{turnId}
+            WHERE session_id = #{conversationId}
+              AND message_id = #{messageId}
+              AND turn_id IS NULL
+            """)
+    int bindMessageToTurn(@Param("conversationId") Long conversationId,
+                          @Param("messageId") Long messageId,
+                          @Param("turnId") Long turnId);
+
+    @Update("""
             UPDATE agent_sessions
             SET last_message_at = CURRENT_TIMESTAMP(3),
                 updated_at = CURRENT_TIMESTAMP(3)

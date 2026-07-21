@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.run;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.agent.llm.AgentLlmCancellationPort;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
@@ -22,7 +23,10 @@ class AgentRunCancellationServiceTest {
     private final AgentRunRepository runs = mock(AgentRunRepository.class);
     private final AgentRunPendingApprovalRepository approvals = mock(AgentRunPendingApprovalRepository.class);
     private final AgentRunEventPublisher events = mock(AgentRunEventPublisher.class);
-    private final AgentRunCancellationService service = new AgentRunCancellationService(runs, approvals, events);
+    private final AgentLlmCancellationPort cancellations = mock(AgentLlmCancellationPort.class);
+    private final AgentRunOutputEventService outputs = mock(AgentRunOutputEventService.class);
+    private final AgentRunCancellationService service = new AgentRunCancellationService(
+            runs, approvals, events, cancellations, outputs);
 
     @Test
     void cancels_recoverable_run_invalidates_approval_and_publishes_once() {
@@ -37,7 +41,9 @@ class AgentRunCancellationServiceTest {
         InOrder order = inOrder(runs, approvals, events);
         order.verify(runs).cancelRecoverable(70001L, "AGENT_RUN_CANCELLED", "Stop now");
         order.verify(approvals).invalidateOpenByRunId(70001L);
+        verify(outputs).persistInterrupted(70001L);
         order.verify(events).publish(eq(70001L), eq("run.cancelled"), any());
+        verify(cancellations).cancel(70001L);
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
 import com.penmate.backend.application.common.exception.BusinessException;
 
 /**
@@ -26,6 +27,16 @@ public interface ProviderChatClient {
     default AgentLlmTurnResponse generateTurn(AgentLlmTurnRequest request,
                                               AgentLlmExecutionConfig executionConfig) {
         throw BusinessException.of("LLM provider does not support structured turn generation");
+    }
+
+    default boolean supportsStreaming() {
+        return false;
+    }
+
+    default AgentLlmTurnResponse streamTurn(AgentLlmTurnRequest request,
+                                            AgentLlmExecutionConfig executionConfig,
+                                            AgentLlmStreamObserver observer) {
+        return generateTurn(request, executionConfig);
     }
 }
 

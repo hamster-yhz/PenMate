@@ -146,6 +146,22 @@ public interface AgentRunMapper {
     AgentRun findSuccessor(Long predecessorRunId);
 
     @Select("""
+            SELECT
+                run_id AS runId, project_id AS projectId, session_id AS sessionId, turn_id AS turnId,
+                owner_user_id AS ownerUserId, predecessor_run_id AS predecessorRunId,
+                run_status AS runStatus, run_phase AS runPhase, context_epoch_id AS contextEpochId,
+                active_approval_id AS activeApprovalId, lease_owner AS leaseOwner, lease_until AS leaseUntil,
+                execution_token AS executionToken, attempt_count AS attemptCount, next_retry_at AS nextRetryAt,
+                last_error_code AS lastErrorCode, last_error_message AS lastErrorMessage,
+                latest_event_seq AS latestEventSeq, latest_checkpoint_id AS latestCheckpointId,
+                trace_id AS traceId, started_at AS startedAt, finished_at AS finishedAt
+            FROM agent_runs
+            WHERE project_id = #{projectId} AND session_id = #{sessionId}
+            ORDER BY turn_id, created_at, run_id
+            """)
+    List<AgentRun> listBySession(@Param("projectId") Long projectId, @Param("sessionId") Long sessionId);
+
+    @Select("""
             WITH candidate AS MATERIALIZED (
                 SELECT run_id, run_status
                 FROM agent_runs

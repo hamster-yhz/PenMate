@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.run;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.agent.llm.AgentLlmCancellationPort;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
@@ -20,13 +21,19 @@ public class AgentRunCancellationService {
     private final AgentRunRepository runs;
     private final AgentRunPendingApprovalRepository pendingApprovals;
     private final AgentRunEventPublisher events;
+    private final AgentLlmCancellationPort llmCancellations;
+    private final AgentRunOutputEventService outputs;
 
     public AgentRunCancellationService(AgentRunRepository runs,
                                        AgentRunPendingApprovalRepository pendingApprovals,
-                                       AgentRunEventPublisher events) {
+                                       AgentRunEventPublisher events,
+                                       AgentLlmCancellationPort llmCancellations,
+                                       AgentRunOutputEventService outputs) {
         this.runs = runs;
         this.pendingApprovals = pendingApprovals;
         this.events = events;
+        this.llmCancellations = llmCancellations;
+        this.outputs = outputs;
     }
 
     @Transactional
@@ -44,10 +51,12 @@ public class AgentRunCancellationService {
             throw BusinessException.conflict("Agent Run is no longer cancellable");
         }
         pendingApprovals.invalidateOpenByRunId(runId);
+        outputs.persistInterrupted(runId);
         events.publish(runId, "run.cancelled", Map.of(
                 "errorCode", ERROR_CODE,
                 "errorMessage", resolvedReason,
                 "operatorId", String.valueOf(operatorId)));
+        llmCancellations.cancel(runId);
         return Objects.requireNonNull(runs.findRun(runId), "Cancelled Agent Run disappeared");
     }
 

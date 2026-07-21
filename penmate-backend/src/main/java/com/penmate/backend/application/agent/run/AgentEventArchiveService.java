@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -111,6 +112,24 @@ public class AgentEventArchiveService {
             }
         }
         return new ArchiveSummary(0, 0, purged);
+    }
+
+    public List<AgentEvent> readArchived(Long runId) {
+        AgentEventArchive archive = archives.findByRunId(runId);
+        if (archive == null || !archive.verified()) return List.of();
+        byte[] bytes = storage.readBytes(archive.objectKey());
+        if (!archive.sha256().equals(sha256(bytes))) {
+            throw new IllegalStateException("Agent Event archive checksum mismatch");
+        }
+        try {
+            List<AgentEvent> result = new ArrayList<>();
+            for (String line : ungzip(bytes).split("\\R")) {
+                if (!line.isBlank()) result.add(objectMapper.readValue(line, AgentEvent.class));
+            }
+            return result;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to read Agent Event archive", ex);
+        }
     }
 
     private String jsonl(List<AgentEvent> runEvents) {

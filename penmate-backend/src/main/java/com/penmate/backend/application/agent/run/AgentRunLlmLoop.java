@@ -2,7 +2,7 @@ package com.penmate.backend.application.agent.run;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
@@ -34,25 +34,28 @@ public class AgentRunLlmLoop {
     private static final int MAX_ITERATIONS = 10;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private final AgentLlmGateway llmGateway;
+    private final AgentLlmInvocationService llmInvocations;
     private final AgentToolDefinitionSource toolDefinitionSource;
     private final AgentRunEventPublisher eventPublisher;
     private final ToolCallApplicationService toolCallService;
     private final AgentCheckpointBoundaryService checkpointBoundary;
     private final AgentRunContinuationArtifactService continuations;
+    private final AgentStreamingMessageService streamingMessages;
 
-    public AgentRunLlmLoop(AgentLlmGateway llmGateway,
+    public AgentRunLlmLoop(AgentLlmInvocationService llmInvocations,
                            AgentToolDefinitionSource toolDefinitionSource,
                            AgentRunEventPublisher eventPublisher,
                            @Lazy ToolCallApplicationService toolCallService,
                            AgentCheckpointBoundaryService checkpointBoundary,
-                           AgentRunContinuationArtifactService continuations) {
-        this.llmGateway = llmGateway;
+                           AgentRunContinuationArtifactService continuations,
+                           AgentStreamingMessageService streamingMessages) {
+        this.llmInvocations = llmInvocations;
         this.toolDefinitionSource = toolDefinitionSource;
         this.eventPublisher = eventPublisher;
         this.toolCallService = toolCallService;
         this.checkpointBoundary = checkpointBoundary;
         this.continuations = continuations;
+        this.streamingMessages = streamingMessages;
     }
 
     public AgentRunLoopResult execute(AgentRunLoopRequest request) {
@@ -100,7 +103,8 @@ public class AgentRunLlmLoop {
             }
             publishBoundary(request.runId(), "tool.call.completed", eventPayload(
                     "llmTurnIndex", continuation.llmTurnIndex(), "toolCallId", pending.toolCallId(),
-                    "toolCode", pending.toolCode(), "outputPreview", clipText(result.toolOutput(), 200)
+                    "toolCode", pending.toolCode(), "toolDisplayName", resolveToolName(pending.toolCode()),
+                    "outputPreview", clipText(result.toolOutput(), 200)
             ));
             messages.add(AgentLlmMessage.tool(pending.toolCallId(), result.toolOutput()));
             List<AgentLlmToolCallPayload> siblingCalls = latestAssistantToolCalls(messages);
@@ -154,14 +158,25 @@ public class AgentRunLlmLoop {
                     "traceId", request.traceId()
             ));
 
-            AgentLlmTurnResponse response = llmGateway.generateTurn(
-                    new AgentLlmTurnRequest(
-                            List.copyOf(messages),
-                            toolDefinitionSource.listLlmSchemas(),
-                            "auto"
-                    ),
-                    request.executionConfig()
-            );
+            AgentStreamingMessageService.StreamSession streamSession = streamingMessages.open(
+                    request.runId(), request.turnId(), turnIndex, fullAssistantText.toString());
+            AgentLlmTurnResponse response;
+            try {
+                response = llmInvocations.invokeStreaming(
+                        request.runId(),
+                        new AgentLlmTurnRequest(
+                                List.copyOf(messages),
+                                toolDefinitionSource.listLlmSchemas(),
+                                "auto"
+                        ),
+                        request.executionConfig(),
+                        streamSession::accept
+                );
+                streamSession.complete(response.assistantText());
+            } catch (RuntimeException ex) {
+                streamSession.flushPending();
+                throw ex;
+            }
 
             totalUsage = totalUsage.add(response.tokenUsage());
             fullAssistantText.append(response.assistantText());
@@ -178,11 +193,6 @@ public class AgentRunLlmLoop {
                             "cacheCreationPromptTokens", response.tokenUsage().cacheCreationPromptTokens()
                     )
             ));
-
-            if (!response.assistantText().isBlank()) {
-                eventPublisher.broadcastOnly(request.runId(), "message.delta",
-                        Map.of("llmTurnIndex", turnIndex, "text", response.assistantText()), -1L);
-            }
 
             if (response.toolCalls().isEmpty()) {
                 saveContinuation(AgentRunContinuation.completed(
@@ -229,6 +239,7 @@ public class AgentRunLlmLoop {
                     "toolCallId", toolCall.id(),
                     "toolCode", toolCall.functionName(),
                     "toolName", toolName,
+                    "toolDisplayName", toolName,
                     "iteration", iterationIndex,
                     "recovered", recovered,
                     "argumentsPreview", toolCall.argumentsJson()
@@ -251,6 +262,7 @@ public class AgentRunLlmLoop {
                         "llmTurnIndex", turnIndex,
                         "toolCallId", toolCall.id(),
                         "toolCode", toolCall.functionName(),
+                        "toolDisplayName", toolName,
                         "approvalId", result.approvalId(),
                         "approvalPreview", result.approvalPreview()
                 ));
@@ -265,6 +277,7 @@ public class AgentRunLlmLoop {
                         "llmTurnIndex", turnIndex,
                         "toolCallId", toolCall.id(),
                         "toolCode", toolCall.functionName(),
+                        "toolDisplayName", toolName,
                         "outputPreview", clipText(result.toolOutput(), 200)
                 ));
                 messages.add(AgentLlmMessage.tool(toolCall.id(), result.toolOutput()));
@@ -274,6 +287,7 @@ public class AgentRunLlmLoop {
                         "llmTurnIndex", turnIndex,
                         "toolCallId", toolCall.id(),
                         "toolCode", toolCall.functionName(),
+                        "toolDisplayName", toolName,
                         "errorCode", result.errorCode(),
                         "errorMessage", error
                 ));

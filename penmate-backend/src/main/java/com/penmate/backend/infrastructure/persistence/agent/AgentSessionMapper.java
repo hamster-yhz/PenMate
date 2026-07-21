@@ -28,10 +28,15 @@ public interface AgentSessionMapper {
                    updated_at,
                    deleted_at
             FROM agent_sessions
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId}
+              AND owner_user_id = #{userId}
+              AND ((#{deleted} = TRUE AND deleted_at IS NOT NULL)
+                   OR (#{deleted} = FALSE AND deleted_at IS NULL))
             ORDER BY COALESCE(last_message_at, created_at) DESC, id DESC
             """)
-    List<AgentConversation> listConversationSummaries(@Param("projectId") Long projectId);
+    List<AgentConversation> listConversationSummaries(@Param("projectId") Long projectId,
+                                                      @Param("userId") Long userId,
+                                                      @Param("deleted") boolean deleted);
 
     @Select("""
             SELECT id,
@@ -51,6 +56,73 @@ public interface AgentSessionMapper {
             """)
     AgentConversation findConversationSummary(@Param("projectId") Long projectId,
                                               @Param("conversationId") Long conversationId);
+
+    @Select("""
+            SELECT id,
+                   session_id AS conversation_id,
+                   project_id,
+                   owner_user_id AS user_id,
+                   title,
+                   NULL AS context_scope_json,
+                   last_message_at,
+                   session_status AS status,
+                   created_at,
+                   updated_at,
+                   deleted_at
+            FROM agent_sessions
+            WHERE project_id = #{projectId} AND session_id = #{conversationId}
+            LIMIT 1
+            """)
+    AgentConversation findConversationSummaryIncludingDeleted(@Param("projectId") Long projectId,
+                                                               @Param("conversationId") Long conversationId);
+
+    @Update("""
+            UPDATE agent_sessions
+            SET title = #{title}, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId} AND session_id = #{conversationId}
+              AND owner_user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int updateConversationTitle(@Param("projectId") Long projectId,
+                                @Param("conversationId") Long conversationId,
+                                @Param("userId") Long userId,
+                                @Param("title") String title);
+
+    @Update("""
+            UPDATE agent_sessions
+            SET deleted_at = CURRENT_TIMESTAMP(3), updated_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId} AND session_id = #{conversationId}
+              AND owner_user_id = #{userId} AND deleted_at IS NULL
+            """)
+    int softDeleteConversation(@Param("projectId") Long projectId,
+                               @Param("conversationId") Long conversationId,
+                               @Param("userId") Long userId);
+
+    @Update("""
+            UPDATE agent_sessions
+            SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId} AND session_id = #{conversationId}
+              AND owner_user_id = #{userId} AND deleted_at IS NOT NULL
+            """)
+    int restoreConversation(@Param("projectId") Long projectId,
+                            @Param("conversationId") Long conversationId,
+                            @Param("userId") Long userId);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM agent_runs
+            WHERE session_id = #{conversationId}
+              AND run_status IN ('PENDING', 'RUNNING', 'WAITING_APPROVAL', 'SUSPENDED')
+            """)
+    int countActiveRuns(@Param("conversationId") Long conversationId);
+
+    @Select("""
+            SELECT run_status
+            FROM agent_runs
+            WHERE session_id = #{conversationId}
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """)
+    String findLatestRunStatus(@Param("conversationId") Long conversationId);
 
     @Insert("""
             INSERT INTO agent_sessions(
@@ -237,16 +309,20 @@ public interface AgentSessionMapper {
                                                @Param("modelConfigId") Long modelConfigId);
 
     @Select("""
-            SELECT message_id AS messageId,
-                   role AS role,
-                   message_kind AS messageKind,
-                   content_markdown AS contentMarkdown,
-                   approval_id AS approvalId,
-                   seq_no AS seqNo,
-                   created_at AS createdAt
-            FROM agent_messages
-            WHERE session_id = #{sessionId}
-            ORDER BY seq_no ASC, id ASC
+            SELECT m.message_id AS "messageId",
+                   COALESCE(m.turn_id, t.turn_id) AS "turnId",
+                   m.role AS role,
+                   m.message_kind AS "messageKind",
+                   m.content_markdown AS "contentMarkdown",
+                   m.approval_id AS "approvalId",
+                   m.seq_no AS "seqNo",
+                   m.created_at AS "createdAt"
+            FROM agent_messages m
+            LEFT JOIN agent_turns t
+              ON t.session_id = m.session_id
+             AND (t.user_message_id = m.message_id OR t.assistant_message_id = m.message_id)
+            WHERE m.session_id = #{sessionId}
+            ORDER BY m.seq_no ASC, m.id ASC
             """)
     List<Map<String, Object>> listMessageRows(@Param("sessionId") Long sessionId);
 

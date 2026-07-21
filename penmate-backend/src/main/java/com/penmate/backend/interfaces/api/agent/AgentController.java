@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
+import com.penmate.backend.application.agent.query.AgentRunHistoryQueryService;
 import com.penmate.backend.application.agent.run.AgentRunCancellationService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
@@ -16,17 +17,23 @@ import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.infrastructure.realtime.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentRunHistoryDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
 import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
 import com.penmate.backend.interfaces.api.agent.dto.StoryBibleRoutingPreferenceDto;
+import com.penmate.backend.interfaces.api.agent.dto.UpdateAgentSessionDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -53,6 +60,7 @@ public class AgentController {
     private final StoryBibleRoutingPreferenceResolver routingPreferences;
     private final AgentRunCancellationService runCancellationService;
     private final AgentRunRetryService runRetryService;
+    private final AgentRunHistoryQueryService runHistoryQueryService;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
@@ -61,7 +69,8 @@ public class AgentController {
                            AgentRunEventStreamService agentRunEventStreamService,
                            StoryBibleRoutingPreferenceResolver routingPreferences,
                            AgentRunCancellationService runCancellationService,
-                           AgentRunRetryService runRetryService) {
+                           AgentRunRetryService runRetryService,
+                           AgentRunHistoryQueryService runHistoryQueryService) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
@@ -70,6 +79,7 @@ public class AgentController {
         this.routingPreferences = routingPreferences;
         this.runCancellationService = runCancellationService;
         this.runRetryService = runRetryService;
+        this.runHistoryQueryService = runHistoryQueryService;
     }
 
     @GetMapping("/routing-preference")
@@ -95,9 +105,12 @@ public class AgentController {
      */
     @GetMapping("/sessions")
     public ApiResponse<List<AgentSessionDto>> listSessions(@PathVariable String projectId,
+                                                           @RequestParam(value = "deleted", defaultValue = "false") boolean deleted,
+                                                           Authentication authentication,
                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(
-                agentConversationAppService.listConversations(requireLongId(projectId, "projectId"))
+                agentConversationAppService.listConversations(
+                                requireLongId(projectId, "projectId"), principalId(authentication), deleted)
                         .stream()
                         .map(this::toSessionDto)
                         .toList(),
@@ -197,12 +210,15 @@ public class AgentController {
                                     @PathVariable String runId,
                                     @RequestParam(value = "after", required = false) String after,
                                     @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
-                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
+                                    HttpServletResponse response) {
         Long resolvedProjectId = requireLongId(projectId, "projectId");
         Long resolvedRunId = requireLongId(runId, "runId");
         Long replayCursor = Math.max(optionalSequence(after), optionalSequence(lastEventId));
         log.info("Open agent run stream request: projectId={}, runId={}, after={}, lastEventId={}, replayCursor={}, traceId={}",
                 resolvedProjectId, resolvedRunId, after, lastEventId, replayCursor, traceId);
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
         return agentRunEventStreamService.openStream(resolvedRunId, replayCursor);
     }
 
@@ -300,6 +316,48 @@ public class AgentController {
         return new StoryBibleRoutingPreferenceDto.View(value.mode(), stringifyBusinessId(value.routerModelConfigId()));
     }
 
+    @PatchMapping("/sessions/{sessionId}")
+    public ApiResponse<AgentSessionDto> renameSession(@PathVariable String projectId,
+                                                      @PathVariable String sessionId,
+                                                      @Valid @RequestBody UpdateAgentSessionDto dto,
+                                                      Authentication authentication,
+                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(toSessionDto(agentConversationAppService.renameConversation(
+                requireLongId(projectId, "projectId"), requireLongId(sessionId, "sessionId"),
+                principalId(authentication), dto.getTitle())), traceId);
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public ApiResponse<String> deleteSession(@PathVariable String projectId,
+                                             @PathVariable String sessionId,
+                                             Authentication authentication,
+                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        agentConversationAppService.deleteConversation(requireLongId(projectId, "projectId"),
+                requireLongId(sessionId, "sessionId"), principalId(authentication));
+        return ApiResponse.success("deleted", traceId);
+    }
+
+    @PostMapping("/sessions/{sessionId}/restore")
+    public ApiResponse<AgentSessionDto> restoreSession(@PathVariable String projectId,
+                                                       @PathVariable String sessionId,
+                                                       Authentication authentication,
+                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(toSessionDto(agentConversationAppService.restoreConversation(
+                requireLongId(projectId, "projectId"), requireLongId(sessionId, "sessionId"),
+                principalId(authentication))), traceId);
+    }
+
+    @GetMapping("/sessions/{sessionId}/runs")
+    public ApiResponse<List<AgentRunHistoryDto>> listSessionRuns(@PathVariable String projectId,
+                                                                 @PathVariable String sessionId,
+                                                                 Authentication authentication,
+                                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(runHistoryQueryService.list(
+                        requireLongId(projectId, "projectId"), requireLongId(sessionId, "sessionId"),
+                        principalId(authentication)).stream().map(this::toRunHistoryDto).toList(),
+                traceId);
+    }
+
     private Long principalId(Authentication authentication) {
         if (authentication == null) throw com.penmate.backend.application.common.exception.BusinessException.of("Login required");
         return requireLongId(authentication.getName(), "principal userId");
@@ -334,8 +392,37 @@ public class AgentController {
         return new AgentSessionDto(
                 conversation == null ? null : stringifyBusinessId(conversation.getConversationId()),
                 conversation == null ? null : conversation.getTitle(),
-                conversation == null ? null : conversation.getStatus()
+                conversation == null ? null : conversation.getStatus(),
+                conversation == null ? null : conversation.getLastRunStatus(),
+                instant(conversation == null ? null : conversation.getLastMessageAt()),
+                instant(conversation == null ? null : conversation.getCreatedAt()),
+                instant(conversation == null ? null : conversation.getUpdatedAt()),
+                instant(conversation == null ? null : conversation.getDeletedAt())
         );
+    }
+
+    private AgentRunHistoryDto toRunHistoryDto(AgentRunHistoryQueryService.RunHistory history) {
+        var run = history.run();
+        return new AgentRunHistoryDto(
+                stringifyBusinessId(run.runId()), stringifyBusinessId(run.turnId()),
+                stringifyBusinessId(run.predecessorRunId()), run.runStatus(), run.runPhase(), run.attemptCount(),
+                run.lastErrorCode(), run.lastErrorMessage(), stringifyBusinessId(run.latestEventSeq()),
+                instant(run.startedAt()), instant(run.finishedAt()),
+                history.output() == null ? null : new AgentRunHistoryDto.OutputDto(
+                        history.output().text(), history.output().offset(),
+                        stringifyBusinessId(history.output().sequence()), history.output().state(),
+                        instant(history.output().updatedAt())),
+                history.events().stream().map(event -> new AgentRunEventDto(
+                        stringifyBusinessId(event.eventId()), stringifyBusinessId(event.runId()),
+                        stringifyBusinessId(event.projectId()), stringifyBusinessId(event.sessionId()),
+                        stringifyBusinessId(event.turnId()), stringifyBusinessId(event.sequence()),
+                        event.schemaVersion(), event.eventType(), event.payloadJson(), instant(event.createdAt())
+                )).toList()
+        );
+    }
+
+    private String instant(java.time.Instant value) {
+        return value == null ? null : value.toString();
     }
 
     private AgentRunDto toRunDto(AgentTurnResult result, Long fallbackSessionId) {

@@ -23,6 +23,8 @@ public interface AgentRunRepository {
 
     AgentRun findSuccessor(Long predecessorRunId);
 
+    List<AgentRun> listBySession(Long projectId, Long sessionId);
+
     Optional<AgentRunLease> tryAcquireLease(Long runId, String owner, Instant now, Instant leaseUntil);
 
     boolean renewLease(AgentRunLease lease, Instant leaseUntil);

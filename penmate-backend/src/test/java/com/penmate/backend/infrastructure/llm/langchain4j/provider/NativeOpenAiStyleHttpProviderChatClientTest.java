@@ -4,6 +4,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
@@ -17,6 +18,8 @@ import org.apache.logging.log4j.core.config.Property;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.lang.reflect.Field;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -46,6 +49,80 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
         assertThat(messages).hasSize(1);
         assertThat(messages.getJSONObject(0).getStr("role")).isEqualTo("user");
         assertThat(messages.getJSONObject(0).getStr("content")).isEqualTo("hello");
+    }
+
+    @Test
+    void parses_streamed_text_tool_arguments_and_usage() throws Exception {
+        TestNativeClient client = new TestNativeClient();
+        List<String> deltas = new ArrayList<>();
+        AgentLlmTurnResponse response = client.readOpenAiEventStream(new BufferedReader(new StringReader("""
+                data: {"choices":[{"delta":{"content":"Hel"}}]}
+
+                data: {"choices":[{"delta":{"content":"lo"}}]}
+
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"book_crud","arguments":"{\\"operation\\":"}}]}}]}
+
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"list\\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}
+
+                data: [DONE]
+
+                """)), new AgentLlmStreamObserver() {
+            @Override public void onResponseStarted() { }
+            @Override public void onTextDelta(String text) { deltas.add(text); }
+            @Override public void onCancellable(Runnable cancelAction) { }
+            @Override public boolean isCancelled() { return false; }
+        });
+
+        assertThat(deltas).containsExactly("Hel", "lo");
+        assertThat(response.assistantText()).isEqualTo("Hello");
+        assertThat(response.tokenUsage()).isEqualTo(new LlmTokenUsage(3, 2, 5));
+        assertThat(response.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.id()).isEqualTo("call-1");
+            assertThat(call.toolCode()).isEqualTo("book_crud");
+            assertThat(call.argumentsJson()).isEqualTo("{\"operation\":\"list\"}");
+        });
+    }
+
+    @Test
+    void parses_content_arrays_responses_events_and_anthropic_compatible_deltas() throws Exception {
+        TestNativeClient client = new TestNativeClient();
+        List<String> deltas = new ArrayList<>();
+        AgentLlmTurnResponse response = client.readOpenAiEventStream(new BufferedReader(new StringReader("""
+                data: {"choices":[{"delta":{"content":[{"type":"text","text":"A"}]}}]}
+
+                data: {"type":"response.output_text.delta","delta":"B"}
+
+                data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"C"}}
+
+                data: [DONE]
+
+                """)), new AgentLlmStreamObserver() {
+            @Override public void onResponseStarted() { }
+            @Override public void onTextDelta(String text) { deltas.add(text); }
+            @Override public void onCancellable(Runnable cancelAction) { }
+            @Override public boolean isCancelled() { return false; }
+        });
+
+        assertThat(deltas).containsExactly("A", "B", "C");
+        assertThat(response.assistantText()).isEqualTo("ABC");
+    }
+
+    @Test
+    void rejects_a_successful_stream_that_contains_neither_text_nor_tool_calls() {
+        TestNativeClient client = new TestNativeClient();
+
+        assertThatThrownBy(() -> client.readOpenAiEventStream(new BufferedReader(new StringReader("""
+                data: {"choices":[{"delta":{"role":"assistant"},"finish_reason":"stop"}]}
+
+                data: [DONE]
+
+                """)), new AgentLlmStreamObserver() {
+            @Override public void onResponseStarted() { }
+            @Override public void onTextDelta(String text) { }
+            @Override public void onCancellable(Runnable cancelAction) { }
+            @Override public boolean isCancelled() { return false; }
+        })).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("without assistant content");
     }
 
     @Test

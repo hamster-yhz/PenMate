@@ -4,6 +4,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
@@ -30,23 +31,37 @@ import java.util.Map;
 public class DefaultQualityReviewApplicationService implements QualityReviewApplicationService {
 
     private final AgentModelRoutingService agentModelRoutingService;
-    private final AgentLlmGateway agentLlmGateway;
+    private final AgentLlmInvocationService llmInvocations;
     private final QualityReviewCommandParser qualityReviewCommandParser;
     private final NovelApplicationService novelApplicationService;
 
     public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
-                                                  AgentLlmGateway agentLlmGateway,
+                                                  AgentLlmInvocationService llmInvocations,
                                                   QualityReviewCommandParser qualityReviewCommandParser) {
-        this(agentModelRoutingService, agentLlmGateway, qualityReviewCommandParser, null);
+        this(agentModelRoutingService, llmInvocations, qualityReviewCommandParser, null);
+    }
+
+    public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
+                                                  AgentLlmGateway llmGateway,
+                                                  QualityReviewCommandParser qualityReviewCommandParser) {
+        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway), qualityReviewCommandParser, null);
+    }
+
+    public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
+                                                  AgentLlmGateway llmGateway,
+                                                  QualityReviewCommandParser qualityReviewCommandParser,
+                                                  NovelApplicationService novelApplicationService) {
+        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway),
+                qualityReviewCommandParser, novelApplicationService);
     }
 
     @Autowired
     public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
-                                                  AgentLlmGateway agentLlmGateway,
+                                                  AgentLlmInvocationService llmInvocations,
                                                   QualityReviewCommandParser qualityReviewCommandParser,
                                                   NovelApplicationService novelApplicationService) {
         this.agentModelRoutingService = agentModelRoutingService;
-        this.agentLlmGateway = agentLlmGateway;
+        this.llmInvocations = llmInvocations;
         this.qualityReviewCommandParser = qualityReviewCommandParser;
         this.novelApplicationService = novelApplicationService;
     }
@@ -67,7 +82,7 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
                 null,
                 request.traceId()
         );
-        AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
+        AgentLlmTurnResponse response = llmInvocations.invokeBuffered(
                 new AgentLlmTurnRequest(List.of(AgentLlmMessage.user(buildPrompt(command))), List.of(), "none"),
                 executionConfig
         );

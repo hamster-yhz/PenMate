@@ -4,6 +4,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONNull;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationCancelledException;
+import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
@@ -15,6 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -24,6 +29,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.CompletionException;
 
 /**
  * 鍩轰簬鍘熺敓 HTTP 鐨?OpenAI 椋庢牸鑱婂ぉ璋冪敤瀹炵幇銆?
@@ -96,7 +103,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                 endpoint,
                 abbreviateForLog(requestBody));
         HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
-                .timeout(Duration.ofSeconds(60))
+                .timeout(turnRequest.timeout())
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -125,6 +132,62 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             throw BusinessException.of("LLM request failed: " + ex.getMessage());
         } catch (IOException ex) {
             throw BusinessException.of("LLM request failed: " + ex.getMessage());
+        }
+    }
+
+    @Override
+    public boolean supportsStreaming() {
+        return true;
+    }
+
+    @Override
+    public AgentLlmTurnResponse streamTurn(AgentLlmTurnRequest turnRequest,
+                                           AgentLlmExecutionConfig executionConfig,
+                                           AgentLlmStreamObserver observer) {
+        if (executionConfig == null) {
+            throw BusinessException.of("LLM execution config is required");
+        }
+        String apiKey = trim(executionConfig.apiKey());
+        String modelName = trim(executionConfig.modelName());
+        String endpoint = resolveChatCompletionsEndpoint(executionConfig.baseUrl());
+        if (apiKey == null || modelName == null || endpoint == null) {
+            throw BusinessException.of("LLM execution config is incomplete");
+        }
+
+        String requestBody = buildStreamingTurnRequestBody(turnRequest, modelName, endpoint);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
+                .timeout(Duration.ofMinutes(5))
+                .header("Accept", "text/event-stream")
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+        var responseFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream());
+        observer.onCancellable(() -> responseFuture.cancel(true));
+
+        try {
+            HttpResponse<InputStream> response = responseFuture.join();
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                try (InputStream body = response.body()) {
+                    String errorBody = new String(body.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    throw BusinessException.of("LLM stream request failed: " + errorBody);
+                }
+            }
+            try (InputStream body = response.body();
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(
+                         body, java.nio.charset.StandardCharsets.UTF_8))) {
+                observer.onCancellable(() -> closeQuietly(body));
+                return readOpenAiEventStream(reader, observer);
+            }
+        } catch (AgentLlmInvocationCancelledException ex) {
+            throw ex;
+        } catch (CompletionException ex) {
+            if (observer.isCancelled()) throw new AgentLlmInvocationCancelledException();
+            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            throw BusinessException.of("LLM stream request failed: " + cause.getMessage());
+        } catch (IOException ex) {
+            if (observer.isCancelled()) throw new AgentLlmInvocationCancelledException();
+            throw BusinessException.of("LLM stream read failed: " + ex.getMessage());
         }
     }
 
@@ -182,6 +245,174 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         } catch (Exception ex) {
             throw BusinessException.of("Failed to build LLM request");
         }
+    }
+
+    protected String buildStreamingTurnRequestBody(AgentLlmTurnRequest request,
+                                                    String modelName,
+                                                    String endpoint) {
+        JSONObject body = AgentJsonCodec.parseObj(buildTurnRequestBody(request, modelName, endpoint));
+        body.set("stream", true);
+        return body.toString();
+    }
+
+    AgentLlmTurnResponse readOpenAiEventStream(BufferedReader reader,
+                                               AgentLlmStreamObserver observer) throws IOException {
+        StreamingTurnState state = new StreamingTurnState();
+        StringBuilder data = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (observer.isCancelled()) throw new AgentLlmInvocationCancelledException();
+            if (line.isBlank()) {
+                if (!consumeSseData(data, state, observer)) break;
+                data.setLength(0);
+                continue;
+            }
+            if (line.startsWith("data:")) {
+                if (!data.isEmpty()) data.append('\n');
+                data.append(line.substring(5).trim());
+            }
+        }
+        if (!data.isEmpty()) consumeSseData(data, state, observer);
+        return state.toResponse();
+    }
+
+    private boolean consumeSseData(StringBuilder data,
+                                   StreamingTurnState state,
+                                   AgentLlmStreamObserver observer) {
+        if (data.isEmpty()) return true;
+        String payload = data.toString().trim();
+        if ("[DONE]".equals(payload)) return false;
+        observer.onResponseStarted();
+        JSONObject root = AgentJsonCodec.parseObj(payload);
+        JSONArray choices = root.getJSONArray("choices");
+        if (choices != null && !choices.isEmpty()) {
+            JSONObject choice = choices.getJSONObject(0);
+            if (choice != null) {
+                JSONObject delta = choice.getJSONObject("delta");
+                if (delta != null) {
+                    String text = streamingText(delta.get("content"));
+                    if (text != null && !text.isEmpty()) {
+                        state.assistantText.append(text);
+                        observer.onTextDelta(text);
+                    }
+                    state.appendToolDeltas(delta.getJSONArray("tool_calls"));
+                }
+                if (state.assistantText.isEmpty() && delta == null) {
+                    JSONObject message = choice.getJSONObject("message");
+                    String text = message == null ? streamingText(choice.get("text"))
+                            : streamingText(message.get("content"));
+                    state.appendText(text, observer);
+                }
+                String finishReason = choice.getStr("finish_reason", null);
+                if (finishReason != null && !finishReason.isBlank()) state.finishReason = finishReason;
+            }
+        }
+        String eventType = root.getStr("type", "");
+        if ("response.output_text.delta".equals(eventType)) {
+            state.appendText(streamingText(root.get("delta")), observer);
+        } else if ("content_block_delta".equals(eventType)) {
+            JSONObject delta = root.getJSONObject("delta");
+            state.appendText(delta == null ? "" : streamingText(delta.get("text")), observer);
+        } else if (state.assistantText.isEmpty() && "response.completed".equals(eventType)) {
+            state.appendText(responseOutputText(root.getJSONObject("response")), observer);
+        }
+        state.tokenUsage = extractTokenUsage(root);
+        return true;
+    }
+
+    private String streamingText(Object value) {
+        if (value == null || value instanceof JSONNull) return "";
+        if (value instanceof CharSequence text) return text.toString();
+        if (value instanceof JSONArray items) {
+            StringBuilder result = new StringBuilder();
+            for (Object item : items) {
+                if (item instanceof JSONObject object) {
+                    String text = streamingText(object.get("text"));
+                    if (text.isEmpty()) text = streamingText(object.get("content"));
+                    result.append(text);
+                } else {
+                    result.append(streamingText(item));
+                }
+            }
+            return result.toString();
+        }
+        if (value instanceof JSONObject object) {
+            String text = streamingText(object.get("text"));
+            return text.isEmpty() ? streamingText(object.get("content")) : text;
+        }
+        return "";
+    }
+
+    private String responseOutputText(JSONObject response) {
+        if (response == null) return "";
+        JSONArray output = response.getJSONArray("output");
+        if (output == null) return "";
+        StringBuilder result = new StringBuilder();
+        for (Object item : output) {
+            if (!(item instanceof JSONObject outputItem)) continue;
+            result.append(streamingText(outputItem.get("content")));
+        }
+        return result.toString();
+    }
+
+    private void closeQuietly(InputStream body) {
+        try {
+            body.close();
+        } catch (IOException ignored) {
+            // Cancellation is best effort.
+        }
+    }
+
+    private static final class StreamingTurnState {
+        private final StringBuilder assistantText = new StringBuilder();
+        private final Map<Integer, StreamingToolCall> toolCalls = new TreeMap<>();
+        private String finishReason = "stop";
+        private LlmTokenUsage tokenUsage = LlmTokenUsage.ZERO;
+
+        private void appendText(String text, AgentLlmStreamObserver observer) {
+            if (text == null || text.isEmpty()) return;
+            assistantText.append(text);
+            observer.onTextDelta(text);
+        }
+
+        private void appendToolDeltas(JSONArray deltas) {
+            if (deltas == null) return;
+            for (int i = 0; i < deltas.size(); i++) {
+                JSONObject delta = deltas.getJSONObject(i);
+                if (delta == null) continue;
+                int index = delta.getInt("index", i);
+                StreamingToolCall call = toolCalls.computeIfAbsent(index, ignored -> new StreamingToolCall());
+                String id = delta.getStr("id", null);
+                if (id != null && !id.isBlank()) call.id = id;
+                JSONObject function = delta.getJSONObject("function");
+                if (function == null) continue;
+                String name = function.getStr("name", null);
+                if (name != null && !name.isBlank()) call.name = name;
+                String arguments = function.getStr("arguments", null);
+                if (arguments != null) call.arguments.append(arguments);
+            }
+        }
+
+        private AgentLlmTurnResponse toResponse() {
+            List<AgentLlmToolCall> calls = toolCalls.entrySet().stream()
+                    .map(entry -> new AgentLlmToolCall(
+                            entry.getValue().id == null ? "tool-call-" + entry.getKey() : entry.getValue().id,
+                            entry.getValue().name,
+                            entry.getValue().arguments.toString()))
+                    .toList();
+            String resolvedFinishReason = calls.isEmpty() ? finishReason : "tool_calls";
+            if (calls.isEmpty() && assistantText.isEmpty()) {
+                throw BusinessException.of("LLM stream completed without assistant content");
+            }
+            return new AgentLlmTurnResponse(
+                    resolvedFinishReason, assistantText.toString(), calls, "{}", tokenUsage);
+        }
+    }
+
+    private static final class StreamingToolCall {
+        private String id;
+        private String name;
+        private final StringBuilder arguments = new StringBuilder();
     }
 
     private JSONObject sanitizeTopLevelFunctionParametersSchema(String parametersJsonSchema) {

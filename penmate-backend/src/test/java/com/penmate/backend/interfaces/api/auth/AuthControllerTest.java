@@ -71,6 +71,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.accessToken").value("atk_1"))
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                 .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Lax")))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId))
                 .andExpect(jsonPath("$.meta.timestamp").exists());
     }
@@ -170,6 +171,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.accessToken").value("atk_2"))
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                 .andExpect(header().exists("Set-Cookie"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Lax")))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId));
     }
 

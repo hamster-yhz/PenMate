@@ -39,6 +39,7 @@ class AgentRunAppServiceTest {
         when(sessionRepository.nextTurnSeq(90001L)).thenReturn(1);
         when(agentRepository.nextMessageSeq(90001L)).thenReturn(1);
         when(agentRepository.insertMessage(any(AgentMessage.class))).thenReturn(1);
+        when(agentRepository.bindMessageToTurn(90001L, 60001L, 50001L)).thenReturn(1);
         when(agentRepository.touchConversationLastMessage(90001L)).thenReturn(1);
         when(sessionRepository.insertTurn(eq(90001L), eq(50001L), eq(1), eq(60001L), eq(70001L), eq("PENDING"), eq(null))).thenReturn(1);
         when(sessionRepository.updateLastTurn(101L, 90001L, 50001L)).thenReturn(1);

@@ -20,8 +20,8 @@ public class AgentRepositoryImpl implements AgentRepository {
     }
 
     @Override
-    public List<AgentConversation> listConversations(Long projectId) {
-        return agentSessionMapper.listConversationSummaries(projectId);
+    public List<AgentConversation> listConversations(Long projectId, Long userId, boolean deleted) {
+        return agentSessionMapper.listConversationSummaries(projectId, userId, deleted);
     }
 
     @Override
@@ -30,8 +30,38 @@ public class AgentRepositoryImpl implements AgentRepository {
     }
 
     @Override
+    public AgentConversation findConversationIncludingDeleted(Long projectId, Long conversationId) {
+        return agentSessionMapper.findConversationSummaryIncludingDeleted(projectId, conversationId);
+    }
+
+    @Override
     public int insertConversation(AgentConversation conversation) {
         return agentSessionMapper.insertConversationSummary(conversation);
+    }
+
+    @Override
+    public int updateConversationTitle(Long projectId, Long conversationId, Long userId, String title) {
+        return agentSessionMapper.updateConversationTitle(projectId, conversationId, userId, title);
+    }
+
+    @Override
+    public int softDeleteConversation(Long projectId, Long conversationId, Long userId) {
+        return agentSessionMapper.softDeleteConversation(projectId, conversationId, userId);
+    }
+
+    @Override
+    public int restoreConversation(Long projectId, Long conversationId, Long userId) {
+        return agentSessionMapper.restoreConversation(projectId, conversationId, userId);
+    }
+
+    @Override
+    public int countActiveRuns(Long conversationId) {
+        return agentSessionMapper.countActiveRuns(conversationId);
+    }
+
+    @Override
+    public String findLatestRunStatus(Long conversationId) {
+        return agentSessionMapper.findLatestRunStatus(conversationId);
     }
 
     @Override
@@ -53,6 +83,11 @@ public class AgentRepositoryImpl implements AgentRepository {
     @Override
     public int insertMessage(AgentMessage message) {
         return agentMapper.insertMessage(message);
+    }
+
+    @Override
+    public int bindMessageToTurn(Long conversationId, Long messageId, Long turnId) {
+        return agentMapper.bindMessageToTurn(conversationId, messageId, turnId);
     }
 
     @Override

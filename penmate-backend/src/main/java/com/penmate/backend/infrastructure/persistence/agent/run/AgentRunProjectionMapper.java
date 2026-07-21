@@ -20,17 +20,17 @@ public interface AgentRunProjectionMapper {
     Long findLatestSequence(@Param("runId") Long runId);
 
     @Select("""
-            SELECT run_id AS runId,
-                   session_id AS sessionId,
-                   turn_id AS turnId,
-                   run_status AS runStatus,
-                   run_phase AS runPhase,
-                   latest_sequence AS latestSequence,
-                   active_approval_id AS activeApprovalId
+            SELECT run_id AS "runId",
+                   session_id AS "sessionId",
+                   turn_id AS "turnId",
+                   run_status AS "runStatus",
+                   run_phase AS "runPhase",
+                   latest_sequence AS "latestSequence",
+                   active_approval_id AS "activeApprovalId"
             FROM agent_run_projections
             WHERE project_id = #{projectId}
               AND session_id = #{sessionId}
-            ORDER BY latest_sequence DESC, id DESC
+            ORDER BY updated_at DESC, id DESC
             LIMIT 1
             """)
     Map<String, Object> findLatestRunForSession(@Param("projectId") Long projectId,

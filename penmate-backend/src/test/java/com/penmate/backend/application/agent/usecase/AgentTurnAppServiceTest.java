@@ -95,7 +95,8 @@ class AgentTurnAppServiceTest {
 
     private static AgentRepository agentRepository() {
         AgentRepository repository = mock(AgentRepository.class);
-                when(repository.insertMessage(any())).thenReturn(1);
+        when(repository.insertMessage(any())).thenReturn(1);
+        when(repository.bindMessageToTurn(any(), any(), any())).thenReturn(1);
         when(repository.touchConversationLastMessage(920002L)).thenReturn(1);
         return repository;
     }

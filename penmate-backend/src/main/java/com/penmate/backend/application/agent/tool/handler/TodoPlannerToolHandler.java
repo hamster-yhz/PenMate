@@ -4,6 +4,7 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
@@ -14,6 +15,7 @@ import com.penmate.backend.application.todo.TodoPlanView;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -57,12 +59,18 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
     );
 
     private final AgentModelRoutingService agentModelRoutingService;
-    private final AgentLlmGateway agentLlmGateway;
+    private final AgentLlmInvocationService llmInvocations;
+
+    @Autowired
+    public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
+                                  AgentLlmInvocationService llmInvocations) {
+        this.agentModelRoutingService = agentModelRoutingService;
+        this.llmInvocations = llmInvocations;
+    }
 
     public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
-                                  AgentLlmGateway agentLlmGateway) {
-        this.agentModelRoutingService = agentModelRoutingService;
-        this.agentLlmGateway = agentLlmGateway;
+                                  AgentLlmGateway llmGateway) {
+        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway));
     }
 
     @Override
@@ -106,7 +114,7 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
                     null,
                     request.traceId()
             );
-            AgentLlmTurnResponse response = agentLlmGateway.generateTurn(
+            AgentLlmTurnResponse response = llmInvocations.invokeBuffered(
                     new AgentLlmTurnRequest(List.of(AgentLlmMessage.user(buildPrompt(command))), List.of(), "none"),
                     executionConfig
             );

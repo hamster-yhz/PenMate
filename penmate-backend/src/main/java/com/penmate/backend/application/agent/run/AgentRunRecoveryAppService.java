@@ -20,13 +20,16 @@ public class AgentRunRecoveryAppService {
     private final AgentSessionRepository agentSessionRepository;
     private final AgentRunProjectionRepository agentRunProjectionRepository;
     private final AgentRunPendingApprovalRepository pendingApprovals;
+    private final AgentPartialMessageCheckpointStore partialMessages;
 
     public AgentRunRecoveryAppService(AgentSessionRepository agentSessionRepository,
                                       AgentRunProjectionRepository agentRunProjectionRepository,
-                                      AgentRunPendingApprovalRepository pendingApprovals) {
+                                      AgentRunPendingApprovalRepository pendingApprovals,
+                                      AgentPartialMessageCheckpointStore partialMessages) {
         this.agentSessionRepository = agentSessionRepository;
         this.agentRunProjectionRepository = agentRunProjectionRepository;
         this.pendingApprovals = pendingApprovals;
+        this.partialMessages = partialMessages;
     }
 
     public AgentRunRecoveryResult getRecovery(Long projectId, Long sessionId, String traceId) {
@@ -68,6 +71,8 @@ public class AgentRunRecoveryAppService {
         List<Object> messages = new java.util.ArrayList<>(agentSessionRepository.listMessageRows(sessionId).stream()
                 .<Object>map(LinkedHashMap::new)
                 .toList());
+        removeAmbiguousActiveTurnAssistant(messages, activeRun);
+        appendPartialAssistantMessage(messages, activeRun);
         Map<String, Object> pendingApproval = null;
         if (activeRun != null && "WAITING_APPROVAL".equalsIgnoreCase(activeRun.runStatus())) {
             var pending = pendingApprovals.findPendingByRunId(activeRun.runId());
@@ -75,6 +80,8 @@ public class AgentRunRecoveryAppService {
                 pendingApproval = pendingApprovalView(pending);
                 Map<String, Object> message = new LinkedHashMap<>(pendingApproval);
                 message.put("messageId", "approval-" + pending.approvalId());
+                message.put("turnId", String.valueOf(activeRun.turnId()));
+                message.put("runId", String.valueOf(activeRun.runId()));
                 message.put("role", "assistant");
                 message.put("contentMarkdown", "");
                 message.put("createdAt", pending.createdAt());
@@ -83,12 +90,12 @@ public class AgentRunRecoveryAppService {
         }
         Map<String, Object> workbenchContext = new LinkedHashMap<>();
         if (activeRun != null) {
-            workbenchContext.put("activeRun", Map.of(
-                    "runId", String.valueOf(activeRun.runId()),
-                    "runStatus", activeRun.runStatus(),
-                    "runPhase", activeRun.runPhase(),
-                    "latestSequence", String.valueOf(activeRun.latestSequence())
-            ));
+            Map<String, Object> activeRunContext = new LinkedHashMap<>();
+            activeRunContext.put("runId", String.valueOf(activeRun.runId()));
+            activeRunContext.put("runStatus", activeRun.runStatus());
+            activeRunContext.put("runPhase", activeRun.runPhase());
+            activeRunContext.put("latestSequence", String.valueOf(activeRun.latestSequence()));
+            workbenchContext.put("activeRun", activeRunContext);
         }
         return new AgentRunRecoveryResult(
                 new AgentRunRecoveryResult.SessionView(
@@ -105,6 +112,39 @@ public class AgentRunRecoveryAppService {
                 messages,
                 workbenchContext.isEmpty() ? null : workbenchContext
         );
+    }
+
+    private void removeAmbiguousActiveTurnAssistant(List<Object> messages,
+                                                    AgentRunRecoveryResult.ActiveRunView activeRun) {
+        if (activeRun == null || activeRun.turnId() == null) return;
+        String activeTurnId = String.valueOf(activeRun.turnId());
+        messages.removeIf(message -> message instanceof Map<?, ?> row
+                && "assistant".equalsIgnoreCase(stringValue(row.get("role")))
+                && activeTurnId.equals(stringValue(row.get("turnId"))));
+    }
+
+    private void appendPartialAssistantMessage(List<Object> messages,
+                                               AgentRunRecoveryResult.ActiveRunView activeRun) {
+        if (activeRun == null || activeRun.runId() == null || activeRun.turnId() == null) return;
+        boolean hasAssistantMessage = messages.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .anyMatch(message -> "assistant".equalsIgnoreCase(stringValue(message.get("role")))
+                        && String.valueOf(activeRun.turnId()).equals(stringValue(message.get("turnId"))));
+        if (hasAssistantMessage) return;
+        partialMessages.find(activeRun.runId())
+                .filter(snapshot -> !snapshot.text().isBlank())
+                .ifPresent(snapshot -> {
+                    Map<String, Object> message = new LinkedHashMap<>();
+                    message.put("messageId", "partial-" + activeRun.runId());
+                    message.put("turnId", String.valueOf(activeRun.turnId()));
+                    message.put("runId", String.valueOf(activeRun.runId()));
+                    message.put("role", "assistant");
+                    message.put("contentMarkdown", snapshot.text());
+                    message.put("partial", true);
+                    message.put("createdAt", snapshot.updatedAt());
+                    messages.add(message);
+                });
     }
 
     private Map<String, Object> pendingApprovalView(AgentRunPendingApproval pending) {

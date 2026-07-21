@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationCancelledException;
 import com.penmate.backend.application.storybible.StoryBibleEffectiveStateResolver;
 import com.penmate.backend.domain.storybible.model.StoryBibleInclusionPolicy;
 import com.penmate.backend.domain.storybible.model.StoryBibleNode;
@@ -9,6 +10,7 @@ import com.penmate.backend.domain.storybible.model.StoryBibleProgression;
 import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
+@Slf4j
 public class StoryBibleContextResolver {
     private final StoryBibleCandidateRetriever candidateRetriever;
     private final StoryBibleSelectorGateway selectorGateway;
@@ -50,7 +53,9 @@ public class StoryBibleContextResolver {
         List<Long> selected;
         Map<Long, String> reasons = new LinkedHashMap<>();
         StoryBibleSelectorGateway.Selection selection = new StoryBibleSelectorGateway.Selection(List.of(), Map.of());
-        boolean selectorUsed = request.routingMode() != StoryBibleRoutingMode.RETRIEVAL;
+        boolean selectorAttempted = request.routingMode() != StoryBibleRoutingMode.RETRIEVAL;
+        boolean selectorUsed = selectorAttempted;
+        boolean selectorFailed = false;
         if (!selectorUsed) {
             selected = new ArrayList<>(candidateById.keySet());
             candidateById.values().forEach(candidate -> reasons.put(candidate.nodeId(), String.join(",", candidate.reasons())));
@@ -58,18 +63,30 @@ public class StoryBibleContextResolver {
             List<StoryBibleRouteRequest.CatalogEntry> selectorCatalog = request.routingMode() == StoryBibleRoutingMode.LLM_SELECTOR
                     ? request.epochCatalog()
                     : request.epochCatalog().stream().filter(item -> candidateById.containsKey(item.nodeId())).toList();
-            selection = selectorGateway.select(new StoryBibleSelectorGateway.SelectorRequest(
-                    request.routingMode(), request.userMessage(), selectorCatalog, request.workingSetNodeIds(),
-                    request.conversationWindow()),
-                    request.selectorExecutionConfig());
-            selected = new ArrayList<>(selection.nodeIds());
-            reasons.putAll(selection.reasons());
-            candidateById.values().stream()
-                    .filter(candidate -> candidate.reasons().contains("always_include") && !selected.contains(candidate.nodeId()))
-                    .forEach(candidate -> {
-                        selected.add(candidate.nodeId());
-                        reasons.put(candidate.nodeId(), "always_include");
-                    });
+            try {
+                selection = selectorGateway.select(new StoryBibleSelectorGateway.SelectorRequest(
+                        request.routingMode(), request.userMessage(), selectorCatalog, request.workingSetNodeIds(),
+                        request.conversationWindow()),
+                        request.selectorExecutionConfig());
+                selected = new ArrayList<>(selection.nodeIds());
+                reasons.putAll(selection.reasons());
+                for (StoryBibleCandidateRetriever.Candidate candidate : candidateById.values()) {
+                    if (candidate.reasons().contains("always_include") && !selected.contains(candidate.nodeId())) {
+                            selected.add(candidate.nodeId());
+                            reasons.put(candidate.nodeId(), "always_include");
+                    }
+                }
+            } catch (AgentLlmInvocationCancelledException ex) {
+                throw ex;
+            } catch (RuntimeException ex) {
+                selectorUsed = false;
+                selectorFailed = true;
+                selected = new ArrayList<>(candidateById.keySet());
+                candidateById.values().forEach(candidate ->
+                        reasons.put(candidate.nodeId(), String.join(",", candidate.reasons())));
+                log.warn("Story Bible selector unavailable; falling back to retrieval: projectId={}, sessionId={}, mode={}, reason={}",
+                        request.projectId(), request.sessionId(), request.routingMode(), ex.getMessage());
+            }
         }
 
         List<StoryBibleRelation> relations = repository.findRelations(retrieval.storyBible().getStoryBibleId(), selected);
@@ -96,6 +113,7 @@ public class StoryBibleContextResolver {
                 .collect(java.util.stream.Collectors.groupingBy(StoryBibleProgression::getNodeId));
         List<RenderedNode> rendered = new ArrayList<>();
         List<String> missing = new ArrayList<>(selection.missingContextFlags());
+        if (selectorFailed) missing.add("SELECTOR_UNAVAILABLE");
         for (StoryBibleNode node : nodes) {
             StoryBibleNodeType type = types.get(node.getTypeId());
             if (type == null) {
@@ -108,7 +126,7 @@ public class StoryBibleContextResolver {
             rendered.add(new RenderedNode(node.getNodeId(), node.getTitle(), type.getTypeCode(), effective.state(),
                     effective.appliedProgressionIds(), effective.complete()));
         }
-        long latency = selectorUsed ? (System.nanoTime() - started) / 1_000_000L : 0L;
+        long latency = selectorAttempted ? (System.nanoTime() - started) / 1_000_000L : 0L;
         StoryBibleRouteDecision decision = new StoryBibleRouteDecision(request.routingMode(), selection.intentTags(),
                 List.copyOf(selected), selection.relationExpansionNodeIds(), reasons, selectorUsed, latency,
                 selection.confidence(), selection.tokenUsage(), retrieval.semanticUnavailable(), retrieval.trace(), missing);

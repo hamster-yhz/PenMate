@@ -53,6 +53,8 @@ public class AgentTurnAppService {
         Long runId = businessIdGenerator.nextId();
         int turnSeq = agentSessionRepository.nextTurnSeq(sessionId);
         persistTurn(sessionId, userMessage, turnId, runId, turnSeq);
+        requireOne(agentRepository.bindMessageToTurn(sessionId, userMessage.getMessageId(), turnId),
+                "failed to bind user message to turn");
         log.info("Agent turn persisted: projectId={}, sessionId={}, turnId={}, turnSeq={}",
                 projectId, sessionId, turnId, turnSeq);
 

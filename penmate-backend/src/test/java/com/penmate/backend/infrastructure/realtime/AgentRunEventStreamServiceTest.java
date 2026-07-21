@@ -2,6 +2,7 @@ package com.penmate.backend.infrastructure.realtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentEventPayloadResolver;
+import com.penmate.backend.application.agent.run.AgentPartialMessageCheckpointStore;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +30,7 @@ class AgentRunEventStreamServiceTest {
     void emits_reset_and_advances_to_latest_when_cursor_is_expired() {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
-        when(bus.subscribe(any(), any())).thenReturn(() -> { });
+        when(bus.subscribeWithRedis(any(), any())).thenReturn(() -> { });
         when(events.findWindow(70L)).thenReturn(new AgentEventWindow(51L, 80L));
         when(events.listAfter(70L, 80L)).thenReturn(List.of());
         CapturingEmitter emitter = new CapturingEmitter();
@@ -46,7 +48,7 @@ class AgentRunEventStreamServiceTest {
     void database_poll_delivers_durable_events_without_bus_notification() {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
-        when(bus.subscribe(any(), any())).thenReturn(() -> { });
+        when(bus.subscribeWithRedis(any(), any())).thenReturn(() -> { });
         when(events.findWindow(70L))
                 .thenReturn(new AgentEventWindow(null, 0L))
                 .thenReturn(new AgentEventWindow(1L, 1L));
@@ -61,11 +63,11 @@ class AgentRunEventStreamServiceTest {
         assertThat(emitter.payloads()).filteredOn(AgentRunEventDto.class::isInstance)
                 .map(AgentRunEventDto.class::cast)
                 .extracting(AgentRunEventDto::sequence)
-                .containsExactly("1");
+                .containsExactly("1", "1");
         assertThat(emitter.payloads()).filteredOn(AgentRunEventDto.class::isInstance)
                 .map(AgentRunEventDto.class::cast)
                 .extracting(AgentRunEventDto::createdAt)
-                .containsExactly("2026-07-17T00:00:00Z");
+                .containsExactly("2026-07-17T00:00:00Z", "2026-07-17T00:00:00Z");
     }
 
     @Test
@@ -73,7 +75,7 @@ class AgentRunEventStreamServiceTest {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
         ArgumentCaptor<Consumer<AgentEvent>> subscriber = ArgumentCaptor.forClass(Consumer.class);
-        when(bus.subscribe(eq(70L), subscriber.capture())).thenReturn(() -> { });
+        when(bus.subscribeWithRedis(eq(70L), subscriber.capture())).thenReturn(() -> { });
         when(events.findWindow(70L))
                 .thenReturn(new AgentEventWindow(null, 0L))
                 .thenReturn(new AgentEventWindow(1L, 2L));
@@ -87,7 +89,38 @@ class AgentRunEventStreamServiceTest {
         assertThat(emitter.payloads()).filteredOn(AgentRunEventDto.class::isInstance)
                 .map(AgentRunEventDto.class::cast)
                 .extracting(AgentRunEventDto::sequence)
-                .containsExactly("1", "2");
+                .containsExactly("1", "1", "2", "2");
+    }
+
+    @Test
+    void sends_the_latest_partial_message_snapshot_when_a_stream_reconnects() {
+        AgentRunEventRepository events = mock(AgentRunEventRepository.class);
+        InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
+        AgentPartialMessageCheckpointStore partialMessages = mock(AgentPartialMessageCheckpointStore.class);
+        when(bus.subscribeWithRedis(any(), any())).thenReturn(() -> { });
+        when(events.findWindow(70L)).thenReturn(new AgentEventWindow(null, 0L));
+        when(events.listAfter(70L, 0L)).thenReturn(List.of());
+        when(partialMessages.find(70L)).thenReturn(Optional.of(
+                new AgentPartialMessageCheckpointStore.Snapshot(
+                        70L, 30L, "partial answer", 14L, Instant.parse("2026-07-21T08:00:00Z"))));
+        CapturingEmitter emitter = new CapturingEmitter();
+        AgentRunEventStreamService service = new AgentRunEventStreamService(
+                events, bus, new AgentEventPayloadResolver(
+                mock(AgentArtifactRepository.class), new ObjectMapper()),
+                partialMessages, new ObjectMapper()) {
+            @Override
+            protected SseEmitter createEmitter() {
+                return emitter;
+            }
+        };
+
+        service.openStream(70L, 0L);
+
+        assertThat(emitter.payloads()).filteredOn(AgentRunEventDto.class::isInstance)
+                .map(AgentRunEventDto.class::cast)
+                .filteredOn(dto -> "message.snapshot".equals(dto.type()))
+                .hasSize(2)
+                .allSatisfy(dto -> assertThat(dto.payloadJson()).contains("partial answer"));
     }
 
     private AgentRunEventStreamService service(AgentRunEventRepository events,
@@ -95,7 +128,8 @@ class AgentRunEventStreamServiceTest {
                                                CapturingEmitter emitter) {
         return new AgentRunEventStreamService(
                 events, bus, new AgentEventPayloadResolver(
-                mock(AgentArtifactRepository.class), new ObjectMapper())) {
+                mock(AgentArtifactRepository.class), new ObjectMapper()),
+                mock(AgentPartialMessageCheckpointStore.class), new ObjectMapper()) {
             @Override
             protected SseEmitter createEmitter() {
                 return emitter;

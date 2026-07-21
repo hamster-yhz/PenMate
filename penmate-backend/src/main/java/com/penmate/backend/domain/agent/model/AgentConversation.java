@@ -24,6 +24,8 @@ public class AgentConversation {
     private Instant lastMessageAt;
     /** 会话状态（如启用、归档）。 */
     private String status;
+    /** 最近一次 Run 状态。 */
+    private String lastRunStatus;
     /** 创建时间。 */
     private Instant createdAt;
     /** 最后更新时间。 */

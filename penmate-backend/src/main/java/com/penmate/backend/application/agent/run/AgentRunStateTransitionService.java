@@ -19,15 +19,18 @@ public class AgentRunStateTransitionService {
     private final AgentRunEventPublisher events;
     private final AgentRunPendingApprovalRepository pendingApprovals;
     private final AgentRunSuccessorService successors;
+    private final AgentRunOutputEventService outputs;
 
     public AgentRunStateTransitionService(AgentRunLeaseService leases,
                                           AgentRunEventPublisher events,
                                           AgentRunPendingApprovalRepository pendingApprovals,
-                                          AgentRunSuccessorService successors) {
+                                          AgentRunSuccessorService successors,
+                                          AgentRunOutputEventService outputs) {
         this.leases = leases;
         this.events = events;
         this.pendingApprovals = pendingApprovals;
         this.successors = successors;
+        this.outputs = outputs;
     }
 
     @Transactional
@@ -42,7 +45,8 @@ public class AgentRunStateTransitionService {
     public Outcome failed(AgentRunLease lease, String assistantText, Long completedApprovalId) {
         leases.failTerminal(lease, "AGENT_RUN_FAILED", assistantText);
         completeApproval(completedApprovalId);
-        return new Outcome(null, events.publish(lease.runId(), "run.failed",
+        AgentEvent interrupted = outputs.persistInterrupted(lease.runId(), assistantText);
+        return new Outcome(interrupted, events.publish(lease.runId(), "run.failed",
                 Map.of("phase", "failed", "message", assistantText)));
     }
 
@@ -64,6 +68,7 @@ public class AgentRunStateTransitionService {
         String fields = String.join(",", changedFields);
         leases.supersede(lease, "Run dependencies changed: " + fields);
         pendingApprovals.invalidateOpenByRunId(run.runId());
+        outputs.persistInterrupted(run.runId());
         events.publish(run.runId(), "run.superseded", Map.of(
                 "errorCode", "AGENT_RUN_DEPENDENCY_CHANGED",
                 "errorMessage", "Run dependencies changed",

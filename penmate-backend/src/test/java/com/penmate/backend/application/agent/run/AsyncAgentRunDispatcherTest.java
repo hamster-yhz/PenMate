@@ -28,7 +28,8 @@ class AsyncAgentRunDispatcherTest {
         when(leaseService.handleFailure(eq(lease), any())).thenReturn(AgentRunStatus.FAILED);
         doThrow(new IllegalStateException("boom")).when(executor).execute(70001L, "trace-1", lease);
 
-        AsyncAgentRunDispatcher dispatcher = new AsyncAgentRunDispatcher(executor, eventPublisher, leaseService);
+        AsyncAgentRunDispatcher dispatcher = new AsyncAgentRunDispatcher(
+                executor, eventPublisher, leaseService, mock(AgentRunOutputEventService.class));
 
         dispatcher.dispatchInitialRun(70001L, "trace-1");
 

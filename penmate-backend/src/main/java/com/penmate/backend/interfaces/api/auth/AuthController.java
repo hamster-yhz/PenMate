@@ -188,14 +188,14 @@ public class AuthController {
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_COOKIE, refreshToken)
                 .httpOnly(true)
                 .secure(request.isSecure())
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .path("/api/v1/auth")
                 .maxAge(java.time.Duration.ofDays(30))
                 .build();
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_COOKIE, String.valueOf(publicTokens.get("accessToken")))
                 .httpOnly(true)
                 .secure(request.isSecure())
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .path("/api/v1/novels")
                 .maxAge(java.time.Duration.ofMinutes(20))
                 .build();

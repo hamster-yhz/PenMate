@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
+import com.penmate.backend.application.agent.query.AgentRunHistoryQueryService;
 import com.penmate.backend.application.agent.run.AgentRunRetryService;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
@@ -20,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Map;
+import java.util.List;
+import java.time.Instant;
 import java.security.Principal;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
@@ -30,6 +33,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +51,8 @@ class AgentControllerRunContractTest {
     private AgentRunEventStreamService agentRunEventStreamService;
     @Mock
     private AgentRunRetryService agentRunRetryService;
+    @Mock
+    private AgentRunHistoryQueryService agentRunHistoryQueryService;
     @InjectMocks
     private AgentController agentController;
 
@@ -92,7 +98,9 @@ class AgentControllerRunContractTest {
                         .param("after", "41")
                         .header("Last-Event-ID", "42")
                         .header("Accept", "text/event-stream"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-cache, no-transform"))
+                .andExpect(header().string("X-Accel-Buffering", "no"));
 
         verify(agentRunEventStreamService).openStream(70001L, 42L);
     }
@@ -116,6 +124,25 @@ class AgentControllerRunContractTest {
                 .andExpect(jsonPath("$.data.latestSequence").value("1"));
 
         verify(agentRunRetryService).retry(101L, 70001L, 201L, traceId);
+    }
+
+    @Test
+    void list_session_runs_returns_output_bound_to_the_exact_run() throws Exception {
+        AgentRun run = run(70001L, null, "RUNNING", "executing", 8L);
+        var output = new AgentRunHistoryQueryService.RunOutput(
+                "current partial", 15L, null, "partial", Instant.parse("2026-07-21T10:00:00Z"));
+        when(agentRunHistoryQueryService.list(101L, 90001L, 201L)).thenReturn(List.of(
+                new AgentRunHistoryQueryService.RunHistory(run, output, List.of())));
+
+        mockMvc().perform(get("/api/v1/novels/101/agent/sessions/90001/runs")
+                        .principal(principal("201")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].runId").value("70001"))
+                .andExpect(jsonPath("$.data[0].turnId").value("50001"))
+                .andExpect(jsonPath("$.data[0].output.text").value("current partial"))
+                .andExpect(jsonPath("$.data[0].output.offset").value(15))
+                .andExpect(jsonPath("$.data[0].output.sequence").doesNotExist())
+                .andExpect(jsonPath("$.data[0].output.state").value("partial"));
     }
 
     private AgentRun run(Long runId, Long predecessorRunId, String status, String phase, Long sequence) {

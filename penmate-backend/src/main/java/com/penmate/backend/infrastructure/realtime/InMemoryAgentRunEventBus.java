@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.realtime;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentRunEventBus;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
@@ -16,12 +17,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.UUID;
 
 @Component
 public class InMemoryAgentRunEventBus implements AgentRunEventBus {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryAgentRunEventBus.class);
     private static final String REDIS_CHANNEL_PREFIX = "agent:run:event:";
+    private final String instanceId = UUID.randomUUID().toString();
 
     private final Map<Long, List<Consumer<AgentEvent>>> subscribers = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
@@ -42,7 +45,7 @@ public class InMemoryAgentRunEventBus implements AgentRunEventBus {
                 .forEach(consumer -> consumer.accept(event));
         try {
             String channel = REDIS_CHANNEL_PREFIX + event.runId();
-            String message = objectMapper.writeValueAsString(event);
+            String message = objectMapper.writeValueAsString(new RedisEventEnvelope(instanceId, event));
             redisTemplate.convertAndSend(channel, message);
         } catch (Exception ex) {
             log.warn("Redis pub/sub publish failed: runId={}", event.runId(), ex);
@@ -50,8 +53,13 @@ public class InMemoryAgentRunEventBus implements AgentRunEventBus {
     }
 
     public Runnable subscribe(Long runId, Consumer<AgentEvent> consumer) {
-        subscribers.computeIfAbsent(runId, ignored -> new CopyOnWriteArrayList<>()).add(consumer);
-        return () -> subscribers.getOrDefault(runId, List.of()).remove(consumer);
+        List<Consumer<AgentEvent>> runSubscribers = subscribers.computeIfAbsent(
+                runId, ignored -> new CopyOnWriteArrayList<>());
+        runSubscribers.add(consumer);
+        return () -> {
+            runSubscribers.remove(consumer);
+            if (runSubscribers.isEmpty()) subscribers.remove(runId, runSubscribers);
+        };
     }
 
     public Runnable subscribeWithRedis(Long runId, Consumer<AgentEvent> consumer) {
@@ -59,16 +67,28 @@ public class InMemoryAgentRunEventBus implements AgentRunEventBus {
         String channel = REDIS_CHANNEL_PREFIX + runId;
         MessageListener listener = (message, pattern) -> {
             try {
-                AgentEvent event = objectMapper.readValue(message.getBody(), AgentEvent.class);
+                JsonNode root = objectMapper.readTree(message.getBody());
+                if (root.hasNonNull("originId") && instanceId.equals(root.path("originId").asText())) return;
+                AgentEvent event = root.has("event")
+                        ? objectMapper.treeToValue(root.get("event"), AgentEvent.class)
+                        : objectMapper.treeToValue(root, AgentEvent.class);
                 consumer.accept(event);
             } catch (Exception ex) {
                 log.warn("Failed to deserialize Redis pub/sub event: runId={}", runId, ex);
             }
         };
-        listenerContainer.addMessageListener(listener, new ChannelTopic(channel));
+        try {
+            listenerContainer.addMessageListener(listener, new ChannelTopic(channel));
+        } catch (RuntimeException ex) {
+            log.warn("Redis pub/sub subscription failed, keeping local delivery: runId={}", runId, ex);
+            return localUnsub;
+        }
         return () -> {
             localUnsub.run();
             listenerContainer.removeMessageListener(listener);
         };
+    }
+
+    private record RedisEventEnvelope(String originId, AgentEvent event) {
     }
 }

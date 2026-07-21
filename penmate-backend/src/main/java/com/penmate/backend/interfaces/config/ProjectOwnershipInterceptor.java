@@ -4,6 +4,7 @@ import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.interfaces.api.common.AuthenticatedActor;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -25,6 +26,7 @@ public class ProjectOwnershipInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (request.getDispatcherType() != DispatcherType.REQUEST) return true;
         Object attribute = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
         if (!(attribute instanceof Map<?, ?> variables) || variables.get("projectId") == null) return true;
         Long projectId = parseId(String.valueOf(variables.get("projectId")));

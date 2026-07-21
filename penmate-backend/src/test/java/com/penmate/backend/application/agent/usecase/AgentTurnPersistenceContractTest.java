@@ -104,6 +104,8 @@ class AgentTurnPersistenceContractTest {
                     .isEqualTo(950001L);
             assertThat(singleLong("SELECT run_id FROM agent_turns WHERE turn_id = 940001"))
                     .isEqualTo(950001L);
+            assertThat(singleLong("SELECT turn_id FROM agent_messages WHERE message_id = 930001"))
+                    .isEqualTo(940001L);
             assertThat(singleString("SELECT prompt_snapshot FROM agent_run_inputs WHERE run_id = 950001"))
                     .isEqualTo("Write the next beat.");
             assertThat(JSON.readTree(singleString(
@@ -189,6 +191,10 @@ class AgentTurnPersistenceContractTest {
             assertThat(messages)
                     .extracting("messageId")
                     .containsExactly(930101L, 930102L);
+
+            assertThat(sqlSession.getMapper(AgentSessionMapper.class).listMessageRows(920002L))
+                    .extracting(row -> row.get("turnId"))
+                    .containsExactly(940101L, 940101L, 940102L);
         }
     }
 

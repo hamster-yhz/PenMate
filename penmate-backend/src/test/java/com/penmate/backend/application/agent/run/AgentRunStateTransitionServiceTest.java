@@ -26,7 +26,8 @@ class AgentRunStateTransitionServiceTest {
     private final AgentRunPendingApprovalRepository approvals = mock(AgentRunPendingApprovalRepository.class);
     private final AgentRunSuccessorService successors = mock(AgentRunSuccessorService.class);
     private final AgentRunStateTransitionService service =
-            new AgentRunStateTransitionService(leases, events, approvals, successors);
+            new AgentRunStateTransitionService(
+                    leases, events, approvals, successors, mock(AgentRunOutputEventService.class));
 
     @Test
     void stale_worker_cannot_publish_completion_events() {

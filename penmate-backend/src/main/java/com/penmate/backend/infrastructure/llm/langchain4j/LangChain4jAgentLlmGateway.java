@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
 import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.infrastructure.llm.langchain4j.provider.ProviderChatClient;
@@ -43,5 +44,22 @@ public class LangChain4jAgentLlmGateway implements AgentLlmGateway {
                 executionConfig.modelConfigId());
         ProviderChatClient providerChatClient = providerChatClientFactory.get(provider);
         return providerChatClient.generateTurn(request, executionConfig);
+    }
+
+    @Override
+    public boolean supportsStreaming(AgentLlmExecutionConfig executionConfig) {
+        if (executionConfig == null || executionConfig.providerCode() == null) return false;
+        return providerChatClientFactory.get(executionConfig.providerCode()).supportsStreaming();
+    }
+
+    @Override
+    public AgentLlmTurnResponse streamTurn(AgentLlmTurnRequest request,
+                                           AgentLlmExecutionConfig executionConfig,
+                                           AgentLlmStreamObserver observer) {
+        if (executionConfig == null) {
+            throw BusinessException.of("LLM execution config is required");
+        }
+        return providerChatClientFactory.get(executionConfig.providerCode())
+                .streamTurn(request, executionConfig, observer);
     }
 }

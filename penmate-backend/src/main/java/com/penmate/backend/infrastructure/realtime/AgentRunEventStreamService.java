@@ -1,6 +1,9 @@
 package com.penmate.backend.infrastructure.realtime;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentEventPayloadResolver;
+import com.penmate.backend.application.agent.run.AgentPartialMessageCheckpointStore;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
@@ -23,19 +26,26 @@ import java.util.concurrent.atomic.AtomicLong;
 public class AgentRunEventStreamService {
 
     private static final long SSE_TIMEOUT_MS = 10 * 60 * 1000L;
+    private static final long SSE_HEARTBEAT_INTERVAL_MS = 15_000L;
 
     private final AgentRunEventRepository eventRepository;
     private final InMemoryAgentRunEventBus eventBus;
     private final AgentEventPayloadResolver payloadResolver;
+    private final AgentPartialMessageCheckpointStore partialMessages;
+    private final ObjectMapper objectMapper;
     private final AtomicLong streamIds = new AtomicLong();
     private final Map<Long, StreamConnection> activeStreams = new ConcurrentHashMap<>();
 
     public AgentRunEventStreamService(AgentRunEventRepository eventRepository,
                                       InMemoryAgentRunEventBus eventBus,
-                                      AgentEventPayloadResolver payloadResolver) {
+                                      AgentEventPayloadResolver payloadResolver,
+                                      AgentPartialMessageCheckpointStore partialMessages,
+                                      ObjectMapper objectMapper) {
         this.eventRepository = eventRepository;
         this.eventBus = eventBus;
         this.payloadResolver = payloadResolver;
+        this.partialMessages = partialMessages;
+        this.objectMapper = objectMapper;
     }
 
     public SseEmitter openStream(Long runId, Long after) {
@@ -44,10 +54,12 @@ public class AgentRunEventStreamService {
         StreamConnection connection = new StreamConnection(
                 streamIds.incrementAndGet(), runId, emitter, cursor);
         activeStreams.put(connection.streamId, connection);
-        connection.unsubscribe = eventBus.subscribe(runId, event -> onBusEvent(connection, event));
+        connection.unsubscribe = eventBus.subscribeWithRedis(runId, event -> onBusEvent(connection, event));
         emitter.onCompletion(() -> close(connection));
         emitter.onTimeout(() -> close(connection));
         emitter.onError(ignored -> close(connection));
+        if (!sendHeartbeat(connection)) return emitter;
+        sendPartialSnapshot(connection);
         poll(connection);
         return emitter;
     }
@@ -58,7 +70,28 @@ public class AgentRunEventStreamService {
 
     @Scheduled(fixedDelayString = "${penmate.agent.stream-poll-ms:1000}")
     public void pollActiveStreams() {
-        activeStreams.values().forEach(this::poll);
+        activeStreams.values().forEach(connection -> {
+            if (System.currentTimeMillis() - connection.lastHeartbeatAt.get() >= SSE_HEARTBEAT_INTERVAL_MS) {
+                if (!sendHeartbeat(connection)) return;
+            }
+            poll(connection);
+        });
+    }
+
+    private boolean sendHeartbeat(StreamConnection connection) {
+        synchronized (connection.monitor) {
+            if (connection.closed.get()) return false;
+            try {
+                connection.emitter.send(SseEmitter.event().comment("keepalive"));
+                connection.lastHeartbeatAt.set(System.currentTimeMillis());
+                return true;
+            } catch (IOException | IllegalStateException ex) {
+                log.debug("agent run SSE heartbeat failed: runId={}", connection.runId, ex);
+                connection.emitter.completeWithError(ex);
+                close(connection);
+                return false;
+            }
+        }
     }
 
     private void onBusEvent(StreamConnection connection, AgentEvent event) {
@@ -71,6 +104,26 @@ public class AgentRunEventStreamService {
             return;
         }
         poll(connection);
+    }
+
+    private void sendPartialSnapshot(StreamConnection connection) {
+        partialMessages.find(connection.runId).ifPresent(snapshot -> {
+            synchronized (connection.monitor) {
+                if (connection.closed.get() || snapshot.text().isBlank()) return;
+                try {
+                    sendEvent(connection, AgentEvent.forBroadcast(connection.runId, -1L, "message.snapshot",
+                            objectMapper.writeValueAsString(Map.of(
+                                    "schemaVersion", 1,
+                                    "turnId", String.valueOf(snapshot.turnId()),
+                                    "text", snapshot.text(),
+                                    "offset", snapshot.offset(),
+                                    "updatedAt", snapshot.updatedAt().toString()
+                            ))));
+                } catch (JsonProcessingException ex) {
+                    log.warn("agent run partial snapshot serialization failed: runId={}", connection.runId, ex);
+                }
+            }
+        });
     }
 
     private void poll(StreamConnection connection) {
@@ -109,13 +162,17 @@ public class AgentRunEventStreamService {
 
     private boolean sendEvent(StreamConnection connection, AgentEvent event) {
         try {
-            SseEmitter.SseEventBuilder builder = SseEmitter.event()
+            AgentRunEventDto payload = toDto(event);
+            connection.emitter.send(SseEmitter.event()
+                    .name("agent.event")
+                    .data(payload));
+            SseEmitter.SseEventBuilder namedEvent = SseEmitter.event()
                     .name(event.eventType())
-                    .data(toDto(event));
+                    .data(payload);
             if (event.sequence() != null && event.sequence() >= 0) {
-                builder.id(stringify(event.sequence()));
+                namedEvent.id(stringify(event.sequence()));
             }
-            connection.emitter.send(builder);
+            connection.emitter.send(namedEvent);
             return true;
         } catch (IOException | IllegalStateException ex) {
             log.debug("agent run SSE send failed: runId={}, sequence={}, eventType={}",
@@ -185,6 +242,7 @@ public class AgentRunEventStreamService {
         private final Long runId;
         private final SseEmitter emitter;
         private final AtomicLong cursor;
+        private final AtomicLong lastHeartbeatAt = new AtomicLong();
         private final AtomicBoolean closed = new AtomicBoolean();
         private final Object monitor = new Object();
         private volatile Runnable unsubscribe = () -> { };

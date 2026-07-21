@@ -3,6 +3,8 @@ package com.penmate.backend.application.agent.run;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
+import com.penmate.backend.application.agent.llm.AgentLlmCancellationPort;
+import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
@@ -48,11 +50,16 @@ class AgentRunLlmLoopTest {
     private AgentCheckpointBoundaryService checkpointBoundary;
     @Mock
     private AgentRunContinuationArtifactService continuations;
+    @Mock
+    private AgentLlmCancellationPort cancellations;
+    @Mock
+    private AgentPartialMessageCheckpointStore partialMessages;
 
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.lenient().when(continuations.save(any())).thenReturn(
                 new AgentRunContinuationArtifactService.ArtifactRef(99001L, "key", "a".repeat(64), 100));
+        org.mockito.Mockito.lenient().when(cancellations.register(anyLong(), any())).thenReturn(() -> { });
     }
 
     @Test
@@ -60,8 +67,7 @@ class AgentRunLlmLoopTest {
         when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(llmGateway.generateTurn(any(), any()))
                 .thenReturn(new AgentLlmTurnResponse("stop", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabc", List.of(), "{}", new LlmTokenUsage(7, 9, 16)));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource,
-                eventPublisher, toolCallService, checkpointBoundary, continuations);
+        AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
                 70001L,
@@ -107,8 +113,7 @@ class AgentRunLlmLoopTest {
                 );
         when(toolCallService.executeToolCall(any()))
                 .thenReturn(new ToolCallResult("FAILED", null, null, "BOOK_CRUD_EXECUTION_FAILED", null));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(llmGateway, toolDefinitionSource,
-                eventPublisher, toolCallService, checkpointBoundary, continuations);
+        AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
                 70001L,
@@ -173,9 +178,7 @@ class AgentRunLlmLoopTest {
         );
         when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
                 "stop", "Done", List.of(), "{}", new LlmTokenUsage(4, 1, 5)));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
-                continuations);
+        AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
@@ -223,9 +226,7 @@ class AgentRunLlmLoopTest {
                 ToolCallResult.success("{\"updated\":true}"),
                 ToolCallResult.waitingApproval(202L, Map.of("nodeId", "71"))
         );
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
-                continuations);
+        AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
@@ -262,9 +263,7 @@ class AgentRunLlmLoopTest {
         when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
                 "stop", "Recovered", List.of(), "{}", new LlmTokenUsage(2, 1, 3)));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
-                continuations);
+        AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.resume(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace", List.of(),
@@ -287,9 +286,7 @@ class AgentRunLlmLoopTest {
     void completed_continuation_finishes_without_calling_llm_or_tools() {
         AgentRunContinuation continuation = AgentRunContinuation.completed(
                 70001L, List.of(), 2, 1, "Already complete", new LlmTokenUsage(4, 2, 6));
-        AgentRunLlmLoop loop = new AgentRunLlmLoop(
-                llmGateway, toolDefinitionSource, eventPublisher, toolCallService, checkpointBoundary,
-                continuations);
+        AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.resume(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace", List.of(),
@@ -298,5 +295,12 @@ class AgentRunLlmLoopTest {
         assertThat(result.finalAssistantText()).isEqualTo("Already complete");
         verify(llmGateway, never()).generateTurn(any(), any());
         verify(toolCallService, never()).executeToolCall(any());
+    }
+
+    private AgentRunLlmLoop newLoop() {
+        AgentLlmInvocationService invocations = new AgentLlmInvocationService(llmGateway, cancellations);
+        AgentStreamingMessageService streaming = new AgentStreamingMessageService(eventPublisher, partialMessages);
+        return new AgentRunLlmLoop(invocations, toolDefinitionSource, eventPublisher, toolCallService,
+                checkpointBoundary, continuations, streaming);
     }
 }

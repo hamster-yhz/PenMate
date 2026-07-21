@@ -7,6 +7,11 @@ package com.penmate.backend.interfaces.api.agent.dto;
 public record AgentSessionDto(
         String sessionId,
         String title,
-        String status
+        String status,
+        String lastRunStatus,
+        String lastMessageAt,
+        String createdAt,
+        String updatedAt,
+        String deletedAt
 ) {
 }
