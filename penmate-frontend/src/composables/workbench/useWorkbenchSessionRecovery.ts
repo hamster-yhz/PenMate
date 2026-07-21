@@ -1,5 +1,6 @@
 import { pickBusinessRecord } from '@/utils/apiPayload'
 import type { WorkbenchRecoverySnapshot } from '@/api/types'
+import type { AgentRunEventStream } from '@/api/agentRunStream'
 
 /**
  * 工作台会话恢复编排器。
@@ -12,7 +13,7 @@ export const useWorkbenchSessionRecovery = (deps: {
     sessionId: string,
     payload: Record<string, unknown>,
   ) => Promise<WorkbenchRecoverySnapshot>
-  openRunStream: (projectId: string, runId: string, after?: string) => EventSource
+  openRunStream: (projectId: string, runId: string, after?: string) => AgentRunEventStream
   hydrateStore: (snapshot: WorkbenchRecoverySnapshot) => void
   resumeRunningRun?: (projectId: string, runId: string, after?: string) => Promise<void>
 }) => {
@@ -29,7 +30,7 @@ export const useWorkbenchSessionRecovery = (deps: {
     const latestSequence = String(snapshot?.activeRun?.latestSequence ?? '0')
     if (runId != null && String(runId).trim() !== '' && String(runId) !== '0' && runStatus === 'RUNNING') {
       if (deps.resumeRunningRun) {
-        await deps.resumeRunningRun(projectId, runId, latestSequence)
+        void deps.resumeRunningRun(projectId, runId, latestSequence).catch(() => undefined)
       } else {
         deps.openRunStream(projectId, runId, latestSequence)
       }

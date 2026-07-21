@@ -56,6 +56,8 @@ export const useWorkbenchPageController = () => {
   const novelTitle = ref('未命名小说')
   const leftCollapsed = ref(false)
   const rightCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches)
+  const chatFocused = ref(false)
+  const chatPanelWidth = ref(440)
   const showStyleManager = ref(false)
   const showPluginWorkshop = ref(false)
   const showModelSettings = ref(false)
@@ -134,8 +136,6 @@ export const useWorkbenchPageController = () => {
     editorRedo,
     wrapSelection,
     insertPrefix,
-    mergeToEditor,
-    replaceSelected,
     saveContent,
     selectChapterDraft,
   } = useWorkbenchEditor({
@@ -232,6 +232,9 @@ export const useWorkbenchPageController = () => {
     showConversationPanel,
     conversationLoading,
     conversationList,
+    deletedConversationList,
+    recentlyDeletedConversation,
+    runAttempts,
     chatInput,
     isGenerating,
     isCancelling,
@@ -245,6 +248,10 @@ export const useWorkbenchPageController = () => {
     runtimeEventSource,
     currentConversationId,
     toggleConversationPanel,
+    loadDeletedConversations,
+    renameConversation,
+    deleteConversation,
+    restoreConversation,
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
@@ -252,10 +259,10 @@ export const useWorkbenchPageController = () => {
     handleApprove,
     handleReject,
     bindChatContainer,
+    showScrollToBottom,
+    scrollChatToBottom,
     selectConversation: handleSelectConversation,
     createSession: handleCreateSession,
-    mergeMessageToEditor: handleMergeToEditor,
-    replaceMessageSelection: handleReplaceSelected,
     resumeLatestSession,
     dispose: disposeChat,
   } = useWorkbenchAgentController({
@@ -270,8 +277,6 @@ export const useWorkbenchPageController = () => {
     requestModelSelection: () => {
       showModelSettings.value = true
     },
-    mergeToEditor,
-    replaceSelected,
     onRecoveryContext: (context) => {
       const chapterId = String(context.chapterId ?? '').trim()
       if (chapterId && chapterId !== '0') activeChapter.value = chapterId
@@ -357,6 +362,8 @@ export const useWorkbenchPageController = () => {
     novelTitle,
     leftCollapsed,
     rightCollapsed,
+    chatFocused,
+    chatPanelWidth,
     showStyleManager,
     showPluginWorkshop,
     showModelSettings,
@@ -409,6 +416,9 @@ export const useWorkbenchPageController = () => {
     showConversationPanel,
     conversationLoading,
     conversationList,
+    deletedConversationList,
+    recentlyDeletedConversation,
+    runAttempts,
     chatInput,
     isGenerating,
     isCancelling,
@@ -421,6 +431,10 @@ export const useWorkbenchPageController = () => {
     streamingAssistantMsgId,
     currentConversationId,
     toggleConversationPanel,
+    loadDeletedConversations,
+    renameConversation,
+    deleteConversation,
+    restoreConversation,
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
@@ -428,10 +442,10 @@ export const useWorkbenchPageController = () => {
     handleApprove,
     handleReject,
     bindChatContainer,
+    showScrollToBottom,
+    scrollChatToBottom,
     handleSelectConversation,
     handleCreateSession,
-    handleMergeToEditor,
-    handleReplaceSelected,
     handleOutlineSelectChapter,
     updateTitle,
     navigateFromUserMenu,

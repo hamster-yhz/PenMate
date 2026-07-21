@@ -90,6 +90,8 @@
 
       <WorkbenchRightPanel
         :collapsed="rightCollapsed"
+        :focused="chatFocused"
+        :panel-width="chatPanelWidth"
         :current-model-name="currentModelName"
         :generation-status-text="generationStatusText"
         :agent-status-detail-text="agentStatusDetailText"
@@ -102,20 +104,30 @@
         :show-conversation-panel="showConversationPanel"
         :conversation-loading="conversationLoading"
         :conversation-list="conversationList"
+        :deleted-conversation-list="deletedConversationList"
+        :recently-deleted-conversation="recentlyDeletedConversation"
         :current-conversation-id="currentConversationId"
         :bound-style-name="boundStyleName"
         :bind-chat-container="bindChatContainer"
+        :show-scroll-to-bottom="showScrollToBottom"
         :messages="visibleMessages"
+        :run-attempts="runAttempts"
         :streaming-assistant-msg-id="streamingAssistantMsgId"
         :is-approval-busy="isApprovalBusy"
         :chat-input="chatInput"
         :active-plugins="activePlugins"
+        :active-chapter-title="currentChapterTitle"
+        :selected-text="selectedText"
         @toggle-collapse="rightCollapsed = !rightCollapsed"
+        @toggle-focus="chatFocused = !chatFocused"
+        @update:panel-width="chatPanelWidth = $event"
         @toggle-history="toggleConversationPanel"
         @create-session="handleCreateSession"
         @select-conversation="handleSelectConversation"
-        @merge-to-editor="handleMergeToEditor"
-        @replace-selected="handleReplaceSelected"
+        @load-deleted-conversations="loadDeletedConversations"
+        @rename-conversation="renameConversation($event.conversationId, $event.title)"
+        @delete-conversation="deleteConversation"
+        @restore-conversation="restoreConversation"
         @approve="handleApprove"
         @reject="handleReject"
         @open-story-bible="openStoryBible"
@@ -124,12 +136,17 @@
         @cancel-run="cancelCurrentRun"
         @retry-run="retryCurrentRun"
         @open-model-settings="showModelSettings = true"
+        @clear-selected-text="selectedText = ''"
+        @scroll-to-bottom="scrollChatToBottom"
       />
 
       <button
+        v-if="!chatFocused"
         type="button"
         class="mobile-chat-toggle"
+        :class="{ open: !rightCollapsed }"
         :title="rightCollapsed ? '打开 Agent 对话' : '关闭 Agent 对话'"
+        :aria-label="rightCollapsed ? '打开 Agent 对话' : '关闭 Agent 对话'"
         @click="rightCollapsed = !rightCollapsed"
       >
         <MessageOutlined v-if="rightCollapsed" />
@@ -172,6 +189,8 @@ const {
   novelTitle,
   leftCollapsed,
   rightCollapsed,
+  chatFocused,
+  chatPanelWidth,
   showStyleManager,
   showPluginWorkshop,
   showModelSettings,
@@ -224,6 +243,9 @@ const {
   showConversationPanel,
   conversationLoading,
   conversationList,
+  deletedConversationList,
+  recentlyDeletedConversation,
+  runAttempts,
   chatInput,
   isGenerating,
   isCancelling,
@@ -236,6 +258,10 @@ const {
   streamingAssistantMsgId,
   currentConversationId,
   toggleConversationPanel,
+  loadDeletedConversations,
+  renameConversation,
+  deleteConversation,
+  restoreConversation,
   sendMessage,
   cancelCurrentRun,
   retryCurrentRun,
@@ -243,10 +269,10 @@ const {
   handleApprove,
   handleReject,
   bindChatContainer,
+  showScrollToBottom,
+  scrollChatToBottom,
   handleSelectConversation,
   handleCreateSession,
-  handleMergeToEditor,
-  handleReplaceSelected,
   handleOutlineSelectChapter,
   updateTitle,
   navigateFromUserMenu,
@@ -286,6 +312,7 @@ const {
 }
 
 .workbench-shell {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -305,13 +332,17 @@ const {
     right: 0;
     bottom: 0;
     z-index: 240;
-    width: min(92vw, 360px);
+    width: min(92vw, 420px) !important;
+    height: auto;
     border-left: 1px solid var(--border-gold);
     background: rgba(11, 17, 32, 0.99);
     box-shadow: var(--shadow-lg);
   }
   .workbench-shell > .panel-right.collapsed {
     display: none;
+  }
+  .workbench-shell > .panel-right.focused {
+    width: 100% !important;
   }
   .workbench-shell > .panel-right .panel-toggle {
     display: none;
@@ -331,6 +362,15 @@ const {
     background: rgba(17, 24, 39, 0.98);
     box-shadow: var(--shadow-lg);
     cursor: pointer;
+  }
+  .mobile-chat-toggle.open {
+    top: 56px;
+    right: min(92vw, 420px);
+    bottom: auto;
+    width: 32px;
+    height: 40px;
+    border-right: 0;
+    border-radius: 4px 0 0 4px;
   }
 }
 </style>

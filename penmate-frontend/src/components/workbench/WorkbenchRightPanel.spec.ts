@@ -29,11 +29,10 @@ const ConversationHistoryPanelStub = defineComponent({
 
 const ChatMessageListStub = defineComponent({
   name: 'ChatMessageList',
-  emits: ['merge-to-editor', 'approve'],
+  emits: ['approve'],
   setup(_, { emit }) {
     return () =>
       h('div', [
-        h('button', { 'data-testid': 'merge-to-editor', onClick: () => emit('merge-to-editor', { messageId: 9 }) }),
         h('button', { 'data-testid': 'approve-message', onClick: () => emit('approve', 'approval-9') }),
       ])
   },
@@ -73,6 +72,7 @@ describe('WorkbenchRightPanel', () => {
         conversationList: [{ conversationId: '77', title: '会话1', updatedAt: '2026-04-27 10:00:00' }],
         currentConversationId: '77',
         bindChatContainer: () => undefined,
+        showScrollToBottom: true,
         messages: [],
         streamingAssistantMsgId: null,
         isApprovalBusy: () => false,
@@ -96,24 +96,24 @@ describe('WorkbenchRightPanel', () => {
     await wrapper.get('[data-testid="create-session"]').trigger('click')
     await wrapper.get('[data-testid="select-conversation"]').trigger('click')
     await wrapper.get('[data-testid="close-history"]').trigger('click')
-    await wrapper.get('[data-testid="merge-to-editor"]').trigger('click')
     await wrapper.get('[data-testid="approve-message"]').trigger('click')
     await wrapper.get('[data-testid="chat-input-update"]').trigger('click')
     await wrapper.get('[data-testid="chat-send"]').trigger('click')
     await wrapper.get('[data-testid="chat-cancel"]').trigger('click')
     await wrapper.get('[data-testid="chat-retry"]').trigger('click')
     await wrapper.get('[data-testid="open-model-settings"]').trigger('click')
+    await wrapper.get('[aria-label="回到底部"]').trigger('click')
 
     expect(wrapper.emitted('toggle-collapse')).toEqual([[]])
     expect(wrapper.emitted('toggle-history')).toEqual([[], []])
     expect(wrapper.emitted('create-session')).toEqual([[]])
     expect(wrapper.emitted('select-conversation')).toEqual([['77']])
-    expect(wrapper.emitted('merge-to-editor')).toEqual([[{ messageId: 9 }]])
     expect(wrapper.emitted('approve')).toEqual([['approval-9']])
     expect(wrapper.emitted('update:chat-input')).toEqual([['继续生成']])
     expect(wrapper.emitted('send')).toEqual([[]])
     expect(wrapper.emitted('cancel-run')).toEqual([[]])
     expect(wrapper.emitted('retry-run')).toEqual([[]])
     expect(wrapper.emitted('open-model-settings')).toEqual([[]])
+    expect(wrapper.emitted('scroll-to-bottom')).toEqual([[]])
   })
 })

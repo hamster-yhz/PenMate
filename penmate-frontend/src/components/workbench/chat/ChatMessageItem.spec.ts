@@ -44,22 +44,18 @@ const mountChatMessageItem = async (
 }
 
 describe('ChatMessageItem', () => {
-  it('renders_assistant_actions_and_emits_editor_commands', async () => {
+  it('renders compact assistant markdown without editor mutation actions', async () => {
     const wrapper = await mountChatMessageItem({
       msg: {
         id: 7,
         role: 'assistant',
-        text: '你好\n世界',
+        text: '**你好**\n世界',
       },
     })
 
-    expect(wrapper.get('[data-testid="message-text"]').text()).toBe('你好\n世界')
-
-    await wrapper.get('[data-testid="merge-to-editor"]').trigger('click')
-    await wrapper.get('[data-testid="replace-selected"]').trigger('click')
-
-    expect(wrapper.emitted('merge-to-editor')).toEqual([[{ id: 7, role: 'assistant', text: '你好\n世界' }]])
-    expect(wrapper.emitted('replace-selected')).toEqual([[{ id: 7, role: 'assistant', text: '你好\n世界' }]])
+    expect(wrapper.get('[data-testid="message-text"] strong').text()).toBe('你好')
+    expect(wrapper.find('[data-testid="merge-to-editor"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="replace-selected"]').exists()).toBe(false)
   })
 
   it('renders_untrusted_message_content_as_text', async () => {

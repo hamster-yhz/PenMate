@@ -1,233 +1,164 @@
+<script setup lang="ts">
+import { ArrowDownOutlined } from '@ant-design/icons-vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
+import AgentSessionHeader from '@/components/workbench/chat/AgentSessionHeader.vue'
+import ChatComposer from '@/components/workbench/chat/ChatComposer.vue'
+import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
+import ConversationHistoryPanel from '@/components/workbench/chat/ConversationHistoryPanel.vue'
+import type { AgentRunAttempt, ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
+
+const props = withDefaults(defineProps<{
+  collapsed: boolean
+  focused?: boolean
+  panelWidth?: number
+  currentModelName?: string
+  generationStatusText?: string
+  agentStatusDetailText?: string
+  isGenerating?: boolean
+  canCancelRun?: boolean
+  isCancelling?: boolean
+  canRetryRun?: boolean
+  isRetrying?: boolean
+  generationPhase?: GenerationPhase
+  boundStyleName?: string
+  showConversationPanel?: boolean
+  conversationLoading?: boolean
+  conversationList?: ConversationItem[]
+  deletedConversationList?: ConversationItem[]
+  recentlyDeletedConversation?: ConversationItem | null
+  currentConversationId?: string | null
+  bindChatContainer: (element: HTMLElement | null) => void
+  showScrollToBottom?: boolean
+  messages?: ChatMessage[]
+  runAttempts?: AgentRunAttempt[]
+  streamingAssistantMsgId?: string | number | null
+  isApprovalBusy: (approvalId: string) => boolean
+  chatInput?: string
+  activePlugins?: string[]
+  activeChapterTitle?: string
+  selectedText?: string
+}>(), {
+  focused: false, panelWidth: 440, currentModelName: '', generationStatusText: '', agentStatusDetailText: '',
+  isGenerating: false, canCancelRun: false, isCancelling: false, canRetryRun: false, isRetrying: false,
+  generationPhase: 'idle', boundStyleName: '', showConversationPanel: false, conversationLoading: false,
+  conversationList: () => [], deletedConversationList: () => [], currentConversationId: null,
+  recentlyDeletedConversation: null,
+  messages: () => [], runAttempts: () => [], streamingAssistantMsgId: null, chatInput: '', activePlugins: () => [],
+  activeChapterTitle: '', selectedText: '', showScrollToBottom: false,
+})
+
+const emit = defineEmits<{
+  'toggle-collapse': []; 'toggle-focus': []; 'update:panel-width': [width: number]; 'toggle-history': [];
+  'create-session': []; 'select-conversation': [payload: string]; 'load-deleted-conversations': [];
+  'rename-conversation': [payload: { conversationId: string; title: string }]; 'delete-conversation': [payload: string];
+  'restore-conversation': [payload: string]; approve: [payload: string]; reject: [payload: string];
+  'open-story-bible': [payload: string]; 'update:chat-input': [payload: string]; send: [];
+  'cancel-run': []; 'retry-run': []; 'open-model-settings': [];
+  'clear-selected-text': [];
+  'scroll-to-bottom': [];
+}>()
+
+const chatContainerRef = ref<HTMLElement | null>(null)
+const panelStyle = computed(() => props.focused ? { width: '100%' } : { width: props.collapsed ? '0px' : `${props.panelWidth}px` })
+const pendingApprovalMessage = computed(() => [...props.messages].reverse().find((item) => item.approval && !item.approval.resolved) ?? null)
+
+watch(chatContainerRef, (value) => props.bindChatContainer(value), { immediate: true })
+
+let stopResize: (() => void) | null = null
+const startResize = (event: PointerEvent) => {
+  if (props.focused) return
+  event.preventDefault()
+  const startX = event.clientX
+  const startWidth = props.panelWidth
+  const move = (next: PointerEvent) => emit('update:panel-width', Math.min(760, Math.max(360, startWidth + startX - next.clientX)))
+  const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); stopResize = null }
+  stopResize = stop
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', stop)
+}
+onUnmounted(() => stopResize?.())
+</script>
+
 <template>
-  <aside class="panel panel-right glass-panel" :class="{ collapsed }">
-    <button
-      type="button"
-      class="panel-toggle right-toggle"
-      :aria-label="collapsed ? '展开对话面板' : '收起对话面板'"
-      @click="emit('toggle-collapse')"
-    >
-      {{ collapsed ? '◂' : '▸' }}
+  <aside class="panel-right glass-panel" :class="{ collapsed, focused }" :style="panelStyle">
+    <button v-if="!focused" type="button" class="panel-toggle" :aria-label="collapsed ? '展开对话面板' : '收起对话面板'" @click="emit('toggle-collapse')">
+      {{ collapsed ? '‹' : '›' }}
     </button>
-
-    <div v-show="!collapsed" class="panel-content">
+    <div v-if="!collapsed || focused" class="panel-content">
+      <button v-if="!focused" type="button" class="resize-handle" aria-label="调整对话面板宽度" @pointerdown="startResize"></button>
       <AgentSessionHeader
-        :current-model-name="currentModelName"
-        :generation-status-text="generationStatusText"
-        :agent-status-detail-text="agentStatusDetailText"
-        :is-generating="isGenerating"
-        :can-cancel-run="canCancelRun"
-        :is-cancelling="isCancelling"
-        :generation-phase="generationPhase"
-        :bound-style-name="boundStyleName"
-        @toggle-history="emit('toggle-history')"
-        @create-session="emit('create-session')"
+        :current-model-name="currentModelName" :generation-status-text="generationStatusText"
+        :agent-status-detail-text="agentStatusDetailText" :is-generating="isGenerating"
+        :generation-phase="generationPhase" :bound-style-name="boundStyleName" :focused="focused"
+        @toggle-history="emit('toggle-history')" @create-session="emit('create-session')" @toggle-focus="emit('toggle-focus')"
       />
-
       <ConversationHistoryPanel
-        :visible="showConversationPanel"
-        :loading="conversationLoading"
-        :conversations="conversationList"
-        :current-conversation-id="currentConversationId"
-        @close="emit('toggle-history')"
-        @select-conversation="emit('select-conversation', $event)"
+        :visible="showConversationPanel" :loading="conversationLoading" :conversations="conversationList"
+        :deleted-conversations="deletedConversationList" :current-conversation-id="currentConversationId"
+        @close="emit('toggle-history')" @select-conversation="emit('select-conversation', $event)"
+        @load-deleted="emit('load-deleted-conversations')" @rename="emit('rename-conversation', $event)"
+        @delete="emit('delete-conversation', $event)" @restore="emit('restore-conversation', $event)"
       />
-
-      <div ref="chatContainerRef" class="chat-messages">
+      <main ref="chatContainerRef" class="chat-scroll" aria-live="polite">
+        <div v-if="!messages.length" class="chat-empty">
+          <strong>开始一次写作协作</strong><span>选择章节并描述你希望 Agent 完成的工作。</span>
+        </div>
         <ChatMessageList
-          :messages="messages"
-          :is-generating="isGenerating"
-          :streaming-assistant-msg-id="streamingAssistantMsgId"
-          :is-approval-busy="isApprovalBusy"
-          @merge-to-editor="emit('merge-to-editor', $event)"
-          @replace-selected="emit('replace-selected', $event)"
-          @approve="emit('approve', $event)"
-          @reject="emit('reject', $event)"
-          @open-story-bible="emit('open-story-bible', $event)"
+          :messages="messages" :run-attempts="runAttempts" :is-generating="isGenerating"
+          :streaming-assistant-msg-id="streamingAssistantMsgId" :is-approval-busy="isApprovalBusy"
+          @approve="emit('approve', $event)" @reject="emit('reject', $event)" @open-story-bible="emit('open-story-bible', $event)"
+        />
+      </main>
+      <button
+        v-if="showScrollToBottom"
+        type="button"
+        class="scroll-to-bottom"
+        title="回到底部"
+        aria-label="回到底部"
+        @click="emit('scroll-to-bottom')"
+      >
+        <ArrowDownOutlined />
+      </button>
+      <div v-if="pendingApprovalMessage?.approval" class="pending-approval-bar" role="region" aria-label="待处理审批">
+        <ApprovalCard
+          :card="pendingApprovalMessage.approval" :busy="isApprovalBusy(pendingApprovalMessage.approval.id)"
+          @approve="emit('approve', $event)" @reject="emit('reject', $event)" @open-story-bible="emit('open-story-bible', $event)"
         />
       </div>
-
+      <div v-if="recentlyDeletedConversation" class="undo-delete" role="status">
+        <span>已删除“{{ recentlyDeletedConversation.title }}”</span>
+        <button type="button" @click="emit('restore-conversation', recentlyDeletedConversation.conversationId)">撤销</button>
+      </div>
       <ChatComposer
-        :model-value="chatInput"
-        :is-generating="isGenerating"
-        :can-cancel-run="canCancelRun"
-        :is-cancelling="isCancelling"
-        :can-retry-run="canRetryRun"
-        :is-retrying="isRetrying"
-        :current-model-name="currentModelName"
-        :active-plugins="activePlugins"
-        @update:model-value="emit('update:chat-input', $event)"
-        @send="emit('send')"
-        @cancel="emit('cancel-run')"
-        @retry="emit('retry-run')"
-        @open-model-settings="emit('open-model-settings')"
+        :model-value="chatInput" :is-generating="isGenerating" :can-cancel-run="canCancelRun"
+        :is-cancelling="isCancelling" :can-retry-run="canRetryRun" :is-retrying="isRetrying"
+        :current-model-name="currentModelName" :active-plugins="activePlugins" :active-chapter-title="activeChapterTitle"
+        :selected-text="selectedText" :bound-style-name="boundStyleName"
+        @update:model-value="emit('update:chat-input', $event)" @send="emit('send')" @cancel="emit('cancel-run')"
+        @retry="emit('retry-run')" @open-model-settings="emit('open-model-settings')"
+        @clear-selected-text="emit('clear-selected-text')"
       />
     </div>
   </aside>
 </template>
 
-<script setup lang="ts">
-import { ref, watch } from 'vue'
-import AgentSessionHeader from '@/components/workbench/chat/AgentSessionHeader.vue'
-import ConversationHistoryPanel from '@/components/workbench/chat/ConversationHistoryPanel.vue'
-import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
-import ChatComposer from '@/components/workbench/chat/ChatComposer.vue'
-import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
-
-const props = withDefaults(
-  defineProps<{
-    collapsed: boolean
-    currentModelName?: string
-    generationStatusText?: string
-    agentStatusDetailText?: string
-    isGenerating?: boolean
-    canCancelRun?: boolean
-    isCancelling?: boolean
-    canRetryRun?: boolean
-    isRetrying?: boolean
-    generationPhase?: GenerationPhase
-    boundStyleName?: string
-    showConversationPanel?: boolean
-    conversationLoading?: boolean
-    conversationList?: ConversationItem[]
-    currentConversationId?: string | null
-    bindChatContainer: (element: HTMLElement | null) => void
-    messages?: ChatMessage[]
-    streamingAssistantMsgId?: string | number | null
-    isApprovalBusy: (approvalId: string) => boolean
-    chatInput?: string
-    activePlugins?: string[]
-  }>(),
-  {
-    currentModelName: '',
-    generationStatusText: '',
-    agentStatusDetailText: '',
-    isGenerating: false,
-    canCancelRun: false,
-    isCancelling: false,
-    canRetryRun: false,
-    isRetrying: false,
-    generationPhase: 'idle',
-    boundStyleName: '',
-    showConversationPanel: false,
-    conversationLoading: false,
-    conversationList: () => [],
-    currentConversationId: null,
-    messages: () => [],
-    streamingAssistantMsgId: null,
-    chatInput: '',
-    activePlugins: () => [],
-  },
-)
-
-const emit = defineEmits<{
-  (event: 'toggle-collapse'): void
-  (event: 'toggle-history'): void
-  (event: 'create-session'): void
-  (event: 'select-conversation', payload: string): void
-  (event: 'merge-to-editor', payload: ChatMessage): void
-  (event: 'replace-selected', payload: ChatMessage): void
-  (event: 'approve', payload: string): void
-  (event: 'reject', payload: string): void
-  (event: 'open-story-bible', payload: string): void
-  (event: 'update:chat-input', payload: string): void
-  (event: 'send'): void
-  (event: 'cancel-run'): void
-  (event: 'retry-run'): void
-  (event: 'open-model-settings'): void
-}>()
-
-const chatContainerRef = ref<HTMLElement | null>(null)
-
-watch(
-  chatContainerRef,
-  (value) => {
-    props.bindChatContainer(value)
-  },
-  { immediate: true },
-)
-</script>
-
-<style lang="less" scoped>
-.panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  transition: width 0.3s var(--ease-silk);
-}
-
-.panel-toggle {
-  position: absolute;
-  top: 50%;
-  z-index: 10;
-  width: 16px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(17, 24, 39, 0.9);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  cursor: pointer;
-  transition: all 0.3s;
-
-  &:hover {
-    color: var(--amber-gold);
-    border-color: var(--border-gold);
-  }
-}
-
-.panel-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-right {
-  width: clamp(320px, 26vw, 420px);
-  min-width: 0;
-  border-left: 1px solid var(--border-subtle);
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(11, 17, 32, 0.56));
-  box-shadow: var(--shadow-lg), var(--shadow-gold);
-
-  &.collapsed {
-    width: 0;
-    border-left: none;
-
-    .right-toggle {
-      left: -16px;
-      border-radius: 4px 0 0 4px;
-    }
-  }
-
-  .right-toggle {
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%) translateX(-100%);
-    border-radius: 4px 0 0 4px;
-    border-right: none;
-  }
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-@media (max-width: 1360px) {
-  .panel-right {
-    width: 320px;
-  }
-}
-
-@media (max-width: 1120px) {
-  .panel-right {
-    width: 300px;
-  }
-}
+<style scoped lang="less">
+.panel-right { position: relative; flex: 0 0 auto; min-width: 0; height: 100%; border-left: 1px solid var(--border-subtle); background: #0b1120; box-shadow: -12px 0 28px rgba(2, 6, 23, 0.18); transition: width 180ms ease; }
+.panel-right.focused { position: absolute; inset: 0; z-index: 210; border-left: 0; }
+.panel-right.collapsed { border-left: 0; box-shadow: none; }
+.panel-content { position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.panel-toggle { position: absolute; left: -24px; top: 50%; z-index: 12; width: 24px; height: 48px; border: 1px solid var(--border-subtle); border-right: 0; background: #111827; color: var(--text-muted); cursor: pointer; }
+.resize-handle { position: absolute; inset: 0 auto 0 -4px; z-index: 15; width: 8px; border: 0; background: transparent; cursor: col-resize; }
+.resize-handle:hover, .resize-handle:focus-visible { background: rgba(105, 168, 207, 0.3); outline: 0; }
+.chat-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 18px; scrollbar-gutter: stable; }
+.chat-empty { min-height: 180px; display: grid; place-content: center; gap: 5px; color: var(--text-muted); text-align: center; }
+.chat-empty strong { color: var(--text-secondary); font-size: 14px; } .chat-empty span { font-size: 12px; }
+.scroll-to-bottom { position: absolute; right: 22px; bottom: 112px; z-index: 12; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-subtle); background: #182235; color: var(--text-secondary); box-shadow: 0 6px 18px rgba(2, 6, 23, 0.32); cursor: pointer; }
+.scroll-to-bottom:hover, .scroll-to-bottom:focus-visible { border-color: rgba(105, 168, 207, 0.5); color: #8cc4e6; outline: 0; }
+.pending-approval-bar { flex: 0 0 auto; max-height: 38vh; overflow: auto; padding: 10px 14px; border-top: 1px solid rgba(216, 177, 94, 0.24); background: #111827; box-shadow: 0 -8px 20px rgba(2, 6, 23, 0.25); }
+.undo-delete { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 14px; border-top: 1px solid var(--border-subtle); background: #182235; color: var(--text-secondary); font-size: 12px; }
+.undo-delete button { border: 0; background: transparent; color: #86c3e7; cursor: pointer; font-weight: 650; }
+@media (max-width: 1080px) { .resize-handle { display: none; } .panel-right.focused { position: fixed; top: 48px; } }
+@media (prefers-reduced-motion: reduce) { .panel-right { transition: none; } }
 </style>

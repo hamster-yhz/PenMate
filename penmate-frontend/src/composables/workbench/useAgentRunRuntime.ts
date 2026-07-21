@@ -1,9 +1,15 @@
 import type { WorkbenchRuntimeApproval, WorkbenchRuntimeEventSource, WorkbenchRuntimeToolCall } from '@/api/types'
+import type { AgentRunEventStream } from '@/api/agentRunStream'
 import type { GenerationPhase } from '@/components/workbench/workbenchTypes'
 import type { ChatRecord } from './useWorkbenchChatTimeline'
 
 export type AgentRunStatus =
   'pending' | 'running' | 'waiting_approval' | 'suspended' | 'completed' | 'failed' | 'cancelled' | 'superseded'
+
+export type AgentRunReconciliationResult = {
+  status: AgentRunStatus | ''
+  errorMessage?: string
+}
 
 type StreamListener = (event: MessageEvent<string>) => void
 
@@ -53,7 +59,9 @@ const normalizeToolCall = (value: unknown): WorkbenchRuntimeToolCall | null => {
   return {
     toolCallId: record.toolCallId == null ? null : String(record.toolCallId),
     toolCode: record.toolCode == null ? null : String(record.toolCode),
-    toolName: record.toolName == null ? null : String(record.toolName),
+    toolName: record.toolDisplayName == null
+      ? record.toolName == null ? null : String(record.toolName)
+      : String(record.toolDisplayName),
     status: record.status == null ? null : String(record.status),
     iteration: record.iteration == null ? null : Number(record.iteration),
     argumentsPreview: record.argumentsPreview ?? null,
@@ -96,7 +104,7 @@ const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown
 })
 
 const failureMessage = (payload: Record<string, unknown>) =>
-  String(payload.errorMsg || payload.message || payload.errorCode || '运行失败')
+  String(payload.errorMessage || payload.errorMsg || payload.message || payload.errorCode || '运行失败')
 
 export const createAgentRunRuntime = (deps: {
   getRunStatus: () => AgentRunStatus | ''
@@ -104,21 +112,33 @@ export const createAgentRunRuntime = (deps: {
   setAgentStatusDetailText: (value: string) => void
   getRunPhase: () => GenerationPhase
   setRunPhase: (value: GenerationPhase) => void
-  getRunStream: () => EventSource | null
-  setRunStream: (stream: EventSource | null) => void
-  openRunStream: (projectId: string, runId: string, after?: string) => EventSource
-  addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
-  closeRunStream?: (stream: EventSource | null) => void
+  getRunStream: () => AgentRunEventStream | null
+  setRunStream: (stream: AgentRunEventStream | null) => void
+  openRunStream: (projectId: string, runId: string, after?: string) => AgentRunEventStream
+  addStreamListener: (stream: AgentRunEventStream, eventName: string, listener: StreamListener) => void
+  closeRunStream?: (stream: AgentRunEventStream | null) => void
   scrollChat: () => void
   setRuntimeEventSource?: (value: WorkbenchRuntimeEventSource | null) => void
-  onToken?: (token: string) => void
+  onEvent?: (eventName: string, payload: Record<string, unknown>) => void
+  onConnectionState?: (state: 'connecting' | 'connected' | 'reconnecting' | 'closed') => void
+  onToken?: (token: string, payload: Record<string, unknown>) => void
+  onMessageSnapshot?: (text: string, payload: Record<string, unknown>) => void
   onMessageCompleted?: (text: string) => void
   onToolCall?: (payload: Record<string, unknown>) => void
   onWaitingApproval?: (payload: Record<string, unknown>) => void
   onStreamReset?: (payload: Record<string, unknown>) => AgentRunStatus | '' | Promise<AgentRunStatus | ''>
+  onStreamError?: (
+    payload: Record<string, unknown>,
+    runId: string,
+  ) => AgentRunReconciliationResult | Promise<AgentRunReconciliationResult>
   setLatestSequence?: (value: string) => void
 }) => {
-  const closeRunStream = () => {
+  let stopActiveReconciliation: (() => void) | null = null
+  let abandonActiveConsumption: (() => void) | null = null
+
+  const closeTransport = () => {
+    stopActiveReconciliation?.()
+    stopActiveReconciliation = null
     const stream = deps.getRunStream()
     if (stream) {
       deps.closeRunStream?.(stream)
@@ -127,10 +147,21 @@ export const createAgentRunRuntime = (deps: {
     }
   }
 
+  const closeRunStream = () => {
+    const abandon = abandonActiveConsumption
+    if (abandon) {
+      abandon()
+      return
+    }
+    closeTransport()
+  }
+
   const publish = (eventName: string, payload: Record<string, unknown>) => {
+    deps.onConnectionState?.('connected')
     const sequence = payload.sequence == null ? null : String(payload.sequence)
     if (sequence && /^\d+$/.test(sequence)) deps.setLatestSequence?.(sequence)
     deps.setRuntimeEventSource?.(toRuntimeEventSource(eventName, payload))
+    deps.onEvent?.(eventName, payload)
   }
 
   const consumeRunStream = (projectId: string, runId: string, after = '0') =>
@@ -138,23 +169,53 @@ export const createAgentRunRuntime = (deps: {
       closeRunStream()
       const stream = deps.openRunStream(projectId, runId, after)
       deps.setRunStream(stream)
+      deps.onConnectionState?.('connecting')
       let settled = false
+      let reconciling = false
+      let reconciliationTimer: ReturnType<typeof setInterval> | null = null
+
+      const stopReconciliation = () => {
+        if (reconciliationTimer) clearInterval(reconciliationTimer)
+        reconciliationTimer = null
+      }
+      stopActiveReconciliation = stopReconciliation
+      let abandonThisConsumption: (() => void) | null = null
+
+      const clearActiveConsumption = () => {
+        if (abandonActiveConsumption === abandonThisConsumption) abandonActiveConsumption = null
+      }
 
       const settleResolve = (status: AgentRunStatus | '') => {
         if (settled) return
         settled = true
-        closeRunStream()
+        stopReconciliation()
+        if (status) deps.setRunStatus(status)
+        clearActiveConsumption()
+        closeTransport()
+        deps.onConnectionState?.('closed')
         resolve(status)
       }
 
       const settleReject = (error: Error) => {
         if (settled) return
         settled = true
-        closeRunStream()
+        stopReconciliation()
+        clearActiveConsumption()
+        closeTransport()
+        deps.onConnectionState?.('closed')
         reject(error)
       }
 
-      deps.addStreamListener(stream, 'stream.reset', async (event) => {
+      abandonThisConsumption = () => settleResolve('')
+      abandonActiveConsumption = abandonThisConsumption
+
+      const listen = (eventName: string, listener: StreamListener) => {
+        deps.addStreamListener(stream, eventName, (event) => {
+          if (!settled) listener(event)
+        })
+      }
+
+      listen('stream.reset', async (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         const latestSequence = String(payload.latestSequence ?? after)
         publish('stream.reset', { ...payload, sequence: latestSequence })
@@ -170,14 +231,76 @@ export const createAgentRunRuntime = (deps: {
         }
       })
 
-      deps.addStreamListener(stream, 'run.started', (event) => {
+      listen('error', (event) => {
+        if (settled) return
+        deps.onConnectionState?.('reconnecting')
+        const payload = parseSseData(event) as Record<string, unknown>
+        const streamError = { ...payload, runId }
+        deps.setRuntimeEventSource?.(toRuntimeEventSource('stream.error', streamError))
+        deps.onEvent?.('stream.error', streamError)
+        if (reconciling) return
+        reconciling = true
+        void (async () => {
+          try {
+            const result = (await deps.onStreamError?.(payload, runId)) ?? { status: '' }
+            if (result.status === 'completed' || result.status === 'cancelled' || result.status === 'superseded') {
+              settleResolve(result.status)
+              return
+            }
+            if (result.status === 'failed') {
+              deps.setRunStatus('failed')
+              deps.setRunPhase('failed')
+              settleReject(new Error(result.errorMessage || failureMessage(payload)))
+              return
+            }
+            if (payload.fatal === true) {
+              settleReject(new Error(getErrorMessage(payload, '事件流连接失败')))
+            }
+          } catch (error) {
+            if (payload.fatal === true) {
+              settleReject(error instanceof Error ? error : new Error(getErrorMessage(payload, '事件流连接失败')))
+            }
+          } finally {
+            reconciling = false
+          }
+        })()
+      })
+
+      // SSE is primary. This low-frequency durable-state check covers half-open
+      // connections and proxies that silently buffer an otherwise healthy stream.
+      reconciliationTimer = setInterval(() => {
+        if (settled || reconciling || !deps.onStreamError) return
+        reconciling = true
+        void Promise.resolve(deps.onStreamError({}, runId))
+          .then((result) => {
+            if (result.status === 'completed' || result.status === 'cancelled' || result.status === 'superseded') {
+              settleResolve(result.status)
+            } else if (result.status === 'failed') {
+              deps.setRunStatus('failed')
+              deps.setRunPhase('failed')
+              settleReject(new Error(result.errorMessage || '运行失败'))
+            }
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            reconciling = false
+          })
+      }, 5_000)
+
+      listen('agent.event', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        const eventName = String(payload.type ?? payload.eventName ?? 'unknown.event')
+        publish(eventName, payload)
+      })
+
+      listen('run.started', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('run.started', payload)
         deps.setRunPhase('streaming')
         deps.setRunStatus('running')
         deps.setAgentStatusDetailText(String(payload.message || ''))
       })
-      deps.addStreamListener(stream, 'run.phase.changed', (event) => {
+      listen('run.phase.changed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('run.phase.changed', payload)
         const status = normalizeRunStatus(payload.status)
@@ -187,28 +310,35 @@ export const createAgentRunRuntime = (deps: {
         )
         deps.setAgentStatusDetailText(String(payload.message || ''))
       })
-      deps.addStreamListener(stream, 'message.delta', (event) => {
+      listen('message.delta', (event) => {
         const payload = parseSseData(event)
         publish('message.delta', payload as Record<string, unknown>)
         const token = String(payload.text ?? payload.token ?? payload.content ?? '')
         if (!token) return
-        deps.onToken?.(token)
+        deps.onToken?.(token, payload as Record<string, unknown>)
         deps.scrollChat()
       })
-      deps.addStreamListener(stream, 'tool.call.started', (event) => {
+      listen('message.snapshot', (event) => {
+        const payload = parseSseData(event) as Record<string, unknown>
+        publish('message.snapshot', payload)
+        const text = String(payload.text ?? payload.content ?? '')
+        deps.onMessageSnapshot?.(text, payload)
+        deps.scrollChat()
+      })
+      listen('tool.call.started', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('tool.call.started', payload)
         deps.onToolCall?.(payload)
         deps.setRunPhase('streaming')
         deps.scrollChat()
       })
-      deps.addStreamListener(stream, 'tool.call.completed', (event) => {
+      listen('tool.call.completed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('tool.call.completed', payload)
         deps.onToolCall?.(payload)
         deps.scrollChat()
       })
-      deps.addStreamListener(stream, 'tool.call.waiting_approval', (event) => {
+      listen('tool.call.waiting_approval', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('tool.call.waiting_approval', payload)
         deps.onWaitingApproval?.(payload)
@@ -216,7 +346,7 @@ export const createAgentRunRuntime = (deps: {
         deps.setRunStatus('waiting_approval')
         deps.scrollChat()
       })
-      deps.addStreamListener(stream, 'approval.requested', (event) => {
+      listen('approval.requested', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('approval.requested', payload)
         deps.onWaitingApproval?.(payload)
@@ -224,7 +354,7 @@ export const createAgentRunRuntime = (deps: {
         deps.setRunStatus('waiting_approval')
         deps.scrollChat()
       })
-      deps.addStreamListener(stream, 'message.completed', (event) => {
+      listen('message.completed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('message.completed', payload)
         const text = String(payload.text ?? payload.content ?? payload.message ?? '')
@@ -233,14 +363,14 @@ export const createAgentRunRuntime = (deps: {
           deps.scrollChat()
         }
       })
-      deps.addStreamListener(stream, 'run.completed', (event) => {
+      listen('run.completed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('run.completed', payload)
         deps.setRunStatus('completed')
         deps.setAgentStatusDetailText(String(payload.message || ''))
         settleResolve('completed')
       })
-      deps.addStreamListener(stream, 'run.failed', (event) => {
+      listen('run.failed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('run.failed', payload)
         deps.setRunPhase('failed')
@@ -249,7 +379,7 @@ export const createAgentRunRuntime = (deps: {
         deps.setAgentStatusDetailText(message)
         settleReject(new Error(message))
       })
-      deps.addStreamListener(stream, 'run.cancelled', (event) => {
+      listen('run.cancelled', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('run.cancelled', payload)
         deps.setRunStatus('cancelled')

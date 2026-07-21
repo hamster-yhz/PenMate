@@ -120,6 +120,9 @@ export const createChatTimeline = (deps: {
       id: messageId || deps.getMsgIdCounter(),
       role: toChatRole(pickMessageRole(item)),
       text: pickMessageText(item),
+      turnId: String(item.turnId ?? '').trim() || undefined,
+      runId: String(item.runId ?? '').trim() || undefined,
+      createdAt: String(item.createdAt ?? '').trim() || undefined,
       ...(toolCallId ? { toolCallId } : {}),
       ...(approval ? { approval } : {}),
     }
@@ -153,6 +156,10 @@ export const createChatTimeline = (deps: {
             conversationId: pickConversationId(item),
             title: String(item.title || ''),
             updatedAt: String(item.updatedAt || item.createdAt || ''),
+            lastMessageAt: String(item.lastMessageAt || ''),
+            status: String(item.status || ''),
+            lastRunStatus: String(item.lastRunStatus || ''),
+            deletedAt: item.deletedAt == null ? null : String(item.deletedAt),
           }))
           .filter((item) => !!item.conversationId),
       )

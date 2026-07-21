@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  ArrowsAltOutlined,
+  CompressOutlined,
+  HistoryOutlined,
+  PlusOutlined,
+  RobotOutlined,
+} from '@ant-design/icons-vue'
+
 withDefaults(
   defineProps<{
     currentModelName?: string
@@ -7,160 +15,56 @@ withDefaults(
     isGenerating?: boolean
     generationPhase?: 'idle' | 'preparing' | 'streaming' | 'waiting_approval' | 'failed'
     boundStyleName?: string
+    focused?: boolean
   }>(),
   {
-    currentModelName: '',
-    generationStatusText: '就绪',
-    agentStatusDetailText: '',
-    isGenerating: false,
-    generationPhase: 'idle',
+    currentModelName: '', generationStatusText: '就绪', agentStatusDetailText: '',
+    isGenerating: false, generationPhase: 'idle', boundStyleName: '', focused: false,
   },
 )
 
-defineEmits<{
-  'toggle-history': []
-  'create-session': []
-}>()
+defineEmits<{ 'toggle-history': []; 'create-session': []; 'toggle-focus': [] }>()
 </script>
 
 <template>
-  <div class="agent-header">
-    <button type="button" class="agent-history-btn" data-testid="toggle-history" @click="$emit('toggle-history')">
-      历史会话
-    </button>
-    <button type="button" class="agent-create-btn" data-testid="create-session" @click="$emit('create-session')">
-      ＋
-    </button>
-    <div class="agent-model" :class="{ empty: !currentModelName }" data-testid="current-model">
-      {{ currentModelName || '未选择模型' }}
+  <header class="agent-header">
+    <div class="agent-title">
+      <span class="agent-mark"><RobotOutlined /></span>
+      <div><strong>写作 Agent</strong><span>{{ generationStatusText }}</span></div>
     </div>
-    <div v-if="boundStyleName" class="agent-style" data-testid="bound-style">
-      {{ boundStyleName }}
+    <div class="agent-meta">
+      <span :class="['status-dot', { busy: isGenerating, failed: generationPhase === 'failed' }]"></span>
+      <span class="model-name" :title="currentModelName || '未选择模型'">{{ currentModelName || '未选择模型' }}</span>
+      <span v-if="boundStyleName" class="style-name">{{ boundStyleName }}</span>
+      <span v-if="agentStatusDetailText" class="status-detail">{{ agentStatusDetailText }}</span>
     </div>
-    <div
-      class="agent-status"
-      :class="{ busy: isGenerating, failed: generationPhase === 'failed' }"
-      data-testid="agent-status"
-    >
-      <span class="status-dot"></span>
-      <span class="agent-status-text-group">
-        <span>{{ generationStatusText }}</span>
-        <span v-if="agentStatusDetailText" class="agent-status-detail" data-testid="agent-status-detail">
-          {{ agentStatusDetailText }}
-        </span>
-      </span>
-    </div>
-  </div>
+    <nav class="agent-actions" aria-label="对话工具">
+      <button type="button" title="会话历史" aria-label="会话历史" data-testid="toggle-history" @click="$emit('toggle-history')"><HistoryOutlined /></button>
+      <button type="button" title="新建会话" aria-label="新建会话" data-testid="create-session" @click="$emit('create-session')"><PlusOutlined /></button>
+      <button type="button" :title="focused ? '退出专注模式' : '进入专注模式'" :aria-label="focused ? '退出专注模式' : '进入专注模式'" @click="$emit('toggle-focus')">
+        <CompressOutlined v-if="focused" /><ArrowsAltOutlined v-else />
+      </button>
+    </nav>
+  </header>
 </template>
 
 <style scoped lang="less">
-.agent-header {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 32, 0.68));
-}
-
-.agent-history-btn,
-.agent-create-btn,
-.agent-model,
-.agent-style,
-.agent-status {
-  min-height: 34px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: rgba(11, 17, 32, 0.56);
-}
-
-.agent-history-btn,
-.agent-create-btn {
-  padding: 0 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.25s var(--ease-silk);
-}
-
-.agent-create-btn {
-  min-width: 34px;
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.agent-history-btn:hover,
-.agent-create-btn:hover {
-  color: var(--amber-gold);
-  border-color: var(--border-gold);
-  box-shadow: var(--shadow-gold);
-}
-
-.agent-model,
-.agent-style,
-.agent-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  color: var(--text-secondary);
-}
-
-.agent-status-text-group {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-  line-height: 1.15;
-}
-
-.agent-status-detail {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.agent-model {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.agent-model.empty {
-  color: var(--text-muted);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--jade-green);
-  box-shadow: 0 0 10px rgba(90, 158, 111, 0.45);
-}
-
-.agent-status.busy .status-dot {
-  background: var(--amber-gold);
-  box-shadow: 0 0 12px rgba(201, 169, 110, 0.45);
-}
-
-.agent-status.failed {
-  color: #f0b9a9;
-  border-color: rgba(192, 60, 45, 0.3);
-  background: rgba(192, 60, 45, 0.08);
-}
-
-.agent-status.failed .status-dot {
-  background: var(--cinnabar);
-  box-shadow: 0 0 12px rgba(192, 60, 45, 0.4);
-}
-
-@media (max-width: 1280px) {
-  .agent-header {
-    grid-template-columns: auto auto 1fr;
-  }
-
-  .agent-model,
-  .agent-status {
-    grid-column: span 3;
-  }
-}
+.agent-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 64px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); background: rgba(11, 17, 32, 0.92); }
+.agent-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.agent-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(94, 154, 190, 0.28); color: #8cc4e6; background: rgba(63, 121, 155, 0.12); }
+.agent-title div { display: grid; gap: 2px; }
+.agent-title strong { color: var(--text-primary); font-size: 13px; }
+.agent-title span { color: var(--text-muted); font-size: 11px; }
+.agent-meta { min-width: 0; display: flex; align-items: center; gap: 7px; overflow: hidden; color: var(--text-muted); font-size: 11px; }
+.status-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: #66b486; }
+.status-dot.busy { background: #d8b15e; box-shadow: 0 0 0 4px rgba(216, 177, 94, 0.1); }
+.status-dot.failed { background: #dc7167; }
+.model-name, .style-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-name { color: var(--text-secondary); }
+.style-name { padding-left: 7px; border-left: 1px solid var(--border-subtle); }
+.status-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d2ae62; }
+.agent-actions { display: flex; gap: 4px; }
+.agent-actions button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; }
+.agent-actions button:hover, .agent-actions button:focus-visible { border-color: var(--border-subtle); color: var(--text-primary); background: rgba(148, 163, 184, 0.08); outline: none; }
+@media (max-width: 560px) { .agent-header { grid-template-columns: minmax(0, 1fr) auto; } .agent-meta { grid-column: 1 / -1; grid-row: 2; } }
 </style>

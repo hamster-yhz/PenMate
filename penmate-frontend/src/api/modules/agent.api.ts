@@ -1,7 +1,11 @@
 import request from '@/utils/request'
+import {
+  createAgentRunEventStream,
+  type AgentRunEventStream,
+  type AgentRunStreamListener,
+} from '@/api/agentRunStream'
 
 type AnyRecord = Record<string, unknown>
-type StreamListener = (event: MessageEvent<string>) => void
 
 type AgentBusinessId = string
 
@@ -47,14 +51,26 @@ const buildRunStreamUrl = (projectId: string, runId: string, after = '0') => {
 }
 
 export const agentApi = {
-  listSessions(projectId: string) {
-    return request.get<AgentSessionRecord[]>(`/v1/novels/${projectId}/agent/sessions`)
+  listSessions(projectId: string, deleted = false) {
+    return request.get<AgentSessionRecord[]>(`/v1/novels/${projectId}/agent/sessions`, { params: { deleted } })
   },
   createSession(projectId: string, payload: AnyRecord) {
     return request.post<AgentSessionRecord>(`/v1/novels/${projectId}/agent/sessions`, withoutActorFields(payload))
   },
   getSessionRecovery(projectId: string, sessionId: string) {
     return request.get<AgentSessionSnapshot>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/recovery`)
+  },
+  listSessionRuns(projectId: string, sessionId: string) {
+    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/runs`)
+  },
+  renameSession(projectId: string, sessionId: string, title: string) {
+    return request.patch<AgentSessionRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}`, { title })
+  },
+  deleteSession(projectId: string, sessionId: string) {
+    return request.delete<string>(`/v1/novels/${projectId}/agent/sessions/${sessionId}`)
+  },
+  restoreDeletedSession(projectId: string, sessionId: string) {
+    return request.post<AgentSessionRecord>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/restore`)
   },
   resumeSession(projectId: string, sessionId: string, payload: AnyRecord) {
     return request.post<AgentSessionSnapshot>(
@@ -80,9 +96,9 @@ export const agentApi = {
   },
   openRunStream(projectId: string, runId: string, after = '0') {
     const url = buildRunStreamUrl(projectId, runId, after)
-    return new EventSource(url)
+    return createAgentRunEventStream(url)
   },
-  addStreamListener(stream: EventSource, eventName: string, listener: StreamListener) {
-    stream.addEventListener(eventName, listener as EventListener)
+  addStreamListener(stream: AgentRunEventStream, eventName: string, listener: AgentRunStreamListener) {
+    stream.addEventListener(eventName, listener)
   },
 }

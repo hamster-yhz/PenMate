@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAgentRunRuntime } from '../useAgentRunRuntime'
+import type { AgentRunEventStream } from '@/api/agentRunStream'
 import type { GenerationPhase } from '@/components/workbench/workbenchTypes'
 
 type Listener = (event: MessageEvent<string>) => void
 
-class FakeEventSource {
+class FakeEventSource implements AgentRunEventStream {
   listeners = new Map<string, Listener>()
   closed = false
+
+  addEventListener(eventName: string, listener: Listener) {
+    this.listeners.set(eventName, listener)
+  }
 
   close() {
     this.closed = true
@@ -32,7 +37,7 @@ const agentRunEventDto = (type: string, payload: Record<string, unknown>, sequen
     createdAt: '2026-07-06T22:33:20.132Z',
   })
 
-const createRuntimeHarness = () => {
+const createRuntimeHarness = (streamErrorStatus: 'completed' | 'failed' | '' = '') => {
   const stream = new FakeEventSource()
   const tokens: string[] = []
   let completedText = ''
@@ -55,9 +60,9 @@ const createRuntimeHarness = () => {
     setRunPhase: (value) => {
       runPhase = value
     },
-    getRunStream: () => stream as unknown as EventSource,
+    getRunStream: () => stream,
     setRunStream: () => undefined,
-    openRunStream: () => stream as unknown as EventSource,
+    openRunStream: () => stream,
     addStreamListener: (_stream, eventName, listener) => {
       stream.listeners.set(eventName, listener)
     },
@@ -78,6 +83,10 @@ const createRuntimeHarness = () => {
       resetCount += 1
       return 'completed' as const
     },
+    onStreamError: async () => ({
+      status: streamErrorStatus,
+      errorMessage: streamErrorStatus === 'failed' ? 'backend failure' : undefined,
+    }),
   })
 
   return {
@@ -105,10 +114,13 @@ const createRuntimeHarness = () => {
       return resetCount
     },
     consume: () => runtime.consumeRunStream('project-1', 'run-1', '0'),
+    close: runtime.closeRunStream,
   }
 }
 
 describe('createAgentRunRuntime', () => {
+  afterEach(() => vi.useRealTimers())
+
   it('unwraps backend AgentRunEventDto payloadJson for stream tokens status and completed text', async () => {
     const harness = createRuntimeHarness()
     const consuming = harness.consume()
@@ -165,5 +177,66 @@ describe('createAgentRunRuntime', () => {
       runId: 'run-1',
       sequence: '80',
     })
+  })
+
+  it('publishes unknown event types from the generic agent event envelope', async () => {
+    const harness = createRuntimeHarness()
+    const consuming = harness.consume()
+
+    harness.stream.listeners.get('agent.event')?.(
+      agentRunEventDto('planner.future.signal', { phase: 'planning', detail: 'kept' }, '7'),
+    )
+
+    expect(harness.runtimeEvent).toMatchObject({
+      eventName: 'planner.future.signal',
+      runId: 'run-1',
+      sequence: '7',
+      phase: 'planning',
+    })
+    expect(harness.latestSequence).toBe('7')
+
+    harness.stream.listeners.get('run.cancelled')?.(
+      agentRunEventDto('run.cancelled', { status: 'cancelled' }, '8'),
+    )
+    await expect(consuming).resolves.toBe('cancelled')
+  })
+
+  it('settles successfully when reconciliation finds a completed Run after a stream error', async () => {
+    const harness = createRuntimeHarness('completed')
+    const consuming = harness.consume()
+
+    harness.stream.listeners.get('error')?.(sseEvent({ message: 'network disconnected', fatal: false }))
+
+    await expect(consuming).resolves.toBe('completed')
+    expect(harness.runtimeEvent).toMatchObject({
+      eventName: 'stream.error',
+      runId: 'run-1',
+      message: 'network disconnected',
+    })
+  })
+
+  it('reconciles a silently stalled stream without waiting for a browser error', async () => {
+    vi.useFakeTimers()
+    const harness = createRuntimeHarness('completed')
+    const consuming = harness.consume()
+
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    await expect(consuming).resolves.toBe('completed')
+    expect(harness.runStatus).toBe('completed')
+  })
+
+  it('settles the active consumer when the UI detaches without cancelling the backend Run', async () => {
+    const harness = createRuntimeHarness()
+    const consuming = harness.consume()
+
+    harness.close()
+
+    await expect(consuming).resolves.toBe('')
+    expect(harness.stream.closed).toBe(true)
+    harness.stream.listeners.get('run.completed')?.(
+      agentRunEventDto('run.completed', { phase: 'completed' }, '12'),
+    )
+    expect(harness.runStatus).toBe('')
   })
 })

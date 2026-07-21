@@ -1,9 +1,11 @@
 import { computed, ref } from 'vue'
 import type { WorkbenchRecoverySnapshot, WorkbenchRuntimeEventSource } from '@/api/types'
+import type { AgentRunEventStream } from '@/api/agentRunStream'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
 import { applyAssistantEventMetadata, createChatTimeline, type ChatRecord } from './useWorkbenchChatTimeline'
 import { createAgentRunRuntime, normalizeRunStatus, type AgentRunStatus } from './useAgentRunRuntime'
-import { pickBusinessRecord } from '@/utils/apiPayload'
+import { useWorkbenchRunTimeline } from './useWorkbenchRunTimeline'
+import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 type ContextProfile = {
   projectId?: string | null
@@ -23,14 +25,16 @@ type UseWorkbenchChatDeps = {
   listSessions: (projectId: string) => Promise<unknown>
   createSession: (projectId: string, payload: Record<string, unknown>) => Promise<unknown>
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
+  listSessionRuns: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
   cancelRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
   retryRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
-  openRunStream: (projectId: string, runId: string, after?: string) => EventSource
-  addStreamListener: (stream: EventSource, eventName: string, listener: StreamListener) => void
-  closeRunStream?: (stream: EventSource | null) => void
+  openRunStream: (projectId: string, runId: string, after?: string) => AgentRunEventStream
+  addStreamListener: (stream: AgentRunEventStream, eventName: string, listener: StreamListener) => void
+  closeRunStream?: (stream: AgentRunEventStream | null) => void
   revealAssistantText?: (assistantMsg: ChatMessage, rawText: string) => Promise<void>
   scrollChat: () => void
+  forceScrollChat?: () => void
   nextTick: () => Promise<void>
   notifyWarning?: (message: string) => void
   debugChatState?: (stage: string, extra?: Record<string, unknown>) => void
@@ -54,13 +58,16 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const currentConversationId = ref<string | null>(null)
   const preferredConversationId = ref<string | null>(null)
   const currentModelName = ref('')
+  const runTimeline = useWorkbenchRunTimeline()
   const currentActiveRun = ref<{
     sessionId: string | null
+    turnId: string | null
     runId: string | null
     latestSequence: string
     runStatus: AgentRunStatus | ''
   }>({
     sessionId: null,
+    turnId: null,
     runId: null,
     latestSequence: '0',
     runStatus: '',
@@ -75,11 +82,12 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   })
   const canRetryRun = computed(() => {
     if (!currentActiveRun.value.runId || isGenerating.value || isRetrying.value) return false
-    return ['completed', 'failed', 'cancelled', 'superseded'].includes(currentActiveRun.value.runStatus)
+    return ['failed', 'cancelled'].includes(currentActiveRun.value.runStatus)
   })
 
   let msgIdCounter = 1
-  let runStream: EventSource | null = null
+  let runStream: AgentRunEventStream | null = null
+  let foregroundEpoch = 0
 
   const generationStatusText = computed(() => {
     if (isGenerating.value && generationTaskStatus.value) return `运行中 · ${generationTaskStatus.value}`
@@ -90,9 +98,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     return '就绪'
   })
 
-  const scrollChat = async () => {
+  const scrollChat = async (force = false) => {
     await deps.nextTick()
-    deps.scrollChat()
+    if (force) deps.forceScrollChat?.()
+    else deps.scrollChat()
   }
 
   const debugChatState = (stage: string, extra: Record<string, unknown> = {}) => {
@@ -144,7 +153,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     setCurrentConversationId: (value) => {
       currentConversationId.value = value == null ? null : String(value)
     },
-    scrollChat,
+    scrollChat: () => scrollChat(true),
   })
 
   const runtime = createAgentRunRuntime({
@@ -161,23 +170,48 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationPhase.value = value
     },
     getRunStream: () => runStream,
-    setRunStream: (stream: EventSource | null) => {
+    setRunStream: (stream: AgentRunEventStream | null) => {
       runStream = stream
     },
     openRunStream: deps.openRunStream,
     addStreamListener: deps.addStreamListener,
     closeRunStream: deps.closeRunStream,
-    scrollChat: deps.scrollChat,
+    scrollChat: () => {
+      void scrollChat()
+    },
     setRuntimeEventSource: (value) => {
       runtimeEventSource.value = value
+    },
+    onEvent: (eventName, payload) => {
+      runTimeline.appendEvent(
+        eventName,
+        payload,
+        currentActiveRun.value.runId || '',
+        currentActiveRun.value.turnId || '',
+      )
+    },
+    onConnectionState: (state) => {
+      const runId = currentActiveRun.value.runId
+      if (runId) runTimeline.setConnectionState(runId, state)
     },
     setLatestSequence: (value) => {
       currentActiveRun.value.latestSequence = value
     },
-    onToken: (token) => {
+    onToken: (token, payload) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
       if (!assistantMsg) return
-      assistantMsg.text += token
+      const offset = Number(payload.offset)
+      if (!Number.isSafeInteger(offset) || offset < 0) {
+        assistantMsg.text += token
+        return
+      }
+      if (offset > assistantMsg.text.length) return
+      if (assistantMsg.text.slice(offset, offset + token.length) === token) return
+      assistantMsg.text = `${assistantMsg.text.slice(0, offset)}${token}`
+    },
+    onMessageSnapshot: (text) => {
+      const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
+      if (assistantMsg) assistantMsg.text = text
     },
     onMessageCompleted: (text) => {
       const assistantMsg = messages.value.find((item) => String(item.id) === String(streamingAssistantMsgId.value))
@@ -195,17 +229,20 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       applyAssistantEventMetadata(assistantMsg, payload as ChatRecord)
     },
     onStreamReset: async () => {
-      const projectId = deps.getCurrentProjectId()
-      const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
-      if (!projectId || !sessionId) return ''
-      const snapshot = (await getSessionRecovery(projectId, sessionId)) as WorkbenchRecoverySnapshot
-      hydrateFromRecoverySnapshot(snapshot)
-      return normalizeRunStatus(snapshot?.activeRun?.runStatus)
+      const runId = currentActiveRun.value.runId || ''
+      if (!runId) return ''
+      return (await reconcileRunAfterStreamError(runId)).status
     },
+    onStreamError: async (_payload, runId) => reconcileRunAfterStreamError(runId),
   })
 
   const loadConversationList = async (projectId: string) => {
     await timeline.loadConversationList(projectId)
+  }
+
+  const loadRunHistory = async (projectId: string, sessionId: string) => {
+    const history = await deps.listSessionRuns(projectId, sessionId)
+    if (currentConversationId.value === sessionId) runTimeline.replaceHistory(history)
   }
 
   const resolveCurrentSessionId = async (projectId: string) => {
@@ -246,10 +283,12 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   function hydrateFromRecoverySnapshot(snapshot: WorkbenchRecoverySnapshot | null | undefined) {
+    foregroundEpoch += 1
     runtimeEventSource.value = null
     const normalizedSnapshot = pickBusinessRecord(snapshot) as {
       session?: { sessionId?: string | number | null }
       activeRun?: {
+        turnId?: string | number | null
         runId?: string | number | null
         runStatus?: string | null
         runPhase?: string | null
@@ -266,6 +305,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     recoveredSelectedText.value = String(normalizedSnapshot?.workbenchContext?.selectedText ?? '')
     currentActiveRun.value = {
       sessionId: currentConversationId.value,
+      turnId: normalizedSnapshot?.activeRun?.turnId == null ? null : String(normalizedSnapshot.activeRun.turnId),
       runId: normalizedSnapshot?.activeRun?.runId == null ? null : String(normalizedSnapshot.activeRun.runId),
       latestSequence: String(normalizedSnapshot?.activeRun?.latestSequence ?? '0'),
       runStatus: normalizeRunStatus(normalizedSnapshot?.activeRun?.runStatus),
@@ -291,12 +331,44 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     streamingAssistantMsgId.value = null
   }
 
+  const detachCurrentSession = () => {
+    foregroundEpoch += 1
+    runtime.closeRunStream()
+    isGenerating.value = false
+    isCancelling.value = false
+    isRetrying.value = false
+    generationPhase.value = 'idle'
+    generationTaskStatus.value = ''
+    agentStatusDetailText.value = ''
+    streamingAssistantMsgId.value = null
+    runtimeEventSource.value = null
+    currentActiveRun.value = {
+      sessionId: null,
+      turnId: null,
+      runId: null,
+      latestSequence: '0',
+      runStatus: '',
+    }
+  }
+
+  const activateEmptySession = (sessionId: string) => {
+    detachCurrentSession()
+    messages.value = []
+    runTimeline.attempts.value = []
+    chatInput.value = ''
+    recoveredSelectedText.value = ''
+    currentConversationId.value = sessionId
+    preferredConversationId.value = sessionId
+  }
+
   const selectConversation = async (conversationId: string) => {
     const projectId = deps.getCurrentProjectId()
     if (!projectId || !conversationId) return
+    detachCurrentSession()
     hydrateFromRecoverySnapshot(
       ((await getSessionRecovery(projectId, conversationId)) || null) as WorkbenchRecoverySnapshot | null,
     )
+    await loadRunHistory(projectId, conversationId)
   }
 
   const toggleConversationPanel = async () => {
@@ -324,6 +396,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       hydrateFromRecoverySnapshot(
         ((await getSessionRecovery(projectId, latestSessionId)) || null) as WorkbenchRecoverySnapshot | null,
       )
+      await loadRunHistory(projectId, latestSessionId)
       await loadConversationList(projectId)
     } catch {
       messages.value = []
@@ -332,54 +405,118 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     }
   }
 
-  const recoverAssistantTextFromSession = async (projectId: string, sessionId: string) => {
-    try {
-      const snapshot = pickBusinessRecord(await getSessionRecovery(projectId, sessionId)) as {
-        messages?: Array<Record<string, unknown>>
+  async function reconcileRunAfterStreamError(runId: string) {
+    const projectId = deps.getCurrentProjectId()
+    const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
+    if (!projectId || !sessionId || !runId) return { status: '' as const }
+
+    const historyPayload = await deps.listSessionRuns(projectId, sessionId)
+    if (currentActiveRun.value.sessionId !== sessionId || currentActiveRun.value.runId !== runId) {
+      return { status: '' as const }
+    }
+    runTimeline.mergeHistory(historyPayload)
+    const exactRun = pickBusinessArray<ChatRecord>(historyPayload).find(
+      (item) => String(item.runId ?? '') === runId,
+    )
+    const status = normalizeRunStatus(exactRun?.runStatus ?? exactRun?.status)
+    if (
+      status === 'pending' ||
+      status === 'running' ||
+      status === 'suspended' ||
+      status === 'completed' ||
+      status === 'cancelled' ||
+      status === 'superseded'
+    ) {
+      const turnId = String(exactRun?.turnId ?? currentActiveRun.value.turnId ?? '')
+      const output = exactRun?.output && typeof exactRun.output === 'object' && !Array.isArray(exactRun.output)
+        ? exactRun.output as ChatRecord
+        : null
+      const recoveredText = String(output?.text ?? '')
+      const recoveredOffset = Number(output?.offset)
+      const assistantMsg = messages.value.find(
+        (item) => String(item.id) === String(streamingAssistantMsgId.value),
+      )
+      const terminal = status === 'completed' || status === 'cancelled' || status === 'superseded'
+      const isCurrentRun = currentActiveRun.value.runId === runId && currentActiveRun.value.turnId === turnId
+      const isExactMessage = assistantMsg?.runId === runId && assistantMsg.turnId === turnId
+      const hasFreshOffset = Boolean(
+        assistantMsg && Number.isSafeInteger(recoveredOffset) && recoveredOffset >= assistantMsg.text.length,
+      )
+      if (assistantMsg && isCurrentRun && isExactMessage && recoveredText && (terminal || hasFreshOffset)) {
+        assistantMsg.text = recoveredText
       }
-      const mappedMessages = (Array.isArray(snapshot?.messages) ? snapshot.messages : []).map((item) =>
-        timeline.mapApiMessage(item as ChatRecord),
-      )
-      return (
-        [...mappedMessages].reverse().find((item) => item.role === 'assistant' && String(item.text || '').trim())
-          ?.text || ''
-      )
-    } catch {
-      return ''
+    }
+    return {
+      status,
+      errorMessage: String(exactRun?.lastErrorMessage ?? exactRun?.errorMessage ?? '').trim() || undefined,
     }
   }
 
-  const resolveAssistantMessageForResume = (): ChatMessage => {
-    const existingAssistant =
-      [...messages.value]
+  const resolveAssistantMessageForResume = (
+    reuseExisting: boolean,
+    runId: string,
+    turnId: string,
+  ): ChatMessage => {
+    if (reuseExisting && turnId) {
+      const existingForTurn = [...messages.value]
         .reverse()
         .find(
-          (item) => item.role === 'assistant' && !String(item.text || '').trim() && !item.approval && !item.toolCallId,
-        ) || null
-    if (existingAssistant) return existingAssistant
-    const assistantMsg: ChatMessage = { id: msgIdCounter++, role: 'assistant', text: '' }
+          (item) =>
+            item.role === 'assistant' &&
+            item.turnId === turnId &&
+            (!item.runId || item.runId === runId),
+        )
+      if (existingForTurn) {
+        existingForTurn.runId = runId
+        return existingForTurn
+      }
+    }
+    const assistantMsg: ChatMessage = { id: msgIdCounter++, role: 'assistant', text: '', runId }
+    if (turnId) assistantMsg.turnId = turnId
     messages.value.push(assistantMsg)
     return assistantMsg
   }
 
-  const consumeRun = async (projectId: string, sessionId: string, runId: string, after = '0') => {
-    const assistantMsg = resolveAssistantMessageForResume()
+  const consumeRun = async (
+    projectId: string,
+    sessionId: string,
+    runId: string,
+    after = '0',
+    turnId = '',
+    reuseExistingAssistant = false,
+    preparedAssistant?: ChatMessage,
+  ) => {
+    const assistantMsg = preparedAssistant ?? resolveAssistantMessageForResume(reuseExistingAssistant, runId, turnId)
+    if (turnId) assistantMsg.turnId = turnId
+    assistantMsg.runId = runId
+    runTimeline.ensureAttempt(runId, turnId)
     isGenerating.value = true
     generationPhase.value = 'idle'
     generationTaskStatus.value = ''
     agentStatusDetailText.value = ''
     streamingAssistantMsgId.value = assistantMsg.id
-    currentActiveRun.value = { sessionId, runId, latestSequence: after, runStatus: currentActiveRun.value.runStatus }
-    await scrollChat()
+    currentActiveRun.value = {
+      sessionId,
+      turnId: turnId || currentActiveRun.value.turnId,
+      runId,
+      latestSequence: after,
+      runStatus: currentActiveRun.value.runStatus,
+    }
+    const isForegroundRun = () =>
+      currentActiveRun.value.sessionId === sessionId &&
+      currentActiveRun.value.runId === runId &&
+      (!turnId || currentActiveRun.value.turnId === turnId)
+    await scrollChat(true)
     try {
       const finalStatus = await runtime.consumeRunStream(projectId, runId, after)
-      if (finalStatus === 'cancelled') {
+      if (!isForegroundRun()) return
+      if (finalStatus === 'cancelled' || finalStatus === 'superseded') {
         generationPhase.value = 'idle'
-        generationTaskStatus.value = 'cancelled'
+        generationTaskStatus.value = finalStatus
         agentStatusDetailText.value = ''
         return
       }
-      if (finalStatus === 'failed' || finalStatus === 'superseded') {
+      if (finalStatus === 'failed') {
         throw new Error(`运行结束: ${finalStatus}`)
       }
       const hasPendingApproval = !!assistantMsg.approval && !assistantMsg.approval?.resolved
@@ -388,9 +525,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         generationTaskStatus.value = 'waiting_approval'
       }
       if (!assistantMsg.text && !hasPendingApproval) {
-        assistantMsg.text = await recoverAssistantTextFromSession(projectId, sessionId)
+        await reconcileRunAfterStreamError(runId)
       }
     } catch (error: unknown) {
+      if (!isForegroundRun()) return
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       const resolvedErrorMessage = runtime.getErrorMessage(error)
@@ -403,40 +541,64 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         nextAction: 'retry_run',
         recoverable: true,
       }
-      const failureText = `运行失败: ${resolvedErrorMessage}`
+      const failureText = assistantMsg.text
+        ? `生成中断：${resolvedErrorMessage}`
+        : `运行失败：${resolvedErrorMessage}`
       assistantMsg.text = assistantMsg.text ? `${assistantMsg.text}\n\n${failureText}` : failureText
     } finally {
-      runtime.closeRunStream()
-      isGenerating.value = false
-      streamingAssistantMsgId.value = null
-      if (generationPhase.value !== 'failed' && generationPhase.value !== 'waiting_approval') {
-        generationPhase.value = 'idle'
-        generationTaskStatus.value = ''
-        agentStatusDetailText.value = ''
+      if (isForegroundRun()) {
+        runtime.closeRunStream()
+        isGenerating.value = false
+        streamingAssistantMsgId.value = null
+        if (generationPhase.value !== 'failed' && generationPhase.value !== 'waiting_approval') {
+          generationPhase.value = 'idle'
+          generationTaskStatus.value = ''
+          agentStatusDetailText.value = ''
+        }
+        await scrollChat()
       }
-      await scrollChat()
     }
   }
 
   const sendMessage = async () => {
     if (!chatInput.value.trim() || isGenerating.value) return
+    const sendEpoch = foregroundEpoch
     const userText = chatInput.value.trim()
-    messages.value.push({ id: msgIdCounter++, role: 'user', text: userText })
+    const userMessage: ChatMessage = { id: msgIdCounter++, role: 'user', text: userText }
+    const assistantMessage: ChatMessage = { id: msgIdCounter++, role: 'assistant', text: '' }
+    messages.value.push(userMessage, assistantMessage)
     chatInput.value = ''
     runtimeEventSource.value = null
+    generationPhase.value = 'preparing'
+    generationTaskStatus.value = ''
+    agentStatusDetailText.value = ''
+    isGenerating.value = true
+    streamingAssistantMsgId.value = assistantMessage.id
+    currentActiveRun.value = {
+      sessionId: currentConversationId.value,
+      turnId: null,
+      runId: null,
+      latestSequence: '0',
+      runStatus: '',
+    }
     debugChatState('user-send-start', { userTextLength: userText.length })
-    await scrollChat()
+    await scrollChat(true)
 
     const { projectId, operatorId } = deps.getContext()
     if (!projectId || !operatorId) {
-      messages.value.push({ id: msgIdCounter++, role: 'assistant', text: '缺少 projectId/operatorId，无法发送。' })
+      assistantMessage.text = '缺少 projectId/operatorId，无法发送。'
+      isGenerating.value = false
+      streamingAssistantMsgId.value = null
+      generationPhase.value = 'failed'
       return
     }
 
     try {
       const sessionId = await ensureSessionIdForSend(projectId, operatorId)
+      if (sendEpoch !== foregroundEpoch) return
       if (!sessionId) throw new Error('会话初始化失败')
       const modelConfigId = await deps.ensureModelConfigId(projectId)
+      if (sendEpoch !== foregroundEpoch) return
       if (!modelConfigId) {
         deps.onRequireModelSelection?.()
         throw new Error('未选择可用模型，请先保存并切换模型')
@@ -456,28 +618,49 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         }),
       ) as ChatRecord & {
         activeRun?: {
+          turnId?: string | number | null
           runId?: string | number | null
           latestSequence?: string | number | null
+          runStatus?: string | null
+          runPhase?: string | null
         }
       }
+      if (sendEpoch !== foregroundEpoch) return
       const runId = created.activeRun?.runId
       if (runId == null || String(runId).trim() === '' || String(runId) === '0') {
         throw new Error('运行创建失败，缺少 runId')
       }
-      await consumeRun(projectId, sessionId, String(runId), String(created.activeRun?.latestSequence ?? '0'))
+      const turnId = String(created.activeRun?.turnId ?? '')
+      if (userMessage && turnId) userMessage.turnId = turnId
+      assistantMessage.turnId = turnId
+      assistantMessage.runId = String(runId)
+      const attempt = runTimeline.ensureAttempt(String(runId), turnId)
+      attempt.runStatus = String(created.activeRun?.runStatus ?? 'PENDING').toUpperCase()
+      attempt.runPhase = String(created.activeRun?.runPhase ?? 'created')
+      const latestSequence = Number(created.activeRun?.latestSequence ?? 0)
+      if (Number.isSafeInteger(latestSequence)) {
+        attempt.latestSequence = Math.max(attempt.latestSequence, latestSequence)
+      }
+      await scrollChat(true)
+      // The creation response only reports the durable cursor; it does not contain
+      // those events. Replay from zero so run.started reaches the live timeline.
+      await consumeRun(projectId, sessionId, String(runId), '0', turnId, false, assistantMessage)
     } catch (error: unknown) {
+      if (sendEpoch !== foregroundEpoch) return
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       const resolvedErrorMessage = runtime.getErrorMessage(error)
       agentStatusDetailText.value = resolvedErrorMessage
-      messages.value.push({ id: msgIdCounter++, role: 'assistant', text: `运行失败: ${resolvedErrorMessage}` })
+      assistantMessage.text = `运行失败: ${resolvedErrorMessage}`
+      isGenerating.value = false
+      streamingAssistantMsgId.value = null
       await scrollChat()
     }
   }
 
   const resumeRunningRun = async (projectId: string, runId: string, after = '0') => {
     const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
-    await consumeRun(projectId, sessionId, runId, after)
+    await consumeRun(projectId, sessionId, runId, after, currentActiveRun.value.turnId || '', true)
   }
 
   const cancelCurrentRun = async () => {
@@ -485,28 +668,23 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     const { projectId, operatorId } = deps.getContext()
     const runId = currentActiveRun.value.runId
     if (!projectId || !operatorId || !runId) return
+    const actionEpoch = foregroundEpoch
     const awaitingRunStream = isGenerating.value
     isCancelling.value = true
     try {
       await deps.cancelRun(projectId, runId, { operatorId })
+      if (actionEpoch !== foregroundEpoch) return
       generationTaskStatus.value = 'cancelled'
       currentActiveRun.value.runStatus = 'cancelled'
       generationPhase.value = 'idle'
       agentStatusDetailText.value = ''
       if (!awaitingRunStream) isGenerating.value = false
     } catch (error: unknown) {
+      if (actionEpoch !== foregroundEpoch) return
       deps.notifyWarning?.(runtime.getErrorMessage(error))
     } finally {
       isCancelling.value = false
     }
-  }
-
-  const prepareAssistantMessageForRetry = () => {
-    const assistant = [...messages.value].reverse().find((item) => item.role === 'assistant')
-    if (!assistant) return
-    assistant.text = ''
-    assistant.approval = undefined
-    assistant.toolCallId = undefined
   }
 
   const retryCurrentRun = async () => {
@@ -515,22 +693,34 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     const predecessorRunId = currentActiveRun.value.runId
     const sessionId = currentActiveRun.value.sessionId || currentConversationId.value || ''
     if (!projectId || !operatorId || !predecessorRunId || !sessionId) return
+    const actionEpoch = foregroundEpoch
 
     isRetrying.value = true
     try {
+      const predecessorAssistant = [...messages.value]
+        .reverse()
+        .find(
+          (item) =>
+            item.role === 'assistant' &&
+            item.turnId === currentActiveRun.value.turnId &&
+            !item.runId,
+        )
+      if (predecessorAssistant) predecessorAssistant.runId = predecessorRunId
       const retried = pickBusinessRecord(await deps.retryRun(projectId, predecessorRunId, { operatorId })) as ChatRecord
+      if (actionEpoch !== foregroundEpoch) return
       const successorRunId = String(retried.runId ?? '').trim()
       if (!successorRunId || successorRunId === '0') {
         throw new Error('Retry did not return a successor Run')
       }
       const runStatus = normalizeRunStatus(retried.runStatus) || 'pending'
       const latestSequence = String(retried.latestSequence ?? '0')
+      const turnId = String(retried.turnId ?? currentActiveRun.value.turnId ?? '')
       runtimeEventSource.value = null
       generationTaskStatus.value = runStatus
-      currentActiveRun.value = { sessionId, runId: successorRunId, latestSequence, runStatus }
-      prepareAssistantMessageForRetry()
-      await consumeRun(projectId, sessionId, successorRunId, latestSequence)
+      currentActiveRun.value = { sessionId, turnId, runId: successorRunId, latestSequence, runStatus }
+      await consumeRun(projectId, sessionId, successorRunId, '0', turnId)
     } catch (error: unknown) {
+      if (actionEpoch !== foregroundEpoch) return
       deps.notifyWarning?.(runtime.getErrorMessage(error))
     } finally {
       isRetrying.value = false
@@ -542,6 +732,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     showConversationPanel,
     conversationLoading,
     conversationList,
+    runAttempts: runTimeline.attempts,
     chatInput,
     isGenerating,
     isCancelling,
@@ -557,12 +748,15 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     currentConversationId,
     currentModelName,
     loadConversationList,
+    loadRunHistory,
     loadConversationHistory,
     selectConversation,
     toggleConversationPanel,
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
+    detachCurrentSession,
+    activateEmptySession,
     dispose: runtime.closeRunStream,
     resumeRunningRun,
     consumeRunStream: runtime.consumeRunStream,

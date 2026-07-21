@@ -2,7 +2,7 @@ import { computed, nextTick, ref, type Ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { agentApi } from '@/api/modules/agent.api'
 import { approvalApi } from '@/api/modules/approval.api'
-import type { ChatMessage } from '@/components/workbench/workbenchTypes'
+import type { ConversationItem } from '@/components/workbench/workbenchTypes'
 import { useWorkbenchApprovals } from '@/composables/workbench/useWorkbenchApprovals'
 import { useWorkbenchChat } from '@/composables/workbench/useWorkbenchChat'
 import { useWorkbenchSessionRecovery } from '@/composables/workbench/useWorkbenchSessionRecovery'
@@ -20,14 +20,16 @@ type WorkbenchAgentOptions = {
   ensureModelConfigId: () => Promise<string>
   refreshActiveModelInfo: () => Promise<string | null>
   requestModelSelection: () => void
-  mergeToEditor: (message: ChatMessage) => void
-  replaceSelected: (message: ChatMessage) => void
   onRecoveryContext: (context: Record<string, unknown>) => void
 }
 
 export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
   const chatContainer = ref<HTMLElement | null>(null)
+  const isChatFollowing = ref(true)
   const boundStyleName = ref('')
+  const deletedConversationList = ref<ConversationItem[]>([])
+  const recentlyDeletedConversation = ref<ConversationItem | null>(null)
+  let clearDeletedUndoTimer: ReturnType<typeof setTimeout> | null = null
 
   const syncBoundStyleName = (value: Record<string, unknown> | null | undefined) => {
     const boundStyle = value?.boundStyle as Record<string, unknown> | null | undefined
@@ -49,18 +51,36 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     console.info('[agent-ui] run-stream-open', { projectId, runId, after })
     return agentApi.openRunStream(projectId, runId, after)
   }
+  const updateChatFollowState = () => {
+    const container = chatContainer.value
+    if (!container) return
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    isChatFollowing.value = distanceFromBottom <= 96
+  }
   const bindChatContainer = (element: HTMLElement | null) => {
+    chatContainer.value?.removeEventListener('scroll', updateChatFollowState)
     chatContainer.value = element
+    isChatFollowing.value = true
+    element?.addEventListener('scroll', updateChatFollowState, { passive: true })
   }
   const scrollChat = () => {
-    if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    const container = chatContainer.value
+    if (!container || !isChatFollowing.value) return
+    container.scrollTop = container.scrollHeight
   }
+  const scrollChatToBottom = () => {
+    isChatFollowing.value = true
+    const container = chatContainer.value
+    if (container) container.scrollTop = container.scrollHeight
+  }
+  const showScrollToBottom = computed(() => !isChatFollowing.value)
 
   const {
     messages,
     showConversationPanel,
     conversationLoading,
     conversationList,
+    runAttempts,
     chatInput,
     isGenerating,
     isCancelling,
@@ -75,6 +95,7 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     runtimeEventSource,
     currentConversationId,
     loadConversationList,
+    loadRunHistory,
     toggleConversationPanel,
     sendMessage,
     cancelCurrentRun,
@@ -82,6 +103,8 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     dispose,
     resumeRunningRun,
     hydrateFromRecoverySnapshot,
+    detachCurrentSession,
+    activateEmptySession,
   } = useWorkbenchChat({
     getContext: options.getContext,
     getCurrentProjectId: options.getProjectId,
@@ -93,6 +116,7 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     listSessions: agentApi.listSessions,
     createSession: agentApi.createSession,
     getSessionRecovery: agentApi.getSessionRecovery,
+    listSessionRuns: agentApi.listSessionRuns,
     createTurn: async (projectId, sessionId, payload) => {
       debugChatState('create-turn-request', {
         projectId,
@@ -115,6 +139,7 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     },
     addStreamListener: agentApi.addStreamListener,
     scrollChat,
+    forceScrollChat: scrollChatToBottom,
     nextTick,
     notifyWarning: (text) => message.warning(text),
     debugChatState,
@@ -145,6 +170,9 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     hydrateStore: (snapshot) => {
       const normalized = pickBusinessRecord(snapshot)
       hydrateFromRecoverySnapshot(normalized)
+      const sessionId = String((normalized.session as Record<string, unknown> | undefined)?.sessionId ?? '')
+      const projectId = options.getProjectId()
+      if (projectId && sessionId) void loadRunHistory(projectId, sessionId)
       syncBoundStyleName(normalized.session as Record<string, unknown> | null | undefined)
       options.onRecoveryContext((normalized.workbenchContext || {}) as Record<string, unknown>)
     },
@@ -153,7 +181,13 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
   const resumeSession = async (sessionId: string) => {
     const projectId = options.getProjectId()
     const operatorId = options.getOperatorId()
-    if (projectId && sessionId && operatorId) await recovery.restore(projectId, sessionId, operatorId)
+    if (projectId && sessionId && operatorId) {
+      detachCurrentSession()
+      await recovery.restore(projectId, sessionId, operatorId)
+      await loadRunHistory(projectId, sessionId)
+      await nextTick()
+      scrollChatToBottom()
+    }
   }
   const selectConversation = async (conversationId: string) => {
     if (!conversationId) return
@@ -164,13 +198,17 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     const projectId = options.getProjectId()
     const operatorId = options.getOperatorId()
     if (!projectId || !operatorId) return
-    const created = pickBusinessRecord(await agentApi.createSession(projectId, { userId: operatorId, title: '新会话' }))
-    const sessionId = String(created.sessionId ?? '').trim()
-    if (!sessionId) return
-    currentConversationId.value = sessionId
-    messages.value = []
-    boundStyleName.value = ''
-    if (showConversationPanel.value) await loadConversationList(projectId)
+    try {
+      const created = pickBusinessRecord(await agentApi.createSession(projectId, { userId: operatorId, title: '新会话' }))
+      const sessionId = String(created.sessionId ?? '').trim()
+      if (!sessionId) throw new Error('会话创建失败')
+      activateEmptySession(sessionId)
+      boundStyleName.value = ''
+      scrollChatToBottom()
+      if (showConversationPanel.value) await loadConversationList(projectId)
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '会话创建失败')
+    }
   }
   const resumeLatestSession = async () => {
     const projectId = options.getProjectId()
@@ -180,6 +218,68 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     if (latestSessionId) await resumeSession(latestSessionId)
   }
 
+  const normalizeConversation = (item: Record<string, unknown>): ConversationItem => ({
+    conversationId: String(item.sessionId ?? ''),
+    title: String(item.title ?? ''),
+    updatedAt: String(item.updatedAt ?? item.createdAt ?? ''),
+    lastMessageAt: String(item.lastMessageAt ?? ''),
+    status: String(item.status ?? ''),
+    lastRunStatus: String(item.lastRunStatus ?? ''),
+    deletedAt: item.deletedAt == null ? null : String(item.deletedAt),
+  })
+  const loadDeletedConversations = async () => {
+    const projectId = options.getProjectId()
+    if (!projectId) return
+    deletedConversationList.value = (await agentApi.listSessions(projectId, true)).map(normalizeConversation)
+  }
+  const renameConversation = async (sessionId: string, title: string, deleted = false) => {
+    const projectId = options.getProjectId()
+    if (!projectId) return
+    try {
+      await agentApi.renameSession(projectId, sessionId, title)
+      if (deleted) await loadDeletedConversations()
+      else await loadConversationList(projectId)
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '会话重命名失败')
+    }
+  }
+  const deleteConversation = async (sessionId: string) => {
+    const projectId = options.getProjectId()
+    if (!projectId) return
+    const deleted = conversationList.value.find((item) => item.conversationId === sessionId) ?? null
+    try {
+      await agentApi.deleteSession(projectId, sessionId)
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '会话删除失败')
+      return
+    }
+    recentlyDeletedConversation.value = deleted
+    if (clearDeletedUndoTimer) clearTimeout(clearDeletedUndoTimer)
+    clearDeletedUndoTimer = setTimeout(() => { recentlyDeletedConversation.value = null }, 10_000)
+    if (currentConversationId.value === sessionId) {
+      currentConversationId.value = null
+      messages.value = []
+      runAttempts.value = []
+    }
+    await Promise.all([loadConversationList(projectId), loadDeletedConversations()])
+  }
+  const restoreConversation = async (sessionId: string) => {
+    const projectId = options.getProjectId()
+    if (!projectId) return
+    try {
+      await agentApi.restoreDeletedSession(projectId, sessionId)
+      await Promise.all([loadConversationList(projectId), loadDeletedConversations()])
+      if (recentlyDeletedConversation.value?.conversationId === sessionId) recentlyDeletedConversation.value = null
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '会话恢复失败')
+    }
+  }
+  const disposeAgent = () => {
+    if (clearDeletedUndoTimer) clearTimeout(clearDeletedUndoTimer)
+    chatContainer.value?.removeEventListener('scroll', updateChatFollowState)
+    dispose()
+  }
+
   return {
     messages,
     visibleMessages,
@@ -187,6 +287,9 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     showConversationPanel,
     conversationLoading,
     conversationList,
+    deletedConversationList,
+    recentlyDeletedConversation,
+    runAttempts,
     chatInput,
     isGenerating,
     isCancelling,
@@ -200,6 +303,10 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     runtimeEventSource,
     currentConversationId,
     toggleConversationPanel,
+    loadDeletedConversations,
+    renameConversation,
+    deleteConversation,
+    restoreConversation,
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
@@ -207,12 +314,12 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     handleApprove,
     handleReject,
     bindChatContainer,
+    showScrollToBottom,
+    scrollChatToBottom,
     resumeSession,
     selectConversation,
     createSession,
     resumeLatestSession,
-    mergeMessageToEditor: options.mergeToEditor,
-    replaceMessageSelection: options.replaceSelected,
-    dispose,
+    dispose: disposeAgent,
   }
 }

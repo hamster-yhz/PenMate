@@ -7,6 +7,8 @@ type ChatMessage = {
   id: number
   role: 'user' | 'assistant' | 'system'
   text: string
+  turnId?: string
+  runId?: string
 }
 
 const ChatMessageItemStub = defineComponent({
@@ -17,12 +19,9 @@ const ChatMessageItemStub = defineComponent({
       required: true,
     },
   },
-  emits: ['merge-to-editor', 'replace-selected'],
   template: `
     <div data-testid="chat-message-item-stub">
       <span data-testid="chat-message-item-id">{{ msg.id }}</span>
-      <button data-testid="emit-merge" @click="$emit('merge-to-editor', msg)">merge</button>
-      <button data-testid="emit-replace" @click="$emit('replace-selected', msg)">replace</button>
     </div>
   `,
 })
@@ -53,19 +52,32 @@ const mountChatMessageList = async (
 }
 
 describe('ChatMessageList', () => {
-  it('renders_message_items_and_re_emits_item_actions', async () => {
+  it('renders message items without editor mutation actions', async () => {
     const wrapper = await mountChatMessageList()
 
     expect(wrapper.find('.chat-messages').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="chat-message-item-stub"]')).toHaveLength(2)
 
-    const mergeButtons = wrapper.findAll('[data-testid="emit-merge"]')
-    const replaceButtons = wrapper.findAll('[data-testid="emit-replace"]')
+    expect(wrapper.find('[data-testid="emit-merge"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="emit-replace"]').exists()).toBe(false)
+  })
 
-    await mergeButtons[1].trigger('click')
-    await replaceButtons[1].trigger('click')
+  it('renders retry outputs through one versioned attempt group', async () => {
+    const wrapper = await mountChatMessageList({
+      messages: [
+        { id: 1, role: 'user', text: 'question', turnId: '10' },
+        { id: 2, role: 'assistant', text: 'failed output', turnId: '10', runId: '20' },
+        { id: 3, role: 'assistant', text: 'successful output', turnId: '10', runId: '21' },
+      ],
+    })
+    await wrapper.setProps({
+      runAttempts: [
+        { runId: '20', turnId: '10', runStatus: 'FAILED', runPhase: 'failed', attemptCount: 1, latestSequence: 1, connectionState: 'closed', events: [] },
+        { runId: '21', turnId: '10', runStatus: 'DONE', runPhase: 'completed', attemptCount: 2, latestSequence: 2, connectionState: 'closed', events: [] },
+      ],
+    })
 
-    expect(wrapper.emitted('merge-to-editor')).toEqual([[{ id: 2, role: 'assistant', text: '收到' }]])
-    expect(wrapper.emitted('replace-selected')).toEqual([[{ id: 2, role: 'assistant', text: '收到' }]])
+    expect(wrapper.findAll('[data-testid="chat-message-item-stub"]')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="run-attempt-group"]').exists()).toBe(true)
   })
 })
