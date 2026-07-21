@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { modelApi } from '@/api/modules/model.api'
 import { pluginApi } from '@/api/modules/plugin.api'
-import { pickBusinessRecord } from '@/utils/apiPayload'
+import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 type WorkbenchIntegrationOptions = {
   getUserId: () => string | undefined
@@ -11,6 +11,10 @@ const modelConfigId = (item: Record<string, unknown>) => {
   if (typeof item.modelConfigId !== 'string') return null
   return item.modelConfigId.trim() || null
 }
+
+const isActiveChatModel = (item: Record<string, unknown>) =>
+  String(item.modelType ?? '').trim().toUpperCase() === 'CHAT' &&
+  String(item.status ?? '').trim().toUpperCase() === 'ACTIVE'
 
 const preferenceRecord = (payload: unknown): Record<string, unknown> => {
   if (!payload || typeof payload !== 'object') return {}
@@ -50,20 +54,18 @@ export const useWorkbenchIntegrations = ({ getUserId }: WorkbenchIntegrationOpti
       return null
     }
     try {
-      const detail = pickBusinessRecord(await modelApi.getUserModelPreferences(userId))
+      const [preferencesPayload, configurationsPayload] = await Promise.all([
+        modelApi.getUserModelPreferences(userId),
+        modelApi.listUserModelConfigs(userId),
+      ])
+      const detail = pickBusinessRecord(preferencesPayload)
       const preferences = preferenceRecord(detail)
-      const configs = Array.isArray(detail.candidateConfigs)
-        ? (detail.candidateConfigs as Array<Record<string, unknown>>)
-        : Array.isArray(preferences.candidateConfigs)
-          ? (preferences.candidateConfigs as Array<Record<string, unknown>>)
-          : Array.isArray(detail.modelConfigs)
-            ? (detail.modelConfigs as Array<Record<string, unknown>>)
-            : Array.isArray(preferences.modelConfigs)
-              ? (preferences.modelConfigs as Array<Record<string, unknown>>)
-              : []
+      const configs = pickBusinessArray<Record<string, unknown>>(configurationsPayload)
       const preferredId =
         typeof preferences.mainAgentModelConfigId === 'string' ? preferences.mainAgentModelConfigId.trim() : ''
-      const preferred = configs.find((item) => modelConfigId(item) === preferredId) || configs[0]
+      const preferred = preferredId
+        ? configs.find((item) => modelConfigId(item) === preferredId && isActiveChatModel(item))
+        : undefined
       activeModelConfigId.value = preferred ? modelConfigId(preferred) : null
       currentModelName.value = String(preferred?.modelName || '').trim()
       return activeModelConfigId.value
