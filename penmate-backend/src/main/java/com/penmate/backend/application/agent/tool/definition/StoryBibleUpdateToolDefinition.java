@@ -92,7 +92,7 @@ public class StoryBibleUpdateToolDefinition implements AgentToolDefinition {
         ApprovalPolicyDecision approval = new ApprovalPolicyDecision(true, "STORY_BIBLE_BATCH_MUTATION");
         return new AgentToolDescriptor(
                 "story_bible_update",
-                new ToolPresentation("Story Bible update"),
+                new ToolPresentation("故事设定更新"),
                 new ToolExposure(true,
                         "Apply an ordered batch of Story Bible mutations after one user approval. Use story_bible_search for reads.",
                         PARAMETERS_JSON_SCHEMA),

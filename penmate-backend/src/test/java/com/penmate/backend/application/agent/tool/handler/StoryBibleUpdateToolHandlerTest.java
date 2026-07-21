@@ -18,7 +18,7 @@ class StoryBibleUpdateToolHandlerTest {
         var descriptor = new StoryBibleUpdateToolDefinition().descriptor();
 
         assertThat(descriptor.toolCode()).isEqualTo("story_bible_update");
-        assertThat(descriptor.presentation().displayName()).isEqualTo("Story Bible update");
+        assertThat(descriptor.presentation().displayName()).isEqualTo("故事设定更新");
         assertThat(descriptor.governancePolicy().defaultDecision().approvalRequired()).isTrue();
         assertThat(descriptor.governancePolicy().defaultDecision().approvalType())
                 .isEqualTo("STORY_BIBLE_BATCH_MUTATION");

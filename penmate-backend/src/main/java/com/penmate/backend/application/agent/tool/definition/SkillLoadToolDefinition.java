@@ -24,7 +24,7 @@ public class SkillLoadToolDefinition implements AgentToolDefinition {
     public AgentToolDescriptor descriptor() {
         return new AgentToolDescriptor(
                 "skill_load",
-                new ToolPresentation("Skill Load"),
+                new ToolPresentation("技能加载"),
                 new ToolExposure(
                         true,
                         "Load full skill instructions by skill name after reviewing the Available skills catalog.",
