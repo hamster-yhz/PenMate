@@ -3,12 +3,14 @@ package com.penmate.backend.infrastructure.realtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentEventPayloadResolver;
 import com.penmate.backend.application.agent.run.AgentPartialMessageCheckpointStore;
+import com.penmate.backend.interfaces.api.agent.stream.AgentRunEventStreamService;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentStreamResetDto;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -30,7 +32,7 @@ class AgentRunEventStreamServiceTest {
     void emits_reset_and_advances_to_latest_when_cursor_is_expired() {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
-        when(bus.subscribeWithRedis(any(), any())).thenReturn(() -> { });
+        when(bus.subscribe(any(), any())).thenReturn(() -> { });
         when(events.findWindow(70L)).thenReturn(new AgentEventWindow(51L, 80L));
         when(events.listAfter(70L, 80L)).thenReturn(List.of());
         CapturingEmitter emitter = new CapturingEmitter();
@@ -48,7 +50,7 @@ class AgentRunEventStreamServiceTest {
     void database_poll_delivers_durable_events_without_bus_notification() {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
-        when(bus.subscribeWithRedis(any(), any())).thenReturn(() -> { });
+        when(bus.subscribe(any(), any())).thenReturn(() -> { });
         when(events.findWindow(70L))
                 .thenReturn(new AgentEventWindow(null, 0L))
                 .thenReturn(new AgentEventWindow(1L, 1L));
@@ -75,7 +77,7 @@ class AgentRunEventStreamServiceTest {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
         ArgumentCaptor<Consumer<AgentEvent>> subscriber = ArgumentCaptor.forClass(Consumer.class);
-        when(bus.subscribeWithRedis(eq(70L), subscriber.capture())).thenReturn(() -> { });
+        when(bus.subscribe(eq(70L), subscriber.capture())).thenReturn(() -> { });
         when(events.findWindow(70L))
                 .thenReturn(new AgentEventWindow(null, 0L))
                 .thenReturn(new AgentEventWindow(1L, 2L));
@@ -97,7 +99,7 @@ class AgentRunEventStreamServiceTest {
         AgentRunEventRepository events = mock(AgentRunEventRepository.class);
         InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
         AgentPartialMessageCheckpointStore partialMessages = mock(AgentPartialMessageCheckpointStore.class);
-        when(bus.subscribeWithRedis(any(), any())).thenReturn(() -> { });
+        when(bus.subscribe(any(), any())).thenReturn(() -> { });
         when(events.findWindow(70L)).thenReturn(new AgentEventWindow(null, 0L));
         when(events.listAfter(70L, 0L)).thenReturn(List.of());
         when(partialMessages.find(70L)).thenReturn(Optional.of(
@@ -106,7 +108,7 @@ class AgentRunEventStreamServiceTest {
         CapturingEmitter emitter = new CapturingEmitter();
         AgentRunEventStreamService service = new AgentRunEventStreamService(
                 events, bus, new AgentEventPayloadResolver(
-                mock(AgentArtifactRepository.class), new ObjectMapper()),
+                mock(AgentArtifactRepository.class), new JacksonJsonCodec(new ObjectMapper())),
                 partialMessages, new ObjectMapper()) {
             @Override
             protected SseEmitter createEmitter() {
@@ -128,7 +130,7 @@ class AgentRunEventStreamServiceTest {
                                                CapturingEmitter emitter) {
         return new AgentRunEventStreamService(
                 events, bus, new AgentEventPayloadResolver(
-                mock(AgentArtifactRepository.class), new ObjectMapper()),
+                mock(AgentArtifactRepository.class), new JacksonJsonCodec(new ObjectMapper())),
                 mock(AgentPartialMessageCheckpointStore.class), new ObjectMapper()) {
             @Override
             protected SseEmitter createEmitter() {

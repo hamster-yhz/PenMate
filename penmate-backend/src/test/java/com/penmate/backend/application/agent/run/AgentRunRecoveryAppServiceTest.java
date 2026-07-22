@@ -5,6 +5,9 @@ import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunProjectionRepository;
+import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,7 +37,8 @@ class AgentRunRecoveryAppServiceTest {
         projection.put("latestSequence", 8L);
         when(projections.findLatestRunForSession(10L, 20L)).thenReturn(projection);
 
-        AgentRunRecoveryResult result = new AgentRunRecoveryAppService(sessions, projections, approvals, partialMessages)
+        AgentRunRecoveryResult result = new AgentRunRecoveryAppService(
+                sessions, projections, approvals, partialMessages, preview())
                 .getRecovery(10L, 20L, "trace");
 
         assertThat(result.activeRun()).isNotNull();
@@ -63,7 +67,8 @@ class AgentRunRecoveryAppServiceTest {
                 "{\"operation\":\"batch\",\"operations\":[{\"kind\":\"update_node\",\"nodeId\":71}]}",
                 "{}", "[]", "50:call-1", "PENDING", 30L, "trace", null, null));
 
-        AgentRunRecoveryResult result = new AgentRunRecoveryAppService(sessions, projections, approvals, partialMessages)
+        AgentRunRecoveryResult result = new AgentRunRecoveryAppService(
+                sessions, projections, approvals, partialMessages, preview())
                 .getRecovery(10L, 20L, "trace");
 
         assertThat(result.pendingApproval()).isInstanceOfSatisfying(Map.class, pending ->
@@ -91,7 +96,7 @@ class AgentRunRecoveryAppServiceTest {
                         50L, 40L, "已经生成的部分内容", 9L, Instant.parse("2026-07-21T08:00:00Z"))));
 
         AgentRunRecoveryResult result = new AgentRunRecoveryAppService(
-                sessions, projections, approvals, partialMessages).getRecovery(10L, 20L, "trace");
+                sessions, projections, approvals, partialMessages, preview()).getRecovery(10L, 20L, "trace");
 
         assertThat(result.messages()).singleElement().isInstanceOfSatisfying(Map.class, message -> {
             assertThat(message).containsEntry("messageId", "partial-50")
@@ -119,8 +124,12 @@ class AgentRunRecoveryAppServiceTest {
         when(partialMessages.find(51L)).thenReturn(Optional.empty());
 
         AgentRunRecoveryResult result = new AgentRunRecoveryAppService(
-                sessions, projections, approvals, partialMessages).getRecovery(10L, 20L, "trace");
+                sessions, projections, approvals, partialMessages, preview()).getRecovery(10L, 20L, "trace");
 
         assertThat(result.messages()).isEmpty();
+    }
+
+    private ToolApprovalPreview preview() {
+        return new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper()));
     }
 }

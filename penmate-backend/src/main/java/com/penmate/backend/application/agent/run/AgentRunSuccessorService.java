@@ -5,7 +5,6 @@ import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,16 +17,16 @@ public class AgentRunSuccessorService {
     private final AgentSessionRepository sessions;
     private final BusinessIdGenerator ids;
     private final AgentRunEventPublisher events;
-    private final ApplicationEventPublisher applicationEvents;
+    private final AgentRunDispatchRequestPublisher dispatchRequests;
 
     public AgentRunSuccessorService(AgentRunRepository runs, AgentSessionRepository sessions,
                                     BusinessIdGenerator ids, AgentRunEventPublisher events,
-                                    ApplicationEventPublisher applicationEvents) {
+                                    AgentRunDispatchRequestPublisher dispatchRequests) {
         this.runs = runs;
         this.sessions = sessions;
         this.ids = ids;
         this.events = events;
-        this.applicationEvents = applicationEvents;
+        this.dispatchRequests = dispatchRequests;
     }
 
     @Transactional
@@ -49,7 +48,7 @@ public class AgentRunSuccessorService {
                 "failed to bind successor Run to Session");
         events.publish(runId, "run.started", Map.of(
                 "phase", "created", "predecessorRunId", String.valueOf(predecessor.runId())));
-        applicationEvents.publishEvent(new AgentRunDispatchRequested(runId, traceId));
+        dispatchRequests.publish(new AgentRunDispatchRequested(runId, traceId));
         return runId;
     }
 

@@ -7,6 +7,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentEventArchiveReposito
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
@@ -41,7 +42,8 @@ class AgentEventArchiveServiceTest {
         BusinessIdGenerator ids = () -> 99L;
 
         var result = new AgentEventArchiveService(
-                events, archives, storage, ids, new ObjectMapper().findAndRegisterModules())
+                events, archives, storage, ids,
+                new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()))
                 .archiveEligible(now);
 
         assertThat(result.archivedRuns()).isEqualTo(1);
@@ -67,7 +69,8 @@ class AgentEventArchiveServiceTest {
         when(storage.readBytes(any())).thenReturn(new byte[]{1, 2, 3});
 
         var result = new AgentEventArchiveService(
-                events, archives, storage, () -> 99L, new ObjectMapper().findAndRegisterModules())
+                events, archives, storage, () -> 99L,
+                new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()))
                 .archiveEligible(now);
 
         assertThat(result.archivedRuns()).isZero();
@@ -88,7 +91,8 @@ class AgentEventArchiveServiceTest {
         when(archives.delete(99L)).thenReturn(1);
 
         var result = new AgentEventArchiveService(
-                events, archives, storage, () -> 100L, new ObjectMapper()).purgeExpired(now);
+                events, archives, storage, () -> 100L,
+                new JacksonJsonCodec(new ObjectMapper())).purgeExpired(now);
 
         assertThat(result.purgedArchives()).isEqualTo(1);
         InOrder order = inOrder(storage, archives);

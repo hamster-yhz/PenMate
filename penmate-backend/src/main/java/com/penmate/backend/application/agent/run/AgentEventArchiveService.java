@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventArchive;
 import com.penmate.backend.domain.agent.run.repository.AgentEventArchiveRepository;
@@ -20,6 +19,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -35,18 +35,18 @@ public class AgentEventArchiveService {
     private final AgentEventArchiveRepository archives;
     private final ObjectStorageService storage;
     private final BusinessIdGenerator ids;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
     public AgentEventArchiveService(AgentRunEventRepository events,
                                     AgentEventArchiveRepository archives,
                                     ObjectStorageService storage,
                                     BusinessIdGenerator ids,
-                                    ObjectMapper objectMapper) {
+                                    JsonCodec jsonCodec) {
         this.events = events;
         this.archives = archives;
         this.storage = storage;
         this.ids = ids;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
     }
 
     public ArchiveSummary archiveEligible(Instant now) {
@@ -124,7 +124,7 @@ public class AgentEventArchiveService {
         try {
             List<AgentEvent> result = new ArrayList<>();
             for (String line : ungzip(bytes).split("\\R")) {
-                if (!line.isBlank()) result.add(objectMapper.readValue(line, AgentEvent.class));
+                if (!line.isBlank()) result.add(jsonCodec.read(line, AgentEvent.class));
             }
             return result;
         } catch (Exception ex) {
@@ -136,7 +136,7 @@ public class AgentEventArchiveService {
         try {
             StringBuilder output = new StringBuilder();
             for (AgentEvent event : runEvents) {
-                output.append(objectMapper.writeValueAsString(event)).append('\n');
+                output.append(jsonCodec.write(event)).append('\n');
             }
             return output.toString();
         } catch (Exception ex) {
@@ -156,8 +156,8 @@ public class AgentEventArchiveService {
             int count = 0;
             for (String line : content.split("\\R")) {
                 if (line.isBlank()) continue;
-                JsonNode root = objectMapper.readTree(line);
-                long sequence = root.path("sequence").asLong(-1);
+                Map<String, Object> root = jsonCodec.readObject(line);
+                long sequence = parseSequence(root.get("sequence"));
                 if (sequence < 0 || (last >= 0 && sequence != last + 1)) {
                     throw new IllegalStateException("Agent Event archive sequence gap");
                 }
@@ -173,6 +173,20 @@ public class AgentEventArchiveService {
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to verify Agent Event archive", ex);
         }
+    }
+
+    private long parseSequence(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return -1L;
+            }
+        }
+        return -1L;
     }
 
     private byte[] gzip(String value) {

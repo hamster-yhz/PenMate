@@ -9,6 +9,7 @@ import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -88,6 +89,7 @@ class AgentRunHistoryQueryServiceTest {
 
     private AgentRunHistoryQueryService service() {
         return new AgentRunHistoryQueryService(
-                conversations, runs, events, archives, partialMessages, payloadResolver, objectMapper);
+                conversations, runs, events, archives, partialMessages, payloadResolver,
+                new JacksonJsonCodec(objectMapper));
     }
 }

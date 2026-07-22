@@ -23,6 +23,8 @@ import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -253,7 +255,8 @@ class AgentRunExecutorTest {
                 outputEvents);
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
-                recoveryService, leaseService, dependencyValidator, stateTransitions, continuations);
+                recoveryService, leaseService, dependencyValidator, stateTransitions, continuations,
+                new JacksonJsonCodec(new ObjectMapper()));
     }
 
     private AgentRun run() {

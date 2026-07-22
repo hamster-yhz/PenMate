@@ -21,15 +21,18 @@ public class AgentRunRecoveryAppService {
     private final AgentRunProjectionRepository agentRunProjectionRepository;
     private final AgentRunPendingApprovalRepository pendingApprovals;
     private final AgentPartialMessageCheckpointStore partialMessages;
+    private final ToolApprovalPreview toolApprovalPreview;
 
     public AgentRunRecoveryAppService(AgentSessionRepository agentSessionRepository,
                                       AgentRunProjectionRepository agentRunProjectionRepository,
                                       AgentRunPendingApprovalRepository pendingApprovals,
-                                      AgentPartialMessageCheckpointStore partialMessages) {
+                                      AgentPartialMessageCheckpointStore partialMessages,
+                                      ToolApprovalPreview toolApprovalPreview) {
         this.agentSessionRepository = agentSessionRepository;
         this.agentRunProjectionRepository = agentRunProjectionRepository;
         this.pendingApprovals = pendingApprovals;
         this.partialMessages = partialMessages;
+        this.toolApprovalPreview = toolApprovalPreview;
     }
 
     public AgentRunRecoveryResult getRecovery(Long projectId, Long sessionId, String traceId) {
@@ -153,7 +156,7 @@ public class AgentRunRecoveryAppService {
         view.put("approvalStatus", "pending");
         view.put("toolCallId", pending.toolCallId());
         view.put("toolCode", pending.toolCode());
-        view.put("approvalPreview", ToolApprovalPreview.from(pending.toolCode(), pending.toolArgsJson()));
+        view.put("approvalPreview", toolApprovalPreview.from(pending.toolCode(), pending.toolArgsJson()));
         return view;
     }
 

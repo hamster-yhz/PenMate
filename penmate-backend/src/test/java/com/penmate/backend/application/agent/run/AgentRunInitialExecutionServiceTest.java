@@ -15,23 +15,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class AsyncAgentRunDispatcherTest {
+class AgentRunInitialExecutionServiceTest {
 
     @Test
-    void dispatchInitialRun_publishes_failed_event_when_executor_throws() {
+    void publishes_failed_event_when_executor_throws() {
         AgentRunExecutor executor = mock(AgentRunExecutor.class);
         AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
         AgentRunLeaseService leaseService = mock(AgentRunLeaseService.class);
         AgentRunLease lease = new AgentRunLease(70001L, "worker", 1L, 3,
-                AgentRunStatus.PENDING, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES));
+                AgentRunStatus.PENDING, Instant.now().plusSeconds(60));
         when(leaseService.tryAcquire(70001L)).thenReturn(Optional.of(lease));
         when(leaseService.handleFailure(eq(lease), any())).thenReturn(AgentRunStatus.FAILED);
         doThrow(new IllegalStateException("boom")).when(executor).execute(70001L, "trace-1", lease);
-
-        AsyncAgentRunDispatcher dispatcher = new AsyncAgentRunDispatcher(
+        AgentRunInitialExecutionService service = new AgentRunInitialExecutionService(
                 executor, eventPublisher, leaseService, mock(AgentRunOutputEventService.class));
 
-        dispatcher.dispatchInitialRun(70001L, "trace-1");
+        service.execute(70001L, "trace-1");
 
         verify(eventPublisher).publish(eq(70001L), eq("run.failed"), any(Map.class));
     }

@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
@@ -25,16 +24,16 @@ public class AgentRunContinuationArtifactService {
     private final AgentArtifactRepository artifacts;
     private final BusinessIdGenerator ids;
     private final ObjectStorageService storage;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
     public AgentRunContinuationArtifactService(AgentArtifactRepository artifacts,
                                                BusinessIdGenerator ids,
                                                ObjectStorageService storage,
-                                               ObjectMapper objectMapper) {
+                                               JsonCodec jsonCodec) {
         this.artifacts = artifacts;
         this.ids = ids;
         this.storage = storage;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
     }
 
     public ArtifactRef save(AgentRunContinuation continuation) {
@@ -64,8 +63,8 @@ public class AgentRunContinuationArtifactService {
         }
         ArtifactRef ref;
         try {
-            ref = objectMapper.readValue(row.payloadJson(), ArtifactRef.class);
-        } catch (JsonProcessingException ex) {
+            ref = jsonCodec.read(row.payloadJson(), ArtifactRef.class);
+        } catch (IllegalArgumentException ex) {
             throw BusinessException.conflict("Agent Run continuation metadata is invalid");
         }
         byte[] bytes = storage.readBytes(ref.objectKey());
@@ -73,8 +72,8 @@ public class AgentRunContinuationArtifactService {
             throw BusinessException.conflict("Agent Run continuation integrity check failed");
         }
         try {
-            return objectMapper.readValue(bytes, AgentRunContinuation.class);
-        } catch (Exception ex) {
+            return jsonCodec.read(new String(bytes, StandardCharsets.UTF_8), AgentRunContinuation.class);
+        } catch (IllegalArgumentException ex) {
             throw BusinessException.conflict("Agent Run continuation is invalid");
         }
     }
@@ -98,8 +97,8 @@ public class AgentRunContinuationArtifactService {
 
     private String json(Object value) {
         try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(value);
+        } catch (RuntimeException ex) {
             throw BusinessException.of("Failed to serialize Agent Run continuation");
         }
     }

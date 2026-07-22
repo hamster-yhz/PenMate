@@ -4,7 +4,6 @@ import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -27,7 +26,6 @@ public class AgentRunReconciler {
         this.recoveryDispatcher = recoveryDispatcher;
     }
 
-    @Scheduled(fixedDelayString = "${penmate.agent.reconcile-delay:PT30S}")
     public void reconcile() {
         Instant now = Instant.now();
         int expired = runs.suspendExpiredRuns(now, now.plusSeconds(5), AgentRunLeaseService.MAX_ATTEMPTS);

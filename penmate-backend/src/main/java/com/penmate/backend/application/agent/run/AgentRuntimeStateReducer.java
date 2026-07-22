@@ -2,18 +2,22 @@ package com.penmate.backend.application.agent.run;
 
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class AgentRuntimeStateReducer {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final JsonCodec jsonCodec;
+
+    public AgentRuntimeStateReducer(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
+    }
 
     public AgentRuntimeState applyAll(AgentRuntimeState initialState, List<AgentEvent> events) {
         AgentRuntimeState state = initialState;
@@ -27,7 +31,7 @@ public class AgentRuntimeStateReducer {
         if (event.sequence() <= state.lastEventSeq()) {
             return state;
         }
-        JsonNode payload = readPayload(event.payloadJson());
+        Map<String, Object> payload = readPayload(event.payloadJson());
         return switch (event.eventType()) {
             case "run.started" -> state.withStatusAndPhase("RUNNING", "routing", event.sequence());
             case "run.phase.changed" -> state.withStatusAndPhase(
@@ -72,7 +76,9 @@ public class AgentRuntimeStateReducer {
         };
     }
 
-    private AgentRuntimeState applyToolCallWaitingApproval(AgentRuntimeState state, JsonNode payload, long sequence) {
+    private AgentRuntimeState applyToolCallWaitingApproval(AgentRuntimeState state,
+                                                           Map<String, Object> payload,
+                                                           long sequence) {
         Long approvalId = longValue(payload, "approvalId");
         AgentRuntimeState s = approvalId != null
                 ? state.withActiveApproval(approvalId, sequence)
@@ -84,49 +90,66 @@ public class AgentRuntimeStateReducer {
                 sequence);
     }
 
-    private String statusOrCurrent(AgentRuntimeState state, JsonNode payload) {
+    private String statusOrCurrent(AgentRuntimeState state, Map<String, Object> payload) {
         return text(payload, "status", state.status());
     }
 
-    private JsonNode readPayload(String payloadJson) {
+    private Map<String, Object> readPayload(String payloadJson) {
         try {
-            return OBJECT_MAPPER.readTree(payloadJson == null || payloadJson.isBlank() ? "{}" : payloadJson);
-        } catch (Exception ex) {
+            return jsonCodec.readObject(payloadJson == null || payloadJson.isBlank() ? "{}" : payloadJson);
+        } catch (RuntimeException ex) {
             throw new IllegalArgumentException("Invalid agent event payload JSON", ex);
         }
     }
 
-    private String text(JsonNode payload, String fieldName, String defaultValue) {
-        JsonNode value = payload.get(fieldName);
-        if (value == null || value.isNull()) {
-            return defaultValue;
-        }
-        return value.asText(defaultValue);
+    private String text(Map<String, Object> payload, String fieldName, String defaultValue) {
+        Object value = payload.get(fieldName);
+        if (value == null) return defaultValue;
+        if (value instanceof String text) return text;
+        if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
+        return "";
     }
 
-    private Long longValue(JsonNode payload, String fieldName) {
-        JsonNode value = payload.get(fieldName);
-        if (value == null || value.isNull()) {
-            return null;
+    private Long longValue(Map<String, Object> payload, String fieldName) {
+        Object value = payload.get(fieldName);
+        if (value == null) return null;
+        if (value instanceof Number number) return number.longValue();
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
         }
-        return value.asLong();
+        return 0L;
     }
 
-    private int intValue(JsonNode payload, String fieldName) {
-        JsonNode node = payload.get(fieldName);
-        return node == null || node.isNull() ? 0 : node.asInt();
+    private int intValue(Map<String, Object> payload, String fieldName) {
+        Long value = longValue(payload, fieldName);
+        return value == null ? 0 : value.intValue();
     }
 
-    private LlmTokenUsage addUsage(LlmTokenUsage current, JsonNode payload) {
-        JsonNode usage = payload.get("tokenUsage");
-        if (usage == null || usage.isNull()) {
-            return current;
-        }
-        int prompt = usage.has("promptTokens") ? usage.get("promptTokens").asInt() : 0;
-        int completion = usage.has("completionTokens") ? usage.get("completionTokens").asInt() : 0;
-        int total = usage.has("totalTokens") ? usage.get("totalTokens").asInt() : 0;
-        int cached = usage.has("cachedPromptTokens") ? usage.get("cachedPromptTokens").asInt() : 0;
-        int cacheCreation = usage.has("cacheCreationPromptTokens") ? usage.get("cacheCreationPromptTokens").asInt() : 0;
+    private LlmTokenUsage addUsage(LlmTokenUsage current, Map<String, Object> payload) {
+        Object rawUsage = payload.get("tokenUsage");
+        if (!(rawUsage instanceof Map<?, ?> values)) return current;
+        int prompt = nestedIntValue(values, "promptTokens");
+        int completion = nestedIntValue(values, "completionTokens");
+        int total = nestedIntValue(values, "totalTokens");
+        int cached = nestedIntValue(values, "cachedPromptTokens");
+        int cacheCreation = nestedIntValue(values, "cacheCreationPromptTokens");
         return current.add(new LlmTokenUsage(prompt, completion, total, cached, cacheCreation));
+    }
+
+    private int nestedIntValue(Map<?, ?> values, String fieldName) {
+        Object value = values.get(fieldName);
+        if (value instanceof Number number) return number.intValue();
+        if (value instanceof String text) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        return 0;
     }
 }

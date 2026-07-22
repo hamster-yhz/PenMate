@@ -9,6 +9,9 @@ import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.infrastructure.agent.run.AgentRunDispatchRequestedListener;
+import com.penmate.backend.infrastructure.agent.run.AsyncAgentRunDispatcher;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -21,6 +24,7 @@ class AgentRunWiringTest {
             .withBean(AgentRunRepository.class, () -> mock(AgentRunRepository.class))
             .withBean(AgentSessionRepository.class, () -> mock(AgentSessionRepository.class))
             .withBean(BusinessIdGenerator.class, () -> mock(BusinessIdGenerator.class))
+            .withBean(JsonCodec.class, () -> mock(JsonCodec.class))
             .withBean(AgentRunEventPublisher.class, () -> mock(AgentRunEventPublisher.class))
             .withBean(AgentRunContextResolutionService.class, () -> mock(AgentRunContextResolutionService.class))
             .withBean(PromptComposer.class, () -> mock(PromptComposer.class))
@@ -36,9 +40,12 @@ class AgentRunWiringTest {
             .withBean(AgentRunDependencyValidator.class, () -> mock(AgentRunDependencyValidator.class))
             .withBean(AgentRunContinuationArtifactService.class,
                     () -> mock(AgentRunContinuationArtifactService.class))
+            .withBean(AgentRunDispatchRequestPublisher.class,
+                    () -> mock(AgentRunDispatchRequestPublisher.class))
             .withBean(AgentRunSuccessorService.class)
             .withBean(AgentRunStateTransitionService.class)
             .withBean(AgentRunExecutor.class)
+            .withBean(AgentRunInitialExecutionService.class)
             .withBean(AsyncAgentRunDispatcher.class)
             .withBean(AgentRunDispatchRequestedListener.class);
 

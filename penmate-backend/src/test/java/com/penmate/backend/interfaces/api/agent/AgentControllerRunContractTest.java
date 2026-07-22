@@ -9,7 +9,7 @@ import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppSe
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
-import com.penmate.backend.infrastructure.realtime.AgentRunEventStreamService;
+import com.penmate.backend.interfaces.api.agent.stream.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

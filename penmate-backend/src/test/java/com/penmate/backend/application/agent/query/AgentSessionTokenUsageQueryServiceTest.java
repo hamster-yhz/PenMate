@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.query;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.exception.BusinessErrorType;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
@@ -84,7 +85,7 @@ class AgentSessionTokenUsageQueryServiceTest {
                 .hasCauseInstanceOf(BusinessException.class)
                 .satisfies(ex -> {
                     BusinessException cause = (BusinessException) ex.getCause();
-                    assertThat(cause.getHttpStatus().value()).isEqualTo(404);
+                    assertThat(cause.getType()).isEqualTo(BusinessErrorType.NOT_FOUND);
                     assertThat(cause.getErrorCode()).isEqualTo("RESOURCE_NOT_FOUND");
                 });
     }

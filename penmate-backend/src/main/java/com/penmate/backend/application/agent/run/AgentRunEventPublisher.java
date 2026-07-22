@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
@@ -27,20 +26,20 @@ public class AgentRunEventPublisher {
     private final AgentRunEventRepository eventRepository;
     private final AgentProjectionUpdater projectionUpdater;
     private final AgentRunEventBus eventBus;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final AgentArtifactRepository artifactRepository;
     private final BusinessIdGenerator businessIdGenerator;
 
     public AgentRunEventPublisher(AgentRunEventRepository eventRepository,
                                   AgentProjectionUpdater projectionUpdater,
                                   AgentRunEventBus eventBus,
-                                  ObjectMapper objectMapper,
+                                  JsonCodec jsonCodec,
                                   AgentArtifactRepository artifactRepository,
                                   BusinessIdGenerator businessIdGenerator) {
         this.eventRepository = eventRepository;
         this.projectionUpdater = projectionUpdater;
         this.eventBus = eventBus;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.artifactRepository = artifactRepository;
         this.businessIdGenerator = businessIdGenerator;
     }
@@ -56,7 +55,7 @@ public class AgentRunEventPublisher {
             artifactRepository.save(new AgentArtifact(
                     artifactId, runId, null, eventType, payloadJson, sizeBytes, null
             ));
-            storedPayload = "{\"artifactRef\":\"" + artifactId + "\",\"sizeBytes\":" + sizeBytes + "}";
+            storedPayload = toJson(Map.of("artifactRef", artifactId, "sizeBytes", sizeBytes));
         }
 
         AgentEvent event = eventRepository.append(runId, eventType, storedPayload);
@@ -101,8 +100,8 @@ public class AgentRunEventPublisher {
 
     private String toJson(Object payload) {
         try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(payload);
+        } catch (RuntimeException ex) {
             throw new IllegalArgumentException("Failed to serialize agent event payload", ex);
         }
     }

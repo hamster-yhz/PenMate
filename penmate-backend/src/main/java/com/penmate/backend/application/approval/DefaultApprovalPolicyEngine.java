@@ -4,7 +4,8 @@ import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor
 import com.penmate.backend.application.agent.tool.definition.ToolGovernancePolicy;
 import com.penmate.backend.application.agent.tool.definition.ToolOperationPolicy;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,12 @@ import java.util.Map;
 @Component
 @Slf4j
 public class DefaultApprovalPolicyEngine {
+
+    private final JsonCodec jsonCodec;
+
+    public DefaultApprovalPolicyEngine(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
+    }
 
     /**
      * 评估一次 tool 调用的审批要求。
@@ -89,7 +96,7 @@ public class DefaultApprovalPolicyEngine {
 
     private String extractOperationCode(String toolArgsJson) {
         try {
-            String operationCode = AgentJsonCodec.parseObj(toolArgsJson).getStr("operation", null);
+            String operationCode = JsonValues.string(jsonCodec.readObject(toolArgsJson), "operation");
             return operationCode == null || operationCode.isBlank() ? null : operationCode;
         } catch (Exception ex) {
             log.warn("解析 tool operation 失败，按默认治理策略处理: rawArgs={}", toolArgsJson, ex);

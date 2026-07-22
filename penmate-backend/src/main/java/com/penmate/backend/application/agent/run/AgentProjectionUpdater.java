@@ -1,13 +1,14 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.repository.AgentRunProjectionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 
 @Service
 public class AgentProjectionUpdater {
@@ -18,18 +19,18 @@ public class AgentProjectionUpdater {
     private final AgentRunProjectionRepository runProjectionRepository;
     private final AgentSessionRepository agentSessionRepository;
     private final BusinessIdGenerator businessIdGenerator;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final AgentEventPayloadResolver payloadResolver;
 
     public AgentProjectionUpdater(AgentRunProjectionRepository runProjectionRepository,
                                   AgentSessionRepository agentSessionRepository,
                                   BusinessIdGenerator businessIdGenerator,
-                                  ObjectMapper objectMapper,
+                                  JsonCodec jsonCodec,
                                   AgentEventPayloadResolver payloadResolver) {
         this.runProjectionRepository = runProjectionRepository;
         this.agentSessionRepository = agentSessionRepository;
         this.businessIdGenerator = businessIdGenerator;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.payloadResolver = payloadResolver;
     }
 
@@ -39,7 +40,7 @@ public class AgentProjectionUpdater {
         if (latestSequence != null && event.sequence() <= latestSequence) {
             return;
         }
-        JsonNode payload = readPayload(payloadResolver.resolve(event).payloadJson());
+        Map<String, Object> payload = readPayload(payloadResolver.resolve(event).payloadJson());
         switch (event.eventType()) {
             case "run.started" -> runProjectionRepository.updateRunState(
                     event.runId(), "RUNNING", text(payload, "phase", "routing"), null, event.sequence(), null, null);
@@ -114,20 +115,23 @@ public class AgentProjectionUpdater {
         }
     }
 
-    private JsonNode readPayload(String payloadJson) {
+    private Map<String, Object> readPayload(String payloadJson) {
         try {
-            return objectMapper.readTree(payloadJson == null || payloadJson.isBlank() ? "{}" : payloadJson);
-        } catch (Exception ex) {
+            return jsonCodec.readObject(payloadJson == null || payloadJson.isBlank() ? "{}" : payloadJson);
+        } catch (RuntimeException ex) {
             throw new IllegalArgumentException("Invalid agent event payload JSON", ex);
         }
     }
 
-    private String text(JsonNode payload, String fieldName, String defaultValue) {
-        JsonNode node = payload.get(fieldName);
-        return node == null || node.isNull() ? defaultValue : node.asText(defaultValue);
+    private String text(Map<String, Object> payload, String fieldName, String defaultValue) {
+        Object value = payload.get(fieldName);
+        if (value == null) return defaultValue;
+        if (value instanceof String text) return text;
+        if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
+        return "";
     }
 
-    private void persistAssistantMessage(AgentEvent event, JsonNode payload) {
+    private void persistAssistantMessage(AgentEvent event, Map<String, Object> payload) {
         String role = text(payload, "role", "assistant");
         String content = text(payload, "text", "");
         if (!"assistant".equalsIgnoreCase(role) || content.isBlank()) {
@@ -162,11 +166,11 @@ public class AgentProjectionUpdater {
         runProjectionRepository.setCurrentAssistantMessage(event.runId(), messageId, event.sequence());
     }
 
-    private String errorCode(JsonNode payload, String defaultValue) {
+    private String errorCode(Map<String, Object> payload, String defaultValue) {
         return truncate(text(payload, "errorCode", defaultValue), ERROR_CODE_MAX_LENGTH);
     }
 
-    private String errorMessage(JsonNode payload) {
+    private String errorMessage(Map<String, Object> payload) {
         return truncate(text(payload, "errorMessage", null), ERROR_MESSAGE_MAX_LENGTH);
     }
 
@@ -177,18 +181,27 @@ public class AgentProjectionUpdater {
         return value.substring(0, maxLength);
     }
 
-    private Long longValue(JsonNode payload, String fieldName) {
-        JsonNode node = payload.get(fieldName);
-        return node == null || node.isNull() ? null : node.asLong();
+    private Long longValue(Map<String, Object> payload, String fieldName) {
+        Object value = payload.get(fieldName);
+        if (value == null) return null;
+        if (value instanceof Number number) return number.longValue();
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
-    private Integer intValue(JsonNode payload, String fieldName) {
-        JsonNode node = payload.get(fieldName);
-        return node == null || node.isNull() ? null : node.asInt();
+    private Integer intValue(Map<String, Object> payload, String fieldName) {
+        Long value = longValue(payload, fieldName);
+        return value == null ? null : value.intValue();
     }
 
-    private String raw(JsonNode payload, String fieldName) {
-        JsonNode node = payload.get(fieldName);
-        return node == null || node.isNull() ? null : node.toString();
+    private String raw(Map<String, Object> payload, String fieldName) {
+        Object value = payload.get(fieldName);
+        return value == null ? null : jsonCodec.write(value);
     }
 }

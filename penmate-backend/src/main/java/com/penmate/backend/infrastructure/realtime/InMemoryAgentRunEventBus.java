@@ -52,7 +52,7 @@ public class InMemoryAgentRunEventBus implements AgentRunEventBus {
         }
     }
 
-    public Runnable subscribe(Long runId, Consumer<AgentEvent> consumer) {
+    private Runnable subscribeLocal(Long runId, Consumer<AgentEvent> consumer) {
         List<Consumer<AgentEvent>> runSubscribers = subscribers.computeIfAbsent(
                 runId, ignored -> new CopyOnWriteArrayList<>());
         runSubscribers.add(consumer);
@@ -62,8 +62,9 @@ public class InMemoryAgentRunEventBus implements AgentRunEventBus {
         };
     }
 
-    public Runnable subscribeWithRedis(Long runId, Consumer<AgentEvent> consumer) {
-        Runnable localUnsub = subscribe(runId, consumer);
+    @Override
+    public Runnable subscribe(Long runId, Consumer<AgentEvent> consumer) {
+        Runnable localUnsub = subscribeLocal(runId, consumer);
         String channel = REDIS_CHANNEL_PREFIX + runId;
         MessageListener listener = (message, pattern) -> {
             try {

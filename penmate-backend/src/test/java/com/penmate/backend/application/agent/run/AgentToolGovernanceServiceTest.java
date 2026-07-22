@@ -14,6 +14,8 @@ import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -58,7 +60,8 @@ class AgentToolGovernanceServiceTest {
                 policyEngine,
                 new ToolApprovalViewFactory(),
                 approvalApplicationService,
-                pendingApprovalRepository
+                pendingApprovalRepository,
+                new JacksonJsonCodec(new ObjectMapper())
         );
 
         AgentToolGovernanceDecision decision = service.beforeExecute(request);

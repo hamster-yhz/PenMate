@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -20,7 +21,8 @@ class AgentEventPayloadResolverTest {
         String payload = "{\"text\":\"answer\"}";
         when(artifacts.findById(88L)).thenReturn(artifact(71L, payload, payload.length()));
 
-        assertThatThrownBy(() -> new AgentEventPayloadResolver(artifacts, new ObjectMapper())
+        assertThatThrownBy(() -> new AgentEventPayloadResolver(
+                artifacts, new JacksonJsonCodec(new ObjectMapper()))
                 .resolve(referenceEvent()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("another run");
@@ -32,7 +34,8 @@ class AgentEventPayloadResolverTest {
         String payload = "{\"text\":\"answer\"}";
         when(artifacts.findById(88L)).thenReturn(artifact(70L, payload, 1));
 
-        assertThatThrownBy(() -> new AgentEventPayloadResolver(artifacts, new ObjectMapper())
+        assertThatThrownBy(() -> new AgentEventPayloadResolver(
+                artifacts, new JacksonJsonCodec(new ObjectMapper()))
                 .resolve(referenceEvent()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("size mismatch");

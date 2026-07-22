@@ -1,30 +1,35 @@
 package com.penmate.backend.application.agent.tool.runtime;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 
-public final class ToolApprovalPreview {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+@Component
+public class ToolApprovalPreview {
+    private final JsonCodec jsonCodec;
 
-    private ToolApprovalPreview() {
+    public ToolApprovalPreview(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
     }
 
-    public static Map<String, String> from(String toolCode, String toolArgsJson) {
+    public Map<String, String> from(String toolCode, String toolArgsJson) {
         try {
-            JsonNode args = OBJECT_MAPPER.readTree(toolArgsJson == null || toolArgsJson.isBlank() ? "{}" : toolArgsJson);
+            Map<String, Object> args = jsonCodec.readObject(
+                    toolArgsJson == null || toolArgsJson.isBlank() ? "{}" : toolArgsJson);
             LinkedHashMap<String, String> preview = new LinkedHashMap<>();
             putText(preview, "operation", args.get("operation"));
             if ("story_bible_update".equals(toolCode)) {
-                JsonNode operations = args.get("operations");
-                if (operations != null && operations.isArray() && !operations.isEmpty()) {
-                    JsonNode first = operations.get(0);
+                Object rawOperations = args.get("operations");
+                if (rawOperations instanceof List<?> operations && !operations.isEmpty()
+                        && operations.getFirst() instanceof Map<?, ?> first) {
                     putText(preview, "kind", first.get("kind"));
                     Long nodeId = null;
-                    for (JsonNode operation : operations) {
+                    for (Object rawOperation : operations) {
+                        if (!(rawOperation instanceof Map<?, ?> operation)) continue;
                         nodeId = firstNodeId(operation);
                         if (nodeId != null) break;
                     }
@@ -38,17 +43,18 @@ public final class ToolApprovalPreview {
         }
     }
 
-    private static Long firstNodeId(JsonNode operation) {
+    private static Long firstNodeId(Map<?, ?> operation) {
         for (String field : new String[]{"nodeId", "sourceNodeId", "targetNodeId"}) {
-            JsonNode value = operation.get(field);
-            if (value != null && value.canConvertToLong() && value.asLong() > 0) return value.asLong();
+            Object value = operation.get(field);
+            if (value instanceof Number number && number.longValue() > 0) return number.longValue();
         }
         return null;
     }
 
-    private static void putText(Map<String, String> preview, String field, JsonNode value) {
-        if (value != null && value.isValueNode() && !value.asText().isBlank()) {
-            preview.put(field, value.asText());
+    private static void putText(Map<String, String> preview, String field, Object value) {
+        if ((value instanceof String || value instanceof Number || value instanceof Boolean)
+                && !String.valueOf(value).isBlank()) {
+            preview.put(field, String.valueOf(value));
         }
     }
 }

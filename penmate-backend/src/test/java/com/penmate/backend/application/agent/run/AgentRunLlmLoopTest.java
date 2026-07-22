@@ -9,6 +9,8 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -301,6 +303,7 @@ class AgentRunLlmLoopTest {
         AgentLlmInvocationService invocations = new AgentLlmInvocationService(llmGateway, cancellations);
         AgentStreamingMessageService streaming = new AgentStreamingMessageService(eventPublisher, partialMessages);
         return new AgentRunLlmLoop(invocations, toolDefinitionSource, eventPublisher, toolCallService,
-                checkpointBoundary, continuations, streaming);
+                checkpointBoundary, continuations, streaming,
+                new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()));
     }
 }

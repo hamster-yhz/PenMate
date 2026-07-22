@@ -1,7 +1,6 @@
 package com.penmate.backend.interfaces.api.agent;
 
 import com.penmate.backend.application.agent.command.AgentCommands.CreateConversationCommand;
-import com.penmate.backend.application.agent.context.StoryBibleRoutingPreferenceResolver;
 import com.penmate.backend.application.agent.query.AgentRunHistoryQueryService;
 import com.penmate.backend.application.agent.run.AgentRunCancellationService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
@@ -14,7 +13,7 @@ import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.domain.agent.model.AgentConversation;
-import com.penmate.backend.infrastructure.realtime.AgentRunEventStreamService;
+import com.penmate.backend.interfaces.api.agent.stream.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
@@ -24,7 +23,6 @@ import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
-import com.penmate.backend.interfaces.api.agent.dto.StoryBibleRoutingPreferenceDto;
 import com.penmate.backend.interfaces.api.agent.dto.UpdateAgentSessionDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
@@ -57,7 +55,6 @@ public class AgentController {
     private final AgentSessionTokenUsageAppService agentSessionTokenUsageAppService;
     private final AgentTurnAppService agentTurnAppService;
     private final AgentRunEventStreamService agentRunEventStreamService;
-    private final StoryBibleRoutingPreferenceResolver routingPreferences;
     private final AgentRunCancellationService runCancellationService;
     private final AgentRunRetryService runRetryService;
     private final AgentRunHistoryQueryService runHistoryQueryService;
@@ -67,7 +64,6 @@ public class AgentController {
                            AgentSessionTokenUsageAppService agentSessionTokenUsageAppService,
                            AgentTurnAppService agentTurnAppService,
                            AgentRunEventStreamService agentRunEventStreamService,
-                           StoryBibleRoutingPreferenceResolver routingPreferences,
                            AgentRunCancellationService runCancellationService,
                            AgentRunRetryService runRetryService,
                            AgentRunHistoryQueryService runHistoryQueryService) {
@@ -76,28 +72,9 @@ public class AgentController {
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
         this.agentTurnAppService = agentTurnAppService;
         this.agentRunEventStreamService = agentRunEventStreamService;
-        this.routingPreferences = routingPreferences;
         this.runCancellationService = runCancellationService;
         this.runRetryService = runRetryService;
         this.runHistoryQueryService = runHistoryQueryService;
-    }
-
-    @GetMapping("/routing-preference")
-    public ApiResponse<StoryBibleRoutingPreferenceDto.View> getUserRoutingPreference(
-            @PathVariable String projectId, Authentication authentication,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        var result = routingPreferences.resolveProject(requireLongId(projectId, "projectId"), principalId(authentication));
-        return ApiResponse.success(toRoutingView(result), traceId);
-    }
-
-    @PutMapping("/routing-preference")
-    public ApiResponse<StoryBibleRoutingPreferenceDto.View> updateUserRoutingPreference(
-            @PathVariable String projectId, Authentication authentication,
-            @RequestBody StoryBibleRoutingPreferenceDto.Update dto,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        var result = routingPreferences.saveProject(requireLongId(projectId, "projectId"), principalId(authentication),
-                dto.mode(), optionalLongId(dto.routerModelConfigId(), "routerModelConfigId"));
-        return ApiResponse.success(toRoutingView(result), traceId);
     }
 
     /**
@@ -309,11 +286,6 @@ public class AgentController {
 
     private String stringifyBusinessId(Long value) {
         return value == null ? null : String.valueOf(value);
-    }
-
-    private StoryBibleRoutingPreferenceDto.View toRoutingView(
-            StoryBibleRoutingPreferenceResolver.EffectivePreference value) {
-        return new StoryBibleRoutingPreferenceDto.View(value.mode(), stringifyBusinessId(value.routerModelConfigId()));
     }
 
     @PatchMapping("/sessions/{sessionId}")

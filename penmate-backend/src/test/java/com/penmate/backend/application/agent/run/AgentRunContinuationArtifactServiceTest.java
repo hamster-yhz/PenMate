@@ -8,6 +8,7 @@ import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -32,7 +33,7 @@ class AgentRunContinuationArtifactServiceTest {
         ObjectStorageService storage = mock(ObjectStorageService.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         AgentRunContinuationArtifactService service = new AgentRunContinuationArtifactService(
-                artifacts, ids, storage, objectMapper);
+                artifacts, ids, storage, new JacksonJsonCodec(objectMapper));
         AtomicReference<String> storedJson = new AtomicReference<>();
         when(ids.nextId()).thenReturn(88001L);
         when(storage.putText(any(), any(), any())).thenAnswer(invocation -> {
@@ -65,7 +66,8 @@ class AgentRunContinuationArtifactServiceTest {
         BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
         ObjectStorageService storage = mock(ObjectStorageService.class);
         AgentRunContinuationArtifactService service = new AgentRunContinuationArtifactService(
-                artifacts, ids, storage, new ObjectMapper().findAndRegisterModules());
+                artifacts, ids, storage,
+                new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()));
         when(ids.nextId()).thenReturn(88002L);
         when(storage.putText(any(), any(), any())).thenAnswer(invocation -> {
             String json = invocation.getArgument(1);

@@ -4,7 +4,6 @@ import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -29,7 +28,6 @@ public class AgentRunPendingApprovalTimeoutGuard {
         this.eventPublisher = eventPublisher;
     }
 
-    @Scheduled(fixedDelayString = "PT1M")
     public void failTimedOutResumingApprovals() {
         List<AgentRunPendingApproval> pendingApprovals = pendingApprovalRepository
                 .findStaleResumingOrApproved(DEFAULT_TIMEOUT_MINUTES, DEFAULT_BATCH_SIZE);

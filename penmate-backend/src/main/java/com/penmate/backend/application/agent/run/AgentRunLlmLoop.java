@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
@@ -32,7 +31,6 @@ public class AgentRunLlmLoop {
     private static final Logger log = LoggerFactory.getLogger(AgentRunLlmLoop.class);
     private static final int INITIAL_TURN_INDEX = 1;
     private static final int MAX_ITERATIONS = 10;
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AgentLlmInvocationService llmInvocations;
     private final AgentToolDefinitionSource toolDefinitionSource;
@@ -41,6 +39,7 @@ public class AgentRunLlmLoop {
     private final AgentCheckpointBoundaryService checkpointBoundary;
     private final AgentRunContinuationArtifactService continuations;
     private final AgentStreamingMessageService streamingMessages;
+    private final JsonCodec jsonCodec;
 
     public AgentRunLlmLoop(AgentLlmInvocationService llmInvocations,
                            AgentToolDefinitionSource toolDefinitionSource,
@@ -48,7 +47,8 @@ public class AgentRunLlmLoop {
                            @Lazy ToolCallApplicationService toolCallService,
                            AgentCheckpointBoundaryService checkpointBoundary,
                            AgentRunContinuationArtifactService continuations,
-                           AgentStreamingMessageService streamingMessages) {
+                           AgentStreamingMessageService streamingMessages,
+                           JsonCodec jsonCodec) {
         this.llmInvocations = llmInvocations;
         this.toolDefinitionSource = toolDefinitionSource;
         this.eventPublisher = eventPublisher;
@@ -56,6 +56,7 @@ public class AgentRunLlmLoop {
         this.checkpointBoundary = checkpointBoundary;
         this.continuations = continuations;
         this.streamingMessages = streamingMessages;
+        this.jsonCodec = jsonCodec;
     }
 
     public AgentRunLoopResult execute(AgentRunLoopRequest request) {
@@ -84,9 +85,9 @@ public class AgentRunLlmLoop {
     public AgentRunLoopResult resumeApproved(AgentRunLoopRequest request, AgentRunPendingApproval pending) {
         Objects.requireNonNull(pending, "pending must not be null");
         try {
-            List<AgentLlmMessage> messages = new ArrayList<>(OBJECT_MAPPER.readValue(
-                    pending.resumePayloadJson(), new TypeReference<List<AgentLlmMessage>>() { }));
-            Continuation continuation = OBJECT_MAPPER.readValue(pending.toolContextJson(), Continuation.class);
+            List<AgentLlmMessage> messages = new ArrayList<>(
+                    jsonCodec.readList(pending.resumePayloadJson(), AgentLlmMessage.class));
+            Continuation continuation = jsonCodec.read(pending.toolContextJson(), Continuation.class);
             ToolCallResult result = toolCallService.executeToolCall(new ToolCallRequest(
                     pending.projectId(), pending.runId(), pending.sessionId(), pending.turnId(), pending.toolCode(),
                     pending.toolArgsJson(),
@@ -312,8 +313,8 @@ public class AgentRunLlmLoop {
 
     private String json(Object value) {
         try {
-            return OBJECT_MAPPER.writeValueAsString(value);
-        } catch (Exception ex) {
+            return jsonCodec.write(value);
+        } catch (RuntimeException ex) {
             throw new IllegalStateException("Failed to snapshot Agent LLM continuation", ex);
         }
     }

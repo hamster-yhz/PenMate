@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentCheckpoint;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
@@ -10,7 +9,6 @@ import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -25,25 +23,24 @@ public class AgentCheckpointService {
     private static final Logger log = LoggerFactory.getLogger(AgentCheckpointService.class);
     private static final int INLINE_STATE_LIMIT_BYTES = 256 * 1024;
     private static final long REDIS_TTL_SECONDS = 30 * 60;
-    private static final String REDIS_KEY_PREFIX = "agent:checkpoint:v2:";
     private static final int STATE_SCHEMA_VERSION = 2;
     private static final int CHECKPOINTS_TO_KEEP = 2;
 
     private final AgentCheckpointRepository checkpointRepository;
-    private final StringRedisTemplate redisTemplate;
+    private final AgentCheckpointCache checkpointCache;
     private final BusinessIdGenerator businessIdGenerator;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final ObjectStorageService objectStorage;
 
     public AgentCheckpointService(AgentCheckpointRepository checkpointRepository,
-                                  StringRedisTemplate redisTemplate,
+                                  AgentCheckpointCache checkpointCache,
                                   BusinessIdGenerator businessIdGenerator,
-                                  ObjectMapper objectMapper,
+                                  JsonCodec jsonCodec,
                                   ObjectStorageService objectStorage) {
         this.checkpointRepository = checkpointRepository;
-        this.redisTemplate = redisTemplate;
+        this.checkpointCache = checkpointCache;
         this.businessIdGenerator = businessIdGenerator;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.objectStorage = objectStorage;
     }
 
@@ -88,26 +85,24 @@ public class AgentCheckpointService {
         checkpointRepository.save(checkpoint);
         checkpointRepository.deleteOlderThanLatest(event.runId(), CHECKPOINTS_TO_KEEP);
         try {
-            String redisKey = REDIS_KEY_PREFIX + event.runId() + ":latest";
-            redisTemplate.opsForValue().set(redisKey, serializedState, Duration.ofSeconds(REDIS_TTL_SECONDS));
+            checkpointCache.put(event.runId(), serializedState, Duration.ofSeconds(REDIS_TTL_SECONDS));
         } catch (Exception ex) {
-            log.warn("Failed to write checkpoint to Redis: runId={}, checkpointNo={}", event.runId(), checkpointNo, ex);
+            log.warn("Failed to write checkpoint hot cache: runId={}, checkpointNo={}", event.runId(), checkpointNo, ex);
         }
     }
 
-    public AgentRuntimeState loadLatestFromRedis(Long runId) {
-        String redisKey = REDIS_KEY_PREFIX + runId + ":latest";
+    public AgentRuntimeState loadLatest(Long runId) {
         try {
-            String stateJson = redisTemplate.opsForValue().get(redisKey);
+            String stateJson = checkpointCache.get(runId);
             if (stateJson != null && !stateJson.isBlank()) {
-                return objectMapper.readValue(stateJson, AgentRuntimeState.class);
+                return jsonCodec.read(stateJson, AgentRuntimeState.class);
             }
         } catch (Exception ex) {
-            log.warn("Failed to load checkpoint from Redis: runId={}", runId, ex);
+            log.warn("Failed to load checkpoint hot cache: runId={}", runId, ex);
         }
         for (AgentCheckpoint checkpoint : checkpointRepository.findLatest(runId, CHECKPOINTS_TO_KEEP)) {
             try {
-                return objectMapper.readValue(loadAndVerify(checkpoint), AgentRuntimeState.class);
+                return jsonCodec.read(loadAndVerify(checkpoint), AgentRuntimeState.class);
             } catch (Exception ex) {
                 log.error("Failed to load checkpoint, trying previous: runId={}, checkpointNo={}",
                         runId, checkpoint.checkpointNo(), ex);
@@ -117,11 +112,10 @@ public class AgentCheckpointService {
     }
 
     public void deleteCheckpoints(Long runId) {
-        String redisKey = REDIS_KEY_PREFIX + runId + ":latest";
         try {
-            redisTemplate.delete(redisKey);
+            checkpointCache.delete(runId);
         } catch (Exception ex) {
-            log.warn("Failed to delete checkpoint from Redis: runId={}", runId, ex);
+            log.warn("Failed to delete checkpoint hot cache: runId={}", runId, ex);
         }
     }
 
@@ -153,8 +147,8 @@ public class AgentCheckpointService {
 
     private String serializeState(AgentRuntimeState state) {
         try {
-            return objectMapper.writeValueAsString(state);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(state);
+        } catch (RuntimeException ex) {
             throw new IllegalArgumentException("Failed to serialize agent runtime state", ex);
         }
     }

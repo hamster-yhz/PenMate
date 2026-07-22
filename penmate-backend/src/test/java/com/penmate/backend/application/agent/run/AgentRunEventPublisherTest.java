@@ -7,6 +7,7 @@ import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunProjectionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -51,7 +52,7 @@ class AgentRunEventPublisherTest {
                 eventRepository,
                 projectionUpdater,
                 eventBus,
-                new ObjectMapper(),
+                new JacksonJsonCodec(new ObjectMapper()),
                 artifactRepository,
                 businessIdGenerator
         );
@@ -70,7 +71,7 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper(),
+                new JacksonJsonCodec(new ObjectMapper()),
                 payloadResolver()
         );
 
@@ -92,7 +93,7 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper(),
+                new JacksonJsonCodec(new ObjectMapper()),
                 payloadResolver()
         );
 
@@ -118,7 +119,7 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper(),
+                new JacksonJsonCodec(new ObjectMapper()),
                 payloadResolver()
         );
 
@@ -139,7 +140,7 @@ class AgentRunEventPublisherTest {
                 runProjectionRepository,
                 agentSessionRepository,
                 businessIdGenerator,
-                new ObjectMapper(),
+                new JacksonJsonCodec(new ObjectMapper()),
                 payloadResolver()
         );
 
@@ -171,7 +172,7 @@ class AgentRunEventPublisherTest {
                 90001L, 50001L, 99001L, "assistant", "CHAT", text, 4)).thenReturn(1);
         AgentProjectionUpdater updater = new AgentProjectionUpdater(
                 runProjectionRepository, agentSessionRepository, businessIdGenerator,
-                new ObjectMapper(), payloadResolver());
+                new JacksonJsonCodec(new ObjectMapper()), payloadResolver());
         AgentEvent event = new AgentEvent(
                 9L, 70001L, 101L, 90001L, 50001L, 9L, 1, "message.completed",
                 "{\"artifactRef\":\"88001\",\"sizeBytes\":" + payload.length() + "}", null);
@@ -194,6 +195,7 @@ class AgentRunEventPublisherTest {
     }
 
     private AgentEventPayloadResolver payloadResolver() {
-        return new AgentEventPayloadResolver(artifactRepository, new ObjectMapper());
+        return new AgentEventPayloadResolver(
+                artifactRepository, new JacksonJsonCodec(new ObjectMapper()));
     }
 }

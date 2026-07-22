@@ -1,6 +1,9 @@
 package com.penmate.backend.application.approval;
 
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -141,9 +144,9 @@ class DefaultApprovalPolicyEngineTest {
     private Object instantiate(String className) {
         try {
             Class<?> type = Class.forName(className);
-            Constructor<?> constructor = type.getDeclaredConstructor();
+            Constructor<?> constructor = type.getDeclaredConstructor(JsonCodec.class);
             constructor.setAccessible(true);
-            return constructor.newInstance();
+            return constructor.newInstance(new JacksonJsonCodec(new ObjectMapper()));
         } catch (Exception ex) {
             throw new AssertionError("expected class to be constructible: " + className, ex);
         }

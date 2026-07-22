@@ -1,24 +1,24 @@
 package com.penmate.backend.application.agent.run;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
 public class AgentEventPayloadResolver {
 
     private final AgentArtifactRepository artifacts;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
-    public AgentEventPayloadResolver(AgentArtifactRepository artifacts, ObjectMapper objectMapper) {
+    public AgentEventPayloadResolver(AgentArtifactRepository artifacts, JsonCodec jsonCodec) {
         this.artifacts = artifacts;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
     }
 
     public AgentEvent resolve(AgentEvent event) {
@@ -27,13 +27,13 @@ public class AgentEventPayloadResolver {
             return event;
         }
         try {
-            JsonNode envelope = objectMapper.readTree(payload);
-            JsonNode reference = envelope.get("artifactRef");
-            if (reference == null || reference.isNull()) {
+            Map<String, Object> envelope = jsonCodec.readObject(payload);
+            Object reference = envelope.get("artifactRef");
+            if (reference == null) {
                 return event;
             }
-            Long artifactId = reference.asLong();
-            if (artifactId <= 0) {
+            long artifactId = parseLong(reference, -1L);
+            if (artifactId <= 0L) {
                 throw new IllegalStateException("Agent Event payload artifact reference is invalid");
             }
             AgentArtifact artifact = artifacts.findById(artifactId);
@@ -54,8 +54,8 @@ public class AgentEventPayloadResolver {
             if (artifact.sizeBytes() == null || artifact.sizeBytes() != actualSize) {
                 throw new IllegalStateException("Agent Event payload artifact size mismatch");
             }
-            JsonNode declaredSize = envelope.get("sizeBytes");
-            if (declaredSize != null && declaredSize.asInt(-1) != actualSize) {
+            Object declaredSize = envelope.get("sizeBytes");
+            if (declaredSize != null && parseLong(declaredSize, -1L) != actualSize) {
                 throw new IllegalStateException("Agent Event payload reference size mismatch");
             }
             return AgentEvent.forReplay(event, resolved);
@@ -64,5 +64,19 @@ public class AgentEventPayloadResolver {
         } catch (Exception ex) {
             throw new IllegalArgumentException("Invalid Agent Event artifact reference", ex);
         }
+    }
+
+    private long parseLong(Object value, long fallback) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 }

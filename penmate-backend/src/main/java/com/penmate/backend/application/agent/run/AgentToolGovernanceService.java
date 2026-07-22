@@ -12,7 +12,7 @@ import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,17 +23,20 @@ public class AgentToolGovernanceService {
     private final ToolApprovalViewFactory toolApprovalViewFactory;
     private final ApprovalApplicationService approvalApplicationService;
     private final AgentRunPendingApprovalRepository pendingApprovalRepository;
+    private final JsonCodec jsonCodec;
 
     public AgentToolGovernanceService(AgentToolDefinitionSource toolDefinitionSource,
                                       DefaultApprovalPolicyEngine approvalPolicyEngine,
                                       ToolApprovalViewFactory toolApprovalViewFactory,
                                       ApprovalApplicationService approvalApplicationService,
-                                      AgentRunPendingApprovalRepository pendingApprovalRepository) {
+                                      AgentRunPendingApprovalRepository pendingApprovalRepository,
+                                      JsonCodec jsonCodec) {
         this.toolDefinitionSource = toolDefinitionSource;
         this.approvalPolicyEngine = approvalPolicyEngine;
         this.toolApprovalViewFactory = toolApprovalViewFactory;
         this.approvalApplicationService = approvalApplicationService;
         this.pendingApprovalRepository = pendingApprovalRepository;
+        this.jsonCodec = jsonCodec;
     }
 
     public AgentToolGovernanceDecision beforeExecute(ToolCallRequest request) {
@@ -65,7 +68,7 @@ public class AgentToolGovernanceService {
                 request.toolCode(),
                 request.toolArgsJson(),
                 request.contextJson(),
-                AgentJsonCodec.toJson(approvalView),
+                jsonCodec.write(approvalView),
                 request.idempotencyKey(),
                 "PENDING",
                 request.operatorId(),

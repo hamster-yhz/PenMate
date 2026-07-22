@@ -1,9 +1,10 @@
-package com.penmate.backend.infrastructure.realtime;
+package com.penmate.backend.interfaces.api.agent.stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentEventPayloadResolver;
 import com.penmate.backend.application.agent.run.AgentPartialMessageCheckpointStore;
+import com.penmate.backend.application.agent.run.AgentRunEventBus;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentEventWindow;
 import com.penmate.backend.domain.agent.run.repository.AgentRunEventRepository;
@@ -29,7 +30,7 @@ public class AgentRunEventStreamService {
     private static final long SSE_HEARTBEAT_INTERVAL_MS = 15_000L;
 
     private final AgentRunEventRepository eventRepository;
-    private final InMemoryAgentRunEventBus eventBus;
+    private final AgentRunEventBus eventBus;
     private final AgentEventPayloadResolver payloadResolver;
     private final AgentPartialMessageCheckpointStore partialMessages;
     private final ObjectMapper objectMapper;
@@ -37,7 +38,7 @@ public class AgentRunEventStreamService {
     private final Map<Long, StreamConnection> activeStreams = new ConcurrentHashMap<>();
 
     public AgentRunEventStreamService(AgentRunEventRepository eventRepository,
-                                      InMemoryAgentRunEventBus eventBus,
+                                      AgentRunEventBus eventBus,
                                       AgentEventPayloadResolver payloadResolver,
                                       AgentPartialMessageCheckpointStore partialMessages,
                                       ObjectMapper objectMapper) {
@@ -54,7 +55,7 @@ public class AgentRunEventStreamService {
         StreamConnection connection = new StreamConnection(
                 streamIds.incrementAndGet(), runId, emitter, cursor);
         activeStreams.put(connection.streamId, connection);
-        connection.unsubscribe = eventBus.subscribeWithRedis(runId, event -> onBusEvent(connection, event));
+        connection.unsubscribe = eventBus.subscribe(runId, event -> onBusEvent(connection, event));
         emitter.onCompletion(() -> close(connection));
         emitter.onTimeout(() -> close(connection));
         emitter.onError(ignored -> close(connection));

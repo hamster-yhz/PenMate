@@ -7,6 +7,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
@@ -42,6 +43,7 @@ public class AgentRunExecutor {
     private final AgentRunDependencyValidator dependencyValidator;
     private final AgentRunStateTransitionService stateTransitions;
     private final AgentRunContinuationArtifactService continuations;
+    private final JsonCodec jsonCodec;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
                             AgentRunEventPublisher eventPublisher,
@@ -57,7 +59,8 @@ public class AgentRunExecutor {
                             AgentRunLeaseService leaseService,
                             AgentRunDependencyValidator dependencyValidator,
                             AgentRunStateTransitionService stateTransitions,
-                            AgentRunContinuationArtifactService continuations) {
+                            AgentRunContinuationArtifactService continuations,
+                            JsonCodec jsonCodec) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
         this.contextResolutionService = contextResolutionService;
@@ -73,6 +76,7 @@ public class AgentRunExecutor {
         this.dependencyValidator = dependencyValidator;
         this.stateTransitions = stateTransitions;
         this.continuations = continuations;
+        this.jsonCodec = jsonCodec;
     }
 
     public void execute(Long runId, String traceId, AgentRunLease lease) {
@@ -381,16 +385,24 @@ public class AgentRunExecutor {
             return null;
         }
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(modelSnapshotJson);
-            com.fasterxml.jackson.databind.JsonNode modelConfigId = node.get("modelConfigId");
-            if (modelConfigId != null && !modelConfigId.isNull()) {
-                long value = modelConfigId.asLong(0L);
-                return value > 0 ? value : null;
-            }
-        } catch (Exception e) {
+            Object modelConfigId = jsonCodec.readObject(modelSnapshotJson).get("modelConfigId");
+            long value = positiveLong(modelConfigId);
+            return value > 0L ? value : null;
+        } catch (RuntimeException ignored) {
             // ignore parse failures
         }
         return null;
+    }
+
+    private long positiveLong(Object value) {
+        if (value instanceof Number number) return number.longValue();
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 }

@@ -20,7 +20,7 @@ public class AgentRunRecoveryService {
     }
 
     public AgentRuntimeState recover(Long runId) {
-        AgentRuntimeState checkpoint = checkpointService.loadLatestFromRedis(runId);
+        AgentRuntimeState checkpoint = checkpointService.loadLatest(runId);
         if (checkpoint == null) checkpoint = AgentRuntimeState.empty(runId);
         return stateReducer.applyAll(
                 checkpoint,
