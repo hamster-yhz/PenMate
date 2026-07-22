@@ -47,9 +47,7 @@ DELETE FROM story_bibles WHERE story_bible_id BETWEEN 920000 AND 922999;
 
 DELETE FROM style_switch_logs WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM style_profiles WHERE project_id BETWEEN 920000 AND 922999;
-DELETE FROM novel_chapter_versions WHERE chapter_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_chapters WHERE project_id BETWEEN 920000 AND 922999;
-DELETE FROM novel_outline_nodes WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_volumes WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM novel_projects WHERE project_id BETWEEN 920000 AND 922999;
 

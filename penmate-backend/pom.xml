@@ -26,9 +26,6 @@
         <langchain4j.version>0.35.0</langchain4j.version>
         <aws.sdk.version>2.30.31</aws.sdk.version>
         <penmate.test.database.mode>local</penmate.test.database.mode>
-        <penmate.test.database.url>jdbc:postgresql://localhost:5432/penmate_test</penmate.test.database.url>
-        <penmate.test.database.username>postgres</penmate.test.database.username>
-        <penmate.test.database.password>postgres</penmate.test.database.password>
     </properties>
 
     <dependencies>
@@ -271,9 +268,6 @@
                 <configuration>
                     <systemPropertyVariables>
                         <penmate.test.database.mode>${penmate.test.database.mode}</penmate.test.database.mode>
-                        <penmate.test.database.url>${penmate.test.database.url}</penmate.test.database.url>
-                        <penmate.test.database.username>${penmate.test.database.username}</penmate.test.database.username>
-                        <penmate.test.database.password>${penmate.test.database.password}</penmate.test.database.password>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
