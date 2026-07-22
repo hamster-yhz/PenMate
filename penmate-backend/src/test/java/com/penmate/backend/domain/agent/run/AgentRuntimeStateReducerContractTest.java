@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentRuntimeStateReducer;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRuntimeState;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -13,7 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentRuntimeStateReducerContractTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final AgentRuntimeStateReducer reducer = new AgentRuntimeStateReducer();
+    private final AgentRuntimeStateReducer reducer =
+            new AgentRuntimeStateReducer(new JacksonJsonCodec(objectMapper));
 
     @Test
     void applies_run_tool_message_and_approval_events() {
@@ -25,7 +27,7 @@ class AgentRuntimeStateReducerContractTest {
         assertThat(s1.phase()).isEqualTo("routing");
         assertThat(s1.lastEventSeq()).isEqualTo(1L);
 
-        AgentRuntimeState s2 = reducer.apply(s1, event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"draft_generation\"}"));
+        AgentRuntimeState s2 = reducer.apply(s1, event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"chapter_edit\"}"));
         assertThat(s2.phase()).isEqualTo("routing");
         assertThat(s2.lastEventSeq()).isEqualTo(2L);
 
@@ -43,7 +45,7 @@ class AgentRuntimeStateReducerContractTest {
         AgentRuntimeState state = AgentRuntimeState.empty(70001L);
         AgentRuntimeState reduced = reducer.applyAll(state, List.of(
                 event(1L, "run.started", "{\"phase\":\"routing\"}"),
-                event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"draft_generation\"}"),
+                event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"chapter_edit\"}"),
                 event(3L, "tool.call.waiting_approval", "{\"toolCallId\":\"call-1\",\"approvalId\":88001}"),
                 event(4L, "message.delta", "{\"text\":\"abc\"}"),
                 event(5L, "llm.continuation.saved", "{\"artifactId\":99001}"),

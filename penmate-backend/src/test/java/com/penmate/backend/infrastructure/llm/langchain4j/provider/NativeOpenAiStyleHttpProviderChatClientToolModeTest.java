@@ -7,8 +7,8 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.ChapterEditToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.ContextEnhancerToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.DraftGenerationToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
@@ -118,7 +118,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
                 new ContextEnhancerToolDefinition(),
                 new BookCrudToolDefinition(),
-                new DraftGenerationToolDefinition(),
+                new ChapterEditToolDefinition(),
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new StoryBibleSearchToolDefinition(),

@@ -107,7 +107,7 @@ class LongcatProviderChatClientTest {
                         new com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource(List.of(
                                 new com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition(),
                                 new com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition(),
-                                new com.penmate.backend.application.agent.tool.definition.DraftGenerationToolDefinition()
+                                new com.penmate.backend.application.agent.tool.definition.ChapterEditToolDefinition()
                         )).listLlmSchemas(),
                         "auto"
                 ),
