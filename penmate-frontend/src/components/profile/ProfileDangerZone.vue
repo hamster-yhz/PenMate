@@ -1,74 +1,31 @@
 <template>
-  <div class="danger-zone glass-panel">
-    <h3 class="section-title danger">⚠️ 危险操作</h3>
-    <div class="setting-row">
-      <div class="sr-info">
-        <span class="sr-label">退出登录</span>
-        <span class="sr-value">退出当前账号</span>
-      </div>
-      <button class="sr-btn logout" type="button" @click="emit('logout')">退出</button>
+  <section class="settings-surface session-exit">
+    <header><h2>当前会话</h2><p>只退出当前浏览器，其他已登录设备不受影响。</p></header>
+    <div class="exit-row">
+      <span><strong>退出登录</strong><small>未保存到后端的本地编辑内容仍会保留在当前设备</small></span>
+      <button type="button" @click="emit('logout')"><LogoutOutlined />退出当前设备</button>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
+import { LogoutOutlined } from '@ant-design/icons-vue'
+
 const emit = defineEmits<{
   (event: 'logout'): void
 }>()
 </script>
 
-<style lang="less" scoped>
-.danger-zone {
-  padding: 20px 24px;
-  background: rgba(17, 24, 39, 0.5);
-  border: 1px solid rgba(192, 60, 45, 0.15);
-  border-radius: 12px;
-}
-
-.section-title {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  color: var(--xuan-paper);
-  letter-spacing: 0.12em;
-  margin-bottom: 16px;
-
-  &.danger {
-    color: #e8a87c;
-  }
-}
-
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.sr-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sr-label {
-  font-size: 0.85rem;
-  color: var(--text-primary);
-}
-
-.sr-value {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.sr-btn {
-  padding: 5px 14px;
-  font-size: 0.78rem;
-  border-radius: 4px;
-  cursor: pointer;
-
-  &.logout {
-    color: #e8a87c;
-    background: rgba(192, 60, 45, 0.08);
-    border: 1px solid rgba(192, 60, 45, 0.2);
-  }
-}
+<style scoped>
+.session-exit { overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 6px; }
+.session-exit header { padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); }
+.session-exit h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 0; }
+.session-exit p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.exit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 16px 20px; }
+.exit-row > span { display: grid; gap: 4px; }
+.exit-row strong { font-size: 13px; }
+.exit-row small { color: var(--text-muted); font-size: 11px; }
+.exit-row button { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 12px; color: var(--danger); background: var(--bg-surface); border: 1px solid var(--danger-border); border-radius: 4px; cursor: pointer; }
+.exit-row button:hover { background: var(--danger-soft); }
+@media (max-width: 560px) { .exit-row { grid-template-columns: 1fr; } .exit-row button { justify-self: start; } }
 </style>

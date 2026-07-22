@@ -2,8 +2,10 @@ import { reactive, ref } from 'vue'
 import { modelApi } from '@/api/modules/model.api'
 import { novelApi } from '@/api/modules/novel.api'
 import { authApi, type UserProfile } from '@/api/modules/auth.api'
-import { getSession } from '@/stores/session'
+import { clearSession, getSession } from '@/stores/session'
 import { pickBusinessRecord } from '@/utils/apiPayload'
+import { broadcastSessionLogout } from '@/utils/request'
+import { getErrorMessage } from '@/utils/errors'
 
 export interface ProfileModel {
   name: string
@@ -29,19 +31,28 @@ export interface ProfilePasswordPayload {
   new2: string
 }
 
+export interface ProfileEmailPayload {
+  email: string
+  currentPassword: string
+}
+
 export interface ProfileActionResult {
   success: boolean
   error?: string
+  deletionDueAt?: string
 }
 
 export interface ProfileModelPreferences {
-  mainAgentModelConfigId: string | null
-  dirtyWorkAgentModelConfigId: string | null
+  creativeModelConfigId: string | null
+  contextSelectorModelConfigId: string | null
+  embeddingModelConfigId: string | null
 }
 
 export interface ProfileModelConfigOption {
   modelConfigId: string
   modelName: string
+  displayName?: string
+  modelType?: string
   providerName?: string
   keySourceType?: string
 }
@@ -82,16 +93,6 @@ const extractPreferenceRecord = (payload: unknown): Record<string, unknown> => {
   return record
 }
 
-const buildParticleStyle = () => ({
-  width: `${Math.random() * 3 + 1}px`,
-  height: `${Math.random() * 3 + 1}px`,
-  left: `${Math.random() * 100}%`,
-  bottom: '-5px',
-  animationDuration: `${Math.random() * 12 + 12}s`,
-  animationDelay: `${Math.random() * 15}s`,
-  opacity: Math.random() * 0.3 + 0.1,
-})
-
 export const useProfileSettings = () => {
   const uiPreferences = readUiPreferences()
   const profile = reactive<ProfileModel>({
@@ -107,11 +108,11 @@ export const useProfileSettings = () => {
 
   const apiKeys = ref<ProfileApiKeyItem[]>([])
 
-  const particleStyles = Array.from({ length: 10 }, buildParticleStyle)
   const session = getSession()
   const modelPreferences = reactive<ProfileModelPreferences>({
-    mainAgentModelConfigId: null,
-    dirtyWorkAgentModelConfigId: null,
+    creativeModelConfigId: null,
+    contextSelectorModelConfigId: null,
+    embeddingModelConfigId: null,
   })
   const modelConfigOptions = ref<ProfileModelConfigOption[]>([])
 
@@ -154,25 +155,35 @@ export const useProfileSettings = () => {
     }
 
     try {
-      applyProfile(await authApi.updateProfile({ displayName: name, email: profile.email, bio }))
+      applyProfile(await authApi.updateProfile({ displayName: name, bio }))
       return { success: true }
     } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : '保存资料失败' }
+      return { success: false, error: getErrorMessage(error, '保存资料失败') }
     }
   }
 
-  const saveEmail = async (email: string): Promise<ProfileActionResult> => {
-    const normalizedEmail = email.trim()
+  const clearCredentialSession = () => {
+    clearSession()
+    broadcastSessionLogout()
+  }
+
+  const saveEmail = async (payload: ProfileEmailPayload): Promise<ProfileActionResult> => {
+    const normalizedEmail = payload.email.trim()
+    const currentPassword = payload.currentPassword.trim()
 
     if (!emailPattern.test(normalizedEmail)) {
       return { success: false, error: '请输入有效邮箱地址' }
     }
+    if (!currentPassword) {
+      return { success: false, error: '请输入当前密码' }
+    }
 
     try {
-      applyProfile(await authApi.updateProfile({ displayName: profile.name, email: normalizedEmail, bio: profile.bio }))
+      await authApi.changeEmail({ currentPassword, newEmail: normalizedEmail })
+      clearCredentialSession()
       return { success: true }
     } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : '保存邮箱失败' }
+      return { success: false, error: getErrorMessage(error, '修改邮箱失败') }
     }
   }
 
@@ -196,9 +207,10 @@ export const useProfileSettings = () => {
 
     try {
       await authApi.changePassword({ currentPassword: oldPassword, newPassword: nextPassword })
+      clearCredentialSession()
       return { success: true }
     } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : '修改密码失败' }
+      return { success: false, error: getErrorMessage(error, '修改密码失败') }
     }
   }
 
@@ -216,8 +228,9 @@ export const useProfileSettings = () => {
   }
 
   const resetModelPreferenceState = () => {
-    modelPreferences.mainAgentModelConfigId = null
-    modelPreferences.dirtyWorkAgentModelConfigId = null
+    modelPreferences.creativeModelConfigId = null
+    modelPreferences.contextSelectorModelConfigId = null
+    modelPreferences.embeddingModelConfigId = null
     modelConfigOptions.value = []
   }
 
@@ -239,16 +252,22 @@ export const useProfileSettings = () => {
     }
 
     try {
-      const detail = pickBusinessRecord(await modelApi.getUserModelPreferences(session.userId))
+      const [preferencePayload, configurations] = await Promise.all([
+        modelApi.getUserModelPreferences(session.userId),
+        modelApi.listUserModelConfigs(session.userId),
+      ])
+      const detail = pickBusinessRecord(preferencePayload)
       const preferenceRecord = extractPreferenceRecord(detail)
-      const mainValue =
-        typeof preferenceRecord.mainAgentModelConfigId === 'string' ? preferenceRecord.mainAgentModelConfigId : null
-      const dirtyValue =
-        typeof preferenceRecord.dirtyWorkAgentModelConfigId === 'string'
-          ? preferenceRecord.dirtyWorkAgentModelConfigId
-          : null
+      const creativeValue = typeof preferenceRecord.defaultCreativeModelConfigId === 'string'
+        ? preferenceRecord.defaultCreativeModelConfigId : null
+      const selectorValue = typeof preferenceRecord.defaultContextSelectorModelConfigId === 'string'
+        ? preferenceRecord.defaultContextSelectorModelConfigId : null
+      const embeddingValue = typeof preferenceRecord.defaultEmbeddingModelConfigId === 'string'
+        ? preferenceRecord.defaultEmbeddingModelConfigId : null
 
-      const candidateConfigs = Array.isArray(detail.candidateConfigs)
+      const candidateConfigs = Array.isArray(configurations) && configurations.length
+        ? configurations
+        : Array.isArray(detail.candidateConfigs)
         ? detail.candidateConfigs
         : Array.isArray(preferenceRecord.candidateConfigs)
           ? preferenceRecord.candidateConfigs
@@ -266,13 +285,16 @@ export const useProfileSettings = () => {
         normalizedOptions.push({
           modelConfigId,
           modelName: String(item.modelName ?? ''),
+          displayName: typeof item.displayName === 'string' ? item.displayName : undefined,
+          modelType: typeof item.modelType === 'string' ? item.modelType : undefined,
           providerName: typeof item.providerName === 'string' ? item.providerName : undefined,
           keySourceType: typeof item.keySourceType === 'string' ? item.keySourceType : undefined,
         })
       }
       modelConfigOptions.value = normalizedOptions
-      modelPreferences.mainAgentModelConfigId = normalizeModelConfigId(mainValue)
-      modelPreferences.dirtyWorkAgentModelConfigId = normalizeModelConfigId(dirtyValue)
+      modelPreferences.creativeModelConfigId = normalizeModelConfigId(creativeValue)
+      modelPreferences.contextSelectorModelConfigId = normalizeModelConfigId(selectorValue)
+      modelPreferences.embeddingModelConfigId = normalizeModelConfigId(embeddingValue)
     } catch (error) {
       resetModelPreferenceState()
       throw error
@@ -284,16 +306,27 @@ export const useProfileSettings = () => {
       throw new Error('缺少用户会话')
     }
 
-    modelPreferences.mainAgentModelConfigId = normalizeModelConfigId(modelPreferences.mainAgentModelConfigId)
-    modelPreferences.dirtyWorkAgentModelConfigId = normalizeModelConfigId(modelPreferences.dirtyWorkAgentModelConfigId)
+    modelPreferences.creativeModelConfigId = normalizeModelConfigId(modelPreferences.creativeModelConfigId)
+    modelPreferences.contextSelectorModelConfigId = normalizeModelConfigId(modelPreferences.contextSelectorModelConfigId)
+    modelPreferences.embeddingModelConfigId = normalizeModelConfigId(modelPreferences.embeddingModelConfigId)
 
     await modelApi.saveUserModelPreferences(session.userId, session.userId, {
-      mainAgentModelConfigId: modelPreferences.mainAgentModelConfigId,
-      dirtyWorkAgentModelConfigId: modelPreferences.dirtyWorkAgentModelConfigId,
+      creativeModelConfigId: modelPreferences.creativeModelConfigId,
+      contextSelectorModelConfigId: modelPreferences.contextSelectorModelConfigId,
+      defaultEmbeddingModelConfigId: modelPreferences.embeddingModelConfigId,
     })
   }
 
-  const pStyle = (n: number) => particleStyles[n - 1] ?? particleStyles[0]
+  const deleteAccount = async (currentPassword: string): Promise<ProfileActionResult> => {
+    try {
+      const receipt = await authApi.deleteAccount(currentPassword)
+      clearSession()
+      broadcastSessionLogout()
+      return { success: true, deletionDueAt: receipt.deletionDueAt }
+    } catch (error: unknown) {
+      return { success: false, error: getErrorMessage(error, '注销账户失败') }
+    }
+  }
 
   return {
     profile,
@@ -308,6 +341,6 @@ export const useProfileSettings = () => {
     updateFontSize,
     loadModelPreferences,
     saveModelPreferences,
-    pStyle,
+    deleteAccount,
   }
 }

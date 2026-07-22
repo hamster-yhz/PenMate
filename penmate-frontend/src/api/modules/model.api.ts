@@ -89,10 +89,9 @@ const normalizeUserModelConfigPayload = (payload: AnyRecord) => {
 }
 
 const normalizeUserModelPreferencePayload = (payload: AnyRecord) => ({
-  defaultMainChatModelConfigId: normalizeBusinessStringId(payload.mainAgentModelConfigId),
-  defaultWorkerChatModelConfigId: normalizeBusinessStringId(payload.dirtyWorkAgentModelConfigId),
+  defaultCreativeModelConfigId: normalizeBusinessStringId(payload.creativeModelConfigId),
+  defaultContextSelectorModelConfigId: normalizeBusinessStringId(payload.contextSelectorModelConfigId),
   defaultEmbeddingModelConfigId: normalizeBusinessStringId(payload.defaultEmbeddingModelConfigId),
-  defaultRouterModelConfigId: normalizeBusinessStringId(payload.defaultRouterModelConfigId),
   defaultStoryBibleRoutingMode: payload.defaultStoryBibleRoutingMode ?? 'LLM_SELECTOR',
   defaultChunkTargetCharacters: payload.defaultChunkTargetCharacters ?? 800,
   defaultChunkOverlapCharacters: payload.defaultChunkOverlapCharacters ?? 120,
@@ -125,7 +124,7 @@ const assertNoLegacyOnlyProviderEntries = (providers: AnyRecord[]) => {
 
 export const modelApi = {
   async listProviders() {
-    const providers = await request.get<AnyRecord[]>('/v1/model/providers')
+    const providers = await request.get<ModelProviderOption[]>('/v1/model/providers')
     const normalizedProviders = Array.isArray(providers) ? providers : []
     assertNoLegacyOnlyProviderEntries(normalizedProviders)
     return normalizedProviders
@@ -138,7 +137,7 @@ export const modelApi = {
   },
   listUserModelConfigs(_userId: string) {
     void _userId
-    return request.get<AnyRecord[]>('/v1/model/configurations')
+    return request.get<ModelConfigurationItem[]>('/v1/model/configurations')
   },
   async listSystemModelConfigs() {
     const configurations = await request.get<ModelConfigurationItem[]>('/v1/model/configurations')
@@ -146,7 +145,9 @@ export const modelApi = {
       .filter((item) => item.scopeType === 'SYSTEM')
   },
   createUserModelConfig(_userId: string, _operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>('/v1/model/configurations', normalizeUserModelConfigPayload(payload))
+    const normalized = normalizeUserModelConfigPayload(payload)
+    delete normalized.status
+    return request.post<AnyRecord>('/v1/model/configurations', normalized)
   },
   updateUserModelConfig(_userId: string, businessModelConfigId: string, _operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(
@@ -164,6 +165,11 @@ export const modelApi = {
     void _userId
     void _operatorId
     return request.delete<string>(`/v1/model/configurations/${businessModelConfigId}`)
+  },
+  testUserModelConnection(businessModelConfigId: string) {
+    return request.post<ModelConnectionTestResult>(
+      `/v1/model/configurations/${encodeURIComponent(businessModelConfigId)}/connection-tests`,
+    )
   },
   createSystemModelConfig(payload: AnyRecord) {
     const normalized = normalizeUserModelConfigPayload(payload)
@@ -199,12 +205,7 @@ export const modelApi = {
   },
   async getUserModelPreferences(_userId: string) {
     void _userId
-    const result = await request.get<AnyRecord>('/v1/model/preferences')
-    return {
-      ...result,
-      mainAgentModelConfigId: result.defaultMainChatModelConfigId,
-      dirtyWorkAgentModelConfigId: result.defaultWorkerChatModelConfigId,
-    }
+    return request.get<AnyRecord>('/v1/model/preferences')
   },
   saveUserModelPreferences(_userId: string, _operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(

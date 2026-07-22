@@ -1,191 +1,109 @@
 <template>
-  <div class="settings-section glass-panel" data-testid="profile-model-preference-panel">
-    <div class="section-header">
+  <section class="model-preferences" data-testid="profile-model-preference-panel">
+    <header>
       <div>
-        <h3 class="section-title">🤖 模型偏好</h3>
-        <p class="section-desc">为主 Agent 与脏活 Agent 选择默认模型配置。</p>
+        <h2>默认模型与 Agent</h2>
+        <p>三个模型分别承担创作、上下文筛选和语义检索。</p>
       </div>
-      <button
-        class="save-btn"
-        type="button"
-        :disabled="loading || saving || !options.length"
-        data-testid="model-preference-save"
-        @click="emit('save')"
-      >
-        {{ saving ? '保存中...' : '保存偏好' }}
+      <button type="button" :disabled="loading || saving" data-testid="model-preference-save" @click="emit('save')">
+        {{ saving ? '保存中' : '保存' }}
       </button>
-    </div>
+    </header>
 
-    <div v-if="loading" class="state-text">正在加载模型偏好...</div>
-    <div v-else-if="error" class="state-text error-text">{{ error }}</div>
-    <div v-else class="editor-body">
-      <label class="field-block">
-        <span class="field-label">主 Agent</span>
-        <select
-          class="field-select"
-          data-testid="model-preference-main-select"
-          :value="toSelectValue(mainAgentModelConfigId)"
-          :disabled="saving || !options.length"
-          @change="handleSelectChange('main-agent', $event)"
-        >
+    <div v-if="loading" class="state-text">正在加载模型配置...</div>
+    <div v-else-if="error" class="state-text error-text" role="alert">
+      <span>{{ error }}</span>
+      <button type="button" data-testid="model-preference-retry" @click="emit('retry')">重新加载</button>
+    </div>
+    <div v-else class="preference-list">
+      <label>
+        <span><strong>创作模型</strong><small>负责 Agent 决策、正文生成与改写</small></span>
+        <select data-testid="model-preference-creative-select" :value="toSelectValue(creativeModelConfigId)" :disabled="saving" @change="emitValue('update:creative-model-config-id', $event)">
           <option value="">未设置</option>
-          <option v-for="option in options" :key="`main-${option.modelConfigId}`" :value="String(option.modelConfigId)">
-            {{ formatOptionLabel(option) }}
-          </option>
+          <option v-for="option in chatOptions" :key="`creative-${option.modelConfigId}`" :value="option.modelConfigId">{{ formatOptionLabel(option) }}</option>
         </select>
       </label>
 
-      <label class="field-block">
-        <span class="field-label">脏活 Agent</span>
-        <select
-          class="field-select"
-          data-testid="model-preference-dirty-select"
-          :value="toSelectValue(dirtyWorkAgentModelConfigId)"
-          :disabled="saving || !options.length"
-          @change="handleSelectChange('dirty-work-agent', $event)"
-        >
+      <label>
+        <span><strong>上下文筛选模型</strong><small>负责智能筛选 Story Bible 与上下文</small></span>
+        <select data-testid="model-preference-selector-select" :value="toSelectValue(contextSelectorModelConfigId)" :disabled="saving" @change="emitValue('update:context-selector-model-config-id', $event)">
           <option value="">未设置</option>
-          <option
-            v-for="option in options"
-            :key="`dirty-${option.modelConfigId}`"
-            :value="String(option.modelConfigId)"
-          >
-            {{ formatOptionLabel(option) }}
-          </option>
+          <option v-for="option in chatOptions" :key="`selector-${option.modelConfigId}`" :value="option.modelConfigId">{{ formatOptionLabel(option) }}</option>
+        </select>
+      </label>
+
+      <label>
+        <span><strong>Embedding 模型</strong><small>负责向量索引与语义检索</small></span>
+        <select data-testid="model-preference-embedding-select" :value="toSelectValue(embeddingModelConfigId)" :disabled="saving" @change="emitValue('update:embedding-model-config-id', $event)">
+          <option value="">未设置</option>
+          <option v-for="option in embeddingOptions" :key="`embedding-${option.modelConfigId}`" :value="option.modelConfigId">{{ formatOptionLabel(option) }}</option>
         </select>
       </label>
 
       <div v-if="successMessage" class="state-text success-text">{{ successMessage }}</div>
-      <div v-else-if="!options.length" class="state-text">暂无可选模型配置，请先在工作台完成配置。</div>
+      <div v-else-if="!options.length" class="state-text">暂无模型配置，请先在“模型服务”中添加。</div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ProfileModelConfigOption } from '@/composables/profile/useProfileSettings'
 
-const { loading, saving, error, successMessage, options, mainAgentModelConfigId, dirtyWorkAgentModelConfigId } =
-  defineProps<{
-    loading: boolean
-    saving: boolean
-    error: string
-    successMessage: string
-    options: ProfileModelConfigOption[]
-    mainAgentModelConfigId: string | null
-    dirtyWorkAgentModelConfigId: string | null
-  }>()
-
-const emit = defineEmits<{
-  (event: 'update:main-agent-model-config-id', value: string | null): void
-  (event: 'update:dirty-work-agent-model-config-id', value: string | null): void
-  (event: 'save'): void
+const props = defineProps<{
+  loading: boolean
+  saving: boolean
+  error: string
+  successMessage: string
+  options: ProfileModelConfigOption[]
+  creativeModelConfigId: string | null
+  contextSelectorModelConfigId: string | null
+  embeddingModelConfigId: string | null
 }>()
 
-const toSelectValue = (value: string | null) => (value == null ? '' : value)
+const emit = defineEmits<{
+  'update:creative-model-config-id': [string | null]
+  'update:context-selector-model-config-id': [string | null]
+  'update:embedding-model-config-id': [string | null]
+  save: []
+  retry: []
+}>()
 
-const parseSelectValue = (event: Event) => {
-  const target = event.target as HTMLSelectElement | null
-  if (!target) {
-    return null
-  }
-  const nextValue = target.value.trim()
-  return nextValue || null
+const chatOptions = computed(() => props.options.filter((option) => !option.modelType || option.modelType === 'CHAT'))
+const embeddingOptions = computed(() => props.options.filter((option) => option.modelType === 'EMBEDDING'))
+const toSelectValue = (value: string | null) => value ?? ''
+const emitValue = (
+  event: 'update:creative-model-config-id' | 'update:context-selector-model-config-id' | 'update:embedding-model-config-id',
+  domEvent: Event,
+) => {
+  const value = (domEvent.target as HTMLSelectElement).value.trim() || null
+  if (event === 'update:creative-model-config-id') emit('update:creative-model-config-id', value)
+  else if (event === 'update:context-selector-model-config-id') emit('update:context-selector-model-config-id', value)
+  else emit('update:embedding-model-config-id', value)
 }
-
-const handleSelectChange = (field: 'main-agent' | 'dirty-work-agent', event: Event) => {
-  const value = parseSelectValue(event)
-  if (field === 'main-agent') {
-    emit('update:main-agent-model-config-id', value)
-    return
-  }
-  emit('update:dirty-work-agent-model-config-id', value)
-}
-
 const formatOptionLabel = (option: ProfileModelConfigOption) => {
-  const providerSegment = option.providerName ? `${option.providerName} / ` : ''
-  const sourceSegment = option.keySourceType ? ` · ${option.keySourceType}` : ''
-  return `${providerSegment}${option.modelName}${sourceSegment}`
+  const name = option.displayName || option.modelName
+  const provider = option.providerName ? `${option.providerName} · ` : ''
+  return `${provider}${name}${name !== option.modelName ? ` (${option.modelName})` : ''}`
 }
 </script>
 
-<style lang="less" scoped>
-.settings-section {
-  padding: 20px 24px;
-  background: rgba(17, 24, 39, 0.5);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  color: var(--xuan-paper);
-  letter-spacing: 0.12em;
-}
-
-.section-desc {
-  margin-top: 6px;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.editor-body {
-  display: grid;
-  gap: 14px;
-}
-
-.field-block {
-  display: grid;
-  gap: 6px;
-}
-
-.field-label {
-  font-size: 0.84rem;
-  color: var(--text-primary);
-}
-
-.field-select {
-  padding: 8px 10px;
-  background: rgba(11, 17, 32, 0.6);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  color: var(--text-primary);
-}
-
-.save-btn {
-  padding: 6px 14px;
-  min-width: 96px;
-  font-size: 0.82rem;
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.08);
-  border: 1px solid rgba(201, 169, 110, 0.18);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.save-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.state-text {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.success-text {
-  color: #7ee787;
-}
-
-.error-text {
-  color: #ff7b72;
-}
+<style scoped>
+.model-preferences { background: var(--bg-surface); border: 1px solid var(--border-subtle); }
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); }
+h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 0; }
+p { margin: 0; color: var(--text-muted); font-size: 12px; }
+header button { min-width: 70px; min-height: 34px; color: var(--text-inverse); background: var(--accent); border: 1px solid var(--accent); border-radius: 5px; cursor: pointer; }
+header button:disabled { cursor: not-allowed; opacity: 0.55; }
+.preference-list { display: grid; }
+label { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 320px); align-items: center; gap: 24px; min-height: 78px; padding: 13px 20px; border-bottom: 1px solid var(--border-subtle); }
+label > span { display: grid; gap: 4px; }
+label strong { font-size: 13px; }
+label small { color: var(--text-muted); font-size: 11px; }
+select { width: 100%; height: 36px; padding: 0 9px; color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 4px; }
+.state-text { padding: 14px 20px; color: var(--text-muted); font-size: 12px; }
+.error-text { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger); background: var(--danger-soft); }
+.error-text button { min-height: 30px; padding: 0 9px; color: var(--danger); background: var(--bg-surface); border: 1px solid var(--danger-border); border-radius: 4px; cursor: pointer; }
+.success-text { color: var(--success); }
+@media (max-width: 680px) { label { grid-template-columns: 1fr; gap: 9px; } }
 </style>

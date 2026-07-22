@@ -1,201 +1,158 @@
 <template>
-  <div class="settings-section glass-panel">
-    <h3 class="section-title">🔐 账号安全</h3>
+  <section class="settings-surface security-panel">
+    <header>
+      <div><h2><SafetyCertificateOutlined />账号安全</h2><p>修改登录凭据后，所有设备都会退出，需要重新登录。</p></div>
+    </header>
 
-    <div class="setting-row">
-      <div class="sr-info">
-        <span class="sr-label">登录邮箱</span>
-        <span class="sr-value">{{ email }}</span>
-      </div>
-      <button
-        class="sr-btn"
-        type="button"
-        data-testid="profile-security-email-toggle"
-        @click="showEmailForm = !showEmailForm"
-      >
-        修改
+    <div class="credential-row">
+      <MailOutlined class="row-icon" />
+      <span><strong>登录邮箱</strong><small>{{ email }}</small></span>
+      <button type="button" data-testid="profile-security-email-toggle" :disabled="emailSaving" @click="toggleEmailForm">
+        {{ showEmailForm ? '收起' : '更改邮箱' }}
       </button>
     </div>
-    <div v-if="showEmailForm" class="setting-row-expand" data-testid="profile-security-email-form">
-      <input v-model="newEmail" class="f-input" placeholder="新邮箱地址" type="email" aria-label="新邮箱地址" />
-      <button class="btn-sm" type="button" data-testid="profile-security-email-save" @click="handleSaveEmail">
-        保存
-      </button>
-      <p v-if="emailError" class="form-error">{{ emailError }}</p>
-    </div>
+    <form v-if="showEmailForm" class="credential-form" data-testid="profile-security-email-form" @submit.prevent="handleSaveEmail">
+      <label>
+        <span>新邮箱地址</span>
+        <input v-model="newEmail" type="email" autocomplete="email" data-testid="profile-security-email-input" />
+      </label>
+      <label>
+        <span>当前密码</span>
+        <input v-model="emailCurrentPassword" type="password" autocomplete="current-password" data-testid="profile-security-email-password" />
+      </label>
+      <p v-if="emailError" class="form-error" role="alert">{{ emailError }}</p>
+      <footer>
+        <button class="primary-button" type="submit" data-testid="profile-security-email-save" :disabled="emailSaving">
+          <LoadingOutlined v-if="emailSaving" spin />
+          <SaveOutlined v-else />
+          {{ emailSaving ? '正在更改' : '确认更改邮箱' }}
+        </button>
+      </footer>
+    </form>
 
-    <div class="setting-row">
-      <div class="sr-info">
-        <span class="sr-label">登录密码</span>
-        <span class="sr-value">••••••••</span>
+    <div class="credential-row">
+      <KeyOutlined class="row-icon" />
+      <span><strong>登录密码</strong><small>建议使用至少 8 位且不与其他服务重复的密码</small></span>
+      <button type="button" data-testid="profile-security-password-toggle" :disabled="passwordSaving" @click="togglePasswordForm">
+        {{ showPasswordForm ? '收起' : '更改密码' }}
+      </button>
+    </div>
+    <form v-if="showPasswordForm" class="credential-form" data-testid="profile-security-password-form" @submit.prevent="handleSavePassword">
+      <label>
+        <span>当前密码</span>
+        <input v-model="passwords.old" type="password" autocomplete="current-password" data-testid="profile-security-current-password" />
+      </label>
+      <div class="field-grid">
+        <label>
+          <span>新密码</span>
+          <input v-model="passwords.new1" type="password" autocomplete="new-password" data-testid="profile-security-new-password" />
+        </label>
+        <label>
+          <span>确认新密码</span>
+          <input v-model="passwords.new2" type="password" autocomplete="new-password" data-testid="profile-security-confirm-password" />
+        </label>
       </div>
-      <button
-        class="sr-btn"
-        type="button"
-        data-testid="profile-security-password-toggle"
-        @click="showPasswordForm = !showPasswordForm"
-      >
-        修改
-      </button>
-    </div>
-    <div v-if="showPasswordForm" class="setting-row-expand" data-testid="profile-security-password-form">
-      <input v-model="passwords.old" class="f-input" placeholder="当前密码" type="password" aria-label="当前密码" />
-      <input v-model="passwords.new1" class="f-input" placeholder="新密码" type="password" aria-label="新密码" />
-      <input
-        v-model="passwords.new2"
-        class="f-input"
-        placeholder="确认新密码"
-        type="password"
-        aria-label="确认新密码"
-      />
-      <button class="btn-sm" type="button" data-testid="profile-security-password-save" @click="handleSavePassword">
-        保存
-      </button>
-      <p v-if="passwordError" class="form-error">{{ passwordError }}</p>
-    </div>
-  </div>
+      <p v-if="passwordError" class="form-error" role="alert">{{ passwordError }}</p>
+      <footer>
+        <button class="primary-button" type="submit" data-testid="profile-security-password-save" :disabled="passwordSaving">
+          <LoadingOutlined v-if="passwordSaving" spin />
+          <SaveOutlined v-else />
+          {{ passwordSaving ? '正在更改' : '确认更改密码' }}
+        </button>
+      </footer>
+    </form>
+  </section>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import type { ProfileActionResult, ProfilePasswordPayload } from '@/composables/profile/useProfileSettings'
-
-type SaveEmailHandler = (email: string) => ProfileActionResult | Promise<ProfileActionResult>
-type SavePasswordHandler = (payload: ProfilePasswordPayload) => ProfileActionResult | Promise<ProfileActionResult>
+import { KeyOutlined, LoadingOutlined, MailOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons-vue'
+import type {
+  ProfileActionResult,
+  ProfileEmailPayload,
+  ProfilePasswordPayload,
+} from '@/composables/profile/useProfileSettings'
 
 const props = defineProps<{
   email: string
-  saveEmail?: SaveEmailHandler
-  savePassword?: SavePasswordHandler
+  saveEmail: (payload: ProfileEmailPayload) => Promise<ProfileActionResult>
+  savePassword: (payload: ProfilePasswordPayload) => Promise<ProfileActionResult>
+}>()
+
+const emit = defineEmits<{
+  credentialChanged: [kind: 'email' | 'password']
 }>()
 
 const showEmailForm = ref(false)
 const showPasswordForm = ref(false)
 const newEmail = ref('')
+const emailCurrentPassword = ref('')
 const passwords = reactive<ProfilePasswordPayload>({ old: '', new1: '', new2: '' })
 const emailError = ref('')
 const passwordError = ref('')
+const emailSaving = ref(false)
+const passwordSaving = ref(false)
+
+const toggleEmailForm = () => {
+  if (emailSaving.value) return
+  showEmailForm.value = !showEmailForm.value
+  emailError.value = ''
+}
+
+const togglePasswordForm = () => {
+  if (passwordSaving.value) return
+  showPasswordForm.value = !showPasswordForm.value
+  passwordError.value = ''
+}
 
 const handleSaveEmail = async () => {
+  if (emailSaving.value) return
+  emailSaving.value = true
   emailError.value = ''
-
-  const result = props.saveEmail ? await props.saveEmail(newEmail.value) : { success: true as const }
-
+  const result = await props.saveEmail({ email: newEmail.value, currentPassword: emailCurrentPassword.value })
+  emailSaving.value = false
   if (!result.success) {
-    emailError.value = result.error ?? '保存邮箱失败'
+    emailError.value = result.error || '修改邮箱失败，请重试'
     return
   }
-
-  newEmail.value = ''
-  showEmailForm.value = false
+  emit('credentialChanged', 'email')
 }
 
 const handleSavePassword = async () => {
+  if (passwordSaving.value) return
+  passwordSaving.value = true
   passwordError.value = ''
-
-  if (!passwords.old.trim()) {
-    passwordError.value = '请输入当前密码'
-    return
-  }
-
-  const result = props.savePassword ? await props.savePassword({ ...passwords }) : { success: true as const }
-
+  const result = await props.savePassword({ ...passwords })
+  passwordSaving.value = false
   if (!result.success) {
-    passwordError.value = result.error ?? '修改密码失败'
+    passwordError.value = result.error || '修改密码失败，请重试'
     return
   }
-
-  passwords.old = ''
-  passwords.new1 = ''
-  passwords.new2 = ''
-  showPasswordForm.value = false
+  emit('credentialChanged', 'password')
 }
 </script>
 
-<style lang="less" scoped>
-.settings-section {
-  padding: 20px 24px;
-  background: rgba(17, 24, 39, 0.5);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-}
-
-.section-title {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  color: var(--xuan-paper);
-  letter-spacing: 0.12em;
-  margin-bottom: 16px;
-}
-
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(201, 169, 110, 0.06);
-
-  &:last-of-type {
-    border-bottom: none;
-  }
-}
-
-.sr-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sr-label {
-  font-size: 0.85rem;
-  color: var(--text-primary);
-}
-
-.sr-value {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.sr-btn,
-.btn-sm {
-  padding: 5px 14px;
-  font-size: 0.78rem;
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.06);
-  border: 1px solid rgba(201, 169, 110, 0.15);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s;
-
-  &:hover {
-    background: rgba(201, 169, 110, 0.12);
-    border-color: var(--border-gold);
-  }
-}
-
-.setting-row-expand {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 0 16px;
-}
-
-.f-input {
-  padding: 8px 12px;
-  background: rgba(11, 17, 32, 0.6);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  outline: none;
-
-  &:focus {
-    border-color: var(--border-gold);
-  }
-}
-
-.form-error {
-  color: #e8a87c;
-  font-size: 0.78rem;
-}
+<style scoped>
+.security-panel { overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 6px; }
+.security-panel > header { padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); }
+.security-panel h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 15px; letter-spacing: 0; }
+.security-panel header p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.credential-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 74px; padding: 12px 20px; border-bottom: 1px solid var(--border-subtle); }
+.row-icon { color: var(--text-muted); font-size: 17px; }
+.credential-row > span { display: grid; gap: 4px; min-width: 0; }
+.credential-row strong { font-size: 13px; }
+.credential-row small { overflow: hidden; color: var(--text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.credential-row button, .primary-button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 7px; padding: 0 11px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.credential-row button { color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-strong); }
+.credential-row button:hover:not(:disabled) { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-border); }
+.credential-form { display: grid; gap: 14px; padding: 16px 20px 18px 58px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-subtle); }
+.credential-form label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+.credential-form input { width: 100%; min-height: 38px; padding: 0 10px; color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 4px; outline: 0; font: inherit; font-weight: 400; }
+.credential-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-error { margin: 0; padding: 9px 10px; color: var(--danger); background: var(--danger-soft); border: 1px solid var(--danger-border); font-size: 12px; }
+.credential-form footer { display: flex; justify-content: flex-end; }
+.primary-button { color: var(--text-inverse); background: var(--accent); border: 1px solid var(--accent); font-weight: 650; }
+button:disabled { cursor: wait; opacity: .58; }
+@media (max-width: 560px) { .credential-row { grid-template-columns: 24px minmax(0, 1fr); padding: 12px 16px; } .credential-row button { grid-column: 2; justify-self: start; } .credential-form { padding: 16px; } .field-grid { grid-template-columns: 1fr; } }
 </style>
