@@ -269,29 +269,11 @@ public class OpenApiConfig {
         if (path.endsWith("/me")) {
             return "获取当前登录用户信息";
         }
-        if (path.contains("/publish")) {
-            return "发布章节";
-        }
-        if (path.contains("/restore")) {
-            return "恢复历史版本";
+        if (path.contains("/trash/") && path.endsWith("/restore")) {
+            return "恢复回收站作品";
         }
         if (path.contains("/move")) {
             return "移动节点";
-        }
-        if (path.contains("/content-upload-url")) {
-            return "获取章节内容上传地址";
-        }
-        if (path.contains("/content-url")) {
-            return "获取章节内容下载地址";
-        }
-        if (path.contains("/content-commit")) {
-            return "提交章节内容元数据";
-        }
-        if (path.contains("/versions") && "GET".equals(httpMethod)) {
-            return "查询章节版本记录";
-        }
-        if (path.contains("/versions") && "POST".equals(httpMethod)) {
-            return "创建章节版本快照";
         }
 
         String resource = guessResourceName(path);
@@ -340,9 +322,6 @@ public class OpenApiConfig {
             case "volumes" -> "分卷";
             case "chapters" -> "章节";
             case "members" -> "成员";
-            case "versions" -> "版本";
-            case "outlines" -> "大纲";
-            case "nodes" -> "大纲节点";
             case "cards" -> "资料卡";
             case "styles" -> "风格";
             default -> "数据";
@@ -413,7 +392,7 @@ public class OpenApiConfig {
                 case "keysourcetype":
                     return place + "：密钥来源类型，仅支持 USER_KEY 或 OFFICIAL_KEY。";
                 case "modelconfigid":
-                    return place + "：用户模型配置业务 ID，用于主 Agent / Dirty Work Agent 偏好绑定。";
+                    return place + "：用户模型配置业务 ID，用于创作、上下文筛选或 Embedding 默认模型绑定。";
                 case "userkeyid":
                     return place + "：用户 API Key 记录 ID，模型配置执行时用此密钥发起调用。";
                 case "officialkeyid":
@@ -558,17 +537,15 @@ public class OpenApiConfig {
         map.put("POST /api/v1/users", "RBAC - 创建用户");
         map.put("PUT /api/v1/users/{userId}", "RBAC - 更新用户");
         map.put("DELETE /api/v1/users/{userId}", "RBAC - 删除用户");
-        map.put("POST /api/v1/users/{userId}/roles", "RBAC - 为用户绑定角色");
         map.put("GET /api/v1/users/{userId}/roles", "RBAC - 查询用户已绑定角色");
-        map.put("DELETE /api/v1/users/{userId}/roles/{roleId}", "RBAC - 解除用户角色绑定");
+        map.put("PUT /api/v1/users/{userId}/roles", "RBAC - 原子保存用户角色");
         map.put("GET /api/v1/roles", "RBAC - 查询角色列表");
         map.put("POST /api/v1/roles", "RBAC - 创建角色");
         map.put("PUT /api/v1/roles/{roleId}", "RBAC - 更新角色");
         map.put("DELETE /api/v1/roles/{roleId}", "RBAC - 删除角色");
         map.put("GET /api/v1/permissions", "RBAC - 查询权限列表");
         map.put("GET /api/v1/roles/{roleId}/permissions", "RBAC - 查询角色已绑定权限");
-        map.put("POST /api/v1/roles/{roleId}/permissions", "RBAC - 为角色绑定权限");
-        map.put("DELETE /api/v1/roles/{roleId}/permissions/{permissionId}", "RBAC - 解除角色权限绑定");
+        map.put("PUT /api/v1/roles/{roleId}/permissions", "RBAC - 原子保存角色权限");
         map.put("GET /api/v1/menus", "RBAC - 查询菜单列表");
         map.put("GET /api/v1/profile/menus", "RBAC - 查询指定用户可见菜单");
 
@@ -601,9 +578,9 @@ public class OpenApiConfig {
                 + "返回说明：data 为 created。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
-        map.put("POST /api/v1/model/preferences", "接口作用：保存用户主 Agent 与 Dirty Work Agent 的模型偏好。\n"
+        map.put("POST /api/v1/model/preferences", "接口作用：保存用户创作、上下文筛选与 Embedding 默认模型。\n"
                 + "业务规则：仅允许选择当前用户可用的模型配置；传 null 表示清空该角色偏好。\n"
-                + "关键入参：userId、mainAgentModelConfigId、dirtyWorkAgentModelConfigId。\n"
+                + "关键入参：userId、defaultCreativeModelConfigId、defaultContextSelectorModelConfigId、defaultEmbeddingModelConfigId。\n"
                 + "返回说明：data 为 updated。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
 
@@ -616,21 +593,21 @@ public class OpenApiConfig {
                 + "关键字段：email（唯一账号）、displayName（展示名）、status（启用状态）、authMethod（认证方式）。\n"
                 + "业务规则：创建后即可参与角色绑定。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
-        map.put("POST /api/v1/users/{userId}/roles", "接口作用：为指定用户绑定角色。\n"
-                + "关键字段：userId（用户业务 ID）、roleId（角色业务 ID）。\n"
-                + "业务规则：绑定成功后用户继承该角色对应权限与菜单可见性。\n"
+        map.put("PUT /api/v1/users/{userId}/roles", "接口作用：一次性替换指定用户的完整角色集合。\n"
+                + "关键字段：userId、expectedRevision、assignmentIds。\n"
+                + "业务规则：事务内原子替换并记录一条完整审计；修订冲突返回 409，不静默覆盖。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("GET /api/v1/users/{userId}/roles", "接口作用：查询指定用户当前已绑定的角色集合。\n"
                 + "关键字段：userId（目标用户业务 ID）。\n"
-                + "业务规则：返回结果用于管理端展示、解绑与增量授权。\n"
+                + "业务规则：data 同时返回 revision 与 items，后续保存必须携带该 revision。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("GET /api/v1/roles/{roleId}/permissions", "接口作用：查询指定角色当前已绑定的权限集合。\n"
                 + "关键字段：roleId（目标角色业务 ID）。\n"
-                + "业务规则：返回结果用于管理端展示、解绑与增量授权。\n"
+                + "业务规则：data 同时返回 revision 与 items，后续保存必须携带该 revision。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
-        map.put("POST /api/v1/roles/{roleId}/permissions", "接口作用：为指定角色绑定权限。\n"
-                + "关键字段：roleId（角色业务 ID）、permissionId（权限业务 ID）。\n"
-                + "业务规则：绑定后所有拥有该角色的用户获得对应权限。\n"
+        map.put("PUT /api/v1/roles/{roleId}/permissions", "接口作用：一次性替换指定角色的完整权限集合。\n"
+                + "关键字段：roleId、expectedRevision、assignmentIds。\n"
+                + "业务规则：事务内原子替换并记录一条完整审计；修订冲突返回 409，不静默覆盖。\n"
                 + "返回约定：统一返回 data/meta 结构（meta 含 traceId、timestamp）。");
         map.put("GET /api/v1/profile/menus", "接口作用：按用户维度计算最终可见菜单。\n"
                 + "关键字段：userId（目标用户业务 ID）。\n"
