@@ -20,7 +20,6 @@ describe('Home index refactor', () => {
 
     expect(wrapper.find('[data-testid="home-hero"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-features"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="home-workflow"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-preview"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-cta"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-footer"]').exists()).toBe(true)
@@ -32,27 +31,23 @@ describe('Home index refactor', () => {
     expect(pushMock).toHaveBeenNthCalledWith(2, '/login')
   })
 
-  it('renders_top_navigation_links_and_split_section_data_from_the_page_container', async () => {
+  it('renders_top_navigation_and_only_the_current_product_capabilities', async () => {
     const wrapper = mount(HomeIndex)
 
     expect(wrapper.get('[data-testid="home-nav-link-features"]').attributes('href')).toBe('#features')
-    expect(wrapper.get('[data-testid="home-nav-link-workflow"]').attributes('href')).toBe('#workflow')
-    expect(wrapper.get('[data-testid="home-nav-link-about"]').attributes('href')).toBe('#about')
+    expect(wrapper.get('[data-testid="home-nav-link-workspace"]').attributes('href')).toBe('#workspace')
 
     await wrapper.get('[data-testid="home-nav-enter"]').trigger('click')
 
     expect(pushMock).toHaveBeenCalledWith('/login')
 
     const featureCards = wrapper.findAll('[data-testid="home-feature-card"]')
-    const workflowSteps = wrapper.findAll('[data-testid="home-workflow-step"]')
-
-    expect(featureCards).toHaveLength(6)
-    expect(workflowSteps).toHaveLength(5)
-    expect(wrapper.text()).toContain('AI智能写作')
-    expect(wrapper.text()).toContain('BYOK模型管理')
-    expect(wrapper.text()).toContain('配置基础设施')
-    expect(wrapper.text()).toContain('审批设定落库')
-    expect(wrapper.text()).not.toContain('AI会话')
-    expect(wrapper.text()).not.toContain('AI 会话')
+    expect(featureCards).toHaveLength(3)
+    expect(wrapper.text()).toContain('专注正文写作')
+    expect(wrapper.text()).toContain('维护复杂设定')
+    expect(wrapper.text()).toContain('让 AI 正式编辑')
+    expect(wrapper.text()).not.toContain('文风管控')
+    expect(wrapper.text()).not.toContain('插件工坊')
+    expect(wrapper.text()).not.toContain('免费开始')
   })
 })

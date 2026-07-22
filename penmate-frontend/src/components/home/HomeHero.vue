@@ -1,276 +1,59 @@
 <template>
-  <section id="hero" class="hero-section" data-testid="home-hero">
-    <div class="hero-bg-wrap">
-      <img :src="heroBg" alt="" class="hero-bg-img" />
-      <div class="hero-overlay"></div>
-    </div>
-
-    <div class="hero-content">
-      <div class="hero-badge">
-        <span class="badge-dot"></span>
-        AI驱动的智能写作平台
-      </div>
-
-      <img :src="logoImg" alt="PenMate" class="hero-logo-img" />
-
-      <h1 class="hero-title">
-        <span class="title-line">执 笔 问 道</span>
-        <span class="title-sub">以AI为墨，以心为笺</span>
-      </h1>
-
-      <p class="hero-desc">
-        AI是主力写手，作者充当导演与编辑。<br />
-        通过智能Agent深度统筹项目上下文，让创作如行云流水。
-      </p>
-
+  <section class="home-hero" data-testid="home-hero">
+    <img :src="workbenchImage" alt="" class="hero-workbench" aria-hidden="true" />
+    <div class="hero-scrim" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <p class="hero-eyebrow">中文长篇创作工作台</p>
+      <h1>PenMate</h1>
+      <p class="hero-lead">让正文写作、复杂设定与 AI 协作保持在同一个安静、可控的工作空间。</p>
       <div class="hero-actions">
-        <button
-          type="button"
-          class="btn-ancient btn-primary-glow"
-          data-testid="home-hero-primary-cta"
-          @click="$emit('enter-workbench')"
-        >
-          <span>踏入工作区</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
+        <button type="button" data-testid="home-hero-primary-cta" @click="$emit('enter-workbench')">
+          登录工作台 <ArrowRightOutlined aria-hidden="true" />
         </button>
-        <a href="#features" class="btn-ancient btn-ghost">
-          <span>一览功能</span>
-        </a>
+        <a href="#workspace">查看真实界面</a>
       </div>
-
-      <div class="hero-stats">
-        <div class="stat-item">
-          <span class="stat-value">∞</span>
-          <span class="stat-label">创意无限</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-value">AI</span>
-          <span class="stat-label">智能驱动</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-value">笔</span>
-          <span class="stat-label">文风如一</span>
-        </div>
+      <div class="hero-facts" aria-label="产品能力">
+        <span>纯文本正文</span>
+        <span>Story Bible</span>
+        <span>AI 章节编辑</span>
       </div>
-    </div>
-
-    <div class="scroll-hint">
-      <div class="scroll-line"></div>
-      <span>向下探索</span>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-defineProps<{
-  heroBg: string
-  logoImg: string
-}>()
+import { ArrowRightOutlined } from '@ant-design/icons-vue'
 
-defineEmits<{
-  (event: 'enter-workbench'): void
-}>()
+defineProps<{ workbenchImage: string }>()
+defineEmits<{ 'enter-workbench': [] }>()
 </script>
 
-<style scoped lang="less">
-.hero-section {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 120px 48px 80px;
-  overflow: hidden;
+<style scoped>
+.home-hero { position: relative; height: min(760px, calc(100svh - 108px)); min-height: 440px; overflow: hidden; background: var(--bg-editor); border-bottom: 1px solid var(--border-subtle); }
+.hero-workbench { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.hero-scrim { position: absolute; inset: 0 auto 0 0; width: 56%; background: color-mix(in srgb, var(--bg-surface) 91%, transparent); clip-path: polygon(0 0, 100% 0, 78% 100%, 0 100%); }
+.hero-inner { position: relative; z-index: 1; display: flex; width: min(1180px, calc(100% - 40px)); height: 100%; flex-direction: column; justify-content: center; align-items: flex-start; margin: 0 auto; }
+.hero-eyebrow { margin: 0 0 14px; color: var(--accent); font-size: 12px; font-weight: 700; }
+h1 { margin: 0; color: var(--text-primary); font-size: 64px; line-height: 1; letter-spacing: 0; }
+.hero-lead { width: min(500px, 44vw); margin: 24px 0 0; color: var(--text-secondary); font-family: var(--font-writing); font-size: 19px; line-height: 1.8; }
+.hero-actions { display: flex; align-items: center; gap: 20px; margin-top: 34px; }
+.hero-actions button { display: inline-flex; min-height: 42px; align-items: center; gap: 8px; padding: 0 18px; color: var(--text-inverse); background: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-md); cursor: pointer; font-weight: 700; }
+.hero-actions a { color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--border-strong); font-size: 13px; font-weight: 650; }
+.hero-actions button:hover, .hero-actions button:focus-visible { background: var(--accent-hover); outline: 2px solid var(--accent-border); outline-offset: 2px; }
+.hero-actions a:hover, .hero-actions a:focus-visible { color: var(--accent); border-color: var(--accent); outline: 0; }
+.hero-facts { display: flex; flex-wrap: wrap; gap: 0; margin-top: 44px; color: var(--text-muted); font-size: 12px; }
+.hero-facts span { padding-right: 14px; }
+.hero-facts span + span { padding-left: 14px; border-left: 1px solid var(--border-strong); }
+@media (max-width: 760px) {
+  .home-hero { height: calc(100svh - 92px); min-height: 440px; }
+  .hero-workbench { object-position: 36% top; }
+  .hero-scrim { width: 100%; clip-path: none; background: color-mix(in srgb, var(--bg-surface) 88%, transparent); }
+  .hero-inner { width: calc(100% - 40px); justify-content: flex-end; padding-bottom: 54px; }
+  h1 { font-size: 44px; }
+  .hero-lead { width: 100%; max-width: 520px; font-size: 17px; }
+  .hero-facts { margin-top: 30px; }
 }
-
-.hero-bg-wrap {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.hero-bg-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.45;
-  filter: brightness(0.6) saturate(0.7);
-}
-
-.hero-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(11, 17, 32, 0.3) 0%, rgba(11, 17, 32, 0.5) 50%, rgba(11, 17, 32, 0.95) 100%),
-    radial-gradient(ellipse at 50% 30%, rgba(201, 169, 110, 0.06) 0%, transparent 60%);
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  max-width: 800px;
-  animation: fadeInUp 1.2s var(--ease-silk) both;
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 20px;
-  font-size: 0.85rem;
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.08);
-  border: 1px solid rgba(201, 169, 110, 0.2);
-  border-radius: 20px;
-  margin-bottom: 32px;
-  letter-spacing: 0.1em;
-}
-
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--amber-gold);
-  animation: pulse-gold 2s infinite;
-}
-
-.hero-logo-img {
-  width: 200px;
-  height: 200px;
-  object-fit: contain;
-  margin-bottom: 24px;
-  animation: floatSlow 6s ease-in-out infinite;
-  filter: drop-shadow(0 0 30px rgba(201, 169, 110, 0.3));
-}
-
-.hero-title {
-  margin-bottom: 24px;
-}
-
-.title-line {
-  display: block;
-  font-family: var(--font-heading);
-  font-size: clamp(3rem, 6vw, 4.5rem);
-  color: var(--xuan-paper);
-  letter-spacing: 0.4em;
-  background: linear-gradient(135deg, var(--xuan-paper) 0%, var(--amber-gold) 50%, var(--xuan-paper) 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 4s linear infinite;
-}
-
-.title-sub {
-  display: block;
-  font-family: var(--font-heading);
-  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-  color: var(--text-secondary);
-  letter-spacing: 0.3em;
-  margin-top: 12px;
-}
-
-.hero-desc {
-  font-size: 1.05rem;
-  color: var(--text-secondary);
-  line-height: 2;
-  margin-bottom: 40px;
-  max-width: 600px;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 56px;
-}
-
-.btn-primary-glow {
-  background: linear-gradient(135deg, rgba(201, 169, 110, 0.15), rgba(201, 169, 110, 0.05));
-  animation: pulse-gold 3s infinite;
-}
-
-.btn-ghost {
-  border-color: rgba(201, 169, 110, 0.25);
-}
-
-.hero-stats {
-  display: flex;
-  align-items: center;
-  gap: 36px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.stat-value {
-  font-family: var(--font-heading);
-  font-size: 1.6rem;
-  color: var(--amber-gold);
-  letter-spacing: 0.1em;
-}
-
-.stat-label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  letter-spacing: 0.15em;
-}
-
-.stat-divider {
-  width: 1px;
-  height: 36px;
-  background: linear-gradient(180deg, transparent, var(--border-gold), transparent);
-}
-
-.scroll-hint {
-  position: absolute;
-  bottom: 32px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.2em;
-}
-
-.scroll-line {
-  width: 1px;
-  height: 40px;
-  background: linear-gradient(180deg, var(--amber-gold), transparent);
-  animation: floatSlow 2s ease-in-out infinite;
-}
-
-@media (max-width: 768px) {
-  .hero-section {
-    padding: 100px 20px 60px;
-  }
-
-  .hero-logo-img {
-    width: 140px;
-    height: 140px;
-  }
-
-  .hero-actions {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .hero-stats {
-    gap: 20px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
 }
 </style>

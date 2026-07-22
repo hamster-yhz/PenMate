@@ -10,7 +10,6 @@ const MissingLoginForm = defineComponent({
 type LoginFormProps = {
   username: string
   password: string
-  remember: boolean
   loading: boolean
 }
 
@@ -30,7 +29,6 @@ const mountLoginForm = async (overrides: Partial<LoginFormProps> = {}) => {
     props: {
       username: '',
       password: '',
-      remember: false,
       loading: false,
       ...overrides,
     },
@@ -42,7 +40,6 @@ describe('LoginForm', () => {
     const wrapper = await mountLoginForm({
       username: 'writer@example.com',
       password: 'secret-pass',
-      remember: true,
     })
 
     expect(wrapper.find('[data-testid="missing-login-form"]').exists()).toBe(false)
@@ -54,7 +51,6 @@ describe('LoginForm', () => {
         {
           username: 'writer@example.com',
           password: 'secret-pass',
-          remember: true,
         },
       ],
     ])
@@ -64,7 +60,6 @@ describe('LoginForm', () => {
     const wrapper = await mountLoginForm({
       username: 'writer@example.com',
       password: 'secret-pass',
-      remember: false,
       loading: true,
     })
 

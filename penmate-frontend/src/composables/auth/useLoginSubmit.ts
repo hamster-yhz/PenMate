@@ -1,12 +1,15 @@
 import { ref } from 'vue'
-import { message } from 'ant-design-vue'
 import { authApi } from '@/api/modules/auth.api'
 import { clearSession, setSession } from '@/stores/session'
 
 export interface LoginSubmitPayload {
   username: string
   password: string
-  remember: boolean
+}
+
+export interface LoginSubmitResult {
+  success: boolean
+  error?: string
 }
 
 export const useLoginSubmit = () => {
@@ -17,8 +20,7 @@ export const useLoginSubmit = () => {
     const password = payload.password.trim()
 
     if (!username || !password) {
-      message.warning('请输入账号与密码')
-      return false
+      return { success: false, error: '请输入邮箱和密码' } satisfies LoginSubmitResult
     }
 
     isLoading.value = true
@@ -43,12 +45,13 @@ export const useLoginSubmit = () => {
         userName: name,
       })
 
-      message.success('登录成功')
-      return true
+      return { success: true } satisfies LoginSubmitResult
     } catch (error: unknown) {
       clearSession()
-      message.error(error instanceof Error ? error.message : '登录失败')
-      return false
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '登录失败',
+      } satisfies LoginSubmitResult
     } finally {
       isLoading.value = false
     }
