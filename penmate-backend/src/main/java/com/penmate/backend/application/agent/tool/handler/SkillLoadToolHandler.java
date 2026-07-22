@@ -1,11 +1,11 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -16,9 +16,11 @@ import java.util.Objects;
 public class SkillLoadToolHandler implements AgentToolHandler {
 
     private final SkillPromptRegistry skillPromptRegistry;
+    private final JsonCodec jsonCodec;
 
-    public SkillLoadToolHandler(SkillPromptRegistry skillPromptRegistry) {
+    public SkillLoadToolHandler(SkillPromptRegistry skillPromptRegistry, JsonCodec jsonCodec) {
         this.skillPromptRegistry = Objects.requireNonNull(skillPromptRegistry, "skillPromptRegistry");
+        this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
     }
 
     @Override
@@ -31,8 +33,8 @@ public class SkillLoadToolHandler implements AgentToolHandler {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
-        JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-        String skill = AgentJsonCodec.getString(args, "skill");
+        Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
+        String skill = JsonValues.string(args, "skill");
         if (skill == null || skill.isBlank()) {
             throw new IllegalArgumentException("skill is required");
         }
@@ -41,14 +43,14 @@ public class SkillLoadToolHandler implements AgentToolHandler {
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String skill = AgentJsonCodec.getString(args, "skill").trim();
+            Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
+            String skill = JsonValues.string(args, "skill").trim();
             SystemPromptDocument document = skillPromptRegistry.load(skill);
             Map<String, Object> output = new LinkedHashMap<>();
             output.put("skill", skill);
             output.put("path", document == null ? "" : document.path());
             output.put("content", document == null ? "" : document.content());
-            return ToolCallResult.success(AgentJsonCodec.toJson(output));
+            return ToolCallResult.success(jsonCodec.write(output));
         } catch (Exception ex) {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "skill load failed"

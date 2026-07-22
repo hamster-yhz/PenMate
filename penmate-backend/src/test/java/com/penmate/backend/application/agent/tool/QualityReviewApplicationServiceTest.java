@@ -12,6 +12,8 @@ import com.penmate.backend.application.agent.tool.support.QualityReviewCommandPa
 import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -283,10 +285,17 @@ class QualityReviewApplicationServiceTest {
         Constructor<?> constructor = clazz.getDeclaredConstructor(
                 AgentModelRoutingService.class,
                 AgentLlmGateway.class,
-                QualityReviewCommandParser.class
+                QualityReviewCommandParser.class,
+                com.penmate.backend.application.common.serialization.JsonCodec.class
         );
         constructor.setAccessible(true);
-        return constructor.newInstance(agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser());
+        JacksonJsonCodec jsonCodec = new JacksonJsonCodec(new ObjectMapper());
+        return constructor.newInstance(
+                agentModelRoutingService,
+                agentLlmGateway,
+                new QualityReviewCommandParser(jsonCodec),
+                jsonCodec
+        );
     }
 
     private static Object instantiateQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
@@ -297,10 +306,18 @@ class QualityReviewApplicationServiceTest {
                 AgentModelRoutingService.class,
                 AgentLlmGateway.class,
                 QualityReviewCommandParser.class,
-                NovelApplicationService.class
+                NovelApplicationService.class,
+                com.penmate.backend.application.common.serialization.JsonCodec.class
         );
         constructor.setAccessible(true);
-        return constructor.newInstance(agentModelRoutingService, agentLlmGateway, new QualityReviewCommandParser(), novelApplicationService);
+        JacksonJsonCodec jsonCodec = new JacksonJsonCodec(new ObjectMapper());
+        return constructor.newInstance(
+                agentModelRoutingService,
+                agentLlmGateway,
+                new QualityReviewCommandParser(jsonCodec),
+                novelApplicationService,
+                jsonCodec
+        );
     }
 
     private static Class<?> loadClass(String fqcn) {

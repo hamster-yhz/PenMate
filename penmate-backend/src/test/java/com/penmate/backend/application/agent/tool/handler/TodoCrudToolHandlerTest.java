@@ -6,6 +6,8 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.todo.TodoCrudApplicationService;
 import com.penmate.backend.domain.todo.model.SessionTodo;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,7 +22,8 @@ import static org.mockito.Mockito.when;
 class TodoCrudToolHandlerTest {
 
     private final TodoCrudApplicationService service = mock(TodoCrudApplicationService.class);
-    private final TodoCrudToolHandler handler = new TodoCrudToolHandler(service);
+    private final TodoCrudToolHandler handler = new TodoCrudToolHandler(
+            service, new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
     void exposes_the_provider_contract_and_classifies_only_list_as_read_only() {

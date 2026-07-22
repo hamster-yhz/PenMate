@@ -1,15 +1,16 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.rag.RagRetrievalService;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * RAG 查询 tool 处理器。
@@ -18,9 +19,11 @@ import java.util.List;
 public class RagQueryToolHandler implements AgentToolHandler {
 
     private final RagRetrievalService ragRetrievalService;
+    private final JsonCodec jsonCodec;
 
-    public RagQueryToolHandler(RagRetrievalService ragRetrievalService) {
+    public RagQueryToolHandler(RagRetrievalService ragRetrievalService, JsonCodec jsonCodec) {
         this.ragRetrievalService = ragRetrievalService;
+        this.jsonCodec = jsonCodec;
     }
 
     @Override
@@ -33,8 +36,8 @@ public class RagQueryToolHandler implements AgentToolHandler {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
-        JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-        String query = AgentJsonCodec.getString(args, "query");
+        Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
+        String query = JsonValues.string(args, "query");
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("query must not be blank");
         }
@@ -43,8 +46,8 @@ public class RagQueryToolHandler implements AgentToolHandler {
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String query = AgentJsonCodec.getString(args, "query");
+            Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
+            String query = JsonValues.string(args, "query");
             List<RagRetrievedChunk> chunks = ragRetrievalService.retrieve(
                     request.projectId(),
                     request.runId(),

@@ -1,12 +1,11 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import cn.hutool.json.JSONObject;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import com.penmate.backend.application.todo.TodoCrudApplicationService;
 import com.penmate.backend.domain.todo.model.SessionTodo;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,9 +20,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class TodoCrudToolHandler implements AgentToolHandler {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
     private final TodoCrudApplicationService todoCrudApplicationService;
+    private final JsonCodec jsonCodec;
 
     @Override
     public String toolCode() {
@@ -32,7 +30,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
 
     @Override
     public boolean mutatesState(ToolCallRequest request) {
-        String operation = AgentJsonCodec.getString(AgentJsonCodec.parseObj(request.toolArgsJson()), "operation");
+        String operation = JsonValues.string(jsonCodec.readObject(request.toolArgsJson()), "operation");
         return !"list".equalsIgnoreCase(operation);
     }
 
@@ -42,12 +40,12 @@ public class TodoCrudToolHandler implements AgentToolHandler {
             throw new IllegalArgumentException("request must not be null");
         }
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String operation = AgentJsonCodec.getString(args, "operation");
+            Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
+            String operation = JsonValues.string(args, "operation");
             if (operation == null || operation.isBlank()) {
                 throw new IllegalArgumentException("operation is required");
             }
-            Long sessionId = args.getLong("sessionId");
+            Long sessionId = JsonValues.longValue(args, "sessionId");
             if (sessionId == null) {
                 throw new IllegalArgumentException("sessionId is required");
             }
@@ -101,8 +99,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         }
         try {
             validate(request);
-            Map<String, Object> args = OBJECT_MAPPER.readValue(request.toolArgsJson(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
-            });
+            Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
             String operation = stringValue(args.get("operation")).toLowerCase();
             Long sessionId = longValue(args.get("sessionId"));
             Long todoId = longValue(args.get("todoId"));
@@ -116,7 +113,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                         request.operatorId(),
                         request.traceId()
                 );
-                return ToolCallResult.success(AgentJsonCodec.toJson(buildTodoOutput("create", created)));
+                return ToolCallResult.success(jsonCodec.write(buildTodoOutput("create", created)));
             }
             if ("list".equals(operation)) {
                 java.util.List<SessionTodo> todos = todoCrudApplicationService.listSessionTodos(
@@ -128,7 +125,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 output.put("operation", "list");
                 output.put("sessionId", stringifyBusinessId(sessionId));
                 output.put("items", todos == null ? java.util.List.of() : todos.stream().map(todo -> buildTodoOutput(null, todo)).toList());
-                return ToolCallResult.success(AgentJsonCodec.toJson(output));
+                return ToolCallResult.success(jsonCodec.write(output));
             }
             if ("update".equals(operation)) {
                 Long sourceRunId = longValue(args.get("sourceRunId")) != null ? longValue(args.get("sourceRunId")) : request.runId();
@@ -141,7 +138,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                         request.operatorId(),
                         request.traceId()
                 );
-                return ToolCallResult.success(AgentJsonCodec.toJson(buildTodoOutput("update", updated)));
+                return ToolCallResult.success(jsonCodec.write(buildTodoOutput("update", updated)));
             }
             if ("complete".equals(operation)) {
                 SessionTodo completed = todoCrudApplicationService.completeTodo(
@@ -151,7 +148,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                         request.operatorId(),
                         request.traceId()
                 );
-                return ToolCallResult.success(AgentJsonCodec.toJson(buildTodoOutput("complete", completed)));
+                return ToolCallResult.success(jsonCodec.write(buildTodoOutput("complete", completed)));
             }
             if ("delete".equals(operation)) {
                 todoCrudApplicationService.deleteTodo(
@@ -166,7 +163,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 output.put("todoId", stringifyBusinessId(todoId));
                 output.put("sessionId", stringifyBusinessId(sessionId));
                 output.put("deleted", true);
-                return ToolCallResult.success(AgentJsonCodec.toJson(output));
+                return ToolCallResult.success(jsonCodec.write(output));
             }
             return new ToolCallResult("FAILED", null, null, "TODO_CRUD_FAILED", "unsupported todo crud operation: " + operation);
         } catch (Exception ex) {
@@ -227,24 +224,24 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         return value == null ? null : String.valueOf(value);
     }
 
-    private void requireLong(JSONObject args, String fieldName) {
-        Long value = args.getLong(fieldName);
+    private void requireLong(Map<String, Object> args, String fieldName) {
+        Long value = JsonValues.longValue(args, fieldName);
         if (value == null) {
             throw new IllegalArgumentException(fieldName + " is required");
         }
         requireMinimumOne(value, fieldName);
     }
 
-    private void validateOptionalLong(JSONObject args, String fieldName) {
-        Long value = args.getLong(fieldName);
+    private void validateOptionalLong(Map<String, Object> args, String fieldName) {
+        Long value = JsonValues.longValue(args, fieldName);
         if (value == null) {
             return;
         }
         requireMinimumOne(value, fieldName);
     }
 
-    private void requireNonBlank(JSONObject args, String fieldName) {
-        String value = args.getStr(fieldName);
+    private void requireNonBlank(Map<String, Object> args, String fieldName) {
+        String value = JsonValues.nullableString(args, fieldName);
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " is required");
         }
@@ -256,7 +253,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
         }
     }
 
-    private void rejectUnexpectedFields(JSONObject args, String operation, Set<String> allowedFields) {
+    private void rejectUnexpectedFields(Map<String, Object> args, String operation, Set<String> allowedFields) {
         for (String fieldName : args.keySet()) {
             if (!allowedFields.contains(fieldName)) {
                 throw new IllegalArgumentException("Unexpected field for operation " + operation + ": " + fieldName);

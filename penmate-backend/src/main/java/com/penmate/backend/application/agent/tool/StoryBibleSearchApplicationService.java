@@ -1,13 +1,12 @@
 package com.penmate.backend.application.agent.tool;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.context.AgentContextEpochService;
 import com.penmate.backend.application.agent.context.AgentWorkingSetPromotionService;
 import com.penmate.backend.application.agent.context.ContextEpochSnapshotCodec;
 import com.penmate.backend.application.agent.context.StoryBibleContextResolver;
 import com.penmate.backend.application.agent.context.StoryBibleRouteRequest;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -26,28 +25,28 @@ public class StoryBibleSearchApplicationService {
     private final ContextEpochSnapshotCodec codec;
     private final StoryBibleContextResolver resolver;
     private final AgentWorkingSetPromotionService workingSetPromotions;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final AgentModelRoutingService modelRouting;
 
     @Autowired
     public StoryBibleSearchApplicationService(AgentRunRepository runs, AgentContextEpochService epochs,
                                                ContextEpochSnapshotCodec codec, StoryBibleContextResolver resolver,
                                                AgentWorkingSetPromotionService workingSetPromotions,
-                                               ObjectMapper objectMapper, AgentModelRoutingService modelRouting) {
+                                               JsonCodec jsonCodec, AgentModelRoutingService modelRouting) {
         this.runs = runs;
         this.epochs = epochs;
         this.codec = codec;
         this.resolver = resolver;
         this.workingSetPromotions = workingSetPromotions;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.modelRouting = modelRouting;
     }
 
     StoryBibleSearchApplicationService(AgentRunRepository runs, AgentContextEpochService epochs,
                                        ContextEpochSnapshotCodec codec, StoryBibleContextResolver resolver,
                                        AgentWorkingSetPromotionService workingSetPromotions,
-                                       ObjectMapper objectMapper) {
-        this(runs, epochs, codec, resolver, workingSetPromotions, objectMapper, null);
+                                       JsonCodec jsonCodec) {
+        this(runs, epochs, codec, resolver, workingSetPromotions, jsonCodec, null);
     }
 
     public ToolCallResult execute(ToolCallRequest request) {
@@ -57,8 +56,8 @@ public class StoryBibleSearchApplicationService {
             return ToolCallResult.failed("STORY_BIBLE_EPOCH_MISSING", "Run has no bound Context Epoch");
         }
         SearchArgs args;
-        try { args = objectMapper.readValue(request.toolArgsJson(), SearchArgs.class); }
-        catch (JsonProcessingException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_INVALID", "Invalid search arguments"); }
+        try { args = jsonCodec.read(request.toolArgsJson(), SearchArgs.class); }
+        catch (RuntimeException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_INVALID", "Invalid search arguments"); }
         var snapshot = codec.decode(epochs.loadVerifiedSnapshot(run.contextEpochId()));
         var epoch = modelRouting == null ? null : epochs.get(run.contextEpochId());
         StoryBibleRoutingMode routingMode = epoch == null ? StoryBibleRoutingMode.RETRIEVAL
@@ -78,8 +77,8 @@ public class StoryBibleSearchApplicationService {
                 "progressionIds", node.appliedProgressionIds().stream().map(String::valueOf).toList(),
                 "citation", "story-bible:" + run.contextEpochId() + ":" + node.nodeId()
         )).toList();
-        try { return ToolCallResult.success(objectMapper.writeValueAsString(results)); }
-        catch (JsonProcessingException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_SERIALIZE", ex.getMessage()); }
+        try { return ToolCallResult.success(jsonCodec.write(results)); }
+        catch (RuntimeException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_SERIALIZE", ex.getMessage()); }
     }
 
     public record SearchArgs(String query, List<String> mentionedEntities) {

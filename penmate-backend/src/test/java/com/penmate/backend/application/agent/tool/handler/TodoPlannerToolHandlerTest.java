@@ -11,6 +11,8 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -329,10 +331,15 @@ class TodoPlannerToolHandlerTest {
         Class<?> clazz = loadClass("com.penmate.backend.application.agent.tool.handler.TodoPlannerToolHandler");
         Constructor<?> constructor = clazz.getDeclaredConstructor(
                 AgentModelRoutingService.class,
-                AgentLlmGateway.class
+                AgentLlmGateway.class,
+                com.penmate.backend.application.common.serialization.JsonCodec.class
         );
         constructor.setAccessible(true);
-        return constructor.newInstance(agentModelRoutingService, agentLlmGateway);
+        return constructor.newInstance(
+                agentModelRoutingService,
+                agentLlmGateway,
+                new JacksonJsonCodec(new ObjectMapper())
+        );
     }
 
     private static Object instantiateNoArgsClass(String fqcn) throws Exception {

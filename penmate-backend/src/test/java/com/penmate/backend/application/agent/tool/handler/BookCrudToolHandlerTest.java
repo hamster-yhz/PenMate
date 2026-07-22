@@ -3,6 +3,8 @@ package com.penmate.backend.application.agent.tool.handler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.novel.NovelApplicationService;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
@@ -19,7 +21,8 @@ import static org.mockito.Mockito.when;
 class BookCrudToolHandlerTest {
 
     private final NovelApplicationService novelApplicationService = mock(NovelApplicationService.class);
-    private final BookCrudToolHandler handler = new BookCrudToolHandler(novelApplicationService);
+    private final BookCrudToolHandler handler = new BookCrudToolHandler(
+            novelApplicationService, new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
     void classifies_mutations_and_accepts_the_minimal_read_request() {

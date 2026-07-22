@@ -7,7 +7,6 @@ import com.penmate.backend.application.agent.run.AgentRunDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.application.agent.run.AgentRunAppService;
-import com.penmate.backend.application.agent.run.AsyncAgentRunDispatcher;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;

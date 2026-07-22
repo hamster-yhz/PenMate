@@ -13,6 +13,7 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionServi
 import com.penmate.backend.application.agent.tool.runtime.AgentToolMutationGuard;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
+import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
@@ -24,6 +25,7 @@ import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,7 +88,7 @@ class ToolCallApplicationServiceTest {
     @BeforeEach
     void setUp() {
         toolCallExecutionService = new ToolCallExecutionService(List.of(handler), executionRepository,
-                businessIdGenerator, mutationGuard, new ObjectMapper());
+                businessIdGenerator, mutationGuard, new JacksonJsonCodec(new ObjectMapper()));
         lenient().when(businessIdGenerator.nextId()).thenReturn(99001L);
         lenient().when(executionRepository.tryInsertStarted(any())).thenReturn(true);
         lenient().when(executionRepository.markFinished(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
@@ -96,7 +98,9 @@ class ToolCallApplicationServiceTest {
                 toolApprovalViewFactory,
                 approvalApplicationService,
                 pendingApprovalRepository,
-                toolCallExecutionService
+                toolCallExecutionService,
+                new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper())),
+                new JacksonJsonCodec(new ObjectMapper())
         );
     }
 

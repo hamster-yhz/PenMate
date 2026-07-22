@@ -1,12 +1,12 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.tool.plugin.PluginToolExecuteCommand;
 import com.penmate.backend.application.agent.tool.plugin.PluginToolExecuteResult;
 import com.penmate.backend.application.agent.tool.plugin.PluginToolExecutor;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,9 +18,11 @@ import org.springframework.stereotype.Component;
 public class ContextEnhancerToolHandler implements AgentToolHandler {
 
     private final PluginToolExecutor pluginToolExecutor;
+    private final JsonCodec jsonCodec;
 
-    public ContextEnhancerToolHandler(PluginToolExecutor pluginToolExecutor) {
+    public ContextEnhancerToolHandler(PluginToolExecutor pluginToolExecutor, JsonCodec jsonCodec) {
         this.pluginToolExecutor = pluginToolExecutor;
+        this.jsonCodec = jsonCodec;
     }
 
     @Override
@@ -38,8 +40,7 @@ public class ContextEnhancerToolHandler implements AgentToolHandler {
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String prompt = AgentJsonCodec.getString(args, "prompt");
+            String prompt = JsonValues.string(jsonCodec.readObject(request.toolArgsJson()), "prompt");
             PluginToolExecuteResult result = pluginToolExecutor.execute(new PluginToolExecuteCommand(
                     request.projectId(),
                     request.runId(),

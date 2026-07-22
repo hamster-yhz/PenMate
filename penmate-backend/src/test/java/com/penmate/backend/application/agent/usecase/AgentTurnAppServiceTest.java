@@ -23,7 +23,7 @@ class AgentTurnAppServiceTest {
     @Test
     void should_create_turn_and_dispatch_run() {
         AgentRunAppService runAppService = runAppServiceThatSucceeds();
-        AsyncAgentRunDispatcher runDispatcher = mock(AsyncAgentRunDispatcher.class);
+        AgentRunDispatcher runDispatcher = mock(AgentRunDispatcher.class);
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 mock(SessionStyleBindingAppService.class),
                 agentRepository(),
@@ -55,7 +55,7 @@ class AgentTurnAppServiceTest {
     @Test
     void should_include_turn_id_in_result_active_run() {
         AgentRunAppService runAppService = runAppServiceThatSucceeds();
-        AsyncAgentRunDispatcher runDispatcher = mock(AsyncAgentRunDispatcher.class);
+        AgentRunDispatcher runDispatcher = mock(AgentRunDispatcher.class);
         AgentTurnAppService agentTurnAppService = new AgentTurnAppService(
                 mock(SessionStyleBindingAppService.class),
                 agentRepository(),

@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.tool;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
@@ -43,7 +44,8 @@ class DefaultStoryBibleUpdateApplicationServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        service = new DefaultStoryBibleUpdateApplicationService(storyBibleApplicationService, objectMapper);
+        service = new DefaultStoryBibleUpdateApplicationService(
+                storyBibleApplicationService, new JacksonJsonCodec(objectMapper));
     }
 
     @Test

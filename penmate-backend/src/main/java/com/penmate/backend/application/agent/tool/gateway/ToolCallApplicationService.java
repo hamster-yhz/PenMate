@@ -1,6 +1,5 @@
 package com.penmate.backend.application.agent.tool.gateway;
 
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
@@ -17,7 +16,8 @@ import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -31,19 +31,25 @@ public class ToolCallApplicationService {
     private final ApprovalApplicationService approvalApplicationService;
     private final AgentRunPendingApprovalRepository pendingApprovalRepository;
     private final ToolCallExecutionService toolCallExecutionService;
+    private final ToolApprovalPreview toolApprovalPreview;
+    private final JsonCodec jsonCodec;
 
     public ToolCallApplicationService(AgentToolDefinitionSource toolDefinitionSource,
                                       DefaultApprovalPolicyEngine approvalPolicyEngine,
                                       ToolApprovalViewFactory toolApprovalViewFactory,
                                       ApprovalApplicationService approvalApplicationService,
                                       AgentRunPendingApprovalRepository pendingApprovalRepository,
-                                      ToolCallExecutionService toolCallExecutionService) {
+                                      ToolCallExecutionService toolCallExecutionService,
+                                      ToolApprovalPreview toolApprovalPreview,
+                                      JsonCodec jsonCodec) {
         this.toolDefinitionSource = toolDefinitionSource;
         this.approvalPolicyEngine = approvalPolicyEngine;
         this.toolApprovalViewFactory = toolApprovalViewFactory;
         this.approvalApplicationService = approvalApplicationService;
         this.pendingApprovalRepository = pendingApprovalRepository;
         this.toolCallExecutionService = toolCallExecutionService;
+        this.toolApprovalPreview = toolApprovalPreview;
+        this.jsonCodec = jsonCodec;
     }
 
     public ToolCallResult executeToolCall(ToolCallRequest request) {
@@ -53,7 +59,7 @@ public class ToolCallApplicationService {
         ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         String operationCode = extractOperationCode(request);
         if (decision.approvalRequired()) {
-            var approvalPreview = ToolApprovalPreview.from(request.toolCode(), request.toolArgsJson());
+            var approvalPreview = toolApprovalPreview.from(request.toolCode(), request.toolArgsJson());
             ToolCallResult validationFailure = toolCallExecutionService.validate(request);
             if (validationFailure != null) return validationFailure;
             AgentRunPendingApproval existing = pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey());
@@ -119,8 +125,7 @@ public class ToolCallApplicationService {
 
     private String extractOperationCode(ToolCallRequest request) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String operation = args.getStr("operation", null);
+            String operation = JsonValues.string(jsonCodec.readObject(request.toolArgsJson()), "operation");
             return operation == null || operation.isBlank() ? null : operation.trim();
         } catch (Exception ex) {
             return null;

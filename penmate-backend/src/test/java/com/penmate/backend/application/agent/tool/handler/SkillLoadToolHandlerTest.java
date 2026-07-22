@@ -6,6 +6,8 @@ import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,7 +18,8 @@ import static org.mockito.Mockito.when;
 class SkillLoadToolHandlerTest {
 
     private final SkillPromptRegistry skillPromptRegistry = mock(SkillPromptRegistry.class);
-    private final SkillLoadToolHandler handler = new SkillLoadToolHandler(skillPromptRegistry);
+    private final SkillLoadToolHandler handler = new SkillLoadToolHandler(
+            skillPromptRegistry, new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
     void should_load_full_skill_prompt_content_from_registry() {

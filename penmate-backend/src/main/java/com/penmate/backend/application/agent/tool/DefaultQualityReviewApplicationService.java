@@ -1,7 +1,5 @@
 package com.penmate.backend.application.agent.tool;
 
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
@@ -14,9 +12,10 @@ import com.penmate.backend.application.agent.tool.support.QualityReportView;
 import com.penmate.backend.application.agent.tool.support.QualityReviewCommand;
 import com.penmate.backend.application.agent.tool.support.QualityReviewCommandParser;
 import com.penmate.backend.application.agent.tool.support.RevisionSuggestionView;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,36 +33,42 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
     private final AgentLlmInvocationService llmInvocations;
     private final QualityReviewCommandParser qualityReviewCommandParser;
     private final NovelApplicationService novelApplicationService;
+    private final JsonCodec jsonCodec;
 
     public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
                                                   AgentLlmInvocationService llmInvocations,
-                                                  QualityReviewCommandParser qualityReviewCommandParser) {
-        this(agentModelRoutingService, llmInvocations, qualityReviewCommandParser, null);
-    }
-
-    public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
-                                                  AgentLlmGateway llmGateway,
-                                                  QualityReviewCommandParser qualityReviewCommandParser) {
-        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway), qualityReviewCommandParser, null);
+                                                  QualityReviewCommandParser qualityReviewCommandParser,
+                                                  JsonCodec jsonCodec) {
+        this(agentModelRoutingService, llmInvocations, qualityReviewCommandParser, null, jsonCodec);
     }
 
     public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
                                                   AgentLlmGateway llmGateway,
                                                   QualityReviewCommandParser qualityReviewCommandParser,
-                                                  NovelApplicationService novelApplicationService) {
+                                                  JsonCodec jsonCodec) {
+        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway), qualityReviewCommandParser, null, jsonCodec);
+    }
+
+    public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
+                                                  AgentLlmGateway llmGateway,
+                                                  QualityReviewCommandParser qualityReviewCommandParser,
+                                                  NovelApplicationService novelApplicationService,
+                                                  JsonCodec jsonCodec) {
         this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway),
-                qualityReviewCommandParser, novelApplicationService);
+                qualityReviewCommandParser, novelApplicationService, jsonCodec);
     }
 
     @Autowired
     public DefaultQualityReviewApplicationService(AgentModelRoutingService agentModelRoutingService,
                                                   AgentLlmInvocationService llmInvocations,
                                                   QualityReviewCommandParser qualityReviewCommandParser,
-                                                  NovelApplicationService novelApplicationService) {
+                                                  NovelApplicationService novelApplicationService,
+                                                  JsonCodec jsonCodec) {
         this.agentModelRoutingService = agentModelRoutingService;
         this.llmInvocations = llmInvocations;
         this.qualityReviewCommandParser = qualityReviewCommandParser;
         this.novelApplicationService = novelApplicationService;
+        this.jsonCodec = jsonCodec;
     }
 
     @Override
@@ -101,41 +106,44 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
         log.info("quality_review 执行成功: projectId={}, runId={}, traceId={}, needsRevision={}, revisionAllowed={}",
                 request.projectId(), request.runId(), request.traceId(),
                 reportView.needsRevision(), reportView.revisionAllowed());
-        return ToolCallResult.success(AgentJsonCodec.toJson(output));
+        return ToolCallResult.success(jsonCodec.write(output));
     }
 
-    private List<String> toStringList(JSONArray array) {
-        return array == null ? List.of() : array.toList(String.class);
+    private List<String> toStringList(List<?> values) {
+        return values.stream()
+                .filter(value -> value != null)
+                .map(String::valueOf)
+                .toList();
     }
 
     private QualityReportView parseReport(String reviewJson, QualityReviewCommand command) {
-        JSONObject jsonObject;
+        Map<String, Object> jsonObject;
         try {
-            jsonObject = AgentJsonCodec.parseObj(reviewJson);
+            jsonObject = jsonCodec.readObject(reviewJson);
         } catch (Exception ex) {
             throw new IllegalStateException("quality review result must be valid JSON", ex);
         }
-        JSONArray issuesArray = jsonObject.getJSONArray("issues");
-        if (issuesArray == null) {
+        Object rawIssues = jsonObject.get("issues");
+        if (!(rawIssues instanceof List<?> issuesArray)) {
             throw new IllegalStateException("quality review result must contain structured issues");
         }
-        JSONArray revisionSuggestionsArray = jsonObject.getJSONArray("revisionSuggestions");
-        if (revisionSuggestionsArray == null) {
+        Object rawRevisionSuggestions = jsonObject.get("revisionSuggestions");
+        if (!(rawRevisionSuggestions instanceof List<?> revisionSuggestionsArray)) {
             throw new IllegalStateException("quality review result must contain revisionSuggestions");
         }
-        String reviewSummary = AgentJsonCodec.getString(jsonObject, "reviewSummary").trim();
+        String reviewSummary = JsonValues.string(jsonObject, "reviewSummary").trim();
         if (reviewSummary.isBlank()) {
             throw new IllegalStateException("quality review summary must be meaningful");
         }
 
         List<Map<String, String>> issues = new ArrayList<>();
-        for (int i = 0; i < issuesArray.size(); i++) {
-            JSONObject issueObject = issuesArray.getJSONObject(i);
-            String dimension = AgentJsonCodec.getString(issueObject, "dimension").trim();
-            String severity = AgentJsonCodec.getString(issueObject, "severity").trim();
-            String summary = AgentJsonCodec.getString(issueObject, "summary").trim();
-            String evidence = AgentJsonCodec.getString(issueObject, "evidence").trim();
-            String suggestion = AgentJsonCodec.getString(issueObject, "suggestion").trim();
+        for (Object issueItem : issuesArray) {
+            Map<String, Object> issueObject = mapValue(issueItem);
+            String dimension = JsonValues.string(issueObject, "dimension").trim();
+            String severity = JsonValues.string(issueObject, "severity").trim();
+            String summary = JsonValues.string(issueObject, "summary").trim();
+            String evidence = JsonValues.string(issueObject, "evidence").trim();
+            String suggestion = JsonValues.string(issueObject, "suggestion").trim();
             if (dimension.isBlank() || severity.isBlank() || summary.isBlank() || evidence.isBlank() || suggestion.isBlank()) {
                 throw new IllegalStateException("quality review issues must contain dimension, severity, summary, evidence and suggestion");
             }
@@ -149,13 +157,13 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
         }
 
         List<RevisionSuggestionView> revisionSuggestions = new ArrayList<>();
-        for (int i = 0; i < revisionSuggestionsArray.size(); i++) {
-            JSONObject suggestionObject = revisionSuggestionsArray.getJSONObject(i);
+        for (Object suggestionItem : revisionSuggestionsArray) {
+            Map<String, Object> suggestionObject = mapValue(suggestionItem);
             RevisionSuggestionView suggestionView = new RevisionSuggestionView(
-                    AgentJsonCodec.getString(suggestionObject, "priority"),
-                    AgentJsonCodec.getString(suggestionObject, "target"),
-                    AgentJsonCodec.getString(suggestionObject, "instruction"),
-                    AgentJsonCodec.getString(suggestionObject, "rationale")
+                    JsonValues.string(suggestionObject, "priority"),
+                    JsonValues.string(suggestionObject, "target"),
+                    JsonValues.string(suggestionObject, "instruction"),
+                    JsonValues.string(suggestionObject, "rationale")
             );
             if (suggestionView.priority().isBlank()
                     || suggestionView.target().isBlank()
@@ -166,23 +174,37 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
             revisionSuggestions.add(suggestionView);
         }
 
-        boolean needsRevision = Boolean.TRUE.equals(jsonObject.getBool("needsRevision", false));
+        boolean needsRevision = JsonValues.booleanValue(jsonObject, "needsRevision");
         if (!needsRevision && !revisionSuggestions.isEmpty()) {
             throw new IllegalStateException("revisionSuggestions must be empty when needsRevision is false");
         }
         boolean revisionAllowed = command.currentRevisionRound() < command.maxRevisionRounds();
         return new QualityReportView(
-                jsonObject.getInt("score", 0),
-                toStringList(jsonObject.getJSONArray("passes")),
+                integerOrZero(jsonObject, "score"),
+                toStringList(JsonValues.list(jsonObject, "passes")),
                 issues,
                 needsRevision,
-                toStringList(jsonObject.getJSONArray("riskFlags")),
+                toStringList(JsonValues.list(jsonObject, "riskFlags")),
                 revisionSuggestions,
                 command.currentRevisionRound(),
                 command.maxRevisionRounds(),
                 revisionAllowed,
                 reviewSummary
         );
+    }
+
+    private Map<String, Object> mapValue(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        map.forEach((key, item) -> result.put(String.valueOf(key), item));
+        return result;
+    }
+
+    private int integerOrZero(Map<String, Object> values, String key) {
+        Integer value = JsonValues.integerValue(values, key);
+        return value == null ? 0 : value;
     }
 
     private List<Map<String, String>> toSuggestionMaps(List<RevisionSuggestionView> suggestions) {
@@ -255,7 +277,7 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
             return null;
         }
         try {
-            return AgentJsonCodec.parseObj(json).getLong(fieldName);
+            return JsonValues.longValue(jsonCodec.readObject(json), fieldName);
         } catch (Exception ex) {
             return null;
         }
@@ -266,7 +288,7 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
             return null;
         }
         try {
-            return AgentJsonCodec.getString(AgentJsonCodec.parseObj(json), fieldName);
+            return JsonValues.nullableString(jsonCodec.readObject(json), fieldName);
         } catch (Exception ex) {
             return null;
         }

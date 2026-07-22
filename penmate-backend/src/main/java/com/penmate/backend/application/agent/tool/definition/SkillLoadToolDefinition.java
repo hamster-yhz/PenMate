@@ -3,7 +3,7 @@ package com.penmate.backend.application.agent.tool.definition;
 import com.penmate.backend.application.agent.prompt.SkillCatalogItem;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -15,9 +15,11 @@ import java.util.Objects;
 public class SkillLoadToolDefinition implements AgentToolDefinition {
 
     private final SkillPromptRegistry skillPromptRegistry;
+    private final JsonCodec jsonCodec;
 
-    public SkillLoadToolDefinition(SkillPromptRegistry skillPromptRegistry) {
+    public SkillLoadToolDefinition(SkillPromptRegistry skillPromptRegistry, JsonCodec jsonCodec) {
         this.skillPromptRegistry = Objects.requireNonNull(skillPromptRegistry, "skillPromptRegistry");
+        this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
     }
 
     @Override
@@ -58,6 +60,6 @@ public class SkillLoadToolDefinition implements AgentToolDefinition {
         schema.put("properties", properties);
         schema.put("required", List.of("skill"));
         schema.put("additionalProperties", false);
-        return AgentJsonCodec.toJson(schema);
+        return jsonCodec.write(schema);
     }
 }

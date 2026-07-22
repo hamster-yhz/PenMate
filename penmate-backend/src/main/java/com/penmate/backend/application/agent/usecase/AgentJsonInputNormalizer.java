@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.usecase;
 
-import cn.hutool.json.JSONUtil;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +11,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class AgentJsonInputNormalizer {
 
+    private final JsonCodec jsonCodec;
+
+    public AgentJsonInputNormalizer(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
+    }
+
     public String normalize(String raw) {
         if (raw == null) {
             return null;
@@ -21,14 +26,8 @@ public class AgentJsonInputNormalizer {
             return trimmed;
         }
         try {
-            if (trimmed.startsWith("{")) {
-                return AgentJsonCodec.toJson(AgentJsonCodec.parseObj(trimmed));
-            }
-            if (trimmed.startsWith("[")) {
-                return AgentJsonCodec.toJson(AgentJsonCodec.parseArray(trimmed));
-            }
-            if (JSONUtil.isTypeJSON(trimmed)) {
-                return trimmed;
+            if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                return jsonCodec.write(jsonCodec.read(trimmed));
             }
             return trimmed;
         } catch (Exception ex) {

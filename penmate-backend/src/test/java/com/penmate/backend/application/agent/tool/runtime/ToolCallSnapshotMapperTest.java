@@ -3,6 +3,8 @@ package com.penmate.backend.application.agent.tool.runtime;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmMessageRole;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ToolCallSnapshotMapperTest {
 
-    private final ToolCallSnapshotMapper toolCallSnapshotMapper = new ToolCallSnapshotMapper();
+    private final ToolCallSnapshotMapper toolCallSnapshotMapper =
+            new ToolCallSnapshotMapper(new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
     void UT_APP_AGENT_TOOL_CALL_SNAPSHOT_MAPPER_SHOULD_PARSE_PERSISTED_ASSISTANT_TOOL_CALL_AND_TOOL_RESULT_MESSAGES_TO_TYPED_MODELS() {

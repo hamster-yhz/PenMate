@@ -4,6 +4,8 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.rag.RagRetrievalService;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -17,7 +19,8 @@ import static org.mockito.Mockito.when;
 class RagQueryToolHandlerTest {
 
     private final RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
-    private final RagQueryToolHandler handler = new RagQueryToolHandler(ragRetrievalService);
+    private final RagQueryToolHandler handler = new RagQueryToolHandler(
+            ragRetrievalService, new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
     void UT_APP_AGENT_RAG_QUERY_TOOL_HANDLER_VALIDATE_SHOULD_REJECT_BLANK_QUERY() {

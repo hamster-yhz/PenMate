@@ -137,7 +137,7 @@ public class SystemDataBootstrap implements ApplicationRunner {
     private void bootstrapAdminPreferences(Long chatConfigId, Long embeddingConfigId) {
         jdbcTemplate.update("""
                 INSERT INTO model_user_preferences(
-                    user_id, default_main_chat_model_config_id, default_worker_chat_model_config_id,
+                    user_id, default_creative_model_config_id, default_context_selector_model_config_id,
                     default_embedding_model_config_id, default_story_bible_routing_mode
                 ) VALUES (?, ?, ?, ?, 'LLM_SELECTOR')
                 ON CONFLICT (user_id) DO NOTHING
@@ -145,7 +145,7 @@ public class SystemDataBootstrap implements ApplicationRunner {
         if (properties.isReconcile()) {
             jdbcTemplate.update("""
                     UPDATE model_user_preferences
-                    SET default_main_chat_model_config_id = ?, default_worker_chat_model_config_id = ?,
+                    SET default_creative_model_config_id = ?, default_context_selector_model_config_id = ?,
                         default_embedding_model_config_id = ?, updated_at = CURRENT_TIMESTAMP(3)
                     WHERE user_id = ?
                     """, chatConfigId, chatConfigId, embeddingConfigId, ADMIN_USER_ID);

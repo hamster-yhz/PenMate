@@ -20,7 +20,6 @@ public class ClasspathSkillPromptRegistry implements SkillPromptRegistry {
    private static final Logger log = LoggerFactory.getLogger(ClasspathSkillPromptRegistry.class);
    private static final Map<String, String> DIRECTORY_ALIASES = Map.ofEntries(
            Map.entry("writer", "writer"),
-           Map.entry("draft_generation", "writer"),
            Map.entry("scene_writer", "writer"),
             Map.entry("planner", "planner"),
             Map.entry("checker", "checker"),

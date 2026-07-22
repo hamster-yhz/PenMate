@@ -1,7 +1,5 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
@@ -12,8 +10,9 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.todo.TodoPlanItemView;
 import com.penmate.backend.application.todo.TodoPlanView;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -60,17 +59,21 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
 
     private final AgentModelRoutingService agentModelRoutingService;
     private final AgentLlmInvocationService llmInvocations;
+    private final JsonCodec jsonCodec;
 
     @Autowired
     public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
-                                  AgentLlmInvocationService llmInvocations) {
+                                  AgentLlmInvocationService llmInvocations,
+                                  JsonCodec jsonCodec) {
         this.agentModelRoutingService = agentModelRoutingService;
         this.llmInvocations = llmInvocations;
+        this.jsonCodec = jsonCodec;
     }
 
     public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
-                                  AgentLlmGateway llmGateway) {
-        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway));
+                                  AgentLlmGateway llmGateway,
+                                  JsonCodec jsonCodec) {
+        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway), jsonCodec);
     }
 
     @Override
@@ -122,7 +125,7 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
             TodoPlanView planView = parsePlan(planningJson);
             log.info("todo_planner 执行成功: projectId={}, runId={}, traceId={}, itemCount={}",
                     request.projectId(), request.runId(), request.traceId(), planView.items().size());
-            return ToolCallResult.success(AgentJsonCodec.toJson(toOutputMap(planView)));
+            return ToolCallResult.success(jsonCodec.write(toOutputMap(planView)));
         } catch (Exception ex) {
             String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "todo planner execution failed"
@@ -135,38 +138,38 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
 
     private TodoPlannerCommand parseCommand(String toolArgsJson) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(toolArgsJson);
+            Map<String, Object> args = jsonCodec.readObject(toolArgsJson);
             return new TodoPlannerCommand(
-                    AgentJsonCodec.getString(args, "planningMode"),
-                    AgentJsonCodec.getString(args, "userRequest"),
-                    toQualityIssues(args.getJSONArray("qualityIssues")),
-                    toStringList(args.getJSONArray("storyBibleUpdates")),
-                    toStringList(args.getJSONArray("planningContext")),
-                    toStringList(args.getJSONArray("existingTodos"))
+                    JsonValues.string(args, "planningMode"),
+                    JsonValues.string(args, "userRequest"),
+                    toQualityIssues(JsonValues.list(args, "qualityIssues")),
+                    toStringList(JsonValues.list(args, "storyBibleUpdates")),
+                    toStringList(JsonValues.list(args, "planningContext")),
+                    toStringList(JsonValues.list(args, "existingTodos"))
             );
         } catch (Exception ex) {
             throw new IllegalArgumentException("toolArgsJson must be valid JSON", ex);
         }
     }
 
-    private List<QualityIssueInput> toQualityIssues(JSONArray array) {
-        if (array == null) {
-            return List.of();
-        }
+    private List<QualityIssueInput> toQualityIssues(List<?> values) {
         List<QualityIssueInput> result = new ArrayList<>();
-        for (int i = 0; i < array.size(); i++) {
-            JSONObject item = array.getJSONObject(i);
+        for (Object value : values) {
+            Map<String, Object> item = mapValue(value);
             result.add(new QualityIssueInput(
-                    AgentJsonCodec.getString(item, "severity"),
-                    AgentJsonCodec.getString(item, "summary"),
-                    AgentJsonCodec.getString(item, "suggestion")
+                    JsonValues.string(item, "severity"),
+                    JsonValues.string(item, "summary"),
+                    JsonValues.string(item, "suggestion")
             ));
         }
         return result;
     }
 
-    private List<String> toStringList(JSONArray array) {
-        return array == null ? List.of() : array.toList(String.class);
+    private List<String> toStringList(List<?> values) {
+        return values.stream()
+                .filter(value -> value != null)
+                .map(String::valueOf)
+                .toList();
     }
 
     private void validateCommand(TodoPlannerCommand command) {
@@ -195,38 +198,38 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
     }
 
     private TodoPlanView parsePlan(String planningJson) {
-        JSONObject jsonObject;
+        Map<String, Object> jsonObject;
         try {
-            jsonObject = AgentJsonCodec.parseObj(planningJson);
+            jsonObject = jsonCodec.readObject(planningJson);
         } catch (Exception ex) {
             throw new IllegalStateException("todo planner result must be valid JSON", ex);
         }
 
-        String planTitle = AgentJsonCodec.getString(jsonObject, "planTitle").trim();
-        String planSummary = AgentJsonCodec.getString(jsonObject, "planSummary").trim();
-        String recommendedNextAction = AgentJsonCodec.getString(jsonObject, "recommendedNextAction").trim();
+        String planTitle = JsonValues.string(jsonObject, "planTitle").trim();
+        String planSummary = JsonValues.string(jsonObject, "planSummary").trim();
+        String recommendedNextAction = JsonValues.string(jsonObject, "recommendedNextAction").trim();
         if (planTitle.isBlank() || planSummary.isBlank() || recommendedNextAction.isBlank()) {
             throw new IllegalStateException("todo planner result must contain planTitle, planSummary and recommendedNextAction");
         }
 
-        JSONArray itemsArray = jsonObject.getJSONArray("items");
-        if (itemsArray == null || itemsArray.isEmpty()) {
+        List<?> itemsArray = JsonValues.list(jsonObject, "items");
+        if (itemsArray.isEmpty()) {
             throw new IllegalStateException("todo planner result must contain structured items");
         }
 
         List<TodoPlanItemView> items = new ArrayList<>();
-        for (int i = 0; i < itemsArray.size(); i++) {
-            JSONObject itemObject = itemsArray.getJSONObject(i);
-            String title = AgentJsonCodec.getString(itemObject, "title").trim();
-            String description = AgentJsonCodec.getString(itemObject, "description").trim();
-            String priority = AgentJsonCodec.getString(itemObject, "priority").trim();
-            String sourceType = AgentJsonCodec.getString(itemObject, "sourceType").trim();
-            String recommendedStatus = AgentJsonCodec.getString(itemObject, "recommendedStatus").trim();
-            String rationale = AgentJsonCodec.getString(itemObject, "rationale").trim();
+        for (Object item : itemsArray) {
+            Map<String, Object> itemObject = mapValue(item);
+            String title = JsonValues.string(itemObject, "title").trim();
+            String description = JsonValues.string(itemObject, "description").trim();
+            String priority = JsonValues.string(itemObject, "priority").trim();
+            String sourceType = JsonValues.string(itemObject, "sourceType").trim();
+            String recommendedStatus = JsonValues.string(itemObject, "recommendedStatus").trim();
+            String rationale = JsonValues.string(itemObject, "rationale").trim();
             boolean hasSuggestedAutoCreate = itemObject.containsKey("suggestedAutoCreate");
-            boolean suggestedAutoCreate = Boolean.TRUE.equals(itemObject.getBool("suggestedAutoCreate", false));
-            List<String> acceptanceCriteria = toStringList(itemObject.getJSONArray("acceptanceCriteria"));
-            List<String> dependsOn = toStringList(itemObject.getJSONArray("dependsOn"));
+            boolean suggestedAutoCreate = JsonValues.booleanValue(itemObject, "suggestedAutoCreate");
+            List<String> acceptanceCriteria = toStringList(JsonValues.list(itemObject, "acceptanceCriteria"));
+            List<String> dependsOn = toStringList(JsonValues.list(itemObject, "dependsOn"));
             if (title.isBlank()
                     || description.isBlank()
                     || priority.isBlank()
@@ -259,6 +262,15 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
             ));
         }
         return new TodoPlanView(planTitle, planSummary, recommendedNextAction, items);
+    }
+
+    private Map<String, Object> mapValue(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        map.forEach((key, item) -> result.put(String.valueOf(key), item));
+        return result;
     }
 
     private Map<String, Object> toOutputMap(TodoPlanView planView) {

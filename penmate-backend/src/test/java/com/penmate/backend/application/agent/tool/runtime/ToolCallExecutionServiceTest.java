@@ -6,6 +6,7 @@ import com.penmate.backend.domain.agent.run.model.AgentToolCallExecution;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecutionStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -144,7 +145,8 @@ class ToolCallExecutionServiceTest {
     }
 
     private ToolCallExecutionService service(AgentToolHandler handler) {
-        return new ToolCallExecutionService(java.util.List.of(handler), executions, ids, guard, objectMapper);
+        return new ToolCallExecutionService(java.util.List.of(handler), executions, ids, guard,
+                new JacksonJsonCodec(objectMapper));
     }
 
     private AgentToolHandler handler(boolean mutates, ToolAction action) {
@@ -160,7 +162,7 @@ class ToolCallExecutionServiceTest {
         InMemoryExecutions temporary = new InMemoryExecutions();
         ToolCallExecutionService hashingService = new ToolCallExecutionService(
                 java.util.List.of(handler(false, ignored -> ToolCallResult.success("ok"))), temporary,
-                ids, guard, objectMapper);
+                ids, guard, new JacksonJsonCodec(objectMapper));
         hashingService.execute(request);
         return temporary.find(request.runId(), request.toolCallId()).requestSha256();
     }

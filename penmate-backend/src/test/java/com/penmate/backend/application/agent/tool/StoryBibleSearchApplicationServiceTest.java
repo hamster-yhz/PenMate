@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.tool;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.penmate.backend.application.agent.context.AgentContextEpochService;
 import com.penmate.backend.application.agent.context.AgentWorkingSetPromotionService;
 import com.penmate.backend.application.agent.context.ContextEpochSnapshotCodec;
@@ -10,9 +9,11 @@ import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
 import com.penmate.backend.application.agent.context.StoryBibleRouteRequest;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,9 +40,10 @@ class StoryBibleSearchApplicationServiceTest {
     @Test
     void should_search_only_the_run_bound_epoch_and_promote_returned_nodes() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        ContextEpochSnapshotCodec codec = new ContextEpochSnapshotCodec(objectMapper);
+        JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
+        ContextEpochSnapshotCodec codec = new ContextEpochSnapshotCodec(jsonCodec);
         StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
-                runs, epochs, codec, resolver, workingSetPromotions, objectMapper);
+                runs, epochs, codec, resolver, workingSetPromotions, jsonCodec);
         AgentRun run = new AgentRun(70001L, 101L, 90001L, 50001L, 201L,
                 "RUNNING", "executing", 88001L, null, 5L, null, "trace-1", null, null);
         AgentRunInput input = new AgentRunInput(70001L, "Inspect Mira", "CHAT", 301L,
@@ -50,7 +52,7 @@ class StoryBibleSearchApplicationServiceTest {
                 71L, "Mira", "CHARACTER", "Pilot", "AUTO_RETRIEVE", "CANON"));
         var snapshot = new ContextEpochSnapshotCodec.Snapshot(
                 1, 101L, 11L, 9L, 4L, 301L, List.of(), catalog);
-        ObjectNode state = objectMapper.createObjectNode().put("title", "Mira").put("rank", "captain");
+        Map<String, Object> state = Map.of("title", "Mira", "rank", "captain");
         when(runs.findRun(70001L)).thenReturn(run);
         when(runs.findInput(70001L)).thenReturn(input);
         when(epochs.loadVerifiedSnapshot(88001L)).thenReturn(codec.encode(snapshot));
@@ -80,8 +82,9 @@ class StoryBibleSearchApplicationServiceTest {
     @Test
     void should_fail_without_a_run_bound_context_epoch() {
         ObjectMapper objectMapper = new ObjectMapper();
+        JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
         StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
-                runs, epochs, new ContextEpochSnapshotCodec(objectMapper), resolver, workingSetPromotions, objectMapper);
+                runs, epochs, new ContextEpochSnapshotCodec(jsonCodec), resolver, workingSetPromotions, jsonCodec);
         when(runs.findRun(70001L)).thenReturn(new AgentRun(
                 70001L, 101L, 90001L, 50001L, 201L, "RUNNING", "executing",
                 null, null, 0L, null, "trace", null, null));

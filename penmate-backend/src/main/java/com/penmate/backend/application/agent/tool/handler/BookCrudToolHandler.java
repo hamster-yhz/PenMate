@@ -1,13 +1,13 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateProjectCommand;
 import com.penmate.backend.domain.novel.model.NovelProject;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -27,9 +27,11 @@ import java.util.Set;
 public class BookCrudToolHandler implements AgentToolHandler {
 
     private final NovelApplicationService novelApplicationService;
+    private final JsonCodec jsonCodec;
 
-    public BookCrudToolHandler(NovelApplicationService novelApplicationService) {
+    public BookCrudToolHandler(NovelApplicationService novelApplicationService, JsonCodec jsonCodec) {
         this.novelApplicationService = novelApplicationService;
+        this.jsonCodec = jsonCodec;
     }
 
     @Override
@@ -39,68 +41,67 @@ public class BookCrudToolHandler implements AgentToolHandler {
 
     @Override
     public boolean mutatesState(ToolCallRequest request) {
-        String operation = AgentJsonCodec.getString(AgentJsonCodec.parseObj(request.toolArgsJson()), "operation");
+        String operation = JsonValues.string(jsonCodec.readObject(request.toolArgsJson()), "operation");
         return !"list".equalsIgnoreCase(operation);
     }
 
     @Override
     public void validate(ToolCallRequest request) {
+        Map<String, Object> args;
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String operation = AgentJsonCodec.getString(args, "operation");
-            if (operation == null || operation.isBlank()) {
-                throw new IllegalArgumentException("operation is required");
-            }
-            if (!("create".equalsIgnoreCase(operation)
-                    || "list".equalsIgnoreCase(operation)
-                    || "update".equalsIgnoreCase(operation)
-                    || "delete".equalsIgnoreCase(operation))) {
-                throw new IllegalArgumentException("Unsupported operation: " + operation);
-            }
-            if ("create".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "ownerUserId", "title", "summary", "status"));
-                if (args.getLong("ownerUserId") == null) {
-                    throw new IllegalArgumentException("ownerUserId is required");
-                }
-                String title = args.getStr("title");
-                if (title == null || title.isBlank()) {
-                    throw new IllegalArgumentException("title is required");
-                }
-            }
-            if ("list".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation"));
-            }
-            if ("update".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "projectId", "title", "summary", "status"));
-                if (args.getLong("projectId") == null) {
-                    throw new IllegalArgumentException("projectId is required");
-                }
-            }
-            if ("delete".equalsIgnoreCase(operation)) {
-                rejectUnexpectedFields(args, operation, Set.of("operation", "projectId"));
-                if (args.getLong("projectId") == null) {
-                    throw new IllegalArgumentException("projectId is required");
-                }
-            }
-        } catch (IllegalArgumentException ex) {
-            throw ex;
+            args = jsonCodec.readObject(request.toolArgsJson());
         } catch (Exception ex) {
             throw new IllegalArgumentException("invalid tool args", ex);
+        }
+        String operation = JsonValues.string(args, "operation");
+        if (operation == null || operation.isBlank()) {
+            throw new IllegalArgumentException("operation is required");
+        }
+        if (!("create".equalsIgnoreCase(operation)
+                || "list".equalsIgnoreCase(operation)
+                || "update".equalsIgnoreCase(operation)
+                || "delete".equalsIgnoreCase(operation))) {
+            throw new IllegalArgumentException("Unsupported operation: " + operation);
+        }
+        if ("create".equalsIgnoreCase(operation)) {
+            rejectUnexpectedFields(args, operation, Set.of("operation", "ownerUserId", "title", "summary", "status"));
+            if (JsonValues.longValue(args, "ownerUserId") == null) {
+                throw new IllegalArgumentException("ownerUserId is required");
+            }
+            String title = JsonValues.nullableString(args, "title");
+            if (title == null || title.isBlank()) {
+                throw new IllegalArgumentException("title is required");
+            }
+        }
+        if ("list".equalsIgnoreCase(operation)) {
+            rejectUnexpectedFields(args, operation, Set.of("operation"));
+        }
+        if ("update".equalsIgnoreCase(operation)) {
+            rejectUnexpectedFields(args, operation, Set.of("operation", "projectId", "title", "summary", "status"));
+            if (JsonValues.longValue(args, "projectId") == null) {
+                throw new IllegalArgumentException("projectId is required");
+            }
+        }
+        if ("delete".equalsIgnoreCase(operation)) {
+            rejectUnexpectedFields(args, operation, Set.of("operation", "projectId"));
+            if (JsonValues.longValue(args, "projectId") == null) {
+                throw new IllegalArgumentException("projectId is required");
+            }
         }
     }
 
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(request.toolArgsJson());
-            String operation = AgentJsonCodec.getString(args, "operation");
+            Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
+            String operation = JsonValues.string(args, "operation");
             if ("create".equalsIgnoreCase(operation)) {
                 NovelProject created = novelApplicationService.createProject(
                         new CreateProjectCommand(
-                                args.getLong("ownerUserId"),
-                                args.getStr("title"),
-                                args.getStr("summary"),
-                                args.getInt("status")
+                                JsonValues.longValue(args, "ownerUserId"),
+                                JsonValues.nullableString(args, "title"),
+                                JsonValues.nullableString(args, "summary"),
+                                JsonValues.integerValue(args, "status")
                         ),
                         request.traceId()
                 );
@@ -113,23 +114,27 @@ public class BookCrudToolHandler implements AgentToolHandler {
                 return ToolCallResult.success(toListOutput(projects));
             }
             if ("update".equalsIgnoreCase(operation)) {
-                Long projectId = args.getLong("projectId");
+                Long projectId = JsonValues.longValue(args, "projectId");
                 NovelProject updated = novelApplicationService.updateProject(
                         projectId,
-                        new UpdateProjectCommand(args.getStr("title"), args.getStr("summary"), args.getInt("status")),
+                        new UpdateProjectCommand(
+                                JsonValues.nullableString(args, "title"),
+                                JsonValues.nullableString(args, "summary"),
+                                JsonValues.integerValue(args, "status")),
                         request.traceId()
                 );
                 log.info("book_crud 更新成功: projectId={}, traceId={}", updated.getProjectId(), request.traceId());
                 return ToolCallResult.success(toOutput(updated));
             }
             if ("delete".equalsIgnoreCase(operation)) {
-                Long projectId = args.getLong("projectId");
+                Long projectId = JsonValues.longValue(args, "projectId");
                 if (projectId == null) {
                     throw new IllegalArgumentException("projectId is required");
                 }
                 novelApplicationService.deleteProject(projectId, request.operatorId(), request.traceId());
                 log.info("book_crud 删除成功: projectId={}, operatorId={}, traceId={}", projectId, request.operatorId(), request.traceId());
-                return ToolCallResult.success("{\"result\":\"deleted\",\"projectId\":" + projectId + "}");
+                return ToolCallResult.success(jsonCodec.write(Map.of(
+                        "result", "deleted", "projectId", projectId)));
             }
             return new ToolCallResult("FAILED", null, null, "UNSUPPORTED_OPERATION", "Unsupported operation: " + operation);
         } catch (Exception ex) {
@@ -141,11 +146,11 @@ public class BookCrudToolHandler implements AgentToolHandler {
     }
 
     private String toOutput(NovelProject project) {
-        return AgentJsonCodec.toJson(toOutputMap(project));
+        return jsonCodec.write(toOutputMap(project));
     }
 
     private String toListOutput(List<NovelProject> projects) {
-        return AgentJsonCodec.toJson(projects.stream()
+        return jsonCodec.write(projects.stream()
                 .map(this::toOutputMap)
                 .toList());
     }
@@ -159,7 +164,7 @@ public class BookCrudToolHandler implements AgentToolHandler {
         return output;
     }
 
-    private void rejectUnexpectedFields(JSONObject args, String operation, Set<String> allowedFields) {
+    private void rejectUnexpectedFields(Map<String, Object> args, String operation, Set<String> allowedFields) {
         for (String fieldName : args.keySet()) {
             if (!allowedFields.contains(fieldName)) {
                 throw new IllegalArgumentException("Unexpected field for operation " + operation + ": " + fieldName);

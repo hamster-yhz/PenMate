@@ -1,12 +1,10 @@
 package com.penmate.backend.application.agent.tool.runtime;
 
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -20,6 +18,12 @@ import java.util.Map;
  */
 @Component
 public class ToolCallSnapshotMapper {
+
+    private final JsonCodec jsonCodec;
+
+    public ToolCallSnapshotMapper(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
+    }
 
     public AgentLlmMessage buildAssistantToolCallMessage(AgentLlmTurnResponse response) {
         return AgentLlmMessage.assistant(
@@ -36,11 +40,11 @@ public class ToolCallSnapshotMapper {
     }
 
     public String toAssistantToolCallsJson(List<AgentLlmToolCall> toolCalls) {
-        return AgentJsonCodec.toJson(buildToolCallPayloads(toolCalls));
+        return jsonCodec.write(buildToolCallPayloads(toolCalls));
     }
 
     public String toConversationMessagesJson(List<AgentLlmMessage> messages) {
-        return AgentJsonCodec.toJson(messages.stream().map(this::toMessagePayload).toList());
+        return jsonCodec.write(messages.stream().map(this::toMessagePayload).toList());
     }
 
     private Map<String, Object> toMessagePayload(AgentLlmMessage message) {
@@ -66,48 +70,30 @@ public class ToolCallSnapshotMapper {
     }
 
     public List<AgentLlmMessage> parseMessagesToTyped(String raw) {
-        JSONArray array = AgentJsonCodec.parseArray(raw);
         List<AgentLlmMessage> messages = new ArrayList<>();
-        for (Object item : array) {
-            Map<String, Object> payload;
-            if (item instanceof JSONObject object) {
-                payload = new LinkedHashMap<>(object);
-            } else if (item instanceof Map<?, ?> map) {
-                payload = new LinkedHashMap<>();
-                map.forEach((key, value) -> payload.put(String.valueOf(key), value));
-            } else {
-                continue;
+        for (Object item : readList(raw)) {
+            if (item instanceof Map<?, ?> map) {
+                messages.add(toAgentLlmMessage(toStringKeyMap(map)));
             }
-            messages.add(toAgentLlmMessage(payload));
         }
         return messages;
     }
 
     public List<Map<String, Object>> parseMessages(String raw) {
-        JSONArray array = AgentJsonCodec.parseArray(raw);
         List<Map<String, Object>> messages = new ArrayList<>();
-        for (Object item : array) {
-            if (item instanceof JSONObject object) {
-                messages.add(new LinkedHashMap<>(object));
-            } else if (item instanceof Map<?, ?> map) {
-                Map<String, Object> message = new LinkedHashMap<>();
-                map.forEach((key, value) -> message.put(String.valueOf(key), value));
-                messages.add(message);
+        for (Object item : readList(raw)) {
+            if (item instanceof Map<?, ?> map) {
+                messages.add(toStringKeyMap(map));
             }
         }
         return messages;
     }
 
     public List<Map<String, Object>> parseToolCallPayloads(String raw) {
-        JSONArray array = AgentJsonCodec.parseArray(raw);
         List<Map<String, Object>> payloads = new ArrayList<>();
-        for (Object item : array) {
-            if (item instanceof JSONObject object) {
-                payloads.add(new LinkedHashMap<>(object));
-            } else if (item instanceof Map<?, ?> map) {
-                Map<String, Object> payload = new LinkedHashMap<>();
-                map.forEach((key, value) -> payload.put(String.valueOf(key), value));
-                payloads.add(payload);
+        for (Object item : readList(raw)) {
+            if (item instanceof Map<?, ?> map) {
+                payloads.add(toStringKeyMap(map));
             }
         }
         return payloads;
@@ -173,15 +159,23 @@ public class ToolCallSnapshotMapper {
     }
 
     private Map<String, Object> mapValue(Object value) {
-        if (value instanceof JSONObject object) {
-            return new LinkedHashMap<>(object);
-        }
         if (value instanceof Map<?, ?> map) {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            map.forEach((key, item) -> payload.put(String.valueOf(key), item));
-            return payload;
+            return toStringKeyMap(map);
         }
         return Map.of();
+    }
+
+    private List<Object> readList(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        return jsonCodec.readList(raw, Object.class);
+    }
+
+    private Map<String, Object> toStringKeyMap(Map<?, ?> values) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        values.forEach((key, value) -> result.put(String.valueOf(key), value));
+        return result;
     }
 
     private String stringValue(Object value) {

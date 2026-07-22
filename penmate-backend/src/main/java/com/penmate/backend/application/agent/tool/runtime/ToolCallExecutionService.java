@@ -1,9 +1,7 @@
 package com.penmate.backend.application.agent.tool.runtime;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecution;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecutionStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
@@ -13,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,19 +26,18 @@ public class ToolCallExecutionService {
     private final AgentToolCallExecutionRepository executions;
     private final BusinessIdGenerator ids;
     private final AgentToolMutationGuard mutationGuard;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
     public ToolCallExecutionService(List<AgentToolHandler> handlers,
                                     AgentToolCallExecutionRepository executions,
                                     BusinessIdGenerator ids,
                                     AgentToolMutationGuard mutationGuard,
-                                    ObjectMapper objectMapper) {
+                                    JsonCodec jsonCodec) {
         this.handlers = List.copyOf(handlers);
         this.executions = executions;
         this.ids = ids;
         this.mutationGuard = mutationGuard;
-        this.objectMapper = objectMapper.copy()
-                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+        this.jsonCodec = jsonCodec;
     }
 
     public ToolCallResult validate(ToolCallRequest request) {
@@ -177,8 +175,8 @@ public class ToolCallExecutionService {
     private ToolCallResult replay(AgentToolCallExecution execution) {
         if (execution.resultJson() != null && !execution.resultJson().isBlank()) {
             try {
-                return objectMapper.readValue(execution.resultJson(), ToolCallResult.class);
-            } catch (JsonProcessingException ex) {
+                return jsonCodec.read(execution.resultJson(), ToolCallResult.class);
+            } catch (IllegalArgumentException ex) {
                 return ToolCallResult.failed("TOOL_CALL_RESULT_CORRUPT",
                         "Stored tool call result is invalid");
             }
@@ -202,10 +200,10 @@ public class ToolCallExecutionService {
         intent.put("operatorId", request.operatorId());
         intent.put("toolCode", request.toolCode());
         try {
-            intent.put("arguments", objectMapper.readValue(request.toolArgsJson(), Object.class));
-            byte[] canonical = objectMapper.writeValueAsBytes(intent);
+            intent.put("arguments", jsonCodec.read(request.toolArgsJson()));
+            byte[] canonical = jsonCodec.writeCanonical(intent).getBytes(StandardCharsets.UTF_8);
             return sha256(canonical);
-        } catch (JsonProcessingException ex) {
+        } catch (RuntimeException ex) {
             throw new IllegalArgumentException("Tool arguments must be valid JSON", ex);
         }
     }
@@ -220,8 +218,8 @@ public class ToolCallExecutionService {
 
     private String json(Object value) {
         try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(value);
+        } catch (RuntimeException ex) {
             throw new IllegalStateException("Failed to serialize tool call result", ex);
         }
     }

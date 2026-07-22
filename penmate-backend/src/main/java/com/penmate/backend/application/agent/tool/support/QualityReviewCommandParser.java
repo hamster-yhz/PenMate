@@ -1,14 +1,20 @@
 package com.penmate.backend.application.agent.tool.support;
 
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
-import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.common.serialization.JsonValues;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class QualityReviewCommandParser {
+
+    private final JsonCodec jsonCodec;
+
+    public QualityReviewCommandParser(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
+    }
 
     public QualityReviewCommand parseAndValidate(String toolArgsJson) {
         QualityReviewCommand command = parse(toolArgsJson);
@@ -18,17 +24,17 @@ public class QualityReviewCommandParser {
 
     public QualityReviewCommand parse(String toolArgsJson) {
         try {
-            JSONObject args = AgentJsonCodec.parseObj(toolArgsJson);
+            Map<String, Object> args = jsonCodec.readObject(toolArgsJson);
             return new QualityReviewCommand(
-                    AgentJsonCodec.getString(args, "draftText"),
-                    toStringList(args.getJSONArray("userRequirements")),
-                    toStringList(args.getJSONArray("personaProfile")),
-                    toStringList(args.getJSONArray("storyOutline")),
-                    toStringList(args.getJSONArray("timelineConstraints")),
-                    toStringList(args.getJSONArray("worldRules")),
-                    toStringList(args.getJSONArray("characterKnowledgeBoundaries")),
-                    args.getInt("currentRevisionRound", 0),
-                    args.getInt("maxRevisionRounds", 0)
+                    JsonValues.string(args, "draftText"),
+                    toStringList(JsonValues.list(args, "userRequirements")),
+                    toStringList(JsonValues.list(args, "personaProfile")),
+                    toStringList(JsonValues.list(args, "storyOutline")),
+                    toStringList(JsonValues.list(args, "timelineConstraints")),
+                    toStringList(JsonValues.list(args, "worldRules")),
+                    toStringList(JsonValues.list(args, "characterKnowledgeBoundaries")),
+                    integerOrZero(args, "currentRevisionRound"),
+                    integerOrZero(args, "maxRevisionRounds")
             );
         } catch (Exception ex) {
             throw new IllegalArgumentException("toolArgsJson must be valid JSON", ex);
@@ -53,8 +59,16 @@ public class QualityReviewCommandParser {
         }
     }
 
-    private List<String> toStringList(JSONArray array) {
-        return array == null ? List.of() : array.toList(String.class);
+    private List<String> toStringList(List<?> values) {
+        return values.stream()
+                .filter(value -> value != null)
+                .map(String::valueOf)
+                .toList();
+    }
+
+    private int integerOrZero(Map<String, Object> values, String key) {
+        Integer value = JsonValues.integerValue(values, key);
+        return value == null ? 0 : value;
     }
 
     private void requireNonEmptyList(List<String> values, String fieldName) {

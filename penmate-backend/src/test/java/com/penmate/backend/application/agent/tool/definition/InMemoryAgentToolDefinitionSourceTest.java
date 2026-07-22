@@ -58,14 +58,16 @@ class InMemoryAgentToolDefinitionSourceTest {
     }
 
     @Test
-    void exposes_real_draft_and_todo_planner_definitions_to_the_llm() {
+    void exposes_chapter_edit_and_todo_planner_without_the_removed_draft_tool() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                new DraftGenerationToolDefinition(), new TodoPlannerToolDefinition()));
+                new ChapterEditToolDefinition(), new TodoPlannerToolDefinition()));
         Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
                 .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
 
-        assertThat(source.getRequired("draft_generation").presentation().displayName()).isNotBlank();
-        assertThat(schemas.get("draft_generation").parametersJsonSchema()).contains("\"oneOf\"");
+        assertThatThrownBy(() -> source.getRequired("draft_generation"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(schemas).doesNotContainKey("draft_generation");
+        assertThat(schemas.get("chapter_edit").parametersJsonSchema()).contains("\"chapterId\"");
         assertThat(source.getRequired("todo_planner").presentation().displayName()).isNotBlank();
         assertThat(schemas.get("todo_planner").parametersJsonSchema()).contains("\"planningMode\"");
     }
