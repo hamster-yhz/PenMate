@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 
 type AnyRecord = Record<string, unknown>
+export type RbacAssignmentSnapshot = { revision: number; items: AnyRecord[] }
 
 const normalizeNamedEntity = (payload: AnyRecord, semanticIdKey: string): AnyRecord | null => {
   const semanticId = payload[semanticIdKey]
@@ -27,6 +28,26 @@ const assertNoLegacyOnlyEntities = (items: AnyRecord[], semanticIdKey: string, e
   }
 }
 
+const normalizeAssignmentSnapshot = (
+  payload: AnyRecord,
+  semanticIdKey: string,
+  errorMessage: string,
+): RbacAssignmentSnapshot => {
+  const revision = payload?.revision
+  const rawItems = payload?.items
+  if (!Number.isSafeInteger(revision) || Number(revision) < 0 || !Array.isArray(rawItems)) {
+    throw new Error(errorMessage)
+  }
+  const items = rawItems.filter((item): item is AnyRecord => item != null && typeof item === 'object')
+  assertNoLegacyOnlyEntities(items, semanticIdKey, errorMessage)
+  return {
+    revision: Number(revision),
+    items: items
+      .map((item) => normalizeNamedEntity(item, semanticIdKey))
+      .filter((item): item is AnyRecord => item !== null),
+  }
+}
+
 export const rbacApi = {
   listUsers() {
     return request.get<AnyRecord[]>('/v1/users')
@@ -43,16 +64,15 @@ export const rbacApi = {
   deleteUser(userId: string) {
     return request.delete<AnyRecord>(`/v1/users/${userId}`)
   },
+  restorePendingUserDeletion(userId: string) {
+    return request.post<AnyRecord>(`/v1/users/${userId}/restore-deletion`)
+  },
   listRoles() {
     return request.get<AnyRecord[]>('/v1/roles')
   },
   async listUserRoles(userId: string) {
-    const roles = await request.get<AnyRecord[]>(`/v1/users/${userId}/roles`)
-    const normalizedRoles = Array.isArray(roles) ? roles : []
-    assertNoLegacyOnlyEntities(normalizedRoles, 'roleId', 'Invalid role contract')
-    return normalizedRoles
-      .map((item) => normalizeNamedEntity(item, 'roleId'))
-      .filter((item): item is AnyRecord => item !== null)
+    const snapshot = await request.get<AnyRecord>(`/v1/users/${userId}/roles`)
+    return normalizeAssignmentSnapshot(snapshot, 'roleId', 'Invalid user role assignment contract')
   },
   createRole(payload: AnyRecord) {
     return request.post<AnyRecord>('/v1/roles', payload)
@@ -67,24 +87,22 @@ export const rbacApi = {
     return request.get<AnyRecord[]>('/v1/permissions')
   },
   async listRolePermissions(roleId: string) {
-    const permissions = await request.get<AnyRecord[]>(`/v1/roles/${roleId}/permissions`)
-    const normalizedPermissions = Array.isArray(permissions) ? permissions : []
-    assertNoLegacyOnlyEntities(normalizedPermissions, 'permissionId', 'Invalid permission contract')
-    return normalizedPermissions
-      .map((item) => normalizeNamedEntity(item, 'permissionId'))
-      .filter((item): item is AnyRecord => item !== null)
+    const snapshot = await request.get<AnyRecord>(`/v1/roles/${roleId}/permissions`)
+    return normalizeAssignmentSnapshot(snapshot, 'permissionId', 'Invalid role permission assignment contract')
   },
-  assignUserRole(userId: string, roleId: string) {
-    return request.post<AnyRecord>(`/v1/users/${userId}/roles?roleId=${roleId}`)
+  async replaceUserRoles(userId: string, expectedRevision: number, roleIds: string[]) {
+    const snapshot = await request.put<AnyRecord>(`/v1/users/${userId}/roles`, {
+      expectedRevision,
+      assignmentIds: roleIds,
+    })
+    return normalizeAssignmentSnapshot(snapshot, 'roleId', 'Invalid user role assignment contract')
   },
-  removeUserRole(userId: string, roleId: string) {
-    return request.delete<AnyRecord>(`/v1/users/${userId}/roles/${roleId}`)
-  },
-  assignRolePermission(roleId: string, permissionId: string) {
-    return request.post<AnyRecord>(`/v1/roles/${roleId}/permissions?permissionId=${permissionId}`)
-  },
-  removeRolePermission(roleId: string, permissionId: string) {
-    return request.delete<AnyRecord>(`/v1/roles/${roleId}/permissions/${permissionId}`)
+  async replaceRolePermissions(roleId: string, expectedRevision: number, permissionIds: string[]) {
+    const snapshot = await request.put<AnyRecord>(`/v1/roles/${roleId}/permissions`, {
+      expectedRevision,
+      assignmentIds: permissionIds,
+    })
+    return normalizeAssignmentSnapshot(snapshot, 'permissionId', 'Invalid role permission assignment contract')
   },
   listMenus() {
     return request.get<AnyRecord[]>('/v1/menus')

@@ -90,7 +90,7 @@
         <div class="user-card-top">
           <strong>{{ user.displayName }}</strong>
           <span class="status-badge" :class="{ enabled: user.status === 1 }">
-            {{ user.status === 1 ? '启用' : '停用' }}
+            {{ user.deletionRequestedAt ? '待删除' : user.status === 1 ? '启用' : '停用' }}
           </span>
         </div>
         <span>{{ user.email }}</span>
@@ -128,6 +128,15 @@
 
     <div class="sub-panel">
       <h3>基本信息</h3>
+      <div v-if="activeUser?.deletionRequestedAt" class="pending-deletion-notice">
+        <div>
+          <strong>账户处于待删除期</strong>
+          <span>预计于 {{ new Date(activeUser.deletionDueAt || '').toLocaleString() }} 永久删除。</span>
+        </div>
+        <button class="primary-btn" type="button" data-testid="rbac-user-restore-deletion" @click="restoreSelectedUser">
+          恢复账户
+        </button>
+      </div>
       <div class="form-grid">
         <input
           aria-label="用户展示名"
@@ -151,6 +160,7 @@
             保存用户
           </button>
           <button
+            v-if="!activeUser?.deletionRequestedAt"
             data-testid="rbac-user-delete-trigger"
             class="ghost-btn"
             type="button"
@@ -185,7 +195,33 @@
     </div>
 
     <div class="sub-panel">
-      <h3>绑定角色</h3>
+      <div class="assignment-heading">
+        <div>
+          <h3>用户角色</h3>
+          <span v-if="userRolesDirty" class="unsaved-state">有未保存变更</span>
+          <span v-else class="saved-state">已保存 · r{{ userRolesRevision }}</span>
+        </div>
+        <div class="inline-actions">
+          <button
+            data-testid="rbac-user-roles-discard"
+            class="ghost-btn inline-action-btn"
+            type="button"
+            :disabled="!userRolesDirty"
+            @click="discardUserRoleChanges"
+          >
+            <UndoOutlined />撤销
+          </button>
+          <button
+            data-testid="rbac-user-roles-save"
+            class="primary-btn"
+            type="button"
+            :disabled="!userRolesDirty"
+            @click="saveUserRoles"
+          >
+            <SaveOutlined />保存角色
+          </button>
+        </div>
+      </div>
       <div class="form-grid">
         <select
           aria-label="待绑定角色"
@@ -198,6 +234,7 @@
             v-for="role in roles"
             :key="`assignable-role-${getRoleBusinessId(role)}`"
             :value="String(getRoleBusinessId(role) ?? '')"
+            :disabled="userRoles.some((assigned) => getRoleBusinessId(assigned) === getRoleBusinessId(role))"
           >
             {{ role.name }} · {{ role.code }}
           </option>
@@ -208,7 +245,7 @@
           type="button"
           @click="assignRoleToSelectedUser"
         >
-          绑定角色
+          <PlusOutlined />添加角色
         </button>
       </div>
     </div>
@@ -223,11 +260,13 @@
           </div>
           <button
             :data-testid="`rbac-remove-user-role-${getRoleBusinessId(role)}`"
-            class="ghost-btn inline-action-btn"
+            class="icon-btn"
             type="button"
+            :aria-label="`移除角色 ${role.name}`"
+            :title="`移除角色 ${role.name}`"
             @click="removeRoleFromSelectedUser(getRoleBusinessId(role) ?? '')"
           >
-            解绑
+            <CloseOutlined />
           </button>
         </li>
       </ul>
@@ -246,6 +285,7 @@
 </template>
 
 <script setup lang="ts">
+import { CloseOutlined, PlusOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons-vue'
 import type { RbacConsoleController } from '@/features/rbac/useRbacConsole'
 
 const { controller } = defineProps<{ controller: RbacConsoleController }>()
@@ -253,6 +293,8 @@ const {
   roles,
   profileMenus,
   userRoles,
+  userRolesRevision,
+  userRolesDirty,
   activeUserId,
   createUserForm,
   userDetailForm,
@@ -275,8 +317,11 @@ const {
   cancelDeleteSelectedUser,
   updateSelectedUser,
   deleteSelectedUser,
+  restoreSelectedUser,
   assignRoleToSelectedUser,
   removeRoleFromSelectedUser,
+  saveUserRoles,
+  discardUserRoleChanges,
   previousUserPage,
   nextUserPage,
 } = controller

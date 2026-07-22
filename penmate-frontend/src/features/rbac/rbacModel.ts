@@ -4,6 +4,8 @@ export type RbacUser = {
   displayName: string
   status: number
   authMethod?: string
+  deletionRequestedAt?: string
+  deletionDueAt?: string
 }
 
 export type RbacRole = {
@@ -60,6 +62,14 @@ export const normalizeRbacUser = (value: unknown): RbacUser | null => {
     status,
     authMethod:
       typeof candidate.authMethod === 'string' && candidate.authMethod.trim() ? candidate.authMethod : undefined,
+    deletionRequestedAt:
+      typeof candidate.deletionRequestedAt === 'string' && candidate.deletionRequestedAt.trim()
+        ? candidate.deletionRequestedAt
+        : undefined,
+    deletionDueAt:
+      typeof candidate.deletionDueAt === 'string' && candidate.deletionDueAt.trim()
+        ? candidate.deletionDueAt
+        : undefined,
   }
 }
 

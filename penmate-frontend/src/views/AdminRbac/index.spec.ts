@@ -28,10 +28,8 @@ const {
   createUserMock,
   updateUserMock,
   deleteUserMock,
-  assignUserRoleMock,
-  removeUserRoleMock,
-  assignRolePermissionMock,
-  removeRolePermissionMock,
+  replaceUserRolesMock,
+  replaceRolePermissionsMock,
   createRoleMock,
   updateRoleMock,
   deleteRoleMock,
@@ -46,10 +44,8 @@ const {
   createUserMock: vi.fn(),
   updateUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
-  assignUserRoleMock: vi.fn(),
-  removeUserRoleMock: vi.fn(),
-  assignRolePermissionMock: vi.fn(),
-  removeRolePermissionMock: vi.fn(),
+  replaceUserRolesMock: vi.fn(),
+  replaceRolePermissionsMock: vi.fn(),
   createRoleMock: vi.fn(),
   updateRoleMock: vi.fn(),
   deleteRoleMock: vi.fn(),
@@ -66,15 +62,19 @@ vi.mock('@/api/modules/rbac.api', () => ({
     listPermissions: listPermissionsMock,
     listMenus: listMenusMock,
     listProfileMenus: listProfileMenusMock,
-    listUserRoles: listUserRolesMock,
-    listRolePermissions: listRolePermissionsMock,
+    listUserRoles: (...args: unknown[]) =>
+      Promise.resolve(listUserRolesMock(...args)).then((value) =>
+        Array.isArray(value) ? { revision: 5, items: value } : value,
+      ),
+    listRolePermissions: (...args: unknown[]) =>
+      Promise.resolve(listRolePermissionsMock(...args)).then((value) =>
+        Array.isArray(value) ? { revision: 8, items: value } : value,
+      ),
     createUser: createUserMock,
     updateUser: updateUserMock,
     deleteUser: deleteUserMock,
-    assignUserRole: assignUserRoleMock,
-    removeUserRole: removeUserRoleMock,
-    assignRolePermission: assignRolePermissionMock,
-    removeRolePermission: removeRolePermissionMock,
+    replaceUserRoles: replaceUserRolesMock,
+    replaceRolePermissions: replaceRolePermissionsMock,
     createRole: createRoleMock,
     updateRole: updateRoleMock,
     deleteRole: deleteRoleMock,
@@ -121,10 +121,8 @@ describe('AdminRbac view', () => {
     createUserMock.mockReset()
     updateUserMock.mockReset()
     deleteUserMock.mockReset()
-    assignUserRoleMock.mockReset()
-    removeUserRoleMock.mockReset()
-    assignRolePermissionMock.mockReset()
-    removeRolePermissionMock.mockReset()
+    replaceUserRolesMock.mockReset()
+    replaceRolePermissionsMock.mockReset()
     createRoleMock.mockReset()
     updateRoleMock.mockReset()
     deleteRoleMock.mockReset()
@@ -178,10 +176,25 @@ describe('AdminRbac view', () => {
       authMethod: 'local',
     })
     deleteUserMock.mockResolvedValue({ deleted: true })
-    assignUserRoleMock.mockResolvedValue({ bound: true })
-    removeUserRoleMock.mockResolvedValue({ unbound: true })
-    assignRolePermissionMock.mockResolvedValue({ bound: true })
-    removeRolePermissionMock.mockResolvedValue({ unbound: true })
+    replaceUserRolesMock.mockImplementation((_userId: string, revision: number, roleIds: string[]) => ({
+      revision: revision + 1,
+      items: roleIds.map((roleId) => ({
+        roleId,
+        code: roleId === '2001' ? 'ADMIN' : 'EDITOR',
+        name: roleId === '2001' ? '管理员' : '编辑',
+      })),
+    }))
+    replaceRolePermissionsMock.mockImplementation(
+      (_roleId: string, revision: number, permissionIds: string[]) => ({
+        revision: revision + 1,
+        items: permissionIds.map((permissionId) => ({
+          permissionId,
+          code: permissionId === '3001' ? 'rbac.manage' : 'content.publish',
+          name: permissionId === '3001' ? 'RBAC 管理' : '内容发布',
+          module: permissionId === '3001' ? 'rbac' : 'content',
+        })),
+      }),
+    )
     createRoleMock.mockResolvedValue({
       roleId: '2002',
       code: 'EDITOR',
@@ -224,7 +237,7 @@ describe('AdminRbac view', () => {
 
     await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
 
-    expect(wrapper.text()).toContain('已绑定权限')
+    expect(wrapper.text()).toContain('权限分配')
     expect(wrapper.text()).toContain('管理员')
     expect(wrapper.text()).toContain('rbac.manage')
   })
@@ -502,6 +515,10 @@ describe('AdminRbac view', () => {
     const user1002RolePermissions =
       createDeferred<Array<{ permissionId: string; code: string; name: string; module: string }>>()
 
+    listPermissionsMock.mockResolvedValue([
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
+    ])
     listRolesMock.mockResolvedValue([
       { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
       { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
@@ -577,8 +594,8 @@ describe('AdminRbac view', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="rbac-role-select-2002"]').classes()).toContain('active')
-    expect(wrapper.find('[data-testid="rbac-remove-role-permission-3002"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="rbac-remove-role-permission-3001"]').exists()).toBe(false)
+    expect((wrapper.get('[data-testid="rbac-permission-toggle-3002"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="rbac-permission-toggle-3001"]').element as HTMLInputElement).checked).toBe(false)
   })
 
   it('creates_user_and_refreshes_the_user_list_when_submitting_new_user', async () => {
@@ -737,10 +754,10 @@ describe('AdminRbac view', () => {
     expect(wrapper.text()).toContain('编辑B')
   })
 
-  it('assigns_a_role_to_the_selected_user_and_refreshes_assigned_roles', async () => {
+  it('stages_a_role_and_saves_all_selected_user_roles_in_one_request', async () => {
     listRolesMock.mockResolvedValue([
-      { roleId: 'role-2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-      { roleId: 'role-2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+      { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+      { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
     ])
     listProfileMenusMock
       .mockResolvedValueOnce([
@@ -750,31 +767,31 @@ describe('AdminRbac view', () => {
         { menuId: '4001', title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
         { menuId: '4004', title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true },
       ])
-    listUserRolesMock
-      .mockResolvedValueOnce([
-        { roleId: 'role-2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-      ])
-      .mockResolvedValueOnce([
-        { roleId: 'role-2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-        { roleId: 'role-2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
-      ])
+    listUserRolesMock.mockResolvedValue([
+      { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+    ])
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="rbac-assign-role-role-id"]').setValue('role-2002')
+    await wrapper.get('[data-testid="rbac-assign-role-role-id"]').setValue('2002')
     await wrapper.get('[data-testid="rbac-assign-role-submit"]').trigger('click')
     await flushPromises()
 
-    expect(assignUserRoleMock).toHaveBeenCalledWith('1001', 'role-2002')
-    expect(listUserRolesMock).toHaveBeenCalledTimes(2)
+    expect(replaceUserRolesMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('有未保存变更')
+    await wrapper.get('[data-testid="rbac-user-roles-save"]').trigger('click')
+    await flushPromises()
+
+    expect(replaceUserRolesMock).toHaveBeenCalledWith('1001', 5, ['2001', '2002'])
+    expect(listUserRolesMock).toHaveBeenCalledTimes(1)
     expect(listProfileMenusMock).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('编辑')
     expect(wrapper.text()).toContain('EDITOR')
     expect(wrapper.text()).toContain('/editor')
   })
 
-  it('removes_a_role_from_the_selected_user_and_refreshes_assigned_roles', async () => {
+  it('stages_a_role_removal_and_saves_the_remaining_roles_atomically', async () => {
     listProfileMenusMock
       .mockResolvedValueOnce([
         { menuId: '4001', title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
@@ -783,14 +800,10 @@ describe('AdminRbac view', () => {
       .mockResolvedValueOnce([
         { menuId: '4004', title: '编辑台', path: '/editor', permissionCode: 'editor.access', visible: true },
       ])
-    listUserRolesMock
-      .mockResolvedValueOnce([
-        { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
-        { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
-      ])
-      .mockResolvedValueOnce([
-        { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
-      ])
+    listUserRolesMock.mockResolvedValue([
+      { roleId: '2001', code: 'ADMIN', name: '管理员', description: '系统管理员', isSystem: true },
+      { roleId: '2002', code: 'EDITOR', name: '编辑', description: '内容编辑', isSystem: false },
+    ])
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
@@ -798,18 +811,22 @@ describe('AdminRbac view', () => {
     await wrapper.get('[data-testid="rbac-remove-user-role-2001"]').trigger('click')
     await flushPromises()
 
-    expect(removeUserRoleMock).toHaveBeenCalledWith('1001', '2001')
-    expect(listUserRolesMock).toHaveBeenCalledTimes(2)
+    expect(replaceUserRolesMock).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="rbac-user-roles-save"]').trigger('click')
+    await flushPromises()
+
+    expect(replaceUserRolesMock).toHaveBeenCalledWith('1001', 5, ['2002'])
+    expect(listUserRolesMock).toHaveBeenCalledTimes(1)
     expect(listProfileMenusMock).toHaveBeenCalledTimes(2)
     expect(wrapper.find('[data-testid="rbac-remove-user-role-2001"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('EDITOR')
     expect(wrapper.text()).toContain('/editor')
   })
 
-  it('assigns_a_permission_to_the_active_role_and_refreshes_bound_permissions', async () => {
+  it('stages_a_permission_and_saves_all_role_permissions_in_one_request', async () => {
     listPermissionsMock.mockResolvedValue([
-      { permissionId: 'perm-3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-      { permissionId: 'perm-3002', code: 'content.publish', name: '内容发布', module: 'content' },
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
     ])
     listProfileMenusMock
       .mockResolvedValueOnce([
@@ -819,29 +836,33 @@ describe('AdminRbac view', () => {
         { menuId: '4001', title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
         { menuId: '4003', title: '发布中心', path: '/publish', permissionCode: 'content.publish', visible: true },
       ])
-    listRolePermissionsMock
-      .mockResolvedValueOnce([{ permissionId: 'perm-3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' }])
-      .mockResolvedValueOnce([
-        { permissionId: 'perm-3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-        { permissionId: 'perm-3002', code: 'content.publish', name: '内容发布', module: 'content' },
-      ])
+    listRolePermissionsMock.mockResolvedValue([
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+    ])
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
     await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
-    await wrapper.get('[data-testid="rbac-assign-permission-permission-id"]').setValue('perm-3002')
-    await wrapper.get('[data-testid="rbac-assign-permission-submit"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-permission-toggle-3002"]').setValue(true)
     await flushPromises()
 
-    expect(assignRolePermissionMock).toHaveBeenCalledWith('2001', 'perm-3002')
-    expect(listRolePermissionsMock).toHaveBeenCalledTimes(2)
+    expect(replaceRolePermissionsMock).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="rbac-role-permissions-save"]').trigger('click')
+    await flushPromises()
+
+    expect(replaceRolePermissionsMock).toHaveBeenCalledWith('2001', 8, ['3001', '3002'])
+    expect(listRolePermissionsMock).toHaveBeenCalledTimes(1)
     expect(listProfileMenusMock).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('content.publish')
     expect(wrapper.text()).toContain('/publish')
   })
 
-  it('removes_a_permission_from_the_active_role_and_refreshes_bound_permissions', async () => {
+  it('stages_a_permission_removal_and_saves_the_remaining_permissions_atomically', async () => {
+    listPermissionsMock.mockResolvedValue([
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
+    ])
     listProfileMenusMock
       .mockResolvedValueOnce([
         { menuId: '4001', title: 'RBAC 管理', path: '/admin/rbac', permissionCode: 'rbac.manage', visible: true },
@@ -850,26 +871,93 @@ describe('AdminRbac view', () => {
       .mockResolvedValueOnce([
         { menuId: '4003', title: '发布中心', path: '/publish', permissionCode: 'content.publish', visible: true },
       ])
-    listRolePermissionsMock
-      .mockResolvedValueOnce([
-        { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
-        { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
-      ])
-      .mockResolvedValueOnce([{ permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' }])
+    listRolePermissionsMock.mockResolvedValue([
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
+    ])
 
     const wrapper = await mountAdminRbacView()
     await flushPromises()
 
     await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
-    await wrapper.get('[data-testid="rbac-remove-role-permission-3001"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-permission-toggle-3001"]').setValue(false)
     await flushPromises()
 
-    expect(removeRolePermissionMock).toHaveBeenCalledWith('2001', '3001')
-    expect(listRolePermissionsMock).toHaveBeenCalledTimes(2)
+    expect(replaceRolePermissionsMock).not.toHaveBeenCalled()
+    await wrapper.get('[data-testid="rbac-role-permissions-save"]').trigger('click')
+    await flushPromises()
+
+    expect(replaceRolePermissionsMock).toHaveBeenCalledWith('2001', 8, ['3002'])
+    expect(listRolePermissionsMock).toHaveBeenCalledTimes(1)
     expect(listProfileMenusMock).toHaveBeenCalledTimes(2)
-    expect(wrapper.find('[data-testid="rbac-remove-role-permission-3001"]').exists()).toBe(false)
+    expect((wrapper.get('[data-testid="rbac-permission-toggle-3001"]').element as HTMLInputElement).checked).toBe(false)
     expect(wrapper.text()).toContain('content.publish')
     expect(wrapper.text()).toContain('/publish')
+  })
+
+  it('filters_permissions_by_business_domain_and_saves_a_group_selection_atomically', async () => {
+    listPermissionsMock.mockResolvedValue([
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+      { permissionId: '3002', code: 'content.publish', name: '内容发布', module: 'content' },
+      { permissionId: '3003', code: 'content.review', name: '内容审核', module: 'content' },
+    ])
+    listRolePermissionsMock.mockResolvedValue([
+      { permissionId: '3001', code: 'rbac.manage', name: 'RBAC 管理', module: 'rbac' },
+    ])
+
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-tab-roles"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-permission-search"]').setValue('content')
+
+    expect(wrapper.find('[data-testid="rbac-permission-toggle-3001"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="rbac-permission-toggle-3002"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="rbac-permission-toggle-3003"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="rbac-permission-group-toggle-content"]').trigger('click')
+    await flushPromises()
+
+    expect(replaceRolePermissionsMock).not.toHaveBeenCalled()
+    expect((wrapper.get('[data-testid="rbac-permission-toggle-3002"]').element as HTMLInputElement).checked).toBe(true)
+    expect((wrapper.get('[data-testid="rbac-permission-toggle-3003"]').element as HTMLInputElement).checked).toBe(true)
+
+    await wrapper.get('[data-testid="rbac-role-permissions-save"]').trigger('click')
+    await flushPromises()
+
+    expect(replaceRolePermissionsMock).toHaveBeenCalledTimes(1)
+    expect(replaceRolePermissionsMock).toHaveBeenCalledWith('2001', 8, ['3001', '3002', '3003'])
+  })
+
+  it('keeps_the_local_draft_and_requires_refresh_after_a_revision_conflict', async () => {
+    const conflict = Object.assign(new Error('stale assignments'), { errorCode: 'RBAC_REVISION_CONFLICT' })
+    replaceUserRolesMock.mockRejectedValueOnce(conflict)
+
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-remove-user-role-2001"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-user-roles-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="rbac-error-state"]').text()).toContain(
+      '角色分配已被其他管理员修改，请刷新后重新操作',
+    )
+    expect(wrapper.text()).toContain('有未保存变更')
+    expect(wrapper.get('[data-testid="rbac-user-roles-save"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('does_not_discard_unsaved_assignments_when_switching_users', async () => {
+    const wrapper = await mountAdminRbacView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="rbac-remove-user-role-2001"]').trigger('click')
+    await wrapper.get('[data-testid="rbac-user-select-1002"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="rbac-active-user-name"]').text()).toContain('管理员A')
+    expect(wrapper.get('[data-testid="rbac-error-state"]').text()).toContain('请先保存或撤销')
+    expect(listUserRolesMock).toHaveBeenCalledTimes(1)
   })
 
   it('creates_a_role_and_refreshes_the_role_list', async () => {
@@ -974,6 +1062,12 @@ describe('AdminRbac view', () => {
     expect(wrapper.find('[data-testid="missing-admin-rbac-view"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="rbac-error-state"]').text()).toContain('RBAC 数据加载失败')
     expect(wrapper.text()).toContain('roles failed')
+    await wrapper.get('[data-testid="rbac-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(listRolesMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="rbac-error-state"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="rbac-user-workspace"]').exists()).toBe(true)
   })
 
   it('keeps_the_previous_selection_when_refreshing_profile_menus_fails', async () => {

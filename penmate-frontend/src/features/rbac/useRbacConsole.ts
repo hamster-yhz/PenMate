@@ -27,9 +27,15 @@ export const useRbacConsole = () => {
   const profileMenus = ref<RbacMenu[]>([])
   const userRoles = ref<RbacRole[]>([])
   const rolePermissions = ref<RbacPermission[]>([])
+  const userRolesRevision = ref(0)
+  const rolePermissionsRevision = ref(0)
+  const savedUserRoleIds = ref<string[]>([])
+  const savedRolePermissionIds = ref<string[]>([])
   const activeUserId = ref<string | null>(toBusinessId(session.userId))
   const activeRoleId = ref<string | null>(null)
   const errorMessage = ref('')
+  const loading = ref(false)
+  const loadFailed = ref(false)
   const createUserForm = ref({ email: '', displayName: '', authMethod: 'local' })
   const userDetailForm = ref({ displayName: '', status: 1 })
   const assignRoleForm = ref({ roleId: '' })
@@ -49,6 +55,10 @@ export const useRbacConsole = () => {
   const getRoleBusinessId = (role: RbacRole) => toBusinessId(role.roleId)
   const getPermissionBusinessId = (permission: RbacPermission) => toBusinessId(permission.permissionId)
   const getMenuBusinessId = (menu: RbacMenu) => toBusinessId(menu.menuId)
+  const sortedIds = (values: Array<string | null>) =>
+    values.filter((value): value is string => value != null).sort((left, right) => left.localeCompare(right))
+  const sameIds = (left: string[], right: string[]) =>
+    left.length === right.length && left.every((value, index) => value === right[index])
 
   const activeUser = computed(
     () => users.value.find((item) => toBusinessId(item.userId) === activeUserId.value) ?? null,
@@ -58,6 +68,14 @@ export const useRbacConsole = () => {
       roles.value.find((item) => getRoleBusinessId(item) === activeRoleId.value) ??
       userRoles.value.find((item) => getRoleBusinessId(item) === activeRoleId.value) ??
       null,
+  )
+  const currentUserRoleIds = computed(() => sortedIds(userRoles.value.map(getRoleBusinessId)))
+  const currentRolePermissionIds = computed(() =>
+    sortedIds(rolePermissions.value.map(getPermissionBusinessId)),
+  )
+  const userRolesDirty = computed(() => !sameIds(currentUserRoleIds.value, savedUserRoleIds.value))
+  const rolePermissionsDirty = computed(
+    () => !sameIds(currentRolePermissionIds.value, savedRolePermissionIds.value),
   )
   const filteredUsers = computed(() => {
     const keyword = userSearchQuery.value.trim().toLowerCase()
@@ -119,10 +137,16 @@ export const useRbacConsole = () => {
     profileMenus.value = normalizeRbacMenuList(await rbacApi.listProfileMenus(userId))
   }
   const loadRolePermissions = async (roleId: string) => {
-    rolePermissions.value = normalizeRbacPermissionList(await rbacApi.listRolePermissions(roleId))
+    const snapshot = await rbacApi.listRolePermissions(roleId)
+    rolePermissions.value = normalizeRbacPermissionList(snapshot.items)
+    rolePermissionsRevision.value = snapshot.revision
+    savedRolePermissionIds.value = sortedIds(rolePermissions.value.map(getPermissionBusinessId))
   }
   const loadUserRoles = async (userId: string) => {
-    userRoles.value = normalizeRbacRoleList(await rbacApi.listUserRoles(userId))
+    const snapshot = await rbacApi.listUserRoles(userId)
+    userRoles.value = normalizeRbacRoleList(snapshot.items)
+    userRolesRevision.value = snapshot.revision
+    savedUserRoleIds.value = sortedIds(userRoles.value.map(getRoleBusinessId))
     const existingRoleIds = new Set(
       userRoles.value.map(getRoleBusinessId).filter((item): item is string => item != null),
     )
@@ -132,7 +156,11 @@ export const useRbacConsole = () => {
         : (getRoleBusinessId(userRoles.value[0] as RbacRole) ?? null)
     activeRoleId.value = defaultRoleId
     if (defaultRoleId != null) await loadRolePermissions(defaultRoleId)
-    else rolePermissions.value = []
+    else {
+      rolePermissions.value = []
+      rolePermissionsRevision.value = 0
+      savedRolePermissionIds.value = []
+    }
   }
 
   const loadUserContext = async (userId: string, selectionToken: number) => {
@@ -140,11 +168,14 @@ export const useRbacConsole = () => {
     const nextProfileMenus = normalizeRbacMenuList(await rbacApi.listProfileMenus(userId))
     if (selectionToken !== latestUserSelectionToken) return false
 
-    const nextUserRoles = normalizeRbacRoleList(await rbacApi.listUserRoles(userId))
+    const nextUserRoleSnapshot = await rbacApi.listUserRoles(userId)
+    const nextUserRoles = normalizeRbacRoleList(nextUserRoleSnapshot.items)
     if (selectionToken !== latestUserSelectionToken) return false
 
     profileMenus.value = nextProfileMenus
     userRoles.value = nextUserRoles
+    userRolesRevision.value = nextUserRoleSnapshot.revision
+    savedUserRoleIds.value = sortedIds(nextUserRoles.map(getRoleBusinessId))
     if (roleSelectionTokenAtStart !== latestRoleSelectionToken) return true
 
     const existingRoleIds = new Set(nextUserRoles.map(getRoleBusinessId).filter((item): item is string => item != null))
@@ -154,30 +185,46 @@ export const useRbacConsole = () => {
         : (getRoleBusinessId(nextUserRoles[0] as RbacRole) ?? null)
     const roleCommitToken = ++latestRoleSelectionToken
     let nextRolePermissions: RbacPermission[] = []
+    let nextRolePermissionsRevision = 0
     if (nextRoleId != null) {
-      nextRolePermissions = normalizeRbacPermissionList(await rbacApi.listRolePermissions(nextRoleId))
+      const nextRolePermissionSnapshot = await rbacApi.listRolePermissions(nextRoleId)
+      nextRolePermissions = normalizeRbacPermissionList(nextRolePermissionSnapshot.items)
+      nextRolePermissionsRevision = nextRolePermissionSnapshot.revision
       if (selectionToken !== latestUserSelectionToken || roleCommitToken !== latestRoleSelectionToken) return true
     }
     if (roleCommitToken !== latestRoleSelectionToken) return true
     activeRoleId.value = nextRoleId
     rolePermissions.value = nextRolePermissions
+    rolePermissionsRevision.value = nextRolePermissionsRevision
+    savedRolePermissionIds.value = sortedIds(nextRolePermissions.map(getPermissionBusinessId))
     return true
   }
 
   const loadRoleContext = async (roleId: string, selectionToken: number) => {
-    const nextRolePermissions = normalizeRbacPermissionList(await rbacApi.listRolePermissions(roleId))
+    const snapshot = await rbacApi.listRolePermissions(roleId)
+    const nextRolePermissions = normalizeRbacPermissionList(snapshot.items)
     if (selectionToken !== latestRoleSelectionToken) return false
     rolePermissions.value = nextRolePermissions
+    rolePermissionsRevision.value = snapshot.revision
+    savedRolePermissionIds.value = sortedIds(nextRolePermissions.map(getPermissionBusinessId))
     return true
   }
 
   const selectUser = async (userId: string) => {
+    if (userId !== activeUserId.value && (userRolesDirty.value || rolePermissionsDirty.value)) {
+      errorMessage.value = '当前授权有未保存变更，请先保存或撤销后再切换用户'
+      return
+    }
     const previous = {
       userId: activeUserId.value,
       profileMenus: [...profileMenus.value],
       userRoles: [...userRoles.value],
       rolePermissions: [...rolePermissions.value],
       roleId: activeRoleId.value,
+      userRolesRevision: userRolesRevision.value,
+      rolePermissionsRevision: rolePermissionsRevision.value,
+      savedUserRoleIds: [...savedUserRoleIds.value],
+      savedRolePermissionIds: [...savedRolePermissionIds.value],
     }
     const selectionToken = ++latestUserSelectionToken
     errorMessage.value = ''
@@ -191,11 +238,19 @@ export const useRbacConsole = () => {
       userRoles.value = previous.userRoles
       rolePermissions.value = previous.rolePermissions
       activeRoleId.value = previous.roleId
+      userRolesRevision.value = previous.userRolesRevision
+      rolePermissionsRevision.value = previous.rolePermissionsRevision
+      savedUserRoleIds.value = previous.savedUserRoleIds
+      savedRolePermissionIds.value = previous.savedRolePermissionIds
       errorMessage.value = error instanceof Error ? error.message : 'profile menus failed'
     }
   }
 
   const selectRole = async (roleId: string) => {
+    if (roleId !== activeRoleId.value && rolePermissionsDirty.value) {
+      errorMessage.value = '当前角色权限有未保存变更，请先保存或撤销后再切换角色'
+      return
+    }
     const previousRoleId = activeRoleId.value
     const selectionToken = ++latestRoleSelectionToken
     errorMessage.value = ''
@@ -274,42 +329,107 @@ export const useRbacConsole = () => {
     }
   }
 
-  const assignRoleToSelectedUser = async () => {
+  const restoreSelectedUser = async () => {
+    if (activeUserId.value == null || !activeUser.value?.deletionRequestedAt) return
+    errorMessage.value = ''
+    try {
+      await rbacApi.restorePendingUserDeletion(activeUserId.value)
+      await loadPage()
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : 'restore user failed'
+    }
+  }
+
+  const assignRoleToSelectedUser = () => {
     if (activeUserId.value == null || !assignRoleForm.value.roleId) return
-    errorMessage.value = ''
-    try {
-      await rbacApi.assignUserRole(activeUserId.value, assignRoleForm.value.roleId)
-      assignRoleForm.value.roleId = ''
-      await loadUserRoles(activeUserId.value)
-      await loadProfileMenus(activeUserId.value)
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'assign role failed'
+    const selected = roles.value.find((role) => getRoleBusinessId(role) === assignRoleForm.value.roleId)
+    if (selected && !userRoles.value.some((role) => getRoleBusinessId(role) === assignRoleForm.value.roleId)) {
+      userRoles.value = [...userRoles.value, selected]
     }
+    assignRoleForm.value.roleId = ''
   }
 
-  const removeRoleFromSelectedUser = async (roleId: string) => {
+  const removeRoleFromSelectedUser = (roleId: string) => {
     if (activeUserId.value == null) return
+    userRoles.value = userRoles.value.filter((role) => getRoleBusinessId(role) !== roleId)
+  }
+
+  const assignPermissionToActiveRole = () => {
+    if (activeRoleId.value == null || !assignPermissionForm.value.permissionId) return
+    const selected = permissions.value.find(
+      (permission) => getPermissionBusinessId(permission) === assignPermissionForm.value.permissionId,
+    )
+    if (
+      selected &&
+      !rolePermissions.value.some(
+        (permission) => getPermissionBusinessId(permission) === assignPermissionForm.value.permissionId,
+      )
+    ) {
+      rolePermissions.value = [...rolePermissions.value, selected]
+    }
+    assignPermissionForm.value.permissionId = ''
+  }
+
+  const saveUserRoles = async () => {
+    if (activeUserId.value == null || !userRolesDirty.value) return
     errorMessage.value = ''
+    const userId = activeUserId.value
     try {
-      await rbacApi.removeUserRole(activeUserId.value, roleId)
-      await loadUserRoles(activeUserId.value)
-      await loadProfileMenus(activeUserId.value)
+      const snapshot = await rbacApi.replaceUserRoles(userId, userRolesRevision.value, currentUserRoleIds.value)
+      if (activeUserId.value !== userId) return
+      userRoles.value = normalizeRbacRoleList(snapshot.items)
+      userRolesRevision.value = snapshot.revision
+      savedUserRoleIds.value = sortedIds(userRoles.value.map(getRoleBusinessId))
+      await loadProfileMenus(userId)
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'remove role failed'
+      const code = (error as { errorCode?: string })?.errorCode
+      errorMessage.value =
+        code === 'RBAC_REVISION_CONFLICT'
+          ? '角色分配已被其他管理员修改，请刷新后重新操作'
+          : error instanceof Error
+            ? error.message
+            : '保存用户角色失败'
     }
   }
 
-  const assignPermissionToActiveRole = async () => {
-    if (activeRoleId.value == null || !assignPermissionForm.value.permissionId) return
+  const discardUserRoleChanges = () => {
+    const byId = new Map(roles.value.map((role) => [getRoleBusinessId(role), role]))
+    userRoles.value = savedUserRoleIds.value
+      .map((id) => byId.get(id))
+      .filter((role): role is RbacRole => role != null)
+  }
+
+  const saveRolePermissions = async () => {
+    if (activeRoleId.value == null || !rolePermissionsDirty.value) return
     errorMessage.value = ''
+    const roleId = activeRoleId.value
     try {
-      await rbacApi.assignRolePermission(activeRoleId.value, assignPermissionForm.value.permissionId)
-      assignPermissionForm.value.permissionId = ''
-      await loadRolePermissions(activeRoleId.value)
+      const snapshot = await rbacApi.replaceRolePermissions(
+        roleId,
+        rolePermissionsRevision.value,
+        currentRolePermissionIds.value,
+      )
+      if (activeRoleId.value !== roleId) return
+      rolePermissions.value = normalizeRbacPermissionList(snapshot.items)
+      rolePermissionsRevision.value = snapshot.revision
+      savedRolePermissionIds.value = sortedIds(rolePermissions.value.map(getPermissionBusinessId))
       if (activeUserId.value != null) await loadProfileMenus(activeUserId.value)
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'assign permission failed'
+      const code = (error as { errorCode?: string })?.errorCode
+      errorMessage.value =
+        code === 'RBAC_REVISION_CONFLICT'
+          ? '角色权限已被其他管理员修改，请刷新后重新操作'
+          : error instanceof Error
+            ? error.message
+            : '保存角色权限失败'
     }
+  }
+
+  const discardRolePermissionChanges = () => {
+    const byId = new Map(permissions.value.map((permission) => [getPermissionBusinessId(permission), permission]))
+    rolePermissions.value = savedRolePermissionIds.value
+      .map((id) => byId.get(id))
+      .filter((permission): permission is RbacPermission => permission != null)
   }
 
   const createRole = async () => {
@@ -354,16 +474,11 @@ export const useRbacConsole = () => {
     }
   }
 
-  const removePermissionFromActiveRole = async (permissionId: string) => {
+  const removePermissionFromActiveRole = (permissionId: string) => {
     if (activeRoleId.value == null) return
-    errorMessage.value = ''
-    try {
-      await rbacApi.removeRolePermission(activeRoleId.value, permissionId)
-      await loadRolePermissions(activeRoleId.value)
-      if (activeUserId.value != null) await loadProfileMenus(activeUserId.value)
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'remove permission failed'
-    }
+    rolePermissions.value = rolePermissions.value.filter(
+      (permission) => getPermissionBusinessId(permission) !== permissionId,
+    )
   }
 
   const previousUserPage = () => {
@@ -374,6 +489,9 @@ export const useRbacConsole = () => {
   }
 
   loadPage = async () => {
+    if (loading.value) return
+    loading.value = true
+    loadFailed.value = false
     errorMessage.value = ''
     try {
       const [userList, roleList, permissionList, menuList] = await Promise.all([
@@ -402,6 +520,10 @@ export const useRbacConsole = () => {
         profileMenus.value = []
         userRoles.value = []
         rolePermissions.value = []
+        userRolesRevision.value = 0
+        rolePermissionsRevision.value = 0
+        savedUserRoleIds.value = []
+        savedRolePermissionIds.value = []
       }
     } catch (error) {
       users.value = []
@@ -411,7 +533,14 @@ export const useRbacConsole = () => {
       profileMenus.value = []
       userRoles.value = []
       rolePermissions.value = []
+      userRolesRevision.value = 0
+      rolePermissionsRevision.value = 0
+      savedUserRoleIds.value = []
+      savedRolePermissionIds.value = []
+      loadFailed.value = true
       errorMessage.value = error instanceof Error ? error.message : 'RBAC 数据加载失败'
+    } finally {
+      loading.value = false
     }
   }
 
@@ -427,9 +556,16 @@ export const useRbacConsole = () => {
     profileMenus,
     userRoles,
     rolePermissions,
+    userRolesRevision,
+    rolePermissionsRevision,
+    userRolesDirty,
+    rolePermissionsDirty,
     activeUserId,
     activeRoleId,
     errorMessage,
+    loading,
+    loadFailed,
+    loadPage,
     createUserForm,
     userDetailForm,
     assignRoleForm,
@@ -461,13 +597,18 @@ export const useRbacConsole = () => {
     cancelDeleteActiveRole,
     updateSelectedUser,
     deleteSelectedUser,
+    restoreSelectedUser,
     assignRoleToSelectedUser,
     removeRoleFromSelectedUser,
+    saveUserRoles,
+    discardUserRoleChanges,
     assignPermissionToActiveRole,
     createRole,
     updateActiveRole,
     deleteActiveRole,
     removePermissionFromActiveRole,
+    saveRolePermissions,
+    discardRolePermissionChanges,
     previousUserPage,
     nextUserPage,
   }
