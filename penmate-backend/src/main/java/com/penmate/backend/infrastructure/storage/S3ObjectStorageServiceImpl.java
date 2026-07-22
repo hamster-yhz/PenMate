@@ -9,6 +9,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -20,6 +21,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.ResponseBytes;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -158,32 +160,49 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
                         .checksumValidationEnabled(false)
                         .build())
                 .build()) {
-            HeadObjectResponse response = client.headObject(HeadObjectRequest.builder()
+            try {
+                HeadObjectResponse response = client.headObject(HeadObjectRequest.builder()
+                        .bucket(storageBucket)
+                        .key(objectKey)
+                        .build());
+                String checksum = response.checksumSHA256() == null ? response.checksumCRC32C() : response.checksumSHA256();
+                return new ObjectMetadata(response.eTag(), response.contentLength(), checksum, response.contentType());
+            } catch (S3Exception exception) {
+                if (exception.statusCode() != 403) throw exception;
+            }
+            // Some S3-compatible providers reject HEAD even when GetObject is allowed. They may also
+            // reject unsigned Range headers, so fall back to a normal GET and retain its metadata.
+            ResponseBytes<GetObjectResponse> storedObject = client.getObjectAsBytes(GetObjectRequest.builder()
                     .bucket(storageBucket)
                     .key(objectKey)
                     .build());
+            GetObjectResponse response = storedObject.response();
             String checksum = response.checksumSHA256() == null ? response.checksumCRC32C() : response.checksumSHA256();
-            return new ObjectMetadata(response.eTag(), response.contentLength(), checksum, response.contentType());
+            return new ObjectMetadata(response.eTag(), resolveObjectSize(response), checksum, response.contentType());
         }
     }
 
     @Override
     public boolean exists(String objectKey) {
-        String endpoint = normalizedStorageEndpoint();
-        URI endpointUri = URI.create(endpoint);
-        boolean pathStyle = shouldUsePathStyle(endpointUri);
         try (S3Client client = S3Client.builder()
-                .endpointOverride(endpointUri)
+                .endpointOverride(URI.create(normalizedStorageEndpoint()))
                 .region(Region.of(storageRegion))
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(storageAccessKey, storageSecretKey)))
                 .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(pathStyle)
+                        .pathStyleAccessEnabled(shouldUsePathStyle(URI.create(normalizedStorageEndpoint())))
                         .chunkedEncodingEnabled(false)
                         .checksumValidationEnabled(false)
                         .build())
                 .build()) {
-            client.headObject(HeadObjectRequest.builder().bucket(storageBucket).key(objectKey).build());
-            return true;
+            try {
+                client.headObject(HeadObjectRequest.builder().bucket(storageBucket).key(objectKey).build());
+                return true;
+            } catch (S3Exception exception) {
+                if (exception.statusCode() == 404) return false;
+                if (exception.statusCode() != 403) throw exception;
+                client.getObjectAsBytes(GetObjectRequest.builder().bucket(storageBucket).key(objectKey).build());
+                return true;
+            }
         } catch (NoSuchKeyException ex) {
             return false;
         } catch (S3Exception ex) {
@@ -244,6 +263,21 @@ public class S3ObjectStorageServiceImpl implements ObjectStorageService {
             return 15;
         }
         return storagePresignExpireMinutes;
+    }
+
+    private Long resolveObjectSize(GetObjectResponse response) {
+        String contentRange = response.contentRange();
+        if (contentRange != null) {
+            int separator = contentRange.lastIndexOf('/');
+            if (separator >= 0 && separator < contentRange.length() - 1) {
+                try {
+                    return Long.parseLong(contentRange.substring(separator + 1));
+                } catch (NumberFormatException ignored) {
+                    // Fall back to Content-Length for providers with a non-standard range header.
+                }
+            }
+        }
+        return response.contentLength();
     }
 
     private String normalizedStorageEndpoint() {
