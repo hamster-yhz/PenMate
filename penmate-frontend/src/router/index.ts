@@ -33,11 +33,23 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Workbench/index.vue'),
   },
   {
-    path: '/admin/rbac',
-    name: 'AdminRbac',
-    meta: { requiresAuth: true, permission: '/admin/rbac' },
-    component: () => import('@/views/AdminRbac/index.vue'),
+    path: '/admin',
+    name: 'AdminOverview',
+    meta: { requiresAuth: true, permission: '/admin', adminSection: 'overview' },
+    component: () => import('@/views/Admin/index.vue'),
   },
+  ...[
+    ['models', 'AdminModels'],
+    ['users', 'AdminUsers'],
+    ['rbac', 'AdminRbac'],
+    ['tasks', 'AdminTasks'],
+    ['audit', 'AdminAudit'],
+  ].map(([section, name]) => ({
+    path: `/admin/${section}`,
+    name,
+    meta: { requiresAuth: true, permission: '/admin', adminSection: section },
+    component: () => import('@/views/Admin/index.vue'),
+  })),
 ]
 
 const router = createRouter({
@@ -84,15 +96,15 @@ router.beforeEach(async (to) => {
     }
   }
 
-  if (to.path !== '/admin/rbac') return true
+  if (!to.path.startsWith('/admin')) return true
 
   const session = getSession()
   if (!session.userId) return { path: '/login', query: { redirect: to.fullPath } }
 
   try {
     const menus = await rbacApi.listProfileMenus(session.userId)
-    const canAccess = (menus || []).some(
-      (menu) => String((menu as Record<string, unknown>)?.path || '') === '/admin/rbac',
+    const canAccess = (menus || []).some((menu) =>
+      String((menu as Record<string, unknown>)?.path || '').startsWith('/admin'),
     )
     return canAccess ? true : '/mybooks'
   } catch {

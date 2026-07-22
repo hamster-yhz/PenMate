@@ -2,6 +2,46 @@ import request from '@/utils/request'
 
 type AnyRecord = Record<string, unknown>
 
+export interface ModelProviderOption extends AnyRecord {
+  providerId: string
+  code: string
+  name: string
+  baseUrl?: string
+  authType?: string
+  capabilities?: Array<{ capabilityCode: string; protocolCode: string }>
+}
+
+export interface ModelConfigurationItem extends AnyRecord {
+  modelConfigId: string
+  scopeType: 'SYSTEM' | 'USER'
+  providerId: string
+  providerCode?: string
+  providerName?: string
+  displayName?: string
+  modelType: 'CHAT' | 'EMBEDDING'
+  modelName: string
+  baseUrl?: string
+  distanceMetric?: 'COSINE' | 'INNER_PRODUCT' | 'L2'
+  embeddingDimensions?: number | null
+  contextWindowTurns?: number
+  maxContextTokens?: number
+  maskedApiKey?: string | null
+  credentialConfigured?: boolean
+  status?: 'ACTIVE' | 'DISABLED'
+  lastTestStatus?: 'SUCCESS' | 'FAILED' | null
+  lastTestLatencyMs?: number | null
+  lastTestError?: string | null
+  lastTestedAt?: string | null
+}
+
+export interface ModelConnectionTestResult {
+  success: boolean
+  latencyMs: number
+  testedAt: string
+  error?: string | null
+  dimensions?: number | null
+}
+
 const normalizeBusinessStringId = (value: unknown) => {
   if (typeof value !== 'string') {
     return null
@@ -44,6 +84,7 @@ const normalizeUserModelConfigPayload = (payload: AnyRecord) => {
   delete next.userKeyId
   delete next.officialKeyId
   delete next.keySourceType
+  delete next.enabled
   return next
 }
 
@@ -99,6 +140,11 @@ export const modelApi = {
     void _userId
     return request.get<AnyRecord[]>('/v1/model/configurations')
   },
+  async listSystemModelConfigs() {
+    const configurations = await request.get<ModelConfigurationItem[]>('/v1/model/configurations')
+    return (Array.isArray(configurations) ? configurations : [])
+      .filter((item) => item.scopeType === 'SYSTEM')
+  },
   createUserModelConfig(_userId: string, _operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>('/v1/model/configurations', normalizeUserModelConfigPayload(payload))
   },
@@ -118,6 +164,38 @@ export const modelApi = {
     void _userId
     void _operatorId
     return request.delete<string>(`/v1/model/configurations/${businessModelConfigId}`)
+  },
+  createSystemModelConfig(payload: AnyRecord) {
+    const normalized = normalizeUserModelConfigPayload(payload)
+    delete normalized.status
+    return request.post<ModelConfigurationItem>('/v1/model/system-configurations', normalized)
+  },
+  updateSystemModelConfig(businessModelConfigId: string, payload: AnyRecord) {
+    return request.put<ModelConfigurationItem>(
+      `/v1/model/system-configurations/${encodeURIComponent(businessModelConfigId)}`,
+      normalizeUserModelConfigPayload(payload),
+    )
+  },
+  deleteSystemModelConfig(businessModelConfigId: string) {
+    return request.delete<string>(
+      `/v1/model/system-configurations/${encodeURIComponent(businessModelConfigId)}`,
+    )
+  },
+  testSystemModelConnection(businessModelConfigId: string) {
+    return request.post<ModelConnectionTestResult>(
+      `/v1/model/system-configurations/${encodeURIComponent(businessModelConfigId)}/connection-tests`,
+    )
+  },
+  previewSystemModelImpact(businessModelConfigId: string, payload: AnyRecord) {
+    return request.post<AnyRecord>(
+      `/v1/model/system-configurations/${encodeURIComponent(businessModelConfigId)}/impact`,
+      normalizeUserModelConfigPayload(payload),
+    )
+  },
+  unbindSystemModelConfig(businessModelConfigId: string) {
+    return request.post<{ unboundProjectCount: number }>(
+      `/v1/model/system-configurations/${encodeURIComponent(businessModelConfigId)}/unbind`,
+    )
   },
   async getUserModelPreferences(_userId: string) {
     void _userId
