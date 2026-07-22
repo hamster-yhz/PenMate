@@ -1,18 +1,32 @@
 package com.penmate.backend.domain.novel.repository;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
-import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelOutlineNode;
+import com.penmate.backend.domain.novel.model.ChapterAiUndoOperation;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 
 import java.util.List;
+import java.time.Instant;
 
 public interface NovelGateway {
 
     List<NovelProject> findAllProjects();
 
+    List<NovelProject> findDeletedProjectsByOwner(Long ownerUserId);
+
+    NovelProject findDeletedProjectByIdAndOwner(Long projectId, Long ownerUserId);
+
+    NovelProject lockDeletedProject(Long projectId, Long ownerUserId, Instant deletedBefore);
+
+    List<Long> findExpiredDeletedProjectIds(Instant deletedBefore);
+
+    List<String> findProjectObjectKeys(Long projectId);
+
+    List<Long> findProjectIdsByOwner(Long ownerUserId);
+
     NovelProject findProjectById(Long projectId);
+
+    NovelProject lockProject(Long projectId);
 
     int insertProject(NovelProject project);
 
@@ -20,7 +34,11 @@ public interface NovelGateway {
 
     int incrementStructureRevision(Long projectId);
 
-    int softDeleteProject(Long projectId);
+    int softDeleteProject(Long projectId, Long ownerUserId);
+
+    int restoreProject(Long projectId, Long ownerUserId);
+
+    int purgeDeletedProject(Long projectId, Long ownerUserId, Instant deletedBefore);
 
     List<NovelVolume> findVolumesByProjectId(Long projectId);
 
@@ -30,6 +48,8 @@ public interface NovelGateway {
 
     int softDeleteVolume(Long projectId, Long volumeId);
 
+    int softDeleteChaptersByVolume(Long projectId, Long volumeId);
+
     List<NovelChapter> findChaptersByProjectId(Long projectId);
 
     NovelChapter findChapterByIdAndProjectId(Long projectId, Long chapterId);
@@ -38,37 +58,45 @@ public interface NovelGateway {
 
     int updateChapter(NovelChapter chapter);
 
+    int acquireChapterLease(Long projectId, Long chapterId, String ownerType, Long ownerId,
+                            String leaseToken, Instant expiresAt, boolean force);
+
+    int acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId,
+                              String leaseToken, Instant expiresAt);
+
+    int renewChapterLease(Long projectId, Long chapterId, String leaseToken, Instant expiresAt);
+
+    int releaseChapterLease(Long projectId, Long chapterId, String leaseToken);
+
+    int updateChapterContent(Long projectId, Long chapterId, String leaseToken,
+                             Long expectedRevision, String content, Integer wordCount);
+
+    int restoreAiChapterContent(Long projectId, Long chapterId, Long expectedRevision,
+                                String expectedContent, String restoredContent, Integer wordCount);
+
+    ChapterAiUndoOperation findAvailableAiUndoByRunAndChapter(Long projectId, Long runId, Long chapterId);
+
+    ChapterAiUndoOperation findAiUndoByOperationId(Long projectId, Long operationId);
+
+    List<ChapterAiUndoOperation> listAvailableAiUndoByChapter(Long projectId, Long chapterId);
+
+    List<ChapterAiUndoOperation> listAvailableAiUndoByRun(Long projectId, Long runId);
+
+    long nextAiUndoSequence(Long projectId, Long chapterId);
+
+    int insertAiUndo(ChapterAiUndoOperation operation);
+
+    int updateMergedAiUndo(ChapterAiUndoOperation operation);
+
+    int invalidateAvailableAiUndoByChapter(Long projectId, Long chapterId);
+
+    int markAiUndoUndone(Long operationId);
+
+    int rebaseAiUndoRevision(Long operationId, Long appliedRevision);
+
+    int deleteExpiredAiUndo(Instant cutoff);
+
     int softDeleteChapter(Long projectId, Long chapterId);
-
-    int publishChapter(Long projectId, Long chapterId);
-
-    int updateChapterContentMeta(Long projectId,
-                                 Long chapterId,
-                                 String objectKey,
-                                 String etag,
-                                 Long size,
-                                 String checksum,
-                                 String storageProvider);
-
-    List<NovelChapterVersion> findVersionsByChapterId(Long chapterId);
-
-    Integer maxVersionNo(Long chapterId);
-
-    int insertChapterVersion(NovelChapterVersion version);
-
-    NovelChapterVersion findVersionByChapterAndVersion(Long chapterId, Integer versionNo);
-
-    List<NovelOutlineNode> findOutlineNodesByProjectId(Long projectId);
-
-    NovelOutlineNode findOutlineNodeByIdAndProjectId(Long projectId, Long nodeId);
-
-    int insertOutlineNode(NovelOutlineNode node);
-
-    int updateOutlineNode(NovelOutlineNode node);
-
-    int moveOutlineNode(Long projectId, Long nodeId, Long parentId, Integer sortOrder);
-
-    int softDeleteOutlineNode(Long projectId, Long nodeId);
 
 }
 

@@ -1,8 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.novel;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
-import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelOutlineNode;
+import com.penmate.backend.domain.novel.model.ChapterAiUndoOperation;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
@@ -20,19 +19,16 @@ public class NovelGatewayImpl implements NovelGateway {
     private final NovelProjectMapper novelProjectMapper;
     private final NovelVolumeMapper novelVolumeMapper;
     private final NovelChapterMapper novelChapterMapper;
-    private final NovelChapterVersionMapper novelChapterVersionMapper;
-    private final NovelOutlineNodeMapper novelOutlineNodeMapper;
+    private final ChapterAiUndoMapper chapterAiUndoMapper;
 
     public NovelGatewayImpl(NovelProjectMapper novelProjectMapper,
                             NovelVolumeMapper novelVolumeMapper,
                             NovelChapterMapper novelChapterMapper,
-                            NovelChapterVersionMapper novelChapterVersionMapper,
-                            NovelOutlineNodeMapper novelOutlineNodeMapper) {
+                            ChapterAiUndoMapper chapterAiUndoMapper) {
         this.novelProjectMapper = novelProjectMapper;
         this.novelVolumeMapper = novelVolumeMapper;
         this.novelChapterMapper = novelChapterMapper;
-        this.novelChapterVersionMapper = novelChapterVersionMapper;
-        this.novelOutlineNodeMapper = novelOutlineNodeMapper;
+        this.chapterAiUndoMapper = chapterAiUndoMapper;
     }
 
     /**
@@ -44,6 +40,36 @@ public class NovelGatewayImpl implements NovelGateway {
     @Override
     public List<NovelProject> findAllProjects() { return novelProjectMapper.findAll(); }
 
+    @Override
+    public List<NovelProject> findDeletedProjectsByOwner(Long ownerUserId) {
+        return novelProjectMapper.findDeletedByOwner(ownerUserId);
+    }
+
+    @Override
+    public NovelProject findDeletedProjectByIdAndOwner(Long projectId, Long ownerUserId) {
+        return novelProjectMapper.findDeletedByProjectIdAndOwner(projectId, ownerUserId);
+    }
+
+    @Override
+    public NovelProject lockDeletedProject(Long projectId, Long ownerUserId, java.time.Instant deletedBefore) {
+        return novelProjectMapper.lockDeletedProject(projectId, ownerUserId, deletedBefore);
+    }
+
+    @Override
+    public List<Long> findExpiredDeletedProjectIds(java.time.Instant deletedBefore) {
+        return novelProjectMapper.findExpiredDeletedProjectIds(deletedBefore);
+    }
+
+    @Override
+    public List<String> findProjectObjectKeys(Long projectId) {
+        return novelProjectMapper.findProjectObjectKeys(projectId);
+    }
+
+    @Override
+    public List<Long> findProjectIdsByOwner(Long ownerUserId) {
+        return novelProjectMapper.findProjectIdsByOwner(ownerUserId);
+    }
+
     /**
      * 处理业务请求。
      *
@@ -52,6 +78,9 @@ public class NovelGatewayImpl implements NovelGateway {
      */
     @Override
     public NovelProject findProjectById(Long projectId) { return novelProjectMapper.findByProjectId(projectId); }
+
+    @Override
+    public NovelProject lockProject(Long projectId) { return novelProjectMapper.lockByProjectId(projectId); }
 
     /**
      * 处理业务请求。
@@ -81,7 +110,19 @@ public class NovelGatewayImpl implements NovelGateway {
      * @return 出参：处理结果
      */
     @Override
-    public int softDeleteProject(Long projectId) { return novelProjectMapper.softDelete(projectId); }
+    public int softDeleteProject(Long projectId, Long ownerUserId) {
+        return novelProjectMapper.softDelete(projectId, ownerUserId);
+    }
+
+    @Override
+    public int restoreProject(Long projectId, Long ownerUserId) {
+        return novelProjectMapper.restore(projectId, ownerUserId);
+    }
+
+    @Override
+    public int purgeDeletedProject(Long projectId, Long ownerUserId, java.time.Instant deletedBefore) {
+        return novelProjectMapper.purgeDeleted(projectId, ownerUserId, deletedBefore);
+    }
 
     /**
      * 处理业务请求。
@@ -120,6 +161,11 @@ public class NovelGatewayImpl implements NovelGateway {
     @Override
     public int softDeleteVolume(Long projectId, Long volumeId) { return novelVolumeMapper.softDelete(projectId, volumeId); }
 
+    @Override
+    public int softDeleteChaptersByVolume(Long projectId, Long volumeId) {
+        return novelChapterMapper.softDeleteByVolume(projectId, volumeId);
+    }
+
     /**
      * 处理业务请求。
      *
@@ -157,6 +203,90 @@ public class NovelGatewayImpl implements NovelGateway {
     @Override
     public int updateChapter(NovelChapter chapter) { return novelChapterMapper.update(chapter); }
 
+    @Override
+    public int acquireChapterLease(Long projectId, Long chapterId, String ownerType, Long ownerId,
+                                   String leaseToken, java.time.Instant expiresAt, boolean force) {
+        return novelChapterMapper.acquireLease(projectId, chapterId, ownerType, ownerId, leaseToken, expiresAt, force);
+    }
+
+    @Override
+    public int acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId,
+                                     String leaseToken, java.time.Instant expiresAt) {
+        return novelChapterMapper.acquireAiLease(projectId, chapterId, actorUserId, runId, leaseToken, expiresAt);
+    }
+
+    @Override
+    public int renewChapterLease(Long projectId, Long chapterId, String leaseToken, java.time.Instant expiresAt) {
+        return novelChapterMapper.renewLease(projectId, chapterId, leaseToken, expiresAt);
+    }
+
+    @Override
+    public int releaseChapterLease(Long projectId, Long chapterId, String leaseToken) {
+        return novelChapterMapper.releaseLease(projectId, chapterId, leaseToken);
+    }
+
+    @Override
+    public int updateChapterContent(Long projectId, Long chapterId, String leaseToken, Long expectedRevision,
+                                    String content, Integer wordCount) {
+        return novelChapterMapper.updateContent(projectId, chapterId, leaseToken, expectedRevision, content, wordCount);
+    }
+
+    @Override
+    public int restoreAiChapterContent(Long projectId, Long chapterId, Long expectedRevision,
+                                       String expectedContent, String restoredContent, Integer wordCount) {
+        return novelChapterMapper.restoreAiContent(projectId, chapterId, expectedRevision,
+                expectedContent, restoredContent, wordCount);
+    }
+
+    @Override
+    public ChapterAiUndoOperation findAvailableAiUndoByRunAndChapter(Long projectId, Long runId, Long chapterId) {
+        return chapterAiUndoMapper.findAvailableByRunAndChapter(projectId, runId, chapterId);
+    }
+
+    @Override
+    public ChapterAiUndoOperation findAiUndoByOperationId(Long projectId, Long operationId) {
+        return chapterAiUndoMapper.findByOperationId(projectId, operationId);
+    }
+
+    @Override
+    public List<ChapterAiUndoOperation> listAvailableAiUndoByChapter(Long projectId, Long chapterId) {
+        return chapterAiUndoMapper.listAvailableByChapter(projectId, chapterId);
+    }
+
+    @Override
+    public List<ChapterAiUndoOperation> listAvailableAiUndoByRun(Long projectId, Long runId) {
+        return chapterAiUndoMapper.listAvailableByRun(projectId, runId);
+    }
+
+    @Override
+    public long nextAiUndoSequence(Long projectId, Long chapterId) {
+        return chapterAiUndoMapper.nextSequence(projectId, chapterId);
+    }
+
+    @Override
+    public int insertAiUndo(ChapterAiUndoOperation operation) { return chapterAiUndoMapper.insert(operation); }
+
+    @Override
+    public int updateMergedAiUndo(ChapterAiUndoOperation operation) {
+        return chapterAiUndoMapper.updateMergedResult(operation);
+    }
+
+    @Override
+    public int invalidateAvailableAiUndoByChapter(Long projectId, Long chapterId) {
+        return chapterAiUndoMapper.invalidateAvailableByChapter(projectId, chapterId);
+    }
+
+    @Override
+    public int markAiUndoUndone(Long operationId) { return chapterAiUndoMapper.markUndone(operationId); }
+
+    @Override
+    public int rebaseAiUndoRevision(Long operationId, Long appliedRevision) {
+        return chapterAiUndoMapper.rebaseAppliedRevision(operationId, appliedRevision);
+    }
+
+    @Override
+    public int deleteExpiredAiUndo(java.time.Instant cutoff) { return chapterAiUndoMapper.deleteExpired(cutoff); }
+
     /**
      * 处理业务请求。
      *
@@ -167,127 +297,4 @@ public class NovelGatewayImpl implements NovelGateway {
     @Override
     public int softDeleteChapter(Long projectId, Long chapterId) { return novelChapterMapper.softDelete(projectId, chapterId); }
 
-    /**
-     * 发布业务状态。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @return 出参：处理结果
-     */
-    @Override
-    public int publishChapter(Long projectId, Long chapterId) { return novelChapterMapper.publish(projectId, chapterId); }
-
-    /**
-     * 更新业务数据。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param objectKey 入参：objectKey
-     * @param etag 入参：etag
-     * @param size 入参：size
-     * @param checksum 入参：checksum
-     * @param storageProvider 入参：storageProvider
-     * @return 出参：处理结果
-     */
-    @Override
-    public int updateChapterContentMeta(Long projectId, Long chapterId, String objectKey, String etag, Long size, String checksum, String storageProvider) {
-        return novelChapterMapper.updateContentMeta(projectId, chapterId, objectKey, etag, size, checksum, storageProvider);
-    }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelChapterVersionMapper.findByChapterId(chapterId 入参：novelChapterVersionMapper.findByChapterId(chapterId
-     * @return 出参：处理结果
-     */
-    @Override
-    public List<NovelChapterVersion> findVersionsByChapterId(Long chapterId) { return novelChapterVersionMapper.findByChapterId(chapterId); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelChapterVersionMapper.maxVersionNo(chapterId 入参：novelChapterVersionMapper.maxVersionNo(chapterId
-     * @return 出参：处理结果
-     */
-    @Override
-    public Integer maxVersionNo(Long chapterId) { return novelChapterVersionMapper.maxVersionNo(chapterId); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelChapterVersionMapper.insert(version 入参：novelChapterVersionMapper.insert(version
-     * @return 出参：处理结果
-     */
-    @Override
-    public int insertChapterVersion(NovelChapterVersion version) { return novelChapterVersionMapper.insert(version); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @return 出参：处理结果
-     */
-    @Override
-    public NovelChapterVersion findVersionByChapterAndVersion(Long chapterId, Integer versionNo) { return novelChapterVersionMapper.findByChapterAndVersion(chapterId, versionNo); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelOutlineNodeMapper.findByProjectId(projectId 入参：novelOutlineNodeMapper.findByProjectId(projectId
-     * @return 出参：处理结果
-     */
-    @Override
-    public List<NovelOutlineNode> findOutlineNodesByProjectId(Long projectId) { return novelOutlineNodeMapper.findByProjectId(projectId); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @return 出参：处理结果
-     */
-    @Override
-    public NovelOutlineNode findOutlineNodeByIdAndProjectId(Long projectId, Long nodeId) { return novelOutlineNodeMapper.findByIdAndProjectId(projectId, nodeId); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param novelOutlineNodeMapper.insert(node 入参：novelOutlineNodeMapper.insert(node
-     * @return 出参：处理结果
-     */
-    @Override
-    public int insertOutlineNode(NovelOutlineNode node) { return novelOutlineNodeMapper.insert(node); }
-
-    /**
-     * 更新业务数据。
-     *
-     * @param novelOutlineNodeMapper.update(node 入参：novelOutlineNodeMapper.update(node
-     * @return 出参：处理结果
-     */
-    @Override
-    public int updateOutlineNode(NovelOutlineNode node) { return novelOutlineNodeMapper.update(node); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param parentId 入参：parentId
-     * @param sortOrder 入参：sortOrder
-     * @return 出参：处理结果
-     */
-    @Override
-    public int moveOutlineNode(Long projectId, Long nodeId, Long parentId, Integer sortOrder) { return novelOutlineNodeMapper.move(projectId, nodeId, parentId, sortOrder); }
-
-    /**
-     * 处理业务请求。
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @return 出参：处理结果
-     */
-    @Override
-    public int softDeleteOutlineNode(Long projectId, Long nodeId) { return novelOutlineNodeMapper.softDelete(projectId, nodeId); }
 }
-

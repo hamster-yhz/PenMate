@@ -1,25 +1,27 @@
 package com.penmate.backend.interfaces.api.novel;
 
 import com.penmate.backend.application.novel.NovelApplicationService;
+import com.penmate.backend.application.novel.NovelCoverApplicationService;
+import com.penmate.backend.application.novel.NovelTrashApplicationService;
 import com.penmate.backend.application.novel.command.NovelCommands;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
-import com.penmate.backend.domain.novel.model.NovelOutlineNode;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelChapterDto;
-import com.penmate.backend.interfaces.api.novel.dto.CreateChapterVersionDto;
-import com.penmate.backend.interfaces.api.novel.dto.CreateNovelOutlineNodeDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.CreateNovelVolumeDto;
-import com.penmate.backend.interfaces.api.novel.dto.CommitChapterContentDto;
-import com.penmate.backend.interfaces.api.novel.dto.MoveNovelOutlineNodeDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelChapterDto;
-import com.penmate.backend.interfaces.api.novel.dto.MoveNovelChapterDto;
-import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelOutlineNodeDto;
+import com.penmate.backend.interfaces.api.novel.dto.MoveNovelDirectoryItemDto;
+import com.penmate.backend.interfaces.api.novel.dto.PermanentlyDeleteNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelVolumeDto;
-import com.penmate.backend.domain.novel.model.NovelChapterVersion;
+import com.penmate.backend.interfaces.api.novel.dto.AcquireChapterLeaseDto;
+import com.penmate.backend.interfaces.api.novel.dto.SaveChapterContentDto;
+import com.penmate.backend.interfaces.api.novel.dto.CompleteNovelCoverUploadDto;
+import com.penmate.backend.interfaces.api.novel.dto.InitializeNovelCoverUploadDto;
+import com.penmate.backend.interfaces.api.novel.dto.NovelCoverCropDto;
+import com.penmate.backend.interfaces.api.novel.dto.RecropNovelCoverDto;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +38,6 @@ import org.springframework.security.core.Authentication;
 import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 小说项目聚合控制器。
@@ -47,9 +48,15 @@ import java.util.Map;
 public class NovelController {
 
     private final NovelApplicationService novelApplicationService;
+    private final NovelTrashApplicationService novelTrashApplicationService;
+    private final NovelCoverApplicationService novelCoverApplicationService;
 
-    public NovelController(NovelApplicationService novelApplicationService) {
+    public NovelController(NovelApplicationService novelApplicationService,
+                           NovelTrashApplicationService novelTrashApplicationService,
+                           NovelCoverApplicationService novelCoverApplicationService) {
         this.novelApplicationService = novelApplicationService;
+        this.novelTrashApplicationService = novelTrashApplicationService;
+        this.novelCoverApplicationService = novelCoverApplicationService;
     }
 
     private Long requireLongId(String raw, String fieldName) {
@@ -66,6 +73,10 @@ public class NovelController {
         return Long.valueOf(raw.trim());
     }
 
+    private NovelCoverApplicationService.CropRequest crop(NovelCoverCropDto dto) {
+        return new NovelCoverApplicationService.CropRequest(dto.getX(), dto.getY(), dto.getWidth(), dto.getHeight());
+    }
+
     /**
      * 查询小说项目列表。
      * <p>流程：调用应用服务读取项目清单并返回统一响应。</p>
@@ -76,7 +87,36 @@ public class NovelController {
     @GetMapping
     public ApiResponse<List<NovelProject>> listProjects(Authentication authentication,
                                                         @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listProjects(id(authentication)), traceId);
+        return ApiResponse.success(novelApplicationService.listProjects(id(authentication)).stream()
+                .map(novelCoverApplicationService::decorate).toList(), traceId);
+    }
+
+    @GetMapping("/trash")
+    public ApiResponse<List<NovelProject>> listDeletedProjects(
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelTrashApplicationService.listDeletedProjects(id(authentication)).stream()
+                .map(novelCoverApplicationService::decorate).toList(), traceId);
+    }
+
+    @PostMapping("/trash/{projectId}/restore")
+    public ApiResponse<NovelProject> restoreDeletedProject(
+            @PathVariable String projectId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelCoverApplicationService.decorate(novelTrashApplicationService.restoreProject(
+                requireLongId(projectId, "projectId"), id(authentication))), traceId);
+    }
+
+    @DeleteMapping("/trash/{projectId}")
+    public ApiResponse<String> permanentlyDeleteProject(
+            @PathVariable String projectId,
+            @Valid @RequestBody PermanentlyDeleteNovelProjectDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        novelTrashApplicationService.permanentlyDeleteProject(
+                requireLongId(projectId, "projectId"), id(authentication), dto.getConfirmationTitle());
+        return ApiResponse.success("deleted", traceId);
     }
 
     /**
@@ -91,15 +131,18 @@ public class NovelController {
     public ApiResponse<NovelProject> createProject(@Valid @RequestBody CreateNovelProjectDto dto,
                                                    Authentication authentication,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.createProject(
+        return ApiResponse.success(novelCoverApplicationService.decorate(novelApplicationService.createProject(
                 new NovelCommands.CreateProjectCommand(
                         id(authentication),
                         dto.getTitle(),
                         dto.getSummary(),
+                        dto.getGenre(),
+                        dto.getCustomGenre(),
+                        dto.getTags(),
                         dto.getStatus()
                 ),
                 traceId
-        ), traceId);
+        )), traceId);
     }
 
     /**
@@ -113,7 +156,8 @@ public class NovelController {
     @GetMapping("/{projectId}")
     public ApiResponse<NovelProject> getProject(@PathVariable String projectId,
                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getProject(requireLongId(projectId, "projectId")), traceId);
+        return ApiResponse.success(novelCoverApplicationService.decorate(
+                novelApplicationService.getProject(requireLongId(projectId, "projectId"))), traceId);
     }
 
     /**
@@ -129,11 +173,12 @@ public class NovelController {
     public ApiResponse<NovelProject> updateProject(@PathVariable String projectId,
                                                    @Valid @RequestBody UpdateNovelProjectDto dto,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.updateProject(
+        return ApiResponse.success(novelCoverApplicationService.decorate(novelApplicationService.updateProject(
                 requireLongId(projectId, "projectId"),
-                new NovelCommands.UpdateProjectCommand(dto.getTitle(), dto.getSummary(), dto.getStatus()),
+                new NovelCommands.UpdateProjectCommand(dto.getTitle(), dto.getSummary(), dto.getGenre(),
+                        dto.getCustomGenre(), dto.getTags(), dto.getStatus()),
                 traceId
-        ), traceId);
+        )), traceId);
     }
 
     /**
@@ -151,6 +196,63 @@ public class NovelController {
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         novelApplicationService.deleteProject(requireLongId(projectId, "projectId"), id(authentication), traceId);
         return ApiResponse.success("deleted", traceId);
+    }
+
+    @PostMapping("/{projectId}/cover/uploads")
+    public ApiResponse<NovelCoverApplicationService.UploadInitialization> initializeCoverUpload(
+            @PathVariable String projectId,
+            @Valid @RequestBody InitializeNovelCoverUploadDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelCoverApplicationService.initializeUpload(
+                requireLongId(projectId, "projectId"), id(authentication),
+                new NovelCoverApplicationService.UploadRequest(
+                        dto.getFilename(), dto.getMimeType(), dto.getSize(), dto.getSha256())), traceId);
+    }
+
+    @PostMapping("/{projectId}/cover/uploads/{uploadId}/complete")
+    public ApiResponse<NovelCoverApplicationService.CoverState> completeCoverUpload(
+            @PathVariable String projectId, @PathVariable String uploadId,
+            @Valid @RequestBody CompleteNovelCoverUploadDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelCoverApplicationService.completeUpload(
+                requireLongId(projectId, "projectId"), id(authentication), requireLongId(uploadId, "uploadId"),
+                dto.getUploadToken(), crop(dto.getCrop())), traceId);
+    }
+
+    @GetMapping("/{projectId}/cover")
+    public ApiResponse<NovelCoverApplicationService.CoverState> getCover(
+            @PathVariable String projectId, Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelCoverApplicationService.getState(
+                requireLongId(projectId, "projectId"), id(authentication)), traceId);
+    }
+
+    @PostMapping("/{projectId}/cover/crops")
+    public ApiResponse<NovelCoverApplicationService.CoverState> recropCover(
+            @PathVariable String projectId, @Valid @RequestBody RecropNovelCoverDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelCoverApplicationService.recrop(
+                requireLongId(projectId, "projectId"), id(authentication), crop(dto.getCrop())), traceId);
+    }
+
+    @PostMapping("/{projectId}/cover/uploads/{uploadId}/retry")
+    public ApiResponse<NovelCoverApplicationService.CoverState> retryCover(
+            @PathVariable String projectId, @PathVariable String uploadId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelCoverApplicationService.retry(
+                requireLongId(projectId, "projectId"), id(authentication), requireLongId(uploadId, "uploadId")), traceId);
+    }
+
+    @DeleteMapping("/{projectId}/cover")
+    public ApiResponse<String> removeCover(
+            @PathVariable String projectId, Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        novelCoverApplicationService.remove(requireLongId(projectId, "projectId"), id(authentication));
+        return ApiResponse.success("removed", traceId);
     }
 
     /**
@@ -268,17 +370,8 @@ public class NovelController {
                 requireLongId(projectId, "projectId"),
                 new NovelCommands.CreateChapterCommand(
                         optionalLongId(dto.getVolumeId()),
-                        optionalLongId(dto.getOutlineNodeId()),
                         dto.getTitle(),
-                        dto.getSortOrder(),
-                        dto.getStatus(),
-                        dto.getWordCount(),
-                        dto.getExcerpt(),
-                        dto.getContentObjectKey(),
-                        dto.getContentEtag(),
-                        dto.getContentSize(),
-                        dto.getContentChecksum(),
-                        dto.getStorageProvider()
+                        dto.getSortOrder()
                 ),
                 id(authentication),
                 traceId
@@ -301,6 +394,74 @@ public class NovelController {
         return ApiResponse.success(novelApplicationService.getChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
     }
 
+    @PostMapping("/{projectId}/chapters/{chapterId}/lease")
+    public ApiResponse<NovelApplicationService.ChapterLeaseView> acquireChapterLease(
+            @PathVariable String projectId, @PathVariable String chapterId,
+            @RequestBody(required = false) AcquireChapterLeaseDto dto, Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.acquireChapterLease(
+                requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
+                id(authentication), dto != null && Boolean.TRUE.equals(dto.getForce())), traceId);
+    }
+
+    @PutMapping("/{projectId}/chapters/{chapterId}/lease/{leaseToken}")
+    public ApiResponse<NovelApplicationService.ChapterLeaseView> renewChapterLease(
+            @PathVariable String projectId, @PathVariable String chapterId, @PathVariable String leaseToken,
+            Authentication authentication, @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.renewChapterLease(
+                requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
+                id(authentication), leaseToken), traceId);
+    }
+
+    @DeleteMapping("/{projectId}/chapters/{chapterId}/lease/{leaseToken}")
+    public ApiResponse<String> releaseChapterLease(
+            @PathVariable String projectId, @PathVariable String chapterId, @PathVariable String leaseToken,
+            Authentication authentication, @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        novelApplicationService.releaseChapterLease(requireLongId(projectId, "projectId"),
+                requireLongId(chapterId, "chapterId"), id(authentication), leaseToken);
+        return ApiResponse.success("released", traceId);
+    }
+
+    @PutMapping("/{projectId}/chapters/{chapterId}/content")
+    public ApiResponse<NovelChapter> saveChapterContent(
+            @PathVariable String projectId, @PathVariable String chapterId,
+            @Valid @RequestBody SaveChapterContentDto dto, Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.saveChapterContent(
+                requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
+                id(authentication), dto.getLeaseToken(), dto.getExpectedRevision(), dto.getContent()), traceId);
+    }
+
+    @GetMapping("/{projectId}/chapters/{chapterId}/ai-undo")
+    public ApiResponse<List<NovelApplicationService.AiUndoView>> listChapterAiUndo(
+            @PathVariable String projectId, @PathVariable String chapterId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.listAvailableAiUndoForChapter(
+                requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
+                id(authentication)), traceId);
+    }
+
+    @PostMapping("/{projectId}/ai-edits/{operationId}/undo")
+    public ApiResponse<NovelApplicationService.AiUndoView> undoChapterAiEdit(
+            @PathVariable String projectId, @PathVariable String operationId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.undoAiChapterEdit(
+                requireLongId(projectId, "projectId"), requireLongId(operationId, "operationId"),
+                id(authentication)), traceId);
+    }
+
+    @PostMapping("/{projectId}/agent-runs/{runId}/chapter-edits/undo")
+    public ApiResponse<List<NovelApplicationService.AiUndoView>> undoRunChapterAiEdits(
+            @PathVariable String projectId, @PathVariable String runId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.undoAiChapterEditsForRun(
+                requireLongId(projectId, "projectId"), requireLongId(runId, "runId"),
+                id(authentication)), traceId);
+    }
+
     /**
      * 更新章节元数据。
      * <p>流程：校验章节归属 -> 执行章节更新。</p>
@@ -321,35 +482,38 @@ public class NovelController {
         return ApiResponse.success(novelApplicationService.updateChapter(
                 requireLongId(projectId, "projectId"),
                 requireLongId(chapterId, "chapterId"),
-                new NovelCommands.UpdateChapterCommand(
-                        optionalLongId(dto.getVolumeId()),
-                        optionalLongId(dto.getOutlineNodeId()),
-                        dto.getTitle(),
-                        dto.getSortOrder(),
-                        dto.getStatus(),
-                        dto.getWordCount(),
-                        dto.getExcerpt(),
-                        dto.getContentObjectKey(),
-                        dto.getContentEtag(),
-                        dto.getContentSize(),
-                        dto.getContentChecksum(),
-                        dto.getStorageProvider()
-                ),
+                new NovelCommands.UpdateChapterCommand(dto.getTitle()),
                 id(authentication),
                 traceId
         ), traceId);
     }
 
-    @PatchMapping("/{projectId}/chapters/{chapterId}/position")
-    public ApiResponse<NovelChapter> moveChapter(@PathVariable String projectId,
-                                                 @PathVariable String chapterId,
-                                                 @Valid @RequestBody MoveNovelChapterDto dto,
-                                                 Authentication authentication,
-                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.moveChapter(
+    @GetMapping("/{projectId}/directory")
+    public ApiResponse<NovelApplicationService.NovelDirectoryView> getDirectory(
+            @PathVariable String projectId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.getDirectory(
                 requireLongId(projectId, "projectId"),
-                requireLongId(chapterId, "chapterId"),
-                new NovelCommands.MoveChapterCommand(optionalLongId(dto.getVolumeId()), dto.getSortOrder()),
+                id(authentication)
+        ), traceId);
+    }
+
+    @PatchMapping("/{projectId}/directory/position")
+    public ApiResponse<NovelApplicationService.NovelDirectoryView> moveDirectoryItem(
+            @PathVariable String projectId,
+            @Valid @RequestBody MoveNovelDirectoryItemDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.moveDirectoryItem(
+                requireLongId(projectId, "projectId"),
+                new NovelCommands.MoveDirectoryItemCommand(
+                        dto.getNodeType(),
+                        requireLongId(dto.getNodeId(), "nodeId"),
+                        optionalLongId(dto.getTargetVolumeId()),
+                        dto.getSortOrder(),
+                        dto.getExpectedStructureRevision()
+                ),
                 id(authentication),
                 traceId
         ), traceId);
@@ -374,304 +538,4 @@ public class NovelController {
         return ApiResponse.success("deleted", traceId);
     }
 
-    /**
-     * 发布章节。
-     * <p>流程：触发章节发布状态流转并返回 published。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/chapters/{chapterId}/publish")
-    public ApiResponse<String> publishChapter(@PathVariable String projectId,
-                                              @PathVariable String chapterId,
-                                              Authentication authentication,
-                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.publishChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), id(authentication), traceId);
-        return ApiResponse.success("published", traceId);
-    }
-
-    /**
-     * 查询章节版本列表。
-     * <p>流程：读取章节历史版本并返回。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/{projectId}/chapters/{chapterId}/versions")
-    public ApiResponse<List<NovelChapterVersion>> listChapterVersions(@PathVariable String projectId,
-                                                                      @PathVariable String chapterId,
-                                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listChapterVersions(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
-    }
-
-    /**
-     * 创建章节版本快照。
-     * <p>流程：根据变更原因创建新版本记录。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param dto 入参：dto
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/chapters/{chapterId}/versions")
-    public ApiResponse<NovelChapterVersion> createChapterVersion(@PathVariable String projectId,
-                                                                  @PathVariable String chapterId,
-                                                                  @Valid @RequestBody CreateChapterVersionDto dto,
-                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.createChapterVersion(
-                requireLongId(projectId, "projectId"),
-                requireLongId(chapterId, "chapterId"),
-                new NovelCommands.CreateChapterVersionCommand(dto.getChangeType(), dto.getChangeReason(), requireLongId(dto.getCreatedBy(), "createdBy")),
-                traceId
-        ), traceId);
-    }
-
-    /**
-     * 查询单个章节版本。
-     * <p>流程：按 versionNo 查询指定版本快照。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/{projectId}/chapters/{chapterId}/versions/{versionNo}")
-    public ApiResponse<NovelChapterVersion> getChapterVersion(@PathVariable String projectId,
-                                                              @PathVariable String chapterId,
-                                                              @PathVariable Integer versionNo,
-                                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterVersion(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo), traceId);
-    }
-
-    /**
-     * 恢复到历史章节版本。
-     * <p>流程：校验版本存在 -> 执行版本回滚并返回章节。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/chapters/{chapterId}/versions/{versionNo}/restore")
-    public ApiResponse<NovelChapter> restoreChapterVersion(@PathVariable String projectId,
-                                                           @PathVariable String chapterId,
-                                                           @PathVariable Integer versionNo,
-                                                           Authentication authentication,
-                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.restoreChapterVersion(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo, id(authentication), traceId), traceId);
-    }
-
-    /**
-     * 获取章节正文下载地址。
-     * <p>流程：生成或读取正文对象访问地址。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/{projectId}/chapters/{chapterId}/content-url")
-    public ApiResponse<Map<String, String>> getChapterContentUrl(@PathVariable String projectId,
-                                                                 @PathVariable String chapterId,
-                                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterContentUrl(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
-    }
-
-    /**
-     * 获取章节正文上传地址。
-     * <p>流程：申请上传URL用于前端直传正文文件。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/chapters/{chapterId}/content-upload-url")
-    public ApiResponse<Map<String, String>> getChapterContentUploadUrl(@PathVariable String projectId,
-                                                                       @PathVariable String chapterId,
-                                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterContentUploadUrl(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
-    }
-
-    /**
-     * 提交章节正文对象变更。
-     * <p>流程：提交对象存储元信息 -> 应用服务更新章节正文引用。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/chapters/{chapterId}/content-commit")
-    public ApiResponse<NovelChapter> commitChapterContent(@PathVariable String projectId,
-                                                           @PathVariable String chapterId,
-                                                            @Valid @RequestBody CommitChapterContentDto dto,
-                                                            Authentication authentication,
-                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.commitChapterContent(
-                requireLongId(projectId, "projectId"),
-                requireLongId(chapterId, "chapterId"),
-                new NovelCommands.CommitChapterContentCommand(
-                        dto.getObjectKey(),
-                        dto.getEtag(),
-                        dto.getSize(),
-                        dto.getChecksum(),
-                        dto.getStorageProvider(),
-                        dto.getContent()
-                ),
-                id(authentication),
-                traceId
-        ), traceId);
-    }
-
-    /**
-     * 获取章节版本快照下载地址。
-     * <p>流程：按版本号返回快照对象访问地址。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/{projectId}/chapters/{chapterId}/versions/{versionNo}/snapshot-url")
-    public ApiResponse<Map<String, String>> getChapterVersionSnapshotUrl(@PathVariable String projectId,
-                                                                          @PathVariable String chapterId,
-                                                                          @PathVariable Integer versionNo,
-                                                                          @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.getChapterVersionSnapshotUrl(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"), versionNo), traceId);
-    }
-
-    /**
-     * 查询大纲树。
-     * <p>流程：按项目读取树形大纲节点。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @GetMapping("/{projectId}/outlines/tree")
-    public ApiResponse<List<NovelOutlineNode>> listOutlineTree(@PathVariable String projectId,
-                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.listOutlineTree(requireLongId(projectId, "projectId")), traceId);
-    }
-
-    /**
-     * 创建大纲节点。
-     * <p>流程：组装节点创建命令 -> 写入并返回节点。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PostMapping("/{projectId}/outlines/nodes")
-    public ApiResponse<NovelOutlineNode> createOutlineNode(@PathVariable String projectId,
-                                                             @Valid @RequestBody CreateNovelOutlineNodeDto dto,
-                                                             Authentication authentication,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.createOutlineNode(
-                requireLongId(projectId, "projectId"),
-                new NovelCommands.CreateOutlineNodeCommand(
-                        optionalLongId(dto.getParentId()),
-                        dto.getTitle(),
-                        dto.getNodeType(),
-                        dto.getSortOrder(),
-                        dto.getContent()
-                ),
-                id(authentication),
-                traceId
-        ), traceId);
-    }
-
-    /**
-     * 更新大纲节点。
-     * <p>流程：按节点ID更新标题/类型/排序与内容。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @PutMapping("/{projectId}/outlines/nodes/{nodeId}")
-    public ApiResponse<NovelOutlineNode> updateOutlineNode(@PathVariable String projectId,
-                                                            @PathVariable String nodeId,
-                                                             @Valid @RequestBody UpdateNovelOutlineNodeDto dto,
-                                                             Authentication authentication,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.updateOutlineNode(
-                requireLongId(projectId, "projectId"),
-                requireLongId(nodeId, "nodeId"),
-                new NovelCommands.UpdateOutlineNodeCommand(
-                        optionalLongId(dto.getParentId()),
-                        dto.getTitle(),
-                        dto.getNodeType(),
-                        dto.getSortOrder(),
-                        dto.getContent()
-                ),
-                id(authentication),
-                traceId
-        ), traceId);
-    }
-
-    /**
-     * 移动大纲节点。
-     * <p>流程：更新父节点与排序号，完成树结构重排。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param dto 入参：dto
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @org.springframework.web.bind.annotation.PatchMapping("/{projectId}/outlines/nodes/{nodeId}/move")
-    public ApiResponse<String> moveOutlineNode(@PathVariable String projectId,
-                                                @PathVariable String nodeId,
-                                                 @Valid @RequestBody MoveNovelOutlineNodeDto dto,
-                                                 Authentication authentication,
-                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.moveOutlineNode(
-                requireLongId(projectId, "projectId"),
-                requireLongId(nodeId, "nodeId"),
-                new NovelCommands.MoveOutlineNodeCommand(optionalLongId(dto.getParentId()), dto.getSortOrder()),
-                id(authentication),
-                traceId
-        );
-        return ApiResponse.success("moved", traceId);
-    }
-
-    /**
-     * 删除大纲节点。
-     * <p>流程：校验节点可删后执行删除。</p>
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    @DeleteMapping("/{projectId}/outlines/nodes/{nodeId}")
-    public ApiResponse<String> deleteOutlineNode(@PathVariable String projectId,
-                                                 @PathVariable String nodeId,
-                                                 Authentication authentication,
-                                                 @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.deleteOutlineNode(requireLongId(projectId, "projectId"), requireLongId(nodeId, "nodeId"), id(authentication), traceId);
-        return ApiResponse.success("deleted", traceId);
-    }
 }
-

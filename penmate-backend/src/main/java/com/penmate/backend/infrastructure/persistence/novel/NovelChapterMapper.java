@@ -18,9 +18,10 @@ import java.util.List;
 public interface NovelChapterMapper {
 
     @Select("""
-            SELECT c.id, c.chapter_id, c.project_id, c.volume_id, c.outline_node_id, c.title, c.sort_order,
-                   c.status, c.word_count, c.excerpt, c.content_object_key, c.content_etag, c.content_size,
-                   c.content_checksum, c.content_revision, c.storage_provider, c.last_generated_at, c.created_at, c.updated_at, c.deleted_at
+            SELECT c.id, c.chapter_id, c.project_id, c.volume_id, c.title, c.sort_order,
+                   c.word_count, c.content, c.content_revision,
+                   c.lease_owner_type, c.lease_owner_id, c.lease_token, c.lease_expires_at,
+                   c.created_at, c.updated_at, c.deleted_at
             FROM novel_chapters c
             LEFT JOIN novel_volumes v
               ON v.volume_id = c.volume_id AND v.project_id = c.project_id AND v.deleted_at IS NULL
@@ -33,9 +34,9 @@ public interface NovelChapterMapper {
     List<NovelChapter> findByProjectId(@Param("projectId") Long projectId);
 
     @Select("""
-            SELECT id, chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status, word_count,
-                   excerpt, content_object_key, content_etag, content_size, content_checksum, content_revision,
-                   storage_provider, last_generated_at, created_at, updated_at, deleted_at
+            SELECT id, chapter_id, project_id, volume_id, title, sort_order, word_count,
+                   content, content_revision, lease_owner_type, lease_owner_id, lease_token, lease_expires_at,
+                   created_at, updated_at, deleted_at
             FROM novel_chapters
             WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
@@ -43,11 +44,9 @@ public interface NovelChapterMapper {
 
     @Insert("""
             INSERT INTO novel_chapters(
-                chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status, word_count, excerpt,
-                content_object_key, content_etag, content_size, content_checksum, storage_provider
+                chapter_id, project_id, volume_id, title, sort_order, word_count, content
             ) VALUES (
-                #{chapterId}, #{projectId}, #{volumeId}, #{outlineNodeId}, #{title}, #{sortOrder}, #{status}, #{wordCount}, #{excerpt},
-                #{contentObjectKey}, #{contentEtag}, #{contentSize}, #{contentChecksum}, #{storageProvider}
+                #{chapterId}, #{projectId}, #{volumeId}, #{title}, #{sortOrder}, #{wordCount}, #{content}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -56,20 +55,78 @@ public interface NovelChapterMapper {
     @Update("""
             UPDATE novel_chapters
             SET volume_id = #{volumeId},
-                outline_node_id = #{outlineNodeId},
                 title = #{title},
-                sort_order = #{sortOrder},
-                status = #{status},
-                word_count = #{wordCount},
-                excerpt = #{excerpt},
-                content_object_key = #{contentObjectKey},
-                content_etag = #{contentEtag},
-                content_size = #{contentSize},
-                content_checksum = #{contentChecksum},
-                storage_provider = #{storageProvider}
+                sort_order = #{sortOrder}
             WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
             """)
     int update(NovelChapter chapter);
+
+    @Update("""
+            UPDATE novel_chapters
+            SET lease_owner_type = #{ownerType}, lease_owner_id = #{ownerId},
+                lease_token = #{leaseToken}, lease_expires_at = #{expiresAt}
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+              AND (lease_token IS NULL OR lease_expires_at <= CURRENT_TIMESTAMP(3) OR #{force} = TRUE)
+            """)
+    int acquireLease(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId,
+                     @Param("ownerType") String ownerType, @Param("ownerId") Long ownerId,
+                     @Param("leaseToken") String leaseToken, @Param("expiresAt") java.time.Instant expiresAt,
+                     @Param("force") boolean force);
+
+    @Update("""
+            UPDATE novel_chapters
+            SET lease_owner_type = 'AI', lease_owner_id = #{runId},
+                lease_token = #{leaseToken}, lease_expires_at = #{expiresAt}
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+              AND (lease_token IS NULL OR lease_expires_at <= CURRENT_TIMESTAMP(3))
+            """)
+    int acquireAiLease(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId,
+                       @Param("actorUserId") Long actorUserId, @Param("runId") Long runId,
+                       @Param("leaseToken") String leaseToken, @Param("expiresAt") java.time.Instant expiresAt);
+
+    @Update("""
+            UPDATE novel_chapters
+            SET lease_expires_at = #{expiresAt}
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND lease_token = #{leaseToken}
+              AND deleted_at IS NULL AND lease_expires_at > CURRENT_TIMESTAMP(3)
+            """)
+    int renewLease(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId,
+                   @Param("leaseToken") String leaseToken, @Param("expiresAt") java.time.Instant expiresAt);
+
+    @Update("""
+            UPDATE novel_chapters
+            SET lease_owner_type = NULL, lease_owner_id = NULL, lease_token = NULL, lease_expires_at = NULL
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND lease_token = #{leaseToken}
+              AND deleted_at IS NULL
+            """)
+    int releaseLease(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId,
+                     @Param("leaseToken") String leaseToken);
+
+    @Update("""
+            UPDATE novel_chapters
+            SET content = #{content}, word_count = #{wordCount}, content_revision = content_revision + 1,
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+              AND lease_token = #{leaseToken} AND lease_expires_at > CURRENT_TIMESTAMP(3)
+              AND content_revision = #{expectedRevision}
+            """)
+    int updateContent(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId,
+                      @Param("leaseToken") String leaseToken, @Param("expectedRevision") Long expectedRevision,
+                      @Param("content") String content, @Param("wordCount") Integer wordCount);
+
+    @Update("""
+            UPDATE novel_chapters
+            SET content = #{restoredContent}, word_count = #{wordCount}, content_revision = content_revision + 1,
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+              AND content_revision = #{expectedRevision} AND content = #{expectedContent}
+              AND (lease_owner_type IS NULL OR lease_owner_type <> 'AI' OR lease_expires_at <= CURRENT_TIMESTAMP(3))
+            """)
+    int restoreAiContent(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId,
+                         @Param("expectedRevision") Long expectedRevision,
+                         @Param("expectedContent") String expectedContent,
+                         @Param("restoredContent") String restoredContent,
+                         @Param("wordCount") Integer wordCount);
 
     @Update("""
             UPDATE novel_chapters
@@ -80,26 +137,10 @@ public interface NovelChapterMapper {
 
     @Update("""
             UPDATE novel_chapters
-            SET status = 2, last_generated_at = CURRENT_TIMESTAMP(3)
-            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
+            SET deleted_at = CURRENT_TIMESTAMP(3),
+                lease_owner_type = NULL, lease_owner_id = NULL, lease_token = NULL, lease_expires_at = NULL
+            WHERE project_id = #{projectId} AND volume_id = #{volumeId} AND deleted_at IS NULL
             """)
-    int publish(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId);
+    int softDeleteByVolume(@Param("projectId") Long projectId, @Param("volumeId") Long volumeId);
 
-    @Update("""
-            UPDATE novel_chapters
-            SET content_object_key = #{objectKey},
-                content_etag = #{etag},
-                content_size = #{size},
-                content_checksum = #{checksum},
-                content_revision = content_revision + 1,
-                storage_provider = #{storageProvider}
-            WHERE chapter_id = #{chapterId} AND project_id = #{projectId} AND deleted_at IS NULL
-            """)
-    int updateContentMeta(@Param("projectId") Long projectId,
-                          @Param("chapterId") Long chapterId,
-                          @Param("objectKey") String objectKey,
-                          @Param("etag") String etag,
-                          @Param("size") Long size,
-                          @Param("checksum") String checksum,
-                          @Param("storageProvider") String storageProvider);
 }

@@ -9,13 +9,23 @@ public final class NovelCommands {
      * CreateProjectCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record CreateProjectCommand(Long ownerUserId, String title, String summary, Integer status) {}
+    public record CreateProjectCommand(Long ownerUserId, String title, String summary, String genre,
+                                       String customGenre, java.util.List<String> tags, Integer status) {
+        public CreateProjectCommand(Long ownerUserId, String title, String summary, Integer status) {
+            this(ownerUserId, title, summary, null, null, java.util.List.of(), status);
+        }
+    }
 
     /**
      * UpdateProjectCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record UpdateProjectCommand(String title, String summary, Integer status) {}
+    public record UpdateProjectCommand(String title, String summary, String genre,
+                                       String customGenre, java.util.List<String> tags, Integer status) {
+        public UpdateProjectCommand(String title, String summary, Integer status) {
+            this(title, summary, null, null, java.util.List.of(), status);
+        }
+    }
 
     /**
      * CreateVolumeCommand。
@@ -33,80 +43,27 @@ public final class NovelCommands {
      * CreateChapterCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record CreateChapterCommand(Long volumeId,
-                                       Long outlineNodeId,
-                                       String title,
-                                       Integer sortOrder,
-                                       Integer status,
-                                       Integer wordCount,
-                                       String excerpt,
-                                       String contentObjectKey,
-                                       String contentEtag,
-                                       Long contentSize,
-                                       String contentChecksum,
-                                       String storageProvider) {}
+    public record CreateChapterCommand(Long volumeId, String title, Integer sortOrder) {}
+
+    public record ImportProjectCommand(CreateProjectCommand project, java.util.List<ImportVolumeCommand> volumes) {}
+
+    public record ImportVolumeCommand(String title, java.util.List<ImportChapterCommand> chapters) {}
+
+    public record ImportChapterCommand(String title, String content) {}
 
     /**
      * UpdateChapterCommand。
      * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
      */
-    public record UpdateChapterCommand(Long volumeId,
-                                       Long outlineNodeId,
-                                       String title,
-                                       Integer sortOrder,
-                                       Integer status,
-                                       Integer wordCount,
-                                       String excerpt,
-                                       String contentObjectKey,
-                                       String contentEtag,
-                                       Long contentSize,
-                                       String contentChecksum,
-                                       String storageProvider) {}
+    public record UpdateChapterCommand(String title) {}
 
-    public record MoveChapterCommand(Long volumeId, Integer sortOrder) {}
+    public enum DirectoryNodeType {
+        VOLUME,
+        CHAPTER
+    }
 
-    /**
-     * CreateChapterVersionCommand。
-     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
-     */
-    public record CreateChapterVersionCommand(String changeType, String changeReason, Long createdBy) {}
-
-    /**
-     * CommitChapterContentCommand。
-     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
-     */
-    public record CommitChapterContentCommand(String objectKey,
-                                              String etag,
-                                              Long size,
-                                              String checksum,
-                                              String storageProvider,
-                                              String content) {}
-
-    /**
-     * CreateOutlineNodeCommand。
-     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
-     */
-    public record CreateOutlineNodeCommand(Long parentId,
-                                           String title,
-                                           String nodeType,
-                                           Integer sortOrder,
-                                           String content) {}
-
-    /**
-     * UpdateOutlineNodeCommand。
-     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
-     */
-    public record UpdateOutlineNodeCommand(Long parentId,
-                                           String title,
-                                           String nodeType,
-                                           Integer sortOrder,
-                                           String content) {}
-
-    /**
-     * MoveOutlineNodeCommand。
-     * <p>业务层：负责业务流程编排、领域对象协作与审计事件触发。</p>
-     */
-    public record MoveOutlineNodeCommand(Long parentId, Integer sortOrder) {}
+    public record MoveDirectoryItemCommand(DirectoryNodeType nodeType, Long nodeId, Long targetVolumeId,
+                                           Integer sortOrder, Long expectedStructureRevision) {}
 
     /**
      * CreateCardCommand。

@@ -3,7 +3,6 @@ package com.penmate.backend.application.ops;
 import com.penmate.backend.domain.ops.model.OpsAsyncJob;
 import com.penmate.backend.domain.ops.repository.OpsRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.lang.management.ManagementFactory;
@@ -24,7 +23,6 @@ public class AsyncJobWorker {
         this.handlers = handlers.stream().collect(Collectors.toUnmodifiableMap(AsyncJobHandler::jobType, Function.identity()));
     }
 
-    @Scheduled(fixedDelayString = "${penmate.jobs.poll-delay:PT1S}")
     public void poll() {
         OpsAsyncJob job = repository.claimNext(workerId);
         if (job == null) return;

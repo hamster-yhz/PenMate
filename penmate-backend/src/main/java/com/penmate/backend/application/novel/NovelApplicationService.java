@@ -1,36 +1,37 @@
 package com.penmate.backend.application.novel;
 
 import com.penmate.backend.domain.novel.model.NovelChapter;
-import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelOutlineNode;
+import com.penmate.backend.domain.novel.model.ChapterAiUndoOperation;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
-import com.penmate.backend.domain.shared.service.ObjectStorageService;
-import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
 import com.penmate.backend.application.rag.ProjectAiConfigurationService;
-import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterVersionCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.CreateOutlineNodeCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateVolumeCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.MoveOutlineNodeCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.MoveChapterCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.ImportChapterCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.ImportProjectCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.ImportVolumeCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.DirectoryNodeType;
+import com.penmate.backend.application.novel.command.NovelCommands.MoveDirectoryItemCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateChapterCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.UpdateOutlineNodeCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateVolumeCommand;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
+import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -41,23 +42,24 @@ import java.util.UUID;
 @Slf4j
 public class NovelApplicationService {
 
+    private static final long CHAPTER_LEASE_SECONDS = 45;
+    private static final long AI_CHAPTER_LEASE_SECONDS = 300;
+    private static final long AI_UNDO_RETENTION_SECONDS = 24 * 60 * 60;
+    private static final Set<String> PROJECT_GENRES = Set.of(
+            "玄幻", "奇幻", "武侠", "仙侠", "都市", "历史", "科幻", "悬疑", "言情", "现实", "轻小说", "其他"
+    );
+
     private final NovelGateway novelGateway;
     private final BusinessIdGenerator businessIdGenerator;
-    private final RealtimeEventService realtimeEventService;
-    private final ObjectStorageService objectStorageService;
     private final StoryBibleApplicationService storyBibleApplicationService;
     private final ProjectAiConfigurationService projectAiConfigurationService;
 
     public NovelApplicationService(NovelGateway novelGateway,
                                    BusinessIdGenerator businessIdGenerator,
-                                   RealtimeEventService realtimeEventService,
-                                   ObjectStorageService objectStorageService,
                                    StoryBibleApplicationService storyBibleApplicationService,
                                    ProjectAiConfigurationService projectAiConfigurationService) {
         this.novelGateway = novelGateway;
         this.businessIdGenerator = businessIdGenerator;
-        this.realtimeEventService = realtimeEventService;
-        this.objectStorageService = objectStorageService;
         this.storyBibleApplicationService = storyBibleApplicationService;
         this.projectAiConfigurationService = projectAiConfigurationService;
     }
@@ -107,11 +109,57 @@ public class NovelApplicationService {
     @Transactional
     public NovelProject createProject(CreateProjectCommand command, String traceId) {
         log.info("创建小说项目: ownerUserId={}, title={}", command.ownerUserId(), command.title());
+        NovelProject project = insertProject(command);
+
+        NovelVolume firstVolume = insertVolume(project.getProjectId(), "第一卷", 1);
+        insertChapter(project.getProjectId(), firstVolume.getVolumeId(), "第一章", "", 1);
+
+        initializeProject(project, command.ownerUserId());
+        log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getProjectId(), command.ownerUserId());
+        return project;
+    }
+
+    @Transactional
+    public NovelProject createImportedProject(ImportProjectCommand command, String traceId) {
+        if (command == null || command.project() == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Import project is required");
+        }
+        List<ImportVolumeCommand> volumes = command.volumes() == null ? List.of() : command.volumes();
+        if (volumes.isEmpty()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Import requires at least one volume");
+        }
+        NovelProject project = insertProject(command.project());
+        int chapterCount = 0;
+        for (int volumeIndex = 0; volumeIndex < volumes.size(); volumeIndex++) {
+            ImportVolumeCommand sourceVolume = volumes.get(volumeIndex);
+            String volumeTitle = requireImportTitle(sourceVolume == null ? null : sourceVolume.title(), "Volume title");
+            NovelVolume volume = insertVolume(project.getProjectId(), volumeTitle, volumeIndex + 1);
+            List<ImportChapterCommand> chapters = sourceVolume.chapters() == null ? List.of() : sourceVolume.chapters();
+            if (chapters.isEmpty()) {
+                throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Every imported volume requires a chapter");
+            }
+            for (int chapterIndex = 0; chapterIndex < chapters.size(); chapterIndex++) {
+                ImportChapterCommand sourceChapter = chapters.get(chapterIndex);
+                String chapterTitle = requireImportTitle(sourceChapter == null ? null : sourceChapter.title(), "Chapter title");
+                insertChapter(project.getProjectId(), volume.getVolumeId(), chapterTitle,
+                        sourceChapter.content() == null ? "" : sourceChapter.content(), chapterIndex + 1);
+                chapterCount++;
+            }
+        }
+        if (chapterCount > 2000) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Import has too many chapters");
+        }
+        initializeProject(project, command.project().ownerUserId());
+        log.info("导入小说项目成功: projectId={}, volumeCount={}, chapterCount={}",
+                project.getProjectId(), volumes.size(), chapterCount);
+        return project;
+    }
+
+    private NovelProject insertProject(CreateProjectCommand command) {
         NovelProject project = new NovelProject();
         project.setProjectId(businessIdGenerator.nextId());
         project.setOwnerUserId(command.ownerUserId());
-        project.setTitle(command.title());
-        project.setSummary(command.summary());
+        applyProjectMetadata(project, command.title(), command.summary(), command.genre(), command.customGenre(), command.tags());
         project.setStatus(command.status() == null ? 1 : command.status());
         project.setStructureRevision(1L);
         int affected = novelGateway.insertProject(project);
@@ -119,15 +167,50 @@ public class NovelApplicationService {
             log.error("创建小说项目失败: ownerUserId={}, title={}", command.ownerUserId(), command.title());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create project");
         }
+        return project;
+    }
+
+    private NovelVolume insertVolume(Long projectId, String title, int sortOrder) {
+        NovelVolume volume = new NovelVolume();
+        volume.setVolumeId(businessIdGenerator.nextId());
+        volume.setProjectId(projectId);
+        volume.setTitle(title);
+        volume.setSortOrder(sortOrder);
+        if (novelGateway.insertVolume(volume) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create imported volume");
+        }
+        return volume;
+    }
+
+    private void insertChapter(Long projectId, Long volumeId, String title, String content, int sortOrder) {
+        NovelChapter chapter = new NovelChapter();
+        chapter.setChapterId(businessIdGenerator.nextId());
+        chapter.setProjectId(projectId);
+        chapter.setVolumeId(volumeId);
+        chapter.setTitle(title);
+        chapter.setSortOrder(sortOrder);
+        chapter.setContent(content);
+        chapter.setWordCount(countWords(content));
+        if (novelGateway.insertChapter(chapter) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create imported chapter");
+        }
+    }
+
+    private String requireImportTitle(String title, String field) {
+        String normalized = title == null ? "" : title.trim();
+        if (normalized.isEmpty() || normalized.length() > 200) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest(field + " must contain 1 to 200 characters");
+        }
+        return normalized;
+    }
+
+    private void initializeProject(NovelProject project, Long ownerUserId) {
         storyBibleApplicationService.bootstrap(
                 project.getProjectId(),
                 project.getTitle(),
-                command.ownerUserId()
+                ownerUserId
         );
-        projectAiConfigurationService.initializeProject(project.getProjectId(), command.ownerUserId());
-         
-        log.info("创建小说项目成功: projectId={}, ownerUserId={}", project.getProjectId(), command.ownerUserId());
-        return project;
+        projectAiConfigurationService.initializeProject(project.getProjectId(), ownerUserId);
     }
 
     /**
@@ -141,8 +224,7 @@ public class NovelApplicationService {
     public NovelProject updateProject(Long projectId, UpdateProjectCommand command, String traceId) {
         log.info("更新小说项目: projectId={}, title={}", projectId, command.title());
         NovelProject existing = getProject(projectId);
-        existing.setTitle(command.title());
-        existing.setSummary(command.summary());
+        applyProjectMetadata(existing, command.title(), command.summary(), command.genre(), command.customGenre(), command.tags());
         existing.setStatus(command.status() == null ? existing.getStatus() : command.status());
         int affected = novelGateway.updateProject(existing);
         if (affected != 1) {
@@ -154,6 +236,43 @@ public class NovelApplicationService {
         return getProject(projectId);
     }
 
+    private void applyProjectMetadata(NovelProject project, String title, String summary, String genre,
+                                      String customGenre, List<String> tags) {
+        if (title == null || title.isBlank()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Project title is required");
+        }
+        String normalizedGenre = genre == null || genre.isBlank() ? "其他" : genre.trim();
+        if (!PROJECT_GENRES.contains(normalizedGenre)) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Unsupported project genre");
+        }
+        String normalizedCustomGenre = customGenre == null ? null : customGenre.trim();
+        if ("其他".equals(normalizedGenre) && (normalizedCustomGenre == null || normalizedCustomGenre.isBlank())) {
+            normalizedCustomGenre = null;
+        }
+        if (normalizedCustomGenre != null && normalizedCustomGenre.length() > 40) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Custom genre is too long");
+        }
+        LinkedHashSet<String> normalizedTags = new LinkedHashSet<>();
+        if (tags != null) {
+            for (String tag : tags) {
+                if (tag == null || tag.isBlank()) continue;
+                String normalized = tag.trim();
+                if (normalized.length() > 12) {
+                    throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Project tag is too long");
+                }
+                normalizedTags.add(normalized);
+            }
+        }
+        if (normalizedTags.size() > 10) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("A project can have at most 10 tags");
+        }
+        project.setTitle(title.trim());
+        project.setSummary(summary == null ? null : summary.trim());
+        project.setGenre(normalizedGenre);
+        project.setCustomGenre("其他".equals(normalizedGenre) ? normalizedCustomGenre : null);
+        project.setTags(List.copyOf(normalizedTags));
+    }
+
     /**
      * 删除小说项目（软删除）。
      *
@@ -163,7 +282,7 @@ public class NovelApplicationService {
      */
     public void deleteProject(Long projectId, Long operatorId, String traceId) {
         log.info("删除小说项目: projectId={}, operatorId={}", projectId, operatorId);
-        int affected = novelGateway.softDeleteProject(projectId);
+        int affected = novelGateway.softDeleteProject(projectId, operatorId);
         if (affected != 1) {
             log.warn("删除小说项目失败: projectId={}, reason=not_found_or_deleted", projectId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Project not found or already deleted");
@@ -182,6 +301,11 @@ public class NovelApplicationService {
         List<NovelVolume> volumes = novelGateway.findVolumesByProjectId(projectId);
         log.info("查询分卷列表: projectId={}, count={}", projectId, volumes.size());
         return volumes;
+    }
+
+    public NovelDirectoryView getDirectory(Long projectId, Long actorUserId) {
+        NovelProject project = requireOwnedProject(projectId, actorUserId);
+        return directoryView(projectId, project.getStructureRevision());
     }
 
     /**
@@ -226,27 +350,32 @@ public class NovelApplicationService {
     @Transactional
     public NovelVolume updateVolume(Long projectId, Long volumeId, UpdateVolumeCommand command, Long operatorId, String traceId) {
         log.info("更新分卷: projectId={}, volumeId={}, operatorId={}", projectId, volumeId, operatorId);
-        NovelVolume existing = listVolumes(projectId).stream()
+        List<NovelVolume> volumes = new ArrayList<>(listVolumes(projectId));
+        NovelVolume existing = volumes.stream()
                 .filter(item -> volumeId.equals(item.getVolumeId()))
                 .findFirst()
-                .orElse(null);
-        NovelVolume volume = new NovelVolume();
-        volume.setVolumeId(volumeId);
-        volume.setProjectId(projectId);
-        volume.setTitle(command.title());
-        volume.setSortOrder(command.sortOrder() == null ? 0 : command.sortOrder());
-        volume.setDescription(command.description());
-        int affected = novelGateway.updateVolume(volume);
-        if (affected != 1) {
-            log.warn("更新分卷失败: projectId={}, volumeId={}, reason=not_found_or_deleted", projectId, volumeId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Volume not found or already deleted");
+                .orElseThrow(() -> com.penmate.backend.application.common.exception.BusinessException.of(
+                        "Volume not found or already deleted"));
+        existing.setTitle(command.title());
+        existing.setDescription(command.description());
+        int currentIndex = volumes.indexOf(existing);
+        int targetIndex = Math.max(0, Math.min(volumes.size() - 1,
+                (command.sortOrder() == null ? currentIndex + 1 : command.sortOrder()) - 1));
+        volumes.remove(currentIndex);
+        volumes.add(targetIndex, existing);
+        for (int index = 0; index < volumes.size(); index++) {
+            NovelVolume volume = volumes.get(index);
+            volume.setSortOrder(index + 1);
+            if (novelGateway.updateVolume(volume) != 1) {
+                throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to reorder volumes");
+            }
         }
-        if (existing == null || !Objects.equals(existing.getSortOrder(), volume.getSortOrder())) {
+        if (currentIndex != targetIndex) {
             incrementStructureRevision(projectId);
         }
          
         log.info("更新分卷成功: projectId={}, volumeId={}", projectId, volumeId);
-        return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getVolumeId())).findFirst().orElse(volume);
+        return listVolumes(projectId).stream().filter(v -> volumeId.equals(v.getVolumeId())).findFirst().orElse(existing);
     }
 
     /**
@@ -260,6 +389,7 @@ public class NovelApplicationService {
     @Transactional
     public void deleteVolume(Long projectId, Long volumeId, Long operatorId, String traceId) {
         log.info("删除分卷: projectId={}, volumeId={}, operatorId={}", projectId, volumeId, operatorId);
+        novelGateway.softDeleteChaptersByVolume(projectId, volumeId);
         int affected = novelGateway.softDeleteVolume(projectId, volumeId);
         if (affected != 1) {
             log.warn("删除分卷失败: projectId={}, volumeId={}, reason=not_found_or_deleted", projectId, volumeId);
@@ -304,6 +434,288 @@ public class NovelApplicationService {
         return chapter;
     }
 
+    @Transactional
+    public ChapterLeaseView acquireChapterLease(Long projectId, Long chapterId, Long actorUserId, boolean force) {
+        requireOwnedProject(projectId, actorUserId);
+        NovelChapter current = getChapter(projectId, chapterId);
+        String token = UUID.randomUUID().toString();
+        Instant expiresAt = Instant.now().plusSeconds(CHAPTER_LEASE_SECONDS);
+        int affected = novelGateway.acquireChapterLease(projectId, chapterId, "USER", actorUserId, token, expiresAt, force);
+        if (affected == 1) {
+            NovelChapter acquired = getChapter(projectId, chapterId);
+            return new ChapterLeaseView(true, token, acquired.getLeaseOwnerType(), acquired.getLeaseExpiresAt(),
+                    acquired.getContentRevision(), value(acquired.getContent()), null);
+        }
+        return new ChapterLeaseView(false, null, current.getLeaseOwnerType(), current.getLeaseExpiresAt(),
+                current.getContentRevision(), value(current.getContent()), "Chapter is being edited in another session");
+    }
+
+    @Transactional
+    public ChapterLeaseView acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId) {
+        requireOwnedProject(projectId, actorUserId);
+        if (runId == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Run id is required");
+        }
+        NovelChapter current = getChapter(projectId, chapterId);
+        String token = UUID.randomUUID().toString();
+        Instant expiresAt = Instant.now().plusSeconds(AI_CHAPTER_LEASE_SECONDS);
+        int affected = novelGateway.acquireChapterAiLease(projectId, chapterId, actorUserId, runId, token, expiresAt);
+        if (affected == 1) {
+            NovelChapter acquired = getChapter(projectId, chapterId);
+            return new ChapterLeaseView(true, token, acquired.getLeaseOwnerType(), acquired.getLeaseExpiresAt(),
+                    acquired.getContentRevision(), value(acquired.getContent()), null);
+        }
+        return new ChapterLeaseView(false, null, current.getLeaseOwnerType(), current.getLeaseExpiresAt(),
+                current.getContentRevision(), value(current.getContent()), "Chapter is locked by another editor");
+    }
+
+    @Transactional
+    public void renewChapterAiLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
+        requireOwnedProject(projectId, actorUserId);
+        Instant expiresAt = Instant.now().plusSeconds(AI_CHAPTER_LEASE_SECONDS);
+        if (novelGateway.renewChapterLease(projectId, chapterId, requireLeaseToken(leaseToken), expiresAt) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict("AI chapter lease has expired");
+        }
+    }
+
+    @Transactional
+    public void releaseChapterAiLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
+        requireOwnedProject(projectId, actorUserId);
+        novelGateway.releaseChapterLease(projectId, chapterId, requireLeaseToken(leaseToken));
+    }
+
+    @Transactional
+    public ChapterLeaseView renewChapterLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
+        requireOwnedProject(projectId, actorUserId);
+        Instant expiresAt = Instant.now().plusSeconds(CHAPTER_LEASE_SECONDS);
+        if (novelGateway.renewChapterLease(projectId, chapterId, requireLeaseToken(leaseToken), expiresAt) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict("Chapter editing lease has expired");
+        }
+        NovelChapter chapter = getChapter(projectId, chapterId);
+        return new ChapterLeaseView(true, leaseToken, chapter.getLeaseOwnerType(), chapter.getLeaseExpiresAt(),
+                chapter.getContentRevision(), value(chapter.getContent()), null);
+    }
+
+    @Transactional
+    public void releaseChapterLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
+        requireOwnedProject(projectId, actorUserId);
+        novelGateway.releaseChapterLease(projectId, chapterId, requireLeaseToken(leaseToken));
+    }
+
+    @Transactional
+    public NovelChapter saveChapterContent(Long projectId, Long chapterId, Long actorUserId, String leaseToken,
+                                           Long expectedRevision, String content) {
+        requireOwnedProject(projectId, actorUserId);
+        if (expectedRevision == null || expectedRevision < 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Expected revision is required");
+        }
+        String normalizedContent = value(content);
+        int wordCount = normalizedContent.codePoints().filter(codePoint -> !Character.isWhitespace(codePoint)).toArray().length;
+        int affected = novelGateway.updateChapterContent(projectId, chapterId, requireLeaseToken(leaseToken),
+                expectedRevision, normalizedContent, wordCount);
+        if (affected != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "Chapter changed or the editing lease is no longer valid");
+        }
+        novelGateway.invalidateAvailableAiUndoByChapter(projectId, chapterId);
+        return getChapter(projectId, chapterId);
+    }
+
+    @Transactional
+    public AiChapterEditResult saveAiChapterEdit(Long projectId, Long chapterId, Long actorUserId,
+                                                 Long runId, String toolCallId, String leaseToken,
+                                                 Long expectedRevision, String content) {
+        requireOwnedProject(projectId, actorUserId);
+        NovelChapter current = novelGateway.findChapterByIdAndProjectId(projectId, chapterId);
+        if (current == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("Chapter not found");
+        }
+        if (!Objects.equals(current.getContentRevision(), expectedRevision)) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict("Chapter changed before AI commit");
+        }
+        String normalizedContent = value(content);
+        if (normalizedContent.isBlank()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("AI chapter content must not be blank");
+        }
+        int wordCount = countWords(normalizedContent);
+        int affected = novelGateway.updateChapterContent(projectId, chapterId, requireLeaseToken(leaseToken),
+                expectedRevision, normalizedContent, wordCount);
+        if (affected != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "Chapter changed or the AI editing lease is no longer valid");
+        }
+
+        String currentHash = sha256(value(current.getContent()));
+        String resultHash = sha256(normalizedContent);
+        ChapterAiUndoOperation operation = novelGateway.findAvailableAiUndoByRunAndChapter(projectId, runId, chapterId);
+        if (operation != null && !Objects.equals(operation.getResultContentHash(), currentHash)) {
+            operation = null;
+        }
+        Instant createdAt = Instant.now();
+        Instant expiresAt = createdAt.plusSeconds(AI_UNDO_RETENTION_SECONDS);
+        if (operation == null) {
+            operation = new ChapterAiUndoOperation();
+            operation.setOperationId(businessIdGenerator.nextId());
+            operation.setProjectId(projectId);
+            operation.setChapterId(chapterId);
+            operation.setRunId(runId);
+            operation.setToolCallId(toolCallId);
+            operation.setBeforeContent(value(current.getContent()));
+            operation.setBeforeWordCount(current.getWordCount() == null ? countWords(value(current.getContent())) : current.getWordCount());
+            operation.setResultContentHash(resultHash);
+            operation.setSequenceNo(novelGateway.nextAiUndoSequence(projectId, chapterId));
+            operation.setAppliedRevision(expectedRevision + 1);
+            operation.setStatus("AVAILABLE");
+            operation.setCreatedAt(createdAt);
+            operation.setExpiresAt(expiresAt);
+            if (novelGateway.insertAiUndo(operation) != 1) {
+                throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to save AI undo operation");
+            }
+        } else {
+            operation.setToolCallId(toolCallId);
+            operation.setResultContentHash(resultHash);
+            operation.setAppliedRevision(expectedRevision + 1);
+            operation.setExpiresAt(expiresAt);
+            if (novelGateway.updateMergedAiUndo(operation) != 1) {
+                throw com.penmate.backend.application.common.exception.BusinessException.conflict("AI undo operation is no longer available");
+            }
+        }
+        NovelChapter saved = getChapter(projectId, chapterId);
+        return new AiChapterEditResult(saved, toUndoView(operation, saved.getTitle()));
+    }
+
+    public List<AiUndoView> listAvailableAiUndoForChapter(Long projectId, Long chapterId, Long actorUserId) {
+        requireOwnedProject(projectId, actorUserId);
+        String title = getChapter(projectId, chapterId).getTitle();
+        return novelGateway.listAvailableAiUndoByChapter(projectId, chapterId).stream()
+                .map(operation -> toUndoView(operation, title))
+                .toList();
+    }
+
+    @Transactional
+    public AiUndoView undoAiChapterEdit(Long projectId, Long operationId, Long actorUserId) {
+        requireOwnedProject(projectId, actorUserId);
+        ChapterAiUndoOperation operation = novelGateway.findAiUndoByOperationId(projectId, operationId);
+        if (operation == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("AI edit operation not found");
+        }
+        return restoreAiOperation(operation);
+    }
+
+    @Transactional
+    public List<AiUndoView> undoAiChapterEditsForRun(Long projectId, Long runId, Long actorUserId) {
+        requireOwnedProject(projectId, actorUserId);
+        List<ChapterAiUndoOperation> operations = novelGateway.listAvailableAiUndoByRun(projectId, runId);
+        if (operations.isEmpty()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict("No AI edits from this run can be undone");
+        }
+        for (ChapterAiUndoOperation operation : operations) {
+            assertLatestUndoOperation(operation);
+            assertUndoMatchesCurrentChapter(operation);
+        }
+        List<AiUndoView> restored = new ArrayList<>();
+        for (ChapterAiUndoOperation operation : operations) {
+            restored.add(restoreAiOperation(operation));
+        }
+        return List.copyOf(restored);
+    }
+
+    private AiUndoView restoreAiOperation(ChapterAiUndoOperation operation) {
+        if (!"AVAILABLE".equals(operation.getStatus()) || operation.getExpiresAt() == null
+                || !operation.getExpiresAt().isAfter(Instant.now())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict("AI edit can no longer be undone");
+        }
+        assertLatestUndoOperation(operation);
+        NovelChapter current = assertUndoMatchesCurrentChapter(operation);
+        int affected = novelGateway.restoreAiChapterContent(operation.getProjectId(), operation.getChapterId(),
+                current.getContentRevision(), value(current.getContent()), operation.getBeforeContent(),
+                operation.getBeforeWordCount());
+        if (affected != 1 || novelGateway.markAiUndoUndone(operation.getOperationId()) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "Chapter changed while the AI edit was being undone");
+        }
+        List<ChapterAiUndoOperation> remaining = novelGateway.listAvailableAiUndoByChapter(
+                operation.getProjectId(), operation.getChapterId());
+        if (!remaining.isEmpty()) {
+            novelGateway.rebaseAiUndoRevision(remaining.getFirst().getOperationId(), current.getContentRevision() + 1);
+        }
+        operation.setStatus("UNDONE");
+        operation.setUndoneAt(Instant.now());
+        return toUndoView(operation, current.getTitle());
+    }
+
+    private void assertLatestUndoOperation(ChapterAiUndoOperation operation) {
+        List<ChapterAiUndoOperation> stack = novelGateway.listAvailableAiUndoByChapter(
+                operation.getProjectId(), operation.getChapterId());
+        if (stack.isEmpty() || !Objects.equals(stack.getFirst().getOperationId(), operation.getOperationId())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "A newer AI edit must be undone first");
+        }
+    }
+
+    private NovelChapter assertUndoMatchesCurrentChapter(ChapterAiUndoOperation operation) {
+        NovelChapter current = novelGateway.findChapterByIdAndProjectId(operation.getProjectId(), operation.getChapterId());
+        if (current == null || !Objects.equals(current.getContentRevision(), operation.getAppliedRevision())
+                || !Objects.equals(sha256(value(current.getContent())), operation.getResultContentHash())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "Chapter was changed after the AI edit");
+        }
+        return current;
+    }
+
+    private AiUndoView toUndoView(ChapterAiUndoOperation operation, String chapterTitle) {
+        return new AiUndoView(operation.getOperationId(), operation.getRunId(), operation.getChapterId(), chapterTitle,
+                operation.getStatus(), operation.getSequenceNo(), operation.getCreatedAt(), operation.getExpiresAt(),
+                operation.getUndoneAt());
+    }
+
+    private int countWords(String content) {
+        return value(content).codePoints().filter(codePoint -> !Character.isWhitespace(codePoint)).toArray().length;
+    }
+
+    private String sha256(String content) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value(content).getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable", ex);
+        }
+    }
+
+    private NovelProject requireOwnedProject(Long projectId, Long actorUserId) {
+        NovelProject project = getProject(projectId);
+        if (!Objects.equals(project.getOwnerUserId(), actorUserId)) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("Project not found");
+        }
+        return project;
+    }
+
+    private String requireLeaseToken(String leaseToken) {
+        if (leaseToken == null || leaseToken.isBlank()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Lease token is required");
+        }
+        return leaseToken.trim();
+    }
+
+    private String value(String content) {
+        return content == null ? "" : content;
+    }
+
+    public record ChapterLeaseView(boolean editable, String leaseToken, String ownerType, Instant expiresAt,
+                                   Long contentRevision, String content, String reason) {
+    }
+
+    public record AiChapterEditResult(NovelChapter chapter, AiUndoView undo) {
+    }
+
+    public record AiUndoView(Long operationId, Long runId, Long chapterId, String chapterTitle, String status,
+                             Long sequenceNo, Instant createdAt, Instant expiresAt, Instant undoneAt) {
+    }
+
+    public record NovelDirectoryView(Long structureRevision, List<NovelVolume> volumes,
+                                     List<NovelChapter> chapters) {
+    }
+
     /**
      * 创建章节。
      *
@@ -316,21 +728,15 @@ public class NovelApplicationService {
     @Transactional
     public NovelChapter createChapter(Long projectId, CreateChapterCommand command, Long operatorId, String traceId) {
         log.info("创建章节: projectId={}, title={}, sortOrder={}, operatorId={}", projectId, command.title(), command.sortOrder(), operatorId);
+        requireVolume(projectId, command.volumeId());
         NovelChapter chapter = new NovelChapter();
         chapter.setChapterId(businessIdGenerator.nextId());
         chapter.setProjectId(projectId);
         chapter.setVolumeId(command.volumeId());
-        chapter.setOutlineNodeId(command.outlineNodeId());
         chapter.setTitle(command.title());
         chapter.setSortOrder(command.sortOrder());
-        chapter.setStatus(command.status() == null ? 1 : command.status());
-        chapter.setWordCount(command.wordCount() == null ? 0 : command.wordCount());
-        chapter.setExcerpt(command.excerpt());
-        chapter.setContentObjectKey(command.contentObjectKey() == null ? "" : command.contentObjectKey());
-        chapter.setContentEtag(command.contentEtag());
-        chapter.setContentSize(command.contentSize());
-        chapter.setContentChecksum(command.contentChecksum());
-        chapter.setStorageProvider(command.storageProvider() == null ? "s3" : command.storageProvider());
+        chapter.setWordCount(0);
+        chapter.setContent("");
         int affected = novelGateway.insertChapter(chapter);
         if (affected != 1) {
             log.error("创建章节失败: projectId={}, title={}", projectId, command.title());
@@ -357,47 +763,137 @@ public class NovelApplicationService {
     public NovelChapter updateChapter(Long projectId, Long chapterId, UpdateChapterCommand command, Long operatorId, String traceId) {
         log.info("更新章节: projectId={}, chapterId={}, operatorId={}", projectId, chapterId, operatorId);
         NovelChapter chapter = getChapter(projectId, chapterId);
-        boolean structureChanged = !Objects.equals(chapter.getVolumeId(), command.volumeId())
-                || !Objects.equals(chapter.getSortOrder(), command.sortOrder());
-        chapter.setVolumeId(command.volumeId());
-        chapter.setOutlineNodeId(command.outlineNodeId());
         chapter.setTitle(command.title());
-        chapter.setSortOrder(command.sortOrder());
-        chapter.setStatus(command.status() == null ? chapter.getStatus() : command.status());
-        chapter.setWordCount(command.wordCount() == null ? chapter.getWordCount() : command.wordCount());
-        chapter.setExcerpt(command.excerpt());
-        chapter.setContentObjectKey(command.contentObjectKey() == null ? chapter.getContentObjectKey() : command.contentObjectKey());
-        chapter.setContentEtag(command.contentEtag());
-        chapter.setContentSize(command.contentSize());
-        chapter.setContentChecksum(command.contentChecksum());
-        chapter.setStorageProvider(command.storageProvider() == null ? chapter.getStorageProvider() : command.storageProvider());
         int affected = novelGateway.updateChapter(chapter);
         if (affected != 1) {
             log.error("更新章节失败: projectId={}, chapterId={}", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update chapter");
         }
-        if (structureChanged) {
-            incrementStructureRevision(projectId);
-        }
-         
+
         log.info("更新章节成功: projectId={}, chapterId={}", projectId, chapterId);
         return getChapter(projectId, chapterId);
     }
 
     @Transactional
-    public NovelChapter moveChapter(Long projectId, Long chapterId, MoveChapterCommand command, Long operatorId, String traceId) {
-        NovelChapter chapter = getChapter(projectId, chapterId);
-        if (Objects.equals(chapter.getVolumeId(), command.volumeId())
-                && Objects.equals(chapter.getSortOrder(), command.sortOrder())) {
-            return chapter;
+    public NovelDirectoryView moveDirectoryItem(Long projectId, MoveDirectoryItemCommand command,
+                                                Long operatorId, String traceId) {
+        NovelProject project = lockOwnedProject(projectId, operatorId);
+        if (!Objects.equals(project.getStructureRevision(), command.expectedStructureRevision())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "The directory changed elsewhere. Refresh and try again");
         }
-        chapter.setVolumeId(command.volumeId());
-        chapter.setSortOrder(command.sortOrder());
-        if (novelGateway.updateChapter(chapter) != 1) {
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to move chapter");
+
+        boolean changed = command.nodeType() == DirectoryNodeType.VOLUME
+                ? moveVolume(projectId, command.nodeId(), command.sortOrder())
+                : moveChapter(projectId, command.nodeId(), command.targetVolumeId(), command.sortOrder());
+        if (!changed) {
+            return directoryView(projectId, project.getStructureRevision());
         }
+
         incrementStructureRevision(projectId);
-        return getChapter(projectId, chapterId);
+        return directoryView(projectId, project.getStructureRevision() + 1);
+    }
+
+    private boolean moveVolume(Long projectId, Long volumeId, Integer sortOrder) {
+        List<NovelVolume> volumes = new ArrayList<>(novelGateway.findVolumesByProjectId(projectId));
+        int currentIndex = -1;
+        for (int index = 0; index < volumes.size(); index++) {
+            if (Objects.equals(volumes.get(index).getVolumeId(), volumeId)) {
+                currentIndex = index;
+                break;
+            }
+        }
+        if (currentIndex < 0) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("Volume not found");
+        }
+        int targetIndex = Math.max(0, Math.min(volumes.size() - 1, sortOrder - 1));
+        if (currentIndex == targetIndex) return false;
+
+        NovelVolume moved = volumes.remove(currentIndex);
+        volumes.add(targetIndex, moved);
+        for (int index = 0; index < volumes.size(); index++) {
+            NovelVolume volume = volumes.get(index);
+            volume.setSortOrder(index + 1);
+            if (novelGateway.updateVolume(volume) != 1) {
+                throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to reorder volumes");
+            }
+        }
+        return true;
+    }
+
+    private boolean moveChapter(Long projectId, Long chapterId, Long targetVolumeId, Integer sortOrder) {
+        if (targetVolumeId == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest(
+                    "Target volume is required for a chapter move");
+        }
+        List<NovelVolume> volumes = novelGateway.findVolumesByProjectId(projectId);
+        if (volumes.stream().noneMatch(volume -> Objects.equals(volume.getVolumeId(), targetVolumeId))) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("Target volume not found");
+        }
+
+        List<NovelChapter> allChapters = novelGateway.findChaptersByProjectId(projectId);
+        NovelChapter chapter = allChapters.stream()
+                .filter(item -> Objects.equals(item.getChapterId(), chapterId))
+                .findFirst()
+                .orElseThrow(() -> com.penmate.backend.application.common.exception.BusinessException.notFound(
+                        "Chapter not found"));
+        Long sourceVolumeId = chapter.getVolumeId();
+        List<NovelChapter> source = new ArrayList<>(allChapters.stream()
+                .filter(item -> Objects.equals(item.getVolumeId(), sourceVolumeId))
+                .toList());
+        int currentIndex = source.indexOf(chapter);
+        int destinationSize = (int) allChapters.stream()
+                .filter(item -> Objects.equals(item.getVolumeId(), targetVolumeId))
+                .filter(item -> !Objects.equals(item.getChapterId(), chapterId))
+                .count();
+        int targetIndex = Math.max(0, Math.min(destinationSize, sortOrder - 1));
+        if (Objects.equals(sourceVolumeId, targetVolumeId) && currentIndex == targetIndex) return false;
+
+        List<NovelChapter> destination = new ArrayList<>(allChapters.stream()
+                .filter(item -> Objects.equals(item.getVolumeId(), targetVolumeId))
+                .filter(item -> !Objects.equals(item.getChapterId(), chapterId))
+                .toList());
+        chapter.setVolumeId(targetVolumeId);
+        destination.add(targetIndex, chapter);
+        resequenceChapters(destination);
+        if (!Objects.equals(sourceVolumeId, targetVolumeId)) {
+            resequenceChapters(source.stream()
+                    .filter(item -> !Objects.equals(item.getChapterId(), chapterId))
+                    .toList());
+        }
+        return true;
+    }
+
+    private void resequenceChapters(List<NovelChapter> chapters) {
+        for (int index = 0; index < chapters.size(); index++) {
+            NovelChapter chapter = chapters.get(index);
+            chapter.setSortOrder(index + 1);
+            if (novelGateway.updateChapter(chapter) != 1) {
+                throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to reorder chapters");
+            }
+        }
+    }
+
+    private NovelVolume requireVolume(Long projectId, Long volumeId) {
+        if (volumeId == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Volume is required");
+        }
+        return novelGateway.findVolumesByProjectId(projectId).stream()
+                .filter(volume -> Objects.equals(volume.getVolumeId(), volumeId))
+                .findFirst()
+                .orElseThrow(() -> com.penmate.backend.application.common.exception.BusinessException.of("Volume not found"));
+    }
+
+    private NovelProject lockOwnedProject(Long projectId, Long actorUserId) {
+        NovelProject project = novelGateway.lockProject(projectId);
+        if (project == null || !Objects.equals(project.getOwnerUserId(), actorUserId)) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("Project not found");
+        }
+        return project;
+    }
+
+    private NovelDirectoryView directoryView(Long projectId, Long structureRevision) {
+        return new NovelDirectoryView(structureRevision, listVolumes(projectId), listChapters(projectId));
     }
 
     /**
@@ -422,139 +918,6 @@ public class NovelApplicationService {
     }
 
     /**
-     * 发布章节。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     */
-    public void publishChapter(Long projectId, Long chapterId, Long operatorId, String traceId) {
-        log.info("发布章节: projectId={}, chapterId={}, operatorId={}", projectId, chapterId, operatorId);
-        int affected = novelGateway.publishChapter(projectId, chapterId);
-        if (affected != 1) {
-            log.warn("发布章节失败: projectId={}, chapterId={}, reason=not_found_or_deleted", projectId, chapterId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
-        }
-         
-        log.info("发布章节成功: projectId={}, chapterId={}", projectId, chapterId);
-    }
-
-    /**
-     * 查询章节版本列表。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @return 出参：处理结果
-     */
-    public List<NovelChapterVersion> listChapterVersions(Long projectId, Long chapterId) {
-        getChapter(projectId, chapterId);
-        List<NovelChapterVersion> versions = novelGateway.findVersionsByChapterId(chapterId);
-        log.info("查询章节版本列表: projectId={}, chapterId={}, count={}", projectId, chapterId, versions.size());
-        return versions;
-    }
-
-    /**
-     * 创建章节版本快照。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param command 入参：command
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelChapterVersion createChapterVersion(Long projectId, Long chapterId, CreateChapterVersionCommand command, String traceId) {
-        log.info("创建章节版本: projectId={}, chapterId={}, changeType={}, createdBy={}", projectId, chapterId, command.changeType(), command.createdBy());
-        NovelChapter chapter = getChapter(projectId, chapterId);
-        NovelChapterVersion version = new NovelChapterVersion();
-        version.setChapterId(chapterId);
-        // 复杂流程解析：基于当前最大版本号自增，保证版本链连续且可追溯。
-        Integer maxVersionNo = novelGateway.maxVersionNo(chapterId);
-        version.setVersionNo((maxVersionNo == null ? 0 : maxVersionNo) + 1);
-        version.setChangeType(command.changeType());
-        version.setChangeReason(command.changeReason());
-        version.setSnapshotObjectKey(chapter.getContentObjectKey());
-        version.setSnapshotEtag(chapter.getContentEtag());
-        version.setSnapshotSize(chapter.getContentSize());
-        version.setSnapshotChecksum(chapter.getContentChecksum());
-        version.setCreatedBy(command.createdBy());
-        int affected = novelGateway.insertChapterVersion(version);
-        if (affected != 1) {
-            log.error("创建章节版本失败: projectId={}, chapterId={}", projectId, chapterId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create chapter version");
-        }
-         
-        log.info("创建章节版本成功: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, version.getVersionNo());
-        return version;
-    }
-
-    /**
-     * 查询章节指定版本详情。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @return 出参：处理结果
-     */
-    public NovelChapterVersion getChapterVersion(Long projectId, Long chapterId, Integer versionNo) {
-        Objects.requireNonNull(projectId, "projectId must not be null");
-        Objects.requireNonNull(chapterId, "chapterId must not be null");
-        Objects.requireNonNull(versionNo, "versionNo must not be null");
-        log.info("查询章节版本详情: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-        getChapter(projectId, chapterId);
-        NovelChapterVersion version = novelGateway.findVersionByChapterAndVersion(chapterId, versionNo);
-        if (version == null) {
-            log.warn("查询章节版本详情失败: projectId={}, chapterId={}, versionNo={}, reason=not_found", projectId, chapterId, versionNo);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter version not found");
-        }
-        log.info("查询章节版本详情成功: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-        return version;
-    }
-
-    /**
-     * 按版本号恢复章节内容元数据。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelChapter restoreChapterVersion(Long projectId, Long chapterId, Integer versionNo, Long operatorId, String traceId) {
-        log.info("恢复章节版本: projectId={}, chapterId={}, versionNo={}, operatorId={}", projectId, chapterId, versionNo, operatorId);
-        NovelChapterVersion version = getChapterVersion(projectId, chapterId, versionNo);
-        // 复杂流程解析：恢复版本时仅回滚内容元数据，不覆盖章节业务字段，确保恢复行为可审计。
-        int affected = novelGateway.updateChapterContentMeta(projectId, chapterId, version.getSnapshotObjectKey(), version.getSnapshotEtag(), version.getSnapshotSize(), version.getSnapshotChecksum(), "s3");
-        if (affected != 1) {
-            log.error("恢复章节版本失败: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to restore chapter version");
-        }
-         
-        log.info("恢复章节版本成功: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-        return getChapter(projectId, chapterId);
-    }
-
-    /**
-     * 获取章节正文读取地址。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @return 出参：处理结果
-     */
-    public Map<String, String> getChapterContentUrl(Long projectId, Long chapterId) {
-        Objects.requireNonNull(projectId, "projectId must not be null");
-        Objects.requireNonNull(chapterId, "chapterId must not be null");
-        NovelChapter chapter = getChapter(projectId, chapterId);
-        if (chapter.getContentObjectKey() == null || chapter.getContentObjectKey().isBlank()) {
-            log.warn("章节正文对象键为空: projectId={}, chapterId={}", projectId, chapterId);
-            return Map.of("url", "");
-        }
-        log.info("获取章节正文读取地址: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, chapter.getContentObjectKey());
-        return Map.of("url", objectStorageService.buildReadUrl(chapter.getContentObjectKey()));
-    }
-
-    /**
      * 服务端直接读取章节正文文本。
      *
      * @param projectId 入参：projectId
@@ -565,211 +928,7 @@ public class NovelApplicationService {
         Objects.requireNonNull(projectId, "projectId must not be null");
         Objects.requireNonNull(chapterId, "chapterId must not be null");
         NovelChapter chapter = getChapter(projectId, chapterId);
-        if (chapter.getContentObjectKey() == null || chapter.getContentObjectKey().isBlank()) {
-            log.warn("章节正文对象键为空，返回空文本: projectId={}, chapterId={}", projectId, chapterId);
-            return "";
-        }
-        log.info("服务端读取章节正文文本: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, chapter.getContentObjectKey());
-        return objectStorageService.readText(chapter.getContentObjectKey());
-    }
-
-    /**
-     * 获取章节正文上传地址。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @return 出参：处理结果
-     */
-    public Map<String, String> getChapterContentUploadUrl(Long projectId, Long chapterId) {
-        Objects.requireNonNull(projectId, "projectId must not be null");
-        Objects.requireNonNull(chapterId, "chapterId must not be null");
-        getChapter(projectId, chapterId);
-        String objectKey = "novels/" + projectId + "/chapters/" + chapterId + "/" + UUID.randomUUID() + ".md";
-        log.info("获取章节正文上传地址: projectId={}, chapterId={}, objectKey={}", projectId, chapterId, objectKey);
-        return Map.of(
-                "objectKey", objectKey,
-                "uploadUrl", objectStorageService.buildUploadUrl(objectKey, "text/plain; charset=utf-8")
-        );
-    }
-
-    /**
-     * 提交章节正文对象存储元数据。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param command 入参：command
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelChapter commitChapterContent(Long projectId, Long chapterId, CommitChapterContentCommand command, Long operatorId, String traceId) {
-        Objects.requireNonNull(command, "command must not be null");
-        Objects.requireNonNull(projectId, "projectId must not be null");
-        Objects.requireNonNull(chapterId, "chapterId must not be null");
-        Objects.requireNonNull(command.objectKey(), "objectKey must not be null");
-        Objects.requireNonNull(operatorId, "operatorId must not be null");
-        log.info("提交章节正文元数据: projectId={}, chapterId={}, objectKey={}, operatorId={}", projectId, chapterId, command.objectKey(), operatorId);
-        if (command.content() != null && !command.content().isBlank()) {
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Direct upload mode does not accept content in commit payload");
-        }
-        int affected = novelGateway.updateChapterContentMeta(
-                projectId,
-                chapterId,
-                command.objectKey(),
-                command.etag(),
-                command.size(),
-                command.checksum(),
-                command.storageProvider() == null ? "s3" : command.storageProvider()
-        );
-        if (affected != 1) {
-            log.error("提交章节正文元数据失败: projectId={}, chapterId={}", projectId, chapterId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to commit chapter content");
-        }
-         
-        log.info("提交章节正文元数据成功: projectId={}, chapterId={}", projectId, chapterId);
-        return getChapter(projectId, chapterId);
-    }
-
-    /**
-     * 获取章节版本快照读取地址。
-     *
-     * @param projectId 入参：projectId
-     * @param chapterId 入参：chapterId
-     * @param versionNo 入参：versionNo
-     * @return 出参：处理结果
-     */
-    public Map<String, String> getChapterVersionSnapshotUrl(Long projectId, Long chapterId, Integer versionNo) {
-        Objects.requireNonNull(projectId, "projectId must not be null");
-        Objects.requireNonNull(chapterId, "chapterId must not be null");
-        Objects.requireNonNull(versionNo, "versionNo must not be null");
-        NovelChapterVersion version = getChapterVersion(projectId, chapterId, versionNo);
-        if (version.getSnapshotObjectKey() == null || version.getSnapshotObjectKey().isBlank()) {
-            log.warn("章节版本快照对象键为空: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-            return Map.of("url", "");
-        }
-        log.info("获取章节版本快照地址: projectId={}, chapterId={}, versionNo={}", projectId, chapterId, versionNo);
-        return Map.of("url", objectStorageService.buildReadUrl(version.getSnapshotObjectKey()));
-    }
-
-    /**
-     * 查询项目大纲树。
-     *
-     * @param projectId 入参：projectId
-     * @return 出参：处理结果
-     */
-    public List<NovelOutlineNode> listOutlineTree(Long projectId) {
-        getProject(projectId);
-        List<NovelOutlineNode> nodes = novelGateway.findOutlineNodesByProjectId(projectId);
-        log.info("查询大纲树: projectId={}, count={}", projectId, nodes.size());
-        return nodes;
-    }
-
-    /**
-     * 创建大纲节点。
-     *
-     * @param projectId 入参：projectId
-     * @param command 入参：command
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelOutlineNode createOutlineNode(Long projectId, CreateOutlineNodeCommand command, Long operatorId, String traceId) {
-        log.info("创建大纲节点: projectId={}, title={}, parentId={}, operatorId={}", projectId, command.title(), command.parentId(), operatorId);
-        getProject(projectId);
-        NovelOutlineNode node = new NovelOutlineNode();
-        node.setOutlineNodeId(businessIdGenerator.nextId());
-        node.setProjectId(projectId);
-        node.setParentId(command.parentId());
-        node.setTitle(command.title());
-        node.setNodeType(command.nodeType() == null ? "chapter" : command.nodeType());
-        node.setSortOrder(command.sortOrder() == null ? 0 : command.sortOrder());
-        node.setContent(command.content());
-        int affected = novelGateway.insertOutlineNode(node);
-        if (affected != 1) {
-            log.error("创建大纲节点失败: projectId={}, title={}", projectId, command.title());
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create outline node");
-        }
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("nodeId", node.getOutlineNodeId());
-        payload.put("parentId", node.getParentId());
-        payload.put("title", node.getTitle());
-        payload.put("nodeType", node.getNodeType());
-        realtimeEventService.publishProjectEvent(projectId, "outline.node.created", payload);
-         
-        log.info("创建大纲节点成功: projectId={}, nodeId={}", projectId, node.getOutlineNodeId());
-        return node;
-    }
-
-    /**
-     * 更新大纲节点信息。
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param command 入参：command
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     * @return 出参：处理结果
-     */
-    public NovelOutlineNode updateOutlineNode(Long projectId, Long nodeId, UpdateOutlineNodeCommand command, Long operatorId, String traceId) {
-        log.info("更新大纲节点: projectId={}, nodeId={}, operatorId={}", projectId, nodeId, operatorId);
-        NovelOutlineNode existing = novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
-        if (existing == null) {
-            log.warn("更新大纲节点失败: projectId={}, nodeId={}, reason=not_found", projectId, nodeId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
-        }
-        existing.setParentId(command.parentId());
-        existing.setTitle(command.title());
-        existing.setNodeType(command.nodeType() == null ? existing.getNodeType() : command.nodeType());
-        existing.setSortOrder(command.sortOrder() == null ? existing.getSortOrder() : command.sortOrder());
-        existing.setContent(command.content());
-        int affected = novelGateway.updateOutlineNode(existing);
-        if (affected != 1) {
-            log.error("更新大纲节点失败: projectId={}, nodeId={}, reason=update_failed", projectId, nodeId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update outline node");
-        }
-         
-        log.info("更新大纲节点成功: projectId={}, nodeId={}", projectId, nodeId);
-        return novelGateway.findOutlineNodeByIdAndProjectId(projectId, nodeId);
-    }
-
-    /**
-     * 移动大纲节点位置。
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param command 入参：command
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     */
-    public void moveOutlineNode(Long projectId, Long nodeId, MoveOutlineNodeCommand command, Long operatorId, String traceId) {
-        log.info("移动大纲节点: projectId={}, nodeId={}, parentId={}, sortOrder={}, operatorId={}",
-                projectId, nodeId, command.parentId(), command.sortOrder(), operatorId);
-        int affected = novelGateway.moveOutlineNode(projectId, nodeId, command.parentId(), command.sortOrder() == null ? 0 : command.sortOrder());
-        if (affected != 1) {
-            log.warn("移动大纲节点失败: projectId={}, nodeId={}, reason=not_found", projectId, nodeId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
-        }
-         
-        log.info("移动大纲节点成功: projectId={}, nodeId={}", projectId, nodeId);
-    }
-
-    /**
-     * 删除大纲节点（软删除）。
-     *
-     * @param projectId 入参：projectId
-     * @param nodeId 入参：nodeId
-     * @param operatorId 入参：operatorId
-     * @param traceId 入参：traceId
-     */
-    public void deleteOutlineNode(Long projectId, Long nodeId, Long operatorId, String traceId) {
-        log.info("删除大纲节点: projectId={}, nodeId={}, operatorId={}", projectId, nodeId, operatorId);
-        int affected = novelGateway.softDeleteOutlineNode(projectId, nodeId);
-        if (affected != 1) {
-            log.warn("删除大纲节点失败: projectId={}, nodeId={}, reason=not_found", projectId, nodeId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Outline node not found");
-        }
-
-        log.info("删除大纲节点成功: projectId={}, nodeId={}", projectId, nodeId);
+        return value(chapter.getContent());
     }
     private void applyDisplayNo(Long projectId, NovelChapter target) {
         List<NovelChapter> ordered = novelGateway.findChaptersByProjectId(projectId);

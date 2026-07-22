@@ -1,20 +1,18 @@
 package com.penmate.backend.application.novel;
 
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
-import com.penmate.backend.application.novel.command.NovelCommands.CommitChapterContentCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
-import com.penmate.backend.application.novel.command.NovelCommands.CreateOutlineNodeCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.ImportChapterCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.ImportProjectCommand;
+import com.penmate.backend.application.novel.command.NovelCommands.ImportVolumeCommand;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
 import com.penmate.backend.application.rag.ProjectAiConfigurationService;
 import com.penmate.backend.domain.novel.model.NovelChapter;
-import com.penmate.backend.domain.novel.model.NovelChapterVersion;
-import com.penmate.backend.domain.novel.model.NovelOutlineNode;
+import com.penmate.backend.domain.novel.model.ChapterAiUndoOperation;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelVolume;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
-import com.penmate.backend.domain.shared.service.ObjectStorageService;
-import com.penmate.backend.domain.shared.service.RealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,17 +21,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class NovelApplicationServiceTest extends BaseApplicationServiceTest {
@@ -42,13 +41,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     private NovelGateway novelGateway;
 
     @Mock
-    private RealtimeEventService realtimeEventService;
-
-    @Mock
     private BusinessIdGenerator businessIdGenerator;
-
-    @Mock
-    private ObjectStorageService objectStorageService;
 
     @Mock
     private StoryBibleApplicationService storyBibleApplicationService;
@@ -76,42 +69,11 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_CREATE_OUTLINE_NODE_ALLOW_NULL_PARENT_ID() {
-        NovelProject project = new NovelProject();
-        project.setId(920002L);
-        project.setTitle("DBCASE_长夜行_连载");
-        when(businessIdGenerator.nextId()).thenReturn(930001L);
-        when(novelGateway.findProjectById(920002L)).thenReturn(project);
-        when(novelGateway.insertOutlineNode(any(NovelOutlineNode.class))).thenAnswer(invocation -> {
-            NovelOutlineNode node = invocation.getArgument(0);
-            node.setId(123L);
-            return 1;
-        });
-        doNothing().when(realtimeEventService).publishProjectEvent(eq(920002L), eq("outline.node.created"), any());
-
-        NovelOutlineNode created = novelApplicationService.createOutlineNode(
-                920002L,
-                new CreateOutlineNodeCommand(null, "第一卷：新的篇章", "chapter", 1, "content"),
-                920001L,
-                "trace-test"
-        );
-
-        ArgumentCaptor<NovelOutlineNode> nodeCaptor = ArgumentCaptor.forClass(NovelOutlineNode.class);
-        verify(novelGateway).insertOutlineNode(nodeCaptor.capture());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass((Class) Map.class);
-        verify(realtimeEventService).publishProjectEvent(eq(920002L), eq("outline.node.created"), payloadCaptor.capture());
-        assertThat(created.getId()).isEqualTo(123L);
-        assertThat(created.getOutlineNodeId()).isEqualTo(930001L);
-        assertThat(created.getParentId()).isNull();
-        assertThat(nodeCaptor.getValue().getOutlineNodeId()).isEqualTo(930001L);
-        assertThat(payloadCaptor.getValue()).containsEntry("nodeId", 930001L);
-    }
-
-    @Test
     void UT_APP_NOVEL_CREATE_PROJECT_DEFAULT_STATUS_AND_GENERATED_ID() {
-        when(businessIdGenerator.nextId()).thenReturn(900001L);
+        when(businessIdGenerator.nextId()).thenReturn(900001L, 900011L, 900021L);
         when(novelGateway.insertProject(any(NovelProject.class))).thenReturn(1);
+        when(novelGateway.insertVolume(any(NovelVolume.class))).thenReturn(1);
+        when(novelGateway.insertChapter(any(NovelChapter.class))).thenReturn(1);
 
         NovelProject created = novelApplicationService.createProject(
                 new CreateProjectCommand(920001L, "新建项目", "摘要", null),
@@ -120,7 +82,22 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
 
         assertThat(created.getProjectId()).isEqualTo(900001L);
         assertThat(created.getStatus()).isEqualTo(1);
+        assertThat(created.getGenre()).isEqualTo("其他");
         verify(novelGateway).insertProject(any(NovelProject.class));
+        ArgumentCaptor<NovelVolume> volumeCaptor = ArgumentCaptor.forClass(NovelVolume.class);
+        verify(novelGateway).insertVolume(volumeCaptor.capture());
+        assertThat(volumeCaptor.getValue()).satisfies(volume -> {
+            assertThat(volume.getVolumeId()).isEqualTo(900011L);
+            assertThat(volume.getProjectId()).isEqualTo(900001L);
+            assertThat(volume.getTitle()).isEqualTo("第一卷");
+        });
+        ArgumentCaptor<NovelChapter> chapterCaptor = ArgumentCaptor.forClass(NovelChapter.class);
+        verify(novelGateway).insertChapter(chapterCaptor.capture());
+        assertThat(chapterCaptor.getValue()).satisfies(chapter -> {
+            assertThat(chapter.getChapterId()).isEqualTo(900021L);
+            assertThat(chapter.getVolumeId()).isEqualTo(900011L);
+            assertThat(chapter.getTitle()).isEqualTo("第一章");
+        });
         verify(storyBibleApplicationService).bootstrap(900001L, created.getTitle(), 920001L);
     }
 
@@ -139,168 +116,184 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_REJECTS_INLINE_CONTENT() {
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                920002L,
-                920101L,
-                new CommitChapterContentCommand("novels/1.md", "etag", 12L, "sha256", null, "inline-content"),
-                920001L,
-                "trace-commit-inline"
-        ))
+    void imported_project_persists_the_adjusted_directory_in_one_application_use_case() {
+        when(businessIdGenerator.nextId()).thenReturn(900001L, 900011L, 900021L, 900022L);
+        when(novelGateway.insertProject(any(NovelProject.class))).thenReturn(1);
+        when(novelGateway.insertVolume(any(NovelVolume.class))).thenReturn(1);
+        when(novelGateway.insertChapter(any(NovelChapter.class))).thenReturn(1);
+
+        NovelProject created = novelApplicationService.createImportedProject(new ImportProjectCommand(
+                new CreateProjectCommand(920001L, "导入作品", null, "其他", null, List.of(), 1),
+                List.of(new ImportVolumeCommand("第一卷 雨夜", List.of(
+                        new ImportChapterCommand("第一章 来客", "雨水落下。"),
+                        new ImportChapterCommand("第二章 回声", "城门合拢。")
+                )))
+        ), "trace-import");
+
+        assertThat(created.getProjectId()).isEqualTo(900001L);
+        ArgumentCaptor<NovelChapter> chapters = ArgumentCaptor.forClass(NovelChapter.class);
+        verify(novelGateway, times(2)).insertChapter(chapters.capture());
+        assertThat(chapters.getAllValues()).extracting(NovelChapter::getTitle)
+                .containsExactly("第一章 来客", "第二章 回声");
+        assertThat(chapters.getAllValues()).extracting(NovelChapter::getSortOrder)
+                .containsExactly(1, 2);
+        assertThat(chapters.getAllValues().getFirst().getWordCount()).isEqualTo(5);
+        verify(storyBibleApplicationService).bootstrap(900001L, "导入作品", 920001L);
+        verify(projectAiConfigurationService).initializeProject(900001L, 920001L);
+    }
+
+    @Test
+    void moving_a_project_to_trash_is_scoped_to_the_authenticated_owner() {
+        when(novelGateway.softDeleteProject(900002L, 920001L)).thenReturn(1);
+
+        novelApplicationService.deleteProject(900002L, 920001L, "trace-trash");
+
+        verify(novelGateway).softDeleteProject(900002L, 920001L);
+    }
+
+    @Test
+    void UT_APP_NOVEL_ACQUIRE_CHAPTER_LEASE_RETURNS_EDITABLE_CONTENT() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        NovelChapter chapter = new NovelChapter();
+        chapter.setProjectId(920002L);
+        chapter.setChapterId(920101L);
+        chapter.setContent("第一段");
+        chapter.setContentRevision(3L);
+        chapter.setLeaseOwnerType("USER");
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(chapter));
+        when(novelGateway.acquireChapterLease(eq(920002L), eq(920101L), eq("USER"), eq(920001L),
+                any(String.class), any(), eq(false))).thenReturn(1);
+
+        NovelApplicationService.ChapterLeaseView lease = novelApplicationService.acquireChapterLease(
+                920002L, 920101L, 920001L, false);
+
+        assertThat(lease.editable()).isTrue();
+        assertThat(lease.leaseToken()).isNotBlank();
+        assertThat(lease.content()).isEqualTo("第一段");
+        assertThat(lease.contentRevision()).isEqualTo(3L);
+    }
+
+    @Test
+    void UT_APP_NOVEL_SAVE_CHAPTER_CONTENT_REQUIRES_REVISION_AND_LEASE_ATOMIC_UPDATE() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        NovelChapter saved = new NovelChapter();
+        saved.setProjectId(920002L);
+        saved.setChapterId(920101L);
+        saved.setContent("山河 无恙");
+        saved.setContentRevision(5L);
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.updateChapterContent(920002L, 920101L, "lease-1", 4L, "山河 无恙", 4)).thenReturn(1);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(saved);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(saved));
+
+        NovelChapter result = novelApplicationService.saveChapterContent(
+                920002L, 920101L, 920001L, "lease-1", 4L, "山河 无恙");
+
+        assertThat(result.getContentRevision()).isEqualTo(5L);
+        verify(novelGateway).updateChapterContent(920002L, 920101L, "lease-1", 4L, "山河 无恙", 4);
+        verify(novelGateway).invalidateAvailableAiUndoByChapter(920002L, 920101L);
+    }
+
+    @Test
+    void should_save_ai_content_and_undo_operation_as_one_application_transaction() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        NovelChapter current = new NovelChapter();
+        current.setProjectId(920002L);
+        current.setChapterId(920101L);
+        current.setTitle("第一章");
+        current.setContent("原正文");
+        current.setWordCount(3);
+        current.setContentRevision(3L);
+        NovelChapter saved = new NovelChapter();
+        saved.setProjectId(920002L);
+        saved.setChapterId(920101L);
+        saved.setTitle("第一章");
+        saved.setContent("AI 修改后的正文");
+        saved.setWordCount(8);
+        saved.setContentRevision(4L);
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(current, saved);
+        when(novelGateway.updateChapterContent(920002L, 920101L, "ai-lease", 3L, "AI 修改后的正文", 8)).thenReturn(1);
+        when(novelGateway.findAvailableAiUndoByRunAndChapter(920002L, 940001L, 920101L)).thenReturn(null);
+        when(novelGateway.nextAiUndoSequence(920002L, 920101L)).thenReturn(1L);
+        when(businessIdGenerator.nextId()).thenReturn(950001L);
+        when(novelGateway.insertAiUndo(any())).thenReturn(1);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(saved));
+
+        NovelApplicationService.AiChapterEditResult result = novelApplicationService.saveAiChapterEdit(
+                920002L, 920101L, 920001L, 940001L, "tool-call-1", "ai-lease", 3L,
+                "AI 修改后的正文");
+
+        assertThat(result.chapter().getContentRevision()).isEqualTo(4L);
+        assertThat(result.undo().operationId()).isEqualTo(950001L);
+        ArgumentCaptor<ChapterAiUndoOperation> operation = ArgumentCaptor.forClass(ChapterAiUndoOperation.class);
+        verify(novelGateway).insertAiUndo(operation.capture());
+        assertThat(operation.getValue()).satisfies(value -> {
+            assertThat(value.getBeforeContent()).isEqualTo("原正文");
+            assertThat(value.getAppliedRevision()).isEqualTo(4L);
+            assertThat(value.getStatus()).isEqualTo("AVAILABLE");
+        });
+    }
+
+    @Test
+    void should_undo_only_the_latest_unchanged_ai_result() throws Exception {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        NovelChapter current = new NovelChapter();
+        current.setProjectId(920002L);
+        current.setChapterId(920101L);
+        current.setTitle("第一章");
+        current.setContent("AI 正文");
+        current.setContentRevision(5L);
+        ChapterAiUndoOperation operation = new ChapterAiUndoOperation();
+        operation.setOperationId(950001L);
+        operation.setProjectId(920002L);
+        operation.setChapterId(920101L);
+        operation.setRunId(940001L);
+        operation.setBeforeContent("原正文");
+        operation.setBeforeWordCount(3);
+        operation.setResultContentHash(HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest("AI 正文".getBytes(StandardCharsets.UTF_8))));
+        operation.setAppliedRevision(5L);
+        operation.setSequenceNo(2L);
+        operation.setStatus("AVAILABLE");
+        operation.setExpiresAt(java.time.Instant.now().plusSeconds(3600));
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.findAiUndoByOperationId(920002L, 950001L)).thenReturn(operation);
+        when(novelGateway.listAvailableAiUndoByChapter(920002L, 920101L))
+                .thenReturn(List.of(operation), List.of());
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(current);
+        when(novelGateway.restoreAiChapterContent(920002L, 920101L, 5L, "AI 正文", "原正文", 3)).thenReturn(1);
+        when(novelGateway.markAiUndoUndone(950001L)).thenReturn(1);
+
+        NovelApplicationService.AiUndoView result = novelApplicationService.undoAiChapterEdit(
+                920002L, 950001L, 920001L);
+
+        assertThat(result.status()).isEqualTo("UNDONE");
+        verify(novelGateway).restoreAiChapterContent(920002L, 920101L, 5L, "AI 正文", "原正文", 3);
+    }
+
+    @Test
+    void UT_APP_NOVEL_SAVE_CHAPTER_CONTENT_REJECTS_STALE_REVISION_OR_LEASE() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.updateChapterContent(any(), any(), any(), any(), any(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> novelApplicationService.saveChapterContent(
+                920002L, 920101L, 920001L, "lease-1", 2L, "正文"))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Direct upload mode does not accept content in commit payload");
-
-        verify(novelGateway, never()).updateChapterContentMeta(any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_NULL_COMMAND_SHOULD_FAIL_FAST() {
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                920002L,
-                920101L,
-                null,
-                920001L,
-                "trace-commit-null-command"
-        ))
-                .isExactlyInstanceOf(NullPointerException.class)
-                .hasMessage("command must not be null");
-
-        verifyNoInteractions(novelGateway);
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_RETURNS_EMPTY_WHEN_OBJECT_KEY_BLANK() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        chapter.setContentObjectKey("  ");
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-
-        assertThat(novelApplicationService.getChapterContentUrl(920002L, 920101L))
-                .containsEntry("url", "");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_SUCCESS() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        chapter.setContentObjectKey("novels/920002/chapters/920101/content.md");
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(objectStorageService.buildReadUrl("novels/920002/chapters/920101/content.md"))
-                .thenReturn("https://cdn.local/read-url");
-
-        assertThat(novelApplicationService.getChapterContentUrl(920002L, 920101L))
-                .containsEntry("url", "https://cdn.local/read-url");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_URL_SHOULD_THROW_WHEN_CHAPTER_NOT_FOUND() {
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(null);
-
-        assertThatThrownBy(() -> novelApplicationService.getChapterContentUrl(920002L, 920101L))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Chapter not found");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_CONTENT_UPLOAD_URL_SUCCESS() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(objectStorageService.buildUploadUrl(any(), eq("text/plain; charset=utf-8")))
-                .thenReturn("https://oss.local/upload-url");
-
-        java.util.Map<String, String> result = novelApplicationService.getChapterContentUploadUrl(920002L, 920101L);
-
-        assertThat(result)
-                .containsEntry("uploadUrl", "https://oss.local/upload-url")
-                .containsKey("objectKey");
-        assertThat(result.get("objectKey"))
-                .startsWith("novels/920002/chapters/920101/")
-                .endsWith(".md");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_NOT_FOUND() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(null);
-
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersion(920002L, 920101L, 3))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Chapter version not found");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_RETURNS_EMPTY_WHEN_OBJECT_KEY_BLANK() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        NovelChapterVersion version = new NovelChapterVersion();
-        version.setVersionNo(3);
-        version.setSnapshotObjectKey("   ");
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(version);
-
-        assertThat(novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, 3))
-                .containsEntry("url", "");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_SUCCESS() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        NovelChapterVersion version = new NovelChapterVersion();
-        version.setVersionNo(3);
-        version.setSnapshotObjectKey("novels/920002/chapters/920101/versions/3/snapshot.md");
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(version);
-        when(objectStorageService.buildReadUrl("novels/920002/chapters/920101/versions/3/snapshot.md"))
-                .thenReturn("https://cdn.local/snapshot-url");
-
-        assertThat(novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, 3))
-                .containsEntry("url", "https://cdn.local/snapshot-url");
-    }
-
-    @Test
-    void UT_APP_NOVEL_GET_CHAPTER_VERSION_SNAPSHOT_URL_SHOULD_THROW_WHEN_VERSION_NOT_FOUND() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(null);
-
-        assertThatThrownBy(() -> novelApplicationService.getChapterVersionSnapshotUrl(920002L, 920101L, 3))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Chapter version not found");
-    }
-
-    @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_SHOULD_FAIL_WHEN_UPDATE_COUNT_IS_NOT_ONE() {
-        when(novelGateway.updateChapterContentMeta(
-                eq(920002L),
-                eq(920101L),
-                eq("novels/920002/chapters/920101/content.md"),
-                eq("etag-1"),
-                eq(128L),
-                eq("sha-256"),
-                eq("s3")
-        )).thenReturn(0);
-
-        assertThatThrownBy(() -> novelApplicationService.commitChapterContent(
-                920002L,
-                920101L,
-                new CommitChapterContentCommand("novels/920002/chapters/920101/content.md", "etag-1", 128L, "sha-256", null, null),
-                920001L,
-                "trace-commit-failed"
-        ))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Failed to commit chapter content");
+                .hasMessage("Chapter changed or the editing lease is no longer valid");
     }
 
     @Test
@@ -308,103 +301,11 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         NovelChapter chapter = new NovelChapter();
         chapter.setProjectId(920002L);
         chapter.setChapterId(920101L);
-        chapter.setContentObjectKey("novels/920002/chapters/920101/content.md");
+        chapter.setContent("夜雨中的追踪在巷口停住。");
         when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(objectStorageService.readText("novels/920002/chapters/920101/content.md"))
-                .thenReturn("夜雨中的追踪在巷口停住。");
 
         assertThat(novelApplicationService.getChapterContentText(920002L, 920101L))
                 .isEqualTo("夜雨中的追踪在巷口停住。");
-    }
-
-    @Test
-    void UT_APP_NOVEL_COMMIT_CHAPTER_CONTENT_DEFAULT_STORAGE_PROVIDER() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        when(novelGateway.updateChapterContentMeta(
-                eq(920002L),
-                eq(920101L),
-                eq("novels/920002/chapters/920101/content.md"),
-                eq("etag-1"),
-                eq(128L),
-                eq("sha-256"),
-                eq("s3")
-        )).thenReturn(1);
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-
-        NovelChapter result = novelApplicationService.commitChapterContent(
-                920002L,
-                920101L,
-                new CommitChapterContentCommand("novels/920002/chapters/920101/content.md", "etag-1", 128L, "sha-256", null, null),
-                920001L,
-                "trace-commit"
-        );
-
-        assertThat(result).isSameAs(chapter);
-        verify(novelGateway).updateChapterContentMeta(
-                920002L,
-                920101L,
-                "novels/920002/chapters/920101/content.md",
-                "etag-1",
-                128L,
-                "sha-256",
-                "s3"
-        );
-    }
-
-    @Test
-    void UT_APP_NOVEL_CREATE_CHAPTER_VERSION_SHOULD_INCREMENT_FROM_MAX_VERSION() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        chapter.setContentObjectKey("novels/920002/chapters/920101/content.md");
-        chapter.setContentEtag("etag-latest");
-        chapter.setContentSize(1024L);
-        chapter.setContentChecksum("sha-latest");
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.maxVersionNo(920101L)).thenReturn(7);
-        when(novelGateway.insertChapterVersion(any(NovelChapterVersion.class))).thenReturn(1);
-
-        NovelChapterVersion created = novelApplicationService.createChapterVersion(
-                920002L,
-                920101L,
-                new com.penmate.backend.application.novel.command.NovelCommands.CreateChapterVersionCommand("manual-save", "保存草稿", 920001L),
-                "trace-version-create"
-        );
-
-        assertThat(created.getVersionNo()).isEqualTo(8);
-        assertThat(created.getSnapshotObjectKey()).isEqualTo("novels/920002/chapters/920101/content.md");
-        assertThat(created.getSnapshotEtag()).isEqualTo("etag-latest");
-        verify(novelGateway).insertChapterVersion(any(NovelChapterVersion.class));
-    }
-
-    @Test
-    void UT_APP_NOVEL_RESTORE_CHAPTER_VERSION_SHOULD_FAIL_WHEN_UPDATE_COUNT_IS_NOT_ONE() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        NovelChapterVersion version = new NovelChapterVersion();
-        version.setVersionNo(3);
-        version.setSnapshotObjectKey("novels/920002/chapters/920101/versions/3/snapshot.md");
-        version.setSnapshotEtag("etag-v3");
-        version.setSnapshotSize(256L);
-        version.setSnapshotChecksum("sha-v3");
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.findVersionByChapterAndVersion(920101L, 3)).thenReturn(version);
-        when(novelGateway.updateChapterContentMeta(
-                eq(920002L),
-                eq(920101L),
-                eq("novels/920002/chapters/920101/versions/3/snapshot.md"),
-                eq("etag-v3"),
-                eq(256L),
-                eq("sha-v3"),
-                eq("s3")
-        )).thenReturn(0);
-
-        assertThatThrownBy(() -> novelApplicationService.restoreChapterVersion(920002L, 920101L, 3, 920001L, "trace-restore-failed"))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Failed to restore chapter version");
     }
 
     @Test
@@ -456,25 +357,64 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Test
     void should_move_chapter_and_increment_structure_revision_once() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        project.setStructureRevision(1L);
+        NovelChapter first = new NovelChapter();
+        first.setChapterId(1000L);
+        first.setProjectId(920002L);
+        first.setVolumeId(930101L);
+        first.setSortOrder(1);
         NovelChapter chapter = new NovelChapter();
         chapter.setChapterId(1001L);
         chapter.setProjectId(920002L);
+        chapter.setVolumeId(930101L);
         chapter.setSortOrder(2);
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 1001L)).thenReturn(chapter);
-        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(chapter));
-        when(novelGateway.updateChapter(chapter)).thenReturn(1);
+        NovelVolume volume = new NovelVolume();
+        volume.setVolumeId(930101L);
+        volume.setProjectId(920002L);
+        volume.setSortOrder(1);
+        when(novelGateway.lockProject(920002L)).thenReturn(project);
+        when(novelGateway.findVolumesByProjectId(920002L)).thenReturn(List.of(volume));
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(first, chapter));
+        when(novelGateway.updateChapter(any())).thenReturn(1);
         when(novelGateway.incrementStructureRevision(920002L)).thenReturn(1);
 
-        NovelChapter moved = novelApplicationService.moveChapter(
+        NovelApplicationService.NovelDirectoryView moved = novelApplicationService.moveDirectoryItem(
                 920002L,
-                1001L,
-                new com.penmate.backend.application.novel.command.NovelCommands.MoveChapterCommand(null, 1),
+                new com.penmate.backend.application.novel.command.NovelCommands.MoveDirectoryItemCommand(
+                        com.penmate.backend.application.novel.command.NovelCommands.DirectoryNodeType.CHAPTER,
+                        1001L, 930101L, 1, 1L),
                 920001L,
-                "trace-move-chapter"
+                "trace-move-directory"
         );
 
-        assertThat(moved.getSortOrder()).isEqualTo(1);
+        assertThat(moved.structureRevision()).isEqualTo(2L);
+        assertThat(chapter.getSortOrder()).isEqualTo(1);
+        assertThat(first.getSortOrder()).isEqualTo(2);
         verify(novelGateway).incrementStructureRevision(920002L);
+    }
+
+    @Test
+    void should_reject_directory_move_when_structure_revision_is_stale() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        project.setStructureRevision(3L);
+        when(novelGateway.lockProject(920002L)).thenReturn(project);
+
+        assertThatThrownBy(() -> novelApplicationService.moveDirectoryItem(
+                920002L,
+                new com.penmate.backend.application.novel.command.NovelCommands.MoveDirectoryItemCommand(
+                        com.penmate.backend.application.novel.command.NovelCommands.DirectoryNodeType.VOLUME,
+                        930101L, null, 1, 2L),
+                920001L,
+                "trace-stale-directory"
+        )).hasMessageContaining("directory changed");
+
+        verify(novelGateway, org.mockito.Mockito.never()).updateVolume(org.mockito.ArgumentMatchers.any());
+        verify(novelGateway, org.mockito.Mockito.never()).incrementStructureRevision(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -517,7 +457,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         );
 
         assertThat(result).isSameAs(updated);
-        assertThat(result.getSortOrder()).isEqualTo(0);
+        assertThat(result.getSortOrder()).isEqualTo(1);
     }
 
     @Test
@@ -530,38 +470,17 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_LIST_CHAPTER_VERSIONS_SUCCESS() {
-        NovelChapter chapter = new NovelChapter();
-        chapter.setProjectId(920002L);
-        chapter.setChapterId(920101L);
-        NovelChapterVersion version = new NovelChapterVersion();
-        version.setVersionNo(1);
-        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
-        when(novelGateway.findVersionsByChapterId(920101L)).thenReturn(List.of(version));
+    void should_soft_delete_chapters_before_deleting_volume() {
+        when(novelGateway.softDeleteChaptersByVolume(920002L, 930101L)).thenReturn(3);
+        when(novelGateway.softDeleteVolume(920002L, 930101L)).thenReturn(1);
+        when(novelGateway.incrementStructureRevision(920002L)).thenReturn(1);
 
-        List<NovelChapterVersion> result = novelApplicationService.listChapterVersions(920002L, 920101L);
+        novelApplicationService.deleteVolume(920002L, 930101L, 920001L, "trace-delete-volume");
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getVersionNo()).isEqualTo(1);
-    }
-
-    @Test
-    void UT_APP_NOVEL_LIST_OUTLINE_TREE_SUCCESS() {
-        NovelProject project = new NovelProject();
-        project.setProjectId(920002L);
-        project.setTitle("长夜行");
-        NovelOutlineNode node = new NovelOutlineNode();
-        node.setId(9001L);
-        node.setProjectId(920002L);
-        when(novelGateway.findProjectById(920002L)).thenReturn(project);
-        when(novelGateway.findOutlineNodesByProjectId(920002L)).thenReturn(List.of(node));
-
-        List<NovelOutlineNode> result = novelApplicationService.listOutlineTree(920002L);
-
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getId()).isEqualTo(9001L);
+        var ordered = org.mockito.Mockito.inOrder(novelGateway);
+        ordered.verify(novelGateway).softDeleteChaptersByVolume(920002L, 930101L);
+        ordered.verify(novelGateway).softDeleteVolume(920002L, 930101L);
+        ordered.verify(novelGateway).incrementStructureRevision(920002L);
     }
 
 }
-
-

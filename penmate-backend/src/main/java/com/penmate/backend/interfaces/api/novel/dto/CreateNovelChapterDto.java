@@ -8,23 +8,14 @@ import jakarta.validation.constraints.NotNull;
 
 public class CreateNovelChapterDto {
 
+    @NotBlank
     private String volumeId;
-    private String outlineNodeId;
 
     @NotBlank
     private String title;
 
     @NotNull
     private Integer sortOrder;
-
-    private Integer status;
-    private Integer wordCount;
-    private String excerpt;
-    private String contentObjectKey;
-    private String contentEtag;
-    private Long contentSize;
-    private String contentChecksum;
-    private String storageProvider;
 
 }
 
