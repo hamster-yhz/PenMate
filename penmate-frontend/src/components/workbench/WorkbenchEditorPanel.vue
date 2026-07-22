@@ -1,106 +1,110 @@
 <template>
-  <main class="panel panel-center glass-panel">
+  <main class="panel-center" :class="{ focused: focusMode }">
     <EditorToolbar
       :current-chapter-title="currentChapterTitle"
-      :selected-version-no="selectedVersionNo"
-      :version-busy="versionBusy"
       :active-chapter="activeChapter"
-      :versions="versions"
-      @save="emit('save')"
-      @undo="emit('undo')"
-      @redo="emit('redo')"
-      @wrap-selection="emit('wrap-selection', $event[0], $event[1])"
-      @insert-prefix="emit('insert-prefix', $event)"
-      @update:selected-version-no="emit('update:selected-version-no', $event)"
-      @restore-version="emit('restore-version')"
-      @view-version="emit('view-version')"
-      @publish-chapter="emit('publish-chapter')"
+      :read-only="readOnly"
+      :typewriter-mode="typewriterMode"
+      @save="$emit('save')"
+      @undo="editorApi?.undo()"
+      @redo="editorApi?.redo()"
+      @find="editorApi?.find()"
+      @toggle-typewriter="toggleTypewriterMode"
+      @focus-mode="focusMode = !focusMode"
     />
-
     <div class="editor-area">
-      <EditorTextarea
-        :ref="editorTextareaRef"
-        :model-value="editorContent"
-        placeholder="在此处开始创作，或让AI为你执笔..."
-        @update:model-value="emit('update:editor-content', $event)"
-        @input="emit('input')"
-        @cursor-activity="emit('cursor-activity')"
-        @save="emit('save')"
-        @undo="emit('undo')"
-        @redo="emit('redo')"
-        @wrap-selection="emit('wrap-selection', $event[0], $event[1])"
+      <PlainTextEditor
+        ref="editorApi"
+        :model-value="aiEditing ? (aiPreviewContent || editorContent) : editorContent"
+        :read-only="readOnly"
+        :lock-reason="lockReason"
+        :ai-editing="aiEditing"
+        :typewriter-mode="typewriterMode"
+        :font-family="uiPreferences.editorFontFamily"
+        :font-size="uiPreferences.editorFontSize"
+        :line-height="uiPreferences.editorLineHeight"
+        :paragraph-spacing="uiPreferences.editorParagraphSpacing"
+        :content-width="uiPreferences.editorContentWidth"
+        :highlight-current-paragraph="uiPreferences.highlightCurrentParagraph"
+        placeholder="开始写作"
+        @update:model-value="$emit('update:editor-content', $event)"
+        @change="$emit('input', $event)"
+        @selection-change="$emit('selection-change', $event)"
+        @save="$emit('save')"
       />
     </div>
-
     <EditorStatusbar
       :selected-text="selectedText"
-      :version-diff-summary="versionDiffSummary"
       :current-line="currentLine"
       :current-col="currentCol"
+      :word-count="wordCount"
+      :save-hint="saveHint"
+      :ai-undo-available="aiUndoAvailable"
+      :ai-undo-busy="aiUndoBusy"
+      @undo-ai="$emit('undo-ai')"
     />
-
-    <VersionPreviewPane :current-content="editorContent" :selected-version-content="selectedVersionContent" />
   </main>
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import EditorToolbar from '@/components/workbench/editor/EditorToolbar.vue'
-import EditorTextarea from '@/components/workbench/editor/EditorTextarea.vue'
 import EditorStatusbar from '@/components/workbench/editor/EditorStatusbar.vue'
-import VersionPreviewPane from '@/components/workbench/editor/VersionPreviewPane.vue'
+import PlainTextEditor, { type EditorSelectionState, type PlainTextEditorApi } from '@/components/workbench/editor/PlainTextEditor.vue'
+import { useUserUiPreferences } from '@/composables/useUserUiPreferences'
 
 defineProps<{
   currentChapterTitle: string
-  selectedVersionNo: string
-  versionBusy: boolean
   activeChapter: string
-  versions: Array<Record<string, unknown>>
-  editorTextareaRef: (instance: Element | import('vue').ComponentPublicInstance | null) => void
   editorContent: string
   selectedText: string
-  versionDiffSummary: string
   currentLine: number
   currentCol: number
-  selectedVersionContent: string
+  wordCount: number
+  saveHint: string
+  readOnly?: boolean
+  lockReason?: string
+  aiEditing?: boolean
+  aiPreviewContent?: string
+  aiUndoAvailable?: boolean
+  aiUndoBusy?: boolean
 }>()
 
-const emit = defineEmits<{
-  (event: 'save'): void
-  (event: 'undo'): void
-  (event: 'redo'): void
-  (event: 'wrap-selection', before: string, after: string): void
-  (event: 'insert-prefix', payload: string): void
-  (event: 'update:selected-version-no', payload: string): void
-  (event: 'restore-version'): void
-  (event: 'view-version'): void
-  (event: 'publish-chapter'): void
-  (event: 'update:editor-content', payload: string): void
-  (event: 'input'): void
-  (event: 'cursor-activity'): void
+defineEmits<{
+  save: []
+  'update:editor-content': [string]
+  input: [string]
+  'selection-change': [EditorSelectionState]
+  'undo-ai': []
 }>()
+
+const editorApi = ref<PlainTextEditorApi | null>(null)
+const { uiPreferences } = useUserUiPreferences()
+const typewriterMode = ref(uiPreferences.typewriterMode)
+const typewriterOverridden = ref(false)
+const focusMode = ref(false)
+watch(() => uiPreferences.typewriterMode, (value) => {
+  if (!typewriterOverridden.value) typewriterMode.value = value
+})
+const toggleTypewriterMode = () => {
+  typewriterOverridden.value = true
+  typewriterMode.value = !typewriterMode.value
+}
 </script>
 
-<style lang="less" scoped>
-.panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  transition: width 0.3s var(--ease-silk);
-}
-
+<style scoped>
 .panel-center {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+  position: relative;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.68), rgba(11, 17, 32, 0.4));
-  box-shadow: var(--shadow-lg), var(--shadow-gold);
-}
-
-.editor-area {
   flex: 1;
-  overflow: hidden;
-  padding: 0;
+  min-width: 520px;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--bg-editor);
+  border-inline: 1px solid var(--border-subtle);
 }
+.editor-area { flex: 1; min-height: 0; overflow: hidden; }
+.panel-center.focused { position: fixed; inset: var(--app-header-height) 0 0; z-index: 300; }
+@media (max-width: 900px) { .panel-center { min-width: 0; border: 0; } }
 </style>

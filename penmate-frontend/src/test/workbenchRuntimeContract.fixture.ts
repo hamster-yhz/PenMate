@@ -18,13 +18,13 @@ const createStoryBibleProposalItems = () => [
   },
 ]
 
-const createDraftToolCall = (): WorkbenchRuntimeToolCall => ({
-  toolCallId: 'call-draft-1',
-  toolCode: 'draft_generation',
-  toolName: '正文生成',
+const createChapterEditToolCall = (): WorkbenchRuntimeToolCall => ({
+  toolCallId: 'call-chapter-edit-1',
+  toolCode: 'chapter_edit',
+  toolName: '编辑章节正文',
   status: 'running',
   argumentsPreview: { chapterId: '301' },
-  output: { draftText: '夜雨中的追踪在巷口停住。' },
+  output: { operationId: '81001', contentRevision: '4' },
   errorMessage: '',
 })
 
@@ -78,9 +78,9 @@ export const createBaseRecoverySnapshot = (): WorkbenchRecoverySnapshot => ({
     activePlugins: ['outline.search'],
     modelConfigId: 'mcfg-9001',
     activeRunRuntime: {
-      lastRuntimeStatus: 'draft_generation',
+      lastRuntimeStatus: 'chapter_edit',
       latestSequence: '12',
-      activeToolCallsSnapshot: [createDraftToolCall()],
+      activeToolCallsSnapshot: [createChapterEditToolCall()],
     },
     resultSummary: {
       draftSummary: { draftText: '夜雨中的追踪在巷口停住。' },

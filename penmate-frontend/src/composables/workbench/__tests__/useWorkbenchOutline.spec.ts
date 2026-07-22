@@ -2,395 +2,138 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useWorkbenchOutline } from '../useWorkbenchOutline'
 
+const createDeps = () => ({
+  getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
+  reloadOutline: vi.fn(async () => undefined),
+  createVolume: vi.fn(async () => ({})),
+  createChapter: vi.fn(async () => ({})),
+  deleteVolume: vi.fn(async () => undefined),
+  deleteChapter: vi.fn(async () => undefined),
+  updateVolume: vi.fn(async () => ({})),
+  updateChapter: vi.fn(async () => ({})),
+  moveDirectoryItem: vi.fn(async () => ({
+    structureRevision: 2,
+    volumes: [{ volumeId: 'volume-10', title: '第一卷', sortOrder: 1 }],
+    chapters: [
+      { chapterId: 'chapter-302', volumeId: 'volume-10', title: '第二章', sortOrder: 1 },
+      { chapterId: 'chapter-301', volumeId: 'volume-10', title: '第一章', sortOrder: 2 },
+    ],
+  })),
+  notify: vi.fn(),
+  notifySuccess: vi.fn(),
+})
+
+const directoryFixture = () => [
+  {
+    key: 'volume-10',
+    title: '第一卷',
+    expanded: true,
+    children: [
+      { key: 'chapter-301', title: '第一章', chapterId: 'chapter-301' },
+      { key: 'chapter-302', title: '第二章', chapterId: 'chapter-302' },
+    ],
+  },
+]
+
 describe('useWorkbenchOutline', () => {
-  it('loads_outline_data_via_map_outline_tree_bridge', () => {
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-    })
+  it('maps volumes and chapters as the only directory source', () => {
+    const outline = useWorkbenchOutline(createDeps())
 
     const volumes = outline.loadOutline(
+      [{ volumeId: 'volume-10', title: '第一卷', sortOrder: 2 }],
       [
-        { outlineNodeId: 'node-10', title: '第一卷', nodeType: 'VOLUME' },
-        { outlineNodeId: 'node-11', title: '第一章', nodeType: 'CHAPTER', parentId: 'node-10' },
+        { chapterId: 'chapter-302', volumeId: 'volume-10', title: '第二章', sortOrder: 2 },
+        { chapterId: 'chapter-301', volumeId: 'volume-10', title: '第一章', sortOrder: 1 },
       ],
-      { 'node-11': 'chapter-1011' },
     )
 
-    expect(volumes).toEqual([
-      {
-        key: 'node-10',
-        title: '第一卷',
-        expanded: true,
-        children: [
-          {
-            key: 'node-11',
-            title: '第一章',
-            chapterId: 'chapter-1011',
-          },
-        ],
-      },
-    ])
+    expect(volumes).toEqual(directoryFixture())
     expect(outline.outlineData.value).toEqual(volumes)
   })
 
-  it('updates_active_chapter_state_when_selecting_a_chapter', () => {
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-    })
+  it('creates a chapter directly under its volume', async () => {
+    const deps = createDeps()
+    const outline = useWorkbenchOutline(deps)
 
-    outline.selectChapter({
-      key: '11',
-      title: '第一章',
-      chapterId: '301',
-    })
+    await outline.addChapter({ key: 'volume-10', title: '第一卷', expanded: true, children: [] })
 
-    expect(outline.activeChapter.value).toBe('301')
-    expect(outline.currentChapterTitle.value).toBe('第一章')
+    expect(deps.createChapter).toHaveBeenCalledWith('project-101', 'operator-201', {
+      volumeId: 'volume-10',
+      title: '第1章：未命名',
+      sortOrder: 1,
+    })
+    expect(deps.reloadOutline).toHaveBeenCalledOnce()
   })
 
-  it('renames_node_and_syncs_current_title_when_active_chapter_matches', async () => {
-    const updateOutlineNode = vi.fn(async () => undefined)
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode,
-      moveOutlineNode: vi.fn(async () => undefined),
-    })
-
-    outline.outlineData.value = [
-      {
-        key: 'node-10',
-        title: '第一卷',
-        expanded: true,
-        children: [{ key: 'node-11', title: '旧章名', chapterId: 'chapter-301' }],
-      },
-    ]
+  it('renames volumes and chapters through their own APIs', async () => {
+    const deps = createDeps()
+    const outline = useWorkbenchOutline(deps)
+    outline.outlineData.value = directoryFixture()
     outline.activeChapter.value = 'chapter-301'
-    outline.currentChapterTitle.value = '旧章名'
+    outline.currentChapterTitle.value = '第一章'
 
-    await outline.renameNode({ nodeKey: 'node-11', title: '新章名' })
+    await outline.renameNode({ nodeKey: 'volume-10', title: '新卷名' })
+    await outline.renameNode({ nodeKey: 'chapter-301', title: '新章名' })
 
-    expect(outline.outlineData.value[0].children[0].title).toBe('新章名')
+    expect(deps.updateVolume).toHaveBeenCalledWith('project-101', 'volume-10', 'operator-201', {
+      title: '新卷名',
+      sortOrder: 1,
+      description: '',
+    })
+    expect(deps.updateChapter).toHaveBeenCalledWith('project-101', 'chapter-301', 'operator-201', {
+      title: '新章名',
+    })
     expect(outline.currentChapterTitle.value).toBe('新章名')
-    expect(updateOutlineNode).toHaveBeenCalledWith('project-101', 'node-11', 'operator-201', { title: '新章名' })
   })
 
-  it('moves_chapter_inside_volume_and_calls_move_api', async () => {
-    const moveOutlineNode = vi.fn(async () => undefined)
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode,
-    })
+  it('moves a chapter through the chapter position API', async () => {
+    const deps = createDeps()
+    const outline = useWorkbenchOutline(deps)
+    outline.outlineData.value = directoryFixture()
+    outline.structureRevision.value = 1
 
-    outline.outlineData.value = [
-      {
-        key: 'node-10',
-        title: '第一卷',
-        expanded: true,
-        children: [
-          { key: 'node-11', title: '第一章', chapterId: 'chapter-301' },
-          { key: 'node-12', title: '第二章', chapterId: 'chapter-302' },
-        ],
-      },
-    ]
+    await outline.moveNode({ nodeKey: 'chapter-302', parentKey: 'volume-10', direction: -1 })
 
-    await outline.moveNode({ nodeKey: 'node-12', parentKey: 'node-10', direction: -1 })
-
-    expect(outline.outlineData.value[0].children.map((item) => item.key)).toEqual(['node-12', 'node-11'])
-    expect(moveOutlineNode).toHaveBeenCalledWith('project-101', 'node-12', 'operator-201', {
-      parentId: 'node-10',
+    expect(deps.moveDirectoryItem).toHaveBeenCalledWith('project-101', {
+      nodeType: 'CHAPTER',
+      nodeId: 'chapter-302',
+      targetVolumeId: 'volume-10',
       sortOrder: 1,
+      expectedStructureRevision: 1,
     })
+    expect(outline.outlineData.value[0].children.map((chapter) => chapter.key)).toEqual([
+      'chapter-302',
+      'chapter-301',
+    ])
   })
 
-  it('rolls_back_created_outline_node_when_create_chapter_fails', async () => {
-    const createOutlineNode = vi.fn(async () => ({ outlineNodeId: '88' }))
-    const createChapter = vi.fn(async () => {
-      throw new Error('create chapter failed')
-    })
-    const deleteOutlineNode = vi.fn(async () => undefined)
-    const notify = vi.fn()
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode,
-      createChapter,
-      deleteOutlineNode,
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-      notify,
-    })
-
-    await outline.addChapter({
-      key: '10',
-      title: '第一卷',
-      expanded: true,
-      children: [],
-    })
-
-    expect(deleteOutlineNode).toHaveBeenCalledWith('101', '88', '201')
-    expect(notify).toHaveBeenCalledWith('create chapter failed')
-  })
-
-  it('creates_chapter_with_string_volume_node_id', async () => {
-    const createOutlineNode = vi.fn(async () => ({ outlineNodeId: 'node-created-88' }))
-    const createChapter = vi.fn(async () => undefined)
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode,
-      createChapter,
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-      notifySuccess: vi.fn(),
-    })
-
-    await outline.addChapter({
-      key: 'node-10',
-      title: '第一卷',
-      expanded: true,
-      children: [],
-    })
-
-    expect(createOutlineNode).toHaveBeenCalledWith(
-      'project-101',
-      'operator-201',
-      expect.objectContaining({
-        parentId: 'node-10',
-      }),
-    )
-    expect(createChapter).toHaveBeenCalledWith(
-      'project-101',
-      'operator-201',
-      expect.objectContaining({
-        outlineNodeId: 'node-created-88',
-      }),
-    )
-  })
-
-  it('clears_active_chapter_when_deleting_the_selected_chapter', async () => {
-    const deleteOutlineNode = vi.fn(async () => undefined)
-    const deleteChapterApi = vi.fn(async () => undefined)
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode,
-      deleteChapter: deleteChapterApi,
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-    })
-
-    outline.outlineData.value = [
-      {
-        key: 'node-10',
-        title: '第一卷',
-        expanded: true,
-        children: [{ key: 'node-11', title: '第一章', chapterId: 'chapter-301' }],
-      },
-    ]
+  it('deletes a selected chapter without touching outline nodes', async () => {
+    const deps = createDeps()
+    const outline = useWorkbenchOutline(deps)
+    outline.outlineData.value = directoryFixture()
     outline.activeChapter.value = 'chapter-301'
     outline.currentChapterTitle.value = '第一章'
 
-    await outline.deleteChapter({ nodeKey: 'node-11', parentKey: 'node-10' })
+    await outline.deleteChapter({ nodeKey: 'chapter-301', parentKey: 'volume-10' })
 
-    expect(deleteChapterApi).toHaveBeenCalledWith('project-101', 'chapter-301', 'operator-201')
-    expect(deleteOutlineNode).toHaveBeenCalledWith('project-101', 'node-11', 'operator-201')
+    expect(deps.deleteChapter).toHaveBeenCalledWith('project-101', 'chapter-301', 'operator-201')
     expect(outline.activeChapter.value).toBe('')
     expect(outline.currentChapterTitle.value).toBe('')
   })
 
-  it('clears_active_chapter_when_deleting_the_selected_volume', async () => {
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-    })
+  it('keeps local ordering unchanged when a move fails', async () => {
+    const deps = createDeps()
+    deps.moveDirectoryItem.mockRejectedValueOnce(new Error('move failed'))
+    const outline = useWorkbenchOutline(deps)
+    outline.outlineData.value = directoryFixture()
+    outline.structureRevision.value = 1
 
-    outline.outlineData.value = [
-      {
-        key: '10',
-        title: '第一卷',
-        expanded: true,
-        children: [{ key: '11', title: '第一章', chapterId: '301' }],
-      },
-    ]
-    outline.activeChapter.value = '301'
-    outline.currentChapterTitle.value = '第一章'
+    await outline.moveNode({ nodeKey: 'chapter-302', parentKey: 'volume-10', direction: -1 })
 
-    await outline.deleteVolume('10')
-
-    expect(outline.activeChapter.value).toBe('')
-    expect(outline.currentChapterTitle.value).toBe('')
-  })
-
-  it('prevents_concurrent_add_chapter_calls_while_outline_operation_is_busy', async () => {
-    let releaseCreateOutlineNode!: () => void
-    const createOutlineNode = vi.fn(
-      () =>
-        new Promise((resolve) => {
-          releaseCreateOutlineNode = () => resolve({ outlineNodeId: 88 })
-        }),
-    )
-
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode,
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-    })
-
-    const volume = {
-      key: '10',
-      title: '第一卷',
-      expanded: true,
-      children: [],
-    }
-
-    const first = outline.addChapter(volume)
-    const second = outline.addChapter(volume)
-    releaseCreateOutlineNode()
-    await Promise.all([first, second])
-
-    expect(createOutlineNode).toHaveBeenCalledTimes(1)
-  })
-
-  it('rolls_back_local_title_and_notifies_when_rename_fails', async () => {
-    const notify = vi.fn()
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => {
-        throw new Error('rename failed')
-      }),
-      moveOutlineNode: vi.fn(async () => undefined),
-      notify,
-    })
-
-    outline.outlineData.value = [
-      {
-        key: '10',
-        title: '第一卷',
-        expanded: true,
-        children: [{ key: '11', title: '旧章名', chapterId: '301' }],
-      },
-    ]
-    outline.activeChapter.value = '301'
-    outline.currentChapterTitle.value = '旧章名'
-
-    await outline.renameNode({ nodeKey: '11', title: '新章名' })
-
-    expect(outline.outlineData.value[0].children[0].title).toBe('旧章名')
-    expect(outline.currentChapterTitle.value).toBe('旧章名')
-    expect(notify).toHaveBeenCalledWith('rename failed')
-  })
-
-  it('persists_chapter_sort_order_when_reordering_outline_chapters', async () => {
-    const moveChapter = vi.fn(async () => undefined)
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => undefined),
-      moveChapter,
-    })
-    outline.outlineData.value = [
-      {
-        key: '10',
-        title: 'Volume',
-        expanded: true,
-        children: [
-          { key: '11', title: 'One', chapterId: '301' },
-          { key: '12', title: 'Two', chapterId: '302' },
-        ],
-      },
-    ]
-
-    await outline.moveNode({ nodeKey: '12', parentKey: '10', direction: -1 })
-
-    expect(moveChapter).toHaveBeenCalledWith('101', '302', '201', {
-      volumeId: null,
-      sortOrder: 1,
-    })
-    expect(outline.outlineData.value[0].children.map((item) => item.chapterId)).toEqual(['302', '301'])
-  })
-
-  it('does_not_reorder_and_notifies_when_move_fails', async () => {
-    const notify = vi.fn()
-    const outline = useWorkbenchOutline({
-      getContext: () => ({ projectId: '101', operatorId: '201' }),
-      reloadOutline: vi.fn(async () => undefined),
-      createOutlineNode: vi.fn(async () => ({})),
-      createChapter: vi.fn(async () => ({})),
-      deleteOutlineNode: vi.fn(async () => undefined),
-      deleteChapter: vi.fn(async () => undefined),
-      updateOutlineNode: vi.fn(async () => undefined),
-      moveOutlineNode: vi.fn(async () => {
-        throw new Error('move failed')
-      }),
-      notify,
-    })
-
-    outline.outlineData.value = [
-      {
-        key: '10',
-        title: '第一卷',
-        expanded: true,
-        children: [
-          { key: '11', title: '第一章', chapterId: '301' },
-          { key: '12', title: '第二章', chapterId: '302' },
-        ],
-      },
-    ]
-
-    await outline.moveNode({ nodeKey: '12', parentKey: '10', direction: -1 })
-
-    expect(outline.outlineData.value[0].children.map((item) => item.key)).toEqual(['11', '12'])
-    expect(notify).toHaveBeenCalledWith('move failed')
+    expect(outline.outlineData.value[0].children.map((chapter) => chapter.key)).toEqual([
+      'chapter-301',
+      'chapter-302',
+    ])
+    expect(deps.notify).toHaveBeenCalledWith('move failed')
   })
 })

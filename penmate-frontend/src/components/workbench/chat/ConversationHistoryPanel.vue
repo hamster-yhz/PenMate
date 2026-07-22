@@ -122,32 +122,32 @@ const displayTime = (item: ConversationItem) => {
 </template>
 
 <style scoped lang="less">
-.conversation-panel { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: #0b1120; }
+.conversation-panel { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--bg-surface); }
 .history-header { min-height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
 .history-header div { display: grid; gap: 2px; } .history-header strong { color: var(--text-primary); font-size: 14px; } .history-header span { color: var(--text-muted); font-size: 11px; }
 .history-header button, .row-actions button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; }
-.history-header button:hover, .row-actions button:hover { color: var(--text-primary); border-color: var(--border-subtle); background: rgba(148, 163, 184, 0.08); }
+.history-header button:hover, .row-actions button:hover { color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); }
 .history-controls { display: grid; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
-.history-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; background: rgba(148, 163, 184, 0.08); }
+.history-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; border-radius: var(--radius-md); background: var(--bg-subtle); }
 .history-tabs button { min-height: 30px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
-.history-tabs button.active { background: #182235; color: var(--text-primary); }
-.history-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--border-subtle); color: var(--text-muted); background: rgba(2, 6, 23, 0.32); }
-.history-search:focus-within { border-color: rgba(105, 168, 207, 0.55); }
+.history-tabs button.active { background: var(--bg-surface); color: var(--accent); font-weight: 650; }
+.history-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); color: var(--text-muted); background: var(--bg-editor); }
+.history-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
 .history-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text-primary); }
 .history-body { flex: 1; overflow-y: auto; padding: 8px 14px 18px; }
 .history-empty { padding: 24px 8px; color: var(--text-muted); text-align: center; }
 .history-group h3 { margin: 14px 0 6px; color: var(--text-muted); font-size: 11px; font-weight: 600; }
-.conversation-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid rgba(148, 163, 184, 0.1); }
-.conversation-row.active { background: rgba(78, 143, 181, 0.1); box-shadow: inset 2px 0 #69a8cf; }
+.conversation-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--border-subtle); }
+.conversation-row.active { background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
 .conversation-main { min-width: 0; display: grid; gap: 4px; padding: 11px 8px; border: 0; background: transparent; text-align: left; cursor: pointer; }
 div.conversation-main { cursor: default; }
 .conversation-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 13px; }
 .conversation-meta { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 10px; }
-.conversation-meta em { padding-left: 7px; border-left: 1px solid var(--border-subtle); color: #83b7d6; font-style: normal; }
+.conversation-meta em { padding-left: 7px; border-left: 1px solid var(--border-subtle); color: var(--accent); font-style: normal; }
 .row-actions { display: flex; }
 .rename-row { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; padding: 8px; }
-.rename-row input { min-width: 0; padding: 7px 8px; border: 1px solid #69a8cf; outline: 0; background: #111827; color: var(--text-primary); }
+.rename-row input { min-width: 0; padding: 7px 8px; border: 1px solid var(--accent); outline: 0; background: var(--bg-surface); color: var(--text-primary); }
 .rename-row button, .delete-confirm button { border: 1px solid var(--border-subtle); background: transparent; color: var(--text-secondary); cursor: pointer; }
-.delete-confirm { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; align-items: center; padding: 8px; border-left: 2px solid #d66b61; background: rgba(214, 107, 97, 0.08); color: #e6aaa4; font-size: 11px; }
+.delete-confirm { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; align-items: center; padding: 8px; border-left: 2px solid var(--danger); background: var(--danger-soft); color: var(--danger); font-size: 11px; }
 @media (max-width: 480px) { .delete-confirm { grid-template-columns: 1fr 1fr; } .delete-confirm span { grid-column: 1 / -1; } }
 </style>

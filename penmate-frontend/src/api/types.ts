@@ -71,6 +71,7 @@ export interface WorkbenchRuntimeEventSource {
   approval?: WorkbenchRuntimeApproval | null
   todoPlan?: WorkbenchTodoSummarySnapshot | Record<string, unknown> | null
   storyBibleApproval?: WorkbenchRuntimeStoryBibleApproval | Record<string, unknown> | null
+  payload?: Record<string, unknown>
 }
 
 export interface WorkbenchActiveRunRuntimeSnapshot {

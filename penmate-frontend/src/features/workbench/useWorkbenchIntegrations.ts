@@ -1,10 +1,12 @@
 import { ref } from 'vue'
 import { modelApi } from '@/api/modules/model.api'
 import { pluginApi } from '@/api/modules/plugin.api'
+import { ragApi } from '@/api/modules/rag.api'
 import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
 
 type WorkbenchIntegrationOptions = {
   getUserId: () => string | undefined
+  getProjectId: () => string
 }
 
 const modelConfigId = (item: Record<string, unknown>) => {
@@ -26,7 +28,7 @@ const preferenceRecord = (payload: unknown): Record<string, unknown> => {
   return record
 }
 
-export const useWorkbenchIntegrations = ({ getUserId }: WorkbenchIntegrationOptions) => {
+export const useWorkbenchIntegrations = ({ getUserId, getProjectId }: WorkbenchIntegrationOptions) => {
   const activePlugins = ref<string[]>([])
   const activeModelConfigId = ref<string | null>(null)
   const currentModelName = ref('')
@@ -54,15 +56,24 @@ export const useWorkbenchIntegrations = ({ getUserId }: WorkbenchIntegrationOpti
       return null
     }
     try {
-      const [preferencesPayload, configurationsPayload] = await Promise.all([
+      const projectId = getProjectId()
+      const [preferencesPayload, configurationsPayload, projectConfiguration] = await Promise.all([
         modelApi.getUserModelPreferences(userId),
         modelApi.listUserModelConfigs(userId),
+        projectId ? ragApi.getConfiguration(projectId) : Promise.resolve({}),
       ])
       const detail = pickBusinessRecord(preferencesPayload)
       const preferences = preferenceRecord(detail)
       const configs = pickBusinessArray<Record<string, unknown>>(configurationsPayload)
-      const preferredId =
-        typeof preferences.mainAgentModelConfigId === 'string' ? preferences.mainAgentModelConfigId.trim() : ''
+      const projectPreferences = projectConfiguration as Record<string, unknown>
+      const accountPreferredId =
+        typeof preferences.defaultCreativeModelConfigId === 'string'
+          ? preferences.defaultCreativeModelConfigId.trim()
+          : ''
+      const projectPreferredId = typeof projectPreferences.creativeModelConfigId === 'string'
+        ? projectPreferences.creativeModelConfigId.trim()
+        : ''
+      const preferredId = projectPreferredId || accountPreferredId
       const preferred = preferredId
         ? configs.find((item) => modelConfigId(item) === preferredId && isActiveChatModel(item))
         : undefined

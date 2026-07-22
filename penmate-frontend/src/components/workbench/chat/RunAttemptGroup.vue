@@ -134,7 +134,7 @@ const selectNext = () => {
 .attempt-group { display: grid; gap: 10px; min-width: 0; }
 .attempt-pagination { min-height: 28px; display: flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--text-muted); font-size: 11px; }
 .attempt-pagination button { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; background: transparent; color: var(--text-secondary); cursor: pointer; }
-.attempt-pagination button:hover:not(:disabled), .attempt-pagination button:focus-visible { border-color: var(--border-subtle); background: rgba(148, 163, 184, 0.08); color: var(--text-primary); outline: 0; }
+.attempt-pagination button:hover:not(:disabled), .attempt-pagination button:focus-visible { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); outline: 0; }
 .attempt-pagination button:disabled { color: var(--text-muted); cursor: default; opacity: 0.4; }
 .attempt-pagination span { min-width: 34px; text-align: center; }
 </style>

@@ -1,15 +1,20 @@
 <template>
-  <div
-    class="tree-item chapter"
-    :class="{ active: isActive }"
-    :data-testid="`chapter-node-${chapter.key}`"
-    role="button"
-    tabindex="0"
-    @click="emit('select-chapter', chapter)"
-    @keydown.enter="emit('select-chapter', chapter)"
-    @keydown.space.prevent="emit('select-chapter', chapter)"
-  >
-    <span class="tree-dot">◇</span>
+  <a-dropdown :trigger="['contextmenu']">
+    <div
+      class="tree-item chapter"
+      :class="{ active: isActive }"
+      :data-testid="`chapter-node-${chapter.key}`"
+      role="button"
+      tabindex="0"
+      :draggable="!isEditing"
+      @click="emit('select-chapter', chapter)"
+      @keydown.enter="emit('select-chapter', chapter)"
+      @keydown.space.prevent="emit('select-chapter', chapter)"
+      @dragstart.stop="handleDragStart"
+      @dragover.prevent
+      @drop.prevent.stop="handleDrop"
+    >
+    <span class="chapter-no">{{ displayNo }}</span>
     <input
       v-if="isEditing"
       ref="renameInputRef"
@@ -22,29 +27,23 @@
       @click.stop
     />
     <span v-else class="tree-label" :data-testid="`chapter-label-${chapter.key}`">{{ chapter.title }}</span>
-    <div class="tree-item-actions" @click.stop>
-      <button class="tree-act-btn" :data-testid="`rename-node-${chapter.key}`" title="重命名" @click="startRename">
-        ✏️
-      </button>
-      <button class="tree-act-btn" :data-testid="`move-up-node-${chapter.key}`" title="上移" @click="emitMove(-1)">
-        ↑
-      </button>
-      <button class="tree-act-btn" :data-testid="`move-down-node-${chapter.key}`" title="下移" @click="emitMove(1)">
-        ↓
-      </button>
-      <button
-        class="tree-act-btn danger"
-        title="删除"
-        @click="emit('delete-chapter', { nodeKey: chapter.key, parentKey })"
-      >
-        ✕
-      </button>
     </div>
-  </div>
+    <template #overlay>
+      <a-menu @click="handleMenuClick">
+        <a-menu-item key="rename"><EditOutlined />重命名</a-menu-item>
+        <a-menu-item key="up"><ArrowUpOutlined />上移</a-menu-item>
+        <a-menu-item key="down"><ArrowDownOutlined />下移</a-menu-item>
+        <a-menu-divider />
+        <a-menu-item key="delete" danger><DeleteOutlined />删除章节</a-menu-item>
+      </a-menu>
+    </template>
+  </a-dropdown>
 </template>
 
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons-vue'
+import { Dropdown as ADropdown, Menu as AMenu, MenuDivider as AMenuDivider, MenuItem as AMenuItem, Modal } from 'ant-design-vue'
 
 import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
 import type {
@@ -57,6 +56,7 @@ const props = defineProps<{
   chapter: OutlineChapterNode
   parentKey: string
   isActive: boolean
+  displayNo: number
 }>()
 
 const emit = defineEmits<{
@@ -99,40 +99,90 @@ const emitMove = (direction: -1 | 1) => {
     direction,
   })
 }
-</script>
 
-<style scoped lang="less">
-.tree-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  color: var(--text-secondary);
+type DraggedDirectoryNode = {
+  nodeKey: string
+  parentKey?: string
+  nodeType: 'VOLUME' | 'CHAPTER'
+}
 
-  &:hover {
-    background: rgba(201, 169, 110, 0.06);
-    color: var(--text-primary);
+const handleDragStart = (event: DragEvent) => {
+  event.dataTransfer?.setData('application/x-penmate-directory-node', JSON.stringify({
+    nodeKey: props.chapter.chapterId || props.chapter.key,
+    parentKey: props.parentKey,
+    nodeType: 'CHAPTER',
+  } satisfies DraggedDirectoryNode))
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
 
-    .tree-item-actions {
-      opacity: 1;
-    }
-  }
-
-  &.active {
-    background: rgba(201, 169, 110, 0.14);
-    color: var(--text-primary);
+const handleDrop = (event: DragEvent) => {
+  const raw = event.dataTransfer?.getData('application/x-penmate-directory-node')
+  if (!raw) return
+  try {
+    const dragged = JSON.parse(raw) as DraggedDirectoryNode
+    if (dragged.nodeType !== 'CHAPTER' || !dragged.parentKey) return
+    const target = event.currentTarget as HTMLElement
+    const rect = target.getBoundingClientRect()
+    const after = event.clientY >= rect.top + rect.height / 2
+    emit('move-node', {
+      nodeKey: dragged.nodeKey,
+      parentKey: dragged.parentKey,
+      targetParentKey: props.parentKey,
+      targetIndex: props.displayNo - 1 + (after ? 1 : 0),
+      drop: true,
+    })
+  } catch {
+    // Ignore drag payloads from outside the directory.
   }
 }
 
-.tree-dot {
-  font-size: 0.65rem;
+const confirmDelete = () => {
+  Modal.confirm({
+    title: `删除“${props.chapter.title}”？`,
+    content: '章节正文会一并删除，此操作无法撤销。',
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: () => emit('delete-chapter', { nodeKey: props.chapter.key, parentKey: props.parentKey }),
+  })
+}
+
+const handleMenuClick = ({ key, domEvent }: { key: string | number; domEvent: Event }) => {
+  domEvent.stopPropagation()
+  if (key === 'rename') void startRename()
+  if (key === 'up') emitMove(-1)
+  if (key === 'down') emitMove(1)
+  if (key === 'delete') confirmDelete()
+}
+</script>
+
+<style scoped>
+.tree-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+.tree-item:hover { background: var(--bg-subtle); color: var(--text-primary); }
+.tree-item.active { background: var(--accent-soft); color: var(--text-primary); }
+
+.chapter-no {
+  flex: 0 0 auto;
+  width: 18px;
+  overflow: hidden;
   color: var(--text-muted);
-  min-width: 12px;
+  font-size: 10px;
+  text-align: right;
 }
 
 .tree-label {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -141,33 +191,9 @@ const emitMove = (direction: -1 | 1) => {
 .tree-edit-input {
   flex: 1;
   padding: 2px 6px;
-  border: 1px solid rgba(201, 169, 110, 0.3);
-  border-radius: 6px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
   outline: none;
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.tree-item-actions {
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.tree-act-btn {
-  padding: 1px 5px;
-  border: 0;
-  background: none;
-  border-radius: 4px;
-  cursor: pointer;
-
-  &:hover {
-    background: rgba(201, 169, 110, 0.12);
-  }
-
-  &.danger:hover {
-    background: rgba(213, 95, 76, 0.12);
-    color: #d55f4c;
-  }
+  background: var(--bg-surface);
 }
 </style>

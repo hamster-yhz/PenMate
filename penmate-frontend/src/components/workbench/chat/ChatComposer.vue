@@ -63,25 +63,26 @@ const handleKeydown = (event: KeyboardEvent) => {
 </template>
 
 <style scoped lang="less">
-.composer { flex: 0 0 auto; display: grid; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid var(--border-subtle); background: #0b1120; }
-.model-warning { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 9px; border-left: 2px solid #d8b15e; background: rgba(216, 177, 94, 0.08); color: #e6c57e; font-size: 12px; }
-.model-warning button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #e6c57e; cursor: pointer; white-space: nowrap; }
+.composer { flex: 0 0 auto; display: grid; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); }
+.model-warning { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 9px; border-left: 2px solid var(--warning); background: var(--warning-soft); color: var(--warning); font-size: 12px; }
+.model-warning button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: var(--warning); cursor: pointer; white-space: nowrap; }
 .context-row { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; }
-.context-chip { flex: 0 0 auto; min-height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid rgba(148, 163, 184, 0.16); background: rgba(148, 163, 184, 0.06); color: var(--text-muted); font-size: 10px; }
-.context-chip b { color: #86b9d8; font-weight: 600; }
+.context-chip { flex: 0 0 auto; min-height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-subtle); color: var(--text-muted); font-size: 10px; }
+.context-chip b { color: var(--accent); font-weight: 600; }
 .context-chip button { width: 18px; height: 18px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
-.composer-box { border: 1px solid rgba(148, 163, 184, 0.22); background: #111827; }
-.composer-box:focus-within { border-color: rgba(105, 168, 207, 0.62); box-shadow: 0 0 0 2px rgba(105, 168, 207, 0.08); }
+.composer-box { border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg-editor); }
+.composer-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
 textarea { width: 100%; min-height: 48px; max-height: 180px; resize: none; display: block; padding: 11px 12px 4px; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: inherit; line-height: 1.55; overflow-y: auto; }
-textarea::placeholder { color: #68768a; }
+textarea::placeholder { color: var(--text-muted); }
 .composer-footer { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 5px 5px 11px; }
 .composer-hint { color: var(--text-muted); font-size: 10px; }
 .composer-actions { display: flex; gap: 5px; }
 .icon-button, .send-button { height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; cursor: pointer; }
 .icon-button { width: 32px; background: transparent; color: var(--text-muted); }
-.retry:hover { color: #8cc4e6; border-color: rgba(105, 168, 207, 0.35); }
-.stop { color: #e38b82; border-color: rgba(211, 91, 81, 0.26); background: rgba(211, 91, 81, 0.08); }
-.send-button { gap: 6px; padding: 0 12px; border-color: #558eb0; background: #3f7798; color: #fff; }
+.retry:hover { color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); }
+.stop { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, var(--border-subtle)); background: var(--danger-soft); }
+.send-button { gap: 6px; padding: 0 12px; border-color: var(--accent); border-radius: var(--radius-sm); background: var(--accent); color: var(--text-inverse); }
+.send-button:hover:not(:disabled) { background: var(--accent-hover); }
 .send-button:disabled, .icon-button:disabled { cursor: not-allowed; opacity: 0.42; }
 @media (max-width: 480px) { .composer { padding-inline: 10px; } .composer-hint { display: none; } }
 </style>

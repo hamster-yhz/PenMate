@@ -26,18 +26,16 @@ describe('business id string-only API contracts', () => {
     requestMock.delete.mockResolvedValue({})
   })
 
-  it('builds approval, chapter, outline, story bible, style, rag and profile endpoints with string ids only', async () => {
+  it('builds approval, chapter, story bible, style, rag and profile endpoints with string ids only', async () => {
     const { approvalApi } = await import('./approval.api')
     const { chapterApi } = await import('./chapter.api')
-    const { outlineApi } = await import('./outline.api')
     const { storyBibleApi } = await import('./storyBible.api')
     const { styleApi } = await import('./style.api')
     const { ragApi } = await import('./rag.api')
     const { profileApi } = await import('./profile.api')
 
     await approvalApi.getApproval('101', '88001')
-    await chapterApi.restoreVersion('101', '301', '9', '1001')
-    await outlineApi.moveNode('101', '11', '1001', { direction: 'before' })
+    await chapterApi.acquireLease('101', '301')
     await storyBibleApi.deleteRelation('101', '8', '1001', 3)
     await styleApi.switchStyle('101', '1001', { toStyleId: '81' }, '90001')
     await ragApi.indexStatus('101', '9001')
@@ -46,11 +44,9 @@ describe('business id string-only API contracts', () => {
     expect(requestMock.get).toHaveBeenNthCalledWith(1, '/v1/novels/101/approvals/88001')
     expect(requestMock.post).toHaveBeenNthCalledWith(
       1,
-      '/v1/novels/101/chapters/301/versions/9/restore',
+      '/v1/novels/101/chapters/301/lease',
+      { force: false },
     )
-    expect(requestMock.patch).toHaveBeenNthCalledWith(1, '/v1/novels/101/outlines/nodes/11/move', {
-      direction: 'before',
-    })
     expect(requestMock.delete).toHaveBeenNthCalledWith(
       1,
       '/v1/novels/101/story-bible/relations/8?expectedRevision=3',
@@ -76,7 +72,7 @@ describe('business id string-only API contracts', () => {
     // @ts-expect-error business ids must stay string-only
     approvalApi.getApproval(101, '88001')
     // @ts-expect-error business ids must stay string-only
-    chapterApi.restoreVersion('101', '301', '9', 1001)
+    chapterApi.acquireLease(101, '301')
     // @ts-expect-error business ids must stay string-only
     styleApi.switchStyle(101, '1001', { toStyleId: '81' }, '90001')
   })

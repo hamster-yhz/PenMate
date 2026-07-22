@@ -1,14 +1,11 @@
 <template>
-  <div class="outline-tree">
-    <div class="tree-actions">
-      <button class="tree-btn" :disabled="busy" @click="emit('add-volume')">+ 新卷</button>
-    </div>
-
-    <div class="tree-root">
+  <a-dropdown :trigger="['contextmenu']" :disabled="busy">
+    <div class="outline-tree">
       <OutlineVolumeNode
         v-for="volume in volumes"
         :key="volume.key"
         :volume="volume"
+        :display-index="volumes.indexOf(volume)"
         :active-chapter-key="activeChapterKey"
         @select-chapter="emit('select-chapter', $event)"
         @rename-node="emit('rename-node', $event)"
@@ -17,11 +14,18 @@
         @delete-volume="emit('delete-volume', $event)"
         @delete-chapter="emit('delete-chapter', $event)"
       />
+      <div v-if="!volumes.length" class="directory-empty" aria-label="作品目录为空"></div>
     </div>
-  </div>
+    <template #overlay>
+      <a-menu @click="({ key }: { key: string | number }) => key === 'add-volume' && emit('add-volume')">
+        <a-menu-item key="add-volume"><FolderAddOutlined />新建卷</a-menu-item>
+      </a-menu>
+    </template>
+  </a-dropdown>
 </template>
 
 <script setup lang="ts">
+import { Dropdown as ADropdown, Menu as AMenu, MenuItem as AMenuItem } from 'ant-design-vue'
 import type { OutlineChapterNode, OutlineVolumeNode as OutlineVolume } from '@/composables/workbench/workbenchOutline'
 import type {
   DeleteChapterPayload,
@@ -30,6 +34,7 @@ import type {
 } from '@/composables/workbench/useWorkbenchOutline'
 
 import OutlineVolumeNodeItem from './OutlineVolumeNode.vue'
+import { FolderAddOutlined } from '@ant-design/icons-vue'
 
 defineOptions({
   components: {
@@ -54,23 +59,14 @@ const emit = defineEmits<{
 }>()
 </script>
 
-<style scoped lang="less">
-.tree-actions {
-  padding: 4px 0 8px;
-}
-
-.tree-btn {
-  padding: 4px 12px;
-  font-size: 0.75rem;
-  border: 1px solid rgba(201, 169, 110, 0.35);
-  border-radius: 999px;
-  background: rgba(201, 169, 110, 0.08);
-  cursor: pointer;
-}
-
-.tree-root {
+<style scoped>
+.outline-tree {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
+.directory-empty { min-height: 160px; }
 </style>

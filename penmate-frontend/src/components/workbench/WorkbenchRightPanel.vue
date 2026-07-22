@@ -5,7 +5,9 @@ import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
 import AgentSessionHeader from '@/components/workbench/chat/AgentSessionHeader.vue'
 import ChatComposer from '@/components/workbench/chat/ChatComposer.vue'
 import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
+import AiEditActivity from '@/components/workbench/chat/AiEditActivity.vue'
 import ConversationHistoryPanel from '@/components/workbench/chat/ConversationHistoryPanel.vue'
+import type { ChapterAiUndoOperation } from '@/entities/chapter/model'
 import type { AgentRunAttempt, ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
 
 const props = withDefaults(defineProps<{
@@ -38,6 +40,9 @@ const props = withDefaults(defineProps<{
   activePlugins?: string[]
   activeChapterTitle?: string
   selectedText?: string
+  aiUndoOperations?: ChapterAiUndoOperation[]
+  aiUndoBusyOperationId?: string
+  aiUndoBusyRunId?: string
 }>(), {
   focused: false, panelWidth: 440, currentModelName: '', generationStatusText: '', agentStatusDetailText: '',
   isGenerating: false, canCancelRun: false, isCancelling: false, canRetryRun: false, isRetrying: false,
@@ -46,10 +51,11 @@ const props = withDefaults(defineProps<{
   recentlyDeletedConversation: null,
   messages: () => [], runAttempts: () => [], streamingAssistantMsgId: null, chatInput: '', activePlugins: () => [],
   activeChapterTitle: '', selectedText: '', showScrollToBottom: false,
+  aiUndoOperations: () => [], aiUndoBusyOperationId: '', aiUndoBusyRunId: '',
 })
 
 const emit = defineEmits<{
-  'toggle-collapse': []; 'toggle-focus': []; 'update:panel-width': [width: number]; 'toggle-history': [];
+  'toggle-collapse': []; 'toggle-focus': []; 'update:panel-width': [width: number]; 'reset-panel-width': []; 'toggle-history': [];
   'create-session': []; 'select-conversation': [payload: string]; 'load-deleted-conversations': [];
   'rename-conversation': [payload: { conversationId: string; title: string }]; 'delete-conversation': [payload: string];
   'restore-conversation': [payload: string]; approve: [payload: string]; reject: [payload: string];
@@ -57,6 +63,7 @@ const emit = defineEmits<{
   'cancel-run': []; 'retry-run': []; 'open-model-settings': [];
   'clear-selected-text': [];
   'scroll-to-bottom': [];
+  'undo-ai': [operationId: string]; 'undo-ai-run': [runId: string];
 }>()
 
 const chatContainerRef = ref<HTMLElement | null>(null)
@@ -71,7 +78,7 @@ const startResize = (event: PointerEvent) => {
   event.preventDefault()
   const startX = event.clientX
   const startWidth = props.panelWidth
-  const move = (next: PointerEvent) => emit('update:panel-width', Math.min(760, Math.max(360, startWidth + startX - next.clientX)))
+  const move = (next: PointerEvent) => emit('update:panel-width', Math.min(600, Math.max(300, startWidth + startX - next.clientX)))
   const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); stopResize = null }
   stopResize = stop
   window.addEventListener('pointermove', move)
@@ -86,7 +93,17 @@ onUnmounted(() => stopResize?.())
       {{ collapsed ? '‹' : '›' }}
     </button>
     <div v-if="!collapsed || focused" class="panel-content">
-      <button v-if="!focused" type="button" class="resize-handle" aria-label="调整对话面板宽度" @pointerdown="startResize"></button>
+      <button
+        v-if="!focused"
+        type="button"
+        class="resize-handle"
+        aria-label="调整对话面板宽度"
+        title="拖拽调整对话面板宽度"
+        @pointerdown="startResize"
+        @dblclick="emit('reset-panel-width')"
+        @keydown.left.prevent="emit('update:panel-width', Math.min(600, panelWidth + 16))"
+        @keydown.right.prevent="emit('update:panel-width', Math.max(300, panelWidth - 16))"
+      ></button>
       <AgentSessionHeader
         :current-model-name="currentModelName" :generation-status-text="generationStatusText"
         :agent-status-detail-text="agentStatusDetailText" :is-generating="isGenerating"
@@ -130,6 +147,13 @@ onUnmounted(() => stopResize?.())
         <span>已删除“{{ recentlyDeletedConversation.title }}”</span>
         <button type="button" @click="emit('restore-conversation', recentlyDeletedConversation.conversationId)">撤销</button>
       </div>
+      <AiEditActivity
+        :operations="aiUndoOperations"
+        :busy-operation-id="aiUndoBusyOperationId"
+        :busy-run-id="aiUndoBusyRunId"
+        @undo="emit('undo-ai', $event)"
+        @undo-run="emit('undo-ai-run', $event)"
+      />
       <ChatComposer
         :model-value="chatInput" :is-generating="isGenerating" :can-cancel-run="canCancelRun"
         :is-cancelling="isCancelling" :can-retry-run="canRetryRun" :is-retrying="isRetrying"
@@ -144,21 +168,21 @@ onUnmounted(() => stopResize?.())
 </template>
 
 <style scoped lang="less">
-.panel-right { position: relative; flex: 0 0 auto; min-width: 0; height: 100%; border-left: 1px solid var(--border-subtle); background: #0b1120; box-shadow: -12px 0 28px rgba(2, 6, 23, 0.18); transition: width 180ms ease; }
+.panel-right { position: relative; flex: 0 0 auto; min-width: 0; height: 100%; border-left: 1px solid var(--border-subtle); background: var(--bg-surface); box-shadow: -8px 0 20px color-mix(in srgb, var(--text-primary) 8%, transparent); transition: width 180ms ease; }
 .panel-right.focused { position: absolute; inset: 0; z-index: 210; border-left: 0; }
 .panel-right.collapsed { border-left: 0; box-shadow: none; }
 .panel-content { position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-.panel-toggle { position: absolute; left: -24px; top: 50%; z-index: 12; width: 24px; height: 48px; border: 1px solid var(--border-subtle); border-right: 0; background: #111827; color: var(--text-muted); cursor: pointer; }
+.panel-toggle { position: absolute; left: -24px; top: 50%; z-index: 12; width: 24px; height: 48px; border: 1px solid var(--border-subtle); border-right: 0; background: var(--bg-surface); color: var(--text-muted); cursor: pointer; }
 .resize-handle { position: absolute; inset: 0 auto 0 -4px; z-index: 15; width: 8px; border: 0; background: transparent; cursor: col-resize; }
-.resize-handle:hover, .resize-handle:focus-visible { background: rgba(105, 168, 207, 0.3); outline: 0; }
+.resize-handle:hover, .resize-handle:focus-visible { background: var(--focus-ring); outline: 0; }
 .chat-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 18px; scrollbar-gutter: stable; }
 .chat-empty { min-height: 180px; display: grid; place-content: center; gap: 5px; color: var(--text-muted); text-align: center; }
 .chat-empty strong { color: var(--text-secondary); font-size: 14px; } .chat-empty span { font-size: 12px; }
-.scroll-to-bottom { position: absolute; right: 22px; bottom: 112px; z-index: 12; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-subtle); background: #182235; color: var(--text-secondary); box-shadow: 0 6px 18px rgba(2, 6, 23, 0.32); cursor: pointer; }
-.scroll-to-bottom:hover, .scroll-to-bottom:focus-visible { border-color: rgba(105, 168, 207, 0.5); color: #8cc4e6; outline: 0; }
-.pending-approval-bar { flex: 0 0 auto; max-height: 38vh; overflow: auto; padding: 10px 14px; border-top: 1px solid rgba(216, 177, 94, 0.24); background: #111827; box-shadow: 0 -8px 20px rgba(2, 6, 23, 0.25); }
-.undo-delete { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 14px; border-top: 1px solid var(--border-subtle); background: #182235; color: var(--text-secondary); font-size: 12px; }
-.undo-delete button { border: 0; background: transparent; color: #86c3e7; cursor: pointer; font-weight: 650; }
-@media (max-width: 1080px) { .resize-handle { display: none; } .panel-right.focused { position: fixed; top: 48px; } }
+.scroll-to-bottom { position: absolute; right: 22px; bottom: 112px; z-index: 12; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); box-shadow: var(--shadow-sm); cursor: pointer; }
+.scroll-to-bottom:hover, .scroll-to-bottom:focus-visible { border-color: var(--accent-border); color: var(--accent); outline: 0; }
+.pending-approval-bar { flex: 0 0 auto; max-height: 38vh; overflow: auto; padding: 10px 14px; border-top: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border-subtle)); background: var(--bg-surface); box-shadow: 0 -8px 20px color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.undo-delete { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 14px; border-top: 1px solid var(--border-subtle); background: var(--bg-subtle); color: var(--text-secondary); font-size: 12px; }
+.undo-delete button { border: 0; background: transparent; color: var(--accent); cursor: pointer; font-weight: 650; }
+@media (max-width: 900px) { .resize-handle { display: none; } .panel-right.focused { position: fixed; top: 48px; } }
 @media (prefers-reduced-motion: reduce) { .panel-right { transition: none; } }
 </style>

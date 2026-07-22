@@ -6,74 +6,84 @@
     </div>
     <WorkbenchHeader
       :novel-title="novelTitle"
-      :word-count="wordCount"
       :save-hint="saveHint"
       :username="username"
-      :user-email="userEmail"
-      :user-menu-open="userMenuOpen"
       :can-access-rbac-admin="canAccessRbacAdmin"
       :workbench-mode="workbenchMode"
-      @go-home="router.push('/')"
-      @update-title="updateTitle"
-      @open-style-manager="showStyleManager = true"
-      @open-plugin-workshop="showPluginWorkshop = true"
-      @open-model-settings="showModelSettings = true"
-      @toggle-user-menu="userMenuOpen = !userMenuOpen"
-      @close-user-menu="userMenuOpen = false"
+      :layout-preset="layoutPreset"
+      :directory-collapsed="leftCollapsed"
+      :ai-collapsed="rightCollapsed"
       @go-profile="navigateFromUserMenu('/profile')"
       @go-mybooks="navigateFromUserMenu('/mybooks')"
-      @go-rbac-admin="navigateFromUserMenu('/admin/rbac')"
+      @go-rbac-admin="navigateFromUserMenu('/admin')"
       @logout="handleLogout"
+      @open-project-settings="router.push(`/projects/${encodeURIComponent(getCurrentProjectId())}/settings`)"
       @update:workbench-mode="setWorkbenchMode"
+      @update:layout-preset="applyLayoutPreset"
+      @restore-directory="toggleLeftPanel"
+      @restore-ai="toggleRightPanel"
     />
 
-    <div class="wb-main workbench-shell">
+    <nav v-if="workbenchMode === 'writing'" class="mobile-pane-tabs" aria-label="工作台视图">
+      <button type="button" aria-label="目录" :aria-pressed="mobilePane === 'directory'" :class="{ active: mobilePane === 'directory' }" @click="selectMobilePane('directory')">
+        <UnorderedListOutlined aria-hidden="true" /><span>目录</span>
+      </button>
+      <button type="button" aria-label="正文" :aria-pressed="mobilePane === 'editor'" :class="{ active: mobilePane === 'editor' }" @click="selectMobilePane('editor')">
+        <EditOutlined aria-hidden="true" /><span>正文</span>
+      </button>
+      <button type="button" aria-label="AI" :aria-pressed="mobilePane === 'ai'" :class="{ active: mobilePane === 'ai' }" @click="selectMobilePane('ai')">
+        <MessageOutlined aria-hidden="true" /><span>AI</span>
+      </button>
+    </nav>
+
+    <div class="wb-main workbench-shell" :class="{ 'directory-overlay-mode': directoryOverlayMode && !leftCollapsed }">
       <WorkbenchLeftPanel
         v-if="workbenchMode === 'writing'"
+        :class="{ 'mobile-pane-hidden': mobilePane !== 'directory', 'mobile-pane-active': mobilePane === 'directory' }"
         :collapsed="leftCollapsed"
-        :left-tabs="leftTabs"
-        :active-left-tab="activeLeftTab"
+        :panel-width="leftPanelWidth"
         :outline-data="outlineData"
         :active-chapter="activeChapter"
         :outline-op-busy="outlineOpBusy"
-        @toggle-collapse="leftCollapsed = !leftCollapsed"
-        @update:active-left-tab="activeLeftTab = $event"
-        @select-chapter="handleOutlineSelectChapter"
+        :pending-move-undo="pendingMoveUndo"
+        @toggle-collapse="toggleLeftPanel"
+        @update:panel-width="leftPanelWidth = $event"
+        @reset-panel-width="resetLayoutPreset"
+        @select-chapter="selectMobileChapter"
         @rename-node="renameNode($event as any)"
         @move-node="moveNode($event as any)"
+        @undo-move="undoLastMove"
         @add-volume="addVolume"
         @add-chapter="addChapter($event as any)"
         @delete-volume="deleteVolume($event as any)"
         @delete-chapter="deleteChapter($event as any)"
       />
 
-      <WorkbenchEditorPanel
-        v-if="workbenchMode === 'writing'"
-        :current-chapter-title="currentChapterTitle"
-        :selected-version-no="selectedVersionNo"
-        :version-busy="versionBusy"
-        :active-chapter="activeChapter"
-        :versions="getCurrentChapterVersions()"
-        :editor-textarea-ref="bindEditorTextarea"
-        :editor-content="editorContent"
-        :selected-text="selectedText"
-        :version-diff-summary="versionDiffSummary"
-        :current-line="currentLine"
-        :current-col="currentCol"
-        :selected-version-content="selectedVersionContent"
-        @save="saveContent"
-        @undo="editorUndo"
-        @redo="editorRedo"
-        @wrap-selection="wrapSelection($event[0], $event[1])"
-        @insert-prefix="insertPrefix($event as string)"
-        @update:selected-version-no="selectedVersionNo = $event"
-        @restore-version="restoreSelectedVersion"
-        @view-version="viewSelectedVersion"
-        @publish-chapter="publishCurrentChapter"
-        @update:editor-content="editorContent = $event"
-        @input="onEditorInput"
-        @cursor-activity="updateCursorPos"
-      />
+      <Suspense v-if="workbenchMode === 'writing'">
+        <WorkbenchEditorPanel
+          :class="{ 'mobile-pane-hidden': mobilePane !== 'editor', 'mobile-pane-active': mobilePane === 'editor' }"
+          :current-chapter-title="currentChapterTitle"
+          :active-chapter="activeChapter"
+          :editor-content="editorContent"
+          :selected-text="selectedText"
+          :current-line="currentLine"
+          :current-col="currentCol"
+          :word-count="wordCount"
+          :save-hint="saveHint"
+          :read-only="chapterReadOnly"
+          :lock-reason="chapterLockReason"
+          :ai-editing="aiEditingCurrentChapter"
+          :ai-preview-content="aiPreviewContent"
+          :ai-undo-available="Boolean(currentChapterAiUndo)"
+          :ai-undo-busy="Boolean(aiUndoBusyOperationId)"
+          @save="saveContent"
+          @update:editor-content="editorContent = $event"
+          @input="onEditorInput"
+          @selection-change="updateCursorPos"
+          @undo-ai="currentChapterAiUndo && undoAiEdit(currentChapterAiUndo.operationId)"
+        />
+        <template #fallback><div class="workbench-panel-skeleton editor-skeleton" :class="{ 'mobile-pane-hidden': mobilePane !== 'editor', 'mobile-pane-active': mobilePane === 'editor' }" aria-label="正在加载正文编辑器"></div></template>
+      </Suspense>
 
       <StoryBibleWorkspace
         v-else
@@ -88,115 +98,120 @@
         :initial-node-id="storyBibleNodeId"
       />
 
-      <WorkbenchRightPanel
-        :collapsed="rightCollapsed"
-        :focused="chatFocused"
-        :panel-width="chatPanelWidth"
-        :current-model-name="currentModelName"
-        :generation-status-text="generationStatusText"
-        :agent-status-detail-text="agentStatusDetailText"
-        :is-generating="isGenerating"
-        :can-cancel-run="canCancelRun"
-        :is-cancelling="isCancelling"
-        :can-retry-run="canRetryRun"
-        :is-retrying="isRetrying"
-        :generation-phase="generationPhase"
-        :show-conversation-panel="showConversationPanel"
-        :conversation-loading="conversationLoading"
-        :conversation-list="conversationList"
-        :deleted-conversation-list="deletedConversationList"
-        :recently-deleted-conversation="recentlyDeletedConversation"
-        :current-conversation-id="currentConversationId"
-        :bound-style-name="boundStyleName"
-        :bind-chat-container="bindChatContainer"
-        :show-scroll-to-bottom="showScrollToBottom"
-        :messages="visibleMessages"
-        :run-attempts="runAttempts"
-        :streaming-assistant-msg-id="streamingAssistantMsgId"
-        :is-approval-busy="isApprovalBusy"
-        :chat-input="chatInput"
-        :active-plugins="activePlugins"
-        :active-chapter-title="currentChapterTitle"
-        :selected-text="selectedText"
-        @toggle-collapse="rightCollapsed = !rightCollapsed"
-        @toggle-focus="chatFocused = !chatFocused"
-        @update:panel-width="chatPanelWidth = $event"
-        @toggle-history="toggleConversationPanel"
-        @create-session="handleCreateSession"
-        @select-conversation="handleSelectConversation"
-        @load-deleted-conversations="loadDeletedConversations"
-        @rename-conversation="renameConversation($event.conversationId, $event.title)"
-        @delete-conversation="deleteConversation"
-        @restore-conversation="restoreConversation"
-        @approve="handleApprove"
-        @reject="handleReject"
-        @open-story-bible="openStoryBible"
-        @update:chat-input="chatInput = $event"
-        @send="sendMessage"
-        @cancel-run="cancelCurrentRun"
-        @retry-run="retryCurrentRun"
-        @open-model-settings="showModelSettings = true"
-        @clear-selected-text="selectedText = ''"
-        @scroll-to-bottom="scrollChatToBottom"
-      />
+      <Suspense>
+        <WorkbenchRightPanel
+          :class="{ 'mobile-pane-hidden': mobilePane !== 'ai', 'mobile-pane-active': mobilePane === 'ai' }"
+          :collapsed="rightCollapsed && mobilePane !== 'ai'"
+          :focused="chatFocused"
+          :panel-width="effectiveChatPanelWidth"
+          :current-model-name="currentModelName"
+          :generation-status-text="generationStatusText"
+          :agent-status-detail-text="agentStatusDetailText"
+          :is-generating="isGenerating"
+          :can-cancel-run="canCancelRun"
+          :is-cancelling="isCancelling"
+          :can-retry-run="canRetryRun"
+          :is-retrying="isRetrying"
+          :generation-phase="generationPhase"
+          :show-conversation-panel="showConversationPanel"
+          :conversation-loading="conversationLoading"
+          :conversation-list="conversationList"
+          :deleted-conversation-list="deletedConversationList"
+          :recently-deleted-conversation="recentlyDeletedConversation"
+          :current-conversation-id="currentConversationId"
+          :bound-style-name="boundStyleName"
+          :bind-chat-container="bindChatContainer"
+          :show-scroll-to-bottom="showScrollToBottom"
+          :messages="visibleMessages"
+          :run-attempts="runAttempts"
+          :streaming-assistant-msg-id="streamingAssistantMsgId"
+          :is-approval-busy="isApprovalBusy"
+          :chat-input="chatInput"
+          :active-plugins="activePlugins"
+          :active-chapter-title="currentChapterTitle"
+          :selected-text="selectedText"
+          :ai-undo-operations="aiUndoOperations"
+          :ai-undo-busy-operation-id="aiUndoBusyOperationId"
+          :ai-undo-busy-run-id="aiUndoBusyRunId"
+          @toggle-collapse="toggleRightPanel"
+          @toggle-focus="chatFocused = !chatFocused"
+          @update:panel-width="chatPanelWidth = $event"
+          @reset-panel-width="resetLayoutPreset"
+          @toggle-history="toggleConversationPanel"
+          @create-session="handleCreateSession"
+          @select-conversation="handleSelectConversation"
+          @load-deleted-conversations="loadDeletedConversations"
+          @rename-conversation="renameConversation($event.conversationId, $event.title)"
+          @delete-conversation="deleteConversation"
+          @restore-conversation="restoreConversation"
+          @approve="handleApprove"
+          @reject="handleReject"
+          @open-story-bible="openStoryBible"
+          @update:chat-input="chatInput = $event"
+          @send="sendMessage"
+          @cancel-run="cancelCurrentRun"
+          @retry-run="retryCurrentRun"
+          @open-model-settings="router.push('/profile?section=agent')"
+          @clear-selected-text="selectedText = ''"
+          @scroll-to-bottom="scrollChatToBottom"
+          @undo-ai="undoAiEdit"
+          @undo-ai-run="undoAiRun"
+        />
+        <template #fallback><div class="workbench-panel-skeleton ai-skeleton" :class="{ collapsed: rightCollapsed && mobilePane !== 'ai', 'mobile-pane-hidden': mobilePane !== 'ai', 'mobile-pane-active': mobilePane === 'ai' }" aria-label="正在加载 AI 面板"></div></template>
+      </Suspense>
 
-      <button
-        v-if="!chatFocused"
-        type="button"
-        class="mobile-chat-toggle"
-        :class="{ open: !rightCollapsed }"
-        :title="rightCollapsed ? '打开 Agent 对话' : '关闭 Agent 对话'"
-        :aria-label="rightCollapsed ? '打开 Agent 对话' : '关闭 Agent 对话'"
-        @click="rightCollapsed = !rightCollapsed"
-      >
-        <MessageOutlined v-if="rightCollapsed" />
-        <CloseOutlined v-else />
-      </button>
     </div>
 
     <StyleManager
+      v-if="showStyleManager"
       :visible="showStyleManager"
       :project-id="getCurrentProjectId()"
       :operator-id="resolveOperatorId()"
       :session-id="currentConversationId"
       @close="showStyleManager = false"
     />
-    <PluginWorkshop :visible="showPluginWorkshop" @close="showPluginWorkshop = false" />
-    <ModelSettings :visible="showModelSettings" @close="showModelSettings = false" @saved="onModelConfigSaved" />
+    <PluginWorkshop v-if="showPluginWorkshop" :visible="showPluginWorkshop" @close="showPluginWorkshop = false" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { CloseOutlined, MessageOutlined } from '@ant-design/icons-vue'
-import StyleManager from '@/components/workbench/StyleManager.vue'
-import PluginWorkshop from '@/components/workbench/PluginWorkshop.vue'
-import ModelSettings from '@/components/workbench/ModelSettings.vue'
+import { defineAsyncComponent, ref } from 'vue'
+import { EditOutlined, MessageOutlined, UnorderedListOutlined } from '@ant-design/icons-vue'
 import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import WorkbenchLeftPanel from '@/components/workbench/WorkbenchLeftPanel.vue'
-import WorkbenchEditorPanel from '@/components/workbench/WorkbenchEditorPanel.vue'
-import WorkbenchRightPanel from '@/components/workbench/WorkbenchRightPanel.vue'
-import StoryBibleWorkspace from '@/components/workbench/story-bible/StoryBibleWorkspace.vue'
 import { useWorkbenchPageController } from '@/features/workbench/useWorkbenchPageController'
+
+const StyleManager = defineAsyncComponent(() => import('@/components/workbench/StyleManager.vue'))
+const PluginWorkshop = defineAsyncComponent(() => import('@/components/workbench/PluginWorkshop.vue'))
+const StoryBibleWorkspace = defineAsyncComponent(() => import('@/components/workbench/story-bible/StoryBibleWorkspace.vue'))
+const WorkbenchEditorPanel = defineAsyncComponent(() => import('@/components/workbench/WorkbenchEditorPanel.vue'))
+const WorkbenchRightPanel = defineAsyncComponent(() => import('@/components/workbench/WorkbenchRightPanel.vue'))
+
+const mobilePane = ref<'directory' | 'editor' | 'ai'>('editor')
 
 const {
   router,
   session,
   username,
-  userEmail,
-  userMenuOpen,
   workbenchInitError,
   canAccessRbacAdmin,
   novelTitle,
+  layoutPreset,
+  applyLayoutPreset,
+  resetLayoutPreset,
   leftCollapsed,
+  directoryOverlayMode,
+  toggleLeftPanel,
+  openLeftPanel,
+  leftPanelWidth,
   rightCollapsed,
+  toggleRightPanel,
   chatFocused,
   chatPanelWidth,
+  effectiveChatPanelWidth,
   showStyleManager,
   showPluginWorkshop,
-  showModelSettings,
   storyBibleChapters,
-  activeLeftTab,
-  leftTabs,
   workbenchMode,
   storyBibleNodeId,
   bindStoryBibleWorkspace,
@@ -208,8 +223,10 @@ const {
   activeChapter,
   currentChapterTitle,
   outlineOpBusy,
+  pendingMoveUndo,
   renameNode,
   moveNode,
+  undoLastMove,
   addVolume,
   addChapter,
   deleteVolume,
@@ -220,22 +237,19 @@ const {
   currentCol,
   selectedText,
   saveHint,
+  chapterReadOnly,
+  chapterLockReason,
+  aiEditingCurrentChapter,
+  aiPreviewContent,
+  currentChapterAiUndo,
+  aiUndoOperations,
+  aiUndoBusyOperationId,
+  aiUndoBusyRunId,
+  undoAiEdit,
+  undoAiRun,
   onEditorInput,
   updateCursorPos,
-  editorUndo,
-  editorRedo,
-  wrapSelection,
-  insertPrefix,
   saveContent,
-  bindEditorTextarea,
-  selectedVersionNo,
-  selectedVersionContent,
-  versionBusy,
-  versionDiffSummary,
-  getCurrentChapterVersions,
-  viewSelectedVersion,
-  restoreSelectedVersion,
-  publishCurrentChapter,
   activePlugins,
   boundStyleName,
   currentModelName,
@@ -274,103 +288,20 @@ const {
   handleSelectConversation,
   handleCreateSession,
   handleOutlineSelectChapter,
-  updateTitle,
   navigateFromUserMenu,
   handleLogout,
   initializeWorkbench,
-  onModelConfigSaved,
 } = useWorkbenchPageController()
+
+const selectMobilePane = (pane: 'directory' | 'editor' | 'ai') => {
+  mobilePane.value = pane
+  if (pane === 'directory') openLeftPanel()
+  if (pane === 'ai' && rightCollapsed.value) toggleRightPanel()
+}
+
+const selectMobileChapter = async (chapter: Parameters<typeof handleOutlineSelectChapter>[0]) => {
+  await handleOutlineSelectChapter(chapter)
+  mobilePane.value = 'editor'
+}
 </script>
-<style lang="less">
-.workbench-page {
-  min-height: 100vh;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.workbench-error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 40px;
-  padding: 8px 16px;
-  color: #fff2f0;
-  background: #5c1d1d;
-  border-bottom: 1px solid #ff7875;
-}
-
-.workbench-error button {
-  padding: 4px 10px;
-  color: #fff;
-  background: transparent;
-  border: 1px solid currentcolor;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.workbench-shell {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  overflow: hidden;
-}
-
-.mobile-chat-toggle {
-  display: none;
-}
-
-@media (max-width: 1080px) {
-  .workbench-shell > .panel-right {
-    position: fixed;
-    top: 48px;
-    right: 0;
-    bottom: 0;
-    z-index: 240;
-    width: min(92vw, 420px) !important;
-    height: auto;
-    border-left: 1px solid var(--border-gold);
-    background: rgba(11, 17, 32, 0.99);
-    box-shadow: var(--shadow-lg);
-  }
-  .workbench-shell > .panel-right.collapsed {
-    display: none;
-  }
-  .workbench-shell > .panel-right.focused {
-    width: 100% !important;
-  }
-  .workbench-shell > .panel-right .panel-toggle {
-    display: none;
-  }
-  .mobile-chat-toggle {
-    position: fixed;
-    right: 12px;
-    bottom: 12px;
-    z-index: 260;
-    width: 40px;
-    height: 40px;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--border-gold);
-    border-radius: 50%;
-    color: var(--amber-gold);
-    background: rgba(17, 24, 39, 0.98);
-    box-shadow: var(--shadow-lg);
-    cursor: pointer;
-  }
-  .mobile-chat-toggle.open {
-    top: 56px;
-    right: min(92vw, 420px);
-    bottom: auto;
-    width: 32px;
-    height: 40px;
-    border-right: 0;
-    border-radius: 4px 0 0 4px;
-  }
-}
-</style>
+<style src="./workbench.less" lang="less"></style>

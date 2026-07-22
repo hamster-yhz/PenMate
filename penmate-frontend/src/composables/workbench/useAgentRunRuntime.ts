@@ -87,6 +87,7 @@ const structuredRecord = (value: unknown) =>
 
 const toRuntimeEventSource = (eventName: string, payload: Record<string, unknown>): WorkbenchRuntimeEventSource => ({
   eventName,
+  payload,
   sessionId: payload.sessionId == null ? null : String(payload.sessionId),
   turnId: payload.turnId == null ? null : String(payload.turnId),
   runId: payload.runId == null ? null : String(payload.runId),
@@ -325,6 +326,18 @@ export const createAgentRunRuntime = (deps: {
         deps.onMessageSnapshot?.(text, payload)
         deps.scrollChat()
       })
+      const listenChapterEdit = (eventName: string) => {
+        listen(eventName, (event) => {
+          const payload = parseSseData(event) as Record<string, unknown>
+          publish(eventName, payload)
+        })
+      }
+      listenChapterEdit('chapter.edit.started')
+      listenChapterEdit('chapter.edit.delta')
+      listenChapterEdit('chapter.edit.snapshot')
+      listenChapterEdit('chapter.edit.completed')
+      listenChapterEdit('chapter.edit.failed')
+      listenChapterEdit('chapter.edit.cancelled')
       listen('tool.call.started', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('tool.call.started', payload)

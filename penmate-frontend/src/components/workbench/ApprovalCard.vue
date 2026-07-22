@@ -58,10 +58,10 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
 .approval-card {
   position: relative;
   padding: 14px;
-  background: rgba(201, 169, 110, 0.06);
-  border: 1px solid rgba(201, 169, 110, 0.2);
-  border-radius: 10px;
-  transition: all 0.3s;
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border-subtle));
+  border-radius: var(--radius-lg);
+  transition: border-color 160ms ease, opacity 160ms ease;
   overflow: hidden;
 
   &.resolved {
@@ -76,8 +76,8 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
   left: 10%;
   right: 10%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--amber-gold), transparent);
-  opacity: 0.3;
+  background: var(--warning);
+  opacity: 0.24;
 }
 
 .ac-header {
@@ -90,11 +90,11 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
 .ac-badge {
   font-size: 0.75rem;
   padding: 2px 8px;
-  background: rgba(201, 169, 110, 0.12);
-  border: 1px solid rgba(201, 169, 110, 0.25);
-  border-radius: 10px;
-  color: var(--amber-gold);
-  letter-spacing: 0.05em;
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border-subtle));
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  letter-spacing: 0;
 }
 
 .ac-time {
@@ -115,7 +115,7 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
 
 .ac-preview {
   padding: 8px 10px;
-  background: rgba(11, 17, 32, 0.5);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
 }
@@ -127,7 +127,7 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
   padding: 3px 0;
 
   .pk {
-    color: var(--amber-gold);
+    color: var(--warning);
     min-width: 60px;
 
     &::after {
@@ -152,7 +152,7 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
   font-size: 0.78rem;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: background 160ms ease, border-color 160ms ease;
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -160,24 +160,24 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
 }
 
 .btn-approve {
-  color: var(--jade-green);
-  background: rgba(90, 158, 111, 0.1);
-  border: 1px solid rgba(90, 158, 111, 0.25);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
 
   &:hover {
-    background: rgba(90, 158, 111, 0.2);
-    border-color: rgba(90, 158, 111, 0.4);
+    background: color-mix(in srgb, var(--accent-soft) 70%, var(--accent) 30%);
+    border-color: var(--accent);
   }
 }
 
 .btn-reject {
-  color: #e8a87c;
-  background: rgba(192, 60, 45, 0.08);
-  border: 1px solid rgba(192, 60, 45, 0.2);
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border-subtle));
 
   &:hover {
-    background: rgba(192, 60, 45, 0.15);
-    border-color: rgba(192, 60, 45, 0.35);
+    background: color-mix(in srgb, var(--danger-soft) 72%, var(--danger) 28%);
+    border-color: var(--danger);
   }
 }
 
@@ -185,10 +185,10 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
   font-size: 0.78rem;
 
   .approved {
-    color: var(--jade-green);
+    color: var(--accent);
   }
   .rejected {
-    color: #e8a87c;
+    color: var(--danger);
   }
 }
 
@@ -199,7 +199,7 @@ const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.c
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-secondary);
-  background: rgba(11, 17, 32, 0.46);
+  background: var(--bg-surface);
   cursor: pointer;
 }
 </style>

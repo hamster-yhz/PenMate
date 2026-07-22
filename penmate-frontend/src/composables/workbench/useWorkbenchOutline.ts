@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
-import { mapOutlineTree, type OutlineChapterNode, type OutlineVolumeNode } from './workbenchOutline'
+import type { MoveNovelDirectoryItemPayload, NovelDirectoryState } from '@/api/modules/novel.api'
+import { mapNovelDirectory, type OutlineChapterNode, type OutlineVolumeNode } from './workbenchOutline'
 
 type ContextProfile = {
   projectId?: string | null
@@ -12,28 +13,23 @@ type OutlineApiPayload = Record<string, unknown>
 type UseWorkbenchOutlineDeps = {
   getContext: () => ContextProfile
   reloadOutline: () => Promise<void>
-  createOutlineNode: (projectId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
+  createVolume: (projectId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
   createChapter: (projectId: string, operatorId: string, payload: OutlineApiPayload) => Promise<unknown>
-  deleteOutlineNode: (projectId: string, nodeId: string, operatorId: string) => Promise<unknown>
+  deleteVolume: (projectId: string, volumeId: string, operatorId: string) => Promise<unknown>
   deleteChapter: (projectId: string, chapterId: string, operatorId: string) => Promise<unknown>
-  updateOutlineNode: (
+  updateVolume: (
     projectId: string,
-    nodeId: string,
+    volumeId: string,
     operatorId: string,
     payload: OutlineApiPayload,
   ) => Promise<unknown>
-  moveOutlineNode: (
-    projectId: string,
-    nodeId: string,
-    operatorId: string,
-    payload: OutlineApiPayload,
-  ) => Promise<unknown>
-  moveChapter?: (
+  updateChapter: (
     projectId: string,
     chapterId: string,
     operatorId: string,
     payload: OutlineApiPayload,
   ) => Promise<unknown>
+  moveDirectoryItem: (projectId: string, payload: MoveNovelDirectoryItemPayload) => Promise<NovelDirectoryState>
   notify?: (message: string) => void
   notifySuccess?: (message: string) => void
 }
@@ -45,8 +41,11 @@ export type RenameNodePayload = {
 
 export type MoveNodePayload = {
   nodeKey: string
-  direction: -1 | 1
+  direction?: -1 | 1
   parentKey?: string
+  targetParentKey?: string
+  targetIndex?: number
+  drop?: boolean
 }
 
 export type DeleteChapterPayload = {
@@ -67,8 +66,6 @@ const toBusinessId = (value: unknown) => {
   const normalized = value.trim()
   return normalized || ''
 }
-
-const pickOutlineNodeId = (item: Record<string, unknown>) => toBusinessId(item.outlineNodeId)
 
 const findVolumeIndexByKey = (volumes: OutlineVolumeNode[], nodeKey: string) =>
   volumes.findIndex((item) => item.key === nodeKey)
@@ -97,11 +94,37 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   const activeChapter = ref('')
   const currentChapterTitle = ref('')
   const outlineOpBusy = ref(false)
+  const structureRevision = ref(0)
+  const pendingMoveUndo = ref<{
+    label: string
+    payload: Omit<MoveNovelDirectoryItemPayload, 'expectedStructureRevision'>
+  } | null>(null)
+  let undoTimer: ReturnType<typeof setTimeout> | null = null
 
-  const loadOutline = (nodes: Array<Record<string, unknown>>, chapterByOutlineNodeId: Record<string, string> = {}) => {
-    const mapped = mapOutlineTree(nodes, chapterByOutlineNodeId)
+  const loadOutline = (
+    volumes: Array<Record<string, unknown>>,
+    chapters: Array<Record<string, unknown>> = [],
+    revision = structureRevision.value,
+  ) => {
+    const mapped = mapNovelDirectory(volumes, chapters)
     outlineData.value = mapped
+    structureRevision.value = Number(revision) || 0
     return mapped
+  }
+
+  const applyDirectory = (directory: NovelDirectoryState) =>
+    loadOutline(directory.volumes || [], directory.chapters || [], directory.structureRevision)
+
+  const offerMoveUndo = (
+    label: string,
+    payload: Omit<MoveNovelDirectoryItemPayload, 'expectedStructureRevision'>,
+  ) => {
+    if (undoTimer) clearTimeout(undoTimer)
+    pendingMoveUndo.value = { label, payload }
+    undoTimer = setTimeout(() => {
+      pendingMoveUndo.value = null
+      undoTimer = null
+    }, 8000)
   }
 
   const selectChapter = (chapter: OutlineChapterNode) => {
@@ -123,12 +146,10 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
 
     outlineOpBusy.value = true
     try {
-      await deps.createOutlineNode(projectId, operatorId, {
-        parentId: null,
+      await deps.createVolume(projectId, operatorId, {
         title,
-        nodeType: 'VOLUME',
         sortOrder: idx + 1,
-        content: '',
+        description: '',
       })
       await deps.reloadOutline()
     } catch (error: unknown) {
@@ -147,9 +168,9 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
       return
     }
 
-    const volumeNodeId = toBusinessId(volume.key)
-    if (!volumeNodeId) {
-      deps.notify?.('分卷节点ID异常，无法创建章节')
+    const volumeId = toBusinessId(volume.key)
+    if (!volumeId) {
+      deps.notify?.('分卷ID异常，无法创建章节')
       return
     }
 
@@ -157,33 +178,16 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     const title = `第${idx + 1}章：未命名`
 
     outlineOpBusy.value = true
-    let createdOutlineNodeId = ''
     try {
-      const createdOutline = (await deps.createOutlineNode(projectId, operatorId, {
-        parentId: volumeNodeId,
-        title,
-        nodeType: 'CHAPTER',
-        sortOrder: idx + 1,
-        content: '',
-      })) as Record<string, unknown>
-      createdOutlineNodeId = pickOutlineNodeId(createdOutline)
-
       await deps.createChapter(projectId, operatorId, {
-        volumeId: null,
-        outlineNodeId: createdOutlineNodeId || null,
+        volumeId,
         title,
         sortOrder: idx + 1,
-        status: 1,
-        wordCount: 0,
-        excerpt: '',
       })
 
       await deps.reloadOutline()
       deps.notifySuccess?.('章节已创建')
     } catch (error: unknown) {
-      if (projectId && operatorId && createdOutlineNodeId) {
-        await deps.deleteOutlineNode(projectId, createdOutlineNodeId, operatorId).catch(() => undefined)
-      }
       deps.notify?.(error instanceof Error ? error.message : '新建章节失败')
     } finally {
       outlineOpBusy.value = false
@@ -198,7 +202,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
 
     if (projectId && operatorId && nodeKey) {
       try {
-        await deps.deleteOutlineNode(projectId, nodeKey, operatorId)
+        await deps.deleteVolume(projectId, nodeKey, operatorId)
         outlineData.value.splice(volumeIndex, 1)
         const removedActive = volume.children.some(
           (chapter) => activeChapter.value === (chapter.chapterId || chapter.key),
@@ -222,10 +226,7 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
 
     if (projectId && operatorId && nodeKey) {
       try {
-        if (chapter.chapterId) {
-          await deps.deleteChapter(projectId, chapter.chapterId, operatorId)
-        }
-        await deps.deleteOutlineNode(projectId, nodeKey, operatorId)
+        await deps.deleteChapter(projectId, chapter.chapterId || nodeKey, operatorId)
         volume.children.splice(chapterIndex, 1)
         if (activeChapter.value === (chapter.chapterId || chapter.key)) {
           clearSelection(activeChapter, currentChapterTitle)
@@ -253,7 +254,17 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     const { projectId, operatorId } = deps.getContext()
     if (projectId && operatorId && nodeKey) {
       try {
-        await deps.updateOutlineNode(projectId, nodeKey, operatorId, { title: nextTitle })
+        if ('children' in target) {
+          await deps.updateVolume(projectId, nodeKey, operatorId, {
+            title: nextTitle,
+            sortOrder: outlineData.value.indexOf(target as OutlineVolumeNode) + 1,
+            description: '',
+          })
+        } else {
+          await deps.updateChapter(projectId, target.chapterId || nodeKey, operatorId, {
+            title: nextTitle,
+          })
+        }
       } catch (error: unknown) {
         target.title = previousTitle
         currentChapterTitle.value = previousCurrentChapterTitle
@@ -262,59 +273,100 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     }
   }
 
-  const moveNode = async ({ nodeKey, parentKey, direction }: MoveNodePayload) => {
+  const moveNode = async ({ nodeKey, parentKey, direction, targetParentKey, targetIndex, drop }: MoveNodePayload) => {
     const { projectId, operatorId } = deps.getContext()
+    if (!projectId || !operatorId || outlineOpBusy.value || structureRevision.value < 1) return
 
     if (!parentKey) {
       const currentIdx = findVolumeIndexByKey(outlineData.value, nodeKey)
-      const targetIdx = currentIdx + direction
-      if (currentIdx < 0 || targetIdx < 0 || targetIdx >= outlineData.value.length) return
+      let resolvedTargetIndex = targetIndex ?? currentIdx + (direction ?? 0)
+      if (drop && currentIdx < resolvedTargetIndex) resolvedTargetIndex -= 1
+      if (currentIdx < 0 || resolvedTargetIndex < 0 || resolvedTargetIndex >= outlineData.value.length) return
+      if (currentIdx === resolvedTargetIndex) return
 
-      if (projectId && operatorId && nodeKey) {
-        try {
-          await deps.moveOutlineNode(projectId, nodeKey, operatorId, {
-            parentId: null,
-            sortOrder: targetIdx + 1,
-          })
-        } catch (error: unknown) {
-          deps.notify?.(error instanceof Error ? error.message : '移动分卷失败')
-          return
-        }
+      outlineOpBusy.value = true
+      try {
+        const directory = await deps.moveDirectoryItem(projectId, {
+          nodeType: 'VOLUME',
+          nodeId: nodeKey,
+          sortOrder: resolvedTargetIndex + 1,
+          expectedStructureRevision: structureRevision.value,
+        })
+        applyDirectory(directory)
+        offerMoveUndo('分卷已移动', {
+          nodeType: 'VOLUME',
+          nodeId: nodeKey,
+          sortOrder: currentIdx + 1,
+        })
+      } catch (error: unknown) {
+        deps.notify?.(error instanceof Error ? error.message : '移动分卷失败')
+      } finally {
+        outlineOpBusy.value = false
       }
-
-      const [item] = outlineData.value.splice(currentIdx, 1)
-      outlineData.value.splice(targetIdx, 0, item)
       return
     }
 
-    const volume = findVolumeByKey(outlineData.value, parentKey)
-    if (!volume) return
+    const source = findVolumeByKey(outlineData.value, parentKey)
+    if (!source) return
+    const currentIdx = source.children.findIndex((item) => item.key === nodeKey)
+    if (currentIdx < 0) return
 
-    const currentIdx = volume.children.findIndex((item) => item.key === nodeKey)
-    const targetIdx = currentIdx + direction
-    if (currentIdx < 0 || targetIdx < 0 || targetIdx >= volume.children.length) return
-
-    if (projectId && operatorId && nodeKey) {
-      try {
-        await deps.moveOutlineNode(projectId, nodeKey, operatorId, {
-          parentId: parentKey || null,
-          sortOrder: targetIdx + 1,
-        })
-        const chapter = volume.children[currentIdx]
-        if (chapter.chapterId && deps.moveChapter) {
-          await deps.moveChapter(projectId, chapter.chapterId, operatorId, {
-            volumeId: null,
-            sortOrder: targetIdx + 1,
-          })
-        }
-      } catch (error: unknown) {
-        deps.notify?.(error instanceof Error ? error.message : '移动章节失败')
-        return
-      }
+    const destinationKey = targetParentKey || parentKey
+    const destination = findVolumeByKey(outlineData.value, destinationKey)
+    if (!destination) return
+    let resolvedTargetIndex = targetIndex ?? currentIdx + (direction ?? 0)
+    if (drop && targetParentKey === parentKey && currentIdx < resolvedTargetIndex) {
+      resolvedTargetIndex -= 1
     }
+    const maxIndex = destinationKey === parentKey ? destination.children.length - 1 : destination.children.length
+    if (resolvedTargetIndex < 0 || resolvedTargetIndex > maxIndex) return
+    if (destinationKey === parentKey && currentIdx === resolvedTargetIndex) return
 
-    const [item] = volume.children.splice(currentIdx, 1)
-    volume.children.splice(targetIdx, 0, item)
+    const chapter = source.children[currentIdx]
+    outlineOpBusy.value = true
+    try {
+      const directory = await deps.moveDirectoryItem(projectId, {
+        nodeType: 'CHAPTER',
+        nodeId: chapter.chapterId || chapter.key,
+        targetVolumeId: destinationKey,
+        sortOrder: resolvedTargetIndex + 1,
+        expectedStructureRevision: structureRevision.value,
+      })
+      applyDirectory(directory)
+      offerMoveUndo('章节已移动', {
+        nodeType: 'CHAPTER',
+        nodeId: chapter.chapterId || chapter.key,
+        targetVolumeId: parentKey,
+        sortOrder: currentIdx + 1,
+      })
+    } catch (error: unknown) {
+      deps.notify?.(error instanceof Error ? error.message : '移动章节失败')
+    } finally {
+      outlineOpBusy.value = false
+    }
+  }
+
+  const undoLastMove = async () => {
+    const pending = pendingMoveUndo.value
+    const { projectId } = deps.getContext()
+    if (!pending || !projectId || outlineOpBusy.value) return
+
+    outlineOpBusy.value = true
+    try {
+      const directory = await deps.moveDirectoryItem(projectId, {
+        ...pending.payload,
+        expectedStructureRevision: structureRevision.value,
+      })
+      applyDirectory(directory)
+      pendingMoveUndo.value = null
+      if (undoTimer) clearTimeout(undoTimer)
+      undoTimer = null
+      deps.notifySuccess?.('已撤销移动')
+    } catch (error: unknown) {
+      deps.notify?.(error instanceof Error ? error.message : '撤销移动失败')
+    } finally {
+      outlineOpBusy.value = false
+    }
   }
 
   return {
@@ -322,6 +374,8 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     activeChapter,
     currentChapterTitle,
     outlineOpBusy,
+    structureRevision,
+    pendingMoveUndo,
     loadOutline,
     selectChapter,
     addVolume,
@@ -330,5 +384,6 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
     deleteChapter,
     renameNode,
     moveNode,
+    undoLastMove,
   }
 }

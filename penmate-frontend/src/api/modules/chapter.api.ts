@@ -1,4 +1,7 @@
 import request from '@/utils/request'
+import type { ChapterAiUndoOperation } from '@/entities/chapter/model'
+
+export type { ChapterAiUndoOperation } from '@/entities/chapter/model'
 
 type AnyRecord = Record<string, unknown>
 
@@ -9,40 +12,25 @@ export const chapterApi = {
   updateChapter(projectId: string, chapterId: string, _operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}`, payload)
   },
-  listVersions(projectId: string, chapterId: string) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/chapters/${chapterId}/versions`)
+  acquireLease(projectId: string, chapterId: string, force = false) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/lease`, { force })
   },
-  createVersion(projectId: string, chapterId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/versions`, payload)
+  renewLease(projectId: string, chapterId: string, leaseToken: string) {
+    return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/lease/${encodeURIComponent(leaseToken)}`)
   },
-  getVersion(projectId: string, chapterId: string, versionNo: string) {
-    return request.get<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}`)
+  releaseLease(projectId: string, chapterId: string, leaseToken: string) {
+    return request.delete<string>(`/v1/novels/${projectId}/chapters/${chapterId}/lease/${encodeURIComponent(leaseToken)}`)
   },
-  restoreVersion(projectId: string, chapterId: string, versionNo: string, _operatorId: string) {
-    void _operatorId
-    return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore`,
-    )
+  saveContent(projectId: string, chapterId: string, payload: { leaseToken: string; expectedRevision: number; content: string }) {
+    return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/content`, payload)
   },
-  getVersionSnapshotUrl(projectId: string, chapterId: string, versionNo: string) {
-    return request.get<Record<string, string>>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`,
-    )
+  listAiUndo(projectId: string, chapterId: string) {
+    return request.get<ChapterAiUndoOperation[]>(`/v1/novels/${projectId}/chapters/${chapterId}/ai-undo`)
   },
-  publishChapter(projectId: string, chapterId: string, _operatorId: string) {
-    void _operatorId
-    return request.post<string>(`/v1/novels/${projectId}/chapters/${chapterId}/publish`)
+  undoAiEdit(projectId: string, operationId: string) {
+    return request.post<ChapterAiUndoOperation>(`/v1/novels/${projectId}/ai-edits/${operationId}/undo`)
   },
-  getContentUploadUrl(projectId: string, chapterId: string) {
-    return request.post<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-upload-url`)
-  },
-  commitContent(projectId: string, chapterId: string, _operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/content-commit`,
-      payload,
-    )
-  },
-  getContentUrl(projectId: string, chapterId: string) {
-    return request.get<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-url`)
+  undoRunAiEdits(projectId: string, runId: string) {
+    return request.post<ChapterAiUndoOperation[]>(`/v1/novels/${projectId}/agent-runs/${runId}/chapter-edits/undo`)
   },
 }

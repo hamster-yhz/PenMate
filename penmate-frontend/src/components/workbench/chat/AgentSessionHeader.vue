@@ -49,22 +49,22 @@ defineEmits<{ 'toggle-history': []; 'create-session': []; 'toggle-focus': [] }>(
 </template>
 
 <style scoped lang="less">
-.agent-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 64px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); background: rgba(11, 17, 32, 0.92); }
+.agent-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 64px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); }
 .agent-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.agent-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(94, 154, 190, 0.28); color: #8cc4e6; background: rgba(63, 121, 155, 0.12); }
+.agent-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--accent-border); border-radius: var(--radius-md); color: var(--accent); background: var(--accent-soft); }
 .agent-title div { display: grid; gap: 2px; }
 .agent-title strong { color: var(--text-primary); font-size: 13px; }
 .agent-title span { color: var(--text-muted); font-size: 11px; }
 .agent-meta { min-width: 0; display: flex; align-items: center; gap: 7px; overflow: hidden; color: var(--text-muted); font-size: 11px; }
-.status-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: #66b486; }
-.status-dot.busy { background: #d8b15e; box-shadow: 0 0 0 4px rgba(216, 177, 94, 0.1); }
-.status-dot.failed { background: #dc7167; }
+.status-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.status-dot.busy { background: var(--warning); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent); }
+.status-dot.failed { background: var(--danger); }
 .model-name, .style-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-name { color: var(--text-secondary); }
 .style-name { padding-left: 7px; border-left: 1px solid var(--border-subtle); }
-.status-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d2ae62; }
+.status-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--warning); }
 .agent-actions { display: flex; gap: 4px; }
 .agent-actions button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; }
-.agent-actions button:hover, .agent-actions button:focus-visible { border-color: var(--border-subtle); color: var(--text-primary); background: rgba(148, 163, 184, 0.08); outline: none; }
+.agent-actions button:hover, .agent-actions button:focus-visible { border-color: var(--accent-border); color: var(--accent); background: var(--accent-soft); outline: none; }
 @media (max-width: 560px) { .agent-header { grid-template-columns: minmax(0, 1fr) auto; } .agent-meta { grid-column: 1 / -1; grid-row: 2; } }
 </style>

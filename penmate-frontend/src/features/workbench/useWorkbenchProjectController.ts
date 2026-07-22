@@ -1,9 +1,7 @@
 import type { Ref } from 'vue'
 import { novelApi } from '@/api/modules/novel.api'
-import { outlineApi } from '@/api/modules/outline.api'
 import type { StoryBibleChapterOption } from '@/components/workbench/story-bible/storyBibleTypes'
-import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
-import { pickBusinessArray } from '@/utils/apiPayload'
+import type { OutlineChapterNode, OutlineVolumeNode } from '@/composables/workbench/workbenchOutline'
 
 type ChapterLoadGuard = {
   begin: (chapterId: string) => number
@@ -18,40 +16,23 @@ type WorkbenchProjectOptions = {
   chapterContents: Ref<Record<string, string>>
   getProjectId: () => string
   saveDraft: (projectId: string, chapterId: string, content: string) => void
+  flushDraft: (projectId: string, chapterId: string) => Promise<void>
   selectChapter: (chapter: OutlineChapterNode) => void
   chapterLoadGuard: ChapterLoadGuard
-  resolveStoredDraft: (projectId: string, chapterId: string) => string | null
+  resolveStoredDraft: (projectId: string, chapterId: string) => Promise<string | null>
   resolveEditorSeedContent: (remoteContent: string | undefined, storedDraft: string | null) => string
   selectChapterDraft: (content: string) => void
   refreshEditorFromRemote: (projectId: string, chapterId: string, requestId: number) => Promise<boolean>
-  loadChapterVersions: (projectId: string, chapterId: string) => Promise<void>
-  loadOutline: (nodes: Array<Record<string, unknown>>, chapterMap?: Record<string, string>) => void
+  loadOutline: (
+    volumes: Array<Record<string, unknown>>,
+    chapters?: Array<Record<string, unknown>>,
+    structureRevision?: number,
+  ) => OutlineVolumeNode[]
   loadActivePlugins: (projectId: string) => Promise<void>
   refreshActiveModelInfo: () => Promise<string | null>
 }
 
 const businessId = (value: unknown) => String(value ?? '').trim() || null
-
-const fallbackOutline = (chapters: Array<Record<string, unknown>>) => {
-  const volumeNodeId = 'virtual-volume-root'
-  const chapterNodes = chapters.flatMap((chapter) => {
-    const chapterId = businessId(chapter.chapterId)
-    const outlineNodeId = businessId(chapter.outlineNodeId)
-    if (!outlineNodeId || !chapterId) return []
-    return [
-      {
-        outlineNodeId,
-        chapterId,
-        title: String(chapter.title ?? chapter.chapterTitle ?? '未命名章节'),
-        nodeType: 'CHAPTER',
-        parentId: volumeNodeId,
-      },
-    ]
-  })
-  return chapterNodes.length
-    ? [{ outlineNodeId: volumeNodeId, title: '未分卷', nodeType: 'VOLUME' }, ...chapterNodes]
-    : []
-}
 
 export const useWorkbenchProjectController = (options: WorkbenchProjectOptions) => {
   const loadRemoteContent = async (chapterIdInput: string, requestId: number) => {
@@ -64,7 +45,7 @@ export const useWorkbenchProjectController = (options: WorkbenchProjectOptions) 
     } catch {
       if (!options.chapterLoadGuard.isCurrent(chapterId, requestId)) return
     }
-    const localDraft = options.resolveStoredDraft(projectId, chapterId)
+    const localDraft = await options.resolveStoredDraft(projectId, chapterId)
     if (localDraft !== null) {
       options.chapterContents.value[chapterId] = localDraft
       options.selectChapterDraft(localDraft)
@@ -83,46 +64,41 @@ export const useWorkbenchProjectController = (options: WorkbenchProjectOptions) 
     const previousProjectId = options.getProjectId()
     if (previousProjectId && options.activeChapter.value) {
       options.saveDraft(previousProjectId, options.activeChapter.value, options.editorContent.value)
+      await options.flushDraft(previousProjectId, options.activeChapter.value)
     }
     options.activeChapter.value = chapterKey
     options.selectChapter(chapter)
     const requestId = options.chapterLoadGuard.begin(chapterKey)
     const projectId = options.getProjectId()
     if (projectId) {
-      const localDraft = options.resolveStoredDraft(projectId, chapterKey)
+      const localDraft = await options.resolveStoredDraft(projectId, chapterKey)
       const seed = localDraft ?? options.resolveEditorSeedContent(undefined, null)
       options.chapterContents.value[chapterKey] = seed
       options.selectChapterDraft(seed)
     }
     await loadRemoteContent(chapterKey, requestId)
-    if (projectId) await options.loadChapterVersions(projectId, chapterKey)
   }
 
   const loadProject = async (projectId: string) => {
     if (!projectId) return
-    const outlineResponse = pickBusinessArray<Record<string, unknown>>(await outlineApi.listOutlineTree(projectId))
-    const chapters = pickBusinessArray<Record<string, unknown>>(await novelApi.listChapters(projectId))
+    const [project, directory] = await Promise.all([
+      novelApi.getProject(projectId),
+      novelApi.getDirectory(projectId),
+    ])
+    options.novelTitle.value = String(project.title ?? '').trim() || '未命名小说'
+    const volumes = directory.volumes || []
+    const chapters = directory.chapters || []
     options.storyBibleChapters.value = chapters.flatMap((chapter) => {
       const chapterId = businessId(chapter.chapterId)
       const displayNo = Number(chapter.displayNo)
       if (!chapterId || !Number.isInteger(displayNo) || displayNo < 1) return []
       return [{ chapterId, displayNo, title: String(chapter.title ?? '').trim() || '未命名章节' }]
     })
-    const chapterMap = Object.fromEntries(
-      chapters
-        .map((chapter) => {
-          const outlineNodeId = businessId(chapter.outlineNodeId)
-          const chapterId = businessId(chapter.chapterId)
-          return outlineNodeId && chapterId ? [outlineNodeId, chapterId] : null
-        })
-        .filter((entry): entry is [string, string] => Array.isArray(entry)),
-    )
-    const hasVolume = outlineResponse.some((node) =>
-      String(node.nodeType ?? node.type ?? '')
-        .toUpperCase()
-        .includes('VOLUME'),
-    )
-    options.loadOutline(outlineResponse.length && hasVolume ? outlineResponse : fallbackOutline(chapters), chapterMap)
+    const mapped = options.loadOutline(volumes, chapters, directory.structureRevision)
+    if (!options.activeChapter.value) {
+      const firstChapter = mapped.flatMap((volume) => volume.children).at(0)
+      if (firstChapter) await selectOutlineChapter(firstChapter)
+    }
     await Promise.all([options.loadActivePlugins(projectId), options.refreshActiveModelInfo()])
   }
 

@@ -1,36 +1,38 @@
 export type OutlineChapterNode = { title: string; key: string; chapterId?: string }
 export type OutlineVolumeNode = { title: string; key: string; expanded: boolean; children: OutlineChapterNode[] }
 
-export const mapOutlineTree = (
-  nodes: Array<Record<string, unknown>>,
-  chapterByOutlineNodeId: Record<string, string> = {},
+const businessId = (value: unknown) => String(value ?? '').trim()
+const sortOrder = (item: Record<string, unknown>) => Number(item.sortOrder ?? 0)
+
+export const mapNovelDirectory = (
+  volumes: Array<Record<string, unknown>>,
+  chapters: Array<Record<string, unknown>>,
 ): OutlineVolumeNode[] => {
+  const sortedVolumes = [...volumes].sort((left, right) => sortOrder(left) - sortOrder(right))
+  const sortedChapters = [...chapters].sort((left, right) => sortOrder(left) - sortOrder(right))
   const volumeMap = new Map<string, OutlineVolumeNode>()
 
-  nodes.forEach((node) => {
-    const key = String(node.outlineNodeId ?? '')
-    if (!key) return
-    const title = String(node.title ?? node.name ?? '未命名')
-    const nodeType = String(node.nodeType ?? node.type ?? '').toUpperCase()
-    if (nodeType.includes('VOLUME')) {
-      volumeMap.set(key, { title, key, expanded: true, children: [] })
-    }
-  })
+  for (const volume of sortedVolumes) {
+    const volumeId = businessId(volume.volumeId)
+    if (!volumeId) continue
+    volumeMap.set(volumeId, {
+      key: volumeId,
+      title: String(volume.title ?? '未命名卷'),
+      expanded: true,
+      children: [],
+    })
+  }
 
-  nodes.forEach((node) => {
-    const key = String(node.outlineNodeId ?? '')
-    if (!key) return
-    const title = String(node.title ?? node.name ?? '未命名章节')
-    const parentId = node.parentId
-    if (parentId != null) {
-      const pKey = String(parentId)
-      const parent = volumeMap.get(pKey)
-      if (parent) {
-        const chapterId = chapterByOutlineNodeId[key] ?? (node.chapterId == null ? undefined : String(node.chapterId))
-        parent.children.push({ title, key, chapterId })
-      }
-    }
-  })
+  for (const chapter of sortedChapters) {
+    const chapterId = businessId(chapter.chapterId)
+    const volumeId = businessId(chapter.volumeId)
+    if (!chapterId || !volumeId) continue
+    volumeMap.get(volumeId)?.children.push({
+      key: chapterId,
+      chapterId,
+      title: String(chapter.title ?? '未命名章节'),
+    })
+  }
 
   return Array.from(volumeMap.values())
 }

@@ -201,6 +201,32 @@ describe('createAgentRunRuntime', () => {
     await expect(consuming).resolves.toBe('cancelled')
   })
 
+  it('publishes chapter edit preview events with their raw payload', async () => {
+    const harness = createRuntimeHarness()
+    const consuming = harness.consume()
+
+    harness.stream.listeners.get('chapter.edit.started')?.(
+      agentRunEventDto('chapter.edit.started', { chapterId: 'chapter-8', contentRevision: 3 }, '7'),
+    )
+    expect(harness.runtimeEvent).toMatchObject({
+      eventName: 'chapter.edit.started',
+      payload: { chapterId: 'chapter-8', contentRevision: 3 },
+    })
+
+    harness.stream.listeners.get('chapter.edit.delta')?.(
+      agentRunEventDto('chapter.edit.delta', { chapterId: 'chapter-8', text: '新正文', offset: 0 }, '-1'),
+    )
+    expect(harness.runtimeEvent).toMatchObject({
+      eventName: 'chapter.edit.delta',
+      payload: { chapterId: 'chapter-8', text: '新正文', offset: 0 },
+    })
+
+    harness.stream.listeners.get('run.cancelled')?.(
+      agentRunEventDto('run.cancelled', { status: 'cancelled' }, '8'),
+    )
+    await expect(consuming).resolves.toBe('cancelled')
+  })
+
   it('settles successfully when reconciliation finds a completed Run after a stream error', async () => {
     const harness = createRuntimeHarness('completed')
     const consuming = harness.consume()

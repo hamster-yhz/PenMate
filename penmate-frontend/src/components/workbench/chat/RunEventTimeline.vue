@@ -168,30 +168,30 @@ const eventTime = (event: AgentTimelineEvent) => {
 </template>
 
 <style scoped lang="less">
-.run-attempt { border-block: 1px solid rgba(148, 163, 184, 0.14); background: rgba(15, 23, 42, 0.28); }
+.run-attempt { border-block: 1px solid var(--border-subtle); background: var(--bg-subtle); }
 .attempt-summary { width: 100%; min-height: 42px; display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 8px 4px; border: 0; background: transparent; color: var(--text-secondary); text-align: left; cursor: pointer; }
-.attempt-spinner { color: #77aeca; }
+.attempt-spinner { color: var(--accent); }
 .attempt-index, .attempt-status { font-size: 12px; font-weight: 650; }
-.attempt-status { color: #82c9a0; }
-.status-failed .attempt-status { color: #f1a69a; }
-.status-waiting_approval .attempt-status { color: #e8c77e; }
+.attempt-status { color: var(--accent); }
+.status-failed .attempt-status { color: var(--danger); }
+.status-waiting_approval .attempt-status { color: var(--warning); }
 .attempt-phase, .attempt-elapsed { font-size: 12px; color: var(--text-muted); }
 .attempt-phase { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attempt-chevron { color: var(--text-muted); }
-.connection-notice { display: flex; align-items: center; gap: 8px; margin: 0 4px 8px; padding: 7px 9px; border-left: 2px solid #d6a84f; color: #e9c883; background: rgba(214, 168, 79, 0.08); font-size: 12px; }
+.connection-notice { display: flex; align-items: center; gap: 8px; margin: 0 4px 8px; padding: 7px 9px; border-left: 2px solid var(--warning); color: var(--warning); background: var(--warning-soft); font-size: 12px; }
 .event-list { padding: 2px 4px 10px; }
 .event-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 9px; position: relative; }
-.event-row:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 24px; bottom: 0; width: 1px; background: rgba(148, 163, 184, 0.2); }
-.event-rail { z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; color: #91a4bc; background: #111827; }
-.tone-success { color: #72bd91; } .tone-error { color: #ef8d82; } .tone-tool { color: #78b8de; }
-.tone-approval, .tone-warning { color: #e2bb68; } .tone-context { color: #a99bd5; }
+.event-row:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 24px; bottom: 0; width: 1px; background: var(--border-strong); }
+.event-rail { z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; color: var(--text-muted); background: var(--bg-subtle); }
+.tone-success { color: var(--accent); } .tone-error { color: var(--danger); } .tone-tool { color: var(--info); }
+.tone-approval, .tone-warning { color: var(--warning); } .tone-context { color: var(--info); }
 .event-content { min-width: 0; padding: 2px 0 12px; }
 .event-title-row { display: flex; justify-content: space-between; gap: 10px; }
 .event-title-row strong { color: var(--text-secondary); font-size: 12px; }
 .event-title-row time { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .event-summary { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
 .event-empty { margin: 0; padding: 8px 0 4px 34px; color: var(--text-muted); font-size: 12px; }
-.run-error { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; margin: 8px 0 0 33px; padding: 9px; border-left: 2px solid #d66358; background: rgba(214, 99, 88, 0.08); color: #f0b5ae; font-size: 12px; }
-.run-error code { color: #d9958d; font-size: 10px; }
+.run-error { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; margin: 8px 0 0 33px; padding: 9px; border-left: 2px solid var(--danger); background: var(--danger-soft); color: var(--danger); font-size: 12px; }
+.run-error code { color: var(--danger); font-size: 10px; }
 @media (max-width: 520px) { .attempt-summary { grid-template-columns: auto auto auto minmax(0, 1fr) auto; } .attempt-elapsed { display: none; } }
 </style>

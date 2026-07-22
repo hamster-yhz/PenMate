@@ -3,25 +3,25 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { StoryBibleChapterOption } from '@/components/workbench/story-bible/storyBibleTypes'
 import { novelApi } from '@/api/modules/novel.api'
-import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
 import { rbacApi } from '@/api/modules/rbac.api'
+import type { ChapterAiUndoOperation } from '@/entities/chapter/model'
 import { getSession } from '@/stores/session'
 import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
 import { useWorkbenchContext } from '@/composables/workbench/useWorkbenchContext'
 import { createChapterLoadGuard, useWorkbenchDraft } from '@/composables/workbench/useWorkbenchDraft'
 import { useWorkbenchOutline } from '@/composables/workbench/useWorkbenchOutline'
 import { useWorkbenchEditor } from '@/composables/workbench/useWorkbenchEditor'
-import { useWorkbenchVersions } from '@/composables/workbench/useWorkbenchVersions'
-import {
-  hasObjectKeyInStorageUrl,
-  normalizeObjectStorageUrl,
-  resolveDirectUploadTarget,
-} from '@/composables/workbench/workbenchStorage'
-import iconOutline from '@/assets/images/icon-outline.webp'
+import { useChapterEditingSession } from '@/composables/workbench/useChapterEditingSession'
 import { useWorkbenchIntegrations } from './useWorkbenchIntegrations'
 import { useWorkbenchAgentController } from './useWorkbenchAgentController'
 import { useWorkbenchProjectController } from './useWorkbenchProjectController'
+import {
+  layoutForPreset,
+  normalizeStoredLayout,
+  resolveResponsiveWorkbenchLayout,
+  type WorkbenchLayoutPreset,
+} from './workbenchLayout'
 
 export const useWorkbenchPageController = () => {
   const router = useRouter()
@@ -34,7 +34,7 @@ export const useWorkbenchPageController = () => {
     username: sessionUsername,
     userEmail: sessionUserEmail,
   } = useWorkbenchContext({ query: route.query, session })
-  const { saveDraft, clearDraft, resolveStoredDraft, resolveEditorSeedContent } = useWorkbenchDraft()
+  const { saveDraft, flushDraft, markDraftSynced, resolveStoredDraft, resolveEditorSeedContent } = useWorkbenchDraft()
   const chapterLoadGuard = createChapterLoadGuard()
 
   const getCurrentProjectId = () => ensureContext().projectId || initialProjectId || ''
@@ -55,20 +55,72 @@ export const useWorkbenchPageController = () => {
   const workbenchInitError = ref('')
   const canAccessRbacAdmin = ref(false)
   const novelTitle = ref('未命名小说')
-  const leftCollapsed = ref(false)
-  const rightCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1080px)').matches)
+  const layoutPreset = ref<WorkbenchLayoutPreset>('balanced')
+  const leftCollapsedPreference = ref(false)
+  const leftPanelWidth = ref(220)
+  const rightCollapsed = ref(false)
   const chatFocused = ref(false)
   const chatPanelWidth = ref(440)
+  const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1440)
+  const directoryOverlayOpen = ref(false)
   const showStyleManager = ref(false)
   const showPluginWorkshop = ref(false)
-  const showModelSettings = ref(false)
   const chapterContents = ref<Record<string, string>>({})
   const storyBibleChapters = ref<StoryBibleChapterOption[]>([])
-  const activeLeftTab = ref('outline')
-  const leftTabs = ref([{ key: 'outline', label: '大纲', icon: iconOutline }])
   const workbenchMode = ref<'writing' | 'story-bible'>(route.query.mode === 'story-bible' ? 'story-bible' : 'writing')
   const storyBibleNodeId = computed(() => (typeof route.query.nodeId === 'string' ? route.query.nodeId : ''))
   const storyBibleWorkspaceRef = ref<{ reload: () => Promise<void> } | null>(null)
+
+  const responsiveLayout = computed(() => resolveResponsiveWorkbenchLayout({
+    viewportWidth: viewportWidth.value,
+    leftPanelWidth: leftPanelWidth.value,
+    chatPanelWidth: chatPanelWidth.value,
+    leftCollapsed: leftCollapsedPreference.value,
+    rightCollapsed: rightCollapsed.value,
+  }))
+  const directoryOverlayMode = computed(() => workbenchMode.value === 'writing' && responsiveLayout.value.directoryOverlay)
+  const leftCollapsed = computed(() => leftCollapsedPreference.value
+    || (directoryOverlayMode.value && !directoryOverlayOpen.value))
+  const effectiveChatPanelWidth = computed(() => responsiveLayout.value.chatPanelWidth)
+
+  const layoutStorageKey = () => `penmate.layout.${session.userId || 'anonymous'}.${getCurrentProjectId() || 'none'}.${workbenchMode.value}`
+  const applyLayoutState = (layout: ReturnType<typeof layoutForPreset>) => {
+    layoutPreset.value = layout.preset
+    leftPanelWidth.value = layout.leftPanelWidth
+    chatPanelWidth.value = layout.chatPanelWidth
+    leftCollapsedPreference.value = layout.leftCollapsed
+    rightCollapsed.value = layout.rightCollapsed
+    directoryOverlayOpen.value = false
+  }
+  const applyLayoutPreset = (preset: WorkbenchLayoutPreset) => applyLayoutState(layoutForPreset(preset))
+  const resetLayoutPreset = () => applyLayoutPreset(layoutPreset.value)
+  const restoreLayout = () => {
+    try {
+      const raw = localStorage.getItem(layoutStorageKey())
+      const stored = raw ? JSON.parse(raw) : null
+      applyLayoutState(normalizeStoredLayout(stored))
+    } catch {
+      applyLayoutState(normalizeStoredLayout(null))
+    }
+  }
+  const toggleLeftPanel = () => {
+    if (leftCollapsed.value) {
+      leftCollapsedPreference.value = false
+      directoryOverlayOpen.value = directoryOverlayMode.value
+      return
+    }
+    directoryOverlayOpen.value = false
+    leftCollapsedPreference.value = true
+  }
+  const openLeftPanel = () => {
+    if (leftCollapsed.value) toggleLeftPanel()
+  }
+  const toggleRightPanel = () => {
+    rightCollapsed.value = !rightCollapsed.value
+  }
+  const updateViewportWidth = () => {
+    viewportWidth.value = window.innerWidth
+  }
   const bindStoryBibleWorkspace = (instance: unknown) => {
     storyBibleWorkspaceRef.value = instance as { reload: () => Promise<void> } | null
   }
@@ -98,6 +150,7 @@ export const useWorkbenchPageController = () => {
     activeChapter,
     currentChapterTitle,
     outlineOpBusy,
+    pendingMoveUndo,
     loadOutline,
     selectChapter,
     addVolume,
@@ -106,39 +159,38 @@ export const useWorkbenchPageController = () => {
     deleteChapter,
     renameNode,
     moveNode,
+    undoLastMove,
   } = useWorkbenchOutline({
     getContext,
     reloadOutline: async () => {
       const projectId = getCurrentProjectId()
       if (projectId) await loadWorkbenchData(projectId)
     },
-    createOutlineNode: outlineApi.createNode,
+    createVolume: novelApi.createVolume,
     createChapter: novelApi.createChapter,
-    deleteOutlineNode: outlineApi.deleteNode,
+    deleteVolume: novelApi.deleteVolume,
     deleteChapter: novelApi.deleteChapter,
-    updateOutlineNode: outlineApi.updateNode,
-    moveOutlineNode: outlineApi.moveNode,
-    moveChapter: novelApi.moveChapter,
+    updateVolume: novelApi.updateVolume,
+    updateChapter: novelApi.updateChapter,
+    moveDirectoryItem: novelApi.moveDirectoryItem,
     notify: (text) => message.warning(text),
     notifySuccess: (text) => message.success(text),
   })
 
   const {
-    editorRef,
     editorContent,
     wordCount,
     currentLine,
     currentCol,
     selectedText,
-    saveHint,
-    onEditorInput,
+    saveHint: localSaveHint,
+    onEditorInput: handleLocalEditorInput,
     updateCursorPos,
     editorUndo,
     editorRedo,
-    wrapSelection,
-    insertPrefix,
-    saveContent,
+    saveContent: saveLocalContent,
     selectChapterDraft,
+    bindEditor,
   } = useWorkbenchEditor({
     getActiveChapterKey: () => activeChapter.value,
     getProjectId: getCurrentProjectId,
@@ -146,87 +198,71 @@ export const useWorkbenchPageController = () => {
     setChapterContent,
   })
 
-  const bindEditorTextarea = (instance: Element | { $el?: Element } | null) => {
-    if (instance instanceof HTMLTextAreaElement) editorRef.value = instance
-    else if (instance && '$el' in instance && instance.$el instanceof HTMLTextAreaElement)
-      editorRef.value = instance.$el
-    else editorRef.value = null
+  const chapterEditing = useChapterEditingSession({ onSaved: markDraftSynced })
+  const online = ref(typeof navigator === 'undefined' || navigator.onLine)
+  const aiEditingChapterId = ref('')
+  const aiPreparingChapterId = ref('')
+  const aiGeneratedContent = ref('')
+  const aiUndoOperations = ref<ChapterAiUndoOperation[]>([])
+  const aiUndoBusyOperationId = ref('')
+  const aiUndoBusyRunId = ref('')
+  const aiEditingCurrentChapter = computed(() => Boolean(activeChapter.value)
+    && (aiEditingChapterId.value === activeChapter.value || chapterEditing.leaseOwnerType.value === 'AI'))
+  const aiPreparingCurrentChapter = computed(() => Boolean(activeChapter.value)
+    && aiPreparingChapterId.value === activeChapter.value)
+  const aiPreviewContent = computed(() => aiGeneratedContent.value || editorContent.value)
+  const currentChapterAiUndo = computed(() => aiUndoOperations.value.find(
+    (operation) => operation.chapterId === activeChapter.value && operation.status === 'AVAILABLE',
+  ) || null)
+  const saveHint = computed(() => aiEditingCurrentChapter.value
+    ? 'AI 正在编辑'
+    : aiPreparingCurrentChapter.value
+      ? '正在交接给 AI'
+      : !online.value && activeChapter.value
+        ? '离线 · 正文已在本地暂存'
+        : chapterEditing.saveStatus.value || localSaveHint.value)
+  const chapterReadOnly = computed(() => Boolean(activeChapter.value)
+    && (aiPreparingCurrentChapter.value || aiEditingCurrentChapter.value || !chapterEditing.editable.value))
+  const chapterLockReason = computed(() => aiPreparingCurrentChapter.value
+    ? '正在保存最新正文并交接给 AI'
+    : aiEditingCurrentChapter.value ? 'AI 正在编辑当前章节，完成前不会覆盖原正文' : chapterEditing.lockReason.value)
+  const onEditorInput = (content: string) => {
+    handleLocalEditorInput(content)
+    aiUndoOperations.value = aiUndoOperations.value.filter((operation) => operation.chapterId !== activeChapter.value)
+    chapterEditing.scheduleSave(content)
+  }
+  const saveContent = async () => {
+    await saveLocalContent()
+    const projectId = getCurrentProjectId()
+    if (projectId && activeChapter.value) await flushDraft(projectId, activeChapter.value)
+    await chapterEditing.flush(editorContent.value)
   }
 
-  const fetchText = async (url: string) => (await fetch(url)).text()
-  const uploadText = async (url: string, content: string) => {
-    const response = await fetch(url, { method: 'PUT', body: content, headers: { 'Content-Type': 'text/plain' } })
-    return {
-      ok: response.ok,
-      status: response.status,
-      etag: response.headers.get('etag') || undefined,
-      checksum: response.headers.get('x-amz-checksum-sha256') || undefined,
+  const updateConnectivity = () => {
+    online.value = navigator.onLine
+    chapterEditing.setOnline(online.value)
+    if (!online.value) {
+      const projectId = getCurrentProjectId()
+      if (projectId && activeChapter.value) void flushDraft(projectId, activeChapter.value)
     }
   }
+  const handleWindowBlur = () => {
+    if (activeChapter.value) void saveContent()
+  }
 
-  const {
-    selectedVersionNo,
-    selectedVersionContent,
-    versionBusy,
-    versionDiffSummary,
-    getCurrentChapterVersions,
-    loadChapterVersions,
-    viewSelectedVersion,
-    restoreSelectedVersion,
-    publishCurrentChapter,
-    refreshEditorFromRemote,
-  } = useWorkbenchVersions({
-    getProjectId: getCurrentProjectId,
-    getActiveChapterKey: () => activeChapter.value,
-    getOperatorId: resolveOperatorId,
-    getEditorContent: () => editorContent.value,
-    setEditorContent: (content) => {
-      editorContent.value = content
-      setChapterContent(activeChapter.value, content)
-    },
-    setWordCount: (count) => {
-      wordCount.value = count
-    },
-    setLastSnapshot: selectChapterDraft,
-    resolveChapterContent: (projectId, chapterId, remoteContent, options) => {
-      if (options?.preferRemote) {
-        clearDraft(projectId, chapterId)
-        return remoteContent
-      }
-      return resolveStoredDraft(projectId, chapterId) ?? remoteContent
-    },
-    resolveStoredDraft,
-    clearDraft,
-    beginChapterRequest: (chapterId) => chapterLoadGuard.begin(chapterId),
-    isChapterRequestCurrent: (chapterId, requestId) => chapterLoadGuard.isCurrent(chapterId, requestId),
-    listVersions: (projectId, chapterId) => chapterApi.listVersions(projectId, chapterId),
-    getVersionSnapshotUrl: (projectId, chapterId, versionNo) =>
-      chapterApi.getVersionSnapshotUrl(projectId, chapterId, String(versionNo)),
-    getContentUrl: (projectId, chapterId) => chapterApi.getContentUrl(projectId, chapterId),
-    restoreVersion: async (projectId, chapterId, versionNo, operatorId) => {
-      await chapterApi.restoreVersion(projectId, chapterId, String(versionNo), operatorId)
-    },
-    publishChapter: async (projectId, chapterId, operatorId) => {
-      await chapterApi.publishChapter(projectId, chapterId, operatorId)
-    },
-    getContentUploadUrl: (projectId, chapterId) => chapterApi.getContentUploadUrl(projectId, chapterId),
-    commitContent: async (projectId, chapterId, operatorId, payload) => {
-      await chapterApi.commitContent(projectId, chapterId, operatorId, payload)
-    },
-    createVersion: async (projectId, chapterId, payload) => {
-      await chapterApi.createVersion(projectId, chapterId, payload)
-    },
-    resolveUploadTarget: resolveDirectUploadTarget,
-    normalizeStorageUrl: normalizeObjectStorageUrl,
-    hasObjectKeyInStorageUrl,
-    fetchText,
-    uploadText,
-    notify: (text) => message.warning(text),
-    notifySuccess: (text) => message.success(text),
-  })
+  const refreshEditorFromRemote = async (projectId: string, chapterId: string, requestId: number) => {
+    const lease = await chapterEditing.open(projectId, chapterId)
+    if (!chapterLoadGuard.isCurrent(chapterId, requestId)) return false
+    const remoteContent = lease.content
+    const content = (await resolveStoredDraft(projectId, chapterId)) ?? remoteContent
+    chapterContents.value[chapterId] = content
+    selectChapterDraft(content)
+    if (content !== remoteContent && lease.editable) chapterEditing.scheduleSave(content)
+    return true
+  }
 
   const { activePlugins, currentModelName, loadActivePlugins, refreshActiveModelInfo, ensureModelConfigId } =
-    useWorkbenchIntegrations({ getUserId: () => session.userId })
+    useWorkbenchIntegrations({ getUserId: () => session.userId, getProjectId: getCurrentProjectId })
   const {
     boundStyleName,
     visibleMessages,
@@ -253,7 +289,7 @@ export const useWorkbenchPageController = () => {
     renameConversation,
     deleteConversation,
     restoreConversation,
-    sendMessage,
+    sendMessage: sendAgentMessage,
     cancelCurrentRun,
     retryCurrentRun,
     isApprovalBusy,
@@ -276,7 +312,7 @@ export const useWorkbenchPageController = () => {
     ensureModelConfigId,
     refreshActiveModelInfo,
     requestModelSelection: () => {
-      showModelSettings.value = true
+      void router.push('/profile?section=agent')
     },
     onRecoveryContext: (context) => {
       const chapterId = String(context.chapterId ?? '').trim()
@@ -285,7 +321,6 @@ export const useWorkbenchPageController = () => {
       activePlugins.value = plugins.map((item) => String(item)).filter(Boolean)
     },
   })
-  const onModelConfigSaved = () => void refreshActiveModelInfo()
 
   const {
     updateTitle,
@@ -299,18 +334,126 @@ export const useWorkbenchPageController = () => {
     chapterContents,
     getProjectId: getCurrentProjectId,
     saveDraft,
+    flushDraft,
     selectChapter,
     chapterLoadGuard,
     resolveStoredDraft,
     resolveEditorSeedContent,
     selectChapterDraft,
     refreshEditorFromRemote,
-    loadChapterVersions,
     loadOutline,
     loadActivePlugins,
     refreshActiveModelInfo,
   })
   loadWorkbenchData = loadProject
+
+  const chapterTitleById = (chapterId: string) => {
+    for (const volume of outlineData.value) {
+      const chapter = volume.children.find((item) => String(item.chapterId || item.key) === chapterId)
+      if (chapter) return chapter.title
+    }
+    return chapterId === activeChapter.value ? currentChapterTitle.value : '未命名章节'
+  }
+
+  const refreshChapterAiUndo = async (chapterId: string) => {
+    const projectId = getCurrentProjectId()
+    if (!projectId || !chapterId) return
+    try {
+      const operations = await chapterApi.listAiUndo(projectId, chapterId)
+      aiUndoOperations.value = [
+        ...aiUndoOperations.value.filter((operation) => operation.chapterId !== chapterId),
+        ...operations,
+      ]
+    } catch {
+      // Undo availability is supplemental; chapter editing remains usable when this lookup fails.
+    }
+  }
+
+  const reloadChapterAfterAi = async (chapterId: string) => {
+    if (chapterId !== activeChapter.value) return
+    const projectId = getCurrentProjectId()
+    if (!projectId) return
+    const lease = await chapterEditing.open(projectId, chapterId)
+    chapterContents.value[chapterId] = lease.content
+    selectChapterDraft(lease.content)
+    await markDraftSynced(projectId, chapterId, lease.content)
+  }
+
+  const clearAiPreview = (chapterId: string) => {
+    if (aiEditingChapterId.value !== chapterId) return
+    aiEditingChapterId.value = ''
+    aiGeneratedContent.value = ''
+    if (aiPreparingChapterId.value === chapterId) aiPreparingChapterId.value = ''
+  }
+
+  const prepareChapterForAi = async (chapterId: string) => {
+    if (!chapterId || chapterId !== activeChapter.value) return
+    aiPreparingChapterId.value = chapterId
+    await saveContent()
+    if (chapterEditing.saveStatus.value.includes('失败')) return
+    await chapterEditing.release()
+  }
+
+  const applyAiPreviewDelta = (payload: Record<string, unknown>) => {
+    const chapterId = String(payload.chapterId || '')
+    if (!chapterId || aiEditingChapterId.value !== chapterId) return
+    const text = String(payload.text ?? '')
+    const offset = Number(payload.offset)
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      aiGeneratedContent.value += text
+      return
+    }
+    if (offset > aiGeneratedContent.value.length) return
+    if (aiGeneratedContent.value.slice(offset, offset + text.length) === text) return
+    aiGeneratedContent.value = `${aiGeneratedContent.value.slice(0, offset)}${text}`
+  }
+
+  const undoAiEdit = async (operationId: string) => {
+    const projectId = getCurrentProjectId()
+    if (!projectId || !operationId || aiUndoBusyOperationId.value) return
+    aiUndoBusyOperationId.value = operationId
+    try {
+      const operation = aiUndoOperations.value.find((item) => item.operationId === operationId)
+      await chapterApi.undoAiEdit(projectId, operationId)
+      aiUndoOperations.value = aiUndoOperations.value.filter((item) => item.operationId !== operationId)
+      if (operation) await reloadChapterAfterAi(operation.chapterId)
+      message.success('已撤回 AI 修改')
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : 'AI 修改无法撤回')
+      if (activeChapter.value) await refreshChapterAiUndo(activeChapter.value)
+    } finally {
+      aiUndoBusyOperationId.value = ''
+    }
+  }
+
+  const undoAiRun = async (runId: string) => {
+    const projectId = getCurrentProjectId()
+    if (!projectId || !runId || aiUndoBusyRunId.value) return
+    aiUndoBusyRunId.value = runId
+    const affectedChapters = aiUndoOperations.value.filter((item) => item.runId === runId).map((item) => item.chapterId)
+    try {
+      await chapterApi.undoRunAiEdits(projectId, runId)
+      aiUndoOperations.value = aiUndoOperations.value.filter((item) => item.runId !== runId)
+      if (affectedChapters.includes(activeChapter.value)) await reloadChapterAfterAi(activeChapter.value)
+      message.success('已撤回本次任务的全部 AI 修改')
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '无法撤回本次全部修改')
+      if (activeChapter.value) await refreshChapterAiUndo(activeChapter.value)
+    } finally {
+      aiUndoBusyRunId.value = ''
+    }
+  }
+
+  const sendMessage = async () => {
+    if (activeChapter.value) {
+      await saveContent()
+      if (chapterEditing.saveStatus.value.includes('失败')) {
+        message.warning('当前章节尚未同步，暂时不能启动 AI')
+        return
+      }
+    }
+    await sendAgentMessage()
+  }
 
   const navigateFromUserMenu = (path: string) => {
     userMenuOpen.value = false
@@ -335,6 +478,7 @@ export const useWorkbenchPageController = () => {
     username.value = sessionUsername || username.value
     userEmail.value = sessionUserEmail || userEmail.value
     try {
+      restoreLayout()
       await loadAdminAccess()
       const projectId = getCurrentProjectId()
       if (projectId) {
@@ -346,8 +490,23 @@ export const useWorkbenchPageController = () => {
     }
   }
 
-  onMounted(() => void initializeWorkbench())
-  onUnmounted(disposeChat)
+  onMounted(() => {
+    window.addEventListener('resize', updateViewportWidth)
+    window.addEventListener('online', updateConnectivity)
+    window.addEventListener('offline', updateConnectivity)
+    window.addEventListener('blur', handleWindowBlur)
+    updateViewportWidth()
+    updateConnectivity()
+    void initializeWorkbench()
+  })
+  onUnmounted(() => {
+    window.removeEventListener('resize', updateViewportWidth)
+    window.removeEventListener('online', updateConnectivity)
+    window.removeEventListener('offline', updateConnectivity)
+    window.removeEventListener('blur', handleWindowBlur)
+    disposeChat()
+    void saveContent().finally(() => chapterEditing.dispose())
+  })
   watch(editorContent, (value) => {
     chapterContents.value[activeChapter.value] = value
   })
@@ -361,6 +520,67 @@ export const useWorkbenchPageController = () => {
     if (event?.eventName === 'run.completed' && storyBibleWorkspaceRef.value) {
       void storyBibleWorkspaceRef.value.reload()
     }
+    const payload = event?.payload || {}
+    const chapterId = String(payload.chapterId || '')
+    if (event?.eventName === 'tool.call.started' && event.toolCall?.toolCode === 'chapter_edit') {
+      try {
+        const args = typeof event.toolCall.argumentsPreview === 'string'
+          ? JSON.parse(event.toolCall.argumentsPreview) as Record<string, unknown>
+          : event.toolCall.argumentsPreview as Record<string, unknown> | null
+        const targetChapterId = String(args?.chapterId || '')
+        if (targetChapterId) void prepareChapterForAi(targetChapterId)
+      } catch {
+        // Backend validation will report malformed tool arguments.
+      }
+    }
+    if (event?.eventName === 'chapter.edit.started' && chapterId) {
+      if (aiPreparingChapterId.value === chapterId) aiPreparingChapterId.value = ''
+      aiEditingChapterId.value = chapterId
+      aiGeneratedContent.value = ''
+    }
+    if (event?.eventName === 'chapter.edit.delta') applyAiPreviewDelta(payload)
+    if (event?.eventName === 'chapter.edit.snapshot' && aiEditingChapterId.value === chapterId) {
+      aiGeneratedContent.value = String(payload.content || '')
+    }
+    if (event?.eventName === 'chapter.edit.completed' && chapterId) {
+      const operationId = String(payload.operationId || '')
+      const runId = String(payload.runId || event.runId || '')
+      if (operationId) {
+        const operation: ChapterAiUndoOperation = {
+          operationId,
+          runId,
+          chapterId,
+          chapterTitle: chapterTitleById(chapterId),
+          status: 'AVAILABLE',
+          sequenceNo: 0,
+          expiresAt: payload.expiresAt == null ? null : String(payload.expiresAt),
+        }
+        aiUndoOperations.value = [
+          ...aiUndoOperations.value.filter((item) => item.operationId !== operationId),
+          operation,
+        ]
+      }
+      void reloadChapterAfterAi(chapterId).finally(() => clearAiPreview(chapterId))
+    }
+    if ((event?.eventName === 'chapter.edit.failed' || event?.eventName === 'chapter.edit.cancelled') && chapterId) {
+      void reloadChapterAfterAi(chapterId).finally(() => clearAiPreview(chapterId))
+    }
+  })
+  watch(activeChapter, (chapterId) => {
+    if (chapterId) void refreshChapterAiUndo(chapterId)
+  })
+  watch([layoutPreset, leftPanelWidth, chatPanelWidth, leftCollapsedPreference, rightCollapsed, workbenchMode], () => {
+    localStorage.setItem(layoutStorageKey(), JSON.stringify({
+      preset: layoutPreset.value,
+      leftPanelWidth: leftPanelWidth.value,
+      chatPanelWidth: chatPanelWidth.value,
+      leftCollapsed: leftCollapsedPreference.value,
+      rightCollapsed: rightCollapsed.value,
+    }))
+  })
+  watch(workbenchMode, restoreLayout)
+  watch(directoryOverlayMode, (overlayMode) => {
+    if (!overlayMode) directoryOverlayOpen.value = false
   })
 
   return {
@@ -372,16 +592,22 @@ export const useWorkbenchPageController = () => {
     workbenchInitError,
     canAccessRbacAdmin,
     novelTitle,
+    layoutPreset,
+    applyLayoutPreset,
+    resetLayoutPreset,
     leftCollapsed,
+    directoryOverlayMode,
+    toggleLeftPanel,
+    openLeftPanel,
+    leftPanelWidth,
     rightCollapsed,
+    toggleRightPanel,
     chatFocused,
     chatPanelWidth,
+    effectiveChatPanelWidth,
     showStyleManager,
     showPluginWorkshop,
-    showModelSettings,
     storyBibleChapters,
-    activeLeftTab,
-    leftTabs,
     workbenchMode,
     storyBibleNodeId,
     bindStoryBibleWorkspace,
@@ -393,8 +619,10 @@ export const useWorkbenchPageController = () => {
     activeChapter,
     currentChapterTitle,
     outlineOpBusy,
+    pendingMoveUndo,
     renameNode,
     moveNode,
+    undoLastMove,
     addVolume,
     addChapter,
     deleteVolume,
@@ -405,22 +633,22 @@ export const useWorkbenchPageController = () => {
     currentCol,
     selectedText,
     saveHint,
+    chapterReadOnly,
+    chapterLockReason,
+    aiEditingCurrentChapter,
+    aiPreviewContent,
+    currentChapterAiUndo,
+    aiUndoOperations,
+    aiUndoBusyOperationId,
+    aiUndoBusyRunId,
+    undoAiEdit,
+    undoAiRun,
     onEditorInput,
     updateCursorPos,
     editorUndo,
     editorRedo,
-    wrapSelection,
-    insertPrefix,
     saveContent,
-    bindEditorTextarea,
-    selectedVersionNo,
-    selectedVersionContent,
-    versionBusy,
-    versionDiffSummary,
-    getCurrentChapterVersions,
-    viewSelectedVersion,
-    restoreSelectedVersion,
-    publishCurrentChapter,
+    bindEditor,
     activePlugins,
     boundStyleName,
     currentModelName,
@@ -463,6 +691,5 @@ export const useWorkbenchPageController = () => {
     navigateFromUserMenu,
     handleLogout,
     initializeWorkbench,
-    onModelConfigSaved,
   }
 }

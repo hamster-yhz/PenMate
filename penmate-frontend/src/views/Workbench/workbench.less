@@ -1,0 +1,96 @@
+.workbench-page {
+  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workbench-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 16px;
+  color: #fff2f0;
+  background: #5c1d1d;
+  border-bottom: 1px solid #ff7875;
+}
+
+.workbench-error button {
+  padding: 4px 10px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.workbench-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.mobile-pane-tabs { display: none; }
+
+.workbench-shell.directory-overlay-mode > .panel-left {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 220;
+  box-shadow: var(--shadow-lg);
+}
+
+.workbench-panel-skeleton {
+  height: 100%;
+  background: var(--bg-muted);
+  border-inline: 1px solid var(--border-subtle);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.editor-skeleton { flex: 1 1 auto; min-width: 0; }
+.ai-skeleton { flex: 0 0 440px; width: 440px; }
+.ai-skeleton.collapsed { flex-basis: 0; width: 0; border: 0; }
+
+@media (max-width: 900px) {
+  .mobile-pane-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 0 0 42px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .mobile-pane-tabs button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--text-muted);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+  }
+  .mobile-pane-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-soft); }
+  .workbench-shell > .mobile-pane-hidden { display: none !important; }
+  .workbench-shell > .panel-left.mobile-pane-active,
+  .workbench-shell > .panel-center.mobile-pane-active,
+  .workbench-shell > .panel-right.mobile-pane-active {
+    position: relative;
+    inset: auto;
+    display: flex;
+    width: 100% !important;
+    max-width: none;
+    height: 100%;
+    flex: 1 1 100%;
+    border: 0;
+    box-shadow: none;
+  }
+  .workbench-shell > .panel-left.mobile-pane-active .panel-toggle,
+  .workbench-shell > .panel-right.mobile-pane-active .panel-toggle,
+  .workbench-shell > .panel-right.mobile-pane-active .resize-handle { display: none; }
+}

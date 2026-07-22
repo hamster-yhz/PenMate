@@ -1,8 +1,7 @@
-import { nextTick, ref } from 'vue'
+import { ref } from 'vue'
+import type { EditorSelectionState, PlainTextEditorApi } from '@/components/workbench/editor/PlainTextEditor.vue'
 
-type ChatMessageLike = {
-  text: string
-}
+type ChatMessageLike = { text: string }
 
 type UseWorkbenchEditorDeps = {
   getActiveChapterKey: () => string
@@ -12,152 +11,77 @@ type UseWorkbenchEditorDeps = {
 }
 
 const countWords = (content: string) => content.replace(/\s/g, '').length
+
 export const useWorkbenchEditor = (deps: UseWorkbenchEditorDeps) => {
-  const editorRef = ref<HTMLTextAreaElement | null>(null)
+  const editorApi = ref<PlainTextEditorApi | null>(null)
   const editorContent = ref('')
   const wordCount = ref(0)
   const currentLine = ref(1)
   const currentCol = ref(1)
   const selectedText = ref('')
   const saveHint = ref('')
-  const undoStack = ref<string[]>([])
-  const redoStack = ref<string[]>([])
-
-  let lastSnapshot = ''
 
   const syncChapterContent = (content: string) => {
     const chapterKey = deps.getActiveChapterKey()
-    if (!chapterKey) return
-    deps.setChapterContent?.(chapterKey, content)
-  }
-
-  const syncWordCount = (content: string) => {
-    wordCount.value = countWords(content)
+    if (chapterKey) deps.setChapterContent?.(chapterKey, content)
   }
 
   const persistDraft = (content: string) => {
     const projectId = deps.getProjectId()
     const chapterKey = deps.getActiveChapterKey()
-    if (!projectId || !chapterKey) return
-    deps.saveDraft(projectId, chapterKey, content)
+    if (projectId && chapterKey) deps.saveDraft(projectId, chapterKey, content)
   }
 
-  const applyEditorChange = (content: string) => {
+  const onEditorInput = (content = editorContent.value) => {
     editorContent.value = content
+    wordCount.value = countWords(content)
     syncChapterContent(content)
-    syncWordCount(content)
     persistDraft(content)
-    if (content !== lastSnapshot) {
-      undoStack.value.push(lastSnapshot)
-      if (undoStack.value.length > 50) undoStack.value.shift()
-      redoStack.value = []
-      lastSnapshot = content
-    }
+    saveHint.value = '本地暂存'
   }
 
-  const updateCursorPos = () => {
-    if (!editorRef.value) return
-    const el = editorRef.value
-    const pos = el.selectionStart
-    const text = editorContent.value.slice(0, pos)
-    const lines = text.split('\n')
-    currentLine.value = lines.length
-    currentCol.value = (lines[lines.length - 1]?.length || 0) + 1
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    selectedText.value = start !== end ? editorContent.value.slice(start, end) : ''
+  const updateCursorPos = (selection?: EditorSelectionState) => {
+    if (!selection) return
+    currentLine.value = selection.line
+    currentCol.value = selection.column
+    selectedText.value = selection.selectedText
   }
 
-  const onEditorInput = () => {
-    applyEditorChange(editorContent.value)
+  const editorUndo = () => editorApi.value?.undo()
+  const editorRedo = () => editorApi.value?.redo()
+
+  const mergeToEditor = (message: ChatMessageLike) => {
+    const separator = editorContent.value ? '\n\n' : ''
+    onEditorInput(`${editorContent.value}${separator}${message.text}`)
   }
 
-  const editorUndo = () => {
-    if (undoStack.value.length === 0) return
-    redoStack.value.push(editorContent.value)
-    const prev = undoStack.value.pop() || ''
-    editorContent.value = prev
-    lastSnapshot = prev
-    syncChapterContent(prev)
-    syncWordCount(prev)
-  }
-
-  const editorRedo = () => {
-    if (redoStack.value.length === 0) return
-    undoStack.value.push(editorContent.value)
-    const next = redoStack.value.pop() || ''
-    editorContent.value = next
-    lastSnapshot = next
-    syncChapterContent(next)
-    syncWordCount(next)
-  }
-
-  const wrapSelection = async (before: string, after: string) => {
-    if (!editorRef.value) return
-    const el = editorRef.value
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    const selected = editorContent.value.slice(start, end)
-    const body = selected || '文本'
-    const replacement = `${before}${body}${after}`
-    applyEditorChange(editorContent.value.slice(0, start) + replacement + editorContent.value.slice(end))
-    await nextTick()
-    el.focus()
-    const newPos = start + before.length + body.length
-    el.setSelectionRange(start + before.length, newPos)
-  }
-
-  const insertPrefix = async (prefix: string) => {
-    if (!editorRef.value) return
-    const el = editorRef.value
-    const pos = el.selectionStart
-    const lineStart = editorContent.value.lastIndexOf('\n', pos - 1) + 1
-    applyEditorChange(editorContent.value.slice(0, lineStart) + prefix + editorContent.value.slice(lineStart))
-    await nextTick()
-    el.focus()
-    el.setSelectionRange(pos + prefix.length, pos + prefix.length)
-  }
-
-  const mergeToEditor = (msg: ChatMessageLike) => {
-    applyEditorChange(`${editorContent.value}\n\n${msg.text}`)
-  }
-
-  const replaceSelected = (msg: ChatMessageLike) => {
-    if (!editorRef.value) return
-    const el = editorRef.value
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    if (start === end) return
-    applyEditorChange(editorContent.value.slice(0, start) + msg.text + editorContent.value.slice(end))
+  const replaceSelected = (message: ChatMessageLike) => {
+    void message
+    // AI edits use the chapter_edit tool. Direct chat-to-selection mutation is intentionally unavailable.
   }
 
   const saveContent = async () => {
+    saveHint.value = '正在同步'
     syncChapterContent(editorContent.value)
-    saveHint.value = '⌛ 保存中...'
-
-    const projectId = deps.getProjectId()
-    const chapterKey = deps.getActiveChapterKey()
-
-    if (projectId && chapterKey) {
-      deps.saveDraft(projectId, chapterKey, editorContent.value)
-    }
-
-    saveHint.value = '✓ 已本地保存'
-    setTimeout(() => {
-      saveHint.value = ''
-    }, 2000)
+    persistDraft(editorContent.value)
+    saveHint.value = '本地已暂存'
   }
 
   const selectChapterDraft = (content: string) => {
     editorContent.value = content
-    syncWordCount(content)
-    undoStack.value = []
-    redoStack.value = []
-    lastSnapshot = content
+    wordCount.value = countWords(content)
+    currentLine.value = 1
+    currentCol.value = 1
+    selectedText.value = ''
+    saveHint.value = ''
+  }
+
+  const bindEditor = (instance: PlainTextEditorApi | null) => {
+    editorApi.value = instance
   }
 
   return {
-    editorRef,
+    editorApi,
     editorContent,
     wordCount,
     currentLine,
@@ -168,11 +92,10 @@ export const useWorkbenchEditor = (deps: UseWorkbenchEditorDeps) => {
     updateCursorPos,
     editorUndo,
     editorRedo,
-    wrapSelection,
-    insertPrefix,
     mergeToEditor,
     replaceSelected,
     saveContent,
     selectChapterDraft,
+    bindEditor,
   }
 }
