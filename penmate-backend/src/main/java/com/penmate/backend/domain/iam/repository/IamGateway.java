@@ -4,8 +4,10 @@ import com.penmate.backend.domain.iam.model.IamMenu;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
+import com.penmate.backend.domain.iam.model.IamRbacAssignmentAudit;
 
 import java.util.List;
+import java.time.Instant;
 
 public interface IamGateway {
 
@@ -27,13 +29,23 @@ public interface IamGateway {
 
     int updateOwnProfile(IamUser user);
 
+    int updateEmail(Long userId, String email);
+
     int updatePassword(Long userId, String passwordHash);
+
+    int requestUserDeletion(Long userId, Instant requestedAt, Instant dueAt);
+
+    int restorePendingUserDeletion(Long userId);
+
+    List<Long> findDeletionDueUserIds(Instant now);
+
+    int purgePendingUserDeletion(Long userId, Instant now);
 
     int softDeleteUserByUserId(Long userId);
 
-    int assignRoleToUser(Long userId, Long roleId);
+    Long lockUserRbacRevision(Long userId);
 
-    int removeRoleFromUser(Long userId, Long roleId);
+    int replaceUserRoles(Long userId, List<Long> roleIds, Long expectedRevision);
 
     List<IamRole> findAllRoles();
 
@@ -45,15 +57,17 @@ public interface IamGateway {
 
     int softDeleteRoleByRoleId(Long roleId);
 
-    int assignPermissionToRole(Long roleId, Long permissionId);
+    Long lockRoleRbacRevision(Long roleId);
 
-    int removePermissionFromRole(Long roleId, Long permissionId);
+    int replaceRolePermissions(Long roleId, List<Long> permissionIds, Long expectedRevision);
 
     List<IamPermission> findPermissionsByRoleId(Long roleId);
 
     List<IamPermission> findAllPermissions();
 
     IamPermission findPermissionByPermissionId(Long permissionId);
+
+    void insertRbacAssignmentAudit(IamRbacAssignmentAudit audit);
 
     List<IamMenu> findVisibleMenus();
 

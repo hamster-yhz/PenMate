@@ -18,6 +18,8 @@ public class IamRole {
     private String description;
     /** 是否为系统内置角色。 */
     private Boolean isSystem;
+    /** 角色权限关系的乐观并发修订号。 */
+    private Long rbacRevision;
 
 }
 

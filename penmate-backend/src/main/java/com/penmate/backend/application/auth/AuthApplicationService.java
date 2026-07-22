@@ -4,9 +4,15 @@ import com.penmate.backend.application.auth.command.LoginCommand;
 import com.penmate.backend.application.auth.command.RefreshCommand;
 import com.penmate.backend.application.auth.support.AuthSessionCache;
 import com.penmate.backend.application.auth.support.AuthTokenBundle;
+import com.penmate.backend.application.auth.support.AuthTokenFingerprint;
 import com.penmate.backend.application.auth.support.AuthTokenService;
 import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
 import com.penmate.backend.application.auth.support.ParsedToken;
+import com.penmate.backend.application.auth.support.UserAgentSummary;
+import com.penmate.backend.domain.auth.model.AuthSession;
+import com.penmate.backend.domain.auth.model.UserUiPreferences;
+import com.penmate.backend.domain.auth.repository.AuthSessionRepository;
+import com.penmate.backend.domain.auth.repository.UserUiPreferencesRepository;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
@@ -15,11 +21,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+import java.math.BigDecimal;
 
 /**
  * 认证应用服务。
@@ -34,6 +46,8 @@ public class AuthApplicationService {
     private final AuthTokenService authTokenService;
     private final AuthSessionCache authSessionCache;
     private final PasswordEncoder passwordEncoder;
+    private final AuthSessionRepository authSessions;
+    private final UserUiPreferencesRepository uiPreferences;
 
     /**
      * 处理邮箱密码登录。
@@ -67,8 +81,27 @@ public class AuthApplicationService {
         payload.setRoles(toRoleMaps(roles));
         payload.setPermissions(toPermissionMaps(permissions));
 
+        String sessionId = UUID.randomUUID().toString();
+        payload.setSessionId(sessionId);
+
         AuthTokenBundle bundle = authTokenService.issueTokens(payload);
         payload.setRefreshJti(bundle.refreshJti());
+        payload.setAccessJti(bundle.accessJti());
+        UserAgentSummary userAgent = UserAgentSummary.parse(command.userAgent());
+        AuthSession session = new AuthSession();
+        session.setSessionId(sessionId);
+        session.setUserId(user.getId());
+        session.setCurrentAccessJti(bundle.accessJti());
+        session.setCurrentRefreshJtiHash(AuthTokenFingerprint.sha256(bundle.refreshJti()));
+        session.setDeviceName(userAgent.deviceName());
+        session.setBrowserName(userAgent.browserName());
+        session.setOperatingSystem(userAgent.operatingSystem());
+        session.setUserAgent(userAgent.raw());
+        session.setIpAddress(normalizeIp(command.ipAddress()));
+        session.setRefreshExpiresAt(bundle.refreshExpiresAt());
+        if (authSessions.insert(session) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create auth session");
+        }
         authSessionCache.saveSession(payload, bundle);
         iamGateway.touchLastLoginByUserId(user.getId());
 
@@ -102,6 +135,9 @@ public class AuthApplicationService {
         if (payload.getRefreshJti() != null && !payload.getRefreshJti().isBlank()) {
             authSessionCache.revokeRefresh(payload.getRefreshJti());
         }
+        if (payload.getSessionId() != null && !payload.getSessionId().isBlank()) {
+            authSessions.revoke(payload.getSessionId(), parsed.userId(), Instant.now());
+        }
         writeAudit(traceId, parsed.userId(), "auth", "logout", "redis_auth_tokens", parsed.tokenId(), null, 200);
         log.info("登出成功: userId={}, accessJti={}", parsed.userId(), parsed.tokenId());
     }
@@ -122,9 +158,21 @@ public class AuthApplicationService {
             log.warn("刷新令牌失败: reason=invalid_or_expired");
             throw com.penmate.backend.application.common.exception.BusinessException.of("Refresh token invalid or expired");
         }
-        authSessionCache.revokeRefresh(parsed.tokenId());
         AuthTokenBundle bundle = authTokenService.issueTokens(payload);
+        String sessionId = payload.getSessionId();
+        if (sessionId == null || authSessions.rotate(sessionId, parsed.userId(),
+                AuthTokenFingerprint.sha256(parsed.tokenId()), bundle.accessJti(),
+                AuthTokenFingerprint.sha256(bundle.refreshJti()), normalizeIp(command.ipAddress()),
+                bundle.refreshExpiresAt(), Instant.now()) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized(
+                    "Refresh token was already used or the session expired");
+        }
+        authSessionCache.revokeRefresh(parsed.tokenId());
+        if (payload.getAccessJti() != null && !payload.getAccessJti().isBlank()) {
+            authSessionCache.revokeAccess(payload.getAccessJti());
+        }
         payload.setRefreshJti(bundle.refreshJti());
+        payload.setAccessJti(bundle.accessJti());
         authSessionCache.saveSession(payload, bundle);
 
         writeAudit(traceId, payload.getUserId(), "auth", "refresh", "redis_auth_tokens", bundle.refreshJti(), null, 200);
@@ -168,7 +216,7 @@ public class AuthApplicationService {
         return result;
     }
 
-    public Map<String, Object> updateProfile(String authorization, String displayName, String email, String bio) {
+    public Map<String, Object> updateProfile(String authorization, String displayName, String bio) {
         ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
         AuthUserSessionPayload payload = authSessionCache.getByAccessJti(parsed.tokenId());
         if (payload == null) {
@@ -180,28 +228,122 @@ public class AuthApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
         user.setDisplayName(displayName.trim());
-        user.setEmail(email.trim());
         user.setBio(bio == null ? "" : bio.trim());
         if (iamGateway.updateOwnProfile(user) != 1) {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Profile update failed");
         }
 
         payload.setDisplayName(user.getDisplayName());
-        payload.setEmail(user.getEmail());
         payload.setBio(user.getBio());
         authSessionCache.updateSessionPayload(parsed.tokenId(), payload);
         return me(authorization);
     }
 
-    public void changePassword(String authorization, String currentPassword, String newPassword) {
+    public List<AuthSessionView> listSessions(String authorization) {
         ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
-        IamUser user = iamGateway.findUserByUserId(parsed.userId());
-        if (user == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Current password is incorrect");
+        AuthUserSessionPayload current = authSessionCache.getByAccessJti(parsed.tokenId());
+        if (current == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
         }
-        if (iamGateway.updatePassword(parsed.userId(), passwordEncoder.encode(newPassword)) != 1) {
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Password update failed");
+        return authSessions.listByUser(parsed.userId()).stream()
+                .map(session -> new AuthSessionView(
+                        session.getSessionId(), session.getDeviceName(), session.getBrowserName(),
+                        session.getOperatingSystem(), session.getIpAddress(), session.getCreatedAt(),
+                        session.getLastSeenAt(), session.getRefreshExpiresAt(),
+                        Objects.equals(session.getSessionId(), current.getSessionId())))
+                .toList();
+    }
+
+    public void revokeSession(String authorization, String sessionId) {
+        ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
+        AuthUserSessionPayload current = authSessionCache.getByAccessJti(parsed.tokenId());
+        if (current == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
         }
+        if (Objects.equals(current.getSessionId(), sessionId)) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "Use logout to end the current session");
+        }
+        AuthSession target = authSessions.findByIdAndUser(sessionId, parsed.userId());
+        if (target == null || target.getRevokedAt() != null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.notFound("Auth session not found");
+        }
+        if (authSessions.revoke(sessionId, parsed.userId(), Instant.now()) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
+                    "Auth session is no longer active");
+        }
+        authSessionCache.revokeAccess(target.getCurrentAccessJti());
+        authSessionCache.revokeRefreshFingerprint(target.getCurrentRefreshJtiHash());
+    }
+
+    @Transactional
+    public int revokeOtherSessions(String authorization) {
+        ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
+        AuthUserSessionPayload current = authSessionCache.getByAccessJti(parsed.tokenId());
+        if (current == null || current.getSessionId() == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
+        }
+        List<AuthSession> revoked = authSessions.revokeAllExcept(
+                parsed.userId(), current.getSessionId(), Instant.now());
+        for (AuthSession target : revoked) {
+            if (target.getCurrentAccessJti() != null) authSessionCache.revokeAccess(target.getCurrentAccessJti());
+            if (target.getCurrentRefreshJtiHash() != null) {
+                authSessionCache.revokeRefreshFingerprint(target.getCurrentRefreshJtiHash());
+            }
+        }
+        return revoked.size();
+    }
+
+    public UserUiPreferences getUiPreferences(String authorization) {
+        Long userId = requireActiveUserId(authorization);
+        UserUiPreferences stored = uiPreferences.findByUserId(userId);
+        return stored == null ? defaultUiPreferences(userId) : stored;
+    }
+
+    public UserUiPreferences saveUiPreferences(String authorization, UserUiPreferences preferences) {
+        Long userId = requireActiveUserId(authorization);
+        preferences.setId(null);
+        preferences.setUserId(userId);
+        preferences.setThemeMode(preferences.getThemeMode().trim().toUpperCase(Locale.ROOT));
+        preferences.setEditorFontFamily(preferences.getEditorFontFamily().trim().toUpperCase(Locale.ROOT));
+        if (uiPreferences.upsert(preferences) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of("UI preferences update failed");
+        }
+        UserUiPreferences saved = uiPreferences.findByUserId(userId);
+        return saved == null ? preferences : saved;
+    }
+
+    private Long requireActiveUserId(String authorization) {
+        ParsedToken parsed = authTokenService.parseAccessToken(extractBearer(authorization));
+        if (authSessionCache.getByAccessJti(parsed.tokenId()) == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
+        }
+        return parsed.userId();
+    }
+
+    private UserUiPreferences defaultUiPreferences(Long userId) {
+        UserUiPreferences defaults = new UserUiPreferences();
+        defaults.setUserId(userId);
+        defaults.setThemeMode("SYSTEM");
+        defaults.setEditorFontFamily("SERIF");
+        defaults.setEditorFontSize(17);
+        defaults.setEditorLineHeight(new BigDecimal("1.90"));
+        defaults.setEditorParagraphSpacing(new BigDecimal("0.35"));
+        defaults.setEditorContentWidth(760);
+        defaults.setTypewriterMode(false);
+        defaults.setHighlightCurrentParagraph(true);
+        return defaults;
+    }
+
+    private String normalizeIp(String value) {
+        if (value == null || value.isBlank()) return "unknown";
+        String normalized = value.trim();
+        return normalized.length() <= 64 ? normalized : normalized.substring(0, 64);
+    }
+
+    public record AuthSessionView(String sessionId, String deviceName, String browserName,
+                                  String operatingSystem, String ipAddress, Instant createdAt,
+                                  Instant lastSeenAt, Instant refreshExpiresAt, boolean current) {
     }
 
     private String extractBearer(String authorization) {

@@ -26,6 +26,12 @@ public class IamUser {
     private String authMethod;
     /** 最近一次登录时间。 */
     private Instant lastLoginAt;
+    /** 用户主动申请注销的时间。 */
+    private Instant deletionRequestedAt;
+    /** 注销等待期结束并永久清理的时间。 */
+    private Instant deletionDueAt;
+    /** 用户角色关系的乐观并发修订号。 */
+    private Long rbacRevision;
 
 }
 

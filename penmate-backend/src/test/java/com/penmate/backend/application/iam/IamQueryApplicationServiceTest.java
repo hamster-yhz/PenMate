@@ -77,6 +77,7 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("System role cannot be deleted");
     }
+
 }
 
 

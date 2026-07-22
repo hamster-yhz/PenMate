@@ -95,20 +95,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex, HttpServletRequest request) {
         String traceId = traceId(request);
-        int status = ex.getHttpStatus().value();
+        HttpStatus status = mapStatus(ex);
         log.warn("业务异常: traceId={}, path={}, errorCode={}, message={}",
                 traceId,
                 request.getRequestURI(),
                 ex.getErrorCode(),
                 ex.getMessage());
-        ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.getHttpStatus());
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
         if ("RATE_LIMIT_EXCEEDED".equals(ex.getErrorCode()) && ex.getDetails() instanceof Map<?, ?> details) {
             Object retryAfter = details.get("retryAfterSeconds");
             if (retryAfter != null) response.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfter));
         }
         return response.body(
                 ErrorResponse.of(
-                        status,
+                        status.value(),
                         ex.getErrorCode(),
                         ex.getMessage(),
                         ex.getDetails(),
@@ -116,6 +116,19 @@ public class GlobalExceptionHandler {
                         traceId
                 )
         );
+    }
+
+    private HttpStatus mapStatus(BusinessException exception) {
+        return switch (exception.getType()) {
+            case BUSINESS_RULE -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
+            case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+            case SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

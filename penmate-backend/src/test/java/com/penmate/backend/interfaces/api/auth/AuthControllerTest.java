@@ -2,6 +2,8 @@ package com.penmate.backend.interfaces.api.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.auth.AuthApplicationService;
+import com.penmate.backend.application.iam.AccountCredentialApplicationService;
+import com.penmate.backend.application.iam.AccountDeletionApplicationService;
 import com.penmate.backend.application.ratelimit.RateLimitApplicationService;
 import com.penmate.backend.interfaces.api.common.ClientIpResolver;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
@@ -11,10 +13,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Map;
+import com.penmate.backend.domain.auth.model.UserUiPreferences;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -22,8 +26,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,6 +47,12 @@ class AuthControllerTest {
 
     @Mock
     private ClientIpResolver clientIpResolver;
+
+    @Mock
+    private AccountDeletionApplicationService accountDeletionApplicationService;
+
+    @Mock
+    private AccountCredentialApplicationService accountCredentialApplicationService;
 
     @InjectMocks
     private AuthController authController;
@@ -74,6 +88,122 @@ class AuthControllerTest {
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Lax")))
                 .andExpect(jsonPath("$.meta.traceId").value(traceId))
                 .andExpect(jsonPath("$.meta.timestamp").exists());
+    }
+
+    private UsernamePasswordAuthenticationToken authenticatedUser() {
+        return UsernamePasswordAuthenticationToken.authenticated("1001", null, java.util.List.of());
+    }
+
+    @Test
+    void profile_update_does_not_accept_or_forward_email() throws Exception {
+        when(authApplicationService.updateProfile("Bearer atk_1", "作者乙", "简介"))
+                .thenReturn(Map.of("displayName", "作者乙", "email", "old@example.com", "bio", "简介"));
+
+        mockMvc().perform(patch("/api/v1/auth/me")
+                        .header("Authorization", "Bearer atk_1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"作者乙","bio":"简介","email":"attacker@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.email").value("old@example.com"));
+
+        verify(authApplicationService).updateProfile("Bearer atk_1", "作者乙", "简介");
+    }
+
+    @Test
+    void email_change_clears_the_refresh_cookie_after_revoking_sessions() throws Exception {
+        mockMvc().perform(post("/api/v1/auth/email")
+                        .principal(authenticatedUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret","newEmail":"new@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+
+        verify(accountCredentialApplicationService).changeEmail(1001L, "secret", "new@example.com");
+    }
+
+    @Test
+    void password_change_clears_the_refresh_cookie_after_revoking_sessions() throws Exception {
+        mockMvc().perform(post("/api/v1/auth/password")
+                        .principal(authenticatedUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"secret","newPassword":"new-password"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+
+        verify(accountCredentialApplicationService).changePassword(1001L, "secret", "new-password");
+    }
+
+    @Test
+    void revoke_other_sessions_returns_the_number_of_revoked_devices() throws Exception {
+        when(authApplicationService.revokeOtherSessions("Bearer atk_1")).thenReturn(2);
+
+        mockMvc().perform(delete("/api/v1/auth/sessions")
+                        .header("Authorization", "Bearer atk_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(2));
+
+        verify(authApplicationService).revokeOtherSessions("Bearer atk_1");
+    }
+
+    @Test
+    void update_ui_preferences_validates_and_returns_the_saved_section() throws Exception {
+        UserUiPreferences saved = new UserUiPreferences();
+        saved.setUserId(1001L);
+        saved.setThemeMode("DARK");
+        saved.setEditorFontFamily("SERIF");
+        saved.setEditorFontSize(18);
+        saved.setEditorLineHeight(new java.math.BigDecimal("2.00"));
+        saved.setEditorParagraphSpacing(new java.math.BigDecimal("0.50"));
+        saved.setEditorContentWidth(800);
+        saved.setTypewriterMode(true);
+        saved.setHighlightCurrentParagraph(true);
+        when(authApplicationService.saveUiPreferences(eq("Bearer atk_1"), any())).thenReturn(saved);
+
+        mockMvc().perform(put("/api/v1/auth/ui-preferences")
+                        .header("Authorization", "Bearer atk_1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "themeMode":"DARK",
+                                  "editorFontFamily":"SERIF",
+                                  "editorFontSize":18,
+                                  "editorLineHeight":2.00,
+                                  "editorParagraphSpacing":0.50,
+                                  "editorContentWidth":800,
+                                  "typewriterMode":true,
+                                  "highlightCurrentParagraph":true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.themeMode").value("DARK"))
+                .andExpect(jsonPath("$.data.editorFontSize").value(18))
+                .andExpect(jsonPath("$.data.typewriterMode").value(true));
+    }
+
+    @Test
+    void update_ui_preferences_rejects_values_outside_editor_limits() throws Exception {
+        mockMvc().perform(put("/api/v1/auth/ui-preferences")
+                        .header("Authorization", "Bearer atk_1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "themeMode":"DARK",
+                                  "editorFontFamily":"SERIF",
+                                  "editorFontSize":40,
+                                  "editorLineHeight":2.00,
+                                  "editorParagraphSpacing":0.50,
+                                  "editorContentWidth":800,
+                                  "typewriterMode":true,
+                                  "highlightCurrentParagraph":true
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

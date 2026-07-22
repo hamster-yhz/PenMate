@@ -3,6 +3,7 @@ package com.penmate.backend.infrastructure.persistence.iam;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -19,7 +20,7 @@ import java.util.List;
 public interface IamRoleMapper {
 
     @Select("""
-            SELECT id, role_id, name, code, description, is_system
+            SELECT id, role_id, name, code, description, is_system, rbac_revision
             FROM iam_roles
             WHERE deleted_at IS NULL
             ORDER BY id DESC
@@ -27,7 +28,7 @@ public interface IamRoleMapper {
     List<IamRole> findAll();
 
     @Select("""
-            SELECT id, role_id, name, code, description, is_system
+            SELECT id, role_id, name, code, description, is_system, rbac_revision
             FROM iam_roles
             WHERE role_id = #{roleId} AND deleted_at IS NULL
             """)
@@ -63,16 +64,35 @@ public interface IamRoleMapper {
             """)
     int softDeleteByRoleId(@Param("roleId") Long roleId);
 
-    @Insert("""
-            INSERT INTO iam_role_permissions(role_id, permission_id)
-            VALUES(#{roleId}, #{permissionId})
+    @Select("""
+            SELECT rbac_revision
+            FROM iam_roles
+            WHERE role_id = #{roleId} AND deleted_at IS NULL
+            FOR UPDATE
             """)
-    int assignPermission(@Param("roleId") Long roleId, @Param("permissionId") Long permissionId);
+    Long lockRbacRevision(@Param("roleId") Long roleId);
+
+    @Delete("DELETE FROM iam_role_permissions WHERE role_id = #{roleId}")
+    int deleteAllPermissions(@Param("roleId") Long roleId);
+
+    @Insert("""
+            <script>
+            INSERT INTO iam_role_permissions(role_id, permission_id)
+            VALUES
+            <foreach collection="permissionIds" item="permissionId" separator=",">
+                (#{roleId}, #{permissionId})
+            </foreach>
+            </script>
+            """)
+    int insertPermissions(@Param("roleId") Long roleId,
+                          @Param("permissionIds") List<Long> permissionIds);
 
     @Update("""
-            DELETE FROM iam_role_permissions
-            WHERE role_id = #{roleId} AND permission_id = #{permissionId}
+            UPDATE iam_roles
+            SET rbac_revision = rbac_revision + 1, updated_at = CURRENT_TIMESTAMP(3)
+            WHERE role_id = #{roleId} AND deleted_at IS NULL AND rbac_revision = #{expectedRevision}
             """)
-    int removePermission(@Param("roleId") Long roleId, @Param("permissionId") Long permissionId);
+    int incrementRbacRevision(@Param("roleId") Long roleId,
+                              @Param("expectedRevision") Long expectedRevision);
 }
 

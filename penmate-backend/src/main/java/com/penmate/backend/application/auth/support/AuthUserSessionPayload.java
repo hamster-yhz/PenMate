@@ -23,5 +23,9 @@ public class AuthUserSessionPayload {
     private List<Map<String, Object>> permissions;
 
     private String refreshJti;
+
+    private String accessJti;
+
+    private String sessionId;
 }
 

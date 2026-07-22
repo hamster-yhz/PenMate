@@ -1,6 +1,7 @@
 package com.penmate.backend.application.ratelimit;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.exception.BusinessErrorType;
 import com.penmate.backend.application.ratelimit.port.RateLimitBucketStore;
 import com.penmate.backend.application.ratelimit.port.RateLimitKeyEncoder;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class RateLimitApplicationServiceTest {
         assertThatThrownBy(() -> service.consume(RateLimitAction.LOGIN_EMAIL, "person@example.com"))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo("RATE_LIMIT_EXCEEDED");
-                    assertThat(exception.getHttpStatus().value()).isEqualTo(429);
+                    assertThat(exception.getType()).isEqualTo(BusinessErrorType.RATE_LIMITED);
                     assertThat(exception.getDetails()).isEqualTo(java.util.Map.of("retryAfterSeconds", 73L));
                 });
     }
@@ -38,7 +39,7 @@ class RateLimitApplicationServiceTest {
         assertThatThrownBy(() -> service.consume(RateLimitAction.REFRESH_TOKEN, "token"))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo("RATE_LIMIT_SERVICE_UNAVAILABLE");
-                    assertThat(exception.getHttpStatus().value()).isEqualTo(503);
+                    assertThat(exception.getType()).isEqualTo(BusinessErrorType.SERVICE_UNAVAILABLE);
                 });
     }
 

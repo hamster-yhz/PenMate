@@ -6,7 +6,12 @@ package com.penmate.backend.application.auth.command;
  */
 public record LoginCommand(
         String email,
-        String password
+        String password,
+        String userAgent,
+        String ipAddress
 ) {
+    public LoginCommand(String email, String password) {
+        this(email, password, "", "unknown");
+    }
 }
 

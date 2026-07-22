@@ -4,7 +4,6 @@ import com.penmate.backend.application.auth.support.AuthSessionCache;
 import com.penmate.backend.application.auth.support.AuthTokenService;
 import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
 import com.penmate.backend.application.auth.support.ParsedToken;
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -17,7 +16,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class BearerAuthenticationFilterTest {
@@ -47,21 +45,6 @@ class BearerAuthenticationFilterTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
                 .extracting("authority")
                 .containsExactlyInAnyOrder("ADMIN", "novel:read");
-    }
-
-    @Test
-    void acceptsAccessCookieOnlyForAgentRunStream() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest(
-                "GET", "/api/v1/novels/novel-1/agent/runs/run-1/stream");
-        request.setCookies(new Cookie("penmate_access", "stream-token"));
-        when(authTokenService.parseAccessToken("stream-token"))
-                .thenReturn(new ParsedToken(1001L, "stream-jti", "ACCESS"));
-        when(authSessionCache.getByAccessJti("stream-jti")).thenReturn(sessionPayload());
-
-        filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
-
-        verify(authTokenService).parseAccessToken("stream-token");
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
     }
 
     @Test

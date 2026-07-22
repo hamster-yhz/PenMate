@@ -1,15 +1,19 @@
 package com.penmate.backend.interfaces.api.rbac;
 
 import com.penmate.backend.application.iam.IamQueryApplicationService;
+import com.penmate.backend.application.iam.IamRbacAssignmentApplicationService;
+import com.penmate.backend.application.iam.RbacAssignmentSnapshot;
 import com.penmate.backend.domain.iam.model.IamMenu;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
+import com.penmate.backend.interfaces.api.common.AuthenticatedActor;
 import com.penmate.backend.interfaces.api.rbac.dto.CreateRoleDto;
 import com.penmate.backend.interfaces.api.rbac.dto.CreateUserDto;
 import com.penmate.backend.interfaces.api.rbac.dto.UpdateRoleDto;
 import com.penmate.backend.interfaces.api.rbac.dto.UpdateUserDto;
+import com.penmate.backend.interfaces.api.rbac.dto.ReplaceRbacAssignmentsDto;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,9 +41,12 @@ import java.util.Objects;
 public class RbacQueryController {
 
     private final IamQueryApplicationService iamQueryApplicationService;
+    private final IamRbacAssignmentApplicationService iamRbacAssignmentApplicationService;
 
-    public RbacQueryController(IamQueryApplicationService iamQueryApplicationService) {
+    public RbacQueryController(IamQueryApplicationService iamQueryApplicationService,
+                               IamRbacAssignmentApplicationService iamRbacAssignmentApplicationService) {
         this.iamQueryApplicationService = iamQueryApplicationService;
+        this.iamRbacAssignmentApplicationService = iamRbacAssignmentApplicationService;
     }
 
     /**
@@ -79,10 +87,12 @@ public class RbacQueryController {
      * <p><b>业务目的�?/b>返回用户当前拥有的角色集合，供管理端授权视图展示�?/p>
      */
     @GetMapping("/users/{userId}/roles")
-    public ApiResponse<List<Map<String, Object>>> userRoles(@PathVariable String userId,
-                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = iamQueryApplicationService.listUserRoles(requireLongId(userId, "userId")).stream().map(this::toRoleView).toList();
-        return ApiResponse.success(items, traceId);
+    public ApiResponse<Map<String, Object>> userRoles(@PathVariable String userId,
+                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        RbacAssignmentSnapshot<IamRole> snapshot = iamRbacAssignmentApplicationService.getUserRoleAssignments(
+                requireLongId(userId, "userId"));
+        return ApiResponse.success(assignmentView(snapshot.revision(),
+                snapshot.items().stream().map(this::toRoleView).toList()), traceId);
     }
 
     /**
@@ -100,10 +110,12 @@ public class RbacQueryController {
      * <p><b>业务目的�?/b>返回角色当前拥有的权限集合，供管理端授权视图展示�?/p>
      */
     @GetMapping("/roles/{roleId}/permissions")
-    public ApiResponse<List<Map<String, Object>>> rolePermissions(@PathVariable String roleId,
-                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<Map<String, Object>> items = iamQueryApplicationService.listRolePermissions(requireLongId(roleId, "roleId")).stream().map(this::toPermissionView).toList();
-        return ApiResponse.success(items, traceId);
+    public ApiResponse<Map<String, Object>> rolePermissions(@PathVariable String roleId,
+                                                            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        RbacAssignmentSnapshot<IamPermission> snapshot = iamRbacAssignmentApplicationService.getRolePermissionAssignments(
+                requireLongId(roleId, "roleId"));
+        return ApiResponse.success(assignmentView(snapshot.revision(),
+                snapshot.items().stream().map(this::toPermissionView).toList()), traceId);
     }
 
     /**
@@ -144,6 +156,14 @@ public class RbacQueryController {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deleted", true);
         return ApiResponse.success(data, traceId);
+    }
+
+    @PostMapping("/users/{userId}/restore-deletion")
+    public ApiResponse<Map<String, Object>> restorePendingUserDeletion(
+            @PathVariable String userId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(toSafeUser(iamQueryApplicationService.restorePendingDeletion(
+                requireLongId(userId, "userId"))), traceId);
     }
 
     /**
@@ -192,14 +212,20 @@ public class RbacQueryController {
      * <p><b>流程主线�?/b>读取用户业务ID与角色业务ID -> 调用绑定服务 -> 返回绑定结果�?/p>
      * <p><b>副作用：</b>新增用户-角色关系�?/p>
      */
-    @PostMapping("/users/{userId}/roles")
-    public ApiResponse<Map<String, Object>> assignRole(@PathVariable String userId,
-                                                       @RequestParam("roleId") String roleId,
-                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.assignRoleToUser(requireLongId(userId, "userId"), requireLongId(roleId, "roleId"));
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("bound", true);
-        return ApiResponse.success(data, traceId);
+    @PutMapping("/users/{userId}/roles")
+    public ApiResponse<Map<String, Object>> replaceUserRoles(
+            @PathVariable String userId,
+            @Valid @RequestBody ReplaceRbacAssignmentsDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        RbacAssignmentSnapshot<IamRole> snapshot = iamRbacAssignmentApplicationService.replaceUserRoles(
+                requireLongId(userId, "userId"),
+                requireLongIds(dto.getAssignmentIds(), "assignmentIds"),
+                dto.getExpectedRevision(),
+                AuthenticatedActor.id(authentication),
+                traceId);
+        return ApiResponse.success(assignmentView(snapshot.revision(),
+                snapshot.items().stream().map(this::toRoleView).toList()), traceId);
     }
 
     /**
@@ -207,30 +233,26 @@ public class RbacQueryController {
      * <p><b>副作用：</b>删除用户-角色关系�?/p>
      * <p><b>ID 语义�?/b>userId、roleId 均为业务语义 ID�?/p>
      */
-    @DeleteMapping("/users/{userId}/roles/{roleId}")
-    public ApiResponse<Map<String, Object>> removeRole(@PathVariable String userId,
-                                                       @PathVariable String roleId,
-                                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.removeRoleFromUser(requireLongId(userId, "userId"), requireLongId(roleId, "roleId"));
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("unbound", true);
-        return ApiResponse.success(data, traceId);
-    }
-
     /**
      * 给角色绑定权限�?
      * <p><b>业务目的�?/b>扩展角色可执行能力�?/p>
      * <p><b>ID 语义�?/b>路径中的 roleId 为角色业�?ID，permissionId 为权限业�?ID�?/p>
      * <p><b>副作用：</b>新增角色-权限关系�?/p>
      */
-    @PostMapping("/roles/{roleId}/permissions")
-    public ApiResponse<Map<String, Object>> assignPermission(@PathVariable String roleId,
-                                                             @RequestParam("permissionId") String permissionId,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.assignPermissionToRole(requireLongId(roleId, "roleId"), requireLongId(permissionId, "permissionId"));
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("bound", true);
-        return ApiResponse.success(data, traceId);
+    @PutMapping("/roles/{roleId}/permissions")
+    public ApiResponse<Map<String, Object>> replaceRolePermissions(
+            @PathVariable String roleId,
+            @Valid @RequestBody ReplaceRbacAssignmentsDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        RbacAssignmentSnapshot<IamPermission> snapshot = iamRbacAssignmentApplicationService.replaceRolePermissions(
+                requireLongId(roleId, "roleId"),
+                requireLongIds(dto.getAssignmentIds(), "assignmentIds"),
+                dto.getExpectedRevision(),
+                AuthenticatedActor.id(authentication),
+                traceId);
+        return ApiResponse.success(assignmentView(snapshot.revision(),
+                snapshot.items().stream().map(this::toPermissionView).toList()), traceId);
     }
 
     /**
@@ -238,16 +260,6 @@ public class RbacQueryController {
      * <p><b>副作用：</b>删除角色-权限关系�?/p>
      * <p><b>ID 语义�?/b>roleId、permissionId 均为业务语义 ID�?/p>
      */
-    @DeleteMapping("/roles/{roleId}/permissions/{permissionId}")
-    public ApiResponse<Map<String, Object>> removePermission(@PathVariable String roleId,
-                                                             @PathVariable String permissionId,
-                                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.removePermissionFromRole(requireLongId(roleId, "roleId"), requireLongId(permissionId, "permissionId"));
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("unbound", true);
-        return ApiResponse.success(data, traceId);
-    }
-
     /**
      * 查询系统菜单树�?
      * <p><b>业务目的�?/b>返回全量菜单定义用于管理端菜单配置展示�?/p>
@@ -276,28 +288,32 @@ public class RbacQueryController {
      */
     private Map<String, Object> toSafeUser(IamUser user) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", stringifyBusinessId(user.getUserId()));
+        data.put("userId", stringifyBusinessId(user.getUserId()));
         data.put("email", user.getEmail());
         data.put("displayName", user.getDisplayName());
         data.put("status", user.getStatus());
         data.put("authMethod", user.getAuthMethod());
         data.put("lastLoginAt", user.getLastLoginAt());
+        data.put("deletionRequestedAt", user.getDeletionRequestedAt());
+        data.put("deletionDueAt", user.getDeletionDueAt());
+        data.put("rbacRevision", user.getRbacRevision());
         return data;
     }
 
     private Map<String, Object> toRoleView(IamRole role) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", stringifyBusinessId(role.getRoleId()));
+        data.put("roleId", stringifyBusinessId(role.getRoleId()));
         data.put("name", role.getName());
         data.put("code", role.getCode());
         data.put("description", role.getDescription());
         data.put("isSystem", role.getIsSystem());
+        data.put("rbacRevision", role.getRbacRevision());
         return data;
     }
 
     private Map<String, Object> toPermissionView(IamPermission permission) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", stringifyBusinessId(permission.getPermissionId()));
+        data.put("permissionId", stringifyBusinessId(permission.getPermissionId()));
         data.put("name", permission.getName());
         data.put("code", permission.getCode());
         data.put("module", permission.getModule());
@@ -307,7 +323,7 @@ public class RbacQueryController {
 
     private Map<String, Object> toMenuView(IamMenu menu) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", stringifyBusinessId(menu.getMenuId() != null ? menu.getMenuId() : menu.getId()));
+        data.put("menuId", stringifyBusinessId(menu.getMenuId() != null ? menu.getMenuId() : menu.getId()));
         if (menu.getParentId() != null) {
             data.put("parentId", stringifyBusinessId(menu.getParentId()));
         }
@@ -317,6 +333,17 @@ public class RbacQueryController {
         data.put("permissionCode", menu.getPermissionCode());
         data.put("visible", menu.getVisible());
         return data;
+    }
+
+    private Map<String, Object> assignmentView(Long revision, List<Map<String, Object>> items) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("revision", revision);
+        data.put("items", items);
+        return data;
+    }
+
+    private List<Long> requireLongIds(List<String> rawValues, String fieldName) {
+        return rawValues.stream().map(value -> requireLongId(value, fieldName)).toList();
     }
 
     private Long requireLongId(String rawValue, String fieldName) {

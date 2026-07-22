@@ -4,12 +4,17 @@ import com.penmate.backend.application.auth.command.LoginCommand;
 import com.penmate.backend.application.auth.command.RefreshCommand;
 import com.penmate.backend.application.auth.support.AuthSessionCache;
 import com.penmate.backend.application.auth.support.AuthTokenBundle;
+import com.penmate.backend.application.auth.support.AuthTokenFingerprint;
 import com.penmate.backend.application.auth.support.AuthTokenService;
 import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
 import com.penmate.backend.application.auth.support.ParsedToken;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
+import com.penmate.backend.domain.auth.repository.AuthSessionRepository;
+import com.penmate.backend.domain.auth.repository.UserUiPreferencesRepository;
+import com.penmate.backend.domain.auth.model.UserUiPreferences;
+import com.penmate.backend.domain.auth.model.AuthSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +48,12 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private AuthSessionRepository authSessions;
+
+    @Mock
+    private UserUiPreferencesRepository uiPreferences;
+
     @InjectMocks
     private AuthApplicationService authApplicationService;
 
@@ -58,16 +70,23 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         when(iamGateway.findRolesByUserId(1001L)).thenReturn(List.of());
         when(iamGateway.findPermissionsByUserId(1001L)).thenReturn(List.of());
         when(authTokenService.issueTokens(any(AuthUserSessionPayload.class))).thenReturn(new AuthTokenBundle(
-                "atk_1", "rtk_1", "ajti_1", "rjti_1", null, null
+                "atk_1", "rtk_1", "ajti_1", "rjti_1", java.time.Instant.now().plusSeconds(1800),
+                java.time.Instant.now().plusSeconds(604800)
         ));
+        when(authSessions.insert(any())).thenReturn(1);
 
         Map<String, Object> result = authApplicationService.login(new LoginCommand("author@penmate.ai", "StrongPass!23"), traceId);
 
         ArgumentCaptor<AuthUserSessionPayload> payloadCaptor = ArgumentCaptor.forClass(AuthUserSessionPayload.class);
         verify(authSessionCache).saveSession(payloadCaptor.capture(), any(AuthTokenBundle.class));
+        ArgumentCaptor<AuthSession> sessionCaptor = ArgumentCaptor.forClass(AuthSession.class);
+        verify(authSessions).insert(sessionCaptor.capture());
         verify(iamGateway).touchLastLoginByUserId(1001L);
         assertThat(payloadCaptor.getValue().getUserId()).isEqualTo(1001L);
         assertThat(payloadCaptor.getValue().getEmail()).isEqualTo("author@penmate.ai");
+        assertThat(sessionCaptor.getValue().getCurrentRefreshJtiHash())
+                .isEqualTo(AuthTokenFingerprint.sha256("rjti_1"))
+                .isNotEqualTo("rjti_1");
         assertThat(result).containsKeys("accessToken", "refreshToken");
     }
 
@@ -122,21 +141,52 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void refresh_rotates_the_durable_session_before_issuing_cached_tokens() {
+        ParsedToken parsed = new ParsedToken(1001L, "old-refresh", "REFRESH");
+        AuthUserSessionPayload payload = new AuthUserSessionPayload();
+        payload.setUserId(1001L);
+        payload.setSessionId("session-1");
+        payload.setAccessJti("old-access");
+        payload.setRefreshJti("old-refresh");
+        java.time.Instant accessExpiry = java.time.Instant.now().plusSeconds(1800);
+        java.time.Instant refreshExpiry = java.time.Instant.now().plusSeconds(604800);
+        AuthTokenBundle bundle = new AuthTokenBundle(
+                "new-at", "new-rt", "new-access", "new-refresh", accessExpiry, refreshExpiry);
+        when(authTokenService.parseRefreshToken("old-token")).thenReturn(parsed);
+        when(authSessionCache.getByRefreshJti("old-refresh")).thenReturn(payload);
+        when(authTokenService.issueTokens(payload)).thenReturn(bundle);
+        when(authSessions.rotate(eq("session-1"), eq(1001L),
+                eq(AuthTokenFingerprint.sha256("old-refresh")), eq("new-access"),
+                eq(AuthTokenFingerprint.sha256("new-refresh")), eq("127.0.0.1"),
+                eq(refreshExpiry), any())).thenReturn(1);
+
+        Map<String, Object> result = authApplicationService.refresh(
+                new RefreshCommand("old-token", "127.0.0.1"), "trace-refresh");
+
+        assertThat(result).containsEntry("accessToken", "new-at").containsEntry("refreshToken", "new-rt");
+        verify(authSessionCache).revokeRefresh("old-refresh");
+        verify(authSessionCache).revokeAccess("old-access");
+        verify(authSessionCache).saveSession(payload, bundle);
+    }
+
+    @Test
     void UT_APP_AUTH_UPDATE_PROFILE_PERSISTS_AND_REFRESHES_SESSION() {
         when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
         AuthUserSessionPayload payload = new AuthUserSessionPayload();
         payload.setUserId(1001L);
+        payload.setEmail("writer@example.com");
         payload.setRoles(List.of());
         payload.setPermissions(List.of());
         when(authSessionCache.getByAccessJti("ajti_1")).thenReturn(payload);
 
         IamUser user = new IamUser();
         user.setId(1001L);
+        user.setEmail("writer@example.com");
         when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
         when(iamGateway.updateOwnProfile(user)).thenReturn(1);
 
         Map<String, Object> result = authApplicationService.updateProfile(
-                "Bearer atk_1", "  作者乙  ", " writer@example.com ", "  简介  ");
+                "Bearer atk_1", "  作者乙  ", "  简介  ");
 
         assertThat(user.getDisplayName()).isEqualTo("作者乙");
         assertThat(user.getEmail()).isEqualTo("writer@example.com");
@@ -146,37 +196,85 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
                 .containsEntry("email", "writer@example.com")
                 .containsEntry("bio", "简介");
         verify(authSessionCache).updateSessionPayload("ajti_1", payload);
+        verify(iamGateway, never()).updateEmail(any(), anyString());
     }
 
     @Test
-    void UT_APP_AUTH_CHANGE_PASSWORD_REJECTS_WRONG_CURRENT_PASSWORD() {
-        when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
-        IamUser user = new IamUser();
-        user.setId(1001L);
-        user.setPasswordHash("stored-hash");
-        when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
-        when(passwordEncoder.matches("wrong-password", "stored-hash")).thenReturn(false);
+    void revoke_other_sessions_retains_the_current_session_and_clears_other_cached_tokens() {
+        when(authTokenService.parseAccessToken("atk_1"))
+                .thenReturn(new ParsedToken(1001L, "current-access", "ACCESS"));
+        AuthUserSessionPayload currentPayload = new AuthUserSessionPayload();
+        currentPayload.setSessionId("current-session");
+        when(authSessionCache.getByAccessJti("current-access")).thenReturn(currentPayload);
 
-        assertThatThrownBy(() -> authApplicationService.changePassword(
-                "Bearer atk_1", "wrong-password", "new-password"))
-                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Current password is incorrect");
+        AuthSession other = authSession("other-session", "other-access", "other-refresh");
+        when(authSessions.revokeAllExcept(eq(1001L), eq("current-session"), any()))
+                .thenReturn(List.of(other));
+
+        assertThat(authApplicationService.revokeOtherSessions("Bearer atk_1")).isEqualTo(1);
+
+        verify(authSessionCache).revokeAccess("other-access");
+        verify(authSessionCache).revokeRefreshFingerprint("other-refresh");
+        verify(authSessionCache, never()).revokeAccess("current-access");
+        verify(authSessionCache, never()).revokeRefreshFingerprint("current-refresh");
     }
 
     @Test
-    void UT_APP_AUTH_CHANGE_PASSWORD_PERSISTS_ENCODED_PASSWORD() {
+    void get_ui_preferences_returns_defaults_when_the_user_has_not_saved_any() {
         when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
-        IamUser user = new IamUser();
-        user.setId(1001L);
-        user.setPasswordHash("stored-hash");
-        when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
-        when(passwordEncoder.matches("current-password", "stored-hash")).thenReturn(true);
-        when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
-        when(iamGateway.updatePassword(1001L, "new-hash")).thenReturn(1);
+        AuthUserSessionPayload payload = new AuthUserSessionPayload();
+        payload.setUserId(1001L);
+        when(authSessionCache.getByAccessJti("ajti_1")).thenReturn(payload);
+        when(uiPreferences.findByUserId(1001L)).thenReturn(null);
 
-        authApplicationService.changePassword("Bearer atk_1", "current-password", "new-password");
+        UserUiPreferences result = authApplicationService.getUiPreferences("Bearer atk_1");
 
-        verify(iamGateway).updatePassword(1001L, "new-hash");
+        assertThat(result.getThemeMode()).isEqualTo("SYSTEM");
+        assertThat(result.getEditorFontFamily()).isEqualTo("SERIF");
+        assertThat(result.getEditorFontSize()).isEqualTo(17);
+        assertThat(result.getEditorContentWidth()).isEqualTo(760);
+        assertThat(result.getHighlightCurrentParagraph()).isTrue();
+    }
+
+    @Test
+    void save_ui_preferences_uses_the_authenticated_user_and_returns_persisted_values() {
+        when(authTokenService.parseAccessToken("atk_1")).thenReturn(new ParsedToken(1001L, "ajti_1", "ACCESS"));
+        AuthUserSessionPayload payload = new AuthUserSessionPayload();
+        payload.setUserId(1001L);
+        when(authSessionCache.getByAccessJti("ajti_1")).thenReturn(payload);
+        when(uiPreferences.upsert(any())).thenReturn(1);
+        when(uiPreferences.findByUserId(1001L)).thenAnswer(invocation -> {
+            UserUiPreferences result = new UserUiPreferences();
+            result.setUserId(1001L);
+            result.setThemeMode("DARK");
+            return result;
+        });
+        UserUiPreferences input = new UserUiPreferences();
+        input.setUserId(9999L);
+        input.setThemeMode("dark");
+        input.setEditorFontFamily("sans");
+        input.setEditorFontSize(18);
+        input.setEditorLineHeight(new java.math.BigDecimal("2.00"));
+        input.setEditorParagraphSpacing(new java.math.BigDecimal("0.50"));
+        input.setEditorContentWidth(800);
+        input.setTypewriterMode(true);
+        input.setHighlightCurrentParagraph(false);
+
+        UserUiPreferences result = authApplicationService.saveUiPreferences("Bearer atk_1", input);
+
+        assertThat(input.getUserId()).isEqualTo(1001L);
+        assertThat(input.getThemeMode()).isEqualTo("DARK");
+        assertThat(input.getEditorFontFamily()).isEqualTo("SANS");
+        assertThat(result.getThemeMode()).isEqualTo("DARK");
+        verify(uiPreferences).upsert(input);
+    }
+
+    private AuthSession authSession(String sessionId, String accessJti, String refreshJti) {
+        AuthSession session = new AuthSession();
+        session.setSessionId(sessionId);
+        session.setCurrentAccessJti(accessJti);
+        session.setCurrentRefreshJtiHash(refreshJti);
+        return session;
     }
 }
 

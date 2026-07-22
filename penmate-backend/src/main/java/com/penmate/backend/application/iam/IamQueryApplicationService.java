@@ -162,6 +162,14 @@ public class IamQueryApplicationService {
         log.info("删除用户成功: userId={}", id);
     }
 
+    public IamUser restorePendingDeletion(Long id) {
+        if (iamGateway.restorePendingUserDeletion(id) != 1) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of(
+                    "Pending account deletion not found");
+        }
+        return getUser(id);
+    }
+
     /**
      * 创建角色。
      *
@@ -232,78 +240,6 @@ public class IamQueryApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
         log.info("删除角色成功: roleId={}", id);
-    }
-
-    /**
-     * 绑定用户与角色关系。
-     *
-     * @param userId 入参：userId
-     * @param roleId 入参：roleId
-     */
-    public void assignRoleToUser(Long userId, Long roleId) {
-        log.info("绑定用户角色: userId={}, roleId={}", userId, roleId);
-        if (iamGateway.findUserByUserId(userId) == null) {
-            log.warn("绑定用户角色失败: userId={}, roleId={}, reason=user_not_found", userId, roleId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
-        }
-        if (iamGateway.findRoleByRoleId(roleId) == null) {
-            log.warn("绑定用户角色失败: userId={}, roleId={}, reason=role_not_found", userId, roleId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
-        }
-        iamGateway.assignRoleToUser(userId, roleId);
-        log.info("绑定用户角色成功: userId={}, roleId={}", userId, roleId);
-    }
-
-    /**
-     * 解绑用户与角色关系。
-     *
-     * @param userId 入参：userId
-     * @param roleId 入参：roleId
-     */
-    public void removeRoleFromUser(Long userId, Long roleId) {
-        log.info("解绑用户角色: userId={}, roleId={}", userId, roleId);
-        int affected = iamGateway.removeRoleFromUser(userId, roleId);
-        if (affected <= 0) {
-            log.warn("解绑用户角色失败: userId={}, roleId={}, reason=relation_not_found", userId, roleId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("User role binding not found");
-        }
-        log.info("解绑用户角色成功: userId={}, roleId={}", userId, roleId);
-    }
-
-    /**
-     * 绑定角色与权限关系。
-     *
-     * @param roleId 入参：roleId
-     * @param permissionId 入参：permissionId
-     */
-    public void assignPermissionToRole(Long roleId, Long permissionId) {
-        log.info("绑定角色权限: roleId={}, permissionId={}", roleId, permissionId);
-        if (iamGateway.findRoleByRoleId(roleId) == null) {
-            log.warn("绑定角色权限失败: roleId={}, permissionId={}, reason=role_not_found", roleId, permissionId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
-        }
-        if (iamGateway.findPermissionByPermissionId(permissionId) == null) {
-            log.warn("绑定角色权限失败: roleId={}, permissionId={}, reason=permission_not_found", roleId, permissionId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Permission not found");
-        }
-        iamGateway.assignPermissionToRole(roleId, permissionId);
-        log.info("绑定角色权限成功: roleId={}, permissionId={}", roleId, permissionId);
-    }
-
-    /**
-     * 解绑角色与权限关系。
-     *
-     * @param roleId 入参：roleId
-     * @param permissionId 入参：permissionId
-     */
-    public void removePermissionFromRole(Long roleId, Long permissionId) {
-        log.info("解绑角色权限: roleId={}, permissionId={}", roleId, permissionId);
-        int affected = iamGateway.removePermissionFromRole(roleId, permissionId);
-        if (affected <= 0) {
-            log.warn("解绑角色权限失败: roleId={}, permissionId={}, reason=relation_not_found", roleId, permissionId);
-            throw com.penmate.backend.application.common.exception.BusinessException.of("Role permission binding not found");
-        }
-        log.info("解绑角色权限成功: roleId={}, permissionId={}", roleId, permissionId);
     }
 
     /**

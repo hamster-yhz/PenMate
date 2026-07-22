@@ -1,6 +1,8 @@
 package com.penmate.backend.interfaces.api.auth;
 
 import com.penmate.backend.application.auth.AuthApplicationService;
+import com.penmate.backend.application.iam.AccountDeletionApplicationService;
+import com.penmate.backend.application.iam.AccountCredentialApplicationService;
 import com.penmate.backend.application.auth.command.LoginCommand;
 import com.penmate.backend.application.auth.command.RefreshCommand;
 import com.penmate.backend.application.ratelimit.RateLimitAction;
@@ -9,6 +11,10 @@ import com.penmate.backend.interfaces.api.auth.dto.LoginDto;
 import com.penmate.backend.interfaces.api.auth.dto.RefreshDto;
 import com.penmate.backend.interfaces.api.auth.dto.ProfileUpdateDto;
 import com.penmate.backend.interfaces.api.auth.dto.PasswordChangeDto;
+import com.penmate.backend.interfaces.api.auth.dto.UpdateUserUiPreferencesDto;
+import com.penmate.backend.interfaces.api.auth.dto.DeleteAccountDto;
+import com.penmate.backend.interfaces.api.auth.dto.EmailChangeDto;
+import com.penmate.backend.domain.auth.model.UserUiPreferences;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.common.ClientIpResolver;
 import jakarta.validation.Valid;
@@ -19,8 +25,11 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,7 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.Locale;
+import static com.penmate.backend.interfaces.api.common.AuthenticatedActor.id;
 
 /**
  * 认证与会话接口控制器。
@@ -39,17 +50,22 @@ import java.util.Locale;
 public class AuthController {
 
     private static final String REFRESH_COOKIE = "penmate_refresh";
-    private static final String ACCESS_COOKIE = "penmate_access";
 
     private final AuthApplicationService authApplicationService;
     private final RateLimitApplicationService rateLimits;
     private final ClientIpResolver clientIpResolver;
+    private final AccountDeletionApplicationService accountDeletion;
+    private final AccountCredentialApplicationService accountCredentials;
 
     public AuthController(AuthApplicationService authApplicationService, RateLimitApplicationService rateLimits,
-                          ClientIpResolver clientIpResolver) {
+                          ClientIpResolver clientIpResolver,
+                          AccountDeletionApplicationService accountDeletion,
+                          AccountCredentialApplicationService accountCredentials) {
         this.authApplicationService = authApplicationService;
         this.rateLimits = rateLimits;
         this.clientIpResolver = clientIpResolver;
+        this.accountDeletion = accountDeletion;
+        this.accountCredentials = accountCredentials;
     }
 
     /**
@@ -69,7 +85,8 @@ public class AuthController {
                                                   @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
                                                   HttpServletRequest request,
                                                   HttpServletResponse response) {
-        LoginCommand command = new LoginCommand(dto.getEmail(), dto.getPassword());
+        LoginCommand command = new LoginCommand(dto.getEmail(), dto.getPassword(),
+                request.getHeader("User-Agent"), clientIpResolver.resolve(request));
         String emailSubject = dto.getEmail().trim().toLowerCase(Locale.ROOT);
         rateLimits.consumeAll(
                 new RateLimitApplicationService.Limit(RateLimitAction.LOGIN_EMAIL, emailSubject),
@@ -96,7 +113,6 @@ public class AuthController {
                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
                                       HttpServletResponse response) {
         clearRefreshCookie(response);
-        clearAccessCookie(response);
         authApplicationService.logout(authorization, traceId);
         return ApiResponse.success("ok", traceId);
     }
@@ -129,8 +145,56 @@ public class AuthController {
         rateLimits.consumeAll(
                 new RateLimitApplicationService.Limit(RateLimitAction.REFRESH_TOKEN, refreshToken),
                 new RateLimitApplicationService.Limit(RateLimitAction.REFRESH_IP, clientIpResolver.resolve(request)));
-        Map<String, Object> tokens = authApplicationService.refresh(new RefreshCommand(refreshToken), traceId);
+        Map<String, Object> tokens = authApplicationService.refresh(
+                new RefreshCommand(refreshToken, clientIpResolver.resolve(request)), traceId);
         return ApiResponse.success(writeAuthCookies(tokens, request, response), traceId);
+    }
+
+    @GetMapping("/sessions")
+    public ApiResponse<List<AuthApplicationService.AuthSessionView>> listSessions(
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(authApplicationService.listSessions(authorization), traceId);
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public ApiResponse<String> revokeSession(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable String sessionId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        authApplicationService.revokeSession(authorization, sessionId);
+        return ApiResponse.success("revoked", traceId);
+    }
+
+    @DeleteMapping("/sessions")
+    public ApiResponse<Integer> revokeOtherSessions(
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(authApplicationService.revokeOtherSessions(authorization), traceId);
+    }
+
+    @GetMapping("/ui-preferences")
+    public ApiResponse<UserUiPreferences> getUiPreferences(
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(authApplicationService.getUiPreferences(authorization), traceId);
+    }
+
+    @PutMapping("/ui-preferences")
+    public ApiResponse<UserUiPreferences> saveUiPreferences(
+            @RequestHeader("Authorization") String authorization,
+            @Valid @RequestBody UpdateUserUiPreferencesDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        UserUiPreferences preferences = new UserUiPreferences();
+        preferences.setThemeMode(dto.getThemeMode());
+        preferences.setEditorFontFamily(dto.getEditorFontFamily());
+        preferences.setEditorFontSize(dto.getEditorFontSize());
+        preferences.setEditorLineHeight(dto.getEditorLineHeight());
+        preferences.setEditorParagraphSpacing(dto.getEditorParagraphSpacing());
+        preferences.setEditorContentWidth(dto.getEditorContentWidth());
+        preferences.setTypewriterMode(dto.getTypewriterMode());
+        preferences.setHighlightCurrentParagraph(dto.getHighlightCurrentParagraph());
+        return ApiResponse.success(authApplicationService.saveUiPreferences(authorization, preferences), traceId);
     }
 
     /**
@@ -164,20 +228,45 @@ public class AuthController {
                                                           @Valid @RequestBody ProfileUpdateDto dto,
                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(authApplicationService.updateProfile(
-                authorization, dto.getDisplayName(), dto.getEmail(), dto.getBio()), traceId);
+                authorization, dto.getDisplayName(), dto.getBio()), traceId);
+    }
+
+    @PostMapping("/email")
+    public ApiResponse<String> changeEmail(@Valid @RequestBody EmailChangeDto dto,
+                                           Authentication authentication,
+                                           HttpServletResponse response,
+                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        rateLimits.consume(RateLimitAction.PASSWORD_CHANGE, authentication.getName());
+        accountCredentials.changeEmail(id(authentication), dto.getCurrentPassword(), dto.getNewEmail());
+        clearRefreshCookie(response);
+        return ApiResponse.success("ok", traceId);
     }
 
     @PostMapping("/password")
-    public ApiResponse<String> changePassword(@RequestHeader("Authorization") String authorization,
-                                              @Valid @RequestBody PasswordChangeDto dto,
+    public ApiResponse<String> changePassword(@Valid @RequestBody PasswordChangeDto dto,
                                               Authentication authentication,
+                                              HttpServletResponse response,
                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         if (authentication == null || authentication.getName() == null) {
             throw com.penmate.backend.application.common.exception.BusinessException.unauthorized("Login required");
         }
         rateLimits.consume(RateLimitAction.PASSWORD_CHANGE, authentication.getName());
-        authApplicationService.changePassword(authorization, dto.getCurrentPassword(), dto.getNewPassword());
+        accountCredentials.changePassword(id(authentication), dto.getCurrentPassword(), dto.getNewPassword());
+        clearRefreshCookie(response);
         return ApiResponse.success("ok", traceId);
+    }
+
+    @DeleteMapping("/account")
+    public ApiResponse<AccountDeletionApplicationService.DeletionReceipt> deleteAccount(
+            @Valid @RequestBody DeleteAccountDto dto,
+            Authentication authentication,
+            HttpServletResponse response,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        rateLimits.consume(RateLimitAction.PASSWORD_CHANGE, authentication.getName());
+        AccountDeletionApplicationService.DeletionReceipt receipt = accountDeletion.requestDeletion(
+                id(authentication), dto.getCurrentPassword(), dto.isConfirmed());
+        clearRefreshCookie(response);
+        return ApiResponse.success(receipt, traceId);
     }
 
     private Map<String, Object> writeAuthCookies(Map<String, Object> source,
@@ -190,17 +279,9 @@ public class AuthController {
                 .secure(request.isSecure())
                 .sameSite("Lax")
                 .path("/api/v1/auth")
-                .maxAge(java.time.Duration.ofDays(30))
-                .build();
-        ResponseCookie accessCookie = ResponseCookie.from(ACCESS_COOKIE, String.valueOf(publicTokens.get("accessToken")))
-                .httpOnly(true)
-                .secure(request.isSecure())
-                .sameSite("Lax")
-                .path("/api/v1/novels")
-                .maxAge(java.time.Duration.ofMinutes(20))
+                .maxAge(java.time.Duration.ofDays(7))
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         return publicTokens;
     }
 
@@ -215,15 +296,5 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private void clearAccessCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(ACCESS_COOKIE, "")
-                .httpOnly(true)
-                .secure(false)
-                .sameSite("Strict")
-                .path("/api/v1/novels")
-                .maxAge(java.time.Duration.ZERO)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-    }
 }
 

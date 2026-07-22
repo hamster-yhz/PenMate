@@ -1,14 +1,17 @@
-package com.penmate.backend.application.auth.support;
+package com.penmate.backend.infrastructure.auth;
 
+import com.penmate.backend.application.auth.support.AuthTokenBundle;
+import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
+import com.penmate.backend.application.auth.support.ParsedToken;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class AuthTokenServiceTest {
+class JwtAuthTokenServiceTest {
 
-    private final AuthTokenService tokenService = new AuthTokenService(
+    private final JwtAuthTokenService tokenService = new JwtAuthTokenService(
             "01234567890123456789012345678901",
             "penmate-test",
             30,
@@ -48,4 +51,3 @@ class AuthTokenServiceTest {
         assertThat(parsed.tokenId()).isEqualTo(bundle.refreshJti());
     }
 }
-

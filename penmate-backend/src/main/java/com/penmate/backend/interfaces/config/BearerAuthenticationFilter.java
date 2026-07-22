@@ -6,7 +6,6 @@ import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
 import com.penmate.backend.application.auth.support.ParsedToken;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
@@ -26,7 +25,6 @@ import java.util.Objects;
 @Component
 public class BearerAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final String ACCESS_COOKIE = "penmate_access";
     private final AuthTokenService authTokenService;
     private final AuthSessionCache authSessionCache;
 
@@ -40,9 +38,6 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = bearerToken(request.getHeader(HttpHeaders.AUTHORIZATION));
-        if (token == null && isRunStreamRequest(request)) {
-            token = cookieToken(request.getCookies());
-        }
         if (token == null) {
             filterChain.doFilter(request, response);
             return;
@@ -69,23 +64,10 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private boolean isRunStreamRequest(HttpServletRequest request) {
-        return "GET".equalsIgnoreCase(request.getMethod())
-                && request.getRequestURI().matches("/api/v1/novels/[^/]+/agent/runs/[^/]+/stream");
-    }
-
     private String bearerToken(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) return null;
         String token = authorization.substring("Bearer ".length()).trim();
         return token.isEmpty() ? null : token;
-    }
-
-    private String cookieToken(Cookie[] cookies) {
-        if (cookies == null) return null;
-        for (Cookie cookie : cookies) {
-            if (ACCESS_COOKIE.equals(cookie.getName()) && !cookie.getValue().isBlank()) return cookie.getValue();
-        }
-        return null;
     }
 
     private List<SimpleGrantedAuthority> authorities(AuthUserSessionPayload session) {

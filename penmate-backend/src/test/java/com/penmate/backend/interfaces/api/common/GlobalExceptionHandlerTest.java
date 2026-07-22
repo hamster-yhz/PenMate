@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.api.common;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.exception.BusinessErrorType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -72,7 +73,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void should_return_business_exception_status_and_payload() {
         HttpServletRequest request = mock(HttpServletRequest.class);
-        BusinessException ex = BusinessException.of(HttpStatus.CONFLICT, "RESOURCE_CONFLICT", "版本冲突", Map.of("version", "12"));
+        BusinessException ex = BusinessException.of(BusinessErrorType.CONFLICT, "RESOURCE_CONFLICT", "版本冲突", Map.of("version", "12"));
 
         when(request.getRequestURI()).thenReturn("/api/v1/novels/1/chapters/2");
         when(request.getAttribute("traceId")).thenReturn("trace-biz");
@@ -94,7 +95,7 @@ class GlobalExceptionHandlerTest {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
         when(request.getAttribute("traceId")).thenReturn("trace-rate-limit");
-        BusinessException exception = BusinessException.of(HttpStatus.TOO_MANY_REQUESTS,
+        BusinessException exception = BusinessException.of(BusinessErrorType.RATE_LIMITED,
                 "RATE_LIMIT_EXCEEDED", "Too many requests", Map.of("retryAfterSeconds", 42L));
 
         ResponseEntity<ErrorResponse> response = handler.handleBusiness(exception, request);

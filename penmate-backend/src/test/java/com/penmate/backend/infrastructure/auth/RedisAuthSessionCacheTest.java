@@ -1,6 +1,10 @@
-package com.penmate.backend.application.auth.support;
+package com.penmate.backend.infrastructure.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.auth.support.AuthSessionCache;
+import com.penmate.backend.application.auth.support.AuthTokenBundle;
+import com.penmate.backend.application.auth.support.AuthTokenFingerprint;
+import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -16,13 +20,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class AuthSessionCacheTest {
+class RedisAuthSessionCacheTest {
 
     @Test
     void should_reject_null_redis_template_in_constructor() {
         ObjectMapper objectMapper = new ObjectMapper();
 
-        assertThatThrownBy(() -> new AuthSessionCache(null, objectMapper))
+        assertThatThrownBy(() -> new RedisAuthSessionCache(null, objectMapper))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("stringRedisTemplate");
     }
@@ -31,7 +35,7 @@ class AuthSessionCacheTest {
     void should_trim_access_jti_before_revoke_access() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         cache.revokeAccess("  access-jti-1  ");
 
@@ -39,21 +43,33 @@ class AuthSessionCacheTest {
     }
 
     @Test
-    void should_trim_refresh_jti_before_revoke_refresh() {
+    void should_hash_refresh_jti_before_revoke_refresh() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         cache.revokeRefresh("  refresh-jti-9  ");
 
-        verify(redisTemplate).delete("auth:refresh:refresh-jti-9");
+        verify(redisTemplate).delete("auth:refresh:" + AuthTokenFingerprint.sha256("refresh-jti-9"));
+    }
+
+    @Test
+    void should_revoke_an_already_hashed_refresh_fingerprint_without_hashing_it_twice() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
+        String fingerprint = AuthTokenFingerprint.sha256("refresh-jti-10");
+
+        cache.revokeRefreshFingerprint(fingerprint);
+
+        verify(redisTemplate).delete("auth:refresh:" + fingerprint);
     }
 
     @Test
     void should_reject_null_access_jti_when_revoking_access() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         assertThatThrownBy(() -> cache.revokeAccess(null))
                 .isInstanceOf(NullPointerException.class)
@@ -65,7 +81,7 @@ class AuthSessionCacheTest {
     void should_reject_null_refresh_jti_when_revoking_refresh() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         assertThatThrownBy(() -> cache.revokeRefresh(null))
                 .isInstanceOf(NullPointerException.class)
@@ -79,7 +95,7 @@ class AuthSessionCacheTest {
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get("auth:access:access-jti-2")).thenReturn(null);
@@ -93,7 +109,7 @@ class AuthSessionCacheTest {
     void should_reject_null_access_jti_when_getting_session() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         assertThatThrownBy(() -> cache.getByAccessJti(null))
                 .isInstanceOf(NullPointerException.class)
@@ -102,26 +118,27 @@ class AuthSessionCacheTest {
     }
 
     @Test
-    void should_trim_refresh_jti_before_getting_session_from_cache() {
+    void should_hash_refresh_jti_before_getting_session_from_cache() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("auth:refresh:refresh-jti-3")).thenReturn(null);
+        String key = "auth:refresh:" + AuthTokenFingerprint.sha256("refresh-jti-3");
+        when(valueOperations.get(key)).thenReturn(null);
 
         cache.getByRefreshJti("  refresh-jti-3  ");
 
-        verify(valueOperations).get("auth:refresh:refresh-jti-3");
+        verify(valueOperations).get(key);
     }
 
     @Test
     void should_reject_null_refresh_jti_when_getting_session() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         assertThatThrownBy(() -> cache.getByRefreshJti(null))
                 .isInstanceOf(NullPointerException.class)
@@ -135,7 +152,7 @@ class AuthSessionCacheTest {
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         AuthUserSessionPayload payload = new AuthUserSessionPayload();
         payload.setUserId(101L);
@@ -160,7 +177,7 @@ class AuthSessionCacheTest {
     void should_reject_null_bundle_when_saving_session() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         AuthUserSessionPayload payload = new AuthUserSessionPayload();
         payload.setUserId(103L);
@@ -175,7 +192,7 @@ class AuthSessionCacheTest {
     void should_reject_null_access_expires_at_when_saving_session() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         AuthUserSessionPayload payload = new AuthUserSessionPayload();
         payload.setUserId(104L);
@@ -196,12 +213,12 @@ class AuthSessionCacheTest {
     }
 
     @Test
-    void should_trim_refresh_jti_before_saving_session_to_cache() {
+    void should_hash_refresh_jti_before_saving_session_to_cache() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        AuthSessionCache cache = new AuthSessionCache(redisTemplate, objectMapper);
+        AuthSessionCache cache = new RedisAuthSessionCache(redisTemplate, objectMapper);
 
         AuthUserSessionPayload payload = new AuthUserSessionPayload();
         payload.setUserId(102L);
@@ -219,7 +236,9 @@ class AuthSessionCacheTest {
 
         cache.saveSession(payload, bundle);
 
-        verify(valueOperations).set(eq("auth:refresh:refresh-jti-save-2"), anyString(), any(Duration.class));
+        verify(valueOperations).set(
+                eq("auth:refresh:" + AuthTokenFingerprint.sha256("refresh-jti-save-2")),
+                anyString(), any(Duration.class));
     }
 }
 

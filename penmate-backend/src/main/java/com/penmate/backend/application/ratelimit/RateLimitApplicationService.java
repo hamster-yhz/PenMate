@@ -1,9 +1,9 @@
 package com.penmate.backend.application.ratelimit;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.exception.BusinessErrorType;
 import com.penmate.backend.application.ratelimit.port.RateLimitBucketStore;
 import com.penmate.backend.application.ratelimit.port.RateLimitKeyEncoder;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -27,11 +27,11 @@ public class RateLimitApplicationService {
                     action.capacity(), action.refillPeriod());
             if (!result.allowed()) {
                 long retryAfter = Math.max(1, result.retryAfterSeconds());
-                throw BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED",
+                throw BusinessException.of(BusinessErrorType.RATE_LIMITED, "RATE_LIMIT_EXCEEDED",
                         "Too many requests", Map.of("retryAfterSeconds", retryAfter));
             }
         } catch (RateLimitStoreUnavailableException exception) {
-            throw BusinessException.of(HttpStatus.SERVICE_UNAVAILABLE, "RATE_LIMIT_SERVICE_UNAVAILABLE",
+            throw BusinessException.of(BusinessErrorType.SERVICE_UNAVAILABLE, "RATE_LIMIT_SERVICE_UNAVAILABLE",
                     "Rate limit service is unavailable", null);
         }
     }
@@ -42,7 +42,7 @@ public class RateLimitApplicationService {
             try {
                 consume(limit.action(), limit.subject());
             } catch (BusinessException exception) {
-                if (failure == null || exception.getHttpStatus() == HttpStatus.SERVICE_UNAVAILABLE) {
+                if (failure == null || exception.getType() == BusinessErrorType.SERVICE_UNAVAILABLE) {
                     failure = exception;
                 }
             }
@@ -55,7 +55,7 @@ public class RateLimitApplicationService {
         try {
             store.clear(key(action, requireSubject(subject)));
         } catch (RateLimitStoreUnavailableException exception) {
-            throw BusinessException.of(HttpStatus.SERVICE_UNAVAILABLE, "RATE_LIMIT_SERVICE_UNAVAILABLE",
+            throw BusinessException.of(BusinessErrorType.SERVICE_UNAVAILABLE, "RATE_LIMIT_SERVICE_UNAVAILABLE",
                     "Rate limit service is unavailable", null);
         }
     }

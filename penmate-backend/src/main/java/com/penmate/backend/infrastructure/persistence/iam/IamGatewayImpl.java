@@ -4,6 +4,7 @@ import com.penmate.backend.domain.iam.model.IamMenu;
 import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
+import com.penmate.backend.domain.iam.model.IamRbacAssignmentAudit;
 import com.penmate.backend.domain.iam.repository.IamGateway;
 import org.springframework.stereotype.Repository;
 
@@ -20,15 +21,18 @@ public class IamGatewayImpl implements IamGateway {
     private final IamRoleMapper iamRoleMapper;
     private final IamPermissionMapper iamPermissionMapper;
     private final IamMenuMapper iamMenuMapper;
+    private final IamRbacAuditMapper iamRbacAuditMapper;
 
     public IamGatewayImpl(IamUserMapper iamUserMapper,
                           IamRoleMapper iamRoleMapper,
                           IamPermissionMapper iamPermissionMapper,
-                          IamMenuMapper iamMenuMapper) {
+                          IamMenuMapper iamMenuMapper,
+                          IamRbacAuditMapper iamRbacAuditMapper) {
         this.iamUserMapper = iamUserMapper;
         this.iamRoleMapper = iamRoleMapper;
         this.iamPermissionMapper = iamPermissionMapper;
         this.iamMenuMapper = iamMenuMapper;
+        this.iamRbacAuditMapper = iamRbacAuditMapper;
     }
 
     /**
@@ -124,8 +128,29 @@ public class IamGatewayImpl implements IamGateway {
     }
 
     @Override
+    public int updateEmail(Long userId, String email) {
+        return iamUserMapper.updateEmail(userId, email);
+    }
+
+    @Override
     public int updatePassword(Long userId, String passwordHash) {
         return iamUserMapper.updatePassword(userId, passwordHash);
+    }
+
+    @Override public int requestUserDeletion(Long userId, java.time.Instant requestedAt, java.time.Instant dueAt) {
+        return iamUserMapper.requestDeletion(userId, requestedAt, dueAt);
+    }
+
+    @Override public int restorePendingUserDeletion(Long userId) {
+        return iamUserMapper.restorePendingDeletion(userId);
+    }
+
+    @Override public List<Long> findDeletionDueUserIds(java.time.Instant now) {
+        return iamUserMapper.findDeletionDueUserIds(now);
+    }
+
+    @Override public int purgePendingUserDeletion(Long userId, java.time.Instant now) {
+        return iamUserMapper.purgePendingDeletion(userId, now);
     }
 
     /**
@@ -147,8 +172,8 @@ public class IamGatewayImpl implements IamGateway {
      * @return 出参：处理结果
      */
     @Override
-    public int assignRoleToUser(Long userId, Long roleId) {
-        return iamUserMapper.assignRole(userId, roleId);
+    public Long lockUserRbacRevision(Long userId) {
+        return iamUserMapper.lockRbacRevision(userId);
     }
 
     /**
@@ -159,8 +184,10 @@ public class IamGatewayImpl implements IamGateway {
      * @return 出参：处理结果
      */
     @Override
-    public int removeRoleFromUser(Long userId, Long roleId) {
-        return iamUserMapper.removeRole(userId, roleId);
+    public int replaceUserRoles(Long userId, List<Long> roleIds, Long expectedRevision) {
+        iamUserMapper.deleteAllRoles(userId);
+        if (!roleIds.isEmpty()) iamUserMapper.insertRoles(userId, roleIds);
+        return iamUserMapper.incrementRbacRevision(userId, expectedRevision);
     }
 
     /**
@@ -225,8 +252,8 @@ public class IamGatewayImpl implements IamGateway {
      * @return 出参：处理结果
      */
     @Override
-    public int assignPermissionToRole(Long roleId, Long permissionId) {
-        return iamRoleMapper.assignPermission(roleId, permissionId);
+    public Long lockRoleRbacRevision(Long roleId) {
+        return iamRoleMapper.lockRbacRevision(roleId);
     }
 
     /**
@@ -237,8 +264,10 @@ public class IamGatewayImpl implements IamGateway {
      * @return 出参：处理结果
      */
     @Override
-    public int removePermissionFromRole(Long roleId, Long permissionId) {
-        return iamRoleMapper.removePermission(roleId, permissionId);
+    public int replaceRolePermissions(Long roleId, List<Long> permissionIds, Long expectedRevision) {
+        iamRoleMapper.deleteAllPermissions(roleId);
+        if (!permissionIds.isEmpty()) iamRoleMapper.insertPermissions(roleId, permissionIds);
+        return iamRoleMapper.incrementRbacRevision(roleId, expectedRevision);
     }
 
     /**
@@ -271,6 +300,24 @@ public class IamGatewayImpl implements IamGateway {
     @Override
     public IamPermission findPermissionByPermissionId(Long permissionId) {
         return iamPermissionMapper.findByPermissionId(permissionId);
+    }
+
+    @Override
+    public void insertRbacAssignmentAudit(IamRbacAssignmentAudit audit) {
+        iamRbacAuditMapper.insert(
+                audit.auditId(),
+                audit.actorUserId(),
+                audit.assignmentType(),
+                audit.targetId(),
+                idsJson(audit.beforeIds()),
+                idsJson(audit.afterIds()),
+                audit.previousRevision(),
+                audit.newRevision(),
+                audit.traceId());
+    }
+
+    private String idsJson(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",", "[", "]"));
     }
 
     /**
