@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Update;
 public interface ProjectAiConfigurationMapper {
 
     String COLUMNS = """
-            project_ai_config_id, project_id, embedding_model_config_id,
+            project_ai_config_id, project_id, creative_model_config_id, embedding_model_config_id,
             story_bible_routing_mode, router_model_config_id,
             chunk_target_characters, chunk_overlap_characters, chunk_max_characters,
             retrieval_candidates, retrieval_top_k, retrieval_max_per_source, hnsw_ef_search,
@@ -26,14 +26,14 @@ public interface ProjectAiConfigurationMapper {
 
     @Insert("""
             INSERT INTO project_ai_configurations(
-                project_ai_config_id, project_id, embedding_model_config_id,
+                project_ai_config_id, project_id, creative_model_config_id, embedding_model_config_id,
                 story_bible_routing_mode, router_model_config_id,
                 chunk_target_characters, chunk_overlap_characters, chunk_max_characters,
                 retrieval_candidates, retrieval_top_k, retrieval_max_per_source, hnsw_ef_search,
                 similarity_threshold, index_status, active_index_build_id,
                 last_error_code, last_error_message
             ) VALUES (
-                #{projectAiConfigId}, #{projectId}, #{embeddingModelConfigId},
+                #{projectAiConfigId}, #{projectId}, #{creativeModelConfigId}, #{embeddingModelConfigId},
                 #{storyBibleRoutingMode}, #{routerModelConfigId},
                 #{chunkTargetCharacters}, #{chunkOverlapCharacters}, #{chunkMaxCharacters},
                 #{retrievalCandidates}, #{retrievalTopK}, #{retrievalMaxPerSource}, #{hnswEfSearch},
@@ -45,7 +45,8 @@ public interface ProjectAiConfigurationMapper {
 
     @Update("""
             UPDATE project_ai_configurations
-            SET embedding_model_config_id = #{embeddingModelConfigId},
+            SET creative_model_config_id = #{creativeModelConfigId},
+                embedding_model_config_id = #{embeddingModelConfigId},
                 story_bible_routing_mode = #{storyBibleRoutingMode},
                 router_model_config_id = #{routerModelConfigId},
                 chunk_target_characters = #{chunkTargetCharacters},
@@ -65,11 +66,4 @@ public interface ProjectAiConfigurationMapper {
             """)
     int update(ProjectAiConfiguration configuration);
 
-    @Select("""
-            SELECT COUNT(*)
-            FROM agent_runs
-            WHERE project_id = #{projectId}
-              AND run_status IN ('PENDING', 'RUNNING', 'WAITING_APPROVAL', 'SUSPENDED')
-            """)
-    int countNonterminalRuns(Long projectId);
 }

@@ -9,6 +9,7 @@ import java.time.Instant;
 public class ProjectAiConfiguration {
     private Long projectAiConfigId;
     private Long projectId;
+    private Long creativeModelConfigId;
     private Long embeddingModelConfigId;
     private String storyBibleRoutingMode;
     private Long routerModelConfigId;

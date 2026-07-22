@@ -183,7 +183,7 @@ class ModelApplicationServiceTest {
     @Test
     void rejectsRetrievalDefaultWithoutEmbeddingModel() {
         SaveUserModelPreferencesCommand command = new SaveUserModelPreferencesCommand(
-                null, null, null, null, "RETRIEVAL", 800, 120, 1200);
+                null, null, null, "RETRIEVAL", 800, 120, 1200);
 
         assertThatThrownBy(() -> service.saveUserPreferences(7L, command))
                 .isInstanceOf(BusinessException.class)
@@ -202,7 +202,7 @@ class ModelApplicationServiceTest {
         when(repository.findUserPreferences(7L)).thenReturn(persisted);
 
         ModelUserPreferences result = service.saveUserPreferences(7L,
-                new SaveUserModelPreferencesCommand(501L, null, 502L, null,
+                new SaveUserModelPreferencesCommand(501L, null, 502L,
                         "retrieval_then_llm", 900, 150, 1300));
 
         assertThat(result).isSameAs(persisted);

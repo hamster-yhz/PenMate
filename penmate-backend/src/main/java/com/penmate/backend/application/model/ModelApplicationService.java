@@ -213,17 +213,15 @@ public class ModelApplicationService {
     public ModelUserPreferences saveUserPreferences(Long actorUserId, SaveUserModelPreferencesCommand command) {
         Long actor = requireActor(actorUserId);
         Objects.requireNonNull(command, "command must not be null");
-        requireUsable(actor, command.defaultMainChatModelConfigId(), "CHAT", "defaultMainChatModelConfigId");
-        requireUsable(actor, command.defaultWorkerChatModelConfigId(), "CHAT", "defaultWorkerChatModelConfigId");
+        requireUsable(actor, command.defaultCreativeModelConfigId(), "CHAT", "defaultCreativeModelConfigId");
+        requireUsable(actor, command.defaultContextSelectorModelConfigId(), "CHAT", "defaultContextSelectorModelConfigId");
         requireUsable(actor, command.defaultEmbeddingModelConfigId(), "EMBEDDING", "defaultEmbeddingModelConfigId");
-        requireUsable(actor, command.defaultRouterModelConfigId(), "CHAT", "defaultRouterModelConfigId");
 
         ModelUserPreferences preferences = new ModelUserPreferences();
         preferences.setUserId(actor);
-        preferences.setDefaultMainChatModelConfigId(command.defaultMainChatModelConfigId());
-        preferences.setDefaultWorkerChatModelConfigId(command.defaultWorkerChatModelConfigId());
+        preferences.setDefaultCreativeModelConfigId(command.defaultCreativeModelConfigId());
+        preferences.setDefaultContextSelectorModelConfigId(command.defaultContextSelectorModelConfigId());
         preferences.setDefaultEmbeddingModelConfigId(command.defaultEmbeddingModelConfigId());
-        preferences.setDefaultRouterModelConfigId(command.defaultRouterModelConfigId());
         String routing = normalizeRoutingMode(command.defaultStoryBibleRoutingMode());
         if (command.defaultEmbeddingModelConfigId() == null && !"LLM_SELECTOR".equals(routing)) {
             throw BusinessException.of("Projects without an Embedding model must default to LLM_SELECTOR");

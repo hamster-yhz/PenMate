@@ -93,7 +93,7 @@ public class OpenAiCompatibleEmbeddingGateway implements EmbeddingGateway, Embed
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 if (request.dimensions() != null && (response.statusCode() == 400 || response.statusCode() == 422)) {
-                    throw BusinessException.of(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                    throw BusinessException.of(com.penmate.backend.application.common.exception.BusinessErrorType.BUSINESS_RULE,
                             "EMBEDDING_DIMENSIONS_UNSUPPORTED",
                             "Embedding endpoint does not support the requested dimensions", null);
                 }
@@ -128,7 +128,7 @@ public class OpenAiCompatibleEmbeddingGateway implements EmbeddingGateway, Embed
             if (dimension == null) dimension = embedding.size();
             if (embedding.size() != dimension || dimension > 4000) throw BusinessException.of("Embedding response dimension is invalid or inconsistent");
             if (expectedDimension != null && embedding.size() != expectedDimension) {
-                throw BusinessException.of(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                throw BusinessException.of(com.penmate.backend.application.common.exception.BusinessErrorType.BUSINESS_RULE,
                         "EMBEDDING_DIMENSION_MISMATCH",
                         "Embedding endpoint returned " + embedding.size() + " dimensions; expected " + expectedDimension,
                         Map.of("expectedDimensions", expectedDimension, "actualDimensions", embedding.size()));

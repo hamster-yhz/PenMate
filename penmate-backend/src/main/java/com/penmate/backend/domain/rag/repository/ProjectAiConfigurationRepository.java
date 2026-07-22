@@ -7,5 +7,4 @@ public interface ProjectAiConfigurationRepository {
     ProjectAiConfiguration findByProjectIdForUpdate(Long projectId);
     int insert(ProjectAiConfiguration configuration);
     int update(ProjectAiConfiguration configuration);
-    boolean hasNonterminalRun(Long projectId);
 }

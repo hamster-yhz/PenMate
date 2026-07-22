@@ -2,6 +2,7 @@ package com.penmate.backend.interfaces.api.model;
 
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.ModelApplicationService;
+import com.penmate.backend.application.model.ModelConnectionTestService;
 import com.penmate.backend.application.model.command.ModelCommands;
 import com.penmate.backend.application.ratelimit.RateLimitAction;
 import com.penmate.backend.application.ratelimit.RateLimitApplicationService;
@@ -37,6 +38,7 @@ import java.util.Map;
 public class ModelController {
 
     private final ModelApplicationService service;
+    private final ModelConnectionTestService connectionTests;
     private final RateLimitApplicationService rateLimits;
 
     @GetMapping("/providers")
@@ -81,6 +83,27 @@ public class ModelController {
         rateLimits.consume(RateLimitAction.EMBEDDING_DIMENSION_PROBE, actor(authentication).toString());
         return ApiResponse.success(probeView(service.probeEmbeddingDimensions(
                 actor(authentication), true, probeCommand(dto))), traceId);
+    }
+
+    @PostMapping("/configurations/{modelConfigId}/connection-tests")
+    public ApiResponse<ModelConnectionTestService.ConnectionTestResult> testUserConnection(
+            Authentication authentication,
+            @PathVariable String modelConfigId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long actor = actor(authentication);
+        rateLimits.consume(RateLimitAction.MODEL_CONNECTION_TEST, actor.toString());
+        return ApiResponse.success(connectionTests.test(actor, id(modelConfigId, "modelConfigId"), false, traceId), traceId);
+    }
+
+    @PostMapping("/system-configurations/{modelConfigId}/connection-tests")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<ModelConnectionTestService.ConnectionTestResult> testSystemConnection(
+            Authentication authentication,
+            @PathVariable String modelConfigId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long actor = actor(authentication);
+        rateLimits.consume(RateLimitAction.MODEL_CONNECTION_TEST, actor.toString());
+        return ApiResponse.success(connectionTests.test(actor, id(modelConfigId, "modelConfigId"), true, traceId), traceId);
     }
 
     @PostMapping("/system-configurations")
@@ -184,10 +207,9 @@ public class ModelController {
             @Valid @RequestBody SaveModelPreferencesDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         ModelCommands.SaveUserModelPreferencesCommand command = new ModelCommands.SaveUserModelPreferencesCommand(
-                optionalId(dto.getDefaultMainChatModelConfigId(), "defaultMainChatModelConfigId"),
-                optionalId(dto.getDefaultWorkerChatModelConfigId(), "defaultWorkerChatModelConfigId"),
+                optionalId(dto.getDefaultCreativeModelConfigId(), "defaultCreativeModelConfigId"),
+                optionalId(dto.getDefaultContextSelectorModelConfigId(), "defaultContextSelectorModelConfigId"),
                 optionalId(dto.getDefaultEmbeddingModelConfigId(), "defaultEmbeddingModelConfigId"),
-                optionalId(dto.getDefaultRouterModelConfigId(), "defaultRouterModelConfigId"),
                 dto.getDefaultStoryBibleRoutingMode(), dto.getDefaultChunkTargetCharacters(),
                 dto.getDefaultChunkOverlapCharacters(), dto.getDefaultChunkMaxCharacters());
         return ApiResponse.success(preferencesView(service.saveUserPreferences(actor(authentication), command)), traceId);
@@ -258,6 +280,10 @@ public class ModelController {
         result.put("credentialConfigured", configuration.getMaskedApiKey() != null
                 || "NONE".equalsIgnoreCase(configuration.getProviderAuthType()));
         result.put("status", configuration.getStatus());
+        result.put("lastTestStatus", configuration.getLastTestStatus());
+        result.put("lastTestLatencyMs", configuration.getLastTestLatencyMs());
+        result.put("lastTestError", configuration.getLastTestError());
+        result.put("lastTestedAt", configuration.getLastTestedAt());
         result.put("createdAt", configuration.getCreatedAt());
         result.put("updatedAt", configuration.getUpdatedAt());
         return result;
@@ -266,10 +292,9 @@ public class ModelController {
     private Map<String, Object> preferencesView(ModelUserPreferences preferences) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("userId", string(preferences.getUserId()));
-        result.put("defaultMainChatModelConfigId", string(preferences.getDefaultMainChatModelConfigId()));
-        result.put("defaultWorkerChatModelConfigId", string(preferences.getDefaultWorkerChatModelConfigId()));
+        result.put("defaultCreativeModelConfigId", string(preferences.getDefaultCreativeModelConfigId()));
+        result.put("defaultContextSelectorModelConfigId", string(preferences.getDefaultContextSelectorModelConfigId()));
         result.put("defaultEmbeddingModelConfigId", string(preferences.getDefaultEmbeddingModelConfigId()));
-        result.put("defaultRouterModelConfigId", string(preferences.getDefaultRouterModelConfigId()));
         result.put("defaultStoryBibleRoutingMode", preferences.getDefaultStoryBibleRoutingMode());
         result.put("defaultChunkTargetCharacters", preferences.getDefaultChunkTargetCharacters());
         result.put("defaultChunkOverlapCharacters", preferences.getDefaultChunkOverlapCharacters());

@@ -47,10 +47,9 @@ public final class ModelCommands {
     }
 
     public record SaveUserModelPreferencesCommand(
-            Long defaultMainChatModelConfigId,
-            Long defaultWorkerChatModelConfigId,
+            Long defaultCreativeModelConfigId,
+            Long defaultContextSelectorModelConfigId,
             Long defaultEmbeddingModelConfigId,
-            Long defaultRouterModelConfigId,
             String defaultStoryBibleRoutingMode,
             Integer defaultChunkTargetCharacters,
             Integer defaultChunkOverlapCharacters,

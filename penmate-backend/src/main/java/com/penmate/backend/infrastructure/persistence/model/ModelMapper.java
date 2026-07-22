@@ -24,7 +24,8 @@ public interface ModelMapper {
                    COALESCE(uak.masked_api_key, oak.masked_api_key) AS masked_api_key,
                    COALESCE(uak.status, oak.status,
                             CASE WHEN p.auth_type = 'NONE' THEN 'ACTIVE' ELSE NULL END) AS credential_status,
-                   mc.status, mc.created_by, mc.updated_by, mc.created_at, mc.updated_at
+                   mc.status, mc.last_test_status, mc.last_test_latency_ms, mc.last_test_error,
+                   mc.last_tested_at, mc.created_by, mc.updated_by, mc.created_at, mc.updated_at
             FROM model_configurations mc
             JOIN model_providers p ON p.provider_id = mc.provider_id AND p.deleted_at IS NULL
             JOIN model_provider_capabilities cap
@@ -139,6 +140,22 @@ public interface ModelMapper {
               AND (#{scopeType} = 'SYSTEM' OR owner_user_id = #{ownerUserId}) AND deleted_at IS NULL
             """)
     int updateConfiguration(ModelConfiguration configuration);
+
+    @Update("""
+            UPDATE model_configurations
+            SET last_test_status = #{status}, last_test_latency_ms = #{latencyMs},
+                last_test_error = #{error}, last_tested_at = #{testedAt}
+            WHERE model_config_id = #{modelConfigId} AND deleted_at IS NULL
+              AND ((#{systemScope} = TRUE AND scope_type = 'SYSTEM')
+                   OR (#{systemScope} = FALSE AND scope_type = 'USER' AND owner_user_id = #{actorUserId}))
+            """)
+    int updateConnectionTest(@Param("actorUserId") Long actorUserId,
+                             @Param("modelConfigId") Long modelConfigId,
+                             @Param("systemScope") boolean systemScope,
+                             @Param("status") String status,
+                             @Param("latencyMs") Integer latencyMs,
+                             @Param("error") String error,
+                             @Param("testedAt") java.time.Instant testedAt);
 
     @Insert("""
             INSERT INTO model_user_api_keys(
@@ -261,16 +278,14 @@ public interface ModelMapper {
 
     @Update("""
             UPDATE model_user_preferences
-            SET default_main_chat_model_config_id = CASE WHEN default_main_chat_model_config_id = #{modelConfigId} THEN NULL ELSE default_main_chat_model_config_id END,
-                default_worker_chat_model_config_id = CASE WHEN default_worker_chat_model_config_id = #{modelConfigId} THEN NULL ELSE default_worker_chat_model_config_id END,
+            SET default_creative_model_config_id = CASE WHEN default_creative_model_config_id = #{modelConfigId} THEN NULL ELSE default_creative_model_config_id END,
+                default_context_selector_model_config_id = CASE WHEN default_context_selector_model_config_id = #{modelConfigId} THEN NULL ELSE default_context_selector_model_config_id END,
                 default_embedding_model_config_id = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN NULL ELSE default_embedding_model_config_id END,
-                default_router_model_config_id = CASE WHEN default_router_model_config_id = #{modelConfigId} THEN NULL ELSE default_router_model_config_id END,
                 default_story_bible_routing_mode = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN 'LLM_SELECTOR' ELSE default_story_bible_routing_mode END,
                 updated_at = CURRENT_TIMESTAMP(3)
-            WHERE default_main_chat_model_config_id = #{modelConfigId}
-               OR default_worker_chat_model_config_id = #{modelConfigId}
+            WHERE default_creative_model_config_id = #{modelConfigId}
+               OR default_context_selector_model_config_id = #{modelConfigId}
                OR default_embedding_model_config_id = #{modelConfigId}
-               OR default_router_model_config_id = #{modelConfigId}
             """)
     int clearUserDefaultReferences(Long modelConfigId);
 
@@ -280,10 +295,9 @@ public interface ModelMapper {
                  WHERE embedding_model_config_id = #{modelConfigId} OR router_model_config_id = #{modelConfigId})
                 +
                 (SELECT COUNT(*) FROM model_user_preferences
-                 WHERE default_main_chat_model_config_id = #{modelConfigId}
-                    OR default_worker_chat_model_config_id = #{modelConfigId}
-                    OR default_embedding_model_config_id = #{modelConfigId}
-                    OR default_router_model_config_id = #{modelConfigId})
+                 WHERE default_creative_model_config_id = #{modelConfigId}
+                    OR default_context_selector_model_config_id = #{modelConfigId}
+                    OR default_embedding_model_config_id = #{modelConfigId})
                 +
                 (SELECT COUNT(*) FROM agent_run_model_bindings WHERE model_config_id = #{modelConfigId})
             )
@@ -291,8 +305,8 @@ public interface ModelMapper {
     int countAllReferences(Long modelConfigId);
 
     @Select("""
-            SELECT user_id, default_main_chat_model_config_id, default_worker_chat_model_config_id,
-                   default_embedding_model_config_id, default_router_model_config_id,
+            SELECT user_id, default_creative_model_config_id, default_context_selector_model_config_id,
+                   default_embedding_model_config_id,
                    default_story_bible_routing_mode, default_chunk_target_characters,
                    default_chunk_overlap_characters, default_chunk_max_characters
             FROM model_user_preferences WHERE user_id = #{userId}
@@ -301,21 +315,20 @@ public interface ModelMapper {
 
     @Insert("""
             INSERT INTO model_user_preferences(
-                user_id, default_main_chat_model_config_id, default_worker_chat_model_config_id,
-                default_embedding_model_config_id, default_router_model_config_id,
+                user_id, default_creative_model_config_id, default_context_selector_model_config_id,
+                default_embedding_model_config_id,
                 default_story_bible_routing_mode, default_chunk_target_characters,
                 default_chunk_overlap_characters, default_chunk_max_characters
             ) VALUES (
-                #{userId}, #{defaultMainChatModelConfigId}, #{defaultWorkerChatModelConfigId},
-                #{defaultEmbeddingModelConfigId}, #{defaultRouterModelConfigId},
+                #{userId}, #{defaultCreativeModelConfigId}, #{defaultContextSelectorModelConfigId},
+                #{defaultEmbeddingModelConfigId},
                 #{defaultStoryBibleRoutingMode}, #{defaultChunkTargetCharacters},
                 #{defaultChunkOverlapCharacters}, #{defaultChunkMaxCharacters}
             )
             ON CONFLICT (user_id) DO UPDATE SET
-                default_main_chat_model_config_id = EXCLUDED.default_main_chat_model_config_id,
-                default_worker_chat_model_config_id = EXCLUDED.default_worker_chat_model_config_id,
+                default_creative_model_config_id = EXCLUDED.default_creative_model_config_id,
+                default_context_selector_model_config_id = EXCLUDED.default_context_selector_model_config_id,
                 default_embedding_model_config_id = EXCLUDED.default_embedding_model_config_id,
-                default_router_model_config_id = EXCLUDED.default_router_model_config_id,
                 default_story_bible_routing_mode = EXCLUDED.default_story_bible_routing_mode,
                 default_chunk_target_characters = EXCLUDED.default_chunk_target_characters,
                 default_chunk_overlap_characters = EXCLUDED.default_chunk_overlap_characters,

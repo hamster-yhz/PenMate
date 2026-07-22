@@ -3,6 +3,7 @@ package com.penmate.backend.application.agent;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.model.ModelCredential;
+import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import org.junit.jupiter.api.Test;
@@ -48,5 +49,26 @@ class AgentModelRoutingServiceTest {
         AgentLlmExecutionConfig config = agentModelRoutingService.resolveExecutionConfig(1001L, 9001L, "trace-ctx-window");
 
         assertThat(config.contextWindowTurns()).isEqualTo(8);
+    }
+
+    @Test
+    void should_use_default_creative_model_when_tool_does_not_override_model() {
+        ModelUserPreferences preferences = new ModelUserPreferences();
+        preferences.setUserId(1001L);
+        preferences.setDefaultCreativeModelConfigId(9001L);
+        ModelConfiguration model = new ModelConfiguration();
+        model.setModelConfigId(9001L);
+        model.setModelType("CHAT");
+        model.setStatus("ACTIVE");
+        model.setProviderCode("local");
+        model.setProviderAuthType("NONE");
+        model.setModelName("creative-model");
+        when(modelRepository.findUserPreferences(1001L)).thenReturn(preferences);
+        when(modelRepository.findAccessibleConfiguration(1001L, 9001L)).thenReturn(model);
+
+        AgentLlmExecutionConfig config = agentModelRoutingService.resolveExecutionConfig(1001L, null, "trace-default");
+
+        assertThat(config.modelConfigId()).isEqualTo(9001L);
+        assertThat(config.modelName()).isEqualTo("creative-model");
     }
 }

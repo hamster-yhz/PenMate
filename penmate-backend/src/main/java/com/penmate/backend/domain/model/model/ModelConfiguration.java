@@ -26,6 +26,10 @@ public class ModelConfiguration {
     private String maskedApiKey;
     private String credentialStatus;
     private String status;
+    private String lastTestStatus;
+    private Integer lastTestLatencyMs;
+    private String lastTestError;
+    private Instant lastTestedAt;
     private Long createdBy;
     private Long updatedBy;
     private Instant createdAt;

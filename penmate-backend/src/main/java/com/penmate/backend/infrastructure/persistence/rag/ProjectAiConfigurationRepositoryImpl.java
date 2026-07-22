@@ -14,5 +14,4 @@ public class ProjectAiConfigurationRepositoryImpl implements ProjectAiConfigurat
     @Override public ProjectAiConfiguration findByProjectIdForUpdate(Long projectId) { return mapper.findByProjectIdForUpdate(projectId); }
     @Override public int insert(ProjectAiConfiguration configuration) { return mapper.insert(configuration); }
     @Override public int update(ProjectAiConfiguration configuration) { return mapper.update(configuration); }
-    @Override public boolean hasNonterminalRun(Long projectId) { return mapper.countNonterminalRuns(projectId) > 0; }
 }

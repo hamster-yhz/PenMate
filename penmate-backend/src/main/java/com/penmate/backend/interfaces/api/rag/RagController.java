@@ -49,7 +49,7 @@ public class RagController {
                                                                  @Valid @RequestBody UpdateProjectAiConfigurationDto dto,
                                                                  @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         var request = new ProjectAiConfigurationService.UpdateRequest(
-                optionalId(dto.getEmbeddingModelConfigId()), dto.getStoryBibleRoutingMode(),
+                optionalId(dto.getCreativeModelConfigId()), optionalId(dto.getEmbeddingModelConfigId()), dto.getStoryBibleRoutingMode(),
                 optionalId(dto.getRouterModelConfigId()), dto.getChunkTargetCharacters(),
                 dto.getChunkOverlapCharacters(), dto.getChunkMaxCharacters(), dto.getRetrievalCandidates(),
                 dto.getRetrievalTopK(), dto.getRetrievalMaxPerSource(), dto.getHnswEfSearch(), dto.getSimilarityThreshold());
@@ -158,6 +158,7 @@ public class RagController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("projectAiConfigId", string(value.getProjectAiConfigId()));
         result.put("projectId", string(value.getProjectId()));
+        result.put("creativeModelConfigId", string(value.getCreativeModelConfigId()));
         result.put("embeddingModelConfigId", string(value.getEmbeddingModelConfigId()));
         result.put("storyBibleRoutingMode", value.getStoryBibleRoutingMode());
         result.put("routerModelConfigId", string(value.getRouterModelConfigId()));

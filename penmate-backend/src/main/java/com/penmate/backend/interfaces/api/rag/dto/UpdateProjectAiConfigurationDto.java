@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 
 @Data
 public class UpdateProjectAiConfigurationDto {
+    private String creativeModelConfigId;
     private String embeddingModelConfigId;
     private String storyBibleRoutingMode;
     private String routerModelConfigId;

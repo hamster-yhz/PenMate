@@ -1,6 +1,5 @@
 package com.penmate.backend.application.rag;
 
-import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.ops.AsyncJobQueueService;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
@@ -19,9 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,7 +35,7 @@ class ProjectAiConfigurationServiceTest {
     void initializesProjectFromUserDefaults() {
         ModelUserPreferences defaults = new ModelUserPreferences();
         defaults.setDefaultEmbeddingModelConfigId(81L);
-        defaults.setDefaultRouterModelConfigId(82L);
+        defaults.setDefaultContextSelectorModelConfigId(82L);
         defaults.setDefaultStoryBibleRoutingMode("RETRIEVAL_THEN_LLM");
         defaults.setDefaultChunkTargetCharacters(900);
         defaults.setDefaultChunkOverlapCharacters(150);
@@ -46,7 +43,6 @@ class ProjectAiConfigurationServiceTest {
         when(ids.nextId()).thenReturn(91L);
         when(models.findUserPreferences(7L)).thenReturn(defaults);
         when(models.existsAccessibleActiveConfiguration(7L, 81L, "EMBEDDING")).thenReturn(true);
-        when(models.existsAccessibleActiveConfiguration(7L, 82L, "CHAT")).thenReturn(true);
         when(repository.insert(any())).thenReturn(1);
 
         service.initializeProject(11L, 7L);
@@ -55,8 +51,10 @@ class ProjectAiConfigurationServiceTest {
         verify(repository).insert(captor.capture());
         assertThat(captor.getValue()).satisfies(value -> {
             assertThat(value.getProjectAiConfigId()).isEqualTo(91L);
-            assertThat(value.getEmbeddingModelConfigId()).isEqualTo(81L);
-            assertThat(value.getStoryBibleRoutingMode()).isEqualTo("RETRIEVAL_THEN_LLM");
+            assertThat(value.getCreativeModelConfigId()).isNull();
+            assertThat(value.getEmbeddingModelConfigId()).isNull();
+            assertThat(value.getRouterModelConfigId()).isNull();
+            assertThat(value.getStoryBibleRoutingMode()).isEqualTo("LLM_SELECTOR");
             assertThat(value.getIndexStatus()).isEqualTo("REINDEX_REQUIRED");
             assertThat(value.getChunkTargetCharacters()).isEqualTo(900);
         });
@@ -98,18 +96,16 @@ class ProjectAiConfigurationServiceTest {
     }
 
     @Test
-    void activeRunBlocksProjectConfigurationChange() {
+    void activeRunDoesNotBlockAtomicProjectConfigurationChange() {
         owner(11L, 7L);
         when(repository.findByProjectIdForUpdate(11L)).thenReturn(current());
-        when(repository.hasNonterminalRun(11L)).thenReturn(true);
+        when(repository.update(any())).thenReturn(1);
 
-        assertThatThrownBy(() -> service.update(11L, 7L,
+        service.update(11L, 7L,
                 new ProjectAiConfigurationService.UpdateRequest(null, "LLM_SELECTOR", null,
-                        800, 120, 1200, 30, 8, 3, 100, BigDecimal.ZERO)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage("Project AI configuration cannot change while an Agent Run is active");
+                        800, 120, 1200, 30, 8, 3, 100, BigDecimal.ZERO));
 
-        verify(repository, never()).update(any());
+        verify(repository).update(any());
     }
 
     private void owner(Long projectId, Long ownerId) {

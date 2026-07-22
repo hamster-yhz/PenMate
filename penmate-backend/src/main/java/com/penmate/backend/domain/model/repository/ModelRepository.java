@@ -7,6 +7,7 @@ import com.penmate.backend.domain.model.model.ModelProviderCapability;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 
 import java.util.List;
+import java.time.Instant;
 
 public interface ModelRepository {
 
@@ -57,4 +58,7 @@ public interface ModelRepository {
     int upsertUserPreferences(ModelUserPreferences preferences);
 
     boolean existsAccessibleActiveConfiguration(Long userId, Long modelConfigId, String modelType);
+
+    int updateConnectionTest(Long actorUserId, Long modelConfigId, boolean systemScope,
+                             String status, Integer latencyMs, String error, Instant testedAt);
 }

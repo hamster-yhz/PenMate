@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.time.Instant;
 
 @Repository
 @RequiredArgsConstructor
@@ -77,5 +78,9 @@ public class ModelRepositoryImpl implements ModelRepository {
     @Override public int upsertUserPreferences(ModelUserPreferences preferences) { return mapper.upsertUserPreferences(preferences); }
     @Override public boolean existsAccessibleActiveConfiguration(Long userId, Long modelConfigId, String modelType) {
         return mapper.countAccessibleActiveConfiguration(userId, modelConfigId, modelType) > 0;
+    }
+    @Override public int updateConnectionTest(Long actorUserId, Long modelConfigId, boolean systemScope,
+                                              String status, Integer latencyMs, String error, Instant testedAt) {
+        return mapper.updateConnectionTest(actorUserId, modelConfigId, systemScope, status, latencyMs, error, testedAt);
     }
 }
