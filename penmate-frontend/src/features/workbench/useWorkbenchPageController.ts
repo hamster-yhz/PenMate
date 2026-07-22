@@ -5,6 +5,7 @@ import type { StoryBibleChapterOption } from '@/components/workbench/story-bible
 import { novelApi } from '@/api/modules/novel.api'
 import { outlineApi } from '@/api/modules/outline.api'
 import { chapterApi } from '@/api/modules/chapter.api'
+import { rbacApi } from '@/api/modules/rbac.api'
 import { getSession } from '@/stores/session'
 import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
 import { useWorkbenchContext } from '@/composables/workbench/useWorkbenchContext'
@@ -319,11 +320,22 @@ export const useWorkbenchPageController = () => {
     await logoutCurrentSession()
     await router.replace('/login')
   }
+  const loadAdminAccess = async () => {
+    canAccessRbacAdmin.value = false
+    if (!session.userId) return
+    try {
+      const menus = await rbacApi.listProfileMenus(session.userId)
+      canAccessRbacAdmin.value = (menus || []).some((menu) => String(menu.path || '').startsWith('/admin'))
+    } catch {
+      canAccessRbacAdmin.value = false
+    }
+  }
   const initializeWorkbench = async () => {
     workbenchInitError.value = ''
     username.value = sessionUsername || username.value
     userEmail.value = sessionUserEmail || userEmail.value
     try {
+      await loadAdminAccess()
       const projectId = getCurrentProjectId()
       if (projectId) {
         await loadWorkbenchData(projectId)
