@@ -1,7 +1,5 @@
 package com.penmate.backend.domain.ops.model;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.Instant;
 
@@ -13,7 +11,6 @@ public class OpsMigrationTask {
     /** 数据库物理主键 ID。 */
     private Long id;
     /** 迁移任务业务 ID。 */
-    @JsonSerialize(using = ToStringSerializer.class)
     private Long migrationId;
     /** 迁移任务类型。 */
     private String migrationType;

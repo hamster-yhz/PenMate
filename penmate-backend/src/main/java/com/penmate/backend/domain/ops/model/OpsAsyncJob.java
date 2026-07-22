@@ -1,7 +1,5 @@
 package com.penmate.backend.domain.ops.model;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.time.Instant;
@@ -9,13 +7,10 @@ import java.time.Instant;
 @Data
 public class OpsAsyncJob {
     private Long id;
-    @JsonSerialize(using = ToStringSerializer.class)
     private Long jobId;
     private String jobType;
     private String bizKey;
-    @JsonSerialize(using = ToStringSerializer.class)
     private Long ownerUserId;
-    @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
     private String payloadJson;
     private String resultJson;
