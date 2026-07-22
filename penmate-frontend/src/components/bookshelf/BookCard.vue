@@ -1,203 +1,242 @@
+<template>
+  <article
+    class="book-card"
+    :class="viewMode"
+    data-testid="book-card"
+    role="link"
+    tabindex="0"
+    @click="emit('open', book)"
+    @keydown.enter="emit('open', book)"
+  >
+    <div class="book-cover" :class="`tone-${book.coverTone}`">
+      <img v-if="book.coverUrl" :src="book.coverUrl" :alt="`${book.title}封面`" />
+      <template v-else>
+        <span class="cover-title">{{ book.title }}</span>
+        <span class="cover-genre">{{ book.genre }}</span>
+      </template>
+    </div>
+
+    <div class="book-info">
+      <div class="title-row">
+        <h2>{{ book.title }}</h2>
+        <a-dropdown :trigger="['click']" placement="bottomRight">
+          <button class="more-button" type="button" title="作品操作" @click.stop>
+            <EllipsisOutlined />
+          </button>
+          <template #overlay>
+            <a-menu @click="handleMenuClick">
+              <a-menu-item key="settings"><SettingOutlined />作品设置</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item key="delete" danger><DeleteOutlined />移入回收站</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </div>
+      <p class="book-description">{{ book.description || '暂无简介' }}</p>
+      <div class="book-meta">
+        <span>{{ book.wordCount.toLocaleString('zh-CN') }} 字</span>
+        <span>{{ book.chapterCount }} 章</span>
+        <time v-if="book.updatedAt">{{ formatUpdatedAt(book.updatedAt) }}</time>
+      </div>
+      <div v-if="book.tags.length" class="book-tags">
+        <span v-for="tag in book.tags.slice(0, 4)" :key="tag">{{ tag }}</span>
+      </div>
+    </div>
+  </article>
+</template>
+
 <script setup lang="ts">
-import type { BookshelfBook } from '@/composables/bookshelf/useBookshelf'
+import { Dropdown as ADropdown, Menu as AMenu, MenuDivider as AMenuDivider, MenuItem as AMenuItem } from 'ant-design-vue'
+import { DeleteOutlined, EllipsisOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import type { BookshelfBook, BookshelfViewMode } from '@/composables/bookshelf/useBookshelf'
 
-const props = defineProps<{
-  book: BookshelfBook
-}>()
-
+const props = defineProps<{ book: BookshelfBook; viewMode: BookshelfViewMode }>()
 const emit = defineEmits<{
   open: [BookshelfBook]
-  edit: [BookshelfBook]
+  settings: [BookshelfBook]
   delete: [BookshelfBook]
 }>()
 
-const openBook = () => {
-  emit('open', props.book)
+const handleMenuClick = ({ key, domEvent }: { key: string | number; domEvent: Event }) => {
+  domEvent.stopPropagation()
+  if (key === 'settings') emit('settings', props.book)
+  if (key === 'delete') emit('delete', props.book)
 }
 
-const editBook = () => {
-  emit('edit', props.book)
-}
-
-const deleteBook = () => {
-  emit('delete', props.book)
+const formatUpdatedAt = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(date)
 }
 </script>
 
-<template>
-  <div
-    class="book-card"
-    data-testid="book-card"
-    role="button"
-    tabindex="0"
-    @click="openBook"
-    @keydown.enter="openBook"
-    @keydown.space.prevent="openBook"
-  >
-    <div class="book-cover" :style="{ background: book.coverGradient }">
-      <span class="cover-title">{{ book.title }}</span>
-      <span class="cover-genre">{{ book.genre }}</span>
-    </div>
-    <div class="book-info">
-      <h3 class="book-title">{{ book.title }}</h3>
-      <p class="book-desc">{{ book.description }}</p>
-      <div class="book-meta">
-        <span>{{ book.wordCount }} 字</span>
-        <span>{{ book.chapterCount }} 章</span>
-        <span>{{ book.updatedAt }}</span>
-      </div>
-      <div class="book-tags">
-        <span v-for="tag in book.tags" :key="tag" class="b-tag">{{ tag }}</span>
-      </div>
-    </div>
-    <div class="book-actions" @click.stop>
-      <button type="button" class="ba-btn" data-testid="book-card-edit" title="编辑" @click="editBook">✏️</button>
-      <button type="button" class="ba-btn danger" data-testid="book-card-delete" title="删除" @click="deleteBook">
-        🗑️
-      </button>
-    </div>
-  </div>
-</template>
-
-<style scoped lang="less">
+<style scoped>
 .book-card {
   position: relative;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  min-width: 0;
   overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
   cursor: pointer;
-  transition: all 0.4s var(--ease-silk);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
 
-  &:hover {
-    transform: translateY(-6px);
-    border-color: var(--border-gold);
-    box-shadow: var(--shadow-gold), var(--shadow-lg);
-
-    .book-actions {
-      opacity: 1;
-    }
-
-    .book-cover .cover-title {
-      text-shadow: 0 0 16px rgba(201, 169, 110, 0.5);
-    }
-  }
+.book-card:hover,
+.book-card:focus-visible {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
 }
 
 .book-cover {
-  height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   position: relative;
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 50%, rgba(11, 17, 32, 0.6) 100%);
-  }
+  display: grid;
+  aspect-ratio: 2 / 3;
+  min-height: 0;
+  padding: 20px 16px;
+  place-items: center;
+  color: #ffffff;
+  background: #27332e;
 }
 
+.book-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tone-forest { background: #244c3e; }
+.tone-ink { background: #293847; }
+.tone-plum { background: #57404d; }
+.tone-ocean { background: #31556a; }
+.tone-graphite { background: #414846; }
+
 .cover-title {
-  font-family: var(--font-heading);
-  font-size: 1.4rem;
-  color: var(--xuan-paper);
-  letter-spacing: 0.2em;
-  z-index: 1;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  transition: text-shadow 0.3s;
+  max-width: 100%;
+  font-family: var(--font-writing);
+  font-size: clamp(18px, 1.7vw, 25px);
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .cover-genre {
-  font-size: 0.72rem;
-  color: rgba(245, 237, 214, 0.6);
-  letter-spacing: 0.1em;
-  z-index: 1;
-  padding: 2px 10px;
-  border: 1px solid rgba(245, 237, 214, 0.2);
-  border-radius: 10px;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
 }
 
 .book-info {
-  padding: 16px;
+  min-width: 0;
+  padding: 14px;
 }
 
-.book-title {
-  font-family: var(--font-heading);
-  font-size: 1.05rem;
-  color: var(--xuan-paper);
-  letter-spacing: 0.1em;
-  margin-bottom: 6px;
+.title-row,
+.book-meta,
+.book-tags {
+  display: flex;
+  align-items: center;
 }
 
-.book-desc {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin-bottom: 10px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.title-row {
+  gap: 8px;
+}
+
+h2 {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.more-button:hover {
+  background: var(--bg-subtle);
+}
+
+.book-description {
+  display: -webkit-box;
+  min-height: 40px;
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .book-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 0.72rem;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 12px;
   color: var(--text-muted);
-  margin-bottom: 10px;
+  font-size: 11px;
 }
 
 .book-tags {
-  display: flex;
-  gap: 6px;
   flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
 }
 
-.b-tag {
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.06);
-  border: 1px solid rgba(201, 169, 110, 0.12);
-  border-radius: 8px;
+.book-tags span {
+  padding: 2px 6px;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
 }
 
-.book-actions {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.3s;
-  z-index: 2;
+.book-card.list {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  min-height: 102px;
 }
 
-.ba-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(11, 17, 32, 0.8);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
+.book-card.list .book-cover {
+  width: 68px;
+  min-height: 102px;
+  padding: 8px;
+}
 
-  &:hover {
-    border-color: var(--border-gold);
-  }
+.book-card.list .cover-title {
+  font-size: 11px;
+}
 
-  &.danger:hover {
-    border-color: rgba(192, 60, 45, 0.5);
+.book-card.list .cover-genre {
+  display: none;
+}
+
+.book-card.list .book-description {
+  min-height: auto;
+  -webkit-line-clamp: 1;
+}
+
+@media (max-width: 560px) {
+  .book-cover {
+    aspect-ratio: 3 / 4;
   }
 }
 </style>

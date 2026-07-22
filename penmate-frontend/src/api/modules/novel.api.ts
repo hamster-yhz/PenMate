@@ -1,6 +1,48 @@
 import request from '@/utils/request'
+import type { NovelCoverCrop } from '@/entities/novel/model'
+
+export type { NovelCoverCrop } from '@/entities/novel/model'
 
 export type AnyRecord = Record<string, unknown>
+export type NovelExportFormat = 'txt' | 'docx'
+export interface NovelCoverState extends AnyRecord {
+  coverUrl?: string
+  thumbnailUrl?: string
+  originalUrl?: string
+  uploadId?: string
+  status?: string
+  errorMessage?: string
+  crop?: NovelCoverCrop
+}
+
+export interface NovelDirectoryState {
+  structureRevision: number
+  volumes: AnyRecord[]
+  chapters: AnyRecord[]
+}
+
+export interface MoveNovelDirectoryItemPayload {
+  nodeType: 'VOLUME' | 'CHAPTER'
+  nodeId: string
+  targetVolumeId?: string
+  sortOrder: number
+  expectedStructureRevision: number
+}
+
+export interface NovelTxtImportChapter {
+  title: string
+  content: string
+}
+
+export interface NovelTxtImportVolume {
+  title: string
+  chapters: NovelTxtImportChapter[]
+}
+
+export interface NovelTxtImportPreview {
+  projectTitle: string
+  volumes: NovelTxtImportVolume[]
+}
 
 const normalizeProjectPayload = (payload: AnyRecord) => {
   const next: AnyRecord = { ...payload }
@@ -16,8 +58,19 @@ export const novelApi = {
   listProjects() {
     return request.get<AnyRecord[]>('/v1/novels')
   },
+  listDeletedProjects() {
+    return request.get<AnyRecord[]>('/v1/novels/trash')
+  },
   createProject(payload: AnyRecord) {
     return request.post<AnyRecord>('/v1/novels', normalizeProjectPayload(payload))
+  },
+  previewTxtImport(file: File) {
+    const form = new FormData()
+    form.append('file', file)
+    return request.post<NovelTxtImportPreview>('/v1/novels/imports/txt/preview', form)
+  },
+  importTxtProject(payload: NovelTxtImportPreview) {
+    return request.post<AnyRecord>('/v1/novels/imports/txt', payload)
   },
   getProject(projectId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}`)
@@ -29,8 +82,64 @@ export const novelApi = {
     void _operatorId
     return request.delete<string>(`/v1/novels/${projectId}`)
   },
+  restoreProject(projectId: string) {
+    return request.post<AnyRecord>(`/v1/novels/trash/${projectId}/restore`)
+  },
+  permanentlyDeleteProject(projectId: string, confirmationTitle: string) {
+    return request.delete<string>(`/v1/novels/trash/${projectId}`, {
+      data: { confirmationTitle },
+    })
+  },
+  exportProject(projectId: string, format: NovelExportFormat) {
+    return request.download(`/v1/novels/${projectId}/exports/${format}`)
+  },
+  getCover(projectId: string) {
+    return request.get<NovelCoverState>(`/v1/novels/${projectId}/cover`)
+  },
+  initializeCoverUpload(projectId: string, payload: AnyRecord) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/cover/uploads`, payload)
+  },
+  completeCoverUpload(projectId: string, uploadId: string, uploadToken: string, crop: NovelCoverCrop) {
+    return request.post<NovelCoverState>(`/v1/novels/${projectId}/cover/uploads/${uploadId}/complete`, {
+      uploadToken,
+      crop,
+    })
+  },
+  async uploadCover(projectId: string, file: File, crop: NovelCoverCrop) {
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+    const sha256 = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
+    const initialized = await this.initializeCoverUpload(projectId, {
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      sha256,
+    })
+    const uploadId = String(initialized.uploadId ?? '')
+    const uploadToken = String(initialized.uploadToken ?? '')
+    const uploadUrl = String(initialized.uploadUrl ?? '')
+    if (!uploadId || !uploadToken || !uploadUrl) throw new Error('封面上传初始化响应无效')
+    const uploaded = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    })
+    if (!uploaded.ok) throw new Error(`封面上传失败（HTTP ${uploaded.status}）`)
+    return this.completeCoverUpload(projectId, uploadId, uploadToken, crop)
+  },
+  recropCover(projectId: string, crop: NovelCoverCrop) {
+    return request.post<NovelCoverState>(`/v1/novels/${projectId}/cover/crops`, { crop })
+  },
+  retryCover(projectId: string, uploadId: string) {
+    return request.post<NovelCoverState>(`/v1/novels/${projectId}/cover/uploads/${uploadId}/retry`)
+  },
+  removeCover(projectId: string) {
+    return request.delete<string>(`/v1/novels/${projectId}/cover`)
+  },
   listVolumes(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/volumes`)
+  },
+  getDirectory(projectId: string) {
+    return request.get<NovelDirectoryState>(`/v1/novels/${projectId}/directory`)
   },
   createVolume(projectId: string, _operatorId: string, payload: AnyRecord) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/volumes`, payload)
@@ -54,69 +163,11 @@ export const novelApi = {
   updateChapter(projectId: string, chapterId: string, _operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}`, payload)
   },
-  moveChapter(projectId: string, chapterId: string, _operatorId: string, payload: AnyRecord) {
-    return request.patch<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/position`,
-      payload,
-    )
+  moveDirectoryItem(projectId: string, payload: MoveNovelDirectoryItemPayload) {
+    return request.patch<NovelDirectoryState>(`/v1/novels/${projectId}/directory/position`, payload)
   },
   deleteChapter(projectId: string, chapterId: string, _operatorId: string) {
     void _operatorId
     return request.delete<string>(`/v1/novels/${projectId}/chapters/${chapterId}`)
-  },
-  publishChapter(projectId: string, chapterId: string, _operatorId: string) {
-    void _operatorId
-    return request.post<string>(`/v1/novels/${projectId}/chapters/${chapterId}/publish`)
-  },
-  listChapterVersions(projectId: string, chapterId: string) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/chapters/${chapterId}/versions`)
-  },
-  createChapterVersion(projectId: string, chapterId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/versions`, payload)
-  },
-  getChapterVersion(projectId: string, chapterId: string, versionNo: number) {
-    return request.get<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}`)
-  },
-  restoreChapterVersion(projectId: string, chapterId: string, versionNo: number, _operatorId: string) {
-    void _operatorId
-    return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/restore`,
-    )
-  },
-  getChapterContentUrl(projectId: string, chapterId: string) {
-    return request.get<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-url`)
-  },
-  getChapterContentUploadUrl(projectId: string, chapterId: string) {
-    return request.post<Record<string, string>>(`/v1/novels/${projectId}/chapters/${chapterId}/content-upload-url`)
-  },
-  commitChapterContent(projectId: string, chapterId: string, _operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/content-commit`,
-      payload,
-    )
-  },
-  getChapterVersionSnapshotUrl(projectId: string, chapterId: string, versionNo: number) {
-    return request.get<Record<string, string>>(
-      `/v1/novels/${projectId}/chapters/${chapterId}/versions/${versionNo}/snapshot-url`,
-    )
-  },
-  listOutlineTree(projectId: string) {
-    return request.get<AnyRecord[]>(`/v1/novels/${projectId}/outlines/tree`)
-  },
-  createOutlineNode(projectId: string, _operatorId: string, payload: AnyRecord) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes`, payload)
-  },
-  updateOutlineNode(projectId: string, nodeId: string, _operatorId: string, payload: AnyRecord) {
-    return request.put<AnyRecord>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}`, payload)
-  },
-  moveOutlineNode(projectId: string, nodeId: string, _operatorId: string, payload: AnyRecord) {
-    return request.patch<string>(
-      `/v1/novels/${projectId}/outlines/nodes/${nodeId}/move`,
-      payload,
-    )
-  },
-  deleteOutlineNode(projectId: string, nodeId: string, _operatorId: string) {
-    void _operatorId
-    return request.delete<string>(`/v1/novels/${projectId}/outlines/nodes/${nodeId}`)
   },
 }

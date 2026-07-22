@@ -2,8 +2,9 @@ import { shallowMount, flushPromises } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { pushMock } = vi.hoisted(() => ({
+const { pushMock, replaceMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
+  replaceMock: vi.fn(),
 }))
 
 const { listProfileMenusMock } = vi.hoisted(() => ({
@@ -11,7 +12,8 @@ const { listProfileMenusMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, replace: replaceMock }),
+  useRoute: () => ({ query: {} }),
 }))
 
 vi.mock('@/stores/session', () => ({
@@ -31,35 +33,52 @@ vi.mock('@/api/modules/rbac.api', () => ({
 vi.mock('@/composables/bookshelf/useBookshelf', () => ({
   useBookshelf: () => ({
     books: ref([]),
+    visibleBooks: computed(() => []),
+    trashBooks: ref([]),
+    visibleTrashBooks: computed(() => []),
     loading: ref(false),
+    loadError: ref(''),
     saving: ref(false),
     deleting: ref(false),
-    totalWords: computed(() => 0),
-    totalChapters: computed(() => 0),
+    trashLoading: ref(false),
+    trashError: ref(''),
+    restoringId: ref(''),
+    permanentlyDeletingId: ref(''),
+    lastDeletedBook: ref(null),
+    undoDeleteBusy: ref(false),
+    searchQuery: ref(''),
+    viewMode: ref('grid'),
+    sort: ref('updated-desc'),
     showEditorModal: ref(false),
     showDeleteDialog: ref(false),
-    editingBook: ref(null),
     deletingBook: ref(null),
     bookForm: ref({}),
-    particleStyles: ref([]),
     canSubmit: computed(() => false),
     genres: ref([]),
     loadBooks: vi.fn(),
+    loadTrash: vi.fn(),
     openCreateModal: vi.fn(),
-    openEditModal: vi.fn(),
+    setViewMode: vi.fn(),
+    setSort: vi.fn(),
     closeEditor: vi.fn(),
     submitBook: vi.fn(),
     openDeleteDialog: vi.fn(),
     closeDeleteDialog: vi.fn(),
     confirmDelete: vi.fn(),
+    restoreTrashBook: vi.fn(),
+    permanentlyDeleteTrashBook: vi.fn(),
+    undoDelete: vi.fn(),
+    dismissDeleteUndo: vi.fn(),
   }),
 }))
 
 import MyBooksView from './index.vue'
+import AppTopbar from '@/components/app/AppTopbar.vue'
 
 describe('MyBooks admin RBAC entry', () => {
   beforeEach(() => {
     pushMock.mockReset()
+    replaceMock.mockReset()
     listProfileMenusMock.mockReset()
   })
 
@@ -70,7 +89,7 @@ describe('MyBooks admin RBAC entry', () => {
     await flushPromises()
 
     expect(listProfileMenusMock).toHaveBeenCalledWith(1001)
-    expect(wrapper.text()).toContain('RBAC 管理')
+    expect(wrapper.findComponent(AppTopbar).props('showAdmin')).toBe(true)
   })
 
   it('hides the rbac admin entry when the backend menus do not grant access', async () => {
@@ -80,6 +99,6 @@ describe('MyBooks admin RBAC entry', () => {
     await flushPromises()
 
     expect(listProfileMenusMock).toHaveBeenCalledWith(1001)
-    expect(wrapper.text()).not.toContain('RBAC 管理')
+    expect(wrapper.findComponent(AppTopbar).props('showAdmin')).toBe(false)
   })
 })

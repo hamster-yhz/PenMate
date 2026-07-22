@@ -1,290 +1,309 @@
 <template>
-  <div class="mybooks-page">
-    <div class="particles" aria-hidden="true">
-      <span v-for="(style, index) in particleStyles" :key="index" class="p-dot" :style="style"></span>
-    </div>
+  <div class="app-page bookshelf-page">
+    <AppTopbar
+      context-title="书架"
+      searchable
+      :search-value="searchQuery"
+      search-placeholder="搜索作品、类型或标签"
+      :show-admin="canAccessAdmin"
+      @update:search-value="searchQuery = $event"
+    />
 
-    <nav class="page-nav">
-      <div class="nav-left">
-        <button type="button" class="nav-logo-button" aria-label="返回首页" @click="router.push('/')">
-          <img :src="logoImg" alt="" class="nav-logo" />
-        </button>
-        <span class="nav-brand">笔友 · 书架</span>
-      </div>
-      <div class="nav-right">
-        <button v-if="canAccessRbacAdmin" class="nav-btn" @click="router.push('/admin/rbac')">
-          <span>🛡️ RBAC 管理</span>
-        </button>
-        <button class="nav-btn" @click="router.push('/profile')">
-          <div class="avatar-sm">{{ userInfo.name.charAt(0) }}</div>
-          <span>{{ userInfo.name }}</span>
-        </button>
-      </div>
-    </nav>
+    <main class="app-content">
+      <BookActionBar
+        :book-count="collection === 'trash' ? trashBooks.length : books.length"
+        :view-mode="viewMode"
+        :sort="sort"
+        :collection="collection"
+        @create="openCreateModal"
+        @import="openImportDialog"
+        @update:collection="setCollection"
+        @update:view-mode="setViewMode"
+        @update:sort="setSort"
+      />
 
-    <div class="page-body">
-      <BookStatsBar :book-count="books.length" :total-words="totalWords" :total-chapters="totalChapters" />
+      <section v-if="collection === 'books' && loading" class="book-grid" :class="viewMode" aria-label="正在加载作品">
+        <div v-for="item in 6" :key="item" class="book-skeleton surface">
+          <div class="skeleton-cover"></div>
+          <div class="skeleton-copy">
+            <span class="skeleton-line title"></span>
+            <span class="skeleton-line"></span>
+            <span class="skeleton-line short"></span>
+          </div>
+        </div>
+      </section>
 
-      <BookActionBar @create="openCreateModal" />
+      <section v-else-if="collection === 'books' && loadError" class="error-panel surface" role="alert">
+        <WarningOutlined class="state-icon" />
+        <p>{{ loadError }}</p>
+        <button type="button" @click="loadBooks"><ReloadOutlined />重试</button>
+      </section>
 
-      <div class="book-grid">
+      <section v-else-if="collection === 'books' && visibleBooks.length" class="book-grid" :class="viewMode" aria-label="作品列表">
         <BookCard
-          v-for="book in books"
+          v-for="book in visibleBooks"
           :key="book.id"
           :book="book"
+          :view-mode="viewMode"
           @open="openBook"
-          @edit="openEditModal"
+          @settings="openProjectSettings"
           @delete="openDeleteDialog"
         />
+      </section>
 
-        <div v-if="!loading && books.length === 0" class="empty-state">
-          <span class="empty-icon">📚</span>
-          <p>你的书架空空如也</p>
-          <p class="empty-sub">点击「创建新书」开始你的创作之旅</p>
+      <section v-else-if="collection === 'books'" class="empty-panel surface">
+        <BookOutlined class="state-icon" />
+        <h2>{{ searchQuery ? '没有匹配的作品' : '开始你的第一部作品' }}</h2>
+        <p>{{ searchQuery ? '尝试更换关键词。' : '创建后会自动生成第一卷和第一章。' }}</p>
+        <button v-if="!searchQuery" type="button" class="empty-create" @click="openCreateModal">
+          <PlusOutlined />新建作品
+        </button>
+      </section>
+
+      <section v-else-if="trashLoading" class="trash-list" aria-label="正在加载回收站">
+        <div v-for="item in 4" :key="item" class="trash-skeleton surface">
+          <span></span><div><i></i><i></i></div>
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section v-else-if="trashError" class="error-panel surface" role="alert">
+        <WarningOutlined class="state-icon" />
+        <p>{{ trashError }}</p>
+        <button type="button" @click="loadTrash"><ReloadOutlined />重试</button>
+      </section>
+
+      <template v-else-if="visibleTrashBooks.length">
+        <p v-if="trashActionError" class="trash-action-error" role="alert">{{ trashActionError }}</p>
+        <section class="trash-list" aria-label="回收站作品">
+          <TrashBookRow
+            v-for="book in visibleTrashBooks"
+            :key="book.id"
+            :book="book"
+            :restoring="restoringId === book.id"
+            :deleting="permanentlyDeletingId === book.id"
+            @restore="handleRestoreBook"
+            @permanent-delete="openPermanentDeleteDialog"
+          />
+        </section>
+      </template>
+
+      <section v-else class="empty-panel surface">
+        <DeleteOutlined class="state-icon" />
+        <h2>{{ searchQuery ? '没有匹配的已删除作品' : '回收站是空的' }}</h2>
+        <p>{{ searchQuery ? '尝试更换关键词。' : '移入回收站的作品会在这里保留 30 天。' }}</p>
+      </section>
+    </main>
 
     <BookEditorModal
       :visible="showEditorModal"
-      :editing="Boolean(editingBook)"
       :form="bookForm"
       :genres="genres"
       :can-submit="canSubmit"
       :saving="saving"
+      :error="createError"
       @update:visible="handleEditorVisibilityChange"
-      @submit="submitBook"
+      @submit="handleCreateBook"
+    />
+
+    <BookImportDialog
+      :visible="showImportDialog"
+      @close="closeImportDialog"
+      @imported="handleImportedProject"
     />
 
     <DeleteBookDialog
       :visible="showDeleteDialog"
       :deleting="deleting"
       :book="deletingBook"
+      :error="deleteError"
       @update:visible="handleDeleteVisibilityChange"
-      @confirm="confirmDelete"
+      @confirm="handleConfirmDelete"
     />
+
+    <PermanentlyDeleteBookDialog
+      :visible="showPermanentDeleteDialog"
+      :book="permanentDeleteBook"
+      :deleting="Boolean(permanentlyDeletingId)"
+      :error="trashActionError"
+      @close="closePermanentDeleteDialog"
+      @confirm="handlePermanentDelete"
+    />
+
+    <div v-if="lastDeletedBook" class="undo-toast" role="status">
+      <span>“{{ lastDeletedBook.title }}”已移入回收站</span>
+      <button type="button" :disabled="undoDeleteBusy" @click="handleUndoDelete">
+        <LoadingOutlined v-if="undoDeleteBusy" spin />
+        <RollbackOutlined v-else />
+        {{ undoDeleteBusy ? '正在恢复' : '撤销' }}
+      </button>
+      <button type="button" class="dismiss-toast" title="关闭" :disabled="undoDeleteBusy" @click="dismissDeleteUndo">
+        <CloseOutlined />
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import logoImg from '@/assets/images/logo.webp'
-import { rbacApi } from '@/api/modules/rbac.api'
+import { BookOutlined, CloseOutlined, DeleteOutlined, LoadingOutlined, PlusOutlined, ReloadOutlined, RollbackOutlined, WarningOutlined } from '@ant-design/icons-vue'
+import AppTopbar from '@/components/app/AppTopbar.vue'
 import BookActionBar from '@/components/bookshelf/BookActionBar.vue'
 import BookCard from '@/components/bookshelf/BookCard.vue'
 import BookEditorModal from '@/components/bookshelf/BookEditorModal.vue'
-import BookStatsBar from '@/components/bookshelf/BookStatsBar.vue'
+import BookImportDialog from '@/components/bookshelf/BookImportDialog.vue'
 import DeleteBookDialog from '@/components/bookshelf/DeleteBookDialog.vue'
-import { useBookshelf, type BookshelfBook } from '@/composables/bookshelf/useBookshelf'
-import { getSession } from '@/stores/session'
-
-const router = useRouter()
-const session = getSession()
-const adminMenuPaths = ref<string[]>([])
-const canAccessRbacAdmin = computed(() => adminMenuPaths.value.includes('/admin/rbac'))
-
-const userInfo = reactive({
-  name: '墨客',
-  email: 'moke@penmate.com',
-})
+import PermanentlyDeleteBookDialog from '@/components/bookshelf/PermanentlyDeleteBookDialog.vue'
+import TrashBookRow from '@/components/bookshelf/TrashBookRow.vue'
+import { useBookshelfPage } from '@/features/bookshelf/useBookshelfPage'
 
 const {
   books,
+  trashBooks,
+  visibleBooks,
+  visibleTrashBooks,
   loading,
+  loadError,
   saving,
   deleting,
-  totalWords,
-  totalChapters,
+  trashLoading,
+  trashError,
+  restoringId,
+  permanentlyDeletingId,
+  lastDeletedBook,
+  undoDeleteBusy,
+  searchQuery,
+  viewMode,
+  sort,
   showEditorModal,
   showDeleteDialog,
-  editingBook,
+  showImportDialog,
   deletingBook,
   bookForm,
-  particleStyles,
   canSubmit,
   genres,
   loadBooks,
+  loadTrash,
+  setViewMode,
+  setSort,
   openCreateModal,
-  openEditModal,
-  closeEditor,
-  submitBook,
   openDeleteDialog,
-  closeDeleteDialog,
-  confirmDelete,
-} = useBookshelf()
-
-const openBook = (book: BookshelfBook) => {
-  router.push({
-    path: '/workbench',
-    query: {
-      projectId: book.id,
-      ...(session.userId ? { operatorId: String(session.userId) } : {}),
-    },
-  })
-}
-
-const handleEditorVisibilityChange = (visible: boolean) => {
-  if (!visible) {
-    closeEditor()
-  }
-}
-
-const handleDeleteVisibilityChange = (visible: boolean) => {
-  if (!visible) {
-    closeDeleteDialog()
-  }
-}
-
-onMounted(() => {
-  if (session.userName) userInfo.name = session.userName
-  if (session.userEmail) userInfo.email = session.userEmail
-  if (session.userId) {
-    void rbacApi
-      .listProfileMenus(session.userId)
-      .then((menus) => {
-        adminMenuPaths.value = (menus || [])
-          .map((menu) => String((menu as Record<string, unknown>)?.path || ''))
-          .filter(Boolean)
-      })
-      .catch(() => {
-        adminMenuPaths.value = []
-      })
-  }
-  loadBooks()
-})
+  createError,
+  deleteError,
+  trashActionError,
+  collection,
+  permanentDeleteBook,
+  showPermanentDeleteDialog,
+  canAccessAdmin,
+  openBook,
+  openProjectSettings,
+  openImportDialog,
+  closeImportDialog,
+  handleImportedProject,
+  handleCreateBook,
+  handleConfirmDelete,
+  setCollection,
+  handleRestoreBook,
+  openPermanentDeleteDialog,
+  closePermanentDeleteDialog,
+  handlePermanentDelete,
+  handleUndoDelete,
+  dismissDeleteUndo,
+  handleEditorVisibilityChange,
+  handleDeleteVisibilityChange,
+} = useBookshelfPage()
 </script>
 
-<style lang="less">
-.mybooks-page {
-  min-height: 100vh;
-  background: var(--bg-primary);
-  position: relative;
-}
-
-.particles {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.p-dot {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--amber-gold), transparent);
-  animation: particleDrift linear infinite;
-}
-
-.page-nav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 32px;
-  background: rgba(11, 17, 32, 0.9);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.nav-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.nav-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  cursor: pointer;
-}
-
-.nav-logo-button {
-  display: inline-flex;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.nav-brand {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  color: var(--amber-gold);
-  letter-spacing: 0.2em;
-}
-
-.nav-right {
-  display: flex;
-  align-items: center;
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: none;
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.3s;
-
-  &:hover {
-    border-color: var(--border-gold);
-    color: var(--amber-gold);
-  }
-}
-
-.avatar-sm {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(201, 169, 110, 0.3), rgba(201, 169, 110, 0.1));
-  border: 1px solid var(--border-gold);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-heading);
-  font-size: 0.8rem;
-  color: var(--amber-gold);
-}
-
-.page-body {
-  position: relative;
-  z-index: 1;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 32px 24px 64px;
-}
-
-.book-grid {
+<style scoped>
+.book-grid.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(174px, 1fr));
+  gap: 18px;
 }
 
-.empty-state {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 60px 20px;
+.book-grid.list {
+  display: grid;
+  gap: 10px;
+}
+
+.trash-list { display: grid; gap: 9px; }
+.trash-action-error { margin-bottom: 10px; padding: 9px 11px; color: var(--danger); background: var(--danger-soft); border: 1px solid var(--danger-border); font-size: 12px; }
+.trash-skeleton { display: grid; grid-template-columns: 58px 1fr; gap: 14px; padding: 12px; }
+.trash-skeleton > span { aspect-ratio: 2 / 3; background: var(--bg-muted); animation: skeleton-pulse 1.4s ease-in-out infinite; }
+.trash-skeleton > div { display: grid; align-content: center; gap: 10px; }
+.trash-skeleton i { display: block; width: min(320px, 70%); height: 12px; background: var(--bg-muted); animation: skeleton-pulse 1.4s ease-in-out infinite; }
+.trash-skeleton i + i { width: min(220px, 45%); }
+.undo-toast { position: fixed; right: 22px; bottom: 22px; z-index: 500; display: flex; max-width: min(460px, calc(100vw - 28px)); align-items: center; gap: 12px; padding: 10px 10px 10px 14px; color: var(--text-primary); background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); font-size: 12px; }
+.undo-toast > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-toast button { display: inline-flex; flex: 0 0 auto; min-height: 30px; align-items: center; gap: 5px; padding: 0 8px; color: var(--accent); background: transparent; border: 0; border-radius: var(--radius-sm); cursor: pointer; }
+.undo-toast button:hover { background: var(--accent-soft); }
+.undo-toast .dismiss-toast { width: 30px; padding: 0; justify-content: center; color: var(--text-muted); }
+
+.book-skeleton {
+  overflow: hidden;
+}
+
+.grid .book-skeleton .skeleton-cover {
+  aspect-ratio: 2 / 3;
+  background: var(--bg-muted);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.list .book-skeleton {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  min-height: 102px;
+}
+
+.list .book-skeleton .skeleton-cover {
+  background: var(--bg-muted);
+}
+
+.skeleton-copy {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 15px;
+}
+
+.skeleton-line.title { width: 68%; }
+.skeleton-line.short { width: 44%; }
+
+.state-icon {
   color: var(--text-muted);
+  font-size: 28px;
 }
 
-.empty-icon {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 16px;
+.empty-panel {
+  gap: 9px;
 }
 
-.empty-sub {
-  font-size: 0.82rem;
-  margin-top: 4px;
+.empty-panel h2 {
+  font-size: 17px;
+}
+
+.empty-panel p {
+  font-size: 13px;
+}
+
+.empty-create,
+.error-panel button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 0 13px;
+  color: var(--text-inverse);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .book-grid.grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .undo-toast { right: 14px; bottom: 14px; left: 14px; }
 }
 </style>

@@ -139,6 +139,12 @@ const request = {
   delete<T>(url: string, config?: RequestOptions) {
     return requestRaw.delete<ApiEnvelope<T>>(url, config).then((res) => unwrap<T>(res.data))
   },
+  download(url: string, config?: RequestOptions) {
+    return requestRaw.get<Blob>(url, { ...config, responseType: 'blob' }).then((res) => ({
+      blob: res.data,
+      contentDisposition: String(res.headers['content-disposition'] || ''),
+    }))
+  },
 }
 
 export default request
