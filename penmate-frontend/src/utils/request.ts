@@ -2,6 +2,7 @@ import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 
 import { parse, isSafeNumber, toSafeNumberOrThrow } from 'lossless-json'
 import type { ApiEnvelope, ApiErrorPayload, AppError } from '@/api/types'
 import { expireSession, getSession, setSession } from '@/stores/session'
+import { withLocalStorageMutex } from '@/utils/browserMutex'
 
 export interface RequestOptions extends AxiosRequestConfig {
   skipAuth?: boolean
@@ -42,6 +43,14 @@ const requestRaw = axios.create({
 })
 
 let refreshPromise: Promise<string> | null = null
+const authChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('penmate.auth')
+
+authChannel?.addEventListener('message', (event: MessageEvent<{ type?: string; accessToken?: string }>) => {
+  if (event.data?.type === 'token' && event.data.accessToken) {
+    setSession({ accessToken: event.data.accessToken })
+  }
+  if (event.data?.type === 'logout') expireSession()
+})
 
 const createTraceId = () => {
   const random = Math.random().toString(36).slice(2, 10)
@@ -68,12 +77,28 @@ const refreshToken = async () => {
     throw new Error('刷新令牌失败：缺少 accessToken')
   }
   setSession({ accessToken })
+  authChannel?.postMessage({ type: 'token', accessToken })
   return accessToken
 }
 
+const refreshWithBrowserLock = async () => {
+  const tokenBeforeWaiting = getSession().accessToken
+  const refreshAfterWaiting = async () => {
+    const latestToken = getSession().accessToken
+    if (latestToken && latestToken !== tokenBeforeWaiting) return latestToken
+    return refreshToken()
+  }
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request('penmate.auth.refresh', refreshAfterWaiting)
+  }
+  return withLocalStorageMutex('penmate.auth.refresh.lock', refreshAfterWaiting)
+}
+
+export const broadcastSessionLogout = () => authChannel?.postMessage({ type: 'logout' })
+
 export const refreshAccessToken = () => {
   if (!refreshPromise) {
-    refreshPromise = refreshToken()
+    refreshPromise = refreshWithBrowserLock()
       .catch((error) => {
         expireSession()
         throw error
@@ -116,7 +141,10 @@ requestRaw.interceptors.response.use(
         return Promise.reject(refreshErr)
       }
     }
-    const errorPayload = (error?.response?.data || {}) as ApiErrorPayload
+    const responseData = error?.response?.data
+    const errorPayload = responseData instanceof Blob
+      ? parseJsonLosslessly(await responseData.text()) as ApiErrorPayload
+      : (responseData || {}) as ApiErrorPayload
     return Promise.reject(toAppError(errorPayload, status))
   },
 )

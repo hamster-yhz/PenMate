@@ -1,5 +1,6 @@
 import { authApi } from '@/api/modules/auth.api'
 import { clearSession, getSession } from '@/stores/session'
+import { broadcastSessionLogout } from '@/utils/request'
 
 let logoutPromise: Promise<void> | null = null
 
@@ -13,6 +14,7 @@ export const logoutCurrentSession = () => {
       }
     } finally {
       clearSession()
+      broadcastSessionLogout()
       logoutPromise = null
     }
   })()
