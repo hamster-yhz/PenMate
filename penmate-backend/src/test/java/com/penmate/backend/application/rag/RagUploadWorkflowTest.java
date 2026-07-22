@@ -1,7 +1,7 @@
 package com.penmate.backend.application.rag;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.ops.AsyncJobQueueService;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
@@ -38,11 +38,13 @@ class RagUploadWorkflowTest {
     @Mock private ObjectStorageService storage;
     @Mock private DocumentContentParser parser;
     @Mock private AsyncJobQueueService jobs;
+    @Mock private JsonCodec jsonCodec;
     private RagApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new RagApplicationService(documents, uploads, novels, ids, retrieval, storage, parser, jobs, new ObjectMapper());
+        service = new RagApplicationService(documents, uploads, novels, ids, retrieval, storage, parser, jobs,
+                jsonCodec, new RagApplicationSettings(10_485_760L, 15L));
         NovelProject project = new NovelProject();
         project.setProjectId(101L);
         project.setOwnerUserId(7L);
@@ -68,6 +70,7 @@ class RagUploadWorkflowTest {
 
     @Test
     void completeValidatesObjectAndEnqueuesParseOnlyAfterDocumentInsert() {
+        when(jsonCodec.write(any())).thenReturn("{}");
         byte[] content = "hello world".getBytes(StandardCharsets.UTF_8);
         RagUploadSession session = session(content.length);
         String token = "upload-secret";

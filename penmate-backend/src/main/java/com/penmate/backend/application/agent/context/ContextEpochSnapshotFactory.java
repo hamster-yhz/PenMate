@@ -1,9 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
@@ -24,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,14 +33,14 @@ public class ContextEpochSnapshotFactory {
     private final StoryBibleRepository storyBibles;
     private final NovelGateway novels;
     private final StoryBibleEffectiveStateResolver effectiveStates;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
     public ContextEpochSnapshotFactory(StoryBibleRepository storyBibles, NovelGateway novels,
-                                       StoryBibleEffectiveStateResolver effectiveStates, ObjectMapper objectMapper) {
+                                       StoryBibleEffectiveStateResolver effectiveStates, JsonCodec jsonCodec) {
         this.storyBibles = storyBibles;
         this.novels = novels;
         this.effectiveStates = effectiveStates;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -141,22 +140,17 @@ public class ContextEpochSnapshotFactory {
 
     private String currentStateSummary(StoryBibleEffectiveStateResolver.EffectiveState state) {
         if (state == null) return "";
-        var summary = objectMapper.createObjectNode();
-        copy(summary, state.state(), "title");
-        copy(summary, state.state(), "summary");
-        copy(summary, state.state(), "attributes");
-        summary.putPOJO("appliedProgressionIds", state.appliedProgressionIds());
-        summary.putPOJO("stateFlags", stateFlags(state));
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("title", state.state().get("title"));
+        summary.put("summary", state.state().get("summary"));
+        summary.put("attributes", state.state().get("attributes"));
+        summary.put("appliedProgressionIds", state.appliedProgressionIds());
+        summary.put("stateFlags", stateFlags(state));
         try {
-            return objectMapper.writeValueAsString(summary);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(summary);
+        } catch (RuntimeException ex) {
             throw BusinessException.of("Failed to serialize Story Bible current state summary");
         }
-    }
-
-    private void copy(com.fasterxml.jackson.databind.node.ObjectNode target, JsonNode source, String field) {
-        JsonNode value = source == null ? null : source.get(field);
-        if (value == null) target.putNull(field); else target.set(field, value);
     }
 
     private List<String> stateFlags(StoryBibleEffectiveStateResolver.EffectiveState state) {

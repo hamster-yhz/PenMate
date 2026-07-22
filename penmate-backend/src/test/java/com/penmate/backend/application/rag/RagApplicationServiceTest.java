@@ -6,10 +6,16 @@ import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.domain.rag.model.RagDocument;
 import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.repository.RagDocumentRepository;
+import com.penmate.backend.domain.rag.repository.RagUploadSessionRepository;
+import com.penmate.backend.domain.novel.repository.NovelGateway;
+import com.penmate.backend.domain.rag.service.DocumentContentParser;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
+import com.penmate.backend.domain.shared.service.ObjectStorageService;
+import com.penmate.backend.application.ops.AsyncJobQueueService;
+import com.penmate.backend.application.common.serialization.JsonCodec;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,8 +43,29 @@ class RagApplicationServiceTest extends BaseApplicationServiceTest {
     @Mock
     private BusinessIdGenerator businessIdGenerator;
 
-    @InjectMocks
+    @Mock private RagUploadSessionRepository ragUploadSessionRepository;
+    @Mock private NovelGateway novelGateway;
+    @Mock private ObjectStorageService objectStorageService;
+    @Mock private DocumentContentParser documentContentParser;
+    @Mock private AsyncJobQueueService asyncJobQueueService;
+    @Mock private JsonCodec jsonCodec;
+
     private RagApplicationService ragApplicationService;
+
+    @BeforeEach
+    void setUp() {
+        ragApplicationService = new RagApplicationService(
+                ragDocumentRepository,
+                ragUploadSessionRepository,
+                novelGateway,
+                businessIdGenerator,
+                ragRetrievalService,
+                objectStorageService,
+                documentContentParser,
+                asyncJobQueueService,
+                jsonCodec,
+                new RagApplicationSettings(10_485_760L, 15L));
+    }
 
     @Test
     void UT_APP_RAG_LIST_DOCUMENTS_SUCCESS() {

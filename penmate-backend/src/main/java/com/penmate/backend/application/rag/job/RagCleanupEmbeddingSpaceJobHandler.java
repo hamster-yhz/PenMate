@@ -1,20 +1,21 @@
 package com.penmate.backend.application.rag.job;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.ops.AsyncJobExecutionContext;
 import com.penmate.backend.application.ops.AsyncJobHandler;
 import com.penmate.backend.domain.ops.model.OpsAsyncJob;
 import com.penmate.backend.domain.rag.repository.RagIndexRepository;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Component
 public class RagCleanupEmbeddingSpaceJobHandler implements AsyncJobHandler {
-    private final ObjectMapper mapper;
+    private final JsonCodec jsonCodec;
     private final RagIndexRepository indexes;
 
-    public RagCleanupEmbeddingSpaceJobHandler(ObjectMapper mapper, RagIndexRepository indexes) {
-        this.mapper = mapper;
+    public RagCleanupEmbeddingSpaceJobHandler(JsonCodec jsonCodec, RagIndexRepository indexes) {
+        this.jsonCodec = jsonCodec;
         this.indexes = indexes;
     }
 
@@ -22,10 +23,10 @@ public class RagCleanupEmbeddingSpaceJobHandler implements AsyncJobHandler {
 
     @Override
     public String execute(OpsAsyncJob job, AsyncJobExecutionContext context) {
-        JsonNode payload = RagJobPayload.parse(mapper, job);
+        Map<String, Object> payload = RagJobPayload.parse(jsonCodec, job);
         long buildId = RagJobPayload.requiredLong(payload, "buildId");
         indexes.deleteBuild(buildId);
         context.heartbeat(1, 1, "Staged index build removed");
-        return "{\"cleanedBuildId\":" + buildId + "}";
+        return jsonCodec.write(Map.of("cleanedBuildId", buildId));
     }
 }

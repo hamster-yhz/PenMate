@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
@@ -35,7 +36,7 @@ class AgentRunContextArtifactServiceTest {
         ObjectStorageService storage = mock(ObjectStorageService.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         AgentRunContextArtifactService service = new AgentRunContextArtifactService(
-                artifacts, mock(BusinessIdGenerator.class), storage, objectMapper);
+                artifacts, mock(BusinessIdGenerator.class), storage, new JacksonJsonCodec(objectMapper));
 
         var trace = new StoryBibleRetrievalTrace(false, 1, 2, 3, 0, 4,
                 List.of(new StoryBibleRetrievalTrace.Candidate(71L, 90d, List.of("exact_alias:Mira"))));
@@ -75,7 +76,8 @@ class AgentRunContextArtifactServiceTest {
         ObjectStorageService storage = mock(ObjectStorageService.class);
         BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
         AgentRunContextArtifactService service = new AgentRunContextArtifactService(
-                artifacts, ids, storage, new ObjectMapper().findAndRegisterModules());
+                artifacts, ids, storage,
+                new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()));
         when(ids.nextId()).thenReturn(88L);
         when(storage.putText(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
             String content = invocation.getArgument(1);
@@ -97,7 +99,8 @@ class AgentRunContextArtifactServiceTest {
         ObjectStorageService storage = mock(ObjectStorageService.class);
         BusinessIdGenerator ids = mock(BusinessIdGenerator.class);
         ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
-        AgentRunContextArtifactService service = new AgentRunContextArtifactService(artifacts, ids, storage, mapper);
+        AgentRunContextArtifactService service = new AgentRunContextArtifactService(
+                artifacts, ids, storage, new JacksonJsonCodec(mapper));
         AtomicReference<String> storedContent = new AtomicReference<>();
         when(ids.nextId()).thenReturn(88L);
         when(storage.putText(anyString(), anyString(), anyString())).thenAnswer(invocation -> {

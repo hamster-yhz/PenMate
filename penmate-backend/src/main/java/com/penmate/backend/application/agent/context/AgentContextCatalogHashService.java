@@ -1,15 +1,15 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HexFormat;
 
@@ -18,14 +18,14 @@ public class AgentContextCatalogHashService {
     private final SystemPromptProvider prompts;
     private final SkillPromptRegistry skills;
     private final AgentToolDefinitionSource tools;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
     public AgentContextCatalogHashService(SystemPromptProvider prompts, SkillPromptRegistry skills,
-                                          AgentToolDefinitionSource tools, ObjectMapper objectMapper) {
+                                          AgentToolDefinitionSource tools, JsonCodec jsonCodec) {
         this.prompts = prompts;
         this.skills = skills;
         this.tools = tools;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
     }
 
     public Hashes hashes(String executionProfile) {
@@ -42,9 +42,9 @@ public class AgentContextCatalogHashService {
 
     private String hash(Object value) {
         try {
-            byte[] encoded = objectMapper.writeValueAsBytes(value);
+            byte[] encoded = jsonCodec.write(value).getBytes(StandardCharsets.UTF_8);
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(encoded));
-        } catch (JsonProcessingException ex) {
+        } catch (RuntimeException ex) {
             throw BusinessException.of("Failed to hash Agent context catalog");
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 unavailable", ex);

@@ -29,7 +29,7 @@ class StoryBibleRoutingPreferenceResolverTest {
         when(sessions.findSession(20L, 30L)).thenReturn(AgentSession.active(30L, 20L, 9L, "Draft"));
         when(novels.findProjectById(20L)).thenReturn(project(20L, 9L));
         when(preferences.findProjectPreference(20L)).thenReturn(
-                new AgentRoutingPreference(20L, "RETRIEVAL_THEN_LLM", 70L, 80L, "ACTIVE"));
+                new AgentRoutingPreference(20L, "RETRIEVAL_THEN_LLM", 70L, 80L, "READY"));
         ModelConfiguration router = new ModelConfiguration();
         router.setModelType("CHAT");
         router.setStatus("ACTIVE");

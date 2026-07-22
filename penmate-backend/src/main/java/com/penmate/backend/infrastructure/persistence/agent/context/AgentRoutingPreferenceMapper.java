@@ -1,9 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.agent.context;
 
 import com.penmate.backend.domain.agent.context.model.AgentRoutingPreference;
-import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 
 public interface AgentRoutingPreferenceMapper {
 
@@ -15,13 +13,4 @@ public interface AgentRoutingPreferenceMapper {
             """)
     AgentRoutingPreference findProjectPreference(Long projectId);
 
-    @Update("""
-            UPDATE project_ai_configurations
-            SET story_bible_routing_mode = #{routingMode}, router_model_config_id = #{routerModelConfigId},
-                updated_at = CURRENT_TIMESTAMP(3)
-            WHERE project_id = #{projectId}
-            """)
-    int updateProjectPreference(@Param("projectId") Long projectId,
-                                @Param("routingMode") String routingMode,
-                                @Param("routerModelConfigId") Long routerModelConfigId);
 }

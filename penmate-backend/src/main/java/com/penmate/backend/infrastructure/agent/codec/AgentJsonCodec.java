@@ -5,6 +5,8 @@ import cn.hutool.json.JSONConfig;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 
+/** @deprecated Infrastructure callers should migrate to {@code JsonCodec} where practical. */
+@Deprecated(forRemoval = false)
 public final class AgentJsonCodec {
 
     private static final JSONConfig CONFIG = JSONConfig.create().setIgnoreNullValue(false);

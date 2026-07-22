@@ -1,19 +1,17 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
-import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
+import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,13 +42,13 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
                     """);
 
     private final AgentLlmInvocationService llmInvocations;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final String systemPrompt;
 
-    public DefaultStoryBibleSelectorGateway(AgentLlmInvocationService llmInvocations, ObjectMapper objectMapper,
+    public DefaultStoryBibleSelectorGateway(AgentLlmInvocationService llmInvocations, JsonCodec jsonCodec,
                                             SystemPromptProvider promptProvider) {
         this.llmInvocations = llmInvocations;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.systemPrompt = promptProvider.loadBundle("context-selector", "default").assembledPrompt();
     }
 
@@ -61,12 +59,7 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
         List<StoryBibleRouteRequest.CatalogEntry> catalog = request.catalog();
         Set<Long> allowed = catalog.stream().map(StoryBibleRouteRequest.CatalogEntry::nodeId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        String catalogJson;
-        try {
-            catalogJson = objectMapper.writeValueAsString(catalog);
-        } catch (JsonProcessingException ex) {
-            throw BusinessException.of("Failed to serialize Story Bible selector catalog");
-        }
+        String catalogJson = json(catalog);
         boolean stableCatalog = request.mode() == StoryBibleRoutingMode.LLM_SELECTOR;
         String stableSystem = stableCatalog
                 ? systemPrompt + "\n\nSELECTOR_CATALOG_JSON:\n" + catalogJson
@@ -82,107 +75,119 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
         List<AgentLlmToolCall> calls = response.toolCalls().stream()
                 .filter(item -> TOOL_CODE.equals(item.toolCode())).toList();
         if (response.toolCalls().size() != 1 || calls.size() != 1) {
-            throw BusinessException.badRequest("Story Bible selector did not return exactly one required structured output");
+            throw BusinessException.badRequest(
+                    "Story Bible selector did not return exactly one required structured output");
         }
-        AgentLlmToolCall call = calls.getFirst();
-        return parse(call.argumentsJson(), catalog, allowed, response.tokenUsage());
+        return parse(calls.getFirst().argumentsJson(), catalog, allowed, response.tokenUsage());
     }
 
     private Selection parse(String value, List<StoryBibleRouteRequest.CatalogEntry> catalog, Set<Long> allowed,
                             com.penmate.backend.domain.agent.run.model.LlmTokenUsage tokenUsage) {
+        Map<String, Object> root;
         try {
-            JsonNode root = objectMapper.readTree(value);
-            JsonNode selected = root == null ? null : root.get("selectedNodeIds");
-            if (selected == null || !selected.isArray()) {
-                throw BusinessException.badRequest("Story Bible selector returned invalid structured output");
-            }
-            List<Long> ids = new ArrayList<>();
-            for (JsonNode item : selected) {
-                Long id = parseId(item);
-                if (!allowed.contains(id)) throw BusinessException.badRequest("Story Bible selector returned an unknown node ID");
-                if (!ids.contains(id)) ids.add(id);
-            }
-            List<Long> relationExpansion = ids(root.get("relationExpansion"), "relationExpansion", allowed);
-            Set<Long> adjacent = new LinkedHashSet<>();
-            catalog.stream().filter(entry -> ids.contains(entry.nodeId())).forEach(entry ->
-                    entry.keyRelations().forEach(relation -> adjacent.add(relation.otherNodeId())));
-            if (!adjacent.containsAll(relationExpansion)) {
-                throw BusinessException.badRequest("Story Bible selector returned a non-adjacent relation expansion ID");
-            }
-            Map<Long, String> reasons = new LinkedHashMap<>();
-            JsonNode reasonNode = root.get("selectionReasons");
-            if (reasonNode == null || !reasonNode.isObject()) {
-                throw BusinessException.badRequest("Story Bible selector returned invalid selectionReasons");
-            }
-            var fields = reasonNode.fields();
-            while (fields.hasNext()) {
-                var entry = fields.next();
-                long reasonId;
-                try {
-                    reasonId = Long.parseLong(entry.getKey());
-                } catch (NumberFormatException ex) {
-                    throw BusinessException.badRequest("Story Bible selector returned an invalid selection reason ID");
-                }
-                if (!ids.contains(reasonId) || !entry.getValue().isTextual()) {
-                    throw BusinessException.badRequest("Story Bible selector reasons must reference selected node IDs");
-                }
-                reasons.put(reasonId, entry.getValue().asText().trim());
-            }
-            if (!reasons.keySet().containsAll(ids)) {
-                throw BusinessException.badRequest("Story Bible selector must explain every selected node ID");
-            }
-            List<String> intentTags = strings(root.get("intentTags"), "intentTags");
-            List<String> missingFlags = strings(root.get("missingContextFlags"), "missingContextFlags");
-            JsonNode confidenceNode = root.get("confidence");
-            if (confidenceNode == null || !confidenceNode.isNumber()
-                    || confidenceNode.asDouble() < 0d || confidenceNode.asDouble() > 1d) {
-                throw BusinessException.badRequest("Story Bible selector confidence must be between 0 and 1");
-            }
-            return new Selection(intentTags, ids, relationExpansion, reasons, missingFlags,
-                    confidenceNode.asDouble(), tokenUsage);
-        } catch (JsonProcessingException ex) {
+            root = jsonCodec.readObject(value);
+        } catch (RuntimeException exception) {
             throw BusinessException.badRequest("Story Bible selector returned invalid JSON");
         }
+        Object selectedValue = root.get("selectedNodeIds");
+        if (!(selectedValue instanceof List<?> selectedValues)) {
+            throw BusinessException.badRequest("Story Bible selector returned invalid structured output");
+        }
+        List<Long> selectedIds = ids(selectedValues, "selectedNodeIds", allowed);
+        List<Long> relationExpansion = ids(root.get("relationExpansion"), "relationExpansion", allowed);
+        Set<Long> adjacent = new LinkedHashSet<>();
+        catalog.stream().filter(entry -> selectedIds.contains(entry.nodeId())).forEach(entry ->
+                entry.keyRelations().forEach(relation -> adjacent.add(relation.otherNodeId())));
+        if (!adjacent.containsAll(relationExpansion)) {
+            throw BusinessException.badRequest(
+                    "Story Bible selector returned a non-adjacent relation expansion ID");
+        }
+        Map<Long, String> reasons = reasons(root.get("selectionReasons"), selectedIds);
+        List<String> intentTags = strings(root.get("intentTags"), "intentTags");
+        List<String> missingFlags = strings(root.get("missingContextFlags"), "missingContextFlags");
+        Object confidenceValue = root.get("confidence");
+        if (!(confidenceValue instanceof Number confidence)
+                || confidence.doubleValue() < 0d || confidence.doubleValue() > 1d) {
+            throw BusinessException.badRequest("Story Bible selector confidence must be between 0 and 1");
+        }
+        return new Selection(intentTags, selectedIds, relationExpansion, reasons, missingFlags,
+                confidence.doubleValue(), tokenUsage);
     }
 
-    private List<Long> ids(JsonNode node, String field, Set<Long> allowed) {
-        if (node == null || !node.isArray()) {
+    private List<Long> ids(Object value, String field, Set<Long> allowed) {
+        if (!(value instanceof List<?> values)) {
             throw BusinessException.badRequest("Story Bible selector returned invalid " + field);
         }
         List<Long> result = new ArrayList<>();
-        for (JsonNode item : node) {
+        for (Object item : values) {
             Long id = parseId(item);
-            if (!allowed.contains(id)) throw BusinessException.badRequest("Story Bible selector returned an unknown node ID");
+            if (!allowed.contains(id)) {
+                throw BusinessException.badRequest("Story Bible selector returned an unknown node ID");
+            }
             if (!result.contains(id)) result.add(id);
         }
         return List.copyOf(result);
     }
 
-    private List<String> strings(JsonNode node, String field) {
-        if (node == null || !node.isArray()) {
+    private List<String> strings(Object value, String field) {
+        if (!(value instanceof List<?> values)) {
             throw BusinessException.badRequest("Story Bible selector returned invalid " + field);
         }
         List<String> result = new ArrayList<>();
-        for (JsonNode item : node) {
-            if (!item.isTextual()) throw BusinessException.badRequest("Story Bible selector " + field + " must contain strings");
-            String value = item.asText().trim();
-            if (!value.isEmpty() && !result.contains(value)) result.add(value);
+        for (Object item : values) {
+            if (!(item instanceof String string)) {
+                throw BusinessException.badRequest(
+                        "Story Bible selector " + field + " must contain strings");
+            }
+            String normalized = string.trim();
+            if (!normalized.isEmpty() && !result.contains(normalized)) result.add(normalized);
         }
         return List.copyOf(result);
     }
 
-    private Long parseId(JsonNode node) {
-        if (node.isTextual()) {
-            try { return Long.valueOf(node.asText()); } catch (NumberFormatException ignored) { }
+    private Map<Long, String> reasons(Object value, List<Long> selectedIds) {
+        if (!(value instanceof Map<?, ?> values)) {
+            throw BusinessException.badRequest("Story Bible selector returned invalid selectionReasons");
         }
-        if (node.isIntegralNumber()) return node.longValue();
+        Map<Long, String> reasons = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : values.entrySet()) {
+            long reasonId;
+            try {
+                reasonId = Long.parseLong(String.valueOf(entry.getKey()));
+            } catch (NumberFormatException exception) {
+                throw BusinessException.badRequest(
+                        "Story Bible selector returned an invalid selection reason ID");
+            }
+            if (!selectedIds.contains(reasonId) || !(entry.getValue() instanceof String reason)) {
+                throw BusinessException.badRequest(
+                        "Story Bible selector reasons must reference selected node IDs");
+            }
+            reasons.put(reasonId, reason.trim());
+        }
+        if (!reasons.keySet().containsAll(selectedIds)) {
+            throw BusinessException.badRequest("Story Bible selector must explain every selected node ID");
+        }
+        return Map.copyOf(reasons);
+    }
+
+    private Long parseId(Object value) {
+        if (value instanceof String string) {
+            try {
+                return Long.valueOf(string);
+            } catch (NumberFormatException ignored) {
+                // Continue to the stable validation error.
+            }
+        }
+        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long) {
+            return ((Number) value).longValue();
+        }
         throw BusinessException.badRequest("Story Bible selector node IDs must be strings");
     }
 
     private String json(Object value) {
         try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(value);
+        } catch (RuntimeException exception) {
             throw BusinessException.of("Failed to serialize Story Bible selector input");
         }
     }

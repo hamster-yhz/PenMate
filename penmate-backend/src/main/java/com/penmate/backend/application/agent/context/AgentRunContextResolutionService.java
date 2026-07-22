@@ -1,11 +1,10 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.orchestration.ConversationWindowBuilder;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.context.model.AgentWorkingSetEntry;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
@@ -31,7 +30,7 @@ public class AgentRunContextResolutionService {
     private final StoryBibleContextResolver contextResolver;
     private final AgentRunContextArtifactService artifacts;
     private final AgentModelRoutingService modelRouting;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final AgentSessionRepository sessionRepository;
     private final ConversationWindowBuilder conversationWindows;
 
@@ -46,7 +45,7 @@ public class AgentRunContextResolutionService {
             StoryBibleContextResolver contextResolver,
             AgentRunContextArtifactService artifacts,
             AgentModelRoutingService modelRouting,
-            ObjectMapper objectMapper,
+            JsonCodec jsonCodec,
             AgentSessionRepository sessionRepository,
             ConversationWindowBuilder conversationWindows
     ) {
@@ -60,7 +59,7 @@ public class AgentRunContextResolutionService {
         this.contextResolver = contextResolver;
         this.artifacts = artifacts;
         this.modelRouting = modelRouting;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.sessionRepository = sessionRepository;
         this.conversationWindows = conversationWindows;
     }
@@ -148,8 +147,8 @@ public class AgentRunContextResolutionService {
     }
 
     private String json(Object value) {
-        try { return objectMapper.writeValueAsString(value); }
-        catch (JsonProcessingException ex) { throw new IllegalStateException("Failed to render resolved Story Bible node", ex); }
+        try { return jsonCodec.write(value); }
+        catch (RuntimeException ex) { throw new IllegalStateException("Failed to render resolved Story Bible node", ex); }
     }
 
     private String sha256(String value) {

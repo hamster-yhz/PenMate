@@ -1,6 +1,5 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationCancelledException;
 import com.penmate.backend.application.storybible.StoryBibleEffectiveStateResolver;
 import com.penmate.backend.domain.storybible.model.StoryBibleInclusionPolicy;
@@ -133,7 +132,7 @@ public class StoryBibleContextResolver {
         return new ResolvedContext(decision, List.copyOf(rendered), relations);
     }
 
-    public record RenderedNode(Long nodeId, String title, String typeCode, JsonNode effectiveState,
+    public record RenderedNode(Long nodeId, String title, String typeCode, Map<String, Object> effectiveState,
                                List<Long> appliedProgressionIds, boolean complete) {
     }
     public record ResolvedContext(StoryBibleRouteDecision decision, List<RenderedNode> nodes,

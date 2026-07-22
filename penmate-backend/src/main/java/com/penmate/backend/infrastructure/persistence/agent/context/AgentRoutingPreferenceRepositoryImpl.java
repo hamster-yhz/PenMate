@@ -14,7 +14,4 @@ public class AgentRoutingPreferenceRepositoryImpl implements AgentRoutingPrefere
         return mapper.findProjectPreference(projectId);
     }
 
-    @Override public int updateProjectPreference(Long projectId, String routingMode, Long routerModelConfigId) {
-        return mapper.updateProjectPreference(projectId, routingMode, routerModelConfigId);
-    }
 }

@@ -1,8 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.context.model.AgentContextEpoch;
 import com.penmate.backend.domain.agent.context.repository.AgentContextEpochRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -24,16 +23,16 @@ public class AgentContextEpochService {
     private final AgentContextEpochRepository repository;
     private final BusinessIdGenerator idGenerator;
     private final ObjectStorageService objectStorage;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final ContextEpochSnapshotCache cache;
 
     public AgentContextEpochService(AgentContextEpochRepository repository, BusinessIdGenerator idGenerator,
-                                    ObjectStorageService objectStorage, ObjectMapper objectMapper,
+                                    ObjectStorageService objectStorage, JsonCodec jsonCodec,
                                     ContextEpochSnapshotCache cache) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator");
         this.objectStorage = Objects.requireNonNull(objectStorage, "objectStorage");
-        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+        this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
         this.cache = Objects.requireNonNull(cache, "cache");
     }
 
@@ -114,8 +113,8 @@ public class AgentContextEpochService {
         fields.put("skillCatalogHash", request.skillCatalogHash());
         fields.put("toolCatalogHash", request.toolCatalogHash());
         try {
-            return sha256(objectMapper.writeValueAsBytes(fields));
-        } catch (JsonProcessingException ex) {
+            return sha256(jsonCodec.write(fields).getBytes(StandardCharsets.UTF_8));
+        } catch (RuntimeException ex) {
             throw BusinessException.of("Failed to compute Context Epoch fingerprint");
         }
     }

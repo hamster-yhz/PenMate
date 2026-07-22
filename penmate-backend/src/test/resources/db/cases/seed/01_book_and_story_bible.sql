@@ -13,22 +13,16 @@ ON CONFLICT (volume_id) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     updated_at = CURRENT_TIMESTAMP(3);
 
-INSERT INTO novel_outline_nodes(outline_node_id, project_id, parent_id, title, node_type, sort_order, content)
-VALUES (920201, 920001, NULL, 'Arrival at the Gate', 'chapter', 10, 'The protagonist reaches the sealed city.')
-ON CONFLICT (outline_node_id) DO UPDATE SET
-    title = EXCLUDED.title,
-    content = EXCLUDED.content,
-    updated_at = CURRENT_TIMESTAMP(3);
-
 INSERT INTO novel_chapters(
-    chapter_id, project_id, volume_id, outline_node_id, title, sort_order, status,
-    word_count, excerpt, content_object_key, content_size, content_revision, storage_provider)
+    chapter_id, project_id, volume_id, title, sort_order,
+    word_count, content, content_revision)
 VALUES (
-    920301, 920001, 920101, 920201, 'The Sealed Gate', 10, 1,
-    860, 'Ash drifted across the northern road.', 'demo/920001/chapters/920301.md', 4096, 1, 's3')
+    920301, 920001, 920101, 'The Sealed Gate', 10,
+    8, 'Ash drifted across the northern road.', 1)
 ON CONFLICT (chapter_id) DO UPDATE SET
     title = EXCLUDED.title,
-    excerpt = EXCLUDED.excerpt,
+    content = EXCLUDED.content,
+    word_count = EXCLUDED.word_count,
     content_revision = EXCLUDED.content_revision,
     updated_at = CURRENT_TIMESTAMP(3);
 

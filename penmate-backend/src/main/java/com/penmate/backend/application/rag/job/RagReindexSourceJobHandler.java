@@ -1,20 +1,21 @@
 package com.penmate.backend.application.rag.job;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.ops.AsyncJobExecutionContext;
 import com.penmate.backend.application.ops.AsyncJobHandler;
 import com.penmate.backend.application.rag.RagIndexingService;
 import com.penmate.backend.domain.ops.model.OpsAsyncJob;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Component
 public class RagReindexSourceJobHandler implements AsyncJobHandler {
-    private final ObjectMapper mapper;
+    private final JsonCodec jsonCodec;
     private final RagIndexingService indexing;
 
-    public RagReindexSourceJobHandler(ObjectMapper mapper, RagIndexingService indexing) {
-        this.mapper = mapper;
+    public RagReindexSourceJobHandler(JsonCodec jsonCodec, RagIndexingService indexing) {
+        this.jsonCodec = jsonCodec;
         this.indexing = indexing;
     }
 
@@ -22,15 +23,15 @@ public class RagReindexSourceJobHandler implements AsyncJobHandler {
 
     @Override
     public String execute(OpsAsyncJob job, AsyncJobExecutionContext context) {
-        JsonNode payload = RagJobPayload.parse(mapper, job);
+        Map<String, Object> payload = RagJobPayload.parse(jsonCodec, job);
         long projectId = RagJobPayload.requiredLong(payload, "projectId");
         long documentId = RagJobPayload.requiredLong(payload, "documentId");
-        if ("DELETE".equals(payload.path("operation").asText())) {
+        if ("DELETE".equals(RagJobPayload.text(payload, "operation"))) {
             indexing.deleteKnowledgeDocument(projectId, documentId);
-            return "{\"deletedSourceId\":" + documentId + "}";
+            return jsonCodec.write(Map.of("deletedSourceId", documentId));
         }
         long revision = RagJobPayload.requiredLong(payload, "sourceRevision");
         indexing.indexKnowledgeDocument(projectId, job.getOwnerUserId(), documentId, revision, context);
-        return "{\"reindexedSourceId\":" + documentId + "}";
+        return jsonCodec.write(Map.of("reindexedSourceId", documentId));
     }
 }

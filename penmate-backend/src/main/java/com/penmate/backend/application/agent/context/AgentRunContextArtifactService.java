@@ -1,8 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -23,14 +22,14 @@ public class AgentRunContextArtifactService {
     private final AgentArtifactRepository artifacts;
     private final BusinessIdGenerator ids;
     private final ObjectStorageService storage;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
     public AgentRunContextArtifactService(AgentArtifactRepository artifacts, BusinessIdGenerator ids,
-                                          ObjectStorageService storage, ObjectMapper objectMapper) {
+                                          ObjectStorageService storage, JsonCodec jsonCodec) {
         this.artifacts = artifacts;
         this.ids = ids;
         this.storage = storage;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
     }
 
     public ArtifactRef save(Long runId, ResolvedArtifact artifact) {
@@ -55,15 +54,15 @@ public class AgentRunContextArtifactService {
             throw BusinessException.notFound("Run context artifact not found");
         }
         ArtifactRef ref;
-        try { ref = objectMapper.readValue(row.payloadJson(), ArtifactRef.class); }
-        catch (JsonProcessingException ex) { throw BusinessException.conflict("Run context artifact metadata is invalid"); }
+        try { ref = jsonCodec.read(row.payloadJson(), ArtifactRef.class); }
+        catch (RuntimeException ex) { throw BusinessException.conflict("Run context artifact metadata is invalid"); }
         String json = storage.readText(ref.objectKey());
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         if (bytes.length != ref.sizeBytes() || !sha256(bytes).equals(ref.sha256())) {
             throw BusinessException.conflict("Run context artifact integrity check failed");
         }
-        try { return objectMapper.readValue(json, ResolvedArtifact.class); }
-        catch (JsonProcessingException ex) { throw BusinessException.conflict("Run context artifact is invalid"); }
+        try { return jsonCodec.read(json, ResolvedArtifact.class); }
+        catch (RuntimeException ex) { throw BusinessException.conflict("Run context artifact is invalid"); }
     }
 
     public ResolvedArtifact loadContextForRun(Long runId, List<Long> artifactRefs) {
@@ -114,15 +113,15 @@ public class AgentRunContextArtifactService {
             throw BusinessException.notFound("Run prompt artifact not found");
         }
         ArtifactRef ref;
-        try { ref = objectMapper.readValue(row.payloadJson(), ArtifactRef.class); }
-        catch (JsonProcessingException ex) { throw BusinessException.conflict("Run prompt artifact metadata is invalid"); }
+        try { ref = jsonCodec.read(row.payloadJson(), ArtifactRef.class); }
+        catch (RuntimeException ex) { throw BusinessException.conflict("Run prompt artifact metadata is invalid"); }
         String json = storage.readText(ref.objectKey());
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         if (bytes.length != ref.sizeBytes() || !sha256(bytes).equals(ref.sha256())) {
             throw BusinessException.conflict("Run prompt artifact integrity check failed");
         }
-        try { return objectMapper.readValue(json, PromptArtifact.class); }
-        catch (JsonProcessingException ex) { throw BusinessException.conflict("Run prompt artifact is invalid"); }
+        try { return jsonCodec.read(json, PromptArtifact.class); }
+        catch (RuntimeException ex) { throw BusinessException.conflict("Run prompt artifact is invalid"); }
     }
 
     public PromptArtifact loadPromptPlanForRun(Long runId, List<Long> artifactRefs) {
@@ -139,8 +138,8 @@ public class AgentRunContextArtifactService {
     }
 
     private String json(Object value) {
-        try { return objectMapper.writeValueAsString(value); }
-        catch (JsonProcessingException ex) { throw BusinessException.of("Failed to serialize Run context artifact"); }
+        try { return jsonCodec.write(value); }
+        catch (RuntimeException ex) { throw BusinessException.of("Failed to serialize Run context artifact"); }
     }
 
     private void verifyUploadedText(String objectKey, byte[] expected, String expectedHash, String label) {

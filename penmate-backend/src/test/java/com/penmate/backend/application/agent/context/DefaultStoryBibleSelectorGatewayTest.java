@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmCancellationPort;
@@ -29,7 +30,7 @@ class DefaultStoryBibleSelectorGatewayTest {
     private final AgentLlmGateway llm = mock(AgentLlmGateway.class);
     private final AgentLlmCancellationPort cancellations = mock(AgentLlmCancellationPort.class);
     private final DefaultStoryBibleSelectorGateway gateway = new DefaultStoryBibleSelectorGateway(
-            new AgentLlmInvocationService(llm, cancellations), new ObjectMapper(),
+            new AgentLlmInvocationService(llm, cancellations), new JacksonJsonCodec(new ObjectMapper()),
             (stage, profile) -> new SystemPromptBundle(stage, profile, List.of(), "selector prompt"));
     private final AgentLlmExecutionConfig config = AgentLlmExecutionConfig.builder().providerCode("test").build();
 

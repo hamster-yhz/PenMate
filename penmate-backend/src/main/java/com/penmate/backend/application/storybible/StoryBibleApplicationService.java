@@ -1,8 +1,7 @@
 package com.penmate.backend.application.storybible;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.storybible.StoryBibleChangesetService.ChangeDraft;
 import com.penmate.backend.application.storybible.command.StoryBibleCommands;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -44,7 +43,7 @@ public class StoryBibleApplicationService {
     private final StoryBibleRepository repository;
     private final StoryBibleChangesetService changesetService;
     private final BusinessIdGenerator idGenerator;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final StoryBibleSchemaValidator schemaValidator;
     private final StoryBiblePatchValidator patchValidator;
     private final StoryBibleEffectiveStateResolver effectiveStateResolver;
@@ -54,7 +53,7 @@ public class StoryBibleApplicationService {
             StoryBibleRepository repository,
             StoryBibleChangesetService changesetService,
             BusinessIdGenerator idGenerator,
-            ObjectMapper objectMapper,
+            JsonCodec jsonCodec,
             StoryBibleSchemaValidator schemaValidator,
             StoryBiblePatchValidator patchValidator,
             StoryBibleEffectiveStateResolver effectiveStateResolver,
@@ -63,7 +62,7 @@ public class StoryBibleApplicationService {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.changesetService = Objects.requireNonNull(changesetService, "changesetService");
         this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator");
-        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+        this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
         this.schemaValidator = Objects.requireNonNull(schemaValidator, "schemaValidator");
         this.patchValidator = Objects.requireNonNull(patchValidator, "patchValidator");
         this.effectiveStateResolver = Objects.requireNonNull(effectiveStateResolver, "effectiveStateResolver");
@@ -804,25 +803,27 @@ public class StoryBibleApplicationService {
 
     private List<ChangeDraft> draftsWithBeforeJson(String entityType, Long entityId, StoryBibleChangeOperation operation, String beforeJson, Object after) {
         try {
-            var before = objectMapper.readTree(beforeJson);
-            var afterNode = objectMapper.valueToTree(after);
+            Map<String, Object> before = jsonCodec.readObject(beforeJson);
+            Map<String, Object> afterValue = jsonCodec.readObject(jsonCodec.write(after));
             List<ChangeDraft> drafts = new ArrayList<>();
             var fields = new java.util.TreeSet<String>();
-            before.fieldNames().forEachRemaining(fields::add);
-            afterNode.fieldNames().forEachRemaining(fields::add);
+            fields.addAll(before.keySet());
+            fields.addAll(afterValue.keySet());
             for (String field : fields) {
-                var beforeValue = before.get(field);
-                var afterValue = afterNode.get(field);
-                if (!Objects.equals(beforeValue, afterValue)) {
+                Object beforeFieldValue = before.get(field);
+                Object afterFieldValue = afterValue.get(field);
+                boolean beforePresent = before.containsKey(field);
+                boolean afterPresent = afterValue.containsKey(field);
+                if (beforePresent != afterPresent || !Objects.equals(beforeFieldValue, afterFieldValue)) {
                     drafts.add(new ChangeDraft(entityType, entityId, operation, "/" + escapePointer(field),
-                            beforeValue == null ? null : beforeValue.toString(),
-                            afterValue == null ? null : afterValue.toString()));
+                            beforePresent ? jsonCodec.write(beforeFieldValue) : null,
+                            afterPresent ? jsonCodec.write(afterFieldValue) : null));
                 }
             }
             return drafts.isEmpty()
                     ? List.of(new ChangeDraft(entityType, entityId, operation, "/", beforeJson, asJson(after)))
                     : List.copyOf(drafts);
-        } catch (JsonProcessingException ex) {
+        } catch (RuntimeException ex) {
             throw BusinessException.badRequest("Story Bible value cannot be compared");
         }
     }
@@ -837,16 +838,16 @@ public class StoryBibleApplicationService {
 
     private String asJson(Object value) {
         try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(value);
+        } catch (RuntimeException ex) {
             throw BusinessException.badRequest("Story Bible value cannot be serialized");
         }
     }
 
     private void parseJson(String value, String field) {
         try {
-            objectMapper.readTree(defaultJson(value));
-        } catch (JsonProcessingException ex) {
+            jsonCodec.read(defaultJson(value));
+        } catch (RuntimeException ex) {
             throw BusinessException.badRequest(field + " must be valid JSON");
         }
     }

@@ -1,6 +1,6 @@
 package com.penmate.backend.application.rag;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.support.BaseApplicationServiceTest;
 import com.penmate.backend.domain.rag.model.RagRetrievalLog;
 import com.penmate.backend.domain.rag.model.RagRetrievedChunk;
@@ -28,6 +28,9 @@ class RagRetrievalServiceTest extends BaseApplicationServiceTest {
     @Mock
     private BusinessIdGenerator businessIdGenerator;
 
+    @Mock
+    private JsonCodec jsonCodec;
+
     @Test
     void retrieve_assigns_retrieval_log_business_id_before_insert() {
         RagRetrievedChunk chunk = new RagRetrievedChunk();
@@ -37,6 +40,7 @@ class RagRetrievalServiceTest extends BaseApplicationServiceTest {
         chunk.setContentText("content");
 
         when(businessIdGenerator.nextId()).thenReturn(910001L);
+        when(jsonCodec.write(any())).thenReturn("[]");
         when(ragRetrievalRepository.searchChunks(1L, "hero", 3)).thenReturn(List.of(chunk));
         when(ragRetrievalRepository.insertRetrievalLog(any(RagRetrievalLog.class))).thenAnswer(invocation -> {
             RagRetrievalLog log = invocation.getArgument(0);
@@ -47,7 +51,7 @@ class RagRetrievalServiceTest extends BaseApplicationServiceTest {
         RagRetrievalService service = new RagRetrievalService(
                 ragRetrievalRepository,
                 businessIdGenerator,
-                new ObjectMapper()
+                jsonCodec
         );
 
         RagRetrievalService.RetrievalResult result = service.retrieve(1L, 11L, "hero", "trace-rag-1");

@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.persistence.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.application.agent.context.AgentContextEpochService;
 import com.penmate.backend.application.agent.context.ContextEpochSnapshotCache;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -75,7 +76,8 @@ class AgentContextEpochConcurrencyTest {
         when(storage.readText(anyString())).thenAnswer(invocation ->
                 storedObjects.get(invocation.getArgument(0, String.class)));
         AgentContextEpochService service = new AgentContextEpochService(
-                repository, idGenerator, storage, new ObjectMapper(), mock(ContextEpochSnapshotCache.class));
+                repository, idGenerator, storage, new JacksonJsonCodec(new ObjectMapper()),
+                mock(ContextEpochSnapshotCache.class));
         TransactionTemplate transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         CyclicBarrier start = new CyclicBarrier(2);
         ExecutorService executor = Executors.newFixedThreadPool(2);

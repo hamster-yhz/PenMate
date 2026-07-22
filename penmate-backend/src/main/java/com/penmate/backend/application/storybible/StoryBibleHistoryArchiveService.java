@@ -1,14 +1,12 @@
 package com.penmate.backend.application.storybible;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
 import com.penmate.backend.domain.storybible.model.StoryBible;
 import com.penmate.backend.domain.storybible.model.StoryBibleChangeItem;
 import com.penmate.backend.domain.storybible.model.StoryBibleChangeset;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -41,20 +39,19 @@ public class StoryBibleHistoryArchiveService {
 
     private final StoryBibleRepository repository;
     private final ObjectStorageService objectStorageService;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final StoryBibleHistoryDeletionService deletionService;
 
     public StoryBibleHistoryArchiveService(StoryBibleRepository repository,
                                            ObjectStorageService objectStorageService,
-                                           ObjectMapper objectMapper,
+                                           JsonCodec jsonCodec,
                                            StoryBibleHistoryDeletionService deletionService) {
         this.repository = repository;
         this.objectStorageService = objectStorageService;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.deletionService = deletionService;
     }
 
-    @Scheduled(cron = "${penmate.story-bible.history-archive-cron:0 30 3 * * ?}")
     public void archiveEligibleHistory() {
         archiveEligibleHistory(Instant.now());
     }
@@ -142,12 +139,12 @@ public class StoryBibleHistoryArchiveService {
             TreeMap<Long, String> lines = new TreeMap<>();
             for (String line : jsonl.split("\\R")) {
                 if (line.isBlank()) continue;
-                JsonNode root = objectMapper.readTree(line);
-                JsonNode id = root.path("changeset").path("changesetId");
-                if (!id.canConvertToLong() && !id.isTextual()) {
+                Map<String, Object> root = jsonCodec.readObject(line);
+                Object changesetValue = root.get("changeset");
+                if (!(changesetValue instanceof Map<?, ?> changeset)) {
                     throw new IllegalStateException("Story Bible history archive line is missing changesetId");
                 }
-                lines.put(Long.parseLong(id.asText()), line);
+                lines.put(requiredLong(changeset.get("changesetId")), line);
             }
             return lines;
         } catch (RuntimeException ex) {
@@ -166,10 +163,22 @@ public class StoryBibleHistoryArchiveService {
         record.put("changeset", changeset);
         record.put("items", items);
         try {
-            return objectMapper.writeValueAsString(record);
-        } catch (Exception ex) {
+            return jsonCodec.write(record);
+        } catch (RuntimeException ex) {
             throw new IllegalStateException("Failed to serialize Story Bible history archive", ex);
         }
+    }
+
+    private long requiredLong(Object value) {
+        if (value instanceof Number number) return number.longValue();
+        if (value instanceof String string && string.matches("\\d+")) {
+            try {
+                return Long.parseLong(string);
+            } catch (NumberFormatException ignored) {
+                // Fall through to the archive corruption error.
+            }
+        }
+        throw new IllegalStateException("Story Bible history archive line is missing changesetId");
     }
 
     private byte[] gzip(String value) {

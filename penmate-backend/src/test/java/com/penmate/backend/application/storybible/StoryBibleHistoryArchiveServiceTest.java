@@ -8,6 +8,7 @@ import com.penmate.backend.domain.storybible.model.StoryBibleChangeItem;
 import com.penmate.backend.domain.storybible.model.StoryBibleChangeOperation;
 import com.penmate.backend.domain.storybible.model.StoryBibleChangeset;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +49,8 @@ class StoryBibleHistoryArchiveServiceTest {
     @BeforeEach
     void setUp() {
         service = new StoryBibleHistoryArchiveService(
-                repository, storage, new ObjectMapper().findAndRegisterModules(), deletionService);
+                repository, storage,
+                new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()), deletionService);
         uploaded = new AtomicReference<>();
     }
 

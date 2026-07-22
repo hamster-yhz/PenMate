@@ -1,26 +1,29 @@
-package com.penmate.backend.application.storybible;
+package com.penmate.backend.infrastructure.storybible;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.storybible.StoryBiblePatchValidator;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class StoryBiblePatchValidatorTest {
+class JacksonStoryBibleValidationEngineTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private StoryBiblePatchValidator validator;
 
     @BeforeEach
     void setUp() {
-        validator = new StoryBiblePatchValidator(objectMapper, new StoryBibleSchemaValidator(objectMapper));
+        validator = new JacksonStoryBibleValidationEngine(objectMapper);
     }
 
     @Test
-    void should_validate_and_apply_supported_patch() throws Exception {
+    void validates_and_applies_supported_patch() {
         String schema = """
                 {"type":"object","properties":{"status":{"type":"string"}},"additionalProperties":false}
                 """;
@@ -28,16 +31,19 @@ class StoryBiblePatchValidatorTest {
                 [{"op":"replace","path":"/attributes/status","value":"wounded"}]
                 """, schema);
 
-        JsonNode result = validator.apply(objectMapper.readTree("""
-                {"title":"Mira","summary":null,"bodyMarkdown":null,"attributes":{"status":"healthy"}}
-                """), patch);
+        Map<String, Object> result = validator.apply(
+                new JacksonJsonCodec(objectMapper).readObject("""
+                        {"title":"Mira","summary":null,"bodyMarkdown":null,"attributes":{"status":"healthy"}}
+                        """), patch);
 
         assertThat(patch.paths()).containsExactly("/attributes/status");
-        assertThat(result.at("/attributes/status").asText()).isEqualTo("wounded");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> attributes = (Map<String, Object>) result.get("attributes");
+        assertThat(attributes.get("status")).isEqualTo("wounded");
     }
 
     @Test
-    void should_reject_unsupported_operations_and_paths_outside_schema() {
+    void rejects_unsupported_operations_and_paths_outside_schema() {
         String schema = """
                 {"type":"object","properties":{"status":{"type":"string"}},"additionalProperties":false}
                 """;

@@ -1,7 +1,9 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.storybible.StoryBibleEffectiveStateResolver;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,8 +47,8 @@ class ContextEpochSnapshotFactoryTest {
         StoryBibleRepository bibles = mock(StoryBibleRepository.class);
         NovelGateway novels = mock(NovelGateway.class);
         StoryBibleEffectiveStateResolver states = mock(StoryBibleEffectiveStateResolver.class);
-        ObjectMapper mapper = new ObjectMapper();
-        ContextEpochSnapshotFactory factory = new ContextEpochSnapshotFactory(bibles, novels, states, mapper);
+        JsonCodec jsonCodec = new JacksonJsonCodec(new ObjectMapper());
+        ContextEpochSnapshotFactory factory = new ContextEpochSnapshotFactory(bibles, novels, states, jsonCodec);
 
         StoryBible root = new StoryBible();
         root.setStoryBibleId(10L);
@@ -79,9 +82,10 @@ class ContextEpochSnapshotFactoryTest {
         when(bibles.findProgressions(10L, List.of(30L, 31L))).thenReturn(List.of());
         when(states.resolve(eq(1L), eq(50L), any(), eq(type), anyList())).thenAnswer(invocation -> {
             StoryBibleNode node = invocation.getArgument(2);
-            var state = mapper.createObjectNode().put("title", node.getTitle() + " at chapter 5")
-                    .put("summary", node.getSummary());
-            state.set("attributes", mapper.createObjectNode());
+            Map<String, Object> state = Map.of(
+                    "title", node.getTitle() + " at chapter 5",
+                    "summary", node.getSummary(),
+                    "attributes", Map.of());
             return new StoryBibleEffectiveStateResolver.EffectiveState(state, List.of(99L), List.of(), List.of(), true);
         });
 
@@ -89,7 +93,7 @@ class ContextEpochSnapshotFactoryTest {
 
         assertThat(snapshot.schemaVersion()).isEqualTo(2);
         assertThat(snapshot.coreContext()).singleElement().satisfies(core -> {
-            assertThat(core.effectiveState().path("title").asText()).isEqualTo("Mira at chapter 5");
+            assertThat(core.effectiveState().get("title")).isEqualTo("Mira at chapter 5");
             assertThat(core.appliedProgressionIds()).containsExactly(99L);
         });
         assertThat(snapshot.selectorCatalog()).first().satisfies(entry -> {

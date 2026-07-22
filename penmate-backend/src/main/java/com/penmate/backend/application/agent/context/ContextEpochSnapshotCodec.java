@@ -1,33 +1,32 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class ContextEpochSnapshotCodec {
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
 
-    public ContextEpochSnapshotCodec(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public ContextEpochSnapshotCodec(JsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
     }
 
     public String encode(Snapshot snapshot) {
         try {
-            return objectMapper.writeValueAsString(snapshot);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.write(snapshot);
+        } catch (RuntimeException ex) {
             throw BusinessException.of("Failed to encode Context Epoch snapshot");
         }
     }
 
     public Snapshot decode(String json) {
         try {
-            return objectMapper.readValue(json, Snapshot.class);
-        } catch (JsonProcessingException ex) {
+            return jsonCodec.read(json, Snapshot.class);
+        } catch (RuntimeException ex) {
             throw BusinessException.conflict("Context Epoch snapshot is invalid");
         }
     }
@@ -61,7 +60,7 @@ public class ContextEpochSnapshotCodec {
             String typeCode,
             String semanticFamily,
             String title,
-            JsonNode effectiveState,
+            Map<String, Object> effectiveState,
             List<Long> appliedProgressionIds,
             List<String> stateFlags
     ) {
@@ -70,24 +69,5 @@ public class ContextEpochSnapshotCodec {
             stateFlags = List.copyOf(stateFlags == null ? List.of() : stateFlags);
         }
 
-        public CoreNode(Long nodeId, Long typeId, String title, String summary,
-                        String bodyMarkdown, String attributesJson) {
-            this(nodeId, typeId, "UNKNOWN", "UNKNOWN", title, legacyState(title, summary, bodyMarkdown, attributesJson),
-                    List.of(), List.of());
-        }
-
-        private static JsonNode legacyState(String title, String summary, String bodyMarkdown, String attributesJson) {
-            ObjectMapper mapper = new ObjectMapper();
-            var state = mapper.createObjectNode();
-            state.put("title", title);
-            if (summary == null) state.putNull("summary"); else state.put("summary", summary);
-            if (bodyMarkdown == null) state.putNull("bodyMarkdown"); else state.put("bodyMarkdown", bodyMarkdown);
-            try {
-                state.set("attributes", mapper.readTree(attributesJson == null ? "{}" : attributesJson));
-            } catch (JsonProcessingException ex) {
-                state.set("attributes", mapper.createObjectNode());
-            }
-            return state;
-        }
     }
 }

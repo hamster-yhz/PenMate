@@ -1,8 +1,7 @@
 package com.penmate.backend.application.rag;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.ops.AsyncJobExecutionContext;
 import com.penmate.backend.application.ops.AsyncJobQueueService;
 import com.penmate.backend.domain.rag.model.ProjectAiConfiguration;
@@ -17,7 +16,6 @@ import com.penmate.backend.domain.rag.service.DocumentContentParser;
 import com.penmate.backend.domain.rag.service.EmbeddingGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -42,7 +40,7 @@ public class RagIndexingService {
     private final DocumentContentParser parser;
     private final BusinessIdGenerator ids;
     private final AsyncJobQueueService jobs;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final DocumentChunker chunker;
     private final int batchSize;
     private final int batchMaxCharacters;
@@ -53,11 +51,8 @@ public class RagIndexingService {
                               RagDocumentRepository documents, EmbeddingModelRoutingService routing,
                               EmbeddingGateway embeddings, ObjectStorageService storage,
                               DocumentContentParser parser, BusinessIdGenerator ids,
-                              AsyncJobQueueService jobs, ObjectMapper objectMapper,
-                              @Value("${penmate.indexing.max-chunks-per-source:20000}") int maxChunksPerSource,
-                              @Value("${penmate.indexing.max-chunks-per-project:100000}") int maxChunksPerProject,
-                              @Value("${penmate.indexing.embedding-batch-size:32}") int batchSize,
-                              @Value("${penmate.indexing.embedding-batch-max-characters:30000}") int batchMaxCharacters) {
+                              AsyncJobQueueService jobs, JsonCodec jsonCodec,
+                              RagIndexingSettings settings) {
         this.configurations = configurations;
         this.sourceCatalog = sourceCatalog;
         this.indexes = indexes;
@@ -68,11 +63,11 @@ public class RagIndexingService {
         this.parser = parser;
         this.ids = ids;
         this.jobs = jobs;
-        this.objectMapper = objectMapper;
-        this.chunker = new DocumentChunker(maxChunksPerSource);
-        this.maxChunksPerProject = maxChunksPerProject;
-        this.batchSize = Math.max(1, Math.min(32, batchSize));
-        this.batchMaxCharacters = Math.max(1, Math.min(30000, batchMaxCharacters));
+        this.jsonCodec = jsonCodec;
+        this.chunker = new DocumentChunker(settings.maxChunksPerSource());
+        this.maxChunksPerProject = settings.maxChunksPerProject();
+        this.batchSize = Math.min(32, settings.embeddingBatchSize());
+        this.batchMaxCharacters = Math.min(30000, settings.embeddingBatchMaxCharacters());
     }
 
     public BuildResult rebuildProject(Long projectId, Long ownerUserId, AsyncJobExecutionContext context) {
@@ -126,12 +121,12 @@ public class RagIndexingService {
         RagSourceContent source = sourceCatalog.findKnowledgeDocument(projectId, documentId);
         if (source == null || !Objects.equals(source.sourceRevision(), String.valueOf(revision))) return;
         ProjectAiConfiguration configuration = requireBoundConfiguration(projectId);
+        var model = routing.resolve(ownerUserId, configuration.getEmbeddingModelConfigId());
         RagEmbeddingSpace space = indexes.findActiveSpaceForProject(projectId);
         if (space == null || configuration.getActiveIndexBuildId() == null) {
-            enqueueRebuild(ownerUserId, projectId, configuration.getEmbeddingModelConfigId(), revision);
+            enqueueRebuild(ownerUserId, projectId, model.modelConfigId(), revision);
             return;
         }
-        var model = routing.resolve(ownerUserId, configuration.getEmbeddingModelConfigId());
         PreparedSource prepared = prepareSource(source, configuration);
         if (prepared.chunks().isEmpty()) throw BusinessException.of("Document has no indexable content");
         Long sourceIndexId = prepared.sourceIndexId();
@@ -178,8 +173,7 @@ public class RagIndexingService {
         int overlap = configuration.getChunkOverlapCharacters();
         int hardMax = configuration.getChunkMaxCharacters();
         List<String> texts;
-        if (("STORY_BIBLE_NODE".equals(source.sourceType()) || "OUTLINE_NODE".equals(source.sourceType()))
-                && content.length() <= hardMax) texts = List.of(content);
+        if ("STORY_BIBLE_NODE".equals(source.sourceType()) && content.length() <= hardMax) texts = List.of(content);
         else texts = chunker.chunk(content, target, overlap, hardMax);
         Long sourceIndexId = ids.nextId();
         List<PreparedChunk> chunks = new ArrayList<>(texts.size());
@@ -273,7 +267,7 @@ public class RagIndexingService {
 
     private ProjectAiConfiguration requireBoundConfiguration(Long projectId) {
         ProjectAiConfiguration configuration = configurations.findByProjectId(projectId);
-        if (configuration == null || configuration.getEmbeddingModelConfigId() == null) {
+        if (configuration == null) {
             throw BusinessException.of("Project has no Embedding model configuration");
         }
         return configuration;
@@ -304,8 +298,7 @@ public class RagIndexingService {
     }
 
     private String json(Object value) {
-        try { return objectMapper.writeValueAsString(value); }
-        catch (JsonProcessingException exception) { throw new IllegalStateException("Cannot serialize RAG payload", exception); }
+        return jsonCodec.write(value);
     }
 
     private String sha256(String value) {

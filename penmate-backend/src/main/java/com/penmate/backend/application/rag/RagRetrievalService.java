@@ -1,8 +1,8 @@
 package com.penmate.backend.application.rag;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.exception.BusinessErrorType;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.rag.model.ProjectAiConfiguration;
@@ -14,7 +14,6 @@ import com.penmate.backend.domain.rag.repository.RagIndexRepository;
 import com.penmate.backend.domain.rag.repository.RagRetrievalRepository;
 import com.penmate.backend.domain.rag.service.EmbeddingGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -29,14 +28,14 @@ public class RagRetrievalService {
     private final EmbeddingModelRoutingService routing;
     private final EmbeddingGateway embeddings;
     private final BusinessIdGenerator ids;
-    private final ObjectMapper objectMapper;
+    private final JsonCodec jsonCodec;
     private final boolean legacyRetrieval;
 
     @Autowired
     public RagRetrievalService(RagRetrievalRepository logs, RagIndexRepository indexes,
                                ProjectAiConfigurationRepository configurations, NovelGateway novels,
                                EmbeddingModelRoutingService routing, EmbeddingGateway embeddings,
-                               BusinessIdGenerator ids, ObjectMapper objectMapper) {
+                               BusinessIdGenerator ids, JsonCodec jsonCodec) {
         this.logs = logs;
         this.indexes = indexes;
         this.configurations = configurations;
@@ -44,11 +43,11 @@ public class RagRetrievalService {
         this.routing = routing;
         this.embeddings = embeddings;
         this.ids = ids;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.legacyRetrieval = false;
     }
 
-    RagRetrievalService(RagRetrievalRepository logs, BusinessIdGenerator ids, ObjectMapper objectMapper) {
+    RagRetrievalService(RagRetrievalRepository logs, BusinessIdGenerator ids, JsonCodec jsonCodec) {
         this.logs = logs;
         this.indexes = null;
         this.configurations = null;
@@ -56,7 +55,7 @@ public class RagRetrievalService {
         this.routing = null;
         this.embeddings = null;
         this.ids = ids;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.legacyRetrieval = true;
     }
 
@@ -76,8 +75,8 @@ public class RagRetrievalService {
         if (query == null || query.isBlank()) throw BusinessException.badRequest("RAG query must not be blank");
         ProjectAiConfiguration configuration = configurations.findByProjectId(projectId);
         RagEmbeddingSpace space = indexes.findActiveSpaceForProject(projectId);
-        if (configuration == null || configuration.getEmbeddingModelConfigId() == null
-                || configuration.getActiveIndexBuildId() == null || !"READY".equals(configuration.getIndexStatus())
+        if (configuration == null || configuration.getActiveIndexBuildId() == null
+                || !"READY".equals(configuration.getIndexStatus())
                 || space == null) {
             throw unavailable();
         }
@@ -117,15 +116,15 @@ public class RagRetrievalService {
 
     private String sourcesJson(List<RagRetrievedChunk> chunks) {
         try {
-            return objectMapper.writeValueAsString(chunks.stream().map(chunk -> new SourceItem(
+            return jsonCodec.write(chunks.stream().map(chunk -> new SourceItem(
                     chunk.getSourceType(), chunk.getSourceId(), chunk.getSourceTitle(), chunk.getChunkNo(), chunk.getDistance())).toList());
-        } catch (JsonProcessingException exception) {
+        } catch (RuntimeException exception) {
             return "[]";
         }
     }
 
     private BusinessException unavailable() {
-        return BusinessException.of(HttpStatus.CONFLICT, "RAG_INDEX_UNAVAILABLE",
+        return BusinessException.of(BusinessErrorType.CONFLICT, "RAG_INDEX_UNAVAILABLE",
                 "The project has no active vector index", null);
     }
 

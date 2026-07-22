@@ -252,7 +252,7 @@ public class JdbcRagIndexRepository implements RagIndexRepository {
             default -> throw new IllegalArgumentException("Unsupported distance metric");
         };
         List<String> filters = sourceTypes == null || sourceTypes.isEmpty()
-                ? List.of("MANUSCRIPT_CHUNK", "OUTLINE_NODE", "KNOWLEDGE_DOCUMENT") : sourceTypes;
+                ? List.of("MANUSCRIPT_CHUNK", "KNOWLEDGE_DOCUMENT") : sourceTypes;
         String placeholders = String.join(",", filters.stream().map(ignored -> "?").toList());
         String distance = "(v.embedding::" + type + "(" + space.embeddingDimension() + ") " + operator
                 + " ?::" + type + "(" + space.embeddingDimension() + "))";

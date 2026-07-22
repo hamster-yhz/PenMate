@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.domain.agent.context.model.AgentContextEpoch;
 import com.penmate.backend.domain.agent.context.repository.AgentContextEpochRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -24,7 +25,8 @@ class AgentContextEpochServiceTest {
     private final BusinessIdGenerator idGenerator = mock(BusinessIdGenerator.class);
     private final ObjectStorageService storage = mock(ObjectStorageService.class);
     private final ContextEpochSnapshotCache cache = mock(ContextEpochSnapshotCache.class);
-    private final AgentContextEpochService service = new AgentContextEpochService(repository, idGenerator, storage, new ObjectMapper(), cache);
+    private final AgentContextEpochService service = new AgentContextEpochService(
+            repository, idGenerator, storage, new JacksonJsonCodec(new ObjectMapper()), cache);
 
     @Test
     void should_create_immutable_epoch_and_bind_session_and_run() {

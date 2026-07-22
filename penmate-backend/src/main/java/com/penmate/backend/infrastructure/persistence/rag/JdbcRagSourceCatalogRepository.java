@@ -32,15 +32,10 @@ public class JdbcRagSourceCatalogRepository implements RagSourceCatalogRepositor
                 GROUP BY n.node_id, n.revision, n.title, t.display_name, n.summary, n.body_markdown, n.attributes_json
                 """, (rs, row) -> row(rs), projectId));
         result.addAll(jdbc.query("""
-                SELECT 'OUTLINE_NODE', outline_node_id, revision::text, title,
-                       concat_ws(E'\\n', title, node_type, content), NULL, 'txt', 'text/plain'
-                FROM novel_outline_nodes WHERE project_id = ? AND deleted_at IS NULL
-                """, (rs, row) -> row(rs), projectId));
-        result.addAll(jdbc.query("""
                 SELECT 'MANUSCRIPT_CHUNK', chapter_id, content_revision::text, title,
-                       NULL, content_object_key, 'txt', 'text/plain'
+                       content, NULL, 'txt', 'text/plain'
                 FROM novel_chapters
-                WHERE project_id = ? AND deleted_at IS NULL AND content_object_key <> ''
+                WHERE project_id = ? AND deleted_at IS NULL AND content <> ''
                 """, (rs, row) -> row(rs), projectId));
         result.addAll(jdbc.query("""
                 SELECT 'KNOWLEDGE_DOCUMENT', document_id, source_revision::text, title,

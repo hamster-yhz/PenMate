@@ -1,6 +1,7 @@
 package com.penmate.backend.application.storybible;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.storybible.command.StoryBibleCommands;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.storybible.model.StoryBible;
@@ -19,6 +20,8 @@ import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.domain.storybible.model.StoryBibleSemanticFamily;
 import com.penmate.backend.domain.storybible.model.StoryBibleTag;
 import com.penmate.backend.domain.storybible.repository.StoryBibleRepository;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.penmate.backend.infrastructure.storybible.JacksonStoryBibleValidationEngine;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -39,14 +42,16 @@ class StoryBibleApplicationServiceTest {
     private final StoryBibleChangesetService changesetService = mock(StoryBibleChangesetService.class);
     private final BusinessIdGenerator idGenerator = mock(BusinessIdGenerator.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final StoryBibleSchemaValidator schemaValidator = new StoryBibleSchemaValidator(objectMapper);
+    private final JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
+    private final JacksonStoryBibleValidationEngine validationEngine =
+            new JacksonStoryBibleValidationEngine(objectMapper);
     private final StoryBibleApplicationService service = new StoryBibleApplicationService(
             repository,
             changesetService,
             idGenerator,
-            objectMapper,
-            schemaValidator,
-            new StoryBiblePatchValidator(objectMapper, schemaValidator),
+            jsonCodec,
+            validationEngine,
+            validationEngine,
             mock(StoryBibleEffectiveStateResolver.class),
             mock(StoryBibleProgressionReferenceValidator.class)
     );

@@ -1,6 +1,5 @@
 package com.penmate.backend.application.agent.context;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationCancelledException;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.storybible.StoryBibleEffectiveStateResolver;
@@ -99,7 +98,7 @@ class StoryBibleContextResolverTest {
         when(repository.findNodeTypes(10L)).thenReturn(List.of(type));
         when(repository.findProgressions(eq(10L), anyList())).thenReturn(List.of());
         when(effective.resolve(any(), any(), any(), any(), anyList())).thenReturn(
-                new StoryBibleEffectiveStateResolver.EffectiveState(new ObjectMapper().createObjectNode(),
+                new StoryBibleEffectiveStateResolver.EffectiveState(Map.of(),
                         List.of(), List.of(), List.of(), true));
     }
 

@@ -1,16 +1,20 @@
 package com.penmate.backend.application.storybible;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.novel.ManuscriptPositionResolver;
 import com.penmate.backend.domain.novel.model.NovelChapter;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.storybible.model.StoryBibleNode;
 import com.penmate.backend.domain.storybible.model.StoryBibleNodeType;
 import com.penmate.backend.domain.storybible.model.StoryBibleProgression;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.penmate.backend.infrastructure.storybible.JacksonStoryBibleValidationEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -24,14 +28,14 @@ class StoryBibleEffectiveStateResolverTest {
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
-        StoryBibleSchemaValidator schemaValidator = new StoryBibleSchemaValidator(objectMapper);
-        StoryBiblePatchValidator patchValidator = new StoryBiblePatchValidator(objectMapper, schemaValidator);
+        JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
+        JacksonStoryBibleValidationEngine validationEngine = new JacksonStoryBibleValidationEngine(objectMapper);
         resolver = new StoryBibleEffectiveStateResolver(
                 new ManuscriptPositionResolver(novelGateway),
-                patchValidator,
+                validationEngine,
                 new StoryBibleConflictDetector(),
-                schemaValidator,
-                objectMapper
+                validationEngine,
+                jsonCodec
         );
         when(novelGateway.findChaptersByProjectId(20L)).thenReturn(List.of(chapter(101L), chapter(102L), chapter(103L)));
     }
@@ -45,7 +49,7 @@ class StoryBibleEffectiveStateResolverTest {
 
         assertThat(result.complete()).isTrue();
         assertThat(result.appliedProgressionIds()).containsExactly(201L);
-        assertThat(result.state().at("/attributes/status").asText()).isEqualTo("wounded");
+        assertThat(status(result)).isEqualTo("wounded");
     }
 
     @Test
@@ -57,7 +61,7 @@ class StoryBibleEffectiveStateResolverTest {
 
         assertThat(atEnd.appliedProgressionIds()).containsExactly(201L);
         assertThat(afterEnd.appliedProgressionIds()).isEmpty();
-        assertThat(afterEnd.state().at("/attributes/status").asText()).isEqualTo("healthy");
+        assertThat(status(afterEnd)).isEqualTo("healthy");
     }
 
     @Test
@@ -70,7 +74,7 @@ class StoryBibleEffectiveStateResolverTest {
         assertThat(result.appliedProgressionIds()).isEmpty();
         assertThat(result.unresolvedAnchors()).extracting(StoryBibleEffectiveStateResolver.UnresolvedAnchor::chapterId)
                 .containsExactly(999L);
-        assertThat(result.state().at("/attributes/status").asText()).isEqualTo("healthy");
+        assertThat(status(result)).isEqualTo("healthy");
     }
 
     @Test
@@ -86,7 +90,12 @@ class StoryBibleEffectiveStateResolverTest {
             assertThat(conflict.code()).isEqualTo("SAME_POSITION_PATH_COLLISION");
             assertThat(conflict.progressionIds()).containsExactly(201L, 202L);
         });
-        assertThat(result.state().at("/attributes/status").asText()).isEqualTo("healthy");
+        assertThat(status(result)).isEqualTo("healthy");
+    }
+
+    @SuppressWarnings("unchecked")
+    private String status(StoryBibleEffectiveStateResolver.EffectiveState state) {
+        return String.valueOf(((Map<String, Object>) state.state().get("attributes")).get("status"));
     }
 
     private NovelChapter chapter(Long chapterId) {

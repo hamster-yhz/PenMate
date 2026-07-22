@@ -1,8 +1,7 @@
 package com.penmate.backend.application.rag;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.ops.AsyncJobQueueService;
 import com.penmate.backend.application.rag.command.CreateRagDocumentCommand;
 import com.penmate.backend.application.rag.command.OperateRagDocumentCommand;
@@ -16,7 +15,6 @@ import com.penmate.backend.domain.rag.repository.RagUploadSessionRepository;
 import com.penmate.backend.domain.rag.service.DocumentContentParser;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.domain.shared.service.ObjectStorageService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,11 +43,9 @@ public class RagApplicationService {
     private final ObjectStorageService storage;
     private final DocumentContentParser parser;
     private final AsyncJobQueueService jobs;
-    private final ObjectMapper objectMapper;
-    @Value("${penmate.indexing.max-upload-bytes:10485760}")
-    private long maxUploadBytes = 10485760L;
-    @Value("${penmate.storage.presign-expire-minutes:15}")
-    private long uploadTtlMinutes = 15L;
+    private final JsonCodec jsonCodec;
+    private final long maxUploadBytes;
+    private final long uploadTtlMinutes;
 
     public RagApplicationService(RagDocumentRepository documents,
                                  RagUploadSessionRepository uploads,
@@ -59,7 +55,8 @@ public class RagApplicationService {
                                  ObjectStorageService storage,
                                  DocumentContentParser parser,
                                  AsyncJobQueueService jobs,
-                                 ObjectMapper objectMapper) {
+                                 JsonCodec jsonCodec,
+                                 RagApplicationSettings settings) {
         this.documents = documents;
         this.uploads = uploads;
         this.novels = novels;
@@ -68,7 +65,9 @@ public class RagApplicationService {
         this.storage = storage;
         this.parser = parser;
         this.jobs = jobs;
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
+        this.maxUploadBytes = settings.maxUploadBytes();
+        this.uploadTtlMinutes = settings.uploadTtlMinutes();
     }
 
     public List<RagDocument> listDocuments(Long projectId, Long actorUserId) {
@@ -236,11 +235,7 @@ public class RagApplicationService {
     }
 
     private String json(Object value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Failed to serialize async job payload", exception);
-        }
+        return jsonCodec.write(value);
     }
 
     private void validateUploadDeclaration(String extension, String mimeType, Long size) {
