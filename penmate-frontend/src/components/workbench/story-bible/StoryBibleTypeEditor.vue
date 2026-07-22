@@ -1,23 +1,21 @@
 <template>
   <div v-if="open" class="editor-overlay">
-    <section class="type-editor" role="dialog" aria-modal="true" aria-label="Story Bible 结构管理" tabindex="-1">
+    <section ref="editorRef" class="type-editor" role="dialog" aria-modal="true" aria-label="Story Bible 结构管理" tabindex="-1">
       <header>
         <div>
           <strong>结构管理</strong>
           <span>类型、分类与标签</span>
         </div>
-        <button type="button" class="icon-button" title="关闭" @click="emit('close')"><CloseOutlined /></button>
+        <button type="button" class="icon-button" title="关闭" aria-label="关闭结构管理" @click="emit('close')"><CloseOutlined /></button>
       </header>
 
       <div class="manager-grid">
         <section>
           <h3>自定义类型</h3>
           <div v-for="type in nodeTypes" :key="type.typeId" class="manager-row">
-            <span
-              >{{ type.displayName }} <small>{{ type.semanticFamily }}</small></span
-            >
+            <span><i :style="{ backgroundColor: typeColor(type) }"></i>{{ type.displayName }} <small v-if="type.system">内置</small></span>
             <div class="manager-actions">
-              <button type="button" title="编辑类型" @click="startTypeEdit(type)"><EditOutlined /></button>
+              <button v-if="!type.system" type="button" title="编辑类型" @click="startTypeEdit(type)"><EditOutlined /></button>
               <button
                 v-if="!type.system"
                 type="button"
@@ -30,11 +28,20 @@
             </div>
           </div>
           <form class="inline-form" @submit.prevent="submitType">
-            <input v-model="typeDraft.displayName" placeholder="类型名称" required />
-            <input v-model="typeDraft.typeCode" placeholder="TYPE_CODE" required :disabled="!!typeDraft.typeId" />
-            <select v-model="typeDraft.semanticFamily" :disabled="!!typeDraft.typeId" aria-label="语义类型">
-              <option v-for="family in families" :key="family" :value="family">{{ family }}</option>
-            </select>
+            <input v-model="typeDraft.displayName" data-dialog-initial-focus placeholder="类型名称" required />
+            <div class="type-appearance">
+              <label><span>图标</span><select v-model="typeDraft.iconCode"><option value="user">人物</option><option value="environment">地点</option><option value="team">组织</option><option value="gift">物品</option><option value="global">世界规则</option><option value="calendar">事件</option><option value="bulb">线索</option><option value="bookmark">其他</option></select></label>
+              <label><span>颜色</span><input v-model="typeColorValue" type="color" aria-label="类型颜色" /></label>
+            </div>
+            <div class="field-editor">
+              <header><span>字段定义</span><button type="button" @click="addField"><PlusOutlined />添加字段</button></header>
+              <div v-for="field in typeFields" :key="field.id" class="field-row">
+                <input v-model.trim="field.name" placeholder="字段名称" required />
+                <select v-model="field.type" aria-label="字段类型"><option value="string">文本</option><option value="number">数字</option><option value="boolean">是 / 否</option></select>
+                <button type="button" title="删除字段" class="danger" @click="removeField(field.id)"><DeleteOutlined /></button>
+              </div>
+              <p v-if="!typeFields.length">未定义额外字段</p>
+            </div>
             <div class="form-actions">
               <button type="submit">
                 <SaveOutlined v-if="typeDraft.typeId" /><PlusOutlined v-else /> {{ typeDraft.typeId ? '保存' : '新建' }}
@@ -113,11 +120,10 @@ import { CloseOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SaveOutlined
 import type {
   StoryBibleCategory,
   StoryBibleNodeType,
-  StoryBibleSemanticFamily,
   StoryBibleTag,
   StoryBibleViewPreference,
-} from '@/api/modules/storyBible.api'
-import { useEscapeKey } from '@/composables/useEscapeKey'
+} from '@/entities/story-bible/model'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const props = defineProps<{
   open: boolean
@@ -136,23 +142,23 @@ const emit = defineEmits<{
   (event: 'deleteTag', payload: StoryBibleTag): void
   (event: 'saveView', payload: StoryBibleViewPreference): void
 }>()
+const editorRef = ref<HTMLElement | null>(null)
+useDialogFocus({ open: () => props.open, dialog: editorRef, close: () => emit('close') })
 
-useEscapeKey(
-  () => props.open,
-  () => emit('close'),
-)
-
-const families: StoryBibleSemanticFamily[] = ['CORE', 'CHARACTER', 'WORLD', 'THING', 'NARRATIVE', 'TIMELINE']
+interface TypeFieldDraft { id: number; name: string; type: 'string' | 'number' | 'boolean' }
+let fieldId = 0
 const typeDraft = reactive({
   typeId: '',
   typeCode: '',
-  semanticFamily: 'WORLD' as StoryBibleSemanticFamily,
+  semanticFamily: 'WORLD' as const,
   displayName: '',
   iconCode: 'bookmark',
   fieldSchemaJson: '{}',
   sortOrder: 500,
 })
 const categoryId = ref('')
+const typeColorValue = ref('#6f8fa8')
+const typeFields = ref<TypeFieldDraft[]>([])
 const categoryName = ref('')
 const categoryParentId = ref<string | null>(null)
 const categorySortOrder = ref(0)
@@ -161,10 +167,22 @@ const tagName = ref('')
 const tagColor = ref('#6f8fa8')
 
 const submitType = () => {
-  emit('saveType', { ...typeDraft })
+  const properties = Object.fromEntries(typeFields.value.map((field) => [field.name.trim(), { type: field.type, title: field.name.trim() }]))
+  emit('saveType', {
+    ...typeDraft,
+    typeCode: typeDraft.typeCode || `CUSTOM_${Date.now().toString(36).toUpperCase()}`,
+    fieldSchemaJson: JSON.stringify({ type: 'object', properties, 'x-penmate-color': typeColorValue.value }),
+  })
   resetTypeDraft()
 }
+const schemaDetails = (type: StoryBibleNodeType) => {
+  try {
+    return JSON.parse(type.fieldSchemaJson || '{}') as { properties?: Record<string, { type?: string; title?: string }>; 'x-penmate-color'?: string }
+  } catch { return {} }
+}
+const typeColor = (type: StoryBibleNodeType) => schemaDetails(type)['x-penmate-color'] || '#6f8fa8'
 const startTypeEdit = (type: StoryBibleNodeType) => {
+  const schema = schemaDetails(type)
   Object.assign(typeDraft, {
     typeId: type.typeId,
     typeCode: type.typeCode,
@@ -174,6 +192,8 @@ const startTypeEdit = (type: StoryBibleNodeType) => {
     fieldSchemaJson: type.fieldSchemaJson,
     sortOrder: type.sortOrder,
   })
+  typeColorValue.value = schema['x-penmate-color'] || '#6f8fa8'
+  typeFields.value = Object.entries(schema.properties || {}).map(([key, value]) => ({ id: ++fieldId, name: value.title || key, type: ['number', 'boolean'].includes(value.type || '') ? value.type as 'number' | 'boolean' : 'string' }))
 }
 const resetTypeDraft = () => {
   typeDraft.typeId = ''
@@ -183,7 +203,11 @@ const resetTypeDraft = () => {
   typeDraft.iconCode = 'bookmark'
   typeDraft.fieldSchemaJson = '{}'
   typeDraft.sortOrder = 500
+  typeColorValue.value = '#6f8fa8'
+  typeFields.value = []
 }
+const addField = () => typeFields.value.push({ id: ++fieldId, name: '', type: 'string' })
+const removeField = (id: number) => { typeFields.value = typeFields.value.filter((field) => field.id !== id) }
 const submitCategory = () => {
   emit('saveCategory', {
     categoryId: categoryId.value || undefined,
@@ -229,15 +253,16 @@ const resetTagDraft = () => {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(3, 7, 16, 0.76);
+  background: var(--overlay);
 }
 .type-editor {
   width: min(920px, 100%);
   max-height: min(720px, 90vh);
   overflow: auto;
-  border: 1px solid var(--border-gold);
-  border-radius: 6px;
-  background: rgba(11, 17, 32, 0.98);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-lg);
 }
 header {
@@ -246,6 +271,7 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
 }
 header div {
@@ -278,7 +304,7 @@ header span {
 }
 h3 {
   margin: 0 0 10px;
-  color: var(--amber-gold);
+  color: var(--text-primary);
   font-size: 0.84rem;
 }
 .manager-row {
@@ -296,12 +322,12 @@ h3 {
 }
 .manager-row button {
   border: 0;
-  color: var(--amber-gold);
+  color: var(--accent);
   background: transparent;
   cursor: pointer;
 }
 .manager-row button.danger {
-  color: #c9827b;
+  color: var(--danger);
 }
 .manager-actions,
 .form-actions {
@@ -328,6 +354,15 @@ h3 {
   gap: 6px;
   margin-top: 12px;
 }
+.type-appearance { display: grid; grid-template-columns: 1fr 74px; gap: 6px; }
+.type-appearance label { display: grid; gap: 4px; color: var(--text-muted); font-size: 11px; }
+.type-appearance input[type='color'] { width: 100%; padding: 3px; }
+.field-editor { border: 1px solid var(--border-subtle); border-radius: 4px; }
+.field-editor header { min-height: 34px; height: auto; padding: 0 8px; }
+.field-editor header button { display: inline-flex; align-items: center; gap: 4px; padding: 0; color: var(--accent); background: transparent; border: 0; }
+.field-row { display: grid; grid-template-columns: 1fr 86px 28px; gap: 5px; padding: 6px; border-top: 1px solid var(--border-subtle); }
+.field-row button { border: 0; color: var(--danger); background: transparent; }
+.field-editor > p { margin: 0; padding: 10px 8px; color: var(--text-muted); font-size: 11px; }
 .inline-form.compact {
   grid-template-columns: 1fr auto;
 }
@@ -342,7 +377,7 @@ select,
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-primary);
-  background: rgba(17, 24, 39, 0.9);
+  background: var(--bg-surface);
 }
 input,
 select {
@@ -350,8 +385,8 @@ select {
 }
 .inline-form button {
   padding: 0 10px;
-  color: var(--amber-gold);
-  border-color: var(--border-gold);
+  color: var(--accent);
+  border-color: var(--accent-border);
   cursor: pointer;
 }
 .form-actions > button:last-child:not(:first-child) {
@@ -379,7 +414,7 @@ select {
 .view-row button {
   height: 30px;
   border: 0;
-  color: var(--amber-gold);
+  color: var(--accent);
   background: transparent;
   cursor: pointer;
 }

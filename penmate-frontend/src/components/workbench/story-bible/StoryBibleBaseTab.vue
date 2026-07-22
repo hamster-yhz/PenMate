@@ -79,7 +79,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { StoryBibleCategory, StoryBibleNodeType, StoryBibleTag } from '@/api/modules/storyBible.api'
+import type { StoryBibleCategory, StoryBibleNodeType, StoryBibleTag } from '@/entities/story-bible/model'
 import type { StoryBibleNodeDraft } from '@/composables/workbench/useStoryBible'
 
 const props = defineProps<{
@@ -146,7 +146,7 @@ select {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-primary);
-  background: rgba(11, 17, 32, 0.68);
+  background: var(--bg-surface);
   outline: none;
 }
 input,
@@ -162,7 +162,8 @@ textarea {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--border-gold);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 .field-grid {
   display: grid;
@@ -175,11 +176,11 @@ select:focus {
   padding: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
-  background: rgba(17, 24, 39, 0.4);
+  background: var(--bg-subtle);
 }
 .schema-fields h3 {
   margin: 0 0 10px;
-  color: var(--amber-gold);
+  color: var(--text-primary);
   font-size: 0.78rem;
 }
 fieldset {

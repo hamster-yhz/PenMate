@@ -1,27 +1,38 @@
 <template>
   <div class="relations-tab">
+    <div class="view-switch" role="tablist" aria-label="关系视图">
+      <button type="button" :class="{ active: viewMode === 'graph' }" @click="viewMode = 'graph'">关系图</button>
+      <button type="button" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">列表</button>
+    </div>
+    <StoryBibleRelationshipGraph v-if="viewMode === 'graph'" :node-id="nodeId" :nodes="nodes" :relations="relations" @select="emit('selectNode', $event)" />
     <form class="relation-form" @submit.prevent="submit">
       <select v-model="targetNodeId" required aria-label="目标节点">
         <option value="" disabled>选择目标节点</option>
         <option v-for="node in availableTargets" :key="node.nodeId" :value="node.nodeId">{{ node.title }}</option>
       </select>
-      <input v-model="relationType" required placeholder="关系类型，例如 ALLY_OF" />
+      <select v-model="relationType" required aria-label="关系类型">
+        <option value="" disabled>选择关系</option>
+        <option v-for="option in relationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+      </select>
       <input v-model="description" placeholder="关系说明" />
       <button type="submit"><PlusOutlined /> 添加关系</button>
     </form>
 
-    <div class="relation-list">
+    <div v-if="viewMode === 'list'" class="relation-list">
       <div v-for="relation in relations" :key="relation.relationId" class="relation-row">
         <div v-if="editingRelationId === relation.relationId" class="relation-edit">
           <select v-model="editTargetNodeId" required aria-label="编辑目标节点">
             <option v-for="node in availableTargets" :key="node.nodeId" :value="node.nodeId">{{ node.title }}</option>
           </select>
-          <input v-model="editRelationType" required aria-label="编辑关系类型" />
+          <select v-model="editRelationType" required aria-label="编辑关系类型">
+            <option v-if="!knownRelation(editRelationType)" :value="editRelationType">其他关系</option>
+            <option v-for="option in relationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
           <input v-model="editDescription" aria-label="编辑关系说明" />
         </div>
         <div v-else class="relation-copy">
           <strong>{{ nodeName(relation.sourceNodeId) }} → {{ nodeName(relation.targetNodeId) }}</strong>
-          <span>{{ relation.relationType }}</span>
+          <span>{{ relationName(relation.relationType) }}</span>
           <small>{{ relation.description || '无说明' }}</small>
         </div>
         <div class="row-actions">
@@ -45,14 +56,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { CloseOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons-vue'
-import type { StoryBibleNode, StoryBibleRelation, StoryBibleRelationUpdatePayload } from '@/api/modules/storyBible.api'
+import type { StoryBibleNode, StoryBibleRelation, StoryBibleRelationUpdatePayload } from '@/entities/story-bible/model'
+import StoryBibleRelationshipGraph from './StoryBibleRelationshipGraph.vue'
 
 const props = defineProps<{ nodeId: string; nodes: StoryBibleNode[]; relations: StoryBibleRelation[] }>()
 const emit = defineEmits<{
   (event: 'create', payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'revision'>): void
   (event: 'update', payload: { relationId: string; update: StoryBibleRelationUpdatePayload }): void
   (event: 'delete', payload: StoryBibleRelation): void
+  (event: 'selectNode', nodeId: string): void
 }>()
+const viewMode = ref<'graph' | 'list'>('graph')
 const targetNodeId = ref('')
 const relationType = ref('')
 const description = ref('')
@@ -60,13 +74,25 @@ const editingRelationId = ref('')
 const editTargetNodeId = ref('')
 const editRelationType = ref('')
 const editDescription = ref('')
+const relationOptions = [
+  { value: 'ALLY_OF', label: '盟友' },
+  { value: 'ENEMY_OF', label: '敌对' },
+  { value: 'MEMBER_OF', label: '隶属' },
+  { value: 'LOCATED_IN', label: '位于' },
+  { value: 'OWNS', label: '拥有' },
+  { value: 'FAMILY_OF', label: '亲属' },
+  { value: 'KNOWS', label: '相识' },
+  { value: 'CONNECTED_TO', label: '关联' },
+]
+const knownRelation = (value: string) => relationOptions.some((option) => option.value === value)
+const relationName = (value: string) => relationOptions.find((option) => option.value === value)?.label || '其他关系'
 const availableTargets = computed(() => props.nodes.filter((node) => node.nodeId !== props.nodeId))
 const nodeName = (id: string) => props.nodes.find((node) => node.nodeId === id)?.title || id
 const submit = () => {
   emit('create', {
     sourceNodeId: props.nodeId,
     targetNodeId: targetNodeId.value,
-    relationType: relationType.value.trim().toUpperCase(),
+    relationType: relationType.value,
     description: description.value,
     attributesJson: '{}',
   })
@@ -89,7 +115,7 @@ const saveEdit = (relation: StoryBibleRelation) => {
     update: {
       expectedRevision: relation.revision,
       targetNodeId: editTargetNodeId.value,
-      relationType: editRelationType.value.trim().toUpperCase(),
+      relationType: editRelationType.value,
       description: editDescription.value,
       attributesJson: relation.attributesJson || '{}',
     },
@@ -100,11 +126,14 @@ const saveEdit = (relation: StoryBibleRelation) => {
 
 <style scoped lang="less">
 .relations-tab {
+  display: grid;
+  gap: 12px;
   padding: 16px;
 }
+.view-switch { display: flex; width: max-content; padding: 3px; background: var(--bg-subtle); border-radius: 5px; }.view-switch button { min-width: 56px; height: 28px; padding: 0 8px; color: var(--text-muted); background: transparent; border: 0; }.view-switch button.active { color: var(--text-primary); background: var(--bg-surface); box-shadow: var(--shadow-xs); }
 .relation-form {
   display: grid;
-  grid-template-columns: minmax(130px, 0.8fr) minmax(130px, 0.7fr) minmax(160px, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-subtle);
@@ -117,7 +146,7 @@ button {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-primary);
-  background: rgba(11, 17, 32, 0.7);
+  background: var(--bg-surface);
 }
 input,
 select {
@@ -125,9 +154,10 @@ select {
 }
 button {
   padding: 0 10px;
-  color: var(--amber-gold);
-  border-color: var(--border-gold);
+  color: var(--accent);
+  border-color: var(--accent-border);
   cursor: pointer;
+  white-space: nowrap;
 }
 .relation-row {
   min-height: 66px;
@@ -155,7 +185,7 @@ button {
   font-size: 0.8rem;
 }
 .relation-row span {
-  color: var(--amber-gold);
+  color: var(--accent);
   font-size: 0.7rem;
 }
 .relation-row small {
@@ -169,12 +199,12 @@ button {
 .relation-row button {
   width: 32px;
   padding: 0;
-  color: var(--amber-gold);
+  color: var(--accent);
   border-color: transparent;
   background: transparent;
 }
 .relation-row button.danger {
-  color: #c9827b;
+  color: var(--danger);
 }
 .empty-state {
   padding: 28px;
@@ -182,7 +212,6 @@ button {
   color: var(--text-muted);
 }
 @media (max-width: 820px) {
-  .relation-form,
   .relation-edit {
     grid-template-columns: 1fr 1fr;
   }

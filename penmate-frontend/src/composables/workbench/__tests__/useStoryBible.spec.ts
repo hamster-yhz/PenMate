@@ -70,9 +70,6 @@ describe('useStoryBible', () => {
     vi.spyOn(storyBibleApi, 'listProgressions').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listChanges').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listNodeChanges').mockResolvedValue([])
-    vi.spyOn(storyBibleApi, 'getProjectRoutingPreference').mockResolvedValue({
-      mode: 'RETRIEVAL',
-    })
     vi.spyOn(storyBibleApi, 'getNode').mockResolvedValue({
       node,
       aliases: [{ aliasId: '81', nodeId: '71', alias: 'Captain' }],

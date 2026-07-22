@@ -1,171 +1,24 @@
 import request from '@/utils/request'
+import type {
+  StoryBibleCanonStatus,
+  StoryBibleCategory,
+  StoryBibleChangeset,
+  StoryBibleChangesetDetails,
+  StoryBibleNode,
+  StoryBibleNodeDetails,
+  StoryBibleNodePayload,
+  StoryBibleNodeType,
+  StoryBibleNodeUpdatePayload,
+  StoryBibleProgression,
+  StoryBibleProgressionUpdatePayload,
+  StoryBibleRelation,
+  StoryBibleRelationUpdatePayload,
+  StoryBibleRoot,
+  StoryBibleTag,
+  StoryBibleViewPreference,
+} from '@/entities/story-bible/model'
 
-export type StoryBibleSemanticFamily = 'CORE' | 'CHARACTER' | 'WORLD' | 'THING' | 'NARRATIVE' | 'TIMELINE'
-export type StoryBibleInclusionPolicy = 'ALWAYS_INCLUDE' | 'AUTO_RETRIEVE' | 'MANUAL_ONLY'
-export type StoryBibleCanonStatus = 'DRAFT' | 'CANON' | 'ARCHIVED'
-export type StoryBibleRoutingMode = 'RETRIEVAL' | 'LLM_SELECTOR' | 'RETRIEVAL_THEN_LLM'
-
-export interface StoryBibleRoot {
-  storyBibleId: string
-  projectId: string
-  title: string
-  description?: string | null
-  contentRevision: number
-}
-
-export interface StoryBibleViewPreference {
-  storyBibleId: string
-  viewCode: string
-  displayName: string
-  hidden: boolean
-  sortOrder: number
-}
-
-export interface StoryBibleNodeType {
-  typeId: string
-  storyBibleId: string
-  typeCode: string
-  semanticFamily: StoryBibleSemanticFamily
-  displayName: string
-  iconCode?: string | null
-  fieldSchemaJson: string
-  system: boolean
-  sortOrder: number
-}
-
-export interface StoryBibleNode {
-  nodeId: string
-  storyBibleId: string
-  typeId: string
-  title: string
-  summary?: string | null
-  bodyMarkdown?: string | null
-  attributesJson: string
-  inclusionPolicy: StoryBibleInclusionPolicy
-  canonStatus: StoryBibleCanonStatus
-  revision: number
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface StoryBibleAlias {
-  aliasId: string
-  nodeId: string
-  alias: string
-}
-
-export interface StoryBibleNodeDetails {
-  node: StoryBibleNode
-  aliases: StoryBibleAlias[]
-  categoryIds: string[]
-  tagIds: string[]
-}
-
-export interface StoryBibleCategory {
-  categoryId: string
-  storyBibleId: string
-  parentCategoryId?: string | null
-  name: string
-  sortOrder: number
-}
-
-export interface StoryBibleTag {
-  tagId: string
-  storyBibleId: string
-  name: string
-  normalizedName: string
-  color?: string | null
-}
-
-export interface StoryBibleRelation {
-  relationId: string
-  storyBibleId: string
-  sourceNodeId: string
-  relationType: string
-  targetNodeId: string
-  description?: string | null
-  attributesJson: string
-  revision: number
-}
-
-export interface StoryBibleRelationUpdatePayload {
-  expectedRevision: number
-  relationType: string
-  targetNodeId: string
-  description?: string | null
-  attributesJson: string
-}
-
-export interface StoryBibleProgression {
-  progressionId: string
-  storyBibleId: string
-  nodeId: string
-  anchorChapterId: string
-  endChapterId?: string | null
-  storyEventNodeId?: string | null
-  patchJson: string
-  summary?: string | null
-  revision: number
-}
-
-export interface StoryBibleProgressionUpdatePayload {
-  expectedRevision: number
-  anchorChapterId: string
-  endChapterId?: string | null
-  storyEventNodeId?: string | null
-  patchJson: string
-  summary?: string | null
-}
-
-export interface StoryBibleChangeset {
-  changesetId: string
-  storyBibleId: string
-  contentRevision: number
-  actorType: 'USER' | 'AGENT' | 'SYSTEM'
-  actorId?: string | null
-  sourceRunId?: string | null
-  changeSummary: string
-  createdAt: string
-}
-
-export interface StoryBibleChangeItem {
-  changeItemId: string
-  changesetId: string
-  entityType: string
-  entityId: string
-  operation: string
-  fieldPath: string
-  beforeJson?: string | null
-  afterJson?: string | null
-  createdAt: string
-}
-
-export interface StoryBibleChangesetDetails {
-  changeset: StoryBibleChangeset
-  items: StoryBibleChangeItem[]
-}
-
-export interface StoryBibleRoutingPreference {
-  mode: StoryBibleRoutingMode
-  routerModelConfigId?: string | null
-}
-
-export interface StoryBibleNodePayload {
-  typeId: string
-  title: string
-  summary?: string | null
-  bodyMarkdown?: string | null
-  attributesJson: string
-  inclusionPolicy: StoryBibleInclusionPolicy
-  canonStatus: StoryBibleCanonStatus
-  aliases: string[]
-  categoryIds: string[]
-  tagIds: string[]
-}
-
-export interface StoryBibleNodeUpdatePayload extends StoryBibleNodePayload {
-  expectedRevision: number
-}
+export type * from '@/entities/story-bible/model'
 
 const base = (projectId: string) => `/v1/novels/${projectId}/story-bible`
 // Kept temporarily to preserve caller signatures while actor identity comes exclusively from the bearer session.
@@ -349,17 +202,5 @@ export const storyBibleApi = {
   },
   listNodeChanges(projectId: string, nodeId: string, limit = 50) {
     return request.get<StoryBibleChangeset[]>(`${base(projectId)}/nodes/${nodeId}/changesets?limit=${limit}`)
-  },
-  getProjectRoutingPreference(projectId: string) {
-    return request.get<StoryBibleRoutingPreference>(`/v1/novels/${projectId}/agent/routing-preference`)
-  },
-  updateProjectRoutingPreference(
-    projectId: string,
-    payload: { mode: StoryBibleRoutingMode; routerModelConfigId?: string | null },
-  ) {
-    return request.put<StoryBibleRoutingPreference>(
-      `/v1/novels/${projectId}/agent/routing-preference`,
-      payload,
-    )
   },
 }

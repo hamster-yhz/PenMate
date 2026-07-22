@@ -1,7 +1,7 @@
 <template>
   <nav class="sb-navigator">
     <div class="nav-section">
-      <div class="section-title">语义层</div>
+      <div class="section-title">设定分组</div>
       <button
         v-for="family in families"
         :key="family.key"
@@ -17,7 +17,7 @@
     <div class="nav-section types">
       <div class="section-title">
         <span>节点类型</span>
-        <button class="mini-button" type="button" title="管理类型" @click="emit('manageTypes')">
+        <button class="mini-button" type="button" title="管理类型" aria-label="管理 Story Bible 结构" @click="emit('manageTypes')">
           <SettingOutlined />
         </button>
       </div>
@@ -69,7 +69,7 @@ import {
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
-import type { StoryBibleCategory, StoryBibleNodeType, StoryBibleTag } from '@/api/modules/storyBible.api'
+import type { StoryBibleCategory, StoryBibleNodeType, StoryBibleTag } from '@/entities/story-bible/model'
 import StoryBibleCategoryTree from './StoryBibleCategoryTree.vue'
 
 defineProps<{
@@ -105,7 +105,7 @@ const families = [
   min-width: 0;
   overflow-y: auto;
   border-right: 1px solid var(--border-subtle);
-  background: rgba(11, 17, 32, 0.72);
+  background: var(--bg-surface);
 }
 .nav-section {
   padding: 8px 0;
@@ -119,7 +119,6 @@ const families = [
   padding: 0 10px;
   color: var(--text-muted);
   font-size: 0.68rem;
-  text-transform: uppercase;
 }
 .nav-section > button:not(.mini-button),
 .types > button {
@@ -137,8 +136,8 @@ const families = [
 }
 .nav-section > button:hover,
 .nav-section > button.active {
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.08);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .type-mark {
   width: 20px;
@@ -171,12 +170,12 @@ const families = [
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-secondary);
-  background: rgba(17, 24, 39, 0.7);
+  background: var(--bg-surface);
   cursor: pointer;
 }
 .tag-chip.active {
-  border-color: var(--border-gold);
-  color: var(--amber-gold);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 .tag-color {
   width: 7px;

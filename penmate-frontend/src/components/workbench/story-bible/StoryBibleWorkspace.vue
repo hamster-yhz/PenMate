@@ -4,65 +4,54 @@
       <div>
         <BookOutlined />
         <strong>{{ story.root.value?.title || 'Story Bible' }}</strong>
-        <span>修订 {{ story.root.value?.contentRevision || 0 }}</span>
+        <span>{{ story.nodes.value.length }} 项设定</span>
       </div>
       <div class="status-actions">
         <span v-if="story.errorMessage.value" class="error-text">{{ story.errorMessage.value }}</span>
         <ReloadOutlined v-if="story.loading.value" spin />
-        <div class="mobile-tools">
-          <button type="button" title="打开 Story Bible 导航" @click="toggleMobilePanel('navigation')">
-            <AppstoreOutlined />
-          </button>
-          <button type="button" title="打开节点列表" @click="toggleMobilePanel('nodes')">
-            <UnorderedListOutlined />
-          </button>
+        <div class="mobile-tools" role="tablist" aria-label="Story Bible 视图">
+          <button type="button" :class="{ active: mobilePane === 'browser' }" @click="mobilePane = 'browser'"><AppstoreOutlined />导航</button>
+          <button type="button" :class="{ active: mobilePane === 'detail' }" @click="mobilePane = 'detail'"><UnorderedListOutlined />详情</button>
         </div>
       </div>
     </div>
 
-    <button
-      v-if="mobilePanel"
-      type="button"
-      class="mobile-backdrop"
-      aria-label="关闭移动面板"
-      @click="mobilePanel = ''"
-    ></button>
-
     <div class="workspace-grid">
-      <StoryBibleNavigator
-        class="story-navigator-panel"
-        :class="{ 'is-mobile-open': mobilePanel === 'navigation' }"
-        :node-types="story.visibleTypes.value"
-        :categories="story.categories.value"
-        :tags="story.tags.value"
-        :selected-family="story.selectedFamily.value"
-        :selected-type-id="story.selectedTypeId.value"
-        :selected-category-id="story.selectedCategoryId.value"
-        :selected-tag-id="story.selectedTagId.value"
-        @update:selected-family="story.selectedFamily.value = $event"
-        @update:selected-type-id="story.selectedTypeId.value = $event"
-        @update:selected-category-id="story.selectedCategoryId.value = $event"
-        @update:selected-tag-id="story.selectedTagId.value = $event"
-        @manage-types="showTypeEditor = true"
-      />
-
-      <section class="node-browser" :class="{ 'is-mobile-open': mobilePanel === 'nodes' }">
-        <StoryBibleSearchToolbar
-          :query="story.searchQuery.value"
-          :status="story.canonFilter.value"
-          @update:query="story.searchQuery.value = $event"
-          @update:status="story.canonFilter.value = $event as any"
-          @create="story.createNodeDraft()"
+      <aside class="story-browser" :class="{ 'mobile-hidden': mobilePane !== 'browser' }">
+        <StoryBibleNavigator
+          :node-types="story.visibleTypes.value"
+          :categories="story.categories.value"
+          :tags="story.tags.value"
+          :selected-family="story.selectedFamily.value"
+          :selected-type-id="story.selectedTypeId.value"
+          :selected-category-id="story.selectedCategoryId.value"
+          :selected-tag-id="story.selectedTagId.value"
+          @update:selected-family="story.selectedFamily.value = $event"
+          @update:selected-type-id="story.selectedTypeId.value = $event"
+          @update:selected-category-id="story.selectedCategoryId.value = $event"
+          @update:selected-tag-id="story.selectedTagId.value = $event"
+          @manage-types="showTypeEditor = true"
         />
-        <StoryBibleNodeList
-          :nodes="story.filteredNodes.value"
-          :node-types="story.nodeTypes.value"
-          :selected-node-id="story.selectedNodeId.value"
-          @select="selectNode"
-        />
-      </section>
+        <section class="node-browser">
+          <StoryBibleSearchToolbar
+            :query="story.searchQuery.value"
+            :status="story.canonFilter.value"
+            @update:query="story.searchQuery.value = $event"
+            @update:status="story.canonFilter.value = $event as any"
+            @create="story.createNodeDraft()"
+          />
+          <StoryBibleNodeList
+            :nodes="story.filteredNodes.value"
+            :node-types="story.nodeTypes.value"
+            :selected-node-id="story.selectedNodeId.value"
+            @select="selectNode"
+          />
+        </section>
+      </aside>
 
       <StoryBibleNodeEditor
+        class="story-detail"
+        :class="{ 'mobile-hidden': mobilePane !== 'detail' }"
         :draft="story.draft.value"
         :saving="story.saving.value"
         :chapter-id="chapterId"
@@ -77,10 +66,10 @@
         :effective-state="story.effectiveState.value"
         @save="story.saveNode()"
         @delete="deleteNode"
-        @open-routing="showRoutingSettings = true"
         @create-relation="run(() => story.createRelation($event))"
         @update-relation="run(() => story.updateRelation($event.relationId, $event.update))"
         @delete-relation="run(() => story.deleteRelation($event))"
+        @select-node="selectNode"
         @create-progression="run(() => story.createProgression($event))"
         @update-progression="run(() => story.updateProgression($event.progressionId, $event.update))"
         @delete-progression="run(() => story.deleteProgression($event))"
@@ -103,12 +92,6 @@
       @delete-tag="run(() => story.deleteTag($event))"
       @save-view="run(() => story.saveViewPreference($event))"
     />
-    <StoryBibleRoutingSettings
-      v-if="showRoutingSettings"
-      :project-preference="story.projectRoutingPreference.value"
-      @close="showRoutingSettings = false"
-      @save="run(() => story.saveProjectRoutingPreference($event))"
-    />
   </main>
 </template>
 
@@ -120,7 +103,6 @@ import { useStoryBible } from '@/composables/workbench/useStoryBible'
 import StoryBibleNavigator from './StoryBibleNavigator.vue'
 import StoryBibleNodeEditor from './StoryBibleNodeEditor.vue'
 import StoryBibleNodeList from './StoryBibleNodeList.vue'
-import StoryBibleRoutingSettings from './StoryBibleRoutingSettings.vue'
 import StoryBibleSearchToolbar from './StoryBibleSearchToolbar.vue'
 import StoryBibleTypeEditor from './StoryBibleTypeEditor.vue'
 import type { StoryBibleChapterOption } from './storyBibleTypes'
@@ -137,8 +119,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (event: 'openRun', runId: string): void }>()
 const showTypeEditor = ref(false)
-const showRoutingSettings = ref(false)
-const mobilePanel = ref<'' | 'navigation' | 'nodes'>('')
+const mobilePane = ref<'browser' | 'detail'>('detail')
 const story = useStoryBible({
   getContext: () => ({
     projectId: props.projectId,
@@ -161,10 +142,7 @@ const run = async (action: () => Promise<unknown>) => {
 }
 const selectNode = async (nodeId: string) => {
   await story.selectNode(nodeId)
-  mobilePanel.value = ''
-}
-const toggleMobilePanel = (panel: 'navigation' | 'nodes') => {
-  mobilePanel.value = mobilePanel.value === panel ? '' : panel
+  mobilePane.value = 'detail'
 }
 const deleteNode = async () => {
   if (!window.confirm('确认删除当前 Story Bible 节点？')) return
@@ -225,8 +203,7 @@ defineExpose({ reload })
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: rgba(11, 17, 32, 0.58);
-  box-shadow: var(--shadow-lg), var(--shadow-gold);
+  background: var(--bg-editor);
 }
 .workspace-statusbar {
   height: 42px;
@@ -237,7 +214,7 @@ defineExpose({ reload })
   gap: 12px;
   padding: 0 12px;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(11, 17, 32, 0.88);
+  background: var(--bg-surface);
 }
 .workspace-statusbar div {
   min-width: 0;
@@ -246,7 +223,7 @@ defineExpose({ reload })
   gap: 8px;
 }
 .workspace-statusbar strong {
-  color: var(--amber-gold);
+  color: var(--accent);
   font-size: 0.82rem;
 }
 .workspace-statusbar span {
@@ -255,7 +232,7 @@ defineExpose({ reload })
 }
 .workspace-statusbar .error-text {
   overflow: hidden;
-  color: #d19087;
+  color: var(--danger);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -276,42 +253,43 @@ defineExpose({ reload })
   display: none;
 }
 .mobile-tools button {
-  width: 32px;
+  min-width: 58px;
   height: 32px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
-  color: var(--amber-gold);
-  background: rgba(17, 24, 39, 0.9);
+  color: var(--text-muted);
+  background: var(--bg-surface);
   cursor: pointer;
-}
-.mobile-backdrop {
-  display: none;
 }
 .workspace-grid {
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(150px, 180px) minmax(210px, 260px) minmax(360px, 1fr);
+  grid-template-columns: minmax(260px, 320px) minmax(420px, 1fr);
+}
+.story-browser {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr);
+  overflow: auto;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
 }
 .node-browser {
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-subtle);
-  background: rgba(17, 24, 39, 0.42);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
 }
 .node-browser :deep(.sb-node-list) {
   flex: 1;
 }
-@media (max-width: 1080px) {
-  .workspace-grid {
-    grid-template-columns: 150px 220px minmax(340px, 1fr);
-  }
-}
-@media (max-width: 1080px) {
+@media (max-width: 900px) {
   .story-bible-workspace {
     overflow: hidden;
   }
@@ -322,51 +300,26 @@ defineExpose({ reload })
   .workspace-statusbar > div:first-child span {
     display: none;
   }
-  .status-actions {
-    padding-right: 76px;
-  }
+  .status-actions { padding-right: 128px; }
   .mobile-tools {
     position: absolute;
     top: 7px;
     right: 8px;
     z-index: 2;
     display: flex;
-    gap: 4px;
-  }
-  .mobile-backdrop {
-    position: absolute;
-    inset: 46px 0 0;
-    z-index: 20;
-    display: block;
-    width: 100%;
-    height: auto;
-    border: 0;
-    background: rgba(3, 7, 16, 0.62);
+    gap: 2px;
   }
   .workspace-grid {
     position: relative;
     display: block;
     min-height: 0;
   }
-  .story-navigator-panel,
-  .node-browser {
-    position: absolute;
-    inset: 0 auto 0 0;
-    z-index: 21;
-    width: min(84vw, 310px);
-    border-right: 1px solid var(--border-gold);
-    background: rgba(11, 17, 32, 0.99);
-    box-shadow: var(--shadow-lg);
-    transform: translateX(-105%);
-    transition: transform 0.2s var(--ease-silk);
-  }
-  .story-navigator-panel.is-mobile-open,
-  .node-browser.is-mobile-open {
-    transform: translateX(0);
-  }
-  .workspace-grid > :last-child {
+  .story-browser,
+  .story-detail {
     width: 100%;
     height: 100%;
   }
+  .mobile-hidden { display: none !important; }
+  .mobile-tools button.active { color: var(--accent); background: var(--accent-soft); }
 }
 </style>

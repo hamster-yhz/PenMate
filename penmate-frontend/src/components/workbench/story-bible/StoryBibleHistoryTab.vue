@@ -1,22 +1,23 @@
 <template>
   <div class="history-tab">
     <div v-for="change in history" :key="change.changesetId" class="history-row">
-      <span class="actor" :class="change.actorType.toLowerCase()">{{ change.actorType }}</span>
+      <span class="actor" :class="change.actorType.toLowerCase()">{{ actorName(change.actorType) }}</span>
       <div>
         <strong>{{ change.changeSummary }}</strong>
-        <small>修订 {{ change.contentRevision }} · {{ formatTime(change.createdAt) }}</small>
+        <small>{{ formatTime(change.createdAt) }}</small>
       </div>
-      <button v-if="change.sourceRunId" type="button" @click="emit('openRun', change.sourceRunId)">查看 Run</button>
+      <button v-if="change.sourceRunId" type="button" @click="emit('openRun', change.sourceRunId)">查看 AI 任务</button>
     </div>
     <div v-if="!history.length" class="empty-state">暂无变更记录</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { StoryBibleChangeset } from '@/api/modules/storyBible.api'
+import type { StoryBibleChangeset } from '@/entities/story-bible/model'
 defineProps<{ history: StoryBibleChangeset[] }>()
 const emit = defineEmits<{ (event: 'openRun', runId: string): void }>()
 const formatTime = (value: string) => (value ? new Date(value).toLocaleString() : '')
+const actorName = (type: StoryBibleChangeset['actorType']) => ({ USER: '作者', AGENT: 'AI', SYSTEM: '系统' })[type]
 </script>
 
 <style scoped lang="less">
@@ -40,8 +41,8 @@ const formatTime = (value: string) => (value ? new Date(value).toLocaleString() 
   text-align: center;
 }
 .actor.agent {
-  color: var(--amber-gold);
-  border-color: var(--border-gold);
+  color: var(--accent);
+  border-color: var(--accent-border);
 }
 .history-row div {
   min-width: 0;

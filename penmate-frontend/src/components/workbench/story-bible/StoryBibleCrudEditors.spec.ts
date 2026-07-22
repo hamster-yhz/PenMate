@@ -48,6 +48,7 @@ describe('Story Bible CRUD editors', () => {
       },
     })
 
+    await wrapper.findAll('.view-switch button')[1].trigger('click')
     await wrapper.get('[title="编辑关系"]').trigger('click')
     await wrapper.get('[aria-label="编辑关系说明"]').setValue('New')
     await wrapper.get('[title="保存关系"]').trigger('click')
@@ -141,7 +142,7 @@ describe('Story Bible CRUD editors', () => {
             displayName: 'Character',
             iconCode: 'user',
             fieldSchemaJson: '{}',
-            system: true,
+            system: false,
             sortOrder: 1,
           },
         ],
@@ -164,5 +165,23 @@ describe('Story Bible CRUD editors', () => {
     expect(wrapper.emitted('saveType')?.[0]?.[0]).toMatchObject({ typeId: '21', displayName: 'Person' })
     expect(wrapper.emitted('saveCategory')?.[0]?.[0]).toMatchObject({ categoryId: '31', name: 'Main cast' })
     expect(wrapper.emitted('saveTag')?.[0]?.[0]).toMatchObject({ tagId: '41', name: 'Primary' })
+    expect(wrapper.text()).not.toContain('semanticFamily')
+    expect(wrapper.text()).not.toContain('RFC 6902')
+  })
+
+  it('keeps JSON Patch internal while emitting readable property changes', async () => {
+    const wrapper = mount(StoryBibleProgressionsTab, {
+      props: { chapterId: '301', chapters: [{ chapterId: '301', displayNo: 1, title: 'Opening' }], effectiveState: { 身份: '旅人' }, progressions: [] },
+    })
+
+    expect(wrapper.text()).toContain('身份')
+    expect(wrapper.text()).not.toContain('RFC 6902')
+    await wrapper.get('.change-editor header button').trigger('click')
+    await wrapper.get('[aria-label="属性名"]').setValue('身份')
+    await wrapper.get('[aria-label="属性值"]').setValue('领队')
+    await wrapper.get('.progression-form').trigger('submit')
+
+    const payload = wrapper.emitted('create')?.[0]?.[0] as { patchJson: string }
+    expect(JSON.parse(payload.patchJson)).toEqual([{ op: 'replace', path: '/身份', value: '领队' }])
   })
 })

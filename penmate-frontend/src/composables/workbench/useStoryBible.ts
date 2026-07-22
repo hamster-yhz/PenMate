@@ -1,24 +1,22 @@
 import { computed, ref } from 'vue'
-import {
-  storyBibleApi,
-  type StoryBibleCanonStatus,
-  type StoryBibleCategory,
-  type StoryBibleChangeset,
-  type StoryBibleInclusionPolicy,
-  type StoryBibleNode,
-  type StoryBibleNodeDetails,
-  type StoryBibleNodePayload,
-  type StoryBibleNodeType,
-  type StoryBibleProgression,
-  type StoryBibleProgressionUpdatePayload,
-  type StoryBibleRelation,
-  type StoryBibleRelationUpdatePayload,
-  type StoryBibleRoot,
-  type StoryBibleRoutingMode,
-  type StoryBibleRoutingPreference,
-  type StoryBibleTag,
-  type StoryBibleViewPreference,
-} from '@/api/modules/storyBible.api'
+import { storyBibleApi } from '@/api/modules/storyBible.api'
+import type {
+  StoryBibleCanonStatus,
+  StoryBibleCategory,
+  StoryBibleChangeset,
+  StoryBibleInclusionPolicy,
+  StoryBibleNode,
+  StoryBibleNodeDetails,
+  StoryBibleNodePayload,
+  StoryBibleNodeType,
+  StoryBibleProgression,
+  StoryBibleProgressionUpdatePayload,
+  StoryBibleRelation,
+  StoryBibleRelationUpdatePayload,
+  StoryBibleRoot,
+  StoryBibleTag,
+  StoryBibleViewPreference,
+} from '@/entities/story-bible/model'
 import type { AppError } from '@/api/types'
 
 export interface StoryBibleNodeDraft extends StoryBibleNodePayload {
@@ -89,7 +87,6 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const canonFilter = ref<StoryBibleCanonStatus | ''>('')
   const draft = ref<StoryBibleNodeDraft | null>(null)
   const effectiveState = ref<Record<string, unknown> | null>(null)
-  const projectRoutingPreference = ref<StoryBibleRoutingPreference | null>(null)
   const loading = ref(false)
   const saving = ref(false)
   const errorMessage = ref('')
@@ -161,12 +158,6 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     }
   }
 
-  const loadRoutingPreferences = async () => {
-    const { projectId } = options.getContext()
-    if (!projectId) return
-    projectRoutingPreference.value = await storyBibleApi.getProjectRoutingPreference(projectId)
-  }
-
   const loadWorkspace = async () => {
     const context = requireContext()
     latestNodeQuery += 1
@@ -202,7 +193,6 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
       relations.value = nextRelations
       progressions.value = nextProgressions
       history.value = nextHistory
-      await loadRoutingPreferences()
       if (selectedNodeId.value && nodes.value.some((node) => node.nodeId === selectedNodeId.value)) {
         await selectNode(selectedNodeId.value)
       }
@@ -436,15 +426,6 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     await refreshRevisionAndHistory()
   }
 
-  const saveProjectRoutingPreference = async (mode: StoryBibleRoutingMode, routerModelConfigId?: string | null) => {
-    const { projectId } = options.getContext()
-    if (!projectId) return
-    projectRoutingPreference.value = await storyBibleApi.updateProjectRoutingPreference(projectId, {
-      mode,
-      routerModelConfigId,
-    })
-  }
-
   return {
     root,
     views,
@@ -470,13 +451,11 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     canonFilter,
     draft,
     effectiveState,
-    projectRoutingPreference,
     loading,
     saving,
     errorMessage,
     loadWorkspace,
     refreshNodes,
-    loadRoutingPreferences,
     selectNode,
     createNodeDraft,
     saveNode,
@@ -494,7 +473,6 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     saveTag,
     deleteTag,
     saveViewPreference,
-    saveProjectRoutingPreference,
   }
 }
 

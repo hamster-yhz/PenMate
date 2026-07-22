@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { StoryBibleCategory } from '@/api/modules/storyBible.api'
+import type { StoryBibleCategory } from '@/entities/story-bible/model'
 
 const props = defineProps<{ categories: StoryBibleCategory[]; modelValue: string }>()
 const emit = defineEmits<{ (event: 'update:modelValue', value: string): void }>()
@@ -47,7 +47,7 @@ button {
 }
 button:hover,
 button.active {
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.08);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 </style>

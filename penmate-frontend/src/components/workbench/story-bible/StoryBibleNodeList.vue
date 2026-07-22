@@ -11,7 +11,7 @@
       <span class="canon-dot" :class="node.canonStatus.toLowerCase()"></span>
       <span class="node-copy">
         <strong>{{ node.title }}</strong>
-        <small>{{ typeName(node.typeId) }} · r{{ node.revision }}</small>
+        <small>{{ typeName(node.typeId) }} · {{ statusName(node.canonStatus) }}</small>
       </span>
     </button>
     <div v-if="!nodes.length" class="empty-state">暂无符合条件的节点</div>
@@ -19,11 +19,12 @@
 </template>
 
 <script setup lang="ts">
-import type { StoryBibleNode, StoryBibleNodeType } from '@/api/modules/storyBible.api'
+import type { StoryBibleNode, StoryBibleNodeType } from '@/entities/story-bible/model'
 
 const props = defineProps<{ nodes: StoryBibleNode[]; nodeTypes: StoryBibleNodeType[]; selectedNodeId: string }>()
 const emit = defineEmits<{ (event: 'select', nodeId: string): void }>()
 const typeName = (typeId: string) => props.nodeTypes.find((item) => item.typeId === typeId)?.displayName || '未分类'
+const statusName = (status: StoryBibleNode['canonStatus']) => ({ DRAFT: '草稿', CANON: '已确认', ARCHIVED: '已归档' })[status]
 </script>
 
 <style scoped lang="less">
@@ -48,10 +49,10 @@ const typeName = (typeId: string) => props.nodeTypes.find((item) => item.typeId 
 }
 .node-row:hover,
 .node-row.active {
-  background: rgba(201, 169, 110, 0.1);
+  background: var(--accent-soft);
 }
 .node-row.active {
-  box-shadow: inset 2px 0 var(--amber-gold);
+  box-shadow: inset 2px 0 var(--accent);
 }
 .canon-dot {
   width: 7px;

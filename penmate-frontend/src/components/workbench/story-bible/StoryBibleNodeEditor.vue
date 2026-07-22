@@ -7,9 +7,6 @@
           <strong>{{ draft.title || '未命名节点' }}</strong>
         </div>
         <div class="editor-actions">
-          <button type="button" class="icon-button" title="路由设置" @click="emit('openRouting')">
-            <SettingOutlined />
-          </button>
           <button v-if="draft.nodeId" type="button" class="icon-button danger" title="删除节点" @click="emit('delete')">
             <DeleteOutlined />
           </button>
@@ -47,6 +44,7 @@
           @create="emit('createRelation', $event)"
           @update="emit('updateRelation', $event)"
           @delete="emit('deleteRelation', $event)"
+          @select-node="emit('selectNode', $event)"
         />
         <StoryBibleProgressionsTab
           v-else-if="activeTab === 'progressions' && draft.nodeId"
@@ -82,7 +80,6 @@ import {
   DeleteOutlined,
   HistoryOutlined,
   SaveOutlined,
-  SettingOutlined,
 } from '@ant-design/icons-vue'
 import type {
   StoryBibleCategory,
@@ -94,7 +91,7 @@ import type {
   StoryBibleRelation,
   StoryBibleRelationUpdatePayload,
   StoryBibleTag,
-} from '@/api/modules/storyBible.api'
+} from '@/entities/story-bible/model'
 import type { StoryBibleNodeDraft } from '@/composables/workbench/useStoryBible'
 import StoryBibleBaseTab from './StoryBibleBaseTab.vue'
 import StoryBibleHistoryTab from './StoryBibleHistoryTab.vue'
@@ -119,10 +116,10 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'save'): void
   (event: 'delete'): void
-  (event: 'openRouting'): void
   (event: 'createRelation', payload: Omit<StoryBibleRelation, 'relationId' | 'storyBibleId' | 'revision'>): void
   (event: 'updateRelation', payload: { relationId: string; update: StoryBibleRelationUpdatePayload }): void
   (event: 'deleteRelation', payload: StoryBibleRelation): void
+  (event: 'selectNode', nodeId: string): void
   (
     event: 'createProgression',
     payload: Omit<StoryBibleProgression, 'progressionId' | 'storyBibleId' | 'nodeId' | 'revision'>,
@@ -147,7 +144,7 @@ const tabs = [
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: rgba(17, 24, 39, 0.5);
+  background: var(--bg-editor);
 }
 .editor-header {
   height: 58px;
@@ -185,19 +182,19 @@ const tabs = [
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-secondary);
-  background: rgba(11, 17, 32, 0.7);
+  background: var(--bg-surface);
   cursor: pointer;
 }
 .icon-button {
   width: 32px;
 }
 .icon-button.danger {
-  color: #c9827b;
+  color: var(--danger);
 }
 .save-button {
   padding: 0 12px;
-  color: var(--amber-gold);
-  border-color: var(--border-gold);
+  color: var(--accent);
+  border-color: var(--accent-border);
 }
 .save-button:disabled {
   opacity: 0.5;
@@ -225,8 +222,8 @@ const tabs = [
   cursor: pointer;
 }
 .editor-tabs button.active {
-  color: var(--amber-gold);
-  border-bottom-color: var(--amber-gold);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 .editor-body {
   min-height: 0;
@@ -243,7 +240,7 @@ const tabs = [
 }
 .editor-empty :deep(svg) {
   font-size: 34px;
-  color: var(--border-gold);
+  color: var(--accent-border);
 }
 .empty-state {
   padding: 40px;

@@ -38,15 +38,6 @@ describe('storyBibleApi', () => {
     )
   })
 
-  it('stores Story Bible routing at project scope', async () => {
-    const { storyBibleApi } = await import('./storyBible.api')
-    await storyBibleApi.updateProjectRoutingPreference('101', { mode: 'RETRIEVAL' })
-
-    expect(requestMock.put).toHaveBeenCalledWith('/v1/novels/101/agent/routing-preference', {
-      mode: 'RETRIEVAL',
-    })
-  })
-
   it('uses canonical filtered-node and changeset query routes', async () => {
     const { storyBibleApi } = await import('./storyBible.api')
 

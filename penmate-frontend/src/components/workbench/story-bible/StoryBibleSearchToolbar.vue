@@ -45,7 +45,7 @@ const emit = defineEmits<{
   padding: 6px 8px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  background: rgba(11, 17, 32, 0.72);
+  background: var(--bg-surface);
 }
 
 input,
@@ -55,7 +55,7 @@ select {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-primary);
-  background: rgba(17, 24, 39, 0.92);
+  background: var(--bg-surface);
   outline: none;
 }
 
@@ -69,10 +69,10 @@ select {
 .icon-button {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--border-gold);
+  border: 1px solid var(--accent-border);
   border-radius: 4px;
-  color: var(--amber-gold);
-  background: rgba(201, 169, 110, 0.08);
+  color: var(--accent);
+  background: var(--accent-soft);
   cursor: pointer;
 }
 </style>
