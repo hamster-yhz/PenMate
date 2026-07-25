@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
+import com.penmate.backend.domain.agent.model.AgentLlmProviderItem;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -35,7 +36,8 @@ public class ToolCallSnapshotMapper {
                                 toolCall.toolCode(),
                                 toolCall.argumentsJson()
                         ))
-                        .toList()
+                        .toList(),
+                response.providerItems()
         );
     }
 
@@ -65,6 +67,9 @@ public class ToolCallSnapshotMapper {
         }
         if (message.toolCallId() != null) {
             payload.put("tool_call_id", message.toolCallId());
+        }
+        if (!message.providerItems().isEmpty()) {
+            payload.put("provider_items", message.providerItems());
         }
         return payload;
     }
@@ -117,7 +122,9 @@ public class ToolCallSnapshotMapper {
             return AgentLlmMessage.user(content);
         }
         if ("assistant".equalsIgnoreCase(role)) {
-            return AgentLlmMessage.assistant(content, toToolCallPayloadModels(rawMessage.get("tool_calls")));
+            return AgentLlmMessage.assistant(content,
+                    toToolCallPayloadModels(rawMessage.get("tool_calls")),
+                    toProviderItems(rawMessage.get("provider_items")));
         }
         if ("tool".equalsIgnoreCase(role)) {
             return AgentLlmMessage.tool(stringValue(rawMessage.get("tool_call_id")), content);
@@ -163,6 +170,20 @@ public class ToolCallSnapshotMapper {
             return toStringKeyMap(map);
         }
         return Map.of();
+    }
+
+    private List<AgentLlmProviderItem> toProviderItems(Object value) {
+        List<AgentLlmProviderItem> items = new ArrayList<>();
+        if (!(value instanceof List<?> values)) return items;
+        for (Object item : values) {
+            Map<String, Object> payload = mapValue(item);
+            String protocolCode = stringValue(payload.get("protocolCode"));
+            String payloadJson = stringValue(payload.get("payloadJson"));
+            if (protocolCode != null && payloadJson != null) {
+                items.add(new AgentLlmProviderItem(protocolCode, payloadJson));
+            }
+        }
+        return items;
     }
 
     private List<Object> readList(String raw) {

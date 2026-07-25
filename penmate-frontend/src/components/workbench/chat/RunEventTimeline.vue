@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import {
   ApiOutlined,
+  BulbOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CodeOutlined,
   ExclamationCircleOutlined,
   LoadingOutlined,
+  MessageOutlined,
   SafetyCertificateOutlined,
   ToolOutlined,
 } from '@ant-design/icons-vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { AgentRunAttempt, AgentTimelineEvent } from '@/components/workbench/workbenchTypes'
+import { compareTimelineEvents } from '@/composables/workbench/useWorkbenchRunTimeline'
+import { renderChatMarkdown } from '@/utils/chatMarkdown'
 
 const props = defineProps<{ attempt: AgentRunAttempt; latest?: boolean; displayIndex?: number }>()
 const shouldAutoCollapse = (status: string) =>
@@ -38,6 +42,10 @@ const eventMeta: Record<string, { label: string; tone: string; icon: typeof ApiO
   'context.resolved': { label: '上下文准备完成', tone: 'context', icon: CheckCircleOutlined },
   'llm.turn.started': { label: '正在生成回复', tone: 'progress', icon: ClockCircleOutlined },
   'llm.turn.completed': { label: '模型轮次完成', tone: 'success', icon: CheckCircleOutlined },
+  'model.commentary.snapshot': { label: '过程说明', tone: 'commentary', icon: MessageOutlined },
+  'model.commentary.completed': { label: '过程说明', tone: 'commentary', icon: MessageOutlined },
+  'model.reasoning_summary.snapshot': { label: '分析过程', tone: 'reasoning', icon: BulbOutlined },
+  'model.reasoning_summary.completed': { label: '分析过程', tone: 'reasoning', icon: BulbOutlined },
   'tool.call.started': { label: '工具调用开始', tone: 'tool', icon: ToolOutlined },
   'tool.call.completed': { label: '工具调用完成', tone: 'success', icon: ToolOutlined },
   'tool.call.failed': { label: '工具调用失败', tone: 'error', icon: ExclamationCircleOutlined },
@@ -64,6 +72,12 @@ const eventGroupKey = (event: AgentTimelineEvent) => {
     const index = String(event.payload.llmTurnIndex ?? event.payload.turnIndex ?? '')
     return `llm:${index}:${event.type}`
   }
+  if (event.type.startsWith('model.commentary.')) {
+    return `model:commentary:${String(event.payload.llmTurnIndex ?? '')}`
+  }
+  if (event.type.startsWith('model.reasoning_summary.')) {
+    return `model:reasoning:${String(event.payload.llmTurnIndex ?? '')}`
+  }
   if (event.type.startsWith('tool.call.')) return `tool:${String(event.payload.toolCallId ?? event.sequence)}`
   if (event.type.startsWith('approval.')) return `approval:${String(event.payload.approvalId ?? event.sequence)}`
   if (event.type.startsWith('stream.')) return 'stream'
@@ -81,7 +95,7 @@ const visibleEvents = computed(() => {
     const key = eventGroupKey(event)
     if (key) latest.set(key, event)
   }
-  const events = [...latest.values()].sort((left, right) => left.sequence - right.sequence)
+  const events = [...latest.values()].sort(compareTimelineEvents)
   const llmTurnCount = new Set(
     events
       .filter((event) => event.type.startsWith('llm.turn.'))
@@ -123,9 +137,16 @@ const connectionLabel = computed(() => {
 
 const eventSummary = (event: AgentTimelineEvent) => String(
   event.payload.message ?? event.payload.errorMessage ?? event.payload.errorMsg ??
+  event.payload.text ??
   event.payload.toolDisplayName ?? event.payload.toolName ?? event.payload.toolCode ??
   event.payload.phase ?? event.payload.status ?? '',
 )
+
+const isModelProcessEvent = (event: AgentTimelineEvent) =>
+  event.type.startsWith('model.commentary.') || event.type.startsWith('model.reasoning_summary.')
+
+const eventSummaryHtml = (event: AgentTimelineEvent) =>
+  renderChatMarkdown(eventSummary(event), event.type.endsWith('.snapshot'))
 
 const eventTime = (event: AgentTimelineEvent) => {
   if (!event.createdAt) return `#${event.sequence}`
@@ -156,7 +177,12 @@ const eventTime = (event: AgentTimelineEvent) => {
         <span class="event-rail" :class="`tone-${meta(event).tone}`"><component :is="meta(event).icon" /></span>
         <div class="event-content">
           <div class="event-title-row"><strong>{{ meta(event).label }}</strong><time>{{ eventTime(event) }}</time></div>
-          <p v-if="eventSummary(event)" class="event-summary">{{ eventSummary(event) }}</p>
+          <div
+            v-if="eventSummary(event) && isModelProcessEvent(event)"
+            class="event-summary event-summary-markdown"
+            v-html="eventSummaryHtml(event)"
+          ></div>
+          <p v-else-if="eventSummary(event)" class="event-summary">{{ eventSummary(event) }}</p>
         </div>
       </article>
       <p v-if="!visibleEvents.length" class="event-empty">正在准备...</p>
@@ -185,11 +211,16 @@ const eventTime = (event: AgentTimelineEvent) => {
 .event-rail { z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; color: var(--text-muted); background: var(--bg-subtle); }
 .tone-success { color: var(--accent); } .tone-error { color: var(--danger); } .tone-tool { color: var(--info); }
 .tone-approval, .tone-warning { color: var(--warning); } .tone-context { color: var(--info); }
+.tone-commentary { color: var(--info); } .tone-reasoning { color: var(--warning); }
 .event-content { min-width: 0; padding: 2px 0 12px; }
 .event-title-row { display: flex; justify-content: space-between; gap: 10px; }
 .event-title-row strong { color: var(--text-secondary); font-size: 12px; }
 .event-title-row time { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .event-summary { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.event-summary-markdown { white-space: normal; }
+.event-summary-markdown :deep(p) { margin: 0 0 4px; }
+.event-summary-markdown :deep(p:last-child) { margin-bottom: 0; }
+.event-summary-markdown :deep(.markdown-stream-tail) { white-space: pre-wrap; }
 .event-empty { margin: 0; padding: 8px 0 4px 34px; color: var(--text-muted); font-size: 12px; }
 .run-error { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; margin: 8px 0 0 33px; padding: 9px; border-left: 2px solid var(--danger); background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .run-error code { color: var(--danger); font-size: 10px; }

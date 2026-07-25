@@ -666,6 +666,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
           latestSequence?: string | number | null
           runStatus?: string | null
           runPhase?: string | null
+          startedAt?: string | null
         }
       }
       if (sendEpoch !== foregroundEpoch) return
@@ -674,12 +675,20 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         throw new Error('运行创建失败，缺少 runId')
       }
       const turnId = String(created.activeRun?.turnId ?? '')
-      if (userMessage && turnId) userMessage.turnId = turnId
+      if (turnId) userMessage.turnId = turnId
       assistantMessage.turnId = turnId
       assistantMessage.runId = String(runId)
+      messages.value = messages.value.map((message) => {
+        if (message.id === userMessage.id) return { ...message, turnId }
+        if (message.id === assistantMessage.id) return { ...message, turnId, runId: String(runId) }
+        return message
+      })
+      const boundAssistantMessage = messages.value.find((message) => message.id === assistantMessage.id)
+        ?? assistantMessage
       const attempt = runTimeline.ensureAttempt(String(runId), turnId)
       attempt.runStatus = String(created.activeRun?.runStatus ?? 'PENDING').toUpperCase()
       attempt.runPhase = String(created.activeRun?.runPhase ?? 'created')
+      if (!attempt.startedAt) attempt.startedAt = String(created.activeRun?.startedAt ?? new Date().toISOString())
       const latestSequence = Number(created.activeRun?.latestSequence ?? 0)
       if (Number.isSafeInteger(latestSequence)) {
         attempt.latestSequence = Math.max(attempt.latestSequence, latestSequence)
@@ -687,7 +696,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       await scrollChat(true)
       // The creation response only reports the durable cursor; it does not contain
       // those events. Replay from zero so run.started reaches the live timeline.
-      await consumeRun(projectId, sessionId, String(runId), '0', turnId, false, assistantMessage)
+      await consumeRun(projectId, sessionId, String(runId), '0', turnId, false, boundAssistantMessage)
     } catch (error: unknown) {
       if (sendEpoch !== foregroundEpoch) return
       generationPhase.value = 'failed'

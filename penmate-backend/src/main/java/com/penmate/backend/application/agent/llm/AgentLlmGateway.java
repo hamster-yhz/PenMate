@@ -9,6 +9,11 @@ public interface AgentLlmGateway {
         return false;
     }
 
+    default AgentLlmCapabilities capabilities(AgentLlmExecutionConfig executionConfig) {
+        return new AgentLlmCapabilities(AgentLlmProtocol.UNKNOWN, false, false,
+                false, false, false);
+    }
+
     default AgentLlmTurnResponse streamTurn(AgentLlmTurnRequest request,
                                             AgentLlmExecutionConfig executionConfig,
                                             AgentLlmStreamObserver observer) {

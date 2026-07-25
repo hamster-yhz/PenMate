@@ -9,9 +9,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
 import java.time.Instant;
+import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -53,6 +56,10 @@ class AgentRunStateTransitionServiceTest {
         order.verify(leases).complete(lease);
         order.verify(events).publish(eq(lease.runId()), eq("message.completed"), any());
         order.verify(events).publish(eq(lease.runId()), eq("run.completed"), any());
+        verify(events).publish(eq(lease.runId()), eq("message.completed"), argThat(payload -> {
+            assertThat(payload).isInstanceOf(Map.class);
+            return "final".equals(((Map<?, ?>) payload).get("channel"));
+        }));
     }
 
     private AgentRunLease lease() {

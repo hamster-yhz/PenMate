@@ -156,6 +156,17 @@ class ToolCallExecutionServiceTest {
     }
 
     @Test
+    void successful_mutation_advances_the_durable_dependency_checkpoint() {
+        AgentToolHandler handler = handler(true, request -> ToolCallResult.success("updated"));
+        AuthorizedAgentRunContext context = context(7L);
+
+        ToolCallResult result = service(handler).execute(context, request("call-checkpoint", "{}", 7L));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        verify(guard).checkpointSuccessfulMutation(context);
+    }
+
+    @Test
     void supplied_context_must_match_run_and_execution_token_in_envelope() {
         AgentToolHandler handler = handler(false, request -> ToolCallResult.success("should-not-run"));
         ToolCallRequest request = request("call-context-mismatch", "{}", 7L);

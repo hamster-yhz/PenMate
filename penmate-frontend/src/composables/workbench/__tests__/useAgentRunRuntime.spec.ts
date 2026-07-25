@@ -129,11 +129,12 @@ describe('createAgentRunRuntime', () => {
       agentRunEventDto('run.phase.changed', { phase: 'executing', status: 'running', message: 'writing' }, '6'),
     )
     harness.stream.listeners.get('message.delta')?.(
-      agentRunEventDto('message.delta', { llmTurnIndex: 1, text: 'Hello' }, '-1'),
+      agentRunEventDto('message.delta', { channel: 'final', llmTurnIndex: 1, text: 'Hello' }, '-1'),
     )
     expect(harness.latestSequence).toBe('6')
     harness.stream.listeners.get('message.completed')?.(
-      agentRunEventDto('message.completed', { llmTurnIndex: 1, role: 'assistant', text: 'Hello final' }, '9'),
+      agentRunEventDto('message.completed',
+        { channel: 'final', llmTurnIndex: 1, role: 'assistant', text: 'Hello final' }, '9'),
     )
     harness.stream.listeners.get('run.completed')?.(
       agentRunEventDto('run.completed', { phase: 'completed', message: 'done' }, '11'),
@@ -153,6 +154,29 @@ describe('createAgentRunRuntime', () => {
     expect(harness.runStatus).toBe('completed')
     expect(harness.statusDetail).toBe('done')
     expect(harness.latestSequence).toBe('11')
+  })
+
+  it('never writes untyped or process-channel message events into the final answer', async () => {
+    const harness = createRuntimeHarness()
+    const consuming = harness.consume()
+
+    harness.stream.listeners.get('message.delta')?.(
+      agentRunEventDto('message.delta', { text: 'untyped process text' }, '-1'),
+    )
+    harness.stream.listeners.get('message.delta')?.(
+      agentRunEventDto('message.delta', { channel: 'commentary', text: 'commentary text' }, '-1'),
+    )
+    harness.stream.listeners.get('message.completed')?.(
+      agentRunEventDto('message.completed', { channel: 'commentary', text: 'process completed' }, '8'),
+    )
+
+    expect(harness.tokens).toEqual([])
+    expect(harness.completedText).toBe('')
+
+    harness.stream.listeners.get('run.cancelled')?.(
+      agentRunEventDto('run.cancelled', { status: 'cancelled' }, '9'),
+    )
+    await expect(consuming).resolves.toBe('cancelled')
   })
 
   it('reloads recovery state and settles when the server resets an expired cursor', async () => {

@@ -33,18 +33,22 @@ public class AgentRunDependencyValidator {
 
     public Validation validate(AgentRun run, AgentRunInput input,
                                AgentRunContextArtifactService.ResolvedArtifact artifact) {
+        var current = currentManifest(run, input);
+        var expected = artifact.dependencies() == null ? fromEpoch(artifact.contextEpochId()) : artifact.dependencies();
+        List<String> changed = differences(expected, current);
+        return new Validation(changed.isEmpty(), expected, current, changed);
+    }
+
+    public AgentRunContextArtifactService.DependencyManifest currentManifest(AgentRun run, AgentRunInput input) {
         var snapshot = snapshots.create(run.projectId(), input.chapterId());
         var preference = preferences.resolve(run.projectId(), run.sessionId(), run.ownerUserId());
         var hashes = catalogHashes.hashes(TaskProfile.fromTaskType(input.taskType()));
         Long styleRevision = sessions.findActiveStyleBindingRevision(run.sessionId());
-        var current = new AgentRunContextArtifactService.DependencyManifest(
+        return new AgentRunContextArtifactService.DependencyManifest(
                 snapshot.storyBibleRevision(), snapshot.manuscriptRevision(), input.chapterId(),
                 snapshot.activeChapterContentRevision(), styleRevision == null ? 0L : styleRevision,
                 preference.mode().name(), preference.routerModelConfigId(),
                 hashes.promptBundleHash(), hashes.skillCatalogHash(), hashes.toolCatalogHash());
-        var expected = artifact.dependencies() == null ? fromEpoch(artifact.contextEpochId()) : artifact.dependencies();
-        List<String> changed = differences(expected, current);
-        return new Validation(changed.isEmpty(), expected, current, changed);
     }
 
     private AgentRunContextArtifactService.DependencyManifest fromEpoch(Long epochId) {

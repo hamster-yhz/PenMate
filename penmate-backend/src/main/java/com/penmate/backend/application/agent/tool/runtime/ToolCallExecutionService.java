@@ -98,8 +98,9 @@ public class ToolCallExecutionService {
             return resolveExisting(request, requestSha256);
         }
 
+        boolean mutatesState = handler.mutatesState(context, request);
         try {
-            mutationGuard.assertExecutable(context, handler.mutatesState(context, request));
+            mutationGuard.assertExecutable(context, mutatesState);
         } catch (AgentRunExecutionRejectedException rejection) {
             ToolCallResult failed = ToolCallResult.failed(rejection.errorCode(), rejection.getMessage());
             return finish(candidate, AgentToolCallExecutionStatus.FAILED, failed)
@@ -112,6 +113,9 @@ public class ToolCallExecutionService {
             result = handler.execute(context, request);
             if (result == null) {
                 result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
+            }
+            if (mutatesState && "SUCCESS".equals(result.status())) {
+                mutationGuard.checkpointSuccessfulMutation(context);
             }
         } catch (Exception ex) {
             markAmbiguous(candidate, ex);

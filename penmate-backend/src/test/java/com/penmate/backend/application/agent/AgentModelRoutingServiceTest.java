@@ -34,6 +34,7 @@ class AgentModelRoutingServiceTest {
         model.setModelType("CHAT");
         model.setStatus("ACTIVE");
         model.setProviderCode("openai");
+        model.setProtocolCode("OPENAI_RESPONSES");
         model.setProviderAuthType("API_KEY");
         model.setModelName("gpt-4o-mini");
         model.setBaseUrl("https://api.openai.com/v1");
@@ -49,6 +50,7 @@ class AgentModelRoutingServiceTest {
         AgentLlmExecutionConfig config = agentModelRoutingService.resolveExecutionConfig(1001L, 9001L, "trace-ctx-window");
 
         assertThat(config.contextWindowTurns()).isEqualTo(8);
+        assertThat(config.protocolCode()).isEqualTo("OPENAI_RESPONSES");
     }
 
     @Test

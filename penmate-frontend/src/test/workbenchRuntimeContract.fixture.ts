@@ -30,7 +30,7 @@ const createChapterEditToolCall = (): WorkbenchRuntimeToolCall => ({
 
 const createTodoToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCallId: 'call-todo-1',
-  toolCode: 'todo_planner',
+  toolCode: 'todo_crud',
   toolName: 'Todo 规划',
   status: 'done',
   argumentsPreview: { planningMode: 'FOLLOW_UP_MODIFICATION' },
@@ -40,7 +40,7 @@ const createTodoToolCall = (): WorkbenchRuntimeToolCall => ({
 
 const createStoryBibleToolCall = (): WorkbenchRuntimeToolCall => ({
   toolCallId: 'call-story-1',
-  toolCode: 'story_bible_update',
+  toolCode: 'story_bible_node_write',
   toolName: '故事圣经整理',
   status: 'waiting_approval',
   argumentsPreview: { chapterId: '301' },

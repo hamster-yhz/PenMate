@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentRunAppService;
 import com.penmate.backend.application.agent.run.AgentRunDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
+import com.penmate.backend.application.agent.run.AgentRunRecoveryPromptService;
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.application.agent.run.AgentRunAppService;
@@ -85,7 +86,8 @@ class AgentTurnPersistenceContractTest {
                             dispatcher
                     ),
                     dispatcher,
-                    mock(AgentSkillActivationService.class)
+                    mock(AgentSkillActivationService.class),
+                    passthroughRecoveryPrompts()
             );
 
             AgentTurnResult result = service.createTurn(
@@ -139,7 +141,8 @@ class AgentTurnPersistenceContractTest {
                     businessIdGenerator,
                     new AgentRunAppService(runRepository, eventPublisher, mock(AgentRunDispatcher.class)),
                     mock(AgentRunDispatcher.class),
-                    mock(AgentSkillActivationService.class)
+                    mock(AgentSkillActivationService.class),
+                    passthroughRecoveryPrompts()
             );
 
             service.createTurn(
@@ -198,6 +201,12 @@ class AgentTurnPersistenceContractTest {
                     .extracting(row -> row.get("turnId"))
                     .containsExactly(940101L, 940101L, 940102L);
         }
+    }
+
+    private static AgentRunRecoveryPromptService passthroughRecoveryPrompts() {
+        AgentRunRecoveryPromptService service = mock(AgentRunRecoveryPromptService.class);
+        when(service.attachToManualRequest(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(2));
+        return service;
     }
 
     private static SqlSessionFactory buildSqlSessionFactory(DataSource dataSource) {

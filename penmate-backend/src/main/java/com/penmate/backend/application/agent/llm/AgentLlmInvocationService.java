@@ -43,11 +43,23 @@ public class AgentLlmInvocationService {
     }
 
     public AgentLlmTurnResponse invokeStreaming(Long runId,
-                                                AgentLlmTurnRequest request,
-                                                AgentLlmExecutionConfig executionConfig,
-                                                Consumer<String> onTextDelta) {
-        Objects.requireNonNull(runId, "runId must not be null");
+                                                 AgentLlmTurnRequest request,
+                                                 AgentLlmExecutionConfig executionConfig,
+                                                 Consumer<String> onTextDelta) {
         Objects.requireNonNull(onTextDelta, "onTextDelta must not be null");
+        return invokeStreamingEvents(runId, request, executionConfig, event -> {
+            if (event instanceof AgentLlmStreamEvent.OutputTextDelta delta) {
+                onTextDelta.accept(delta.text());
+            }
+        });
+    }
+
+    public AgentLlmTurnResponse invokeStreamingEvents(Long runId,
+                                                       AgentLlmTurnRequest request,
+                                                       AgentLlmExecutionConfig executionConfig,
+                                                       Consumer<AgentLlmStreamEvent> onEvent) {
+        Objects.requireNonNull(runId, "runId must not be null");
+        Objects.requireNonNull(onEvent, "onEvent must not be null");
         if (!gateway.supportsStreaming(executionConfig)) {
             return gateway.generateTurn(request, executionConfig);
         }
@@ -68,7 +80,15 @@ public class AgentLlmInvocationService {
                 @Override
                 public void onTextDelta(String text) {
                     if (isCancelled()) throw new AgentLlmInvocationCancelledException();
-                    if (text != null && !text.isEmpty()) onTextDelta.accept(text);
+                    if (text != null && !text.isEmpty()) {
+                        onEvent.accept(new AgentLlmStreamEvent.OutputTextDelta(text));
+                    }
+                }
+
+                @Override
+                public void onEvent(AgentLlmStreamEvent event) {
+                    if (isCancelled()) throw new AgentLlmInvocationCancelledException();
+                    if (event != null) onEvent.accept(event);
                 }
 
                 @Override

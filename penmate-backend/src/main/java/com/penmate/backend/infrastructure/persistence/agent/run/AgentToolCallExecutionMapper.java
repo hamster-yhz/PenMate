@@ -31,6 +31,30 @@ public interface AgentToolCallExecutionMapper {
     })
     AgentToolCallExecution find(@Param("runId") Long runId, @Param("toolCallId") String toolCallId);
 
+    @Select("""
+            SELECT execution_id, run_id, tool_call_id, tool_code, request_sha256,
+                   execution_token, execution_status, result_json, error_code, error_message,
+                   started_at, finished_at
+            FROM agent_tool_call_executions
+            WHERE run_id = #{runId}
+            ORDER BY started_at ASC, id ASC
+            """)
+    @ConstructorArgs({
+            @Arg(column = "execution_id", javaType = Long.class),
+            @Arg(column = "run_id", javaType = Long.class),
+            @Arg(column = "tool_call_id", javaType = String.class),
+            @Arg(column = "tool_code", javaType = String.class),
+            @Arg(column = "request_sha256", javaType = String.class),
+            @Arg(column = "execution_token", javaType = Long.class),
+            @Arg(column = "execution_status", javaType = String.class),
+            @Arg(column = "result_json", javaType = String.class),
+            @Arg(column = "error_code", javaType = String.class),
+            @Arg(column = "error_message", javaType = String.class),
+            @Arg(column = "started_at", javaType = Instant.class),
+            @Arg(column = "finished_at", javaType = Instant.class)
+    })
+    java.util.List<AgentToolCallExecution> listByRun(@Param("runId") Long runId);
+
     @Insert("""
             INSERT INTO agent_tool_call_executions(
                 execution_id, run_id, tool_call_id, tool_code, request_sha256,

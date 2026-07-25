@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AgentTurnAppServiceTest {
@@ -32,7 +34,8 @@ class AgentTurnAppServiceTest {
                 businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
                 runAppService,
                 runDispatcher,
-                mock(AgentSkillActivationService.class)
+                mock(AgentSkillActivationService.class),
+                recoveryPrompts()
         );
 
         Long projectId = 920001L;
@@ -66,7 +69,8 @@ class AgentTurnAppServiceTest {
                 businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
                 runAppService,
                 runDispatcher,
-                mock(AgentSkillActivationService.class)
+                mock(AgentSkillActivationService.class),
+                recoveryPrompts()
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(
@@ -82,9 +86,42 @@ class AgentTurnAppServiceTest {
         assertThat(result.activeRun().runStatus()).isEqualTo("running");
     }
 
+    @Test
+    void should_use_recovery_augmented_prompt_only_for_the_created_run_input() {
+        AgentRunAppService runAppService = runAppServiceThatSucceeds();
+        AgentRunRecoveryPromptService recovery = mock(AgentRunRecoveryPromptService.class);
+        when(recovery.attachToManualRequest(920001L, 920002L, "continue"))
+                .thenReturn("[Application recovery record]\n[Current user request]\ncontinue");
+        AgentTurnAppService service = new AgentTurnAppService(
+                mock(SessionStyleBindingAppService.class),
+                agentRepository(),
+                sessionRepository(),
+                businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
+                runAppService,
+                mock(AgentRunDispatcher.class),
+                mock(AgentSkillActivationService.class),
+                recovery
+        );
+
+        service.createTurn(920001L, 920002L,
+                new AgentTurnCommand(1001L, "continue", java.util.List.of(),
+                        new AgentTurnCommand.TaskRequest("WRITE", null, null, null)),
+                "trace-recovery");
+
+        verify(runAppService).createRun(argThat(command ->
+                command.promptSnapshot().startsWith("[Application recovery record]")
+                        && command.promptSnapshot().endsWith("continue")));
+    }
+
     private static AgentRunAppService runAppServiceThatSucceeds() {
         AgentRunAppService service = mock(AgentRunAppService.class);
         when(service.createRun(any())).thenReturn(new AgentRunResult(FAKE_RUN_ID, "running", "created", 1L));
+        return service;
+    }
+
+    private static AgentRunRecoveryPromptService recoveryPrompts() {
+        AgentRunRecoveryPromptService service = mock(AgentRunRecoveryPromptService.class);
+        when(service.attachToManualRequest(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(2));
         return service;
     }
 

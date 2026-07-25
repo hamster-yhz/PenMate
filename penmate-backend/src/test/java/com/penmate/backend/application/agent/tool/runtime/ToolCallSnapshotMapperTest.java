@@ -3,6 +3,7 @@ package com.penmate.backend.application.agent.tool.runtime;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmMessageRole;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
+import com.penmate.backend.domain.agent.model.AgentLlmProviderItem;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -88,5 +89,22 @@ class ToolCallSnapshotMapperTest {
         assertThat(rawMessagesJson).contains("\"tool_call_id\"");
         assertThat(rawMessagesJson).contains("\"name\":\"book_crud\"");
         assertThat(rawMessagesJson).contains("\"arguments\":\"{\\\"operation\\\":\\\"list\\\"}\"");
+    }
+
+    @Test
+    void round_trips_opaque_provider_items_for_reasoning_tool_continuation() {
+        AgentLlmProviderItem item = new AgentLlmProviderItem("OPENAI_RESPONSES",
+                "{\"type\":\"reasoning\",\"encrypted_content\":\"opaque\"}");
+        List<AgentLlmMessage> source = List.of(AgentLlmMessage.assistant(
+                "", List.of(new AgentLlmToolCallPayload("call_1", "function", "book_crud", "{}")),
+                List.of(item)));
+
+        List<AgentLlmMessage> restored = toolCallSnapshotMapper.parseMessagesToTyped(
+                toolCallSnapshotMapper.toConversationMessagesJson(source));
+
+        assertThat(restored).singleElement().satisfies(message -> {
+            assertThat(message.providerItems()).containsExactly(item);
+            assertThat(message.toolCalls()).hasSize(1);
+        });
     }
 }

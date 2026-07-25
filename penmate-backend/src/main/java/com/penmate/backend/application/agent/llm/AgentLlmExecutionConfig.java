@@ -13,5 +13,22 @@ public record AgentLlmExecutionConfig(
         String apiKey,
         String modelName,
         String keySource,
-        Integer contextWindowTurns) {
+        Integer contextWindowTurns,
+        String protocolCode,
+        AgentReasoningPolicy reasoningPolicy) {
+
+    public AgentLlmExecutionConfig(Long modelConfigId,
+                                   String providerCode,
+                                   String baseUrl,
+                                   String apiKey,
+                                   String modelName,
+                                   String keySource,
+                                   Integer contextWindowTurns) {
+        this(modelConfigId, providerCode, baseUrl, apiKey, modelName, keySource,
+                contextWindowTurns, null, AgentReasoningPolicy.AUTO);
+    }
+
+    public AgentLlmExecutionConfig {
+        reasoningPolicy = reasoningPolicy == null ? AgentReasoningPolicy.AUTO : reasoningPolicy;
+    }
 }

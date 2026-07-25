@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.llm;
 
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
+import com.penmate.backend.domain.agent.model.AgentLlmProviderItem;
 
 import java.util.List;
 
@@ -12,14 +13,27 @@ public record AgentLlmTurnResponse(
         String assistantText,
         List<AgentLlmToolCall> toolCalls,
         String rawResponseJson,
-        LlmTokenUsage tokenUsage
+        LlmTokenUsage tokenUsage,
+        String commentaryText,
+        String reasoningSummary,
+        List<AgentLlmProviderItem> providerItems
 ) {
 
     public AgentLlmTurnResponse(String finishReason,
                                 String assistantText,
                                 List<AgentLlmToolCall> toolCalls,
                                 String rawResponseJson) {
-        this(finishReason, assistantText, toolCalls, rawResponseJson, LlmTokenUsage.ZERO);
+        this(finishReason, assistantText, toolCalls, rawResponseJson, LlmTokenUsage.ZERO,
+                "", "", List.of());
+    }
+
+    public AgentLlmTurnResponse(String finishReason,
+                                String assistantText,
+                                List<AgentLlmToolCall> toolCalls,
+                                String rawResponseJson,
+                                LlmTokenUsage tokenUsage) {
+        this(finishReason, assistantText, toolCalls, rawResponseJson, tokenUsage,
+                "", "", List.of());
     }
 
     public AgentLlmTurnResponse {
@@ -27,6 +41,9 @@ public record AgentLlmTurnResponse(
         assistantText = assistantText == null ? "" : assistantText;
         finishReason = (finishReason == null || finishReason.isBlank()) ? "stop" : finishReason;
         tokenUsage = tokenUsage == null ? LlmTokenUsage.ZERO : tokenUsage;
+        commentaryText = commentaryText == null ? "" : commentaryText;
+        reasoningSummary = reasoningSummary == null ? "" : reasoningSummary;
+        providerItems = providerItems == null ? List.of() : List.copyOf(providerItems);
     }
 
     public boolean requestsToolCalls() {

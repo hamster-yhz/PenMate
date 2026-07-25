@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.run.AgentRunAppService;
 import com.penmate.backend.application.agent.run.AgentRunCommand;
 import com.penmate.backend.application.agent.run.AgentRunResult;
 import com.penmate.backend.application.agent.run.AgentRunDispatcher;
+import com.penmate.backend.application.agent.run.AgentRunRecoveryPromptService;
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.common.exception.BusinessErrorType;
 import com.penmate.backend.application.common.exception.BusinessException;
@@ -27,6 +28,7 @@ public class AgentTurnAppService {
     private final AgentRunDispatcher runDispatcher;
     private final SessionStyleBindingAppService sessionStyleBindingAppService;
     private final AgentSkillActivationService skillActivationService;
+    private final AgentRunRecoveryPromptService recoveryPromptService;
 
     public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
                                AgentRepository agentRepository,
@@ -34,7 +36,8 @@ public class AgentTurnAppService {
                                BusinessIdGenerator businessIdGenerator,
                                AgentRunAppService agentRunAppService,
                                AgentRunDispatcher runDispatcher,
-                               AgentSkillActivationService skillActivationService) {
+                               AgentSkillActivationService skillActivationService,
+                               AgentRunRecoveryPromptService recoveryPromptService) {
         this.sessionStyleBindingAppService = sessionStyleBindingAppService;
         this.agentRepository = agentRepository;
         this.agentSessionRepository = agentSessionRepository;
@@ -42,6 +45,7 @@ public class AgentTurnAppService {
         this.agentRunAppService = agentRunAppService;
         this.runDispatcher = runDispatcher;
         this.skillActivationService = skillActivationService;
+        this.recoveryPromptService = recoveryPromptService;
     }
 
     @Transactional
@@ -67,6 +71,10 @@ public class AgentTurnAppService {
         skillActivationService.replaceSessionSkills(sessionId,
                 command == null ? null : command.activeSkills());
 
+        String userRequest = command == null || command.userMessage() == null ? "" : command.userMessage();
+        String effectiveRequest = recoveryPromptService.attachToManualRequest(projectId, sessionId, userRequest);
+        if (effectiveRequest == null) effectiveRequest = userRequest;
+
         AgentMessage userMessage = createUserMessage(projectId, sessionId, command, traceId);
         persistMessage(sessionId, userMessage);
 
@@ -85,8 +93,7 @@ public class AgentTurnAppService {
         String modelSnapshotJson = "{\"operatorId\":" + operatorId + ",\"modelConfigId\":"
                 + (modelConfigId == null ? "null" : modelConfigId) + "}";
         String styleSnapshotJson = sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, sessionId);
-        String promptText = command == null || command.userMessage() == null
-                ? "" : command.userMessage();
+        String promptText = effectiveRequest;
         AgentRunResult runResult = agentRunAppService.createRun(new AgentRunCommand(
                 projectId,
                 sessionId,

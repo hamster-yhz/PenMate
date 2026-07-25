@@ -43,12 +43,32 @@ const normalizeEvent = (record: AnyRecord, fallbackRunId = '', fallbackTurnId = 
   createdAt: record.createdAt == null ? undefined : String(record.createdAt),
 })
 
+const isModelProcessEvent = (event: AgentTimelineEvent) =>
+  event.type.startsWith('model.commentary.') || event.type.startsWith('model.reasoning_summary.')
+
+export const compareTimelineEvents = (left: AgentTimelineEvent, right: AgentTimelineEvent) => {
+  if (isModelProcessEvent(left) && isModelProcessEvent(right)
+      && left.liveOrder && right.liveOrder && left.liveOrder !== right.liveOrder) {
+    return left.liveOrder - right.liveOrder
+  }
+  const leftLive = left.sequence < 0
+  const rightLive = right.sequence < 0
+  if (leftLive && rightLive) return (left.liveOrder ?? 0) - (right.liveOrder ?? 0)
+  if (leftLive) return 1
+  if (rightLive) return -1
+  return left.sequence - right.sequence
+}
+
 const normalizeAttempt = (record: AnyRecord): AgentRunAttempt => {
   const runId = String(record.runId ?? '')
   const turnId = String(record.turnId ?? '')
   const events = pickBusinessArray<AnyRecord>(record.events)
-    .map((event) => normalizeEvent(event, runId, turnId))
-    .sort((left, right) => left.sequence - right.sequence)
+    .map((event, index) => {
+      const normalized = normalizeEvent(event, runId, turnId)
+      if (normalized.sequence < 0) normalized.liveOrder = index + 1
+      return normalized
+    })
+    .sort(compareTimelineEvents)
   const output = record.output && typeof record.output === 'object' && !Array.isArray(record.output)
     ? record.output as AnyRecord
     : null
@@ -76,6 +96,12 @@ const normalizeAttempt = (record: AnyRecord): AgentRunAttempt => {
       : null,
     events,
   }
+}
+
+const modelProcessKey = (event: AgentTimelineEvent) => {
+  if (!event.type.startsWith('model.commentary.') && !event.type.startsWith('model.reasoning_summary.')) return ''
+  const kind = event.type.startsWith('model.commentary.') ? 'commentary' : 'reasoning_summary'
+  return `${kind}:${String(event.payload.llmTurnIndex ?? '')}`
 }
 
 export const useWorkbenchRunTimeline = () => {
@@ -111,7 +137,7 @@ export const useWorkbenchRunTimeline = () => {
       current.startedAt = incoming.startedAt ?? current.startedAt
       current.finishedAt = incoming.finishedAt ?? current.finishedAt
       current.output = incoming.output ?? current.output
-      current.events = [...events.values()].sort((left, right) => left.sequence - right.sequence)
+      current.events = [...events.values()].sort(compareTimelineEvents)
     }
   }
 
@@ -131,12 +157,23 @@ export const useWorkbenchRunTimeline = () => {
     const event = normalizeEvent(source, fallbackRunId, fallbackTurnId)
     if (!event.runId) return
     const attempt = ensureAttempt(event.runId, event.turnId)
+    const processKey = modelProcessKey(event)
+    const previousProcessEvent = processKey
+      ? attempt.events.find((item) => modelProcessKey(item) === processKey)
+      : undefined
+    if (processKey) {
+      event.liveOrder = previousProcessEvent?.liveOrder
+        ?? Math.max(0, ...attempt.events.map((item) => item.liveOrder ?? 0)) + 1
+    }
+    if (processKey) {
+      attempt.events = attempt.events.filter((item) => modelProcessKey(item) !== processKey)
+    }
     const duplicate = attempt.events.some(
       (item) => (event.eventId && item.eventId === event.eventId) || (event.sequence >= 0 && item.sequence === event.sequence),
     )
     if (!duplicate && event.type !== 'message.delta') {
       attempt.events.push(event)
-      attempt.events.sort((left, right) => left.sequence - right.sequence)
+      attempt.events.sort(compareTimelineEvents)
     }
     if (event.sequence >= 0) attempt.latestSequence = Math.max(attempt.latestSequence, event.sequence)
     if (event.type === 'run.started' && !attempt.startedAt) {

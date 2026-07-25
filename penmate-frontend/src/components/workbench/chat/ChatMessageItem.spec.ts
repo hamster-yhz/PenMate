@@ -26,6 +26,8 @@ const mountChatMessageItem = async (
     isGenerating: boolean
     streamingAssistantMsgId: number | null
     approvalBusy: boolean
+    canRetry: boolean
+    isRetrying: boolean
   }> = {},
 ) => {
   return mount(ChatMessageItem, {
@@ -84,6 +86,23 @@ describe('ChatMessageItem', () => {
 
     expect(wrapper.get('[data-testid="inline-typing"]').text()).toContain('AI正在创作中')
   })
+
+  it('confirms_before_reexecuting_a_failed_user_request', async () => {
+    const wrapper = await mountChatMessageItem({
+      msg: { id: 10, role: 'user', text: 'Rewrite chapter three' },
+      canRetry: true,
+    })
+
+    const retry = wrapper.get('[data-testid="message-retry"]')
+    expect(retry.attributes('title')).toBe('重新执行原请求')
+    expect(wrapper.find('[data-testid="confirm-message-retry"]').exists()).toBe(false)
+
+    await retry.trigger('click')
+    expect(wrapper.get('[role="alertdialog"]').text()).toContain('不会继承上一次的步骤记录')
+    await wrapper.get('[data-testid="confirm-message-retry"]').trigger('click')
+
+    expect(wrapper.emitted('retry')).toEqual([[]])
+  })
   it('passes_extended_approval_metadata_to_approval_card', async () => {
     const wrapper = await mountChatMessageItem({
       msg: {
@@ -122,8 +141,8 @@ describe('ChatMessageItem', () => {
           id: '43',
           message: 'pending',
           time: '2026-07-17 12:00:00',
-          toolCode: 'story_bible_update',
-          preview: { kind: 'update_node', nodeId: '71' },
+          toolCode: 'story_bible_node_write',
+          preview: { operation: 'update', nodeId: '71' },
           resolved: false,
         },
       },

@@ -314,6 +314,7 @@ export const createAgentRunRuntime = (deps: {
       listen('message.delta', (event) => {
         const payload = parseSseData(event)
         publish('message.delta', payload as Record<string, unknown>)
+        if (payload.channel !== 'final') return
         const token = String(payload.text ?? payload.token ?? payload.content ?? '')
         if (!token) return
         deps.onToken?.(token, payload as Record<string, unknown>)
@@ -322,6 +323,7 @@ export const createAgentRunRuntime = (deps: {
       listen('message.snapshot', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('message.snapshot', payload)
+        if (payload.channel !== 'final') return
         const text = String(payload.text ?? payload.content ?? '')
         deps.onMessageSnapshot?.(text, payload)
         deps.scrollChat()
@@ -370,6 +372,7 @@ export const createAgentRunRuntime = (deps: {
       listen('message.completed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('message.completed', payload)
+        if (payload.channel !== 'final') return
         const text = String(payload.text ?? payload.content ?? payload.message ?? '')
         if (text) {
           deps.onMessageCompleted?.(text)

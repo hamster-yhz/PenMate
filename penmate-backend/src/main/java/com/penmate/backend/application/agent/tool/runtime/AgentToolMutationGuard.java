@@ -56,4 +56,20 @@ public class AgentToolMutationGuard {
             super(errorCode, message);
         }
     }
+
+    public void checkpointSuccessfulMutation(AuthorizedAgentRunContext context) {
+        executionContexts.assertExecutionOwned(context);
+        AgentRun run = runs.findRun(context.runId());
+        AgentRunInput input = context.input();
+        if (run == null || input == null) {
+            throw new Rejection("AGENT_RUN_NOT_FOUND", "Agent Run or its immutable input is missing");
+        }
+        var artifact = contextArtifacts.loadLatestContextForRun(context.runId());
+        if (run.contextEpochId() == null || !run.contextEpochId().equals(artifact.contextEpochId())) {
+            throw new Rejection("AGENT_RUN_CONTEXT_MISMATCH",
+                    "Agent Run Context Epoch does not match its latest dependency checkpoint");
+        }
+        contextArtifacts.saveDependencyCheckpoint(
+                context.runId(), artifact, dependencyValidator.currentManifest(run, input));
+    }
 }

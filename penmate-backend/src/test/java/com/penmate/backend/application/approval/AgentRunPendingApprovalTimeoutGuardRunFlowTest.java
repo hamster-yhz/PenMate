@@ -70,7 +70,7 @@ class AgentRunPendingApprovalTimeoutGuardRunFlowTest {
                 9101L,
                 9201L,
                 "call-1",
-                "story_bible_update",
+                "story_bible_node_write",
                 "{}",
                 "{}",
                 "{}",

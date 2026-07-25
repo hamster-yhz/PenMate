@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { nextTick, watchEffect } from 'vue'
 import { useWorkbenchChat } from '../useWorkbenchChat'
 import type { AgentRunEventStream } from '@/api/agentRunStream'
 
@@ -65,7 +66,7 @@ describe('useWorkbenchChat terminal Run retry', () => {
     void chat.retryCurrentRun()
     await vi.waitFor(() => expect(stream.listeners.has('run.completed')).toBe(true))
 
-    stream.listeners.get('message.completed')?.(event({ text: 'new answer', sequence: '4' }))
+    stream.listeners.get('message.completed')?.(event({ channel: 'final', text: 'new answer', sequence: '4' }))
     stream.listeners.get('run.completed')?.(event({ phase: 'completed', sequence: '5' }))
     await retrying
 
@@ -121,9 +122,9 @@ describe('useWorkbenchChat terminal Run retry', () => {
 
     const consuming = chat.resumeRunningRun('10', '61', '10')
     await vi.waitFor(() => expect(stream.listeners.has('error')).toBe(true))
-    stream.listeners.get('message.snapshot')?.(event({ text: 'partial', offset: 7 }))
-    stream.listeners.get('message.delta')?.(event({ text: ' answer', offset: 7 }))
-    stream.listeners.get('message.delta')?.(event({ text: ' answer', offset: 7 }))
+    stream.listeners.get('message.snapshot')?.(event({ channel: 'final', text: 'partial', offset: 7 }))
+    stream.listeners.get('message.delta')?.(event({ channel: 'final', text: ' answer', offset: 7 }))
+    stream.listeners.get('message.delta')?.(event({ channel: 'final', text: ' answer', offset: 7 }))
     expect(chat.messages.value.at(-1)?.text).toBe('partial answer')
     stream.listeners.get('error')?.(event({ message: 'network disconnected', fatal: false }))
     await consuming
@@ -345,6 +346,11 @@ describe('useWorkbenchChat terminal Run retry', () => {
       ],
     })
     chat.chatInput.value = 'new question'
+    const observedNewTurnIds: string[] = []
+    const stopObserving = watchEffect(() => {
+      const message = chat.messages.value.find((item) => item.text === 'new question')
+      observedNewTurnIds.push(message?.turnId ?? '')
+    })
 
     const sending = chat.sendMessage()
     await vi.waitFor(() => expect(createTurn).toHaveBeenCalledOnce())
@@ -358,6 +364,7 @@ describe('useWorkbenchChat terminal Run retry', () => {
 
     resolveCreateTurn?.({ activeRun: { turnId: '81', runId: '62' } })
     await vi.waitFor(() => expect(stream.listeners.has('run.completed')).toBe(true))
+    await nextTick()
 
     expect(chat.messages.value.at(-1)).toMatchObject({
       role: 'assistant',
@@ -371,15 +378,18 @@ describe('useWorkbenchChat terminal Run retry', () => {
       turnId: '81',
       runStatus: 'PENDING',
       runPhase: 'created',
+      startedAt: expect.any(String),
     })
+    expect(observedNewTurnIds).toContain('81')
     stream.listeners.get('error')?.(event({ message: 'disconnected', fatal: false }))
     await vi.waitFor(() => expect(listSessionRuns).toHaveBeenCalled())
     expect(chat.messages.value.at(-1)?.text).toBe('')
 
-    stream.listeners.get('message.completed')?.(event({ text: 'new answer', sequence: '4' }))
+    stream.listeners.get('message.completed')?.(event({ channel: 'final', text: 'new answer', sequence: '4' }))
     stream.listeners.get('run.completed')?.(event({ sequence: '5' }))
     await sending
     expect(chat.messages.value.at(-1)?.text).toBe('new answer')
+    stopObserving()
   })
 
   it('scrolls streamed content only after Vue has updated the DOM', async () => {
@@ -411,7 +421,7 @@ describe('useWorkbenchChat terminal Run retry', () => {
 
     const consuming = chat.consumeRunStream('10', '61', '0')
     await vi.waitFor(() => expect(stream.listeners.has('message.delta')).toBe(true))
-    stream.listeners.get('message.delta')?.(event({ text: 'token', sequence: '1' }))
+    stream.listeners.get('message.delta')?.(event({ channel: 'final', text: 'token', sequence: '1' }))
 
     expect(nextTick).toHaveBeenCalledOnce()
     expect(scrollChat).not.toHaveBeenCalled()

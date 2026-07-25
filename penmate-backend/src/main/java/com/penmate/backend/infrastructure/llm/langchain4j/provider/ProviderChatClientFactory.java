@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,6 +20,14 @@ public class ProviderChatClientFactory {
                 .filter(client -> client.supports(providerCode))
                 .findFirst()
                 .orElseThrow(() -> BusinessException.of("Unsupported provider: " + providerCode));
+    }
+
+    public ProviderChatClient get(AgentLlmExecutionConfig executionConfig) {
+        return clients.stream()
+                .filter(client -> client.supports(executionConfig))
+                .findFirst()
+                .orElseThrow(() -> BusinessException.of("Unsupported LLM provider/protocol: "
+                        + executionConfig.providerCode() + "/" + executionConfig.protocolCode()));
     }
 }
 

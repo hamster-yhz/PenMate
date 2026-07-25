@@ -12,14 +12,14 @@ describe('useWorkbenchChatTimeline refactor contract', () => {
     expect(
       buildApprovalCard({
         approvalId: '43',
-        toolCode: 'story_bible_update',
-        approvalPreview: { kind: 'update_node', nodeId: '71' },
+        toolCode: 'story_bible_node_write',
+        approvalPreview: { operation: 'update', nodeId: '71' },
         approvalStatus: 'pending',
       }),
     ).toMatchObject({
       id: '43',
-      toolCode: 'story_bible_update',
-      preview: { kind: 'update_node', nodeId: '71' },
+      toolCode: 'story_bible_node_write',
+      preview: { operation: 'update', nodeId: '71' },
       resolved: false,
     })
   })

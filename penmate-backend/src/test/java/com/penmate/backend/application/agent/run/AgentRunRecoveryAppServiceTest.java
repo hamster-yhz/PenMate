@@ -64,8 +64,8 @@ class AgentRunRecoveryAppServiceTest {
                 "turnId", 40L, "runId", 50L, "runStatus", "WAITING_APPROVAL",
                 "runPhase", "waiting_approval", "latestSequence", 8L));
         when(approvals.findPendingByRunId(50L)).thenReturn(new AgentRunPendingApproval(
-                1L, 60L, 60L, 50L, 10L, 20L, 40L, "call-1", "story_bible_update",
-                "{\"operation\":\"batch\",\"operations\":[{\"kind\":\"update_node\",\"nodeId\":71}]}",
+                1L, 60L, 60L, 50L, 10L, 20L, 40L, "call-1", "story_bible_node_write",
+                "{\"operation\":\"update\",\"nodeId\":71,\"expectedRevision\":3}",
                 "{}", "[]", "50:call-1", "PENDING", 30L, "trace", null, null));
 
         AgentRunRecoveryResult result = new AgentRunRecoveryAppService(
@@ -76,7 +76,7 @@ class AgentRunRecoveryAppServiceTest {
                 assertThat(((Map<?, ?>) pending.get("approvalPreview")).get("nodeId")).isEqualTo("71"));
         assertThat(result.messages()).singleElement().isInstanceOfSatisfying(Map.class, message -> {
             assertThat(message).containsEntry("approvalId", "60")
-                    .containsEntry("toolCode", "story_bible_update");
+                    .containsEntry("toolCode", "story_bible_node_write");
             assertThat(((Map<?, ?>) message.get("approvalPreview")).get("nodeId")).isEqualTo("71");
         });
     }
@@ -133,6 +133,7 @@ class AgentRunRecoveryAppServiceTest {
     private ToolApprovalPreview preview() {
         return new ToolApprovalPreview(
                 new JacksonJsonCodec(new ObjectMapper()),
-                List.of(new com.penmate.backend.application.agent.tool.runtime.StoryBibleUpdateApprovalPreviewProvider()));
+                List.of(new com.penmate.backend.application.agent.tool.runtime.StoryBibleV2ApprovalPreviewConfiguration()
+                        .storyBibleNodeWriteApprovalPreview()));
     }
 }

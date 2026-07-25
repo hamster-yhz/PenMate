@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { CheckOutlined, CloseOutlined, RedoOutlined, SendOutlined, SettingOutlined, StopOutlined, ToolOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined, CloseOutlined, SendOutlined, SettingOutlined, StopOutlined, ToolOutlined } from '@ant-design/icons-vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { WorkbenchSkillCatalogItem } from '@/components/workbench/workbenchTypes'
 
 const props = withDefaults(defineProps<{
   modelValue?: string; isGenerating?: boolean; canCancelRun?: boolean; isCancelling?: boolean;
-  canRetryRun?: boolean; isRetrying?: boolean; currentModelName?: string; activePlugins?: string[];
+  currentModelName?: string; activePlugins?: string[];
   activeChapterTitle?: string; selectedText?: string; boundStyleName?: string;
   skillCatalog?: WorkbenchSkillCatalogItem[]; activeSkills?: string[]; skillCatalogLoading?: boolean;
 }>(), {
-  modelValue: '', isGenerating: false, canCancelRun: false, isCancelling: false, canRetryRun: false,
-  isRetrying: false, currentModelName: '', activePlugins: () => [], activeChapterTitle: '', selectedText: '', boundStyleName: '',
+  modelValue: '', isGenerating: false, canCancelRun: false, isCancelling: false,
+  currentModelName: '', activePlugins: () => [], activeChapterTitle: '', selectedText: '', boundStyleName: '',
   skillCatalog: () => [], activeSkills: () => [], skillCatalogLoading: false,
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]; send: []; cancel: []; retry: []; 'open-model-settings': []; 'clear-selected-text': [];
+  'update:modelValue': [value: string]; send: []; cancel: []; 'open-model-settings': []; 'clear-selected-text': [];
   'add-skill': [name: string]; 'remove-skill': [name: string]; 'refresh-skill-catalog': [];
 }>()
 const textarea = ref<HTMLTextAreaElement | null>(null)
@@ -160,7 +160,6 @@ const handleKeydown = (event: KeyboardEvent) => {
       <div class="composer-footer">
         <span class="composer-hint">Enter 发送 · Shift+Enter 换行</span>
         <div class="composer-actions">
-          <button v-if="canRetryRun && !isGenerating" type="button" class="icon-button retry" data-testid="chat-retry" :disabled="isRetrying" title="重试运行" aria-label="重试运行" @click="emit('retry')"><RedoOutlined /></button>
           <button v-if="canCancelRun" type="button" class="icon-button stop" data-testid="chat-cancel" :disabled="isCancelling" title="停止运行" aria-label="停止运行" @click="emit('cancel')"><StopOutlined /></button>
           <button v-else type="button" class="send-button btn-send" data-testid="chat-send" :disabled="sendDisabled" @click="send"><SendOutlined /><span>发送</span></button>
         </div>
@@ -201,7 +200,6 @@ textarea::placeholder { color: var(--text-muted); }
 .composer-actions { display: flex; gap: 5px; }
 .icon-button, .send-button { height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; cursor: pointer; }
 .icon-button { width: 32px; background: transparent; color: var(--text-muted); }
-.retry:hover { color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); }
 .stop { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, var(--border-subtle)); background: var(--danger-soft); }
 .send-button { gap: 6px; padding: 0 12px; border-color: var(--accent); border-radius: var(--radius-sm); background: var(--accent); color: var(--text-inverse); }
 .send-button:hover:not(:disabled) { background: var(--accent-hover); }

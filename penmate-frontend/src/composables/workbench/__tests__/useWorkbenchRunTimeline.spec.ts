@@ -29,6 +29,95 @@ describe('useWorkbenchRunTimeline', () => {
     expect(timeline.attempts.value[0]?.events).toHaveLength(0)
   })
 
+  it('replaces model process snapshots with the durable completed block', () => {
+    const timeline = useWorkbenchRunTimeline()
+    timeline.appendEvent('model.reasoning_summary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.reasoning_summary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"先检查"}',
+    })
+    timeline.appendEvent('model.reasoning_summary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.reasoning_summary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"先检查设定"}',
+    })
+    timeline.appendEvent('model.reasoning_summary.completed', {
+      runId: '1', turnId: '10', sequence: '4', type: 'model.reasoning_summary.completed',
+      payloadJson: '{"llmTurnIndex":1,"text":"先检查设定"}',
+    })
+
+    expect(timeline.attempts.value[0]?.events).toHaveLength(1)
+    expect(timeline.attempts.value[0]?.events[0]).toMatchObject({
+      type: 'model.reasoning_summary.completed',
+      sequence: 4,
+      payload: { llmTurnIndex: 1, text: '先检查设定' },
+    })
+  })
+
+  it('keeps live process snapshots at the timeline tail without swapping their arrival order', () => {
+    const timeline = useWorkbenchRunTimeline()
+    timeline.appendEvent('llm.turn.started', {
+      runId: '1', turnId: '10', sequence: '12', type: 'llm.turn.started',
+    })
+    timeline.appendEvent('model.commentary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.commentary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"正在读取"}',
+    })
+    timeline.appendEvent('model.reasoning_summary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.reasoning_summary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"先检查设定"}',
+    })
+    timeline.appendEvent('model.commentary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.commentary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"正在读取章节"}',
+    })
+
+    expect(timeline.attempts.value[0]?.events.map((event) => event.type)).toEqual([
+      'llm.turn.started',
+      'model.commentary.snapshot',
+      'model.reasoning_summary.snapshot',
+    ])
+
+    timeline.appendEvent('model.commentary.completed', {
+      runId: '1', turnId: '10', sequence: '13', type: 'model.commentary.completed',
+      payloadJson: '{"llmTurnIndex":1,"text":"正在读取章节"}',
+    })
+
+    expect(timeline.attempts.value[0]?.events.map((event) => event.type)).toEqual([
+      'llm.turn.started',
+      'model.commentary.completed',
+      'model.reasoning_summary.snapshot',
+    ])
+  })
+
+  it('does not swap two process blocks while one snapshot becomes durable', () => {
+    const timeline = useWorkbenchRunTimeline()
+    timeline.appendEvent('model.reasoning_summary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.reasoning_summary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"reasoning"}',
+    })
+    timeline.appendEvent('model.commentary.snapshot', {
+      runId: '1', turnId: '10', sequence: '-1', type: 'model.commentary.snapshot',
+      payloadJson: '{"llmTurnIndex":1,"text":"commentary"}',
+    })
+    timeline.appendEvent('model.commentary.completed', {
+      runId: '1', turnId: '10', sequence: '8', type: 'model.commentary.completed',
+      payloadJson: '{"llmTurnIndex":1,"text":"commentary"}',
+    })
+
+    expect(timeline.attempts.value[0]?.events.map((event) => event.type)).toEqual([
+      'model.reasoning_summary.snapshot',
+      'model.commentary.completed',
+    ])
+
+    timeline.appendEvent('model.reasoning_summary.completed', {
+      runId: '1', turnId: '10', sequence: '9', type: 'model.reasoning_summary.completed',
+      payloadJson: '{"llmTurnIndex":1,"text":"reasoning"}',
+    })
+    expect(timeline.attempts.value[0]?.events.map((event) => event.type)).toEqual([
+      'model.reasoning_summary.completed',
+      'model.commentary.completed',
+    ])
+  })
+
   it('derives live timing and failure details from streamed run events', () => {
     const timeline = useWorkbenchRunTimeline()
     timeline.appendEvent('run.started', {

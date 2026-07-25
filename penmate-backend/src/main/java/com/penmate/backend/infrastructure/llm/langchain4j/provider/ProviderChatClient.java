@@ -1,6 +1,8 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmCapabilities;
+import com.penmate.backend.application.agent.llm.AgentLlmProtocol;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
@@ -15,6 +17,16 @@ public interface ProviderChatClient {
      * 是否支持当前 provider。
      */
     boolean supports(String providerCode);
+
+    default boolean supports(AgentLlmExecutionConfig executionConfig) {
+        return executionConfig != null && supports(executionConfig.providerCode());
+    }
+
+    default AgentLlmCapabilities capabilities(AgentLlmExecutionConfig executionConfig) {
+        return new AgentLlmCapabilities(
+                AgentLlmProtocol.from(executionConfig == null ? null : executionConfig.protocolCode()),
+                supportsStreaming(), true, false, false, false);
+    }
 
     /**
      * 调用供应商模型生成。

@@ -6,6 +6,12 @@ public interface AgentLlmStreamObserver {
 
     void onTextDelta(String text);
 
+    default void onEvent(AgentLlmStreamEvent event) {
+        if (event instanceof AgentLlmStreamEvent.OutputTextDelta delta) {
+            onTextDelta(delta.text());
+        }
+    }
+
     void onCancellable(Runnable cancelAction);
 
     boolean isCancelled();

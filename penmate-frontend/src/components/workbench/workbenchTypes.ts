@@ -36,6 +36,7 @@ export type AgentTimelineEvent = {
   runId: string
   turnId: string
   sequence: number
+  liveOrder?: number
   type: string
   payload: Record<string, unknown>
   createdAt?: string

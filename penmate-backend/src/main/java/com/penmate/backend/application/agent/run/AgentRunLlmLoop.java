@@ -164,7 +164,7 @@ public class AgentRunLlmLoop {
                     request.runId(), request.turnId(), turnIndex, fullAssistantText.toString());
             AgentLlmTurnResponse response;
             try {
-                response = llmInvocations.invokeStreaming(
+                response = llmInvocations.invokeStreamingEvents(
                         request.runId(),
                         new AgentLlmTurnRequest(
                                 List.copyOf(messages),
@@ -172,9 +172,9 @@ public class AgentRunLlmLoop {
                                 "auto"
                         ),
                         request.executionConfig(),
-                        streamSession::accept
+                        streamSession::acceptEvent
                 );
-                streamSession.complete(response.assistantText());
+                streamSession.complete(response);
             } catch (RuntimeException ex) {
                 streamSession.flushPending();
                 throw ex;
@@ -207,7 +207,8 @@ public class AgentRunLlmLoop {
                     .map(call -> new AgentLlmToolCallPayload(
                             call.id(), "function", call.toolCode(), call.argumentsJson()))
                     .toList();
-            messages.add(AgentLlmMessage.assistant(response.assistantText(), toolCalls));
+            messages.add(AgentLlmMessage.assistant(
+                    response.assistantText(), toolCalls, response.providerItems()));
 
             AgentRunLoopResult waiting = executeToolBatch(request, messages, toolCalls, 0,
                     turnIndex, iteration, totalUsage, fullAssistantText, false);

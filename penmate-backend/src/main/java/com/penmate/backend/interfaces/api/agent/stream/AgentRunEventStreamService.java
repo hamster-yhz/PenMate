@@ -115,6 +115,7 @@ public class AgentRunEventStreamService {
                     sendEvent(connection, AgentEvent.forBroadcast(connection.runId, -1L, "message.snapshot",
                             objectMapper.writeValueAsString(Map.of(
                                     "schemaVersion", 1,
+                                    "channel", "final",
                                     "turnId", String.valueOf(snapshot.turnId()),
                                     "text", snapshot.text(),
                                     "offset", snapshot.offset(),

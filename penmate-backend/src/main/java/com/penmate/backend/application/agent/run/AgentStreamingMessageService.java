@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent.run;
 
+import com.penmate.backend.application.agent.llm.AgentLlmStreamEvent;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,6 +33,10 @@ public class AgentStreamingMessageService {
         private final String prefix;
         private final StringBuilder accumulated;
         private final StringBuilder pending = new StringBuilder();
+        private final ProcessAccumulator commentary = new ProcessAccumulator(
+                "model.commentary.snapshot", "model.commentary.completed");
+        private final ProcessAccumulator reasoningSummary = new ProcessAccumulator(
+                "model.reasoning_summary.snapshot", "model.reasoning_summary.completed");
         private long lastFlushNanos = 0L;
 
         private StreamSession(Long runId, Long turnId, int llmTurnIndex, String existingText) {
@@ -52,6 +58,25 @@ public class AgentStreamingMessageService {
             }
         }
 
+        public synchronized void acceptEvent(AgentLlmStreamEvent event) {
+            if (event instanceof AgentLlmStreamEvent.OutputTextDelta delta) {
+                accept(delta.text());
+            } else if (event instanceof AgentLlmStreamEvent.CommentaryDelta delta) {
+                commentary.accept(delta.text());
+            } else if (event instanceof AgentLlmStreamEvent.ReasoningSummaryDelta delta) {
+                reasoningSummary.accept(delta.text());
+            }
+        }
+
+        public synchronized void complete(AgentLlmTurnResponse response) {
+            AgentLlmTurnResponse resolved = response == null
+                    ? new AgentLlmTurnResponse("stop", "", java.util.List.of(), "{}")
+                    : response;
+            complete(resolved.assistantText());
+            commentary.complete(resolved.commentaryText());
+            reasoningSummary.complete(resolved.reasoningSummary());
+        }
+
         public synchronized void complete(String finalTurnText) {
             String resolvedTurnText = finalTurnText == null ? "" : finalTurnText;
             String expected = prefix + resolvedTurnText;
@@ -67,6 +92,7 @@ public class AgentStreamingMessageService {
                 pending.setLength(0);
                 saveSnapshot();
                 events.broadcastOnly(runId, "message.snapshot", Map.of(
+                        "channel", "final",
                         "llmTurnIndex", llmTurnIndex,
                         "text", accumulated.toString(),
                         "offset", accumulated.length()
@@ -78,6 +104,8 @@ public class AgentStreamingMessageService {
 
         public synchronized void flushPending() {
             flush(System.nanoTime());
+            commentary.flushSnapshot(true);
+            reasoningSummary.flushSnapshot(true);
         }
 
         private void flush(long now) {
@@ -87,6 +115,7 @@ public class AgentStreamingMessageService {
             pending.setLength(0);
             saveSnapshot();
             events.broadcastOnly(runId, "message.delta", Map.of(
+                    "channel", "final",
                     "llmTurnIndex", llmTurnIndex,
                     "text", chunk,
                     "offset", startOffset,
@@ -98,6 +127,56 @@ public class AgentStreamingMessageService {
         private void saveSnapshot() {
             checkpoints.save(new AgentPartialMessageCheckpointStore.Snapshot(
                     runId, turnId, accumulated.toString(), accumulated.length(), Instant.now()));
+        }
+
+        private final class ProcessAccumulator {
+            private final String snapshotEvent;
+            private final String completedEvent;
+            private final StringBuilder accumulated = new StringBuilder();
+            private int lastSnapshotLength;
+            private long lastSnapshotNanos;
+
+            private ProcessAccumulator(String snapshotEvent, String completedEvent) {
+                this.snapshotEvent = snapshotEvent;
+                this.completedEvent = completedEvent;
+            }
+
+            private void accept(String text) {
+                if (text == null || text.isEmpty()) return;
+                accumulated.append(text);
+                flushSnapshot(false);
+            }
+
+            private void flushSnapshot(boolean force) {
+                if (accumulated.length() == lastSnapshotLength) return;
+                long now = System.nanoTime();
+                if (!force && lastSnapshotNanos != 0L
+                        && now - lastSnapshotNanos < FLUSH_INTERVAL_NANOS
+                        && accumulated.length() - lastSnapshotLength < MAX_PENDING_CHARS) return;
+                events.broadcastOnly(runId, snapshotEvent, Map.of(
+                        "llmTurnIndex", llmTurnIndex,
+                        "text", accumulated.toString(),
+                        "offset", accumulated.length(),
+                        "visibility", "public"
+                ), -1L);
+                lastSnapshotLength = accumulated.length();
+                lastSnapshotNanos = now;
+            }
+
+            private void complete(String finalText) {
+                String resolved = finalText == null ? "" : finalText;
+                if (!resolved.isEmpty() && !resolved.equals(accumulated.toString())) {
+                    accumulated.setLength(0);
+                    accumulated.append(resolved);
+                }
+                if (accumulated.isEmpty()) return;
+                flushSnapshot(true);
+                events.publish(runId, completedEvent, Map.of(
+                        "llmTurnIndex", llmTurnIndex,
+                        "text", accumulated.toString(),
+                        "visibility", "public"
+                ));
+            }
         }
     }
 }

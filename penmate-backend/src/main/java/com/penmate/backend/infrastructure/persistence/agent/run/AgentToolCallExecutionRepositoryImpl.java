@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.List;
 
 @Repository
 public class AgentToolCallExecutionRepositoryImpl implements AgentToolCallExecutionRepository {
@@ -20,6 +21,11 @@ public class AgentToolCallExecutionRepositoryImpl implements AgentToolCallExecut
     @Override
     public AgentToolCallExecution find(Long runId, String toolCallId) {
         return mapper.find(runId, toolCallId);
+    }
+
+    @Override
+    public List<AgentToolCallExecution> listByRun(Long runId) {
+        return mapper.listByRun(runId);
     }
 
     @Override

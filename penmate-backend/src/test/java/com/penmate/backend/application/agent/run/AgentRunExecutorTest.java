@@ -152,7 +152,7 @@ class AgentRunExecutorTest {
         when(dependencyValidator.validate(any(), any(), any())).thenReturn(
                 new AgentRunDependencyValidator.Validation(true, null, null, List.of()));
         AgentRunPendingApproval pending = new AgentRunPendingApproval(
-                1L, 2L, 3L, 70001L, 10001L, 20001L, 30001L, "call-1", "story_bible_update",
+                1L, 2L, 3L, 70001L, 10001L, 20001L, 30001L, "call-1", "story_bible_node_write",
                 "{}", "{}", "[]", "key", "APPROVED", 920001L, "trace-1", null, null);
         when(pendingApprovals.findApprovedByRunId(70001L)).thenReturn(pending);
         when(pendingApprovals.markStatus(3L, "APPROVED", "COMPLETED")).thenReturn(1);

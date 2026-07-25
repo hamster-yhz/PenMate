@@ -196,7 +196,7 @@ class AgentRunLlmLoopTest {
     void resume_should_ignore_stale_pending_identity_and_execute_remaining_sibling_calls() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         List<AgentLlmToolCallPayload> calls = List.of(
-                new AgentLlmToolCallPayload("call-1", "function", "story_bible_update", "{\"operation\":\"batch\"}"),
+                new AgentLlmToolCallPayload("call-1", "function", "story_bible_node_write", "{\"operation\":\"update\"}"),
                 new AgentLlmToolCallPayload("call-2", "function", "story_bible_search", "{\"query\":\"Mira\"}")
         );
         List<AgentLlmMessage> savedMessages = List.of(
@@ -205,7 +205,7 @@ class AgentRunLlmLoopTest {
         );
         AgentRunPendingApproval pending = new AgentRunPendingApproval(
                 1L, 88001L, 88001L, 70001L, 999L, 998L, 997L,
-                "call-1", "story_bible_update", "{\"operation\":\"batch\"}",
+                "call-1", "story_bible_node_write", "{\"operation\":\"update\"}",
                 "{\"llmTurnIndex\":1,\"tokenUsage\":{\"promptTokens\":3,\"completionTokens\":2,\"totalTokens\":5},\"assistantText\":\"\"}",
                 objectMapper.writeValueAsString(savedMessages), "70001:call-1", "APPROVED",
                 996L, "stale-snapshot-trace", null, null
@@ -247,7 +247,7 @@ class AgentRunLlmLoopTest {
     void resume_should_pause_again_when_a_remaining_sibling_requires_approval() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         List<AgentLlmToolCallPayload> calls = List.of(
-                new AgentLlmToolCallPayload("call-1", "function", "story_bible_update", "{\"operation\":\"batch\"}"),
+                new AgentLlmToolCallPayload("call-1", "function", "story_bible_node_write", "{\"operation\":\"update\"}"),
                 new AgentLlmToolCallPayload("call-2", "function", "book_crud", "{\"operation\":\"delete\"}")
         );
         List<AgentLlmMessage> savedMessages = List.of(
@@ -256,7 +256,7 @@ class AgentRunLlmLoopTest {
         );
         AgentRunPendingApproval pending = new AgentRunPendingApproval(
                 1L, 88001L, 88001L, 70001L, 101L, 90001L, 50001L,
-                "call-1", "story_bible_update", "{\"operation\":\"batch\"}",
+                "call-1", "story_bible_node_write", "{\"operation\":\"update\"}",
                 "{\"llmTurnIndex\":1,\"tokenUsage\":{\"promptTokens\":3,\"completionTokens\":2,\"totalTokens\":5},\"assistantText\":\"\"}",
                 objectMapper.writeValueAsString(savedMessages), "70001:call-1", "APPROVED",
                 201L, "trace-1", null, null

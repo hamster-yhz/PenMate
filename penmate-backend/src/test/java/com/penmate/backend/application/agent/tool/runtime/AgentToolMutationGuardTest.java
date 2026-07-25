@@ -91,6 +91,48 @@ class AgentToolMutationGuardTest {
         assertThatCode(() -> guard.assertExecutable(context, true)).doesNotThrowAnyException();
     }
 
+    @Test
+    void successful_mutation_persists_the_current_dependencies_as_the_next_guard_baseline() {
+        AuthorizedAgentRunContext context = context();
+        AgentRun run = run();
+        AgentRunInput input = input();
+        var artifact = artifact();
+        var manifest = new AgentRunContextArtifactService.DependencyManifest(
+                4L, 6L, 5L, 8L, 0L, "RETRIEVAL", null, "p", "s", "t");
+        when(runs.findRun(11L)).thenReturn(run);
+        when(contextArtifacts.loadLatestContextForRun(11L)).thenReturn(artifact);
+        when(dependencies.currentManifest(run, input)).thenReturn(manifest);
+
+        guard.checkpointSuccessfulMutation(context);
+
+        verify(contextArtifacts).saveDependencyCheckpoint(11L, artifact, manifest);
+    }
+
+    @Test
+    void a_second_mutation_in_the_same_run_validates_against_the_advanced_checkpoint() {
+        AuthorizedAgentRunContext context = context();
+        AgentRun run = run();
+        AgentRunInput input = input();
+        var initial = artifact();
+        var advancedManifest = new AgentRunContextArtifactService.DependencyManifest(
+                4L, 6L, 5L, 8L, 0L, "RETRIEVAL", null, "p", "s", "t");
+        var advanced = new AgentRunContextArtifactService.ResolvedArtifact(
+                2, 11L, 9L, null, null, List.of(), advancedManifest);
+        when(runs.findRun(11L)).thenReturn(run);
+        when(contextArtifacts.loadLatestContextForRun(11L)).thenReturn(initial, initial, advanced);
+        when(dependencies.validate(run, input, initial)).thenReturn(
+                new AgentRunDependencyValidator.Validation(true, null, null, List.of()));
+        when(dependencies.currentManifest(run, input)).thenReturn(advancedManifest);
+        when(dependencies.validate(run, input, advanced)).thenReturn(
+                new AgentRunDependencyValidator.Validation(true, advancedManifest, advancedManifest, List.of()));
+
+        guard.assertExecutable(context, true);
+        guard.checkpointSuccessfulMutation(context);
+
+        assertThatCode(() -> guard.assertExecutable(context, true)).doesNotThrowAnyException();
+        verify(contextArtifacts).saveDependencyCheckpoint(11L, initial, advancedManifest);
+    }
+
     private AuthorizedAgentRunContext context() {
         return AgentToolTestContext.context(1L, 11L, 2L, 3L, 4L, 9L, 7L, 5L, "trace");
     }

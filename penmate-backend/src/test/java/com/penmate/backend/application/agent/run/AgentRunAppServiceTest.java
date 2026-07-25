@@ -56,7 +56,8 @@ class AgentRunAppServiceTest {
                 idGenerator,
                 new AgentRunAppService(agentRunRepository, eventPublisher, runDispatcher),
                 runDispatcher,
-                mock(AgentSkillActivationService.class)
+                mock(AgentSkillActivationService.class),
+                passthroughRecoveryPrompts()
         );
 
         AgentTurnResult result = service.createTurn(101L, 90001L, command(), "trace-1");
@@ -77,6 +78,12 @@ class AgentRunAppServiceTest {
                 java.util.List.of(),
                 new AgentTurnCommand.TaskRequest("WRITE", 30001L, 1001L, "selected text")
         );
+    }
+
+    private AgentRunRecoveryPromptService passthroughRecoveryPrompts() {
+        AgentRunRecoveryPromptService service = mock(AgentRunRecoveryPromptService.class);
+        when(service.attachToManualRequest(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(2));
+        return service;
     }
 
     private BusinessIdGenerator ids(Long... ids) {

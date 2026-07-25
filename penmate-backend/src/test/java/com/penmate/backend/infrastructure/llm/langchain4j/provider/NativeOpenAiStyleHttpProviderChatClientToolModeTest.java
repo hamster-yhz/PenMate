@@ -12,8 +12,8 @@ import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDe
 import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.StoryBibleSearchToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.StoryBibleUpdateToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.TodoPlannerToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.StoryBibleV2ToolDefinitions;
+import com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import org.junit.jupiter.api.Test;
@@ -92,8 +92,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
     @Test
     void omits_tools_that_are_registered_but_hidden_from_the_llm() {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
-                new BookCrudToolDefinition(),
-                new TodoPlannerToolDefinition()
+                new BookCrudToolDefinition()
         ));
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
                 List.of(AgentLlmMessage.user("hello")),
@@ -115,8 +114,12 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new StoryBibleSearchToolDefinition(),
-                new StoryBibleUpdateToolDefinition(),
-                new TodoPlannerToolDefinition()
+                StoryBibleV2ToolDefinitions.inspect(),
+                StoryBibleV2ToolDefinitions.nodeWrite(),
+                StoryBibleV2ToolDefinitions.relationWrite(),
+                StoryBibleV2ToolDefinitions.progressionWrite(),
+                StoryBibleV2ToolDefinitions.structureWrite(),
+                new TodoCrudToolDefinition()
         ));
         List<AgentLlmToolSchema> schemas = definitions.listLlmSchemas();
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
@@ -128,11 +131,12 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         assertThat(tools)
                 .extracting(item -> ((JSONObject) item).getJSONObject("function").getStr("name"))
                 .containsExactlyElementsOf(schemas.stream().map(AgentLlmToolSchema::toolCode).toList());
-        JSONObject storyBibleUpdate = findParameters(tools, "story_bible_update");
-        assertThat(storyBibleUpdate.getJSONObject("properties").getJSONObject("operation").getStr("const"))
-                .isEqualTo("batch");
-        assertThat(storyBibleUpdate.getJSONObject("properties").getJSONObject("operations").getInt("minItems"))
-                .isEqualTo(1);
+        assertThat(schemas).extracting(AgentLlmToolSchema::toolCode)
+                .contains("story_bible_inspect", "story_bible_node_write", "story_bible_relation_write",
+                        "story_bible_progression_write", "story_bible_structure_write", "todo_crud");
+        JSONObject nodeWrite = findParameters(tools, "story_bible_node_write");
+        assertThat(nodeWrite.getJSONObject("properties").getJSONObject("attributes").getStr("type"))
+                .isEqualTo("object");
     }
 
     @Test

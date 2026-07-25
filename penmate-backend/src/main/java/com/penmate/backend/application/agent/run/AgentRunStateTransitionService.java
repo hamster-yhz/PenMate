@@ -56,7 +56,7 @@ public class AgentRunStateTransitionService {
         leases.complete(lease);
         completeApproval(completedApprovalId);
         AgentEvent message = assistantMessageCompleted ? null : events.publish(lease.runId(), "message.completed",
-                Map.of("role", "assistant", "text", assistantText));
+                Map.of("channel", "final", "role", "assistant", "text", assistantText));
         AgentEvent terminal = events.publish(lease.runId(), "run.completed",
                 Map.of("phase", "completed", "tokenUsage", tokenUsage));
         return new Outcome(message, terminal);

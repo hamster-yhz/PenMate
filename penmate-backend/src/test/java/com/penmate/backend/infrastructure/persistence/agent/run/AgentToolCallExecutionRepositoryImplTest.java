@@ -53,6 +53,8 @@ class AgentToolCallExecutionRepositoryImplTest {
             AgentToolCallExecution stored = repository.find(11L, "call-1");
             assertThat(stored.status()).isEqualTo(AgentToolCallExecutionStatus.SUCCEEDED);
             assertThat(stored.resultJson()).contains("SUCCESS");
+            assertThat(repository.listByRun(11L)).extracting(AgentToolCallExecution::toolCallId)
+                    .containsExactly("call-1");
         }
     }
 

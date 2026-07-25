@@ -29,25 +29,25 @@ const ConversationHistoryPanelStub = defineComponent({
 
 const ChatMessageListStub = defineComponent({
   name: 'ChatMessageList',
-  emits: ['approve'],
+  emits: ['approve', 'retry'],
   setup(_, { emit }) {
     return () =>
       h('div', [
         h('button', { 'data-testid': 'approve-message', onClick: () => emit('approve', 'approval-9') }),
+        h('button', { 'data-testid': 'message-retry', onClick: () => emit('retry') }),
       ])
   },
 })
 
 const ChatComposerStub = defineComponent({
   name: 'ChatComposer',
-  emits: ['update:model-value', 'send', 'cancel', 'retry', 'open-model-settings'],
+  emits: ['update:model-value', 'send', 'cancel', 'open-model-settings'],
   setup(_, { emit }) {
     return () =>
       h('div', [
         h('button', { 'data-testid': 'chat-input-update', onClick: () => emit('update:model-value', '继续生成') }),
         h('button', { 'data-testid': 'chat-send', onClick: () => emit('send') }),
         h('button', { 'data-testid': 'chat-cancel', onClick: () => emit('cancel') }),
-        h('button', { 'data-testid': 'chat-retry', onClick: () => emit('retry') }),
         h('button', { 'data-testid': 'open-model-settings', onClick: () => emit('open-model-settings') }),
       ])
   },
@@ -100,7 +100,7 @@ describe('WorkbenchRightPanel', () => {
     await wrapper.get('[data-testid="chat-input-update"]').trigger('click')
     await wrapper.get('[data-testid="chat-send"]').trigger('click')
     await wrapper.get('[data-testid="chat-cancel"]').trigger('click')
-    await wrapper.get('[data-testid="chat-retry"]').trigger('click')
+    await wrapper.get('[data-testid="message-retry"]').trigger('click')
     await wrapper.get('[data-testid="open-model-settings"]').trigger('click')
     await wrapper.get('[aria-label="回到底部"]').trigger('click')
 

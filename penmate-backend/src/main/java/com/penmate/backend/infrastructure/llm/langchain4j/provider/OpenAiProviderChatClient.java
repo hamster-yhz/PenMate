@@ -1,5 +1,7 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmProtocol;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -21,6 +23,12 @@ public class OpenAiProviderChatClient extends AbstractOpenAiCompatibleProviderCh
     @Override
     public boolean supports(String providerCode) {
         return "openai".equalsIgnoreCase(providerCode);
+    }
+
+    @Override
+    public boolean supports(AgentLlmExecutionConfig executionConfig) {
+        return supports(executionConfig == null ? null : executionConfig.providerCode())
+                && AgentLlmProtocol.from(executionConfig.protocolCode()) != AgentLlmProtocol.OPENAI_RESPONSES;
     }
 }
 

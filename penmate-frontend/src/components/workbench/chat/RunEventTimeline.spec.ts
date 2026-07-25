@@ -109,4 +109,26 @@ describe('RunEventTimeline', () => {
     expect(wrapper.text()).not.toContain('模型轮次完成')
     expect(wrapper.text()).not.toContain('回答已生成')
   })
+
+  it('renders public commentary and reasoning summaries in the work timeline', () => {
+    const wrapper = mount(RunEventTimeline, {
+      props: {
+        latest: true,
+        attempt: {
+          runId: '1', turnId: '2', runStatus: 'RUNNING', runPhase: 'executing', attemptCount: 1,
+          latestSequence: 3, connectionState: 'connected',
+          events: [
+            { runId: '1', turnId: '2', sequence: 2, type: 'model.commentary.completed', payload: { llmTurnIndex: 1, text: '正在读取人物设定' } },
+            { runId: '1', turnId: '2', sequence: 3, type: 'model.reasoning_summary.completed', payload: { llmTurnIndex: 1, text: '**发现时间线冲突**' } },
+          ],
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('过程说明')
+    expect(wrapper.text()).toContain('正在读取人物设定')
+    expect(wrapper.text()).toContain('分析过程')
+    expect(wrapper.text()).toContain('发现时间线冲突')
+    expect(wrapper.find('.event-summary-markdown strong').text()).toBe('发现时间线冲突')
+  })
 })

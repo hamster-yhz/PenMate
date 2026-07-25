@@ -23,7 +23,7 @@
       </button>
     </div>
     <button
-      v-if="card.toolCode === 'story_bible_update'"
+      v-if="isStoryBibleWrite"
       type="button"
       class="btn-open-bible"
       @click="emit('open-story-bible', targetNodeId)"
@@ -51,7 +51,19 @@ const emit = defineEmits<{
   (event: 'reject', id: string): void
   (event: 'open-story-bible', nodeId: string): void
 }>()
-const targetNodeId = computed(() => String(props.card.preview?.nodeId || props.card.preview?.entityId || ''))
+const storyBibleWriteTools = new Set([
+  'story_bible_node_write',
+  'story_bible_relation_write',
+  'story_bible_progression_write',
+  'story_bible_structure_write',
+])
+const isStoryBibleWrite = computed(() => storyBibleWriteTools.has(props.card.toolCode || ''))
+const targetNodeId = computed(() => String(
+  props.card.preview?.nodeId
+    || props.card.preview?.sourceNodeId
+    || props.card.preview?.targetNodeId
+    || '',
+))
 </script>
 
 <style lang="less" scoped>

@@ -86,6 +86,17 @@ public class AgentRunContextArtifactService {
         return load(row.artifactId());
     }
 
+    public ArtifactRef saveDependencyCheckpoint(Long runId, ResolvedArtifact source,
+                                                DependencyManifest dependencies) {
+        if (source == null || dependencies == null) {
+            throw new IllegalArgumentException("Dependency checkpoint source and manifest are required");
+        }
+        return save(runId, new ResolvedArtifact(
+                source.schemaVersion(), source.runId(), source.contextEpochId(),
+                source.routeDecision(), source.contextPackage(), source.workingSetNodeIds(),
+                dependencies, source.progressionIds(), source.contentHashes()));
+    }
+
     public ArtifactRef savePromptPlan(Long runId, PromptPlan plan, PromptManifest manifest,
                                       List<AgentLlmMessage> messages) {
         String json = json(new PromptArtifact(3, plan, manifest, messages));

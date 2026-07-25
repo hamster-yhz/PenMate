@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,5 +21,19 @@ class ProviderChatClientFactoryTest {
         ProviderChatClient actual = factory.get("openai-compatible");
 
         assertThat(actual).isSameAs(openAiCompatibleProviderChatClient);
+    }
+
+    @Test
+    void selects_openai_adapter_by_protocol_instead_of_provider_name_alone() {
+        OpenAiProviderChatClient chat = new OpenAiProviderChatClient();
+        OpenAiResponsesProviderChatClient responses = new OpenAiResponsesProviderChatClient();
+        ProviderChatClientFactory factory = new ProviderChatClientFactory(List.of(chat, responses));
+
+        ProviderChatClient actual = factory.get(AgentLlmExecutionConfig.builder()
+                .providerCode("openai")
+                .protocolCode("OPENAI_RESPONSES")
+                .build());
+
+        assertThat(actual).isSameAs(responses);
     }
 }

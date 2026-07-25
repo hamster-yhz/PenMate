@@ -122,7 +122,7 @@ class AgentRunEventStreamServiceTest {
                 .map(AgentRunEventDto.class::cast)
                 .filteredOn(dto -> "message.snapshot".equals(dto.type()))
                 .hasSize(2)
-                .allSatisfy(dto -> assertThat(dto.payloadJson()).contains("partial answer"));
+                .allSatisfy(dto -> assertThat(dto.payloadJson()).contains("partial answer", "\"channel\":\"final\""));
     }
 
     private AgentRunEventStreamService service(AgentRunEventRepository events,

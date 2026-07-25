@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { UserOutlined } from '@ant-design/icons-vue'
-import { computed } from 'vue'
+import { ExclamationCircleOutlined, LoadingOutlined, RedoOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { computed, ref } from 'vue'
 import ApprovalCard from '@/components/workbench/ApprovalCard.vue'
 import type { ChatMessage } from '@/components/workbench/workbenchTypes'
 import { renderChatMarkdown } from '@/utils/chatMarkdown'
 
-const props = withDefaults(defineProps<{ msg: ChatMessage; isGenerating?: boolean; streamingAssistantMsgId?: string | number | null; approvalBusy?: boolean }>(), {
-  isGenerating: false, streamingAssistantMsgId: null, approvalBusy: false,
+const props = withDefaults(defineProps<{
+  msg: ChatMessage
+  isGenerating?: boolean
+  streamingAssistantMsgId?: string | number | null
+  approvalBusy?: boolean
+  canRetry?: boolean
+  isRetrying?: boolean
+}>(), {
+  isGenerating: false, streamingAssistantMsgId: null, approvalBusy: false, canRetry: false, isRetrying: false,
 })
 const emit = defineEmits<{
-  approve: [id: string]; reject: [id: string]; 'open-story-bible': [nodeId: string];
+  approve: [id: string]; reject: [id: string]; 'open-story-bible': [nodeId: string]; retry: [];
 }>()
+const retryConfirmationOpen = ref(false)
 const isStreaming = () => props.msg.role === 'assistant' && String(props.msg.id) === String(props.streamingAssistantMsgId) && props.isGenerating
 const renderedMarkdown = computed(() => renderChatMarkdown(props.msg.text, isStreaming()))
+const confirmRetry = () => {
+  retryConfirmationOpen.value = false
+  emit('retry')
+}
 </script>
 
 <template>
@@ -20,7 +32,32 @@ const renderedMarkdown = computed(() => renderChatMarkdown(props.msg.text, isStr
     <div class="message-heading">
       <span v-if="msg.role === 'user'" class="message-avatar"><UserOutlined /></span>
       <strong>{{ msg.role === 'user' ? '你' : msg.role === 'assistant' ? 'Agent' : '系统' }}</strong>
+      <span class="message-heading-spacer"></span>
       <time v-if="msg.createdAt">{{ new Date(msg.createdAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' }) }}</time>
+      <button
+        v-if="msg.role === 'user' && canRetry"
+        type="button"
+        class="message-retry"
+        data-testid="message-retry"
+        :disabled="isRetrying"
+        title="重新执行原请求"
+        aria-label="重新执行原请求"
+        @click="retryConfirmationOpen = true"
+      >
+        <LoadingOutlined v-if="isRetrying" />
+        <RedoOutlined v-else />
+      </button>
+    </div>
+    <div v-if="retryConfirmationOpen && canRetry" class="retry-confirmation" role="alertdialog" aria-labelledby="retry-confirmation-title">
+      <ExclamationCircleOutlined class="retry-warning-icon" />
+      <div>
+        <strong id="retry-confirmation-title">重新执行原请求？</strong>
+        <p>已完成的修改仍会保留，但不会继承上一次的步骤记录，可能重复操作。</p>
+        <div class="retry-confirmation-actions">
+          <button type="button" @click="retryConfirmationOpen = false">取消</button>
+          <button type="button" class="confirm" data-testid="confirm-message-retry" @click="confirmRetry">仍然重新执行</button>
+        </div>
+      </div>
     </div>
     <div class="message-body">
       <div
@@ -42,8 +79,19 @@ const renderedMarkdown = computed(() => renderChatMarkdown(props.msg.text, isStr
 .chat-message { display: grid; gap: 7px; min-width: 0; }
 .message-heading { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; }
 .message-heading strong { color: var(--text-secondary); font-size: 12px; }
-.message-heading time { margin-left: auto; }
+.message-heading-spacer { flex: 1 1 auto; }
+.message-heading time { flex: 0 0 auto; }
 .message-avatar { width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent); }
+.message-retry { flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; }
+.message-retry:hover:not(:disabled), .message-retry:focus-visible { border-color: var(--warning); background: var(--warning-soft); color: var(--warning); outline: 0; }
+.message-retry:disabled { cursor: wait; opacity: 0.48; }
+.retry-confirmation { margin-left: 29px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 9px; padding: 10px 11px; border-left: 2px solid var(--warning); background: var(--warning-soft); color: var(--text-secondary); }
+.retry-warning-icon { margin-top: 2px; color: var(--warning); }
+.retry-confirmation strong { color: var(--text-primary); font-size: 12px; }
+.retry-confirmation p { margin: 3px 0 9px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.retry-confirmation-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.retry-confirmation-actions button { min-height: 28px; padding: 3px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; }
+.retry-confirmation-actions .confirm { border-color: var(--warning); background: var(--warning); color: var(--text-inverse); }
 .message-body { min-width: 0; }
 .user .message-body { margin-left: 29px; padding: 10px 12px; border-left: 2px solid var(--accent); background: var(--accent-soft); }
 .assistant .message-body { padding: 0 0 2px; }

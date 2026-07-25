@@ -129,7 +129,9 @@ onUnmounted(() => stopResize?.())
         <ChatMessageList
           :messages="messages" :run-attempts="runAttempts" :is-generating="isGenerating"
           :streaming-assistant-msg-id="streamingAssistantMsgId" :is-approval-busy="isApprovalBusy"
+          :can-retry-run="canRetryRun" :is-retrying="isRetrying"
           @approve="emit('approve', $event)" @reject="emit('reject', $event)" @open-story-bible="emit('open-story-bible', $event)"
+          @retry="emit('retry-run')"
         />
       </main>
       <button
@@ -162,13 +164,13 @@ onUnmounted(() => stopResize?.())
       <ChatComposer
         :model-value="chatInput" :is-generating="isGenerating" :can-cancel-run="canCancelRun"
         :skill-catalog="skillCatalog" :active-skills="activeSkills" :skill-catalog-loading="skillCatalogLoading"
-        :is-cancelling="isCancelling" :can-retry-run="canRetryRun" :is-retrying="isRetrying"
+        :is-cancelling="isCancelling"
         :current-model-name="currentModelName" :active-plugins="activePlugins" :active-chapter-title="activeChapterTitle"
         :selected-text="selectedText" :bound-style-name="boundStyleName"
         @update:model-value="emit('update:chat-input', $event)" @send="emit('send')" @cancel="emit('cancel-run')"
         @add-skill="emit('add-skill', $event)" @remove-skill="emit('remove-skill', $event)"
         @refresh-skill-catalog="emit('refresh-skill-catalog')"
-        @retry="emit('retry-run')" @open-model-settings="emit('open-model-settings')"
+        @open-model-settings="emit('open-model-settings')"
         @clear-selected-text="emit('clear-selected-text')"
       />
     </div>

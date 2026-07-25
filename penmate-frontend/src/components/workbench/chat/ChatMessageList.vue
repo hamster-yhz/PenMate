@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ChatMessageItem from './ChatMessageItem.vue'
 import RunAttemptGroup from './RunAttemptGroup.vue'
+import { computed } from 'vue'
 import type { AgentRunAttempt, ChatMessage } from '@/components/workbench/workbenchTypes'
 
 const props = withDefaults(
@@ -10,6 +11,8 @@ const props = withDefaults(
     streamingAssistantMsgId?: string | number | null
     isApprovalBusy?: (id: string) => boolean
     runAttempts?: AgentRunAttempt[]
+    canRetryRun?: boolean
+    isRetrying?: boolean
   }>(),
   {
     messages: () => [],
@@ -17,6 +20,8 @@ const props = withDefaults(
     streamingAssistantMsgId: null,
     isApprovalBusy: undefined,
     runAttempts: () => [],
+    canRetryRun: false,
+    isRetrying: false,
   },
 )
 
@@ -24,7 +29,15 @@ defineEmits<{
   approve: [id: string]
   reject: [id: string]
   'open-story-bible': [nodeId: string]
+  retry: []
 }>()
+
+const retryableTurnId = computed(() => {
+  if (!props.canRetryRun) return ''
+  return [...props.runAttempts]
+    .reverse()
+    .find((attempt) => ['FAILED', 'CANCELLED'].includes(attempt.runStatus.toUpperCase()))?.turnId ?? ''
+})
 
 const attemptsForMessage = (message: ChatMessage) =>
   message.turnId ? props.runAttempts.filter((attempt) => attempt.turnId === message.turnId) : []
@@ -47,9 +60,12 @@ const isHandledByAttemptGroup = (message: ChatMessage) =>
         :is-generating="isGenerating"
         :streaming-assistant-msg-id="streamingAssistantMsgId"
         :approval-busy="msg.approval ? Boolean(isApprovalBusy?.(msg.approval.id)) : false"
+        :can-retry="msg.role === 'user' && Boolean(msg.turnId) && msg.turnId === retryableTurnId"
+        :is-retrying="isRetrying"
         @approve="$emit('approve', $event)"
         @reject="$emit('reject', $event)"
         @open-story-bible="$emit('open-story-bible', $event)"
+        @retry="$emit('retry')"
       />
       <RunAttemptGroup
         v-if="msg.role === 'user' && attemptsForMessage(msg).length"
