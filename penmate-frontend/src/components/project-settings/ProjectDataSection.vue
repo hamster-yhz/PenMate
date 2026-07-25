@@ -15,11 +15,27 @@
     </div>
 
     <div class="command-row">
+      <div><strong>Markdown</strong><p>保留作品、卷和章节的标题层级。</p></div>
+      <button type="button" :disabled="exportingFormat !== null" @click="emit('export', 'markdown')">
+        <LoadingOutlined v-if="exportingFormat === 'markdown'" spin />
+        <DownloadOutlined v-else />
+        {{ exportingFormat === 'markdown' ? '正在导出' : '导出 Markdown' }}
+      </button>
+    </div>
+
+    <div class="command-row">
       <div><strong>DOCX</strong><p>按作品、卷和章节生成标题结构。</p></div>
       <button type="button" :disabled="exportingFormat !== null" @click="emit('export', 'docx')">
         <LoadingOutlined v-if="exportingFormat === 'docx'" spin />
         <DownloadOutlined v-else />
         {{ exportingFormat === 'docx' ? '正在导出' : '导出 DOCX' }}
+      </button>
+    </div>
+
+    <div class="command-row">
+      <div><strong>打印 / PDF</strong><p>打开排版视图，可直接打印或保存为 PDF。</p></div>
+      <button type="button" :disabled="exportingFormat !== null" @click="emit('print')">
+        <PrinterOutlined />打开打印视图
       </button>
     </div>
 
@@ -29,9 +45,9 @@
 </template>
 
 <script setup lang="ts">
-import { DownloadOutlined, LoadingOutlined } from '@ant-design/icons-vue'
+import { DownloadOutlined, LoadingOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 
-type NovelExportFormat = 'txt' | 'docx'
+type NovelExportFormat = 'txt' | 'markdown' | 'docx'
 
 defineProps<{
   exportingFormat: NovelExportFormat | null
@@ -41,5 +57,6 @@ defineProps<{
 
 const emit = defineEmits<{
   export: [format: NovelExportFormat]
+  print: []
 }>()
 </script>

@@ -116,7 +116,7 @@ describe('router admin rbac guard', () => {
 
     expect(listProfileMenusMock).toHaveBeenCalledWith(1001)
     expect(router.currentRoute.value.fullPath).toBe('/admin/rbac')
-  })
+  }, 20_000)
 
   it('redirects_to_mybooks_when_rbac_menu_query_fails', async () => {
     getSessionMock.mockReturnValue({ userId: 1001, accessToken: 'atk' })

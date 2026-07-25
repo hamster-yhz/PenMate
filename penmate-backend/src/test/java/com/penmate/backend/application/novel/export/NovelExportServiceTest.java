@@ -71,7 +71,7 @@ class NovelExportServiceTest {
 
         assertThatThrownBy(() -> service.export(2001L, 1001L, "pdf"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("[txt, docx]");
+                .hasMessageContaining("[txt, markdown, docx]");
         verifyNoInteractions(renderer);
     }
 

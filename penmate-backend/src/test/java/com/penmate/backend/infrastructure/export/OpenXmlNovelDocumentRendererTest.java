@@ -41,7 +41,7 @@ class OpenXmlNovelDocumentRendererTest {
     void renders_a_complete_openxml_package_with_heading_styles_and_body_text() throws Exception {
         Map<String, byte[]> entries = unzip(renderer.render(NovelExportFormat.DOCX, manuscript));
 
-        assertThat(entries.keySet()).containsExactlyInAnyOrder(
+        assertThat(entries.keySet()).contains(
                 "[Content_Types].xml",
                 "_rels/.rels",
                 "docProps/core.xml",

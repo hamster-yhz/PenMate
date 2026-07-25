@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import ProjectDataSection from './ProjectDataSection.vue'
 
 describe('ProjectDataSection', () => {
-  it('emits the selected format and disables both downloads while exporting', async () => {
+  it('emits all manuscript formats and disables commands while exporting', async () => {
     const wrapper = mount(ProjectDataSection, {
       props: { exportingFormat: null, error: '', success: '' },
     })
 
-    await wrapper.findAll('button')[1].trigger('click')
+    await wrapper.findAll('button')[2].trigger('click')
     expect(wrapper.emitted('export')).toEqual([['docx']])
 
     await wrapper.setProps({ exportingFormat: 'docx' })

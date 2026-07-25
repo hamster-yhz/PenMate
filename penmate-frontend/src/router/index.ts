@@ -33,6 +33,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ProjectSettings/index.vue'),
   },
   {
+    path: '/projects/:projectId/print',
+    name: 'ProjectPrint',
+    meta: { requiresAuth: true },
+    component: () => import('@/views/ProjectPrint/index.vue'),
+  },
+  {
     path: '/workbench',
     name: 'Workbench',
     meta: { requiresAuth: true },
