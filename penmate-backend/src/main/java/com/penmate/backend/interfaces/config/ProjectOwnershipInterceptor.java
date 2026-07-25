@@ -1,8 +1,7 @@
 package com.penmate.backend.interfaces.config;
 
 import com.penmate.backend.application.common.exception.BusinessException;
-import com.penmate.backend.domain.novel.model.NovelProject;
-import com.penmate.backend.domain.novel.repository.NovelGateway;
+import com.penmate.backend.application.novel.security.ProjectAccessAuthorizer;
 import com.penmate.backend.interfaces.api.common.AuthenticatedActor;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,14 +13,13 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.util.Map;
-import java.util.Objects;
 
 @Component
 public class ProjectOwnershipInterceptor implements HandlerInterceptor {
-    private final NovelGateway novels;
+    private final ProjectAccessAuthorizer projectAccess;
 
-    public ProjectOwnershipInterceptor(NovelGateway novels) {
-        this.novels = novels;
+    public ProjectOwnershipInterceptor(ProjectAccessAuthorizer projectAccess) {
+        this.projectAccess = projectAccess;
     }
 
     @Override
@@ -32,11 +30,7 @@ public class ProjectOwnershipInterceptor implements HandlerInterceptor {
         Long projectId = parseId(String.valueOf(variables.get("projectId")));
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Long actor = AuthenticatedActor.id(authentication);
-        NovelProject project = novels.findProjectById(projectId);
-        if (project == null || !Objects.equals(project.getOwnerUserId(), actor)) {
-            // Do not disclose whether another user's project exists.
-            throw BusinessException.notFound("Novel project not found");
-        }
+        projectAccess.requireOwnedProject(projectId, actor);
         return true;
     }
 
