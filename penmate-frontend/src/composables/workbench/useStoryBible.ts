@@ -17,7 +17,6 @@ import type {
   StoryBibleTag,
   StoryBibleViewPreference,
 } from '@/entities/story-bible/model'
-import type { AppError } from '@/api/types'
 
 export interface StoryBibleNodeDraft extends StoryBibleNodePayload {
   nodeId?: string
@@ -164,16 +163,11 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     loading.value = true
     errorMessage.value = ''
     try {
-      try {
-        root.value = await storyBibleApi.get(context.projectId)
-      } catch (error) {
-        if ((error as AppError).status !== 404) throw error
-        root.value = await storyBibleApi.bootstrap(
-          context.projectId,
-          context.operatorId,
-          context.projectTitle || 'Story Bible',
-        )
-      }
+      root.value = await storyBibleApi.bootstrap(
+        context.projectId,
+        context.operatorId,
+        context.projectTitle || 'Story Bible',
+      )
       const [nextViews, nextTypes, nextNodes, nextCategories, nextTags, nextRelations, nextProgressions, nextHistory] =
         await Promise.all([
           storyBibleApi.listViews(context.projectId),

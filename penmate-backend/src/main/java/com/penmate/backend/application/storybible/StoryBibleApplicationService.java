@@ -37,13 +37,13 @@ import java.util.Objects;
 
 @Service
 public class StoryBibleApplicationService {
-
     private static final String EMPTY_OBJECT = "{}";
 
     private final StoryBibleRepository repository;
     private final StoryBibleChangesetService changesetService;
     private final BusinessIdGenerator idGenerator;
     private final JsonCodec jsonCodec;
+    private final StoryBibleSystemTypeCatalog systemTypeCatalog;
     private final StoryBibleSchemaValidator schemaValidator;
     private final StoryBiblePatchValidator patchValidator;
     private final StoryBibleEffectiveStateResolver effectiveStateResolver;
@@ -54,6 +54,7 @@ public class StoryBibleApplicationService {
             StoryBibleChangesetService changesetService,
             BusinessIdGenerator idGenerator,
             JsonCodec jsonCodec,
+            StoryBibleSystemTypeCatalog systemTypeCatalog,
             StoryBibleSchemaValidator schemaValidator,
             StoryBiblePatchValidator patchValidator,
             StoryBibleEffectiveStateResolver effectiveStateResolver,
@@ -63,6 +64,7 @@ public class StoryBibleApplicationService {
         this.changesetService = Objects.requireNonNull(changesetService, "changesetService");
         this.idGenerator = Objects.requireNonNull(idGenerator, "idGenerator");
         this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
+        this.systemTypeCatalog = Objects.requireNonNull(systemTypeCatalog, "systemTypeCatalog");
         this.schemaValidator = Objects.requireNonNull(schemaValidator, "schemaValidator");
         this.patchValidator = Objects.requireNonNull(patchValidator, "patchValidator");
         this.effectiveStateResolver = Objects.requireNonNull(effectiveStateResolver, "effectiveStateResolver");
@@ -82,6 +84,7 @@ public class StoryBibleApplicationService {
     public StoryBible bootstrap(Long projectId, String projectTitle, Long actorId) {
         StoryBible existing = repository.findByProjectId(projectId);
         if (existing != null) {
+            synchronizeSystemDefinitions(existing, actorId);
             return existing;
         }
         StoryBible storyBible = new StoryBible();
@@ -92,19 +95,23 @@ public class StoryBibleApplicationService {
         storyBible.setContentRevision(1L);
         requireOne(repository.insertStoryBible(storyBible), "Failed to create Story Bible");
 
-        for (SystemNodeType seed : systemNodeTypes()) {
+        StoryBibleNodeType coreType = null;
+        for (StoryBibleSystemTypeCatalog.Definition seed : systemTypeCatalog.definitions()) {
             StoryBibleNodeType type = new StoryBibleNodeType();
             type.setTypeId(idGenerator.nextId());
             type.setStoryBibleId(storyBible.getStoryBibleId());
-            type.setTypeCode(seed.code());
-            type.setSemanticFamily(seed.family());
+            type.setTypeCode(seed.typeCode());
+            type.setSemanticFamily(seed.semanticFamily());
             type.setDisplayName(seed.displayName());
             type.setIconCode(seed.iconCode());
-            type.setFieldSchemaJson(EMPTY_OBJECT);
+            type.setFieldSchemaJson(seed.fieldSchemaJson());
             type.setSystem(true);
             type.setSortOrder(seed.sortOrder());
             requireOne(repository.insertNodeType(type), "Failed to seed Story Bible node type");
+            if ("STORY_CORE".equals(seed.typeCode())) coreType = type;
         }
+        StoryBibleNode coreNode = newStoryCoreNode(storyBible, Objects.requireNonNull(coreType, "STORY_CORE type"), actorId);
+        requireOne(repository.insertNode(coreNode), "Failed to seed Story Core node");
         int viewOrder = 10;
         for (StoryBibleSemanticFamily family : StoryBibleSemanticFamily.values()) {
             StoryBibleViewPreference preference = new StoryBibleViewPreference();
@@ -122,7 +129,10 @@ public class StoryBibleApplicationService {
                 StoryBibleActorType.USER,
                 actorId,
                 "Initial Story Bible",
-                List.of(draft("STORY_BIBLE", storyBible.getStoryBibleId(), StoryBibleChangeOperation.CREATE, null, storyBible))
+                List.of(
+                        draft("STORY_BIBLE", storyBible.getStoryBibleId(), StoryBibleChangeOperation.CREATE, null, storyBible),
+                        draft("NODE", coreNode.getNodeId(), StoryBibleChangeOperation.CREATE, null, coreNode)
+                )
         );
         return storyBible;
     }
@@ -252,6 +262,7 @@ public class StoryBibleApplicationService {
     public StoryBibleNode createNode(Long projectId, StoryBibleCommands.CreateNode command, StoryBibleActorType actorType, Long actorId, Long sourceRunId) {
         StoryBible root = get(projectId);
         StoryBibleNodeType nodeType = requireNodeType(root, command.typeId());
+        rejectDuplicateStoryCore(root, nodeType, null);
         schemaValidator.validateAttributes(command.attributesJson(), nodeType.getFieldSchemaJson());
         NodeOrganization organization = normalizeOrganization(command.aliases(), command.categoryIds(), command.tagIds());
         validateNodeOrganization(root, organization);
@@ -263,8 +274,10 @@ public class StoryBibleApplicationService {
         node.setSummary(command.summary());
         node.setBodyMarkdown(command.bodyMarkdown());
         node.setAttributesJson(defaultJson(command.attributesJson()));
-        node.setInclusionPolicy(command.inclusionPolicy() == null ? StoryBibleInclusionPolicy.AUTO_RETRIEVE : command.inclusionPolicy());
-        node.setCanonStatus(command.canonStatus() == null ? StoryBibleCanonStatus.DRAFT : command.canonStatus());
+        node.setInclusionPolicy(isStoryCore(nodeType) ? StoryBibleInclusionPolicy.ALWAYS_INCLUDE
+                : command.inclusionPolicy() == null ? StoryBibleInclusionPolicy.AUTO_RETRIEVE : command.inclusionPolicy());
+        node.setCanonStatus(isStoryCore(nodeType) ? StoryBibleCanonStatus.CANON
+                : command.canonStatus() == null ? StoryBibleCanonStatus.DRAFT : command.canonStatus());
         node.setRevision(1L);
         node.setCreatedBy(actorId);
         node.setUpdatedBy(actorId);
@@ -283,6 +296,7 @@ public class StoryBibleApplicationService {
         StoryBible root = get(projectId);
         StoryBibleNode node = requireNode(root, nodeId);
         StoryBibleNodeType nodeType = requireNodeType(root, command.typeId());
+        rejectDuplicateStoryCore(root, nodeType, nodeId);
         schemaValidator.validateAttributes(command.attributesJson(), nodeType.getFieldSchemaJson());
         NodeOrganization beforeOrganization = readNodeOrganization(root, nodeId);
         NodeOrganization afterOrganization = normalizeOrganization(command.aliases(), command.categoryIds(), command.tagIds());
@@ -293,8 +307,10 @@ public class StoryBibleApplicationService {
         node.setSummary(command.summary());
         node.setBodyMarkdown(command.bodyMarkdown());
         node.setAttributesJson(defaultJson(command.attributesJson()));
-        node.setInclusionPolicy(command.inclusionPolicy() == null ? node.getInclusionPolicy() : command.inclusionPolicy());
-        node.setCanonStatus(command.canonStatus() == null ? node.getCanonStatus() : command.canonStatus());
+        node.setInclusionPolicy(isStoryCore(nodeType) ? StoryBibleInclusionPolicy.ALWAYS_INCLUDE
+                : command.inclusionPolicy() == null ? node.getInclusionPolicy() : command.inclusionPolicy());
+        node.setCanonStatus(isStoryCore(nodeType) ? StoryBibleCanonStatus.CANON
+                : command.canonStatus() == null ? node.getCanonStatus() : command.canonStatus());
         node.setUpdatedBy(actorId);
         requireOne(repository.updateNode(node, command.expectedRevision()), "Story Bible node revision conflict");
         node.setRevision(command.expectedRevision() + 1);
@@ -311,6 +327,9 @@ public class StoryBibleApplicationService {
     public void deleteNode(Long projectId, Long nodeId, Long expectedRevision, StoryBibleActorType actorType, Long actorId, Long sourceRunId) {
         StoryBible root = get(projectId);
         StoryBibleNode node = requireNode(root, nodeId);
+        if (isStoryCore(repository.findNodeType(root.getStoryBibleId(), node.getTypeId()))) {
+            throw BusinessException.badRequest("Story Core node cannot be deleted");
+        }
         requireOne(repository.softDeleteNode(root.getStoryBibleId(), nodeId, expectedRevision, actorId), "Story Bible node revision conflict");
         List<ChangeDraft> drafts = new ArrayList<>();
         drafts.add(draft("NODE", nodeId, StoryBibleChangeOperation.DELETE, node, null));
@@ -876,6 +895,96 @@ public class StoryBibleApplicationService {
         }
     }
 
+    private void synchronizeSystemDefinitions(StoryBible root, Long actorId) {
+        Map<String, StoryBibleNodeType> currentByCode = repository.findNodeTypes(root.getStoryBibleId()).stream()
+                .collect(java.util.stream.Collectors.toMap(StoryBibleNodeType::getTypeCode, type -> type));
+        List<ChangeDraft> drafts = new ArrayList<>();
+        for (StoryBibleSystemTypeCatalog.Definition definition : systemTypeCatalog.definitions()) {
+            schemaValidator.parseSchema(definition.fieldSchemaJson());
+            StoryBibleNodeType current = currentByCode.get(definition.typeCode());
+            if (current == null) {
+                current = new StoryBibleNodeType();
+                current.setTypeId(idGenerator.nextId());
+                current.setStoryBibleId(root.getStoryBibleId());
+                current.setTypeCode(definition.typeCode());
+                current.setSemanticFamily(definition.semanticFamily());
+                current.setDisplayName(definition.displayName());
+                current.setIconCode(definition.iconCode());
+                current.setFieldSchemaJson(definition.fieldSchemaJson());
+                current.setSystem(true);
+                current.setSortOrder(definition.sortOrder());
+                requireOne(repository.insertNodeType(current), "Failed to install Story Bible system node type");
+                currentByCode.put(current.getTypeCode(), current);
+                drafts.add(draft("NODE_TYPE", current.getTypeId(), StoryBibleChangeOperation.CREATE, null, current));
+                continue;
+            }
+            if (!Boolean.TRUE.equals(current.getSystem())) {
+                throw BusinessException.conflict("Custom Story Bible type uses reserved code " + definition.typeCode());
+            }
+            if (matches(current, definition)) continue;
+            String beforeJson = asJson(current);
+            current.setSemanticFamily(definition.semanticFamily());
+            current.setDisplayName(definition.displayName());
+            current.setIconCode(definition.iconCode());
+            current.setFieldSchemaJson(definition.fieldSchemaJson());
+            current.setSortOrder(definition.sortOrder());
+            requireOne(repository.updateNodeType(current), "Failed to synchronize Story Bible system node type");
+            drafts.addAll(draftsWithBeforeJson(
+                    "NODE_TYPE", current.getTypeId(), StoryBibleChangeOperation.UPDATE, beforeJson, current));
+        }
+
+        StoryBibleNodeType coreType = currentByCode.get("STORY_CORE");
+        List<StoryBibleNode> coreNodes = repository.findNodes(
+                root.getStoryBibleId(), Objects.requireNonNull(coreType, "STORY_CORE type").getTypeId(), null, null);
+        if (coreNodes.isEmpty()) {
+            StoryBibleNode coreNode = newStoryCoreNode(root, coreType, actorId);
+            requireOne(repository.insertNode(coreNode), "Failed to install Story Core node");
+            drafts.add(draft("NODE", coreNode.getNodeId(), StoryBibleChangeOperation.CREATE, null, coreNode));
+        } else {
+            StoryBibleNode coreNode = coreNodes.get(0);
+            if (coreNode.getInclusionPolicy() != StoryBibleInclusionPolicy.ALWAYS_INCLUDE
+                    || coreNode.getCanonStatus() != StoryBibleCanonStatus.CANON) {
+                String beforeJson = asJson(coreNode);
+                Long expectedRevision = coreNode.getRevision();
+                coreNode.setInclusionPolicy(StoryBibleInclusionPolicy.ALWAYS_INCLUDE);
+                coreNode.setCanonStatus(StoryBibleCanonStatus.CANON);
+                coreNode.setUpdatedBy(actorId);
+                requireOne(repository.updateNode(coreNode, expectedRevision), "Story Bible node revision conflict");
+                coreNode.setRevision(expectedRevision + 1);
+                drafts.addAll(draftsWithBeforeJson(
+                        "NODE", coreNode.getNodeId(), StoryBibleChangeOperation.UPDATE, beforeJson, coreNode));
+            }
+        }
+        if (!drafts.isEmpty()) {
+            append(root, StoryBibleActorType.SYSTEM, actorId, null, "Synchronized Story Bible system definitions", drafts);
+        }
+    }
+
+    private boolean matches(StoryBibleNodeType current, StoryBibleSystemTypeCatalog.Definition definition) {
+        return current.getSemanticFamily() == definition.semanticFamily()
+                && Objects.equals(current.getDisplayName(), definition.displayName())
+                && Objects.equals(current.getIconCode(), definition.iconCode())
+                && Objects.equals(current.getFieldSchemaJson(), definition.fieldSchemaJson())
+                && Objects.equals(current.getSortOrder(), definition.sortOrder());
+    }
+
+    private StoryBibleNode newStoryCoreNode(StoryBible root, StoryBibleNodeType coreType, Long actorId) {
+        StoryBibleNode coreNode = new StoryBibleNode();
+        coreNode.setNodeId(idGenerator.nextId());
+        coreNode.setStoryBibleId(root.getStoryBibleId());
+        coreNode.setTypeId(coreType.getTypeId());
+        coreNode.setTitle("故事核心");
+        coreNode.setSummary("");
+        coreNode.setBodyMarkdown("");
+        coreNode.setAttributesJson(EMPTY_OBJECT);
+        coreNode.setInclusionPolicy(StoryBibleInclusionPolicy.ALWAYS_INCLUDE);
+        coreNode.setCanonStatus(StoryBibleCanonStatus.CANON);
+        coreNode.setRevision(1L);
+        coreNode.setCreatedBy(actorId);
+        coreNode.setUpdatedBy(actorId);
+        return coreNode;
+    }
+
     private String defaultFamilyName(StoryBibleSemanticFamily family) {
         return switch (family) {
             case CORE -> "Story Core";
@@ -887,29 +996,15 @@ public class StoryBibleApplicationService {
         };
     }
 
-    private List<SystemNodeType> systemNodeTypes() {
-        return List.of(
-                new SystemNodeType("STORY_CORE", StoryBibleSemanticFamily.CORE, "Story Core", "book-open", 10),
-                new SystemNodeType("CHARACTER", StoryBibleSemanticFamily.CHARACTER, "Character", "user", 20),
-                new SystemNodeType("CHARACTER_ARC", StoryBibleSemanticFamily.CHARACTER, "Character Arc", "route", 30),
-                new SystemNodeType("LOCATION", StoryBibleSemanticFamily.WORLD, "Location", "map-pin", 40),
-                new SystemNodeType("ORGANIZATION", StoryBibleSemanticFamily.WORLD, "Organization", "building", 50),
-                new SystemNodeType("FACTION", StoryBibleSemanticFamily.WORLD, "Faction", "shield", 60),
-                new SystemNodeType("MAGIC_SYSTEM", StoryBibleSemanticFamily.WORLD, "Magic System", "sparkles", 70),
-                new SystemNodeType("ITEM", StoryBibleSemanticFamily.THING, "Item", "gem", 80),
-                new SystemNodeType("ABILITY", StoryBibleSemanticFamily.THING, "Ability", "zap", 90),
-                new SystemNodeType("TECHNOLOGY", StoryBibleSemanticFamily.THING, "Technology", "cpu", 100),
-                new SystemNodeType("TERM", StoryBibleSemanticFamily.THING, "Term", "text", 110),
-                new SystemNodeType("PLOTLINE", StoryBibleSemanticFamily.NARRATIVE, "Plotline", "git-branch", 120),
-                new SystemNodeType("MYSTERY", StoryBibleSemanticFamily.NARRATIVE, "Mystery", "circle-help", 130),
-                new SystemNodeType("FORESHADOWING", StoryBibleSemanticFamily.NARRATIVE, "Foreshadowing", "eye", 140),
-                new SystemNodeType("EVENT", StoryBibleSemanticFamily.TIMELINE, "Event", "calendar", 150),
-                new SystemNodeType("FACT", StoryBibleSemanticFamily.TIMELINE, "Fact", "check", 160),
-                new SystemNodeType("CONTINUITY_CONSTRAINT", StoryBibleSemanticFamily.TIMELINE, "Continuity Constraint", "lock", 170)
-        );
+    private boolean isStoryCore(StoryBibleNodeType type) {
+        return type != null && "STORY_CORE".equals(type.getTypeCode());
     }
 
-    private record SystemNodeType(String code, StoryBibleSemanticFamily family, String displayName, String iconCode, int sortOrder) {
+    private void rejectDuplicateStoryCore(StoryBible root, StoryBibleNodeType type, Long currentNodeId) {
+        if (!isStoryCore(type)) return;
+        boolean duplicate = repository.findNodes(root.getStoryBibleId(), type.getTypeId(), null, null).stream()
+                .anyMatch(node -> currentNodeId == null || !currentNodeId.equals(node.getNodeId()));
+        if (duplicate) throw BusinessException.conflict("Story Core node already exists");
     }
 
     private record NodeOrganization(List<String> aliases, List<Long> categoryIds, List<Long> tagIds) {

@@ -1,9 +1,31 @@
 import { expect, test, type Page } from '@playwright/test'
 
 const envelope = (data: unknown) => ({ data, meta: { traceId: 'visual-story-bible' } })
-const nodeType = { typeId: '21', storyBibleId: '11', typeCode: 'CHARACTER', semanticFamily: 'CHARACTER', displayName: '角色', iconCode: 'user', fieldSchemaJson: '{"type":"object","properties":{"身份":{"type":"string","title":"身份"}}}', system: true, sortOrder: 1 }
+const nodeTypes = [
+  {
+    typeId: '21', storyBibleId: '11', typeCode: 'CHARACTER', semanticFamily: 'CHARACTER', displayName: '人物', iconCode: 'user', system: true, sortOrder: 1,
+    fieldSchemaJson: JSON.stringify({
+      type: 'object',
+      'x-penmate-color': '#C2415D',
+      'x-penmate-description': '人物稳定身份、心理驱动力、能力边界和可辨识表达。',
+      'x-penmate-title-placeholder': '人物姓名',
+      'x-penmate-summary-placeholder': '这个人物在故事中的身份和核心矛盾',
+      'x-penmate-sections': [{ key: 'identity', title: '身份档案' }, { key: 'psychology', title: '心理驱动力' }],
+      properties: {
+        storyRole: { type: 'string', title: '故事角色', enum: ['PROTAGONIST', 'SUPPORTING'], 'x-penmate-enum-labels': { PROTAGONIST: '主角', SUPPORTING: '重要配角' }, 'x-penmate-control': 'enum', 'x-penmate-section': 'identity', 'x-penmate-order': 10 },
+        occupation: { type: 'string', title: '身份 / 职业', 'x-penmate-section': 'identity', 'x-penmate-order': 20 },
+        coreMotivation: { type: 'string', title: '核心动机', 'x-penmate-control': 'multiline', 'x-penmate-section': 'psychology', 'x-penmate-order': 10 },
+        strengths: { type: 'array', title: '优势', items: { type: 'string' }, 'x-penmate-control': 'string-list', 'x-penmate-section': 'psychology', 'x-penmate-order': 20 },
+      },
+    }),
+  },
+  {
+    typeId: '22', storyBibleId: '11', typeCode: 'LOCATION', semanticFamily: 'WORLD', displayName: '地点', iconCode: 'environment', system: true, sortOrder: 2,
+    fieldSchemaJson: JSON.stringify({ type: 'object', 'x-penmate-color': '#16856B', properties: { climate: { type: 'string', title: '气候' } } }),
+  },
+]
 const nodes = [
-  { nodeId: '71', storyBibleId: '11', typeId: '21', title: '沈砚', summary: '沉默寡言的旧城守夜人', bodyMarkdown: '他熟悉旧城每一条暗巷。', attributesJson: '{"身份":"守夜人"}', inclusionPolicy: 'AUTO_RETRIEVE', canonStatus: 'CANON', revision: 2 },
+  { nodeId: '71', storyBibleId: '11', typeId: '21', title: '沈砚', summary: '沉默寡言的旧城守夜人', bodyMarkdown: '他熟悉旧城每一条暗巷。', attributesJson: '{"storyRole":"PROTAGONIST","occupation":"守夜人","coreMotivation":"守住旧城最后的秘密","strengths":["熟悉地形","观察敏锐"]}', inclusionPolicy: 'AUTO_RETRIEVE', canonStatus: 'CANON', revision: 2 },
   { nodeId: '72', storyBibleId: '11', typeId: '21', title: '陆青禾', summary: '远征队领队', attributesJson: '{}', inclusionPolicy: 'AUTO_RETRIEVE', canonStatus: 'CANON', revision: 1 },
 ]
 
@@ -20,7 +42,7 @@ const mockStoryBible = async (page: Page, themeMode: 'LIGHT' | 'DARK') => {
     if (path.endsWith('/v1/novels/2001/chapters/3001/ai-undo')) return route.fulfill({ json: envelope([]) })
     if (path.endsWith('/v1/model/preferences')) return route.fulfill({ json: envelope({ defaultCreativeModelConfigId: '5001' }) })
     if (path.endsWith('/v1/model/configurations')) return route.fulfill({ json: envelope([{ modelConfigId: '5001', displayName: '创作模型', modelName: 'writer-pro' }]) })
-    if (path.endsWith('/v1/novels/2001/story-bible/node-types')) return route.fulfill({ json: envelope([nodeType]) })
+    if (path.endsWith('/v1/novels/2001/story-bible/node-types')) return route.fulfill({ json: envelope(nodeTypes) })
     if (path.endsWith('/v1/novels/2001/story-bible/nodes/71/changesets')) return route.fulfill({ json: envelope([{ changesetId: '81', storyBibleId: '11', contentRevision: 3, actorType: 'AGENT', sourceRunId: '901', changeSummary: '补充角色身份', createdAt: '2026-07-22T02:00:00Z' }]) })
     if (path.endsWith('/v1/novels/2001/story-bible/nodes/71/effective-state')) return route.fulfill({ json: envelope({ 身份: '守夜人', 阵营: '旧城' }) })
     if (path.endsWith('/v1/novels/2001/story-bible/nodes/71')) return route.fulfill({ json: envelope({ node: nodes[0], aliases: [{ aliasId: '1', nodeId: '71', alias: '阿砚' }], categoryIds: [], tagIds: [] }) })
@@ -41,6 +63,11 @@ test('Story Bible uses a combined browser and readable relationship graph', asyn
   await page.goto('/workbench?projectId=2001&mode=story-bible')
   if (mobile) await page.getByRole('button', { name: '导航' }).click()
   await page.getByRole('button', { name: /沈砚/ }).click()
+  await expect(page.getByText('身份档案')).toBeVisible()
+  await expect(page.getByLabel('核心动机')).toHaveValue('守住旧城最后的秘密')
+  await expect(page.getByLabel('优势 1')).toHaveValue('熟悉地形')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('story-bible-character-fields.png'), fullPage: true })
   await page.getByRole('button', { name: '关系' }).click()
 
   const graph = page.getByRole('img', { name: '沈砚的关系图' })
@@ -56,7 +83,8 @@ test('Story Bible uses a combined browser and readable relationship graph', asyn
   await manageStructure.click()
   const structureDialog = page.getByRole('dialog', { name: 'Story Bible 结构管理' })
   await expect(structureDialog).toBeVisible()
-  await expect(structureDialog.getByPlaceholder('类型名称')).toBeFocused()
+  await expect(structureDialog.getByPlaceholder('例如：城市', { exact: true })).toBeFocused()
+  await expect(structureDialog.getByText('4 个字段')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('story-bible-structure-manager.png'), fullPage: true })
   await page.keyboard.press('Escape')

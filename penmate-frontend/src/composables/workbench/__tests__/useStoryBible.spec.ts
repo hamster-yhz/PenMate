@@ -44,6 +44,12 @@ const progression: StoryBibleProgression = {
 describe('useStoryBible', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.spyOn(storyBibleApi, 'bootstrap').mockResolvedValue({
+      storyBibleId: '11',
+      projectId: '101',
+      title: 'Bible',
+      contentRevision: 3,
+    })
     vi.spyOn(storyBibleApi, 'get').mockResolvedValue({
       storyBibleId: '11',
       projectId: '101',
@@ -87,6 +93,7 @@ describe('useStoryBible', () => {
     await story.selectNode('71')
 
     expect(story.root.value?.storyBibleId).toBe('11')
+    expect(storyBibleApi.bootstrap).toHaveBeenCalledWith('101', '7', 'Story Bible')
     expect(story.draft.value).toMatchObject({ nodeId: '71', revision: 3, title: 'Mira', aliases: ['Captain'] })
     expect(story.effectiveState.value).toEqual({ state: { title: 'Mira' } })
     expect(storyBibleApi.listNodeChanges).toHaveBeenCalledWith('101', '71')
@@ -158,7 +165,7 @@ describe('useStoryBible', () => {
     expect(updateProgression).toHaveBeenCalledWith('101', '92', '7', expect.objectContaining({ expectedRevision: 4 }))
     expect(story.relations.value[0]).toEqual(updatedRelation)
     expect(story.progressions.value[0]).toEqual(updatedProgression)
-    expect(storyBibleApi.get).toHaveBeenCalledTimes(3)
+    expect(storyBibleApi.get).toHaveBeenCalledTimes(2)
     expect(storyBibleApi.listChanges).toHaveBeenCalledTimes(3)
   })
 })

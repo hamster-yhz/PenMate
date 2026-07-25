@@ -25,7 +25,9 @@ import com.penmate.backend.infrastructure.storybible.JacksonStoryBibleValidation
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +46,7 @@ class StoryBibleApplicationServiceTest {
     private final BusinessIdGenerator idGenerator = mock(BusinessIdGenerator.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
+    private final StoryBibleSystemTypeCatalog systemTypeCatalog = new StoryBibleSystemTypeCatalog(jsonCodec);
     private final JacksonStoryBibleValidationEngine validationEngine =
             new JacksonStoryBibleValidationEngine(objectMapper);
     private final StoryBibleApplicationService service = new StoryBibleApplicationService(
@@ -50,11 +54,103 @@ class StoryBibleApplicationServiceTest {
             changesetService,
             idGenerator,
             jsonCodec,
+            systemTypeCatalog,
             validationEngine,
             validationEngine,
             mock(StoryBibleEffectiveStateResolver.class),
             mock(StoryBibleProgressionReferenceValidator.class)
     );
+
+    @Test
+    void bootstrap_seeds_one_canonical_always_included_story_core_with_structured_schema() {
+        when(repository.findByProjectId(20L)).thenReturn(null);
+        when(repository.insertStoryBible(any())).thenReturn(1);
+        when(repository.insertNodeType(any())).thenReturn(1);
+        when(repository.insertNode(any())).thenReturn(1);
+        when(repository.upsertViewPreference(any())).thenReturn(1);
+        AtomicLong ids = new AtomicLong(100L);
+        when(idGenerator.nextId()).thenAnswer(invocation -> ids.incrementAndGet());
+
+        service.bootstrap(20L, "Novel", 9L);
+
+        ArgumentCaptor<StoryBibleNodeType> types = ArgumentCaptor.forClass(StoryBibleNodeType.class);
+        verify(repository, org.mockito.Mockito.times(19)).insertNodeType(types.capture());
+        StoryBibleNodeType coreType = types.getAllValues().stream()
+                .filter(type -> "STORY_CORE".equals(type.getTypeCode())).findFirst().orElseThrow();
+        assertThat(coreType.getFieldSchemaJson())
+                .contains("\"premise\"", "\"themes\"", "\"hardConstraints\"", "\"forbiddenElements\"");
+        assertThat(types.getAllValues()).extracting(StoryBibleNodeType::getTypeCode)
+                .contains("CULTURE", "RELATIONSHIP_ARC");
+
+        ArgumentCaptor<StoryBibleNode> node = ArgumentCaptor.forClass(StoryBibleNode.class);
+        verify(repository).insertNode(node.capture());
+        assertThat(node.getValue().getTypeId()).isEqualTo(coreType.getTypeId());
+        assertThat(node.getValue().getInclusionPolicy()).isEqualTo(StoryBibleInclusionPolicy.ALWAYS_INCLUDE);
+        assertThat(node.getValue().getCanonStatus()).isEqualTo(StoryBibleCanonStatus.CANON);
+    }
+
+    @Test
+    void bootstrap_upgrades_an_existing_story_bible_once_and_is_idempotent() {
+        StoryBible root = root();
+        List<StoryBibleNodeType> installedTypes = new ArrayList<>();
+        List<StoryBibleNode> installedNodes = new ArrayList<>();
+        AtomicLong ids = new AtomicLong(100L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findNodeTypes(10L)).thenAnswer(invocation -> List.copyOf(installedTypes));
+        when(repository.insertNodeType(any())).thenAnswer(invocation -> {
+            installedTypes.add(invocation.getArgument(0));
+            return 1;
+        });
+        when(repository.findNodes(eq(10L), any(), eq(null), eq(null)))
+                .thenAnswer(invocation -> installedNodes.stream()
+                        .filter(node -> node.getTypeId().equals(invocation.getArgument(1)))
+                        .toList());
+        when(repository.insertNode(any())).thenAnswer(invocation -> {
+            installedNodes.add(invocation.getArgument(0));
+            return 1;
+        });
+        when(idGenerator.nextId()).thenAnswer(invocation -> ids.incrementAndGet());
+
+        service.bootstrap(20L, "Novel", 9L);
+        service.bootstrap(20L, "Novel", 9L);
+
+        assertThat(installedTypes).hasSize(19);
+        assertThat(installedNodes).singleElement().satisfies(node -> {
+            assertThat(node.getCanonStatus()).isEqualTo(StoryBibleCanonStatus.CANON);
+            assertThat(node.getInclusionPolicy()).isEqualTo(StoryBibleInclusionPolicy.ALWAYS_INCLUDE);
+        });
+        verify(repository, times(19)).insertNodeType(any());
+        verify(repository, times(1)).insertNode(any());
+        verify(changesetService, times(1)).append(
+                eq(root), eq(StoryBibleActorType.SYSTEM), eq(9L), eq(null),
+                eq("Synchronized Story Bible system definitions"), any());
+    }
+
+    @Test
+    void bootstrap_does_not_write_when_system_definitions_are_current() {
+        StoryBible root = root();
+        List<StoryBibleNodeType> installedTypes = new ArrayList<>();
+        AtomicLong ids = new AtomicLong(200L);
+        for (StoryBibleSystemTypeCatalog.Definition definition : systemTypeCatalog.definitions()) {
+            installedTypes.add(systemType(definition, ids.incrementAndGet(), root.getStoryBibleId()));
+        }
+        StoryBibleNode core = new StoryBibleNode();
+        core.setNodeId(300L);
+        core.setTypeId(installedTypes.get(0).getTypeId());
+        core.setCanonStatus(StoryBibleCanonStatus.CANON);
+        core.setInclusionPolicy(StoryBibleInclusionPolicy.ALWAYS_INCLUDE);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findNodeTypes(10L)).thenReturn(installedTypes);
+        when(repository.findNodes(10L, core.getTypeId(), null, null)).thenReturn(List.of(core));
+
+        service.bootstrap(20L, "Novel", 9L);
+
+        verify(repository, never()).insertNodeType(any());
+        verify(repository, never()).updateNodeType(any());
+        verify(repository, never()).insertNode(any());
+        verify(repository, never()).updateNode(any(), any());
+        verify(changesetService, never()).append(any(), any(), any(), any(), any(), any());
+    }
 
     @Test
     void should_create_node_and_append_one_aggregate_changeset() {
@@ -290,5 +386,21 @@ class StoryBibleApplicationServiceTest {
         root.setProjectId(20L);
         root.setContentRevision(4L);
         return root;
+    }
+
+    private StoryBibleNodeType systemType(StoryBibleSystemTypeCatalog.Definition definition,
+                                          Long typeId,
+                                          Long storyBibleId) {
+        StoryBibleNodeType type = new StoryBibleNodeType();
+        type.setTypeId(typeId);
+        type.setStoryBibleId(storyBibleId);
+        type.setTypeCode(definition.typeCode());
+        type.setSemanticFamily(definition.semanticFamily());
+        type.setDisplayName(definition.displayName());
+        type.setIconCode(definition.iconCode());
+        type.setFieldSchemaJson(definition.fieldSchemaJson());
+        type.setSystem(true);
+        type.setSortOrder(definition.sortOrder());
+        return type;
     }
 }

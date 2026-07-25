@@ -7,7 +7,7 @@
           <strong>{{ draft.title || '未命名节点' }}</strong>
         </div>
         <div class="editor-actions">
-          <button v-if="draft.nodeId" type="button" class="icon-button danger" title="删除节点" @click="emit('delete')">
+          <button v-if="draft.nodeId && !isStoryCore" type="button" class="icon-button danger" title="删除节点" @click="emit('delete')">
             <DeleteOutlined />
           </button>
           <button type="button" class="save-button" :disabled="saving" @click="emit('save')">
@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import {
   ApartmentOutlined,
   BookOutlined,
@@ -99,7 +99,7 @@ import StoryBibleProgressionsTab from './StoryBibleProgressionsTab.vue'
 import StoryBibleRelationsTab from './StoryBibleRelationsTab.vue'
 import type { StoryBibleChapterOption } from './storyBibleTypes'
 
-defineProps<{
+const props = defineProps<{
   draft: StoryBibleNodeDraft | null
   saving: boolean
   chapterId?: string
@@ -113,6 +113,7 @@ defineProps<{
   history: StoryBibleChangeset[]
   effectiveState: Record<string, unknown> | null
 }>()
+const isStoryCore = computed(() => props.nodeTypes.find((type) => type.typeId === props.draft?.typeId)?.typeCode === 'STORY_CORE')
 const emit = defineEmits<{
   (event: 'save'): void
   (event: 'delete'): void
