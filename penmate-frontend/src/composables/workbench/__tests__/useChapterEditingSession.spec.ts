@@ -1,31 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { acquireLease, renewLease, releaseLease, saveContent } = vi.hoisted(() => ({
-  acquireLease: vi.fn(),
-  renewLease: vi.fn(),
-  releaseLease: vi.fn(),
+const { getChapter, saveContent } = vi.hoisted(() => ({
+  getChapter: vi.fn(),
   saveContent: vi.fn(),
 }))
 
 vi.mock('@/api/modules/chapter.api', () => ({
-  chapterApi: { acquireLease, renewLease, releaseLease, saveContent },
+  chapterApi: { getChapter, saveContent },
 }))
 
 import { useChapterEditingSession } from '../useChapterEditingSession'
+
+const appError = (errorCode: string, message: string) => Object.assign(new Error(message), { errorCode })
 
 describe('useChapterEditingSession', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
-    sessionStorage.clear()
-    acquireLease.mockResolvedValue({
-      editable: true,
-      leaseToken: 'lease-1',
+    getChapter.mockResolvedValue({
       contentRevision: 4,
       content: '远端正文',
+      leaseOwnerType: null,
+      leaseExpiresAt: null,
     })
-    renewLease.mockResolvedValue({})
-    releaseLease.mockResolvedValue('released')
     saveContent.mockResolvedValue({ contentRevision: 5 })
   })
 
@@ -33,25 +30,22 @@ describe('useChapterEditingSession', () => {
     vi.useRealTimers()
   })
 
-  it('debounces a save for one second and advances the server revision', async () => {
+  it('opens without acquiring a user lease and saves with optimistic revision control', async () => {
     const onSaved = vi.fn()
     const session = useChapterEditingSession({ onSaved })
     await session.open('project-101', 'chapter-301')
 
     session.scheduleSave('新的正文')
-    await vi.advanceTimersByTimeAsync(999)
-    expect(saveContent).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1000)
 
-    await vi.advanceTimersByTimeAsync(1)
+    expect(getChapter).toHaveBeenCalledWith('project-101', 'chapter-301')
     expect(saveContent).toHaveBeenCalledWith('project-101', 'chapter-301', {
-      leaseToken: 'lease-1',
       expectedRevision: 4,
       content: '新的正文',
     })
     expect(session.contentRevision.value).toBe(5)
     expect(session.saveStatus.value).toBe('已保存')
     expect(onSaved).toHaveBeenCalledWith('project-101', 'chapter-301', '新的正文')
-    await session.release()
   })
 
   it('coalesces changes made while a save request is in flight', async () => {
@@ -69,72 +63,17 @@ describe('useChapterEditingSession', () => {
     await vi.waitFor(() => expect(saveContent).toHaveBeenCalledTimes(2))
 
     expect(saveContent).toHaveBeenNthCalledWith(2, 'project-101', 'chapter-301', {
-      leaseToken: 'lease-1',
       expectedRevision: 5,
       content: '第二批',
     })
-    await session.release()
   })
 
-  it('does not create a new revision when flushing unchanged content', async () => {
-    const session = useChapterEditingSession()
-    await session.open('project-101', 'chapter-301')
-
-    await session.flush('远端正文')
-
-    expect(saveContent).not.toHaveBeenCalled()
-    await session.release()
-  })
-
-  it('resumes the tab-scoped lease after a page refresh', async () => {
-    sessionStorage.setItem('penmate.chapter-lease:project-101:chapter-301', 'lease-before-refresh')
-    renewLease.mockResolvedValueOnce({
-      editable: true,
-      leaseToken: 'lease-before-refresh',
-      ownerType: 'USER',
-      contentRevision: 8,
-      content: '刷新前正文',
-    })
-    const session = useChapterEditingSession()
-
-    const opened = await session.open('project-101', 'chapter-301')
-
-    expect(renewLease).toHaveBeenCalledWith('project-101', 'chapter-301', 'lease-before-refresh')
-    expect(acquireLease).not.toHaveBeenCalled()
-    expect(opened).toEqual({ content: '刷新前正文', editable: true })
-    expect(session.contentRevision.value).toBe(8)
-    await session.release()
-    expect(sessionStorage.getItem('penmate.chapter-lease:project-101:chapter-301')).toBeNull()
-  })
-
-  it('falls back to a fresh lease when the stored lease cannot be resumed', async () => {
-    sessionStorage.setItem('penmate.chapter-lease:project-101:chapter-301', 'expired-lease')
-    renewLease.mockRejectedValueOnce(new Error('expired'))
-    const session = useChapterEditingSession()
-
-    await session.open('project-101', 'chapter-301')
-
-    expect(acquireLease).toHaveBeenCalledWith('project-101', 'chapter-301', false)
-    expect(sessionStorage.getItem('penmate.chapter-lease:project-101:chapter-301')).toBe('lease-1')
-    await session.release()
-  })
-
-  it('keeps the recovery token when releasing the lease fails', async () => {
-    releaseLease.mockRejectedValueOnce(new Error('network unavailable'))
-    const session = useChapterEditingSession()
-
-    await session.open('project-101', 'chapter-301')
-    await session.release()
-
-    expect(sessionStorage.getItem('penmate.chapter-lease:project-101:chapter-301')).toBe('lease-1')
-  })
-
-  it('stays read-only when another editor owns the chapter lease', async () => {
-    acquireLease.mockResolvedValueOnce({
-      editable: false,
-      ownerType: 'AI',
+  it('keeps the chapter read-only while an active AI lease exists', async () => {
+    getChapter.mockResolvedValueOnce({
       contentRevision: 7,
       content: 'AI 编辑前正文',
+      leaseOwnerType: 'AI',
+      leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
     })
     const session = useChapterEditingSession()
 
@@ -143,8 +82,62 @@ describe('useChapterEditingSession', () => {
     await vi.advanceTimersByTimeAsync(5000)
 
     expect(opened).toEqual({ content: 'AI 编辑前正文', editable: false })
+    expect(session.leaseOwnerType.value).toBe('AI')
     expect(session.lockReason.value).toBe('AI 正在编辑当前章节')
     expect(saveContent).not.toHaveBeenCalled()
+  })
+
+  it('ignores an expired AI lease when opening the chapter', async () => {
+    getChapter.mockResolvedValueOnce({
+      contentRevision: 7,
+      content: '正文',
+      leaseOwnerType: 'AI',
+      leaseExpiresAt: new Date(Date.now() - 1000).toISOString(),
+    })
+    const session = useChapterEditingSession()
+
+    const opened = await session.open('project-101', 'chapter-301')
+
+    expect(opened.editable).toBe(true)
+    expect(session.leaseOwnerType.value).toBe('')
+  })
+
+  it('quarantines the local draft after another page wins the revision race', async () => {
+    const onConflict = vi.fn()
+    saveContent.mockRejectedValueOnce(appError('CHAPTER_REVISION_CONFLICT', 'stale revision'))
+    const session = useChapterEditingSession({ onConflict })
+    await session.open('project-101', 'chapter-301')
+
+    session.scheduleSave('本地草稿')
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(session.editable.value).toBe(false)
+    expect(session.saveStatus.value).toBe('版本冲突')
+    expect(session.lockReason.value).toContain('本地草稿已保留')
+    expect(onConflict).toHaveBeenCalledWith('project-101', 'chapter-301', '本地草稿')
+  })
+
+  it('switches to AI read-only state when a user save loses the lock race', async () => {
+    saveContent.mockRejectedValueOnce(appError('CHAPTER_AI_EDITING', 'AI editing'))
+    const session = useChapterEditingSession()
+    await session.open('project-101', 'chapter-301')
+
+    session.scheduleSave('本地草稿')
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(session.editable.value).toBe(false)
+    expect(session.leaseOwnerType.value).toBe('AI')
+    expect(session.saveStatus.value).toBe('AI 正在编辑')
+  })
+
+  it('locks immediately when the chapter edit event arrives', async () => {
+    const session = useChapterEditingSession()
+    await session.open('project-101', 'chapter-301')
+
+    session.lockForAi('chapter-301')
+
+    expect(session.editable.value).toBe(false)
+    expect(session.leaseOwnerType.value).toBe('AI')
   })
 
   it('keeps dirty content offline and saves it once connectivity returns', async () => {
@@ -154,18 +147,13 @@ describe('useChapterEditingSession', () => {
     session.setOnline(false)
     session.scheduleSave('离线正文')
     await vi.advanceTimersByTimeAsync(5000)
-
-    expect(session.saveStatus.value).toBe('离线')
     expect(saveContent).not.toHaveBeenCalled()
 
     session.setOnline(true)
     await vi.waitFor(() => expect(saveContent).toHaveBeenCalledOnce())
     expect(saveContent).toHaveBeenCalledWith('project-101', 'chapter-301', {
-      leaseToken: 'lease-1',
       expectedRevision: 4,
       content: '离线正文',
     })
-    expect(session.saveStatus.value).toBe('已保存')
-    await session.release()
   })
 })

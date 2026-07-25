@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,6 +59,26 @@ class NovelChapterMapperDbCaseTest {
             assertThat(chapters)
                     .extracting(NovelChapter::getChapterId)
                     .containsExactly(5002L, 5003L, 5004L, 5005L);
+        }
+    }
+
+    @Test
+    void user_revisions_compete_optimistically_and_ai_lease_blocks_every_user_save() {
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            NovelChapterMapper mapper = session.getMapper(NovelChapterMapper.class);
+
+            assertThat(mapper.updateUserContent(77L, 5002L, 1L, "用户页面 A", 5)).isEqualTo(1);
+            assertThat(mapper.updateUserContent(77L, 5002L, 1L, "用户页面 B", 5)).isZero();
+
+            assertThat(mapper.acquireAiLease(77L, 5002L, 9001L, "ai-token",
+                    Instant.now().plusSeconds(60))).isEqualTo(1);
+            assertThat(mapper.updateUserContent(77L, 5002L, 2L, "用户不能覆盖", 6)).isZero();
+            assertThat(mapper.updateAiContent(77L, 5002L, "wrong-token", 2L, "错误 AI", 4)).isZero();
+            assertThat(mapper.updateAiContent(77L, 5002L, "ai-token", 2L, "AI 正文", 4)).isEqualTo(1);
+
+            NovelChapter saved = mapper.findByIdAndProjectId(77L, 5002L);
+            assertThat(saved.getContent()).isEqualTo("AI 正文");
+            assertThat(saved.getContentRevision()).isEqualTo(3L);
         }
     }
 

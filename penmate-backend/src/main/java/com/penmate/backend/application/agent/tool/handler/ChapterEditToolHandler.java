@@ -80,14 +80,14 @@ public class ChapterEditToolHandler implements AgentToolHandler {
         Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
         Long chapterId = context.input().chapterId();
         String instruction = JsonValues.string(args, "instruction").trim();
-        NovelApplicationService.ChapterLeaseView lease = null;
+        NovelApplicationService.AiChapterLeaseView lease = null;
         PreviewStream preview = null;
         try {
             lease = acquireLeaseWithWait(context, chapterId);
             if (!lease.editable()) {
                 publish(context.runId(), "chapter.edit.failed", eventPayload(context, request, chapterId,
-                        "errorCode", "CHAPTER_LOCKED", "errorMessage", lease.reason()));
-                return ToolCallResult.failed("CHAPTER_LOCKED", lease.reason());
+                        "errorCode", "CHAPTER_AI_BUSY", "errorMessage", lease.reason()));
+                return ToolCallResult.failed("CHAPTER_AI_BUSY", lease.reason());
             }
             publish(context.runId(), "chapter.edit.started", eventPayload(context, request, chapterId,
                     "contentRevision", lease.contentRevision(), "leaseExpiresAt", lease.expiresAt()));
@@ -146,9 +146,9 @@ public class ChapterEditToolHandler implements AgentToolHandler {
         }
     }
 
-    private NovelApplicationService.ChapterLeaseView acquireLeaseWithWait(AuthorizedAgentRunContext context,
-                                                                           Long chapterId) {
-        NovelApplicationService.ChapterLeaseView lease = null;
+    private NovelApplicationService.AiChapterLeaseView acquireLeaseWithWait(AuthorizedAgentRunContext context,
+                                                                             Long chapterId) {
+        NovelApplicationService.AiChapterLeaseView lease = null;
         for (int attempt = 0; attempt < LEASE_ACQUIRE_ATTEMPTS; attempt++) {
             lease = novels.acquireChapterAiLease(
                     context.projectId(), chapterId, context.ownerUserId(), context.runId());
@@ -166,7 +166,7 @@ public class ChapterEditToolHandler implements AgentToolHandler {
     }
 
     private void releaseQuietly(AuthorizedAgentRunContext context, Long chapterId,
-                                NovelApplicationService.ChapterLeaseView lease) {
+                                NovelApplicationService.AiChapterLeaseView lease) {
         if (lease == null || !lease.editable() || lease.leaseToken() == null) return;
         try {
             novels.releaseChapterAiLease(context.projectId(), chapterId, context.ownerUserId(), lease.leaseToken());

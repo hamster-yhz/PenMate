@@ -4,7 +4,13 @@
     <div v-if="readOnly" class="lock-overlay" role="status">
       <RobotOutlined v-if="aiEditing" />
       <LockOutlined v-else />
-      <span>{{ lockReason || 'AI 正在编辑当前章节' }}</span>
+      <div>
+        <span>{{ lockReason || 'AI 正在编辑当前章节' }}</span>
+        <div v-if="conflictPending && !aiEditing" class="conflict-actions">
+          <button type="button" @click="$emit('use-latest')">使用最新版本</button>
+          <button type="button" class="primary" @click="$emit('continue-local')">继续本地草稿</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -40,6 +46,7 @@ const props = withDefaults(defineProps<{
   lockReason?: string
   typewriterMode?: boolean
   aiEditing?: boolean
+  conflictPending?: boolean
   fontFamily?: EditorFontFamily
   fontSize?: number
   lineHeight?: number
@@ -53,6 +60,7 @@ const props = withDefaults(defineProps<{
   lockReason: '',
   typewriterMode: false,
   aiEditing: false,
+  conflictPending: false,
   fontFamily: 'SERIF',
   fontSize: 17,
   lineHeight: 1.9,
@@ -82,6 +90,8 @@ const emit = defineEmits<{
   change: [string]
   selectionChange: [EditorSelectionState]
   save: []
+  'use-latest': []
+  'continue-local': []
 }>()
 
 const host = ref<HTMLElement | null>(null)
@@ -232,6 +242,29 @@ onBeforeUnmount(() => view?.destroy())
   transform: translateX(-50%);
   max-width: calc(100% - 32px);
   text-align: center;
+}
+
+.conflict-actions {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.conflict-actions button {
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.conflict-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-inverse);
 }
 
 @media (max-width: 720px) {

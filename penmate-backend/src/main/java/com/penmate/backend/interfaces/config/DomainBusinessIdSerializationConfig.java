@@ -1,6 +1,7 @@
 package com.penmate.backend.interfaces.config;
 
 import com.fasterxml.jackson.annotation.JacksonAnnotationsInside;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.penmate.backend.domain.novel.model.ChapterAiUndoOperation;
@@ -52,6 +53,7 @@ public class DomainBusinessIdSerializationConfig {
         @StringId abstract Long getProjectId();
         @StringId abstract Long getVolumeId();
         @StringId abstract Long getLeaseOwnerId();
+        @JsonIgnore abstract String getLeaseToken();
     }
 
     private abstract static class ChapterAiUndoOperationMixin {

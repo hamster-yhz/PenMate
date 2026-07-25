@@ -27,6 +27,7 @@ class DomainBusinessIdSerializationConfigTest {
         chapter.setProjectId(LARGE_ID - 1);
         chapter.setVolumeId(LARGE_ID - 2);
         chapter.setLeaseOwnerId(LARGE_ID - 3);
+        chapter.setLeaseToken("must-not-leak");
         chapter.setContentRevision(17L);
 
         JsonNode json = mapper.readTree(mapper.writeValueAsBytes(chapter));
@@ -36,6 +37,7 @@ class DomainBusinessIdSerializationConfigTest {
         assertThat(json.path("volumeId").isTextual()).isTrue();
         assertThat(json.path("leaseOwnerId").isTextual()).isTrue();
         assertThat(json.path("contentRevision").isIntegralNumber()).isTrue();
+        assertThat(json.has("leaseToken")).isFalse();
     }
 
     @Test

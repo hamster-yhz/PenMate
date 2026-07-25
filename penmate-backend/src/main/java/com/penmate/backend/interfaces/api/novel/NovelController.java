@@ -16,7 +16,6 @@ import com.penmate.backend.interfaces.api.novel.dto.MoveNovelDirectoryItemDto;
 import com.penmate.backend.interfaces.api.novel.dto.PermanentlyDeleteNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelVolumeDto;
-import com.penmate.backend.interfaces.api.novel.dto.AcquireChapterLeaseDto;
 import com.penmate.backend.interfaces.api.novel.dto.SaveChapterContentDto;
 import com.penmate.backend.interfaces.api.novel.dto.CompleteNovelCoverUploadDto;
 import com.penmate.backend.interfaces.api.novel.dto.InitializeNovelCoverUploadDto;
@@ -394,34 +393,6 @@ public class NovelController {
         return ApiResponse.success(novelApplicationService.getChapter(requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId")), traceId);
     }
 
-    @PostMapping("/{projectId}/chapters/{chapterId}/lease")
-    public ApiResponse<NovelApplicationService.ChapterLeaseView> acquireChapterLease(
-            @PathVariable String projectId, @PathVariable String chapterId,
-            @RequestBody(required = false) AcquireChapterLeaseDto dto, Authentication authentication,
-            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.acquireChapterLease(
-                requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
-                id(authentication), dto != null && Boolean.TRUE.equals(dto.getForce())), traceId);
-    }
-
-    @PutMapping("/{projectId}/chapters/{chapterId}/lease/{leaseToken}")
-    public ApiResponse<NovelApplicationService.ChapterLeaseView> renewChapterLease(
-            @PathVariable String projectId, @PathVariable String chapterId, @PathVariable String leaseToken,
-            Authentication authentication, @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(novelApplicationService.renewChapterLease(
-                requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
-                id(authentication), leaseToken), traceId);
-    }
-
-    @DeleteMapping("/{projectId}/chapters/{chapterId}/lease/{leaseToken}")
-    public ApiResponse<String> releaseChapterLease(
-            @PathVariable String projectId, @PathVariable String chapterId, @PathVariable String leaseToken,
-            Authentication authentication, @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        novelApplicationService.releaseChapterLease(requireLongId(projectId, "projectId"),
-                requireLongId(chapterId, "chapterId"), id(authentication), leaseToken);
-        return ApiResponse.success("released", traceId);
-    }
-
     @PutMapping("/{projectId}/chapters/{chapterId}/content")
     public ApiResponse<NovelChapter> saveChapterContent(
             @PathVariable String projectId, @PathVariable String chapterId,
@@ -429,7 +400,7 @@ public class NovelController {
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return ApiResponse.success(novelApplicationService.saveChapterContent(
                 requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
-                id(authentication), dto.getLeaseToken(), dto.getExpectedRevision(), dto.getContent()), traceId);
+                id(authentication), dto.getExpectedRevision(), dto.getContent()), traceId);
     }
 
     @GetMapping("/{projectId}/chapters/{chapterId}/ai-undo")

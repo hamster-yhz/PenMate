@@ -19,6 +19,7 @@
         :read-only="readOnly"
         :lock-reason="lockReason"
         :ai-editing="aiEditing"
+        :conflict-pending="conflictPending"
         :typewriter-mode="typewriterMode"
         :font-family="uiPreferences.editorFontFamily"
         :font-size="uiPreferences.editorFontSize"
@@ -31,6 +32,8 @@
         @change="$emit('input', $event)"
         @selection-change="$emit('selection-change', $event)"
         @save="$emit('save')"
+        @use-latest="$emit('use-latest')"
+        @continue-local="$emit('continue-local')"
       />
     </div>
     <EditorStatusbar
@@ -65,6 +68,7 @@ defineProps<{
   readOnly?: boolean
   lockReason?: string
   aiEditing?: boolean
+  conflictPending?: boolean
   aiPreviewContent?: string
   aiUndoAvailable?: boolean
   aiUndoBusy?: boolean
@@ -76,6 +80,8 @@ defineEmits<{
   input: [string]
   'selection-change': [EditorSelectionState]
   'undo-ai': []
+  'use-latest': []
+  'continue-local': []
 }>()
 
 const editorApi = ref<PlainTextEditorApi | null>(null)

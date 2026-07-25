@@ -35,29 +35,25 @@ describe('business id string-only API contracts', () => {
     const { profileApi } = await import('./profile.api')
 
     await approvalApi.getApproval('101', '88001')
-    await chapterApi.acquireLease('101', '301')
+    await chapterApi.getChapter('101', '301')
     await storyBibleApi.deleteRelation('101', '8', '1001', 3)
     await styleApi.switchStyle('101', '1001', { toStyleId: '81' }, '90001')
     await ragApi.indexStatus('101', '9001')
     await profileApi.profileMenus('1001')
 
     expect(requestMock.get).toHaveBeenNthCalledWith(1, '/v1/novels/101/approvals/88001')
-    expect(requestMock.post).toHaveBeenNthCalledWith(
-      1,
-      '/v1/novels/101/chapters/301/lease',
-      { force: false },
-    )
+    expect(requestMock.get).toHaveBeenNthCalledWith(2, '/v1/novels/101/chapters/301')
     expect(requestMock.delete).toHaveBeenNthCalledWith(
       1,
       '/v1/novels/101/story-bible/relations/8?expectedRevision=3',
     )
     expect(requestMock.post).toHaveBeenNthCalledWith(
-      2,
+      1,
       '/v1/novels/101/styles/switch?sessionId=90001',
       { toStyleId: '81' },
     )
-    expect(requestMock.get).toHaveBeenNthCalledWith(2, '/v1/novels/101/rag/documents/9001/index-status')
-    expect(requestMock.get).toHaveBeenNthCalledWith(3, '/v1/profile/menus?userId=1001')
+    expect(requestMock.get).toHaveBeenNthCalledWith(3, '/v1/novels/101/rag/documents/9001/index-status')
+    expect(requestMock.get).toHaveBeenNthCalledWith(4, '/v1/profile/menus?userId=1001')
   })
 
   it('rejects non-string business ids at compile time for core api surfaces', async () => {
@@ -72,7 +68,7 @@ describe('business id string-only API contracts', () => {
     // @ts-expect-error business ids must stay string-only
     approvalApi.getApproval(101, '88001')
     // @ts-expect-error business ids must stay string-only
-    chapterApi.acquireLease(101, '301')
+    chapterApi.getChapter(101, '301')
     // @ts-expect-error business ids must stay string-only
     styleApi.switchStyle(101, '1001', { toStyleId: '81' }, '90001')
   })

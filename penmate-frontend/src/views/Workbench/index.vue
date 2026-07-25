@@ -72,11 +72,14 @@
           :save-hint="saveHint"
           :read-only="chapterReadOnly"
           :lock-reason="chapterLockReason"
+          :conflict-pending="chapterConflictPending"
           :ai-editing="aiEditingCurrentChapter"
           :ai-preview-content="aiPreviewContent"
           :ai-undo-available="Boolean(currentChapterAiUndo)"
           :ai-undo-busy="Boolean(aiUndoBusyOperationId)"
           @save="saveContent"
+          @use-latest="useLatestChapterVersion"
+          @continue-local="continueWithLocalDraft"
           @update:editor-content="editorContent = $event"
           @input="onEditorInput"
           @selection-change="updateCursorPos"
@@ -245,6 +248,7 @@ const {
   saveHint,
   chapterReadOnly,
   chapterLockReason,
+  chapterConflictPending,
   aiEditingCurrentChapter,
   aiPreviewContent,
   currentChapterAiUndo,
@@ -256,6 +260,8 @@ const {
   onEditorInput,
   updateCursorPos,
   saveContent,
+  useLatestChapterVersion,
+  continueWithLocalDraft,
   activePlugins,
   boundStyleName,
   currentModelName,

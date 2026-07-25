@@ -42,4 +42,15 @@ describe('useWorkbenchDraft', () => {
 
     expect(await drafts.resolveStoredDraft('project-101', 'chapter-301')).toBeNull()
   })
+
+  it('keeps a conflicted draft recoverable without applying it as current正文', async () => {
+    const drafts = useWorkbenchDraft()
+    drafts.saveDraft('project-101', 'chapter-301', '未能提交的本地正文')
+    await drafts.flushDraft('project-101', 'chapter-301')
+
+    await drafts.markDraftConflicted('project-101', 'chapter-301')
+
+    expect(await drafts.readDraft('project-101', 'chapter-301')).toBe('未能提交的本地正文')
+    expect(await drafts.resolveStoredDraft('project-101', 'chapter-301')).toBeNull()
+  })
 })

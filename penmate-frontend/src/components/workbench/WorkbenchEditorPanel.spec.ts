@@ -13,13 +13,15 @@ const EditorToolbarStub = defineComponent({
 
 const PlainTextEditorStub = defineComponent({
   name: 'PlainTextEditor',
-  props: ['fontFamily', 'fontSize', 'lineHeight', 'paragraphSpacing', 'contentWidth', 'highlightCurrentParagraph'],
-  emits: ['update:model-value', 'change', 'selection-change'],
+  props: ['conflictPending', 'fontFamily', 'fontSize', 'lineHeight', 'paragraphSpacing', 'contentWidth', 'highlightCurrentParagraph'],
+  emits: ['update:model-value', 'change', 'selection-change', 'use-latest', 'continue-local'],
   setup(_, { emit }) {
     return () => h('div', [
       h('button', { 'data-testid': 'editor-update', onClick: () => emit('update:model-value', '新正文') }),
       h('button', { 'data-testid': 'editor-change', onClick: () => emit('change', '新正文') }),
       h('button', { 'data-testid': 'editor-selection', onClick: () => emit('selection-change', { line: 2, column: 3, selectedText: '新正' }) }),
+      h('button', { 'data-testid': 'editor-use-latest', onClick: () => emit('use-latest') }),
+      h('button', { 'data-testid': 'editor-continue-local', onClick: () => emit('continue-local') }),
     ])
   },
 })
@@ -41,6 +43,7 @@ describe('WorkbenchEditorPanel', () => {
         currentCol: 1,
         wordCount: 4,
         saveHint: '已保存',
+        conflictPending: true,
       },
       global: { stubs: { EditorToolbar: EditorToolbarStub, PlainTextEditor: PlainTextEditorStub, EditorStatusbar: EditorStatusbarStub } },
     })
@@ -55,16 +58,21 @@ describe('WorkbenchEditorPanel', () => {
       paragraphSpacing: 0.35,
       contentWidth: 760,
       highlightCurrentParagraph: true,
+      conflictPending: true,
     })
 
     await wrapper.get('[data-testid="toolbar-save"]').trigger('click')
     await wrapper.get('[data-testid="editor-update"]').trigger('click')
     await wrapper.get('[data-testid="editor-change"]').trigger('click')
     await wrapper.get('[data-testid="editor-selection"]').trigger('click')
+    await wrapper.get('[data-testid="editor-use-latest"]').trigger('click')
+    await wrapper.get('[data-testid="editor-continue-local"]').trigger('click')
 
     expect(wrapper.emitted('save')).toEqual([[]])
     expect(wrapper.emitted('update:editor-content')).toEqual([['新正文']])
     expect(wrapper.emitted('input')).toEqual([['新正文']])
     expect(wrapper.emitted('selection-change')).toEqual([[{ line: 2, column: 3, selectedText: '新正' }]])
+    expect(wrapper.emitted('use-latest')).toEqual([[]])
+    expect(wrapper.emitted('continue-local')).toEqual([[]])
   })
 })

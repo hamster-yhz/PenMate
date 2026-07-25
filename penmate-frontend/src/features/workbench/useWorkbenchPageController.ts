@@ -34,7 +34,15 @@ export const useWorkbenchPageController = () => {
     username: sessionUsername,
     userEmail: sessionUserEmail,
   } = useWorkbenchContext({ query: route.query, session })
-  const { saveDraft, flushDraft, markDraftSynced, resolveStoredDraft, resolveEditorSeedContent } = useWorkbenchDraft()
+  const {
+    saveDraft,
+    flushDraft,
+    clearDraft,
+    markDraftSynced,
+    markDraftConflicted,
+    resolveStoredDraft,
+    resolveEditorSeedContent,
+  } = useWorkbenchDraft()
   const chapterLoadGuard = createChapterLoadGuard()
 
   const getCurrentProjectId = () => ensureContext().projectId || initialProjectId || ''
@@ -198,34 +206,37 @@ export const useWorkbenchPageController = () => {
     setChapterContent,
   })
 
-  const chapterEditing = useChapterEditingSession({ onSaved: markDraftSynced })
+  const chapterConflict = ref<{ chapterId: string; content: string } | null>(null)
+  const chapterEditing = useChapterEditingSession({
+    onSaved: markDraftSynced,
+    onConflict: async (projectId, chapterId, content) => {
+      await flushDraft(projectId, chapterId)
+      await markDraftConflicted(projectId, chapterId)
+      chapterConflict.value = { chapterId, content }
+    },
+  })
   const online = ref(typeof navigator === 'undefined' || navigator.onLine)
   const aiEditingChapterId = ref('')
-  const aiPreparingChapterId = ref('')
   const aiGeneratedContent = ref('')
   const aiUndoOperations = ref<ChapterAiUndoOperation[]>([])
   const aiUndoBusyOperationId = ref('')
   const aiUndoBusyRunId = ref('')
   const aiEditingCurrentChapter = computed(() => Boolean(activeChapter.value)
     && (aiEditingChapterId.value === activeChapter.value || chapterEditing.leaseOwnerType.value === 'AI'))
-  const aiPreparingCurrentChapter = computed(() => Boolean(activeChapter.value)
-    && aiPreparingChapterId.value === activeChapter.value)
   const aiPreviewContent = computed(() => aiGeneratedContent.value || editorContent.value)
   const currentChapterAiUndo = computed(() => aiUndoOperations.value.find(
     (operation) => operation.chapterId === activeChapter.value && operation.status === 'AVAILABLE',
   ) || null)
+  const chapterConflictPending = computed(() => chapterConflict.value?.chapterId === activeChapter.value)
   const saveHint = computed(() => aiEditingCurrentChapter.value
     ? 'AI 正在编辑'
-    : aiPreparingCurrentChapter.value
-      ? '正在交接给 AI'
-      : !online.value && activeChapter.value
+    : !online.value && activeChapter.value
         ? '离线 · 正文已在本地暂存'
         : chapterEditing.saveStatus.value || localSaveHint.value)
   const chapterReadOnly = computed(() => Boolean(activeChapter.value)
-    && (aiPreparingCurrentChapter.value || aiEditingCurrentChapter.value || !chapterEditing.editable.value))
-  const chapterLockReason = computed(() => aiPreparingCurrentChapter.value
-    ? '正在保存最新正文并交接给 AI'
-    : aiEditingCurrentChapter.value ? 'AI 正在编辑当前章节，完成前不会覆盖原正文' : chapterEditing.lockReason.value)
+    && (aiEditingCurrentChapter.value || !chapterEditing.editable.value))
+  const chapterLockReason = computed(() => aiEditingCurrentChapter.value
+    ? 'AI 正在编辑当前章节，完成前用户无法修改' : chapterEditing.lockReason.value)
   const onEditorInput = (content: string) => {
     handleLocalEditorInput(content)
     aiUndoOperations.value = aiUndoOperations.value.filter((operation) => operation.chapterId !== activeChapter.value)
@@ -236,6 +247,32 @@ export const useWorkbenchPageController = () => {
     const projectId = getCurrentProjectId()
     if (projectId && activeChapter.value) await flushDraft(projectId, activeChapter.value)
     await chapterEditing.flush(editorContent.value)
+  }
+
+  const useLatestChapterVersion = async () => {
+    const conflict = chapterConflict.value
+    const projectId = getCurrentProjectId()
+    if (!conflict || !projectId || conflict.chapterId !== activeChapter.value) return
+    const remote = await chapterEditing.open(projectId, conflict.chapterId)
+    if (!remote.editable) return
+    chapterContents.value[conflict.chapterId] = remote.content
+    selectChapterDraft(remote.content)
+    await clearDraft(projectId, conflict.chapterId)
+    chapterConflict.value = null
+  }
+
+  const continueWithLocalDraft = async () => {
+    const conflict = chapterConflict.value
+    const projectId = getCurrentProjectId()
+    if (!conflict || !projectId || conflict.chapterId !== activeChapter.value) return
+    const remote = await chapterEditing.open(projectId, conflict.chapterId)
+    if (!remote.editable) return
+    chapterContents.value[conflict.chapterId] = conflict.content
+    selectChapterDraft(conflict.content)
+    saveDraft(projectId, conflict.chapterId, conflict.content)
+    chapterEditing.scheduleSave(conflict.content)
+    await chapterEditing.flush(conflict.content)
+    if (chapterEditing.saveStatus.value === '已保存') chapterConflict.value = null
   }
 
   const updateConnectivity = () => {
@@ -389,15 +426,6 @@ export const useWorkbenchPageController = () => {
     if (aiEditingChapterId.value !== chapterId) return
     aiEditingChapterId.value = ''
     aiGeneratedContent.value = ''
-    if (aiPreparingChapterId.value === chapterId) aiPreparingChapterId.value = ''
-  }
-
-  const prepareChapterForAi = async (chapterId: string) => {
-    if (!chapterId || chapterId !== activeChapter.value) return
-    aiPreparingChapterId.value = chapterId
-    await saveContent()
-    if (chapterEditing.saveStatus.value.includes('失败')) return
-    await chapterEditing.release()
   }
 
   const applyAiPreviewDelta = (payload: Record<string, unknown>) => {
@@ -453,7 +481,9 @@ export const useWorkbenchPageController = () => {
   const sendMessage = async () => {
     if (activeChapter.value) {
       await saveContent()
-      if (chapterEditing.saveStatus.value.includes('失败')) {
+      if (chapterEditing.saveStatus.value.includes('失败')
+        || chapterEditing.saveStatus.value === '版本冲突'
+        || chapterEditing.leaseOwnerType.value === 'AI') {
         message.warning('当前章节尚未同步，暂时不能启动 AI')
         return
       }
@@ -529,19 +559,10 @@ export const useWorkbenchPageController = () => {
     }
     const payload = event?.payload || {}
     const chapterId = String(payload.chapterId || '')
-    if (event?.eventName === 'tool.call.started' && event.toolCall?.toolCode === 'chapter_edit') {
-      try {
-        const args = typeof event.toolCall.argumentsPreview === 'string'
-          ? JSON.parse(event.toolCall.argumentsPreview) as Record<string, unknown>
-          : event.toolCall.argumentsPreview as Record<string, unknown> | null
-        const targetChapterId = String(args?.chapterId || '')
-        if (targetChapterId) void prepareChapterForAi(targetChapterId)
-      } catch {
-        // Backend validation will report malformed tool arguments.
-      }
-    }
     if (event?.eventName === 'chapter.edit.started' && chapterId) {
-      if (aiPreparingChapterId.value === chapterId) aiPreparingChapterId.value = ''
+      chapterEditing.lockForAi(chapterId)
+      const projectId = getCurrentProjectId()
+      if (projectId) void flushDraft(projectId, chapterId).then(() => markDraftConflicted(projectId, chapterId))
       aiEditingChapterId.value = chapterId
       aiGeneratedContent.value = ''
     }
@@ -642,6 +663,7 @@ export const useWorkbenchPageController = () => {
     saveHint,
     chapterReadOnly,
     chapterLockReason,
+    chapterConflictPending,
     aiEditingCurrentChapter,
     aiPreviewContent,
     currentChapterAiUndo,
@@ -655,6 +677,8 @@ export const useWorkbenchPageController = () => {
     editorUndo,
     editorRedo,
     saveContent,
+    useLatestChapterVersion,
+    continueWithLocalDraft,
     bindEditor,
     activePlugins,
     boundStyleName,

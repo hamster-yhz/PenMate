@@ -8,6 +8,7 @@ export type ChapterDraftRecord = {
   chapterId: string
   content: string
   updatedAt: number
+  conflicted?: boolean
 }
 
 const fallbackDrafts = new Map<string, ChapterDraftRecord>()
@@ -51,9 +52,14 @@ const execute = async <T>(
   })
 }
 
-export const saveChapterDraft = async (projectId: string, chapterId: string, content: string) => {
+export const saveChapterDraft = async (
+  projectId: string,
+  chapterId: string,
+  content: string,
+  conflicted = false,
+) => {
   const key = getDraftStorageKey(projectId, chapterId)
-  const record: ChapterDraftRecord = { key, projectId, chapterId, content, updatedAt: Date.now() }
+  const record: ChapterDraftRecord = { key, projectId, chapterId, content, updatedAt: Date.now(), conflicted }
   fallbackDrafts.set(key, record)
   await execute('readwrite', (store) => store.put(record))
 }

@@ -25,6 +25,7 @@ export const createChapterLoadGuard = () => {
 
 export const useWorkbenchDraft = () => {
   const pendingContent = new Map<string, string>()
+  const conflictedKeys = new Set<string>()
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const writePendingDraft = async (projectId: string, chapterId: string) => {
@@ -34,7 +35,7 @@ export const useWorkbenchDraft = () => {
     if (timer) clearTimeout(timer)
     timers.delete(key)
     if (content === undefined) return
-    await saveChapterDraft(projectId, chapterId, content)
+    await saveChapterDraft(projectId, chapterId, content, conflictedKeys.has(key))
   }
 
   const readDraft = async (projectId: string, chapterId: string) => {
@@ -45,6 +46,7 @@ export const useWorkbenchDraft = () => {
 
   const saveDraft = (projectId: string, chapterId: string, content: string) => {
     const key = getDraftStorageKey(projectId, chapterId)
+    conflictedKeys.delete(key)
     pendingContent.set(key, content)
     const currentTimer = timers.get(key)
     if (currentTimer) clearTimeout(currentTimer)
@@ -59,6 +61,7 @@ export const useWorkbenchDraft = () => {
     if (timer) clearTimeout(timer)
     timers.delete(key)
     pendingContent.delete(key)
+    conflictedKeys.delete(key)
     await clearChapterDraft(projectId, chapterId)
   }
 
@@ -75,8 +78,19 @@ export const useWorkbenchDraft = () => {
 
   const resolveStoredDraft = async (projectId: string, chapterId: string) => {
     const key = getDraftStorageKey(projectId, chapterId)
-    if (pendingContent.has(key)) return pendingContent.get(key) ?? ''
-    return (await readChapterDraft(projectId, chapterId))?.content ?? null
+    if (pendingContent.has(key)) return conflictedKeys.has(key) ? null : pendingContent.get(key) ?? ''
+    const stored = await readChapterDraft(projectId, chapterId)
+    return stored?.conflicted ? null : stored?.content ?? null
+  }
+
+  const markDraftConflicted = async (projectId: string, chapterId: string) => {
+    const key = getDraftStorageKey(projectId, chapterId)
+    const pending = pendingContent.get(key)
+    const stored = pending === undefined ? await readChapterDraft(projectId, chapterId) : null
+    const content = pending ?? stored?.content
+    if (content === undefined) return
+    conflictedKeys.add(key)
+    await saveChapterDraft(projectId, chapterId, content, true)
   }
 
   const resolveEditorSeedContent = (chapterContent: string | undefined, storedDraft: string | null) =>
@@ -88,6 +102,7 @@ export const useWorkbenchDraft = () => {
     flushDraft,
     clearDraft,
     markDraftSynced,
+    markDraftConflicted,
     resolveStoredDraft,
     resolveEditorSeedContent,
   }

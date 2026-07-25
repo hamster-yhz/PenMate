@@ -12,16 +12,7 @@ export const chapterApi = {
   updateChapter(projectId: string, chapterId: string, _operatorId: string, payload: AnyRecord) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}`, payload)
   },
-  acquireLease(projectId: string, chapterId: string, force = false) {
-    return request.post<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/lease`, { force })
-  },
-  renewLease(projectId: string, chapterId: string, leaseToken: string) {
-    return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/lease/${encodeURIComponent(leaseToken)}`)
-  },
-  releaseLease(projectId: string, chapterId: string, leaseToken: string) {
-    return request.delete<string>(`/v1/novels/${projectId}/chapters/${chapterId}/lease/${encodeURIComponent(leaseToken)}`)
-  },
-  saveContent(projectId: string, chapterId: string, payload: { leaseToken: string; expectedRevision: number; content: string }) {
+  saveContent(projectId: string, chapterId: string, payload: { expectedRevision: number; content: string }) {
     return request.put<AnyRecord>(`/v1/novels/${projectId}/chapters/${chapterId}/content`, payload)
   },
   listAiUndo(projectId: string, chapterId: string) {

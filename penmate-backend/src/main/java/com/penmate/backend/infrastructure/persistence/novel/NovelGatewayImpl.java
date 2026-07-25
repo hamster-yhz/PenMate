@@ -166,6 +166,11 @@ public class NovelGatewayImpl implements NovelGateway {
         return novelChapterMapper.softDeleteByVolume(projectId, volumeId);
     }
 
+    @Override
+    public int countActiveAiChapterLeasesByVolume(Long projectId, Long volumeId) {
+        return novelChapterMapper.countActiveAiLeasesByVolume(projectId, volumeId);
+    }
+
     /**
      * 处理业务请求。
      *
@@ -204,31 +209,31 @@ public class NovelGatewayImpl implements NovelGateway {
     public int updateChapter(NovelChapter chapter) { return novelChapterMapper.update(chapter); }
 
     @Override
-    public int acquireChapterLease(Long projectId, Long chapterId, String ownerType, Long ownerId,
-                                   String leaseToken, java.time.Instant expiresAt, boolean force) {
-        return novelChapterMapper.acquireLease(projectId, chapterId, ownerType, ownerId, leaseToken, expiresAt, force);
-    }
-
-    @Override
-    public int acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId,
+    public int acquireChapterAiLease(Long projectId, Long chapterId, Long runId,
                                      String leaseToken, java.time.Instant expiresAt) {
-        return novelChapterMapper.acquireAiLease(projectId, chapterId, actorUserId, runId, leaseToken, expiresAt);
+        return novelChapterMapper.acquireAiLease(projectId, chapterId, runId, leaseToken, expiresAt);
     }
 
     @Override
-    public int renewChapterLease(Long projectId, Long chapterId, String leaseToken, java.time.Instant expiresAt) {
-        return novelChapterMapper.renewLease(projectId, chapterId, leaseToken, expiresAt);
+    public int renewChapterAiLease(Long projectId, Long chapterId, String leaseToken, java.time.Instant expiresAt) {
+        return novelChapterMapper.renewAiLease(projectId, chapterId, leaseToken, expiresAt);
     }
 
     @Override
-    public int releaseChapterLease(Long projectId, Long chapterId, String leaseToken) {
-        return novelChapterMapper.releaseLease(projectId, chapterId, leaseToken);
+    public int releaseChapterAiLease(Long projectId, Long chapterId, String leaseToken) {
+        return novelChapterMapper.releaseAiLease(projectId, chapterId, leaseToken);
     }
 
     @Override
-    public int updateChapterContent(Long projectId, Long chapterId, String leaseToken, Long expectedRevision,
-                                    String content, Integer wordCount) {
-        return novelChapterMapper.updateContent(projectId, chapterId, leaseToken, expectedRevision, content, wordCount);
+    public int updateUserChapterContent(Long projectId, Long chapterId, Long expectedRevision,
+                                        String content, Integer wordCount) {
+        return novelChapterMapper.updateUserContent(projectId, chapterId, expectedRevision, content, wordCount);
+    }
+
+    @Override
+    public int updateAiChapterContent(Long projectId, Long chapterId, String leaseToken, Long expectedRevision,
+                                      String content, Integer wordCount) {
+        return novelChapterMapper.updateAiContent(projectId, chapterId, leaseToken, expectedRevision, content, wordCount);
     }
 
     @Override

@@ -4,17 +4,23 @@ import { getErrorMessage } from '@/utils/errors'
 
 const SAVE_DELAY_MS = 1000
 const MAX_SAVE_DELAY_MS = 5000
-const RENEW_INTERVAL_MS = 20_000
-const LEASE_STORAGE_PREFIX = 'penmate.chapter-lease'
 
 type ChapterEditingSessionOptions = {
   onSaved?: (projectId: string, chapterId: string, content: string) => void | Promise<void>
+  onConflict?: (projectId: string, chapterId: string, content: string) => void | Promise<void>
+}
+
+type AppErrorLike = Error & { errorCode?: string }
+
+const hasActiveAiLease = (chapter: Record<string, unknown>) => {
+  if (String(chapter.leaseOwnerType || '') !== 'AI') return false
+  const expiresAt = Date.parse(String(chapter.leaseExpiresAt || ''))
+  return !Number.isFinite(expiresAt) || expiresAt > Date.now()
 }
 
 export const useChapterEditingSession = (options: ChapterEditingSessionOptions = {}) => {
   const editable = ref(false)
   const lockReason = ref('')
-  const leaseToken = ref('')
   const leaseOwnerType = ref('')
   const contentRevision = ref(1)
   const saveStatus = ref('')
@@ -26,27 +32,8 @@ export const useChapterEditingSession = (options: ChapterEditingSessionOptions =
   let dirty = false
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let maxTimer: ReturnType<typeof setTimeout> | null = null
-  let renewTimer: ReturnType<typeof setInterval> | null = null
   let savePromise: Promise<void> | null = null
   let online = typeof navigator === 'undefined' || navigator.onLine
-
-  const leaseStorageKey = (targetProjectId = projectId, targetChapterId = chapterId) =>
-    `${LEASE_STORAGE_PREFIX}:${targetProjectId}:${targetChapterId}`
-
-  const readStoredLeaseToken = (targetProjectId: string, targetChapterId: string) => {
-    if (typeof sessionStorage === 'undefined') return ''
-    return sessionStorage.getItem(leaseStorageKey(targetProjectId, targetChapterId)) || ''
-  }
-
-  const storeLeaseToken = (token: string) => {
-    if (typeof sessionStorage === 'undefined' || !projectId || !chapterId || !token) return
-    sessionStorage.setItem(leaseStorageKey(), token)
-  }
-
-  const clearStoredLeaseToken = () => {
-    if (typeof sessionStorage === 'undefined' || !projectId || !chapterId) return
-    sessionStorage.removeItem(leaseStorageKey())
-  }
 
   const clearSaveTimers = () => {
     if (debounceTimer) clearTimeout(debounceTimer)
@@ -55,31 +42,17 @@ export const useChapterEditingSession = (options: ChapterEditingSessionOptions =
     maxTimer = null
   }
 
-  const stopRenewal = () => {
-    if (renewTimer) clearInterval(renewTimer)
-    renewTimer = null
-  }
-
-  const renew = async () => {
-    if (!online || !editable.value || !projectId || !chapterId || !leaseToken.value) return
-    try {
-      await chapterApi.renewLease(projectId, chapterId, leaseToken.value)
-    } catch (error: unknown) {
-      editable.value = false
-      lockReason.value = getErrorMessage(error, '编辑权限已失效')
-      saveStatus.value = '保存失败'
-      stopRenewal()
-    }
-  }
-
-  const startRenewal = () => {
-    stopRenewal()
-    renewTimer = setInterval(() => void renew(), RENEW_INTERVAL_MS)
+  const blockSaving = (ownerType: string, reason: string, status: string) => {
+    clearSaveTimers()
+    editable.value = false
+    leaseOwnerType.value = ownerType
+    lockReason.value = reason
+    saveStatus.value = status
   }
 
   const runSave = async () => {
     clearSaveTimers()
-    if (!dirty || !editable.value || !leaseToken.value || !projectId || !chapterId) return
+    if (!dirty || !editable.value || !projectId || !chapterId) return
     if (!online) {
       saveStatus.value = '离线'
       return
@@ -94,18 +67,27 @@ export const useChapterEditingSession = (options: ChapterEditingSessionOptions =
         saveStatus.value = '正在同步'
         try {
           const saved = await chapterApi.saveContent(projectId, chapterId, {
-            leaseToken: leaseToken.value,
             expectedRevision: revision,
             content,
           })
           contentRevision.value = Number(saved.contentRevision ?? revision + 1)
           savedContent = content
           saveStatus.value = '已保存'
+          lockReason.value = ''
           await options.onSaved?.(projectId, chapterId, content)
         } catch (error: unknown) {
           dirty = true
-          saveStatus.value = '保存失败'
-          lockReason.value = getErrorMessage(error, '章节保存失败')
+          const errorCode = String((error as AppErrorLike | null)?.errorCode || '')
+          if (errorCode === 'CHAPTER_AI_EDITING') {
+            blockSaving('AI', 'AI 正在编辑当前章节，本地草稿已保留', 'AI 正在编辑')
+            await options.onConflict?.(projectId, chapterId, content)
+          } else if (errorCode === 'CHAPTER_REVISION_CONFLICT') {
+            blockSaving('', '章节已在其他页面更新，本地草稿已保留', '版本冲突')
+            await options.onConflict?.(projectId, chapterId, content)
+          } else {
+            saveStatus.value = '保存失败'
+            lockReason.value = getErrorMessage(error, '章节保存失败')
+          }
           break
         }
       }
@@ -144,56 +126,36 @@ export const useChapterEditingSession = (options: ChapterEditingSessionOptions =
 
   const release = async () => {
     clearSaveTimers()
-    stopRenewal()
-    if (editable.value && projectId && chapterId && leaseToken.value) {
-      try {
-        await chapterApi.releaseLease(projectId, chapterId, leaseToken.value)
-        clearStoredLeaseToken()
-      } catch {
-        // Keep the tab-scoped token when the server may still own the lease.
-      }
-    }
+    if (editable.value) await runSave()
     editable.value = false
-    leaseToken.value = ''
     leaseOwnerType.value = ''
   }
 
-  const open = async (nextProjectId: string, nextChapterId: string, force = false) => {
+  const open = async (nextProjectId: string, nextChapterId: string) => {
     if (projectId && chapterId && (projectId !== nextProjectId || chapterId !== nextChapterId)) {
-      await flush()
       await release()
     }
     projectId = nextProjectId
     chapterId = nextChapterId
     saveStatus.value = ''
     lockReason.value = ''
-    const storedLeaseToken = force ? '' : readStoredLeaseToken(projectId, chapterId)
-    let lease: Awaited<ReturnType<typeof chapterApi.acquireLease>> | undefined
-    if (storedLeaseToken) {
-      try {
-        lease = await chapterApi.renewLease(projectId, chapterId, storedLeaseToken)
-      } catch {
-        // A network failure does not prove that the server-side lease is gone.
-      }
-    }
-    lease ??= await chapterApi.acquireLease(projectId, chapterId, force)
-    editable.value = Boolean(lease.editable)
-    leaseOwnerType.value = String(lease.ownerType || (editable.value ? 'USER' : ''))
-    leaseToken.value = editable.value ? String(lease.leaseToken || '') : ''
-    contentRevision.value = Math.max(1, Number(lease.contentRevision ?? 1))
-    pendingContent = String(lease.content ?? '')
+    const chapter = await chapterApi.getChapter(projectId, chapterId)
+    const aiEditing = hasActiveAiLease(chapter)
+    editable.value = !aiEditing
+    leaseOwnerType.value = aiEditing ? 'AI' : ''
+    contentRevision.value = Math.max(1, Number(chapter.contentRevision ?? 1))
+    pendingContent = String(chapter.content ?? '')
     savedContent = pendingContent
     dirty = false
-    if (editable.value) {
-      storeLeaseToken(leaseToken.value)
-      startRenewal()
-    } else {
-      lockReason.value = String(lease.reason || (lease.ownerType === 'AI' ? 'AI 正在编辑当前章节' : '此章节已在其他窗口编辑'))
-    }
+    if (aiEditing) lockReason.value = 'AI 正在编辑当前章节'
     return { content: pendingContent, editable: editable.value }
   }
 
-  const takeover = () => projectId && chapterId ? open(projectId, chapterId, true) : Promise.resolve({ content: '', editable: false })
+  const lockForAi = (targetChapterId: string) => {
+    if (!targetChapterId || targetChapterId !== chapterId) return
+    blockSaving('AI', 'AI 正在编辑当前章节', 'AI 正在编辑')
+  }
+
   const setOnline = (nextOnline: boolean) => {
     online = nextOnline
     if (!online) {
@@ -201,12 +163,23 @@ export const useChapterEditingSession = (options: ChapterEditingSessionOptions =
       if (dirty) saveStatus.value = '离线'
       return
     }
-    if (dirty) void runSave()
-  }
-  const dispose = async () => {
-    await flush()
-    await release()
+    if (dirty && editable.value) void runSave()
   }
 
-  return { editable, lockReason, leaseOwnerType, contentRevision, saveStatus, open, takeover, scheduleSave, flush, release, setOnline, dispose }
+  const dispose = async () => release()
+
+  return {
+    editable,
+    lockReason,
+    leaseOwnerType,
+    contentRevision,
+    saveStatus,
+    open,
+    scheduleSave,
+    flush,
+    release,
+    lockForAi,
+    setOnline,
+    dispose,
+  }
 }

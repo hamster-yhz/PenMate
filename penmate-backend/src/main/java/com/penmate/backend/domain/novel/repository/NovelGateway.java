@@ -50,6 +50,8 @@ public interface NovelGateway {
 
     int softDeleteChaptersByVolume(Long projectId, Long volumeId);
 
+    int countActiveAiChapterLeasesByVolume(Long projectId, Long volumeId);
+
     List<NovelChapter> findChaptersByProjectId(Long projectId);
 
     NovelChapter findChapterByIdAndProjectId(Long projectId, Long chapterId);
@@ -58,18 +60,18 @@ public interface NovelGateway {
 
     int updateChapter(NovelChapter chapter);
 
-    int acquireChapterLease(Long projectId, Long chapterId, String ownerType, Long ownerId,
-                            String leaseToken, Instant expiresAt, boolean force);
-
-    int acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId,
+    int acquireChapterAiLease(Long projectId, Long chapterId, Long runId,
                               String leaseToken, Instant expiresAt);
 
-    int renewChapterLease(Long projectId, Long chapterId, String leaseToken, Instant expiresAt);
+    int renewChapterAiLease(Long projectId, Long chapterId, String leaseToken, Instant expiresAt);
 
-    int releaseChapterLease(Long projectId, Long chapterId, String leaseToken);
+    int releaseChapterAiLease(Long projectId, Long chapterId, String leaseToken);
 
-    int updateChapterContent(Long projectId, Long chapterId, String leaseToken,
-                             Long expectedRevision, String content, Integer wordCount);
+    int updateUserChapterContent(Long projectId, Long chapterId, Long expectedRevision,
+                                 String content, Integer wordCount);
+
+    int updateAiChapterContent(Long projectId, Long chapterId, String leaseToken,
+                               Long expectedRevision, String content, Integer wordCount);
 
     int restoreAiChapterContent(Long projectId, Long chapterId, Long expectedRevision,
                                 String expectedContent, String restoredContent, Integer wordCount);

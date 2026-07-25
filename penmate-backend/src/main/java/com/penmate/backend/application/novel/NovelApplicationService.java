@@ -30,6 +30,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -42,7 +43,6 @@ import java.util.UUID;
 @Slf4j
 public class NovelApplicationService {
 
-    private static final long CHAPTER_LEASE_SECONDS = 45;
     private static final long AI_CHAPTER_LEASE_SECONDS = 300;
     private static final long AI_UNDO_RETENTION_SECONDS = 24 * 60 * 60;
     private static final Set<String> PROJECT_GENRES = Set.of(
@@ -389,7 +389,9 @@ public class NovelApplicationService {
     @Transactional
     public void deleteVolume(Long projectId, Long volumeId, Long operatorId, String traceId) {
         log.info("删除分卷: projectId={}, volumeId={}, operatorId={}", projectId, volumeId, operatorId);
+        rejectActiveAiLeaseInVolume(projectId, volumeId);
         novelGateway.softDeleteChaptersByVolume(projectId, volumeId);
+        rejectActiveAiLeaseInVolume(projectId, volumeId);
         int affected = novelGateway.softDeleteVolume(projectId, volumeId);
         if (affected != 1) {
             log.warn("删除分卷失败: projectId={}, volumeId={}, reason=not_found_or_deleted", projectId, volumeId);
@@ -435,23 +437,7 @@ public class NovelApplicationService {
     }
 
     @Transactional
-    public ChapterLeaseView acquireChapterLease(Long projectId, Long chapterId, Long actorUserId, boolean force) {
-        requireOwnedProject(projectId, actorUserId);
-        NovelChapter current = getChapter(projectId, chapterId);
-        String token = UUID.randomUUID().toString();
-        Instant expiresAt = Instant.now().plusSeconds(CHAPTER_LEASE_SECONDS);
-        int affected = novelGateway.acquireChapterLease(projectId, chapterId, "USER", actorUserId, token, expiresAt, force);
-        if (affected == 1) {
-            NovelChapter acquired = getChapter(projectId, chapterId);
-            return new ChapterLeaseView(true, token, acquired.getLeaseOwnerType(), acquired.getLeaseExpiresAt(),
-                    acquired.getContentRevision(), value(acquired.getContent()), null);
-        }
-        return new ChapterLeaseView(false, null, current.getLeaseOwnerType(), current.getLeaseExpiresAt(),
-                current.getContentRevision(), value(current.getContent()), "Chapter is being edited in another session");
-    }
-
-    @Transactional
-    public ChapterLeaseView acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId) {
+    public AiChapterLeaseView acquireChapterAiLease(Long projectId, Long chapterId, Long actorUserId, Long runId) {
         requireOwnedProject(projectId, actorUserId);
         if (runId == null) {
             throw com.penmate.backend.application.common.exception.BusinessException.badRequest("Run id is required");
@@ -459,21 +445,21 @@ public class NovelApplicationService {
         NovelChapter current = getChapter(projectId, chapterId);
         String token = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plusSeconds(AI_CHAPTER_LEASE_SECONDS);
-        int affected = novelGateway.acquireChapterAiLease(projectId, chapterId, actorUserId, runId, token, expiresAt);
+        int affected = novelGateway.acquireChapterAiLease(projectId, chapterId, runId, token, expiresAt);
         if (affected == 1) {
             NovelChapter acquired = getChapter(projectId, chapterId);
-            return new ChapterLeaseView(true, token, acquired.getLeaseOwnerType(), acquired.getLeaseExpiresAt(),
+            return new AiChapterLeaseView(true, token, acquired.getLeaseExpiresAt(),
                     acquired.getContentRevision(), value(acquired.getContent()), null);
         }
-        return new ChapterLeaseView(false, null, current.getLeaseOwnerType(), current.getLeaseExpiresAt(),
-                current.getContentRevision(), value(current.getContent()), "Chapter is locked by another editor");
+        return new AiChapterLeaseView(false, null, current.getLeaseExpiresAt(),
+                current.getContentRevision(), value(current.getContent()), "Chapter is already being edited by AI");
     }
 
     @Transactional
     public void renewChapterAiLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
         requireOwnedProject(projectId, actorUserId);
         Instant expiresAt = Instant.now().plusSeconds(AI_CHAPTER_LEASE_SECONDS);
-        if (novelGateway.renewChapterLease(projectId, chapterId, requireLeaseToken(leaseToken), expiresAt) != 1) {
+        if (novelGateway.renewChapterAiLease(projectId, chapterId, requireLeaseToken(leaseToken), expiresAt) != 1) {
             throw com.penmate.backend.application.common.exception.BusinessException.conflict("AI chapter lease has expired");
         }
     }
@@ -481,29 +467,11 @@ public class NovelApplicationService {
     @Transactional
     public void releaseChapterAiLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
         requireOwnedProject(projectId, actorUserId);
-        novelGateway.releaseChapterLease(projectId, chapterId, requireLeaseToken(leaseToken));
+        novelGateway.releaseChapterAiLease(projectId, chapterId, requireLeaseToken(leaseToken));
     }
 
     @Transactional
-    public ChapterLeaseView renewChapterLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
-        requireOwnedProject(projectId, actorUserId);
-        Instant expiresAt = Instant.now().plusSeconds(CHAPTER_LEASE_SECONDS);
-        if (novelGateway.renewChapterLease(projectId, chapterId, requireLeaseToken(leaseToken), expiresAt) != 1) {
-            throw com.penmate.backend.application.common.exception.BusinessException.conflict("Chapter editing lease has expired");
-        }
-        NovelChapter chapter = getChapter(projectId, chapterId);
-        return new ChapterLeaseView(true, leaseToken, chapter.getLeaseOwnerType(), chapter.getLeaseExpiresAt(),
-                chapter.getContentRevision(), value(chapter.getContent()), null);
-    }
-
-    @Transactional
-    public void releaseChapterLease(Long projectId, Long chapterId, Long actorUserId, String leaseToken) {
-        requireOwnedProject(projectId, actorUserId);
-        novelGateway.releaseChapterLease(projectId, chapterId, requireLeaseToken(leaseToken));
-    }
-
-    @Transactional
-    public NovelChapter saveChapterContent(Long projectId, Long chapterId, Long actorUserId, String leaseToken,
+    public NovelChapter saveChapterContent(Long projectId, Long chapterId, Long actorUserId,
                                            Long expectedRevision, String content) {
         requireOwnedProject(projectId, actorUserId);
         if (expectedRevision == null || expectedRevision < 1) {
@@ -511,11 +479,16 @@ public class NovelApplicationService {
         }
         String normalizedContent = value(content);
         int wordCount = normalizedContent.codePoints().filter(codePoint -> !Character.isWhitespace(codePoint)).toArray().length;
-        int affected = novelGateway.updateChapterContent(projectId, chapterId, requireLeaseToken(leaseToken),
+        int affected = novelGateway.updateUserChapterContent(projectId, chapterId,
                 expectedRevision, normalizedContent, wordCount);
         if (affected != 1) {
-            throw com.penmate.backend.application.common.exception.BusinessException.conflict(
-                    "Chapter changed or the editing lease is no longer valid");
+            NovelChapter current = getChapter(projectId, chapterId);
+            rejectActiveAiLease(current);
+            throw com.penmate.backend.application.common.exception.BusinessException.of(
+                    com.penmate.backend.application.common.exception.BusinessErrorType.CONFLICT,
+                    "CHAPTER_REVISION_CONFLICT",
+                    "Chapter was updated in another page",
+                    Map.of("contentRevision", current.getContentRevision()));
         }
         novelGateway.invalidateAvailableAiUndoByChapter(projectId, chapterId);
         return getChapter(projectId, chapterId);
@@ -538,7 +511,7 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.badRequest("AI chapter content must not be blank");
         }
         int wordCount = countWords(normalizedContent);
-        int affected = novelGateway.updateChapterContent(projectId, chapterId, requireLeaseToken(leaseToken),
+        int affected = novelGateway.updateAiChapterContent(projectId, chapterId, requireLeaseToken(leaseToken),
                 expectedRevision, normalizedContent, wordCount);
         if (affected != 1) {
             throw com.penmate.backend.application.common.exception.BusinessException.conflict(
@@ -701,8 +674,34 @@ public class NovelApplicationService {
         return content == null ? "" : content;
     }
 
-    public record ChapterLeaseView(boolean editable, String leaseToken, String ownerType, Instant expiresAt,
-                                   Long contentRevision, String content, String reason) {
+    private boolean hasActiveAiLease(NovelChapter chapter) {
+        return chapter != null
+                && "AI".equals(chapter.getLeaseOwnerType())
+                && chapter.getLeaseExpiresAt() != null
+                && chapter.getLeaseExpiresAt().isAfter(Instant.now());
+    }
+
+    private void rejectActiveAiLease(NovelChapter chapter) {
+        if (!hasActiveAiLease(chapter)) return;
+        throw com.penmate.backend.application.common.exception.BusinessException.of(
+                com.penmate.backend.application.common.exception.BusinessErrorType.CONFLICT,
+                "CHAPTER_AI_EDITING",
+                "AI is editing this chapter",
+                Map.of("contentRevision", chapter.getContentRevision(),
+                        "leaseExpiresAt", chapter.getLeaseExpiresAt()));
+    }
+
+    private void rejectActiveAiLeaseInVolume(Long projectId, Long volumeId) {
+        if (novelGateway.countActiveAiChapterLeasesByVolume(projectId, volumeId) <= 0) return;
+        throw com.penmate.backend.application.common.exception.BusinessException.of(
+                com.penmate.backend.application.common.exception.BusinessErrorType.CONFLICT,
+                "CHAPTER_AI_EDITING",
+                "AI is editing a chapter in this volume",
+                Map.of("volumeId", volumeId));
+    }
+
+    public record AiChapterLeaseView(boolean editable, String leaseToken, Instant expiresAt,
+                                     Long contentRevision, String content, String reason) {
     }
 
     public record AiChapterEditResult(NovelChapter chapter, AiUndoView undo) {
@@ -763,9 +762,12 @@ public class NovelApplicationService {
     public NovelChapter updateChapter(Long projectId, Long chapterId, UpdateChapterCommand command, Long operatorId, String traceId) {
         log.info("更新章节: projectId={}, chapterId={}, operatorId={}", projectId, chapterId, operatorId);
         NovelChapter chapter = getChapter(projectId, chapterId);
+        rejectActiveAiLease(chapter);
         chapter.setTitle(command.title());
         int affected = novelGateway.updateChapter(chapter);
         if (affected != 1) {
+            NovelChapter current = novelGateway.findChapterByIdAndProjectId(projectId, chapterId);
+            rejectActiveAiLease(current);
             log.error("更新章节失败: projectId={}, chapterId={}", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to update chapter");
         }
@@ -907,8 +909,10 @@ public class NovelApplicationService {
     @Transactional
     public void deleteChapter(Long projectId, Long chapterId, Long operatorId, String traceId) {
         log.info("删除章节: projectId={}, chapterId={}, operatorId={}", projectId, chapterId, operatorId);
+        rejectActiveAiLease(novelGateway.findChapterByIdAndProjectId(projectId, chapterId));
         int affected = novelGateway.softDeleteChapter(projectId, chapterId);
         if (affected != 1) {
+            rejectActiveAiLease(novelGateway.findChapterByIdAndProjectId(projectId, chapterId));
             log.warn("删除章节失败: projectId={}, chapterId={}, reason=not_found_or_deleted", projectId, chapterId);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
         }

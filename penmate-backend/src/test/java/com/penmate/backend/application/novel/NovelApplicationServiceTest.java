@@ -152,7 +152,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_ACQUIRE_CHAPTER_LEASE_RETURNS_EDITABLE_CONTENT() {
+    void acquires_an_ai_only_lease_with_the_latest_chapter_content() {
         NovelProject project = new NovelProject();
         project.setProjectId(920002L);
         project.setOwnerUserId(920001L);
@@ -161,15 +161,14 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         chapter.setChapterId(920101L);
         chapter.setContent("第一段");
         chapter.setContentRevision(3L);
-        chapter.setLeaseOwnerType("USER");
         when(novelGateway.findProjectById(920002L)).thenReturn(project);
         when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(chapter);
         when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(chapter));
-        when(novelGateway.acquireChapterLease(eq(920002L), eq(920101L), eq("USER"), eq(920001L),
-                any(String.class), any(), eq(false))).thenReturn(1);
+        when(novelGateway.acquireChapterAiLease(eq(920002L), eq(920101L), eq(940001L),
+                any(String.class), any())).thenReturn(1);
 
-        NovelApplicationService.ChapterLeaseView lease = novelApplicationService.acquireChapterLease(
-                920002L, 920101L, 920001L, false);
+        NovelApplicationService.AiChapterLeaseView lease = novelApplicationService.acquireChapterAiLease(
+                920002L, 920101L, 920001L, 940001L);
 
         assertThat(lease.editable()).isTrue();
         assertThat(lease.leaseToken()).isNotBlank();
@@ -178,7 +177,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_SAVE_CHAPTER_CONTENT_REQUIRES_REVISION_AND_LEASE_ATOMIC_UPDATE() {
+    void saves_user_content_with_revision_only() {
         NovelProject project = new NovelProject();
         project.setProjectId(920002L);
         project.setOwnerUserId(920001L);
@@ -188,15 +187,15 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         saved.setContent("山河 无恙");
         saved.setContentRevision(5L);
         when(novelGateway.findProjectById(920002L)).thenReturn(project);
-        when(novelGateway.updateChapterContent(920002L, 920101L, "lease-1", 4L, "山河 无恙", 4)).thenReturn(1);
+        when(novelGateway.updateUserChapterContent(920002L, 920101L, 4L, "山河 无恙", 4)).thenReturn(1);
         when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(saved);
         when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(saved));
 
         NovelChapter result = novelApplicationService.saveChapterContent(
-                920002L, 920101L, 920001L, "lease-1", 4L, "山河 无恙");
+                920002L, 920101L, 920001L, 4L, "山河 无恙");
 
         assertThat(result.getContentRevision()).isEqualTo(5L);
-        verify(novelGateway).updateChapterContent(920002L, 920101L, "lease-1", 4L, "山河 无恙", 4);
+        verify(novelGateway).updateUserChapterContent(920002L, 920101L, 4L, "山河 无恙", 4);
         verify(novelGateway).invalidateAvailableAiUndoByChapter(920002L, 920101L);
     }
 
@@ -221,7 +220,7 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
         saved.setContentRevision(4L);
         when(novelGateway.findProjectById(920002L)).thenReturn(project);
         when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(current, saved);
-        when(novelGateway.updateChapterContent(920002L, 920101L, "ai-lease", 3L, "AI 修改后的正文", 8)).thenReturn(1);
+        when(novelGateway.updateAiChapterContent(920002L, 920101L, "ai-lease", 3L, "AI 修改后的正文", 8)).thenReturn(1);
         when(novelGateway.findAvailableAiUndoByRunAndChapter(920002L, 940001L, 920101L)).thenReturn(null);
         when(novelGateway.nextAiUndoSequence(920002L, 920101L)).thenReturn(1L);
         when(businessIdGenerator.nextId()).thenReturn(950001L);
@@ -283,17 +282,49 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
-    void UT_APP_NOVEL_SAVE_CHAPTER_CONTENT_REJECTS_STALE_REVISION_OR_LEASE() {
+    void rejects_a_stale_user_revision_with_a_specific_conflict_code() {
         NovelProject project = new NovelProject();
         project.setProjectId(920002L);
         project.setOwnerUserId(920001L);
+        NovelChapter current = new NovelChapter();
+        current.setProjectId(920002L);
+        current.setChapterId(920101L);
+        current.setContentRevision(3L);
         when(novelGateway.findProjectById(920002L)).thenReturn(project);
-        when(novelGateway.updateChapterContent(any(), any(), any(), any(), any(), any())).thenReturn(0);
+        when(novelGateway.updateUserChapterContent(any(), any(), any(), any(), any())).thenReturn(0);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(current);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(current));
 
         assertThatThrownBy(() -> novelApplicationService.saveChapterContent(
-                920002L, 920101L, 920001L, "lease-1", 2L, "正文"))
+                920002L, 920101L, 920001L, 2L, "正文"))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
-                .hasMessage("Chapter changed or the editing lease is no longer valid");
+                .hasMessage("Chapter was updated in another page")
+                .satisfies(error -> assertThat(((com.penmate.backend.application.common.exception.BusinessException) error)
+                        .getErrorCode()).isEqualTo("CHAPTER_REVISION_CONFLICT"));
+    }
+
+    @Test
+    void rejects_user_saves_while_ai_owns_the_chapter() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        NovelChapter current = new NovelChapter();
+        current.setProjectId(920002L);
+        current.setChapterId(920101L);
+        current.setContentRevision(3L);
+        current.setLeaseOwnerType("AI");
+        current.setLeaseExpiresAt(java.time.Instant.now().plusSeconds(60));
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.updateUserChapterContent(any(), any(), any(), any(), any())).thenReturn(0);
+        when(novelGateway.findChapterByIdAndProjectId(920002L, 920101L)).thenReturn(current);
+        when(novelGateway.findChaptersByProjectId(920002L)).thenReturn(List.of(current));
+
+        assertThatThrownBy(() -> novelApplicationService.saveChapterContent(
+                920002L, 920101L, 920001L, 3L, "正文"))
+                .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .hasMessage("AI is editing this chapter")
+                .satisfies(error -> assertThat(((com.penmate.backend.application.common.exception.BusinessException) error)
+                        .getErrorCode()).isEqualTo("CHAPTER_AI_EDITING"));
     }
 
     @Test
