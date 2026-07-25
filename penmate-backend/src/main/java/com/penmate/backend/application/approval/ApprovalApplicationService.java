@@ -3,6 +3,7 @@ package com.penmate.backend.application.approval;
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.application.agent.run.AgentRunResumeDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunLeaseService;
+import com.penmate.backend.application.agent.security.AgentResourceAccessGuard;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
 import com.penmate.backend.application.common.exception.BusinessException;
@@ -27,22 +28,29 @@ public class ApprovalApplicationService {
     private final AgentRunResumeDispatcher runResumeDispatcher;
     private final AgentRunLeaseService runLeaseService;
     private final BusinessIdGenerator businessIdGenerator;
+    private final AgentResourceAccessGuard accessGuard;
 
     public ApprovalApplicationService(ApprovalRequestRepository approvalRequestRepository,
                                       AgentRunPendingApprovalRepository pendingApprovalRepository,
                                       AgentRunEventPublisher eventPublisher,
                                       AgentRunResumeDispatcher runResumeDispatcher,
                                       AgentRunLeaseService runLeaseService,
-                                      BusinessIdGenerator businessIdGenerator) {
+                                      BusinessIdGenerator businessIdGenerator,
+                                      AgentResourceAccessGuard accessGuard) {
         this.approvalRequestRepository = approvalRequestRepository;
         this.pendingApprovalRepository = pendingApprovalRepository;
         this.eventPublisher = eventPublisher;
         this.runResumeDispatcher = runResumeDispatcher;
         this.runLeaseService = runLeaseService;
         this.businessIdGenerator = businessIdGenerator;
+        this.accessGuard = accessGuard;
     }
 
     public ApprovalRequest create(CreateApprovalCommand command, String traceId) {
+        accessGuard.requireProject(command.projectId(), command.requestedBy());
+        if (command.runId() != null) {
+            accessGuard.requireRun(command.projectId(), command.runId(), command.requestedBy());
+        }
         log.info("创建审批申请: projectId={}, runId={}, type={}, riskLevel={}, requestedBy={}",
                 command.projectId(), command.runId(), command.approvalType(), command.riskLevel(), command.requestedBy());
         ApprovalRequest request = new ApprovalRequest();
@@ -74,15 +82,16 @@ public class ApprovalApplicationService {
         return request;
     }
 
-    public List<ApprovalRequest> listByProject(Long projectId) {
+    public List<ApprovalRequest> listByProject(Long projectId, Long actorUserId) {
+        accessGuard.requireProject(projectId, actorUserId);
         List<ApprovalRequest> requests = approvalRequestRepository.findByProjectId(projectId);
         log.info("查询项目审批列表: projectId={}, count={}", projectId, requests.size());
         return requests;
     }
 
-    public ApprovalRequest detail(Long approvalId) {
+    public ApprovalRequest detail(Long projectId, Long approvalId, Long actorUserId) {
         log.info("查询审批详情: approvalId={}", approvalId);
-        ApprovalRequest request = approvalRequestRepository.findByApprovalRequestId(approvalId);
+        ApprovalRequest request = accessGuard.requireApproval(projectId, approvalId, actorUserId);
         if (request == null) {
             log.warn("查询审批详情失败: approvalId={}, reason=not_found", approvalId);
             throw BusinessException.of("Approval request not found");
@@ -92,10 +101,11 @@ public class ApprovalApplicationService {
         return request;
     }
 
-    public void approve(Long approvalId, ReviewApprovalCommand command, String traceId) {
+    public void approve(Long projectId, Long approvalId, ReviewApprovalCommand command, String traceId) {
         log.info("审批通过请求: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
-        int affected = approvalRequestRepository.approveByApprovalRequestId(approvalId, command.reviewedBy(), command.comment());
-        ApprovalRequest request = detail(approvalId);
+        ApprovalRequest request = accessGuard.requireApproval(projectId, approvalId, command.reviewedBy());
+        int affected = approvalRequestRepository.approveByApprovalRequestId(
+                projectId, approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
             if ("approved".equalsIgnoreCase(request.getStatus())) {
                 log.info("审批通过重复回调跳过: approvalId={}, status={}", approvalId, request.getStatus());
@@ -125,10 +135,11 @@ public class ApprovalApplicationService {
         log.info("审批通过成功: approvalId={}, runId={}, reviewedBy={}", approvalId, pendingApproval.runId(), command.reviewedBy());
     }
 
-    public void reject(Long approvalId, ReviewApprovalCommand command, String traceId) {
+    public void reject(Long projectId, Long approvalId, ReviewApprovalCommand command, String traceId) {
         log.info("审批驳回请求: approvalId={}, reviewedBy={}", approvalId, command.reviewedBy());
-        int affected = approvalRequestRepository.rejectByApprovalRequestId(approvalId, command.reviewedBy(), command.comment());
-        ApprovalRequest request = detail(approvalId);
+        ApprovalRequest request = accessGuard.requireApproval(projectId, approvalId, command.reviewedBy());
+        int affected = approvalRequestRepository.rejectByApprovalRequestId(
+                projectId, approvalId, command.reviewedBy(), command.comment());
         if (affected != 1) {
             if ("rejected".equalsIgnoreCase(request.getStatus())) {
                 log.info("审批驳回重复回调跳过: approvalId={}, status={}", approvalId, request.getStatus());

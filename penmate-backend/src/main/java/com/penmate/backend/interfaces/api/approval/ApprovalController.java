@@ -86,8 +86,10 @@ public class ApprovalController {
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list(@PathVariable String projectId,
                                                        @RequestParam(value = "status", required = false) String status,
+                                                       Authentication authentication,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        List<ApprovalRequest> items = approvalApplicationService.listByProject(requireLongId(projectId, "projectId"));
+        List<ApprovalRequest> items = approvalApplicationService.listByProject(
+                requireLongId(projectId, "projectId"), id(authentication));
         if (status != null && !status.isBlank()) {
             items = items.stream().filter(it -> status.equalsIgnoreCase(it.getStatus())).toList();
         }
@@ -108,9 +110,12 @@ public class ApprovalController {
      * @return 出参：处理结�?
      */
     @GetMapping("/{approvalId}")
-    public ApiResponse<Map<String, Object>> detail(@PathVariable String approvalId,
+    public ApiResponse<Map<String, Object>> detail(@PathVariable String projectId,
+                                                   @PathVariable String approvalId,
+                                                   Authentication authentication,
                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(toApprovalView(approvalApplicationService.detail(requireLongId(approvalId, "approvalId"))), traceId);
+        return ApiResponse.success(toApprovalView(approvalApplicationService.detail(
+                requireLongId(projectId, "projectId"), requireLongId(approvalId, "approvalId"), id(authentication))), traceId);
     }
 
     /**
@@ -128,12 +133,14 @@ public class ApprovalController {
      * @return 出参：处理结�?
      */
     @PostMapping("/{approvalId}/approve")
-    public ApiResponse<String> approve(@PathVariable String approvalId,
+    public ApiResponse<String> approve(@PathVariable String projectId,
+                                       @PathVariable String approvalId,
                                        @Valid @RequestBody ReviewApprovalRequestDto dto,
                                        Authentication authentication,
                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         ReviewApprovalCommand command = new ReviewApprovalCommand(id(authentication), dto.getComment());
-        approvalApplicationService.approve(requireLongId(approvalId, "approvalId"), command, traceId);
+        approvalApplicationService.approve(requireLongId(projectId, "projectId"),
+                requireLongId(approvalId, "approvalId"), command, traceId);
         return ApiResponse.success("approved", traceId);
     }
 
@@ -152,12 +159,14 @@ public class ApprovalController {
      * @return 出参：处理结�?
      */
     @PostMapping("/{approvalId}/reject")
-    public ApiResponse<String> reject(@PathVariable String approvalId,
+    public ApiResponse<String> reject(@PathVariable String projectId,
+                                      @PathVariable String approvalId,
                                       @Valid @RequestBody ReviewApprovalRequestDto dto,
                                       Authentication authentication,
                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         ReviewApprovalCommand command = new ReviewApprovalCommand(id(authentication), dto.getComment());
-        approvalApplicationService.reject(requireLongId(approvalId, "approvalId"), command, traceId);
+        approvalApplicationService.reject(requireLongId(projectId, "projectId"),
+                requireLongId(approvalId, "approvalId"), command, traceId);
         return ApiResponse.success("rejected", traceId);
     }
 

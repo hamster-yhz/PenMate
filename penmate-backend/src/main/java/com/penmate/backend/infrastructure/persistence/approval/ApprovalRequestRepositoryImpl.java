@@ -61,8 +61,8 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
      * @return 受影响行数
      */
     @Override
-    public int approveByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment) {
-        return approvalRequestMapper.approveByApprovalRequestId(approvalRequestId, reviewedBy, comment);
+    public int approveByApprovalRequestId(Long projectId, Long approvalRequestId, Long reviewedBy, String comment) {
+        return approvalRequestMapper.approveByApprovalRequestId(projectId, approvalRequestId, reviewedBy, comment);
     }
 
     /**
@@ -74,8 +74,8 @@ public class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
      * @return 受影响行数
      */
     @Override
-    public int rejectByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment) {
-        return approvalRequestMapper.rejectByApprovalRequestId(approvalRequestId, reviewedBy, comment);
+    public int rejectByApprovalRequestId(Long projectId, Long approvalRequestId, Long reviewedBy, String comment) {
+        return approvalRequestMapper.rejectByApprovalRequestId(projectId, approvalRequestId, reviewedBy, comment);
     }
 }
 

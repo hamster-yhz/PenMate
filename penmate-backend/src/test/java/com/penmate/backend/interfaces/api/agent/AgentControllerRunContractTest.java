@@ -9,6 +9,8 @@ import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppSe
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
+import com.penmate.backend.application.agent.security.AgentResourceAccessGuard;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.interfaces.api.agent.stream.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
@@ -31,6 +33,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -56,6 +60,8 @@ class AgentControllerRunContractTest {
     private AgentRunHistoryQueryService agentRunHistoryQueryService;
     @Mock
     private SkillPromptRegistry skillPromptRegistry;
+    @Mock
+    private AgentResourceAccessGuard accessGuard;
     @InjectMocks
     private AgentController agentController;
 
@@ -99,6 +105,7 @@ class AgentControllerRunContractTest {
         when(agentRunEventStreamService.openStream(70001L, 42L)).thenReturn(emitter);
 
         mockMvc().perform(get("/api/v1/novels/101/agent/runs/70001/stream")
+                        .principal(principal("201"))
                         .param("after", "41")
                         .header("Last-Event-ID", "42")
                         .header("Accept", "text/event-stream"))
@@ -107,6 +114,20 @@ class AgentControllerRunContractTest {
                 .andExpect(header().string("X-Accel-Buffering", "no"));
 
         verify(agentRunEventStreamService).openStream(70001L, 42L);
+        verify(accessGuard).requireRun(101L, 70001L, 201L);
+    }
+
+    @Test
+    void cross_project_run_is_rejected_before_opening_stream() throws Exception {
+        doThrow(BusinessException.notFound("Agent Run not found"))
+                .when(accessGuard).requireRun(101L, 70001L, 201L);
+
+        mockMvc().perform(get("/api/v1/novels/101/agent/runs/70001/stream")
+                        .principal(principal("201"))
+                        .header("Accept", "text/event-stream"))
+                .andExpect(status().isNotFound());
+
+        verify(agentRunEventStreamService, never()).openStream(any(), any());
     }
 
     @Test

@@ -3,8 +3,10 @@ package com.penmate.backend.application.approval;
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
 import com.penmate.backend.application.agent.run.AgentRunResumeDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunLeaseService;
+import com.penmate.backend.application.agent.security.AgentResourceAccessGuard;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.application.approval.command.ReviewApprovalCommand;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
@@ -20,8 +22,36 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApprovalApplicationServiceRunFlowTest {
+
+    @Test
+    void unauthorized_review_is_rejected_before_approval_state_mutation() {
+        ApprovalRequestRepository approvals = mock(ApprovalRequestRepository.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
+        ApprovalApplicationService service = new ApprovalApplicationService(
+                approvals,
+                mock(AgentRunPendingApprovalRepository.class),
+                mock(AgentRunEventPublisher.class),
+                mock(AgentRunResumeDispatcher.class),
+                mock(AgentRunLeaseService.class),
+                mock(BusinessIdGenerator.class),
+                accessGuard
+        );
+        doThrow(BusinessException.notFound("Approval request not found"))
+                .when(accessGuard).requireApproval(9001L, 88001L, 202L);
+        ReviewApprovalCommand review = new ReviewApprovalCommand(202L, "unauthorized");
+
+        assertThatThrownBy(() -> service.approve(9001L, 88001L, review, "trace-approve"))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.reject(9001L, 88001L, review, "trace-reject"))
+                .isInstanceOf(BusinessException.class);
+
+        verifyNoInteractions(approvals);
+    }
 
     @Test
     void approval_approved_emits_run_event_and_dispatches_run_resume_once() {
@@ -29,23 +59,25 @@ class ApprovalApplicationServiceRunFlowTest {
         AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);
         AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
         AgentRunResumeDispatcher runResumeDispatcher = mock(AgentRunResumeDispatcher.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
         ApprovalApplicationService service = new ApprovalApplicationService(
                 approvalRequestRepository,
                 pendingApprovalRepository,
                 eventPublisher,
                 runResumeDispatcher,
                 mock(AgentRunLeaseService.class),
-                mock(BusinessIdGenerator.class)
+                mock(BusinessIdGenerator.class),
+                accessGuard
         );
         ApprovalRequest approval = approvalRequest(88001L, 70001L);
         AgentRunPendingApproval pending = pendingApproval(88001L, 70001L);
 
-        when(approvalRequestRepository.approveByApprovalRequestId(88001L, 201L, "ok")).thenReturn(1);
-        when(approvalRequestRepository.findByApprovalRequestId(88001L)).thenReturn(approval);
+        when(approvalRequestRepository.approveByApprovalRequestId(9001L, 88001L, 201L, "ok")).thenReturn(1);
+        when(accessGuard.requireApproval(9001L, 88001L, 201L)).thenReturn(approval);
         when(pendingApprovalRepository.findByApprovalId(88001L)).thenReturn(pending);
         when(pendingApprovalRepository.markStatus(88001L, "PENDING", "APPROVED")).thenReturn(1);
 
-        service.approve(88001L, new ReviewApprovalCommand(201L, "ok"), "trace-1");
+        service.approve(9001L, 88001L, new ReviewApprovalCommand(201L, "ok"), "trace-1");
 
         verify(eventPublisher).publish(eq(70001L), eq("approval.approved"), any(Map.class));
         verify(runResumeDispatcher).dispatchResume(70001L, "trace-1");
@@ -57,21 +89,23 @@ class ApprovalApplicationServiceRunFlowTest {
         AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);
         AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
         AgentRunResumeDispatcher runResumeDispatcher = mock(AgentRunResumeDispatcher.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
         ApprovalApplicationService service = new ApprovalApplicationService(
                 approvalRequestRepository,
                 pendingApprovalRepository,
                 eventPublisher,
                 runResumeDispatcher,
                 mock(AgentRunLeaseService.class),
-                mock(BusinessIdGenerator.class)
+                mock(BusinessIdGenerator.class),
+                accessGuard
         );
         ApprovalRequest approval = approvalRequest(88001L, 70001L);
         approval.setStatus("approved");
 
-        when(approvalRequestRepository.approveByApprovalRequestId(88001L, 201L, "ok")).thenReturn(0);
-        when(approvalRequestRepository.findByApprovalRequestId(88001L)).thenReturn(approval);
+        when(approvalRequestRepository.approveByApprovalRequestId(9001L, 88001L, 201L, "ok")).thenReturn(0);
+        when(accessGuard.requireApproval(9001L, 88001L, 201L)).thenReturn(approval);
 
-        service.approve(88001L, new ReviewApprovalCommand(201L, "ok"), "trace-1");
+        service.approve(9001L, 88001L, new ReviewApprovalCommand(201L, "ok"), "trace-1");
 
         verify(eventPublisher, never()).publish(eq(70001L), eq("approval.approved"), any());
         verify(runResumeDispatcher, never()).dispatchResume(any(), any());
@@ -90,7 +124,8 @@ class ApprovalApplicationServiceRunFlowTest {
                 eventPublisher,
                 runResumeDispatcher,
                 mock(AgentRunLeaseService.class),
-                businessIdGenerator
+                businessIdGenerator,
+                mock(AgentResourceAccessGuard.class)
         );
         when(businessIdGenerator.nextId()).thenReturn(88001L);
 

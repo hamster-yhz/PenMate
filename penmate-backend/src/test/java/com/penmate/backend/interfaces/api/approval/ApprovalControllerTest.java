@@ -107,9 +107,10 @@ class ApprovalControllerTest {
         approved.setApprovalRequestId(88002L);
         approved.setStatus("approved");
 
-        when(approvalApplicationService.listByProject(10001L)).thenReturn(List.of(pending, approved));
+        when(approvalApplicationService.listByProject(10001L, 2001L)).thenReturn(List.of(pending, approved));
 
         mockMvc().perform(get("/api/v1/novels/10001/approvals")
+                        .principal(principal("2001"))
                         .param("status", "approved")
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isOk())
@@ -124,7 +125,7 @@ class ApprovalControllerTest {
     void UT_APPROVAL_REVIEW_REPEAT_BLOCKED() throws Exception {
         String traceId = "UT-TRACE-APPROVAL-REVIEW-BLOCKED";
         doThrow(new IllegalArgumentException("Approval is not in pending status or not found"))
-                .when(approvalApplicationService).approve(eq(88001L), any(), eq(traceId));
+                .when(approvalApplicationService).approve(eq(10001L), eq(88001L), any(), eq(traceId));
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals/88001/approve")
                         .principal(principal("2001"))
@@ -145,9 +146,10 @@ class ApprovalControllerTest {
     void UT_APPROVAL_DETAIL_NOT_FOUND() throws Exception {
         String traceId = "UT-TRACE-APPROVAL-DETAIL-NOT-FOUND";
         doThrow(new IllegalArgumentException("Approval not found"))
-                .when(approvalApplicationService).detail(99999L);
+                .when(approvalApplicationService).detail(10001L, 99999L, 2001L);
 
         mockMvc().perform(get("/api/v1/novels/10001/approvals/99999")
+                        .principal(principal("2001"))
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.status").value(422))
@@ -160,7 +162,7 @@ class ApprovalControllerTest {
     // 审批通过成功�?
     void UT_APPROVAL_APPROVE_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-APPROVAL-APPROVE-SUCCESS";
-        doNothing().when(approvalApplicationService).approve(eq(88001L), any(), eq(traceId));
+        doNothing().when(approvalApplicationService).approve(eq(10001L), eq(88001L), any(), eq(traceId));
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals/88001/approve")
                         .principal(principal("2001"))
@@ -179,7 +181,7 @@ class ApprovalControllerTest {
     // 审批拒绝成功�?
     void UT_APPROVAL_REJECT_SUCCESS() throws Exception {
         String traceId = "UT-TRACE-APPROVAL-REJECT-SUCCESS";
-        doNothing().when(approvalApplicationService).reject(eq(88001L), any(), eq(traceId));
+        doNothing().when(approvalApplicationService).reject(eq(10001L), eq(88001L), any(), eq(traceId));
 
         mockMvc().perform(post("/api/v1/novels/10001/approvals/88001/reject")
                         .principal(principal("2001"))
@@ -198,6 +200,7 @@ class ApprovalControllerTest {
         String traceId = "UT-TRACE-APPROVAL-LEGACY-ID-REJECT";
 
         mockMvc().perform(get("/api/v1/novels/project-10001/approvals/approval-88001")
+                        .principal(principal("2001"))
                         .header("X-Trace-Id", traceId))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.data.errorCode").value("BUSINESS_RULE_VIOLATION"));

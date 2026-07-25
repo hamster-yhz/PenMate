@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.run.AgentRunCancellationService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
 import com.penmate.backend.application.agent.run.AgentRunRetryService;
+import com.penmate.backend.application.agent.security.AgentResourceAccessGuard;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
@@ -28,6 +29,7 @@ import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
 import com.penmate.backend.interfaces.api.agent.dto.RetryAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.UpdateAgentSessionDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
+import com.penmate.backend.application.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +64,7 @@ public class AgentController {
     private final AgentRunRetryService runRetryService;
     private final AgentRunHistoryQueryService runHistoryQueryService;
     private final SkillPromptRegistry skillPromptRegistry;
+    private final AgentResourceAccessGuard accessGuard;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
@@ -71,7 +74,8 @@ public class AgentController {
                            AgentRunCancellationService runCancellationService,
                            AgentRunRetryService runRetryService,
                            AgentRunHistoryQueryService runHistoryQueryService,
-                           SkillPromptRegistry skillPromptRegistry) {
+                           SkillPromptRegistry skillPromptRegistry,
+                           AgentResourceAccessGuard accessGuard) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
@@ -81,6 +85,7 @@ public class AgentController {
         this.runRetryService = runRetryService;
         this.runHistoryQueryService = runHistoryQueryService;
         this.skillPromptRegistry = skillPromptRegistry;
+        this.accessGuard = accessGuard;
     }
 
     @GetMapping("/skills")
@@ -203,10 +208,17 @@ public class AgentController {
                                     @PathVariable String runId,
                                     @RequestParam(value = "after", required = false) String after,
                                     @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
+                                    Authentication authentication,
                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
                                     HttpServletResponse response) {
         Long resolvedProjectId = requireLongId(projectId, "projectId");
         Long resolvedRunId = requireLongId(runId, "runId");
+        try {
+            accessGuard.requireRun(resolvedProjectId, resolvedRunId, principalId(authentication));
+        } catch (BusinessException notFound) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return null;
+        }
         Long replayCursor = Math.max(optionalSequence(after), optionalSequence(lastEventId));
         log.info("Open agent run stream request: projectId={}, runId={}, after={}, lastEventId={}, replayCursor={}, traceId={}",
                 resolvedProjectId, resolvedRunId, after, lastEventId, replayCursor, traceId);

@@ -48,15 +48,21 @@ public interface ApprovalRequestMapper {
     @Update("""
             UPDATE agent_approval_requests
             SET status = 'approved', reviewed_by = #{reviewedBy}, reviewed_at = CURRENT_TIMESTAMP(3), review_comment = #{comment}
-            WHERE approval_request_id = #{approvalRequestId} AND status = 'pending'
+            WHERE project_id = #{projectId} AND approval_request_id = #{approvalRequestId} AND status = 'pending'
             """)
-    int approveByApprovalRequestId(@Param("approvalRequestId") Long approvalRequestId, @Param("reviewedBy") Long reviewedBy, @Param("comment") String comment);
+    int approveByApprovalRequestId(@Param("projectId") Long projectId,
+                                   @Param("approvalRequestId") Long approvalRequestId,
+                                   @Param("reviewedBy") Long reviewedBy,
+                                   @Param("comment") String comment);
 
     @Update("""
             UPDATE agent_approval_requests
             SET status = 'rejected', reviewed_by = #{reviewedBy}, reviewed_at = CURRENT_TIMESTAMP(3), review_comment = #{comment}
-            WHERE approval_request_id = #{approvalRequestId} AND status = 'pending'
+            WHERE project_id = #{projectId} AND approval_request_id = #{approvalRequestId} AND status = 'pending'
             """)
-    int rejectByApprovalRequestId(@Param("approvalRequestId") Long approvalRequestId, @Param("reviewedBy") Long reviewedBy, @Param("comment") String comment);
+    int rejectByApprovalRequestId(@Param("projectId") Long projectId,
+                                  @Param("approvalRequestId") Long approvalRequestId,
+                                  @Param("reviewedBy") Long reviewedBy,
+                                  @Param("comment") String comment);
 }
 

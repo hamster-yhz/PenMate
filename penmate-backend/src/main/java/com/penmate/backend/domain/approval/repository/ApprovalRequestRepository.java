@@ -12,8 +12,8 @@ public interface ApprovalRequestRepository {
 
     ApprovalRequest findByApprovalRequestId(Long approvalRequestId);
 
-    int approveByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment);
+    int approveByApprovalRequestId(Long projectId, Long approvalRequestId, Long reviewedBy, String comment);
 
-    int rejectByApprovalRequestId(Long approvalRequestId, Long reviewedBy, String comment);
+    int rejectByApprovalRequestId(Long projectId, Long approvalRequestId, Long reviewedBy, String comment);
 }
 
