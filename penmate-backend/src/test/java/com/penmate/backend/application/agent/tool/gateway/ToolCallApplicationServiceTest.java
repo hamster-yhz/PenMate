@@ -6,11 +6,10 @@ import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalViewFactory;
 import com.penmate.backend.application.agent.tool.definition.ToolExposure;
 import com.penmate.backend.application.agent.tool.definition.ToolGovernancePolicy;
+import com.penmate.backend.application.agent.tool.definition.ToolLifecycleStatus;
 import com.penmate.backend.application.agent.tool.definition.ToolOperationPolicy;
 import com.penmate.backend.application.agent.tool.definition.ToolPresentation;
-import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
-import com.penmate.backend.application.agent.tool.runtime.AgentToolMutationGuard;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
@@ -20,11 +19,9 @@ import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
-import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
 import com.penmate.backend.domain.shared.model.ApprovalView;
 import com.penmate.backend.domain.shared.service.RealtimeEventService;
-import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +38,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,29 +65,13 @@ class ToolCallApplicationServiceTest {
     @Mock
     private RealtimeEventService realtimeEventService;
 
-    @Mock
-    private AgentToolHandler handler;
-
-    @Mock
-    private AgentToolCallExecutionRepository executionRepository;
-
-    @Mock
-    private BusinessIdGenerator businessIdGenerator;
-
-    @Mock
-    private AgentToolMutationGuard mutationGuard;
-
     private ToolCallApplicationService toolCallApplicationService;
 
     private ToolCallExecutionService toolCallExecutionService;
 
     @BeforeEach
     void setUp() {
-        toolCallExecutionService = new ToolCallExecutionService(List.of(handler), executionRepository,
-                businessIdGenerator, mutationGuard, new JacksonJsonCodec(new ObjectMapper()));
-        lenient().when(businessIdGenerator.nextId()).thenReturn(99001L);
-        lenient().when(executionRepository.tryInsertStarted(any())).thenReturn(true);
-        lenient().when(executionRepository.markFinished(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
+        toolCallExecutionService = org.mockito.Mockito.mock(ToolCallExecutionService.class);
         toolCallApplicationService = new ToolCallApplicationService(
                 toolDefinitionSource,
                 approvalPolicyEngine,
@@ -99,7 +79,7 @@ class ToolCallApplicationServiceTest {
                 approvalApplicationService,
                 pendingApprovalRepository,
                 toolCallExecutionService,
-                new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper())),
+                new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper()), List.of()),
                 new JacksonJsonCodec(new ObjectMapper())
         );
     }
@@ -128,7 +108,7 @@ class ToolCallApplicationServiceTest {
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud",
                 new ToolPresentation("书籍 CRUD"),
-                new ToolExposure(true, "书籍 CRUD；必须提供 operation", "{\"type\":\"object\"}"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "书籍 CRUD；必须提供 operation", "{\"type\":\"object\"}"),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
                         2,
@@ -148,7 +128,6 @@ class ToolCallApplicationServiceTest {
         approvalRequest.setApprovalRequestId(88001L);
 
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
-        when(handler.toolCode()).thenReturn("book_crud");
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(decision);
         when(toolApprovalViewFactory.create(descriptor, decision)).thenReturn(approvalView);
         when(approvalApplicationService.create(any(CreateApprovalCommand.class), eq("trace-approval"))).thenReturn(approvalRequest);
@@ -181,13 +160,12 @@ class ToolCallApplicationServiceTest {
                 "{}", "11:call-recovery", 1, "call-recovery", "[]", "[]", null, null, 3L);
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud", new ToolPresentation("Book CRUD"),
-                new ToolExposure(true, "desc", "{}"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "desc", "{}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(true, "BOOK_DELETE"), 5, Map.of()));
         var pending = new com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval(
                 1L, 88001L, 88001L, 11L, 1L, 9L, 501L, "call-recovery", "book_crud",
                 request.toolArgsJson(), "{}", "[]", request.idempotencyKey(), "PENDING",
                 7L, "trace-original", null, null);
-        when(handler.toolCode()).thenReturn("book_crud");
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(
                 new ApprovalPolicyDecision(true, "BOOK_DELETE"));
@@ -227,11 +205,13 @@ class ToolCallApplicationServiceTest {
         when(toolDefinitionSource.getRequired("missing_handler_tool")).thenReturn(new AgentToolDescriptor(
                 "missing_handler_tool",
                 new ToolPresentation("不存在的 handler"),
-                new ToolExposure(true, "desc", "{}"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "desc", "{}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
         ));
         when(approvalPolicyEngine.evaluate(org.mockito.ArgumentMatchers.any(), eq(request)))
                 .thenReturn(new ApprovalPolicyDecision(false, ""));
+        when(toolCallExecutionService.execute(request)).thenReturn(
+                ToolCallResult.failed("TOOL_HANDLER_NOT_FOUND", "Tool handler not found: missing_handler_tool"));
  
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
@@ -247,7 +227,7 @@ class ToolCallApplicationServiceTest {
                 11L,
                 9L,
                 501L,
-                "context_enhancer",
+                "custom_tool",
                 "{}",
                 7L,
                 "trace-validate",
@@ -262,17 +242,16 @@ class ToolCallApplicationServiceTest {
                 3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
-                "context_enhancer",
+                "custom_tool",
                 new ToolPresentation("上下文增强"),
-                new ToolExposure(true, "补充上下文", "{\"type\":\"object\"}"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "补充上下文", "{\"type\":\"object\"}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
         );
 
-        when(handler.toolCode()).thenReturn("context_enhancer");
-        when(toolDefinitionSource.getRequired("context_enhancer")).thenReturn(descriptor);
-        org.mockito.Mockito.doThrow(new IllegalArgumentException("prompt required"))
-                .when(handler).validate(request);
+        when(toolDefinitionSource.getRequired("custom_tool")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
+        when(toolCallExecutionService.execute(request)).thenReturn(
+                ToolCallResult.failed("TOOL_VALIDATION_FAILED", "prompt required"));
  
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
@@ -289,7 +268,7 @@ class ToolCallApplicationServiceTest {
                 11L,
                 9L,
                 501L,
-                "context_enhancer",
+                "custom_tool",
                 "{\"prompt\":\"hello\"}",
                 7L,
                 "trace-direct",
@@ -304,23 +283,21 @@ class ToolCallApplicationServiceTest {
                 3L
         );
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
-                "context_enhancer",
+                "custom_tool",
                 new ToolPresentation("上下文增强"),
-                new ToolExposure(true, "补充上下文", "{\"type\":\"object\"}"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "补充上下文", "{\"type\":\"object\"}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
         );
         ToolCallResult success = ToolCallResult.success("{\"context\":\"ok\"}");
 
-        when(handler.toolCode()).thenReturn("context_enhancer");
-        when(toolDefinitionSource.getRequired("context_enhancer")).thenReturn(descriptor);
+        when(toolDefinitionSource.getRequired("custom_tool")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
-        when(handler.execute(request)).thenReturn(success);
+        when(toolCallExecutionService.execute(request)).thenReturn(success);
 
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
         assertThat(result).isSameAs(success);
-        verify(handler).validate(request);
-        verify(handler).execute(request);
+        verify(toolCallExecutionService).execute(request);
         verify(approvalApplicationService, never()).create(any(), any());
     }
 }

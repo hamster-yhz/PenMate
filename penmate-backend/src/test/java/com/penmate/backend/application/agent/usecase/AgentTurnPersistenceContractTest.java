@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.run.AgentRunAppService;
 import com.penmate.backend.application.agent.run.AgentRunDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.application.agent.run.AgentRunAppService;
 import com.penmate.backend.domain.agent.model.AgentSession;
@@ -83,7 +84,8 @@ class AgentTurnPersistenceContractTest {
                             eventPublisher,
                             dispatcher
                     ),
-                    dispatcher
+                    dispatcher,
+                    mock(AgentSkillActivationService.class)
             );
 
             AgentTurnResult result = service.createTurn(
@@ -136,7 +138,8 @@ class AgentTurnPersistenceContractTest {
                     sessionRepository,
                     businessIdGenerator,
                     new AgentRunAppService(runRepository, eventPublisher, mock(AgentRunDispatcher.class)),
-                    mock(AgentRunDispatcher.class)
+                    mock(AgentRunDispatcher.class),
+                    mock(AgentSkillActivationService.class)
             );
 
             service.createTurn(
@@ -235,6 +238,7 @@ class AgentTurnPersistenceContractTest {
         return new AgentTurnCommand(
                 1001L,
                 message,
+                java.util.List.of(),
                 new AgentTurnCommand.TaskRequest("WRITE", chapterId, modelConfigId, selectedText)
         );
     }

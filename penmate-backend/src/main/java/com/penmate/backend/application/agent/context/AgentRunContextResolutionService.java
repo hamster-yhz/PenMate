@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.orchestration.ConversationWindowBuilder;
+import com.penmate.backend.application.author.AuthorProfileApplicationService;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.context.model.AgentWorkingSetEntry;
@@ -33,6 +34,7 @@ public class AgentRunContextResolutionService {
     private final JsonCodec jsonCodec;
     private final AgentSessionRepository sessionRepository;
     private final ConversationWindowBuilder conversationWindows;
+    private final AuthorProfileApplicationService authorProfiles;
 
     public AgentRunContextResolutionService(
             StoryBibleRoutingPreferenceResolver preferences,
@@ -47,7 +49,8 @@ public class AgentRunContextResolutionService {
             AgentModelRoutingService modelRouting,
             JsonCodec jsonCodec,
             AgentSessionRepository sessionRepository,
-            ConversationWindowBuilder conversationWindows
+            ConversationWindowBuilder conversationWindows,
+            AuthorProfileApplicationService authorProfiles
     ) {
         this.preferences = preferences;
         this.snapshotFactory = snapshotFactory;
@@ -62,13 +65,14 @@ public class AgentRunContextResolutionService {
         this.jsonCodec = jsonCodec;
         this.sessionRepository = sessionRepository;
         this.conversationWindows = conversationWindows;
+        this.authorProfiles = authorProfiles;
     }
 
     public Resolution resolveInitial(AgentRun run, AgentRunInput input, TaskProfile profile,
                                      AgentLlmExecutionConfig executionConfig, String traceId) {
         var preference = preferences.resolve(run.projectId(), run.sessionId(), run.ownerUserId());
         var newSnapshot = snapshotFactory.create(run.projectId(), input.chapterId());
-        var catalogHashes = hashes.hashes(profile.executionProfile());
+        var catalogHashes = hashes.hashes(profile);
         String snapshotJson = snapshotCodec.encode(newSnapshot);
         Long styleBindingRevision = sessionRepository.findActiveStyleBindingRevision(run.sessionId());
         var binding = epochs.bind(new AgentContextEpochService.BindRequest(
@@ -91,7 +95,7 @@ public class AgentRunContextResolutionService {
                 preference.mode(), boundSnapshot.storyBibleRevision(), boundSnapshot.selectorCatalog(), workingSetIds,
                 selectorConfig, conversationWindow));
         ContextPackage contextPackage = toContextPackage(resolved, boundSnapshot, workingSetIds,
-                input.styleSnapshotJson(), input.chapterId());
+                input.styleSnapshotJson(), input.chapterId(), authorProfiles.promptSnapshot(run.ownerUserId()));
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
                 newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(), input.chapterId(),
                 newSnapshot.activeChapterContentRevision(), styleBindingRevision == null ? 0L : styleBindingRevision,
@@ -126,7 +130,8 @@ public class AgentRunContextResolutionService {
 
     private ContextPackage toContextPackage(StoryBibleContextResolver.ResolvedContext resolved,
                                             ContextEpochSnapshotCodec.Snapshot snapshot,
-                                            List<Long> workingSetIds, String styleSnapshot, Long chapterId) {
+                                            List<Long> workingSetIds, String styleSnapshot, Long chapterId,
+                                            String authorProfileSnapshot) {
         java.util.Set<Long> coreIds = snapshot.coreContext().stream()
                 .map(ContextEpochSnapshotCodec.CoreNode::nodeId).collect(java.util.stream.Collectors.toSet());
         java.util.Set<Long> selectedIds = new java.util.HashSet<>(resolved.decision().selectedNodeIds());
@@ -142,8 +147,8 @@ public class AgentRunContextResolutionService {
             if (selectedIds.contains(node.nodeId()) && !coreIds.contains(node.nodeId())) selected.add(json);
         }
         return new ContextPackage(List.of("story-bible"), resolved.decision().missingFlags(), List.of(), rendered,
-                core, working, selected, List.of(), styleSnapshot,
-                chapterId == null ? "" : "chapter:" + chapterId);
+                core, working, selected, styleSnapshot,
+                chapterId == null ? "" : "chapter:" + chapterId, authorProfileSnapshot);
     }
 
     private String json(Object value) {

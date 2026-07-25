@@ -15,13 +15,13 @@ class AgentJsonCodecTest {
 
     @Test
     void should_parse_object_array_and_keep_stable_json_string() {
-        JSONObject object = AgentJsonCodec.parseObj("{\"tool\":\"context_enhancer\",\"enabled\":true}");
+        JSONObject object = AgentJsonCodec.parseObj("{\"tool\":\"custom_tool\",\"enabled\":true}");
         JSONArray array = AgentJsonCodec.parseArray("[{\"id\":\"call_1\"}]");
 
-        assertEquals("context_enhancer", AgentJsonCodec.getString(object, "tool"));
+        assertEquals("custom_tool", AgentJsonCodec.getString(object, "tool"));
         assertTrue(AgentJsonCodec.getBool(object, "enabled"));
         assertEquals("call_1", array.getJSONObject(0).getStr("id"));
-        assertEquals("{\"tool\":\"context_enhancer\",\"enabled\":true}", AgentJsonCodec.toJson(object));
+        assertEquals("{\"tool\":\"custom_tool\",\"enabled\":true}", AgentJsonCodec.toJson(object));
     }
 
     @Test
@@ -35,10 +35,10 @@ class AgentJsonCodecTest {
     @Test
     void should_keep_null_fields_when_serializing_with_unified_config() {
         Map<String, Object> value = new LinkedHashMap<>();
-        value.put("tool", "context_enhancer");
+        value.put("tool", "custom_tool");
         value.put("enabled", null);
 
-        assertEquals("{\"tool\":\"context_enhancer\",\"enabled\":null}", AgentJsonCodec.toJson(value));
+        assertEquals("{\"tool\":\"custom_tool\",\"enabled\":null}", AgentJsonCodec.toJson(value));
     }
 
     @Test

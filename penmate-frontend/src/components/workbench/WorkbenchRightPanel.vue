@@ -8,7 +8,7 @@ import ChatMessageList from '@/components/workbench/chat/ChatMessageList.vue'
 import AiEditActivity from '@/components/workbench/chat/AiEditActivity.vue'
 import ConversationHistoryPanel from '@/components/workbench/chat/ConversationHistoryPanel.vue'
 import type { ChapterAiUndoOperation } from '@/entities/chapter/model'
-import type { AgentRunAttempt, ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
+import type { AgentRunAttempt, ChatMessage, ConversationItem, GenerationPhase, WorkbenchSkillCatalogItem } from '@/components/workbench/workbenchTypes'
 
 const props = withDefaults(defineProps<{
   collapsed: boolean
@@ -37,6 +37,9 @@ const props = withDefaults(defineProps<{
   streamingAssistantMsgId?: string | number | null
   isApprovalBusy: (approvalId: string) => boolean
   chatInput?: string
+  skillCatalog?: WorkbenchSkillCatalogItem[]
+  activeSkills?: string[]
+  skillCatalogLoading?: boolean
   activePlugins?: string[]
   activeChapterTitle?: string
   selectedText?: string
@@ -50,6 +53,7 @@ const props = withDefaults(defineProps<{
   conversationList: () => [], deletedConversationList: () => [], currentConversationId: null,
   recentlyDeletedConversation: null,
   messages: () => [], runAttempts: () => [], streamingAssistantMsgId: null, chatInput: '', activePlugins: () => [],
+  skillCatalog: () => [], activeSkills: () => [], skillCatalogLoading: false,
   activeChapterTitle: '', selectedText: '', showScrollToBottom: false,
   aiUndoOperations: () => [], aiUndoBusyOperationId: '', aiUndoBusyRunId: '',
 })
@@ -60,6 +64,7 @@ const emit = defineEmits<{
   'rename-conversation': [payload: { conversationId: string; title: string }]; 'delete-conversation': [payload: string];
   'restore-conversation': [payload: string]; approve: [payload: string]; reject: [payload: string];
   'open-story-bible': [payload: string]; 'update:chat-input': [payload: string]; send: [];
+  'add-skill': [payload: string]; 'remove-skill': [payload: string]; 'refresh-skill-catalog': [];
   'cancel-run': []; 'retry-run': []; 'open-model-settings': [];
   'clear-selected-text': [];
   'scroll-to-bottom': [];
@@ -156,10 +161,13 @@ onUnmounted(() => stopResize?.())
       />
       <ChatComposer
         :model-value="chatInput" :is-generating="isGenerating" :can-cancel-run="canCancelRun"
+        :skill-catalog="skillCatalog" :active-skills="activeSkills" :skill-catalog-loading="skillCatalogLoading"
         :is-cancelling="isCancelling" :can-retry-run="canRetryRun" :is-retrying="isRetrying"
         :current-model-name="currentModelName" :active-plugins="activePlugins" :active-chapter-title="activeChapterTitle"
         :selected-text="selectedText" :bound-style-name="boundStyleName"
         @update:model-value="emit('update:chat-input', $event)" @send="emit('send')" @cancel="emit('cancel-run')"
+        @add-skill="emit('add-skill', $event)" @remove-skill="emit('remove-skill', $event)"
+        @refresh-skill-catalog="emit('refresh-skill-catalog')"
         @retry="emit('retry-run')" @open-model-settings="emit('open-model-settings')"
         @clear-selected-text="emit('clear-selected-text')"
       />

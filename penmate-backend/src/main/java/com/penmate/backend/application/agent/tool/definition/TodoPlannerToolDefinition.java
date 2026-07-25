@@ -5,9 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * todo_planner tool 的静态定义。
- */
+/** Static definition for direct manipulation of the current session's todo plan. */
 @Component
 public class TodoPlannerToolDefinition implements AgentToolDefinition {
 
@@ -15,95 +13,23 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
             {
               "type": "object",
               "properties": {
-                "planningMode": {
+                "operation": {
                   "type": "string",
-                  "enum": ["TASK_BREAKDOWN", "QUALITY_REMEDIATION", "FOLLOW_UP_MODIFICATION"],
-                  "description": "TASK_BREAKDOWN 需要 userRequest；QUALITY_REMEDIATION 需要 qualityIssues；FOLLOW_UP_MODIFICATION 至少应提供 userRequest、qualityIssues、storyBibleUpdates、planningContext、existingTodos 之一"
+                  "enum": ["list", "create", "update", "complete", "delete"]
                 },
-                "userRequest": {
-                  "type": "string"
+                "todoId": { "type": "integer", "minimum": 1 },
+                "title": { "type": "string", "minLength": 1, "pattern": ".*\\\\S.*" },
+                "description": { "type": "string" },
+                "sourceType": {
+                  "type": "string",
+                  "enum": ["USER_REQUEST", "QUALITY_REVIEW", "STORY_BIBLE_UPDATE", "PLANNING"]
                 },
-                "qualityIssues": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "severity": {
-                        "type": "string"
-                      },
-                      "summary": {
-                        "type": "string"
-                      },
-                      "suggestion": {
-                        "type": "string"
-                      }
-                    },
-                    "required": ["severity", "summary", "suggestion"],
-                    "additionalProperties": false
-                  }
-                },
-                "storyBibleUpdates": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "planningContext": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "existingTodos": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "todoStatus": {
+                  "type": "string",
+                  "enum": ["TODO", "IN_PROGRESS", "BLOCKED", "DONE"]
                 }
               },
-              "required": ["planningMode"],
-              "oneOf": [
-                {
-                  "properties": {
-                    "planningMode": {
-                      "const": "TASK_BREAKDOWN"
-                    }
-                  },
-                  "required": ["planningMode", "userRequest"]
-                },
-                {
-                  "properties": {
-                    "planningMode": {
-                      "const": "QUALITY_REMEDIATION"
-                    }
-                  },
-                  "required": ["planningMode", "qualityIssues"]
-                },
-                {
-                  "properties": {
-                    "planningMode": {
-                      "const": "FOLLOW_UP_MODIFICATION"
-                    }
-                  },
-                  "anyOf": [
-                    {
-                      "required": ["userRequest"]
-                    },
-                    {
-                      "required": ["qualityIssues"]
-                    },
-                    {
-                      "required": ["storyBibleUpdates"]
-                    },
-                    {
-                      "required": ["planningContext"]
-                    },
-                    {
-                      "required": ["existingTodos"]
-                    }
-                  ]
-                }
-              ],
+              "required": ["operation"],
               "additionalProperties": false
             }
             """;
@@ -112,13 +38,13 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
     public AgentToolDescriptor descriptor() {
         return new AgentToolDescriptor(
                 "todo_planner",
-                new ToolPresentation("Todo 规划"),
-                new ToolExposure(true, "将用户请求、质量问题与后续规划整理为结构化 Todo 规划建议", PARAMETERS_JSON_SCHEMA),
-                new ToolGovernancePolicy(
-                        new ApprovalPolicyDecision(false, ""),
-                        1,
-                        Map.of()
-                )
+                new ToolPresentation("任务计划"),
+                new ToolExposure(
+                        ToolLifecycleStatus.ACTIVE,
+                        "读取或直接维护当前会话的任务计划。create/update 需要 title、sourceType 和 todoStatus；complete/delete 需要 todoId。",
+                        PARAMETERS_JSON_SCHEMA
+                ),
+                new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
         );
     }
 }

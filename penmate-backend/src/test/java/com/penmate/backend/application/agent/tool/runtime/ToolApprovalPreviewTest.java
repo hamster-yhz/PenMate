@@ -10,7 +10,8 @@ class ToolApprovalPreviewTest {
 
     @Test
     void extracts_the_first_affected_story_bible_node_without_copying_node_content() {
-        var preview = new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper()))
+        var preview = new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper()),
+                java.util.List.of(new StoryBibleUpdateApprovalPreviewProvider()))
                 .from("story_bible_update", """
                 {"operation":"batch","operations":[
                   {"kind":"update_node","nodeId":71,"bodyMarkdown":"private body"},

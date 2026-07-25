@@ -70,7 +70,7 @@ describe('useWorkbenchChat terminal Run retry', () => {
     await retrying
 
     expect(retryRun).toHaveBeenCalledOnce()
-    expect(retryRun).toHaveBeenCalledWith('10', '60', { operatorId: '50' })
+    expect(retryRun).toHaveBeenCalledWith('10', '60', { operatorId: '50', activeSkills: [] })
     expect(openRunStream).toHaveBeenCalledWith('10', '61', '0')
     expect(chat.messages.value).toHaveLength(2)
     expect(chat.messages.value[0]?.text).toContain('old failure')

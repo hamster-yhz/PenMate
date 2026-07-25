@@ -318,7 +318,7 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
                         "id": "call_1",
                         "type": "function",
                         "function": {
-                          "name": "context_enhancer",
+                          "name": "custom_tool",
                           "arguments": "{\\\"prompt\\\":\\\"hello\\\"}"
                         }
                       }]

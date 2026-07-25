@@ -10,8 +10,14 @@ import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
+import com.penmate.backend.application.agent.orchestration.AgentPromptAssembler;
+import com.penmate.backend.application.agent.prompt.PromptContextRenderer;
+import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
+import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.run.model.AgentEvent;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
@@ -66,6 +72,8 @@ class AgentRunExecutorTest {
     @Mock private AgentRunDependencyValidator dependencyValidator;
     @Mock private AgentRunSuccessorService successorService;
     @Mock private AgentRunContinuationArtifactService continuations;
+    @Mock private AgentToolSelectionPolicy toolSelectionPolicy;
+    @Mock private AgentSkillActivationService skillActivationService;
 
     @Test
     void executor_routes_context_without_full_preflight_then_executes_run() {
@@ -93,10 +101,13 @@ class AgentRunExecutorTest {
         ArgumentCaptor<AgentRunLoopRequest> loopRequest = ArgumentCaptor.forClass(AgentRunLoopRequest.class);
         verify(llmLoop).execute(loopRequest.capture());
         org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().executionToken()).isEqualTo(2L);
+        org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().toolSchemas())
+                .extracting(AgentLlmToolSchema::toolCode)
+                .containsExactly("chapter_edit");
         org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().messages())
                 .extracting(AgentLlmMessage::content)
                 .containsSubsequence("assembled prompt", "Earlier user request", "Earlier assistant answer",
-                        "Write a suspense opening.");
+                        "<user_request>\nWrite a suspense opening.\n</user_request>");
     }
 
     @Test
@@ -134,7 +145,10 @@ class AgentRunExecutorTest {
                 .thenReturn(new AgentRunContextArtifactService.ResolvedArtifact(
                 1, 70001L, 99L,
                 new StoryBibleRouteDecision(StoryBibleRoutingMode.RETRIEVAL, List.of(1L), Map.of(), false, 0L, true, List.of()),
-                new ContextPackage(List.of(), List.of(), List.of(), List.of(), List.of(), "", "chapter:30001"), List.of()));
+                new ContextPackage(List.of(), List.of(), List.of(), List.of(), "", "chapter:30001"), List.of()));
+        when(contextArtifacts.loadPromptPlanForRun(70001L, List.of(89L, 88L)))
+                .thenReturn(new AgentRunContextArtifactService.PromptArtifact(
+                        3, promptPlan(), null, List.of()));
         when(dependencyValidator.validate(any(), any(), any())).thenReturn(
                 new AgentRunDependencyValidator.Validation(true, null, null, List.of()));
         AgentRunPendingApproval pending = new AgentRunPendingApproval(
@@ -151,7 +165,11 @@ class AgentRunExecutorTest {
         executor().recover(70001L, "trace-1", lease());
 
         verify(contextResolutionService, never()).resolveInitial(any(), any(), any(), any(), any());
-        verify(llmLoop).resumeApproved(any(), eq(pending));
+        ArgumentCaptor<AgentRunLoopRequest> resumedRequest = ArgumentCaptor.forClass(AgentRunLoopRequest.class);
+        verify(llmLoop).resumeApproved(resumedRequest.capture(), eq(pending));
+        org.assertj.core.api.Assertions.assertThat(resumedRequest.getValue().toolSchemas())
+                .extracting(AgentLlmToolSchema::toolCode)
+                .containsExactly("chapter_edit");
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
     }
 
@@ -254,9 +272,11 @@ class AgentRunExecutorTest {
                 leaseService, eventPublisher, pendingApprovals, successorService,
                 outputEvents);
         return new AgentRunExecutor(runRepository, eventPublisher, contextResolutionService, promptComposer,
+                new AgentPromptAssembler(new PromptContextRenderer(new StructuredPromptBlockFormatter())),
                 llmLoop, modelRoutingService, stateReducer, checkpointService, pendingApprovals, contextArtifacts,
-                recoveryService, leaseService, dependencyValidator, stateTransitions, continuations,
-                new JacksonJsonCodec(new ObjectMapper()));
+                recoveryService, leaseService, dependencyValidator, toolSelectionPolicy,
+                stateTransitions, continuations,
+                new JacksonJsonCodec(new ObjectMapper()), skillActivationService);
     }
 
     private AgentRun run() {
@@ -284,7 +304,7 @@ class AgentRunExecutorTest {
                 "RETRIEVAL", null, "prompt", "skills", "tools", "key", "hash", 10L, null, null);
         return new AgentRunContextResolutionService.Resolution(
                 new AgentContextEpochService.Binding(epoch, false),
-                new ContextPackage(List.of("story-bible"), List.of(), List.of(), List.of(), List.of(),
+                new ContextPackage(List.of("story-bible"), List.of(), List.of(), List.of(),
                         "{\"styleId\":81}", "chapter:30001"),
                 new StoryBibleRouteDecision(StoryBibleRoutingMode.RETRIEVAL, List.of(1L), Map.of(),
                         false, 0L, true, List.of()),
@@ -296,7 +316,11 @@ class AgentRunExecutorTest {
     }
 
     private PromptPlan promptPlan() {
-        return new PromptPlan(List.of(), List.of(), "default", "assembled prompt");
+        return new PromptPlan(
+                List.of(),
+                List.of(new AgentLlmToolSchema(
+                        "chapter_edit", "Edit chapter", "{\"type\":\"object\"}")),
+                "default", "assembled prompt", "", "assembled prompt");
     }
 
     private Object containsText(String expected) {

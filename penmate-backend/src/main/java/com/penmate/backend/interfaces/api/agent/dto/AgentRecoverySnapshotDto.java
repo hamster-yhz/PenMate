@@ -15,8 +15,12 @@ public record AgentRecoverySnapshotDto(
             String title,
             String status,
             BoundStyleDto boundStyle,
-            String lastRunStatus
+            String lastRunStatus,
+            List<String> activeSkills
     ) {
+        public SessionDto {
+            activeSkills = List.copyOf(activeSkills == null ? List.of() : activeSkills);
+        }
     }
 
     public record BoundStyleDto(

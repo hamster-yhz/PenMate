@@ -26,7 +26,6 @@ class TaskProfileSerializationTest {
         TaskProfile profile = new TaskProfile(
                 List.of(TaskIntentTag.DRAFT_GENERATION, TaskIntentTag.STORY_BIBLE_QUERY),
                 "default",
-                List.of("scene-writer", "consistency-checker"),
                 List.of("chapter_edit", "story_bible_lookup"),
                 List.of("保留第一人称", "不得改写既有设定"),
                 "输出一段可直接进入正文的中文场景续写",
@@ -43,7 +42,6 @@ class TaskProfileSerializationTest {
         assertThat(tree).containsOnlyKeys(
                 "intentTags",
                 "executionProfile",
-                "skills",
                 "tools",
                 "hardConstraints",
                 "outputExpectation",
@@ -53,7 +51,6 @@ class TaskProfileSerializationTest {
                 "reasoningSummary"
         );
         assertThat(tree.get("executionProfile")).isEqualTo("default");
-        assertThat(tree.get("skills")).isEqualTo(List.of("scene_writer", "consistency_checker"));
         assertThat(tree.get("needsApproval")).isEqualTo(true);
         assertThat(tree.get("includeStoryBible")).isEqualTo(true);
         assertThat(tree.get("includeRag")).isEqualTo(false);
@@ -62,13 +59,12 @@ class TaskProfileSerializationTest {
     }
 
     @Test
-    void should_round_trip_prompt_plan_with_modules_skills_final_profile_and_preview() throws Exception {
+    void should_round_trip_prompt_plan_with_modules_final_profile_and_preview() throws Exception {
         PromptPlan plan = new PromptPlan(
                 List.of(
                         new PromptModulePlan("base-role", "system/base-role.md", true, "定义主编排角色"),
                         new PromptModulePlan("story-bible", "system/story-bible.md", true, "注入设定约束")
                 ),
-                List.of("scene-writer", "story-bible-guard"),
                 "default",
                 "# assembled prompt preview"
         );
@@ -77,7 +73,9 @@ class TaskProfileSerializationTest {
         Map<String, Object> tree = objectMapper.readValue(json, Map.class);
         PromptPlan restored = objectMapper.readValue(json, PromptPlan.class);
 
-        assertThat(tree).containsOnlyKeys("modules", "skills", "finalProfile", "stablePrefix", "dynamicContext", "assembledPromptPreview");
+        assertThat(tree).containsOnlyKeys(
+                "modules", "toolSchemas", "finalProfile", "stablePrefix", "dynamicContext",
+                "assembledPromptPreview");
         assertThat(tree.get("finalProfile")).isEqualTo("default");
         assertThat(tree.get("assembledPromptPreview")).isEqualTo("# assembled prompt preview");
         assertThat(restored).isEqualTo(plan);
@@ -89,7 +87,6 @@ class TaskProfileSerializationTest {
                 {
                   "intentTags": ["DRAFT_GENERATION", "STORY_BIBLE_QUERY"],
                   "executionProfile": "default",
-                  "skills": ["scene-writer"],
                   "tools": ["story_bible_lookup"],
                   "hardConstraints": ["保留第一人称"],
                   "outputExpectation": null,
@@ -104,10 +101,9 @@ class TaskProfileSerializationTest {
 
         assertThat(restored.intentTags()).containsExactly(TaskIntentTag.DRAFT_GENERATION, TaskIntentTag.STORY_BIBLE_QUERY);
         assertThat(restored.executionProfile()).isEqualTo("default");
-        assertThat(restored.skills()).containsExactly("scene_writer");
         assertThat(restored.outputExpectation()).isNull();
         assertThat(restored.reasoningSummary()).isEqualTo("需要核对设定");
-        assertThat(restored.skills()).isUnmodifiable();
+        assertThat(restored.tools()).isUnmodifiable();
     }
 
 }

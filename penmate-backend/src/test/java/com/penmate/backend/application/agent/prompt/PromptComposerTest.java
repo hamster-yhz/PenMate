@@ -4,6 +4,13 @@ import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskIntentTag;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
+import com.penmate.backend.application.agent.tool.definition.ToolExposure;
+import com.penmate.backend.application.agent.tool.definition.ToolGovernancePolicy;
+import com.penmate.backend.application.agent.tool.definition.ToolLifecycleStatus;
+import com.penmate.backend.application.agent.tool.definition.ToolPresentation;
+import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
+import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,7 +27,32 @@ class PromptComposerTest {
     private final SystemPromptProvider systemPromptProvider = mock(SystemPromptProvider.class);
     private final SkillPromptRegistry skillPromptRegistry = mock(SkillPromptRegistry.class);
     private final AgentToolDefinitionSource toolDefinitionSource = mock(AgentToolDefinitionSource.class);
-    private final PromptComposer promptComposer = new PromptComposer(systemPromptProvider, skillPromptRegistry, toolDefinitionSource);
+    private final PromptComposer promptComposer = new PromptComposer(
+            systemPromptProvider,
+            skillPromptRegistry,
+            new AgentToolSelectionPolicy(toolDefinitionSource),
+            new PromptContextRenderer(new StructuredPromptBlockFormatter()));
+
+    @Test
+    void snapshots_selected_tools_without_repeating_json_schema_in_the_prompt() {
+        stubExecutionBundle("default", "execution base");
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of());
+        when(toolDefinitionSource.listAll()).thenReturn(List.of(new AgentToolDescriptor(
+                "rag_query",
+                new ToolPresentation("RAG query"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "Search manuscript context", "{\"type\":\"object\"}"),
+                new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 0, java.util.Map.of())
+        )));
+
+        PromptPlan plan = promptComposer.compose(
+                profileFor("default", List.of()), emptyContextPackage(), "Find Mira");
+
+        assertThat(plan.toolSchemas()).extracting(schema -> schema.toolCode()).containsExactly("rag_query");
+        assertThat(plan.stablePrefix())
+                .contains("- rag_query: Search manuscript context")
+                .doesNotContain("parameters:")
+                .doesNotContain("{\"type\":\"object\"}");
+    }
 
     @Test
     void should_keep_user_request_out_of_prompt_preview_and_expose_skill_catalog_only() {
@@ -35,7 +67,6 @@ class PromptComposerTest {
                 new TaskProfile(
                         List.of(TaskIntentTag.DRAFT_GENERATION),
                         "default",
-                        List.of("writer"),
                         List.of(),
                         List.of("keep explicit user perspective"),
                         "draft output",
@@ -49,7 +80,6 @@ class PromptComposerTest {
                         List.of(),
                         List.of(),
                         List.of(),
-                        List.of(),
                         "{\"person\":\"first\"}",
                         "chapter:12"
                 ),
@@ -57,7 +87,6 @@ class PromptComposerTest {
         );
 
         assertThat(promptPlan.finalProfile()).isEqualTo("default");
-        assertThat(promptPlan.skills()).containsExactly("writer");
         assertThat(promptPlan.assembledPromptPreview())
                 .contains("execution base")
                 .contains("Available skills")
@@ -78,18 +107,18 @@ class PromptComposerTest {
                         "tool-catalog:",
                         "skill-catalog:checker,planner,writer",
                         "context-epoch-core:entries=0",
-                        "context-package:sources=1/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
+                        "context-package:sources=1/storyBibleEntries=0/conflicts=0/missing=0"
                 );
     }
 
     @Test
-    void should_not_load_task_profile_skills_as_prompt_modules() {
+    void should_expose_catalog_without_loading_skill_bodies() {
         stubExecutionBundle("default", "execution base");
         when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of(
                 new SkillCatalogItem("writer", "Write prose and scenes"),
                 new SkillCatalogItem("planner", "Plan writing tasks"),
                 new SkillCatalogItem("checker", "Check continuity and constraints"),
-                new SkillCatalogItem("story_bible_query", "Read relevant story bible facts")
+                new SkillCatalogItem("story-bible", "Read relevant story bible facts")
         ));
 
         PromptPlan promptPlan = promptComposer.compose(
@@ -98,12 +127,11 @@ class PromptComposerTest {
                 "Generate a plot outline."
         );
 
-        assertThat(promptPlan.skills()).containsExactly("planner", "checker");
         assertThat(promptPlan.assembledPromptPreview())
                 .contains("Available skills")
                 .contains("- planner: Plan writing tasks")
                 .contains("- checker: Check continuity and constraints")
-                .contains("- story_bible_query: Read relevant story bible facts")
+                .contains("- story-bible: Read relevant story bible facts")
                 .contains("skill_load");
         verify(skillPromptRegistry, never()).load("planner");
         verify(skillPromptRegistry, never()).load("checker");
@@ -141,7 +169,6 @@ class PromptComposerTest {
                 List.of("rag-missing"),
                 List.of("story bible conflict: character age"),
                 List.of("character age: 17 (canon)"),
-                List.of(),
                 "{\"tone\":\"restrained\"}",
                 "chapter:21"
         );
@@ -159,6 +186,35 @@ class PromptComposerTest {
                 .contains("rag-missing");
         verify(skillPromptRegistry).listAvailableSkills();
         verify(skillPromptRegistry, never()).load(anyString());
+    }
+
+    @Test
+    void should_render_escaped_typed_context_blocks_without_duplicate_story_bible_entries() {
+        stubExecutionBundle("default", "default base");
+        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of());
+        ContextPackage contextPackage = new ContextPackage(
+                List.of("story-bible"),
+                List.of("timeline missing"),
+                List.of("age conflict"),
+                List.of("unused aggregate"),
+                List.of("core <canon>"),
+                List.of("shared node", "working node"),
+                List.of("shared node", "selected node"),
+                "style <restrained>",
+                "chapter:21"
+        );
+
+        PromptPlan promptPlan = promptComposer.compose(
+                profileFor("default", List.of()), contextPackage, "Continue");
+
+        assertThat(promptPlan.stablePrefix())
+                .contains("<context type=\"story_bible\" scope=\"epoch_core\">")
+                .contains("core &lt;canon&gt;");
+        assertThat(promptPlan.dynamicContext())
+                .contains("<context type=\"style\">")
+                .contains("style &lt;restrained&gt;")
+                .contains("<context type=\"chapter_scope\">")
+                .containsOnlyOnce("shared node");
     }
 
     @Test
@@ -200,7 +256,7 @@ class PromptComposerTest {
                         "tool-catalog:",
                         "skill-catalog:editor",
                         "context-epoch-core:entries=0",
-                        "context-package:sources=0/storyBibleEntries=0/ragRefs=0/conflicts=0/missing=0"
+                        "context-package:sources=0/storyBibleEntries=0/conflicts=0/missing=0"
                 );
     }
 
@@ -221,7 +277,6 @@ class PromptComposerTest {
         return new TaskProfile(
                 List.of(TaskIntentTag.DRAFT_GENERATION),
                 executionProfile,
-                skills,
                 List.of(),
                 List.of(),
                 "draft output",
@@ -233,6 +288,6 @@ class PromptComposerTest {
     }
 
     private ContextPackage emptyContextPackage() {
-        return new ContextPackage(List.of(), List.of(), List.of(), List.of(), List.of(), "", "");
+        return new ContextPackage(List.of(), List.of(), List.of(), List.of(), "", "");
     }
 }

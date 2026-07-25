@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { WorkbenchRecoverySnapshot, WorkbenchRuntimeEventSource } from '@/api/types'
+import type { AgentSkillCatalogItem, AppError, WorkbenchRecoverySnapshot, WorkbenchRuntimeEventSource } from '@/api/types'
 import type { AgentRunEventStream } from '@/api/agentRunStream'
 import type { ChatMessage, ConversationItem, GenerationPhase } from '@/components/workbench/workbenchTypes'
 import { applyAssistantEventMetadata, createChatTimeline, type ChatRecord } from './useWorkbenchChatTimeline'
@@ -20,6 +20,7 @@ type UseWorkbenchChatDeps = {
   getActiveChapterKey: () => string
   getSelectedText: () => string
   getActivePlugins: () => string[]
+  listSkills?: (projectId: string) => Promise<AgentSkillCatalogItem[]>
   ensureModelConfigId: (projectId: string) => Promise<string | null>
   refreshActiveModelInfo?: (projectId: string) => Promise<string | null | void>
   listSessions: (projectId: string) => Promise<unknown>
@@ -47,6 +48,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   const conversationLoading = ref(false)
   const conversationList = ref<ConversationItem[]>([])
   const chatInput = ref('')
+  const skillCatalog = ref<AgentSkillCatalogItem[]>([])
+  const activeSkills = ref<string[]>([])
+  const skillCatalogLoading = ref(false)
   const isGenerating = ref(false)
   const isCancelling = ref(false)
   const isRetrying = ref(false)
@@ -115,6 +119,37 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const listSessions = (projectId: string) => deps.listSessions(projectId)
+
+  const loadSkillCatalog = async () => {
+    const projectId = deps.getCurrentProjectId()
+    if (!projectId || !deps.listSkills || skillCatalogLoading.value) return
+    skillCatalogLoading.value = true
+    try {
+      const items = await deps.listSkills(projectId)
+      skillCatalog.value = (Array.isArray(items) ? items : [])
+        .map((item) => ({ name: String(item.name || ''), description: String(item.description || '') }))
+        .filter((item) => item.name)
+        .sort((left, right) => left.name.localeCompare(right.name))
+    } catch (error) {
+      deps.notifyWarning?.(runtime.getErrorMessage(error))
+    } finally {
+      skillCatalogLoading.value = false
+    }
+  }
+
+  const addActiveSkill = (name: string) => {
+    const normalized = String(name || '').trim()
+    if (!normalized || activeSkills.value.includes(normalized)) return
+    if (activeSkills.value.length >= 4) {
+      deps.notifyWarning?.('最多同时激活 4 个 Skill')
+      return
+    }
+    activeSkills.value = [...activeSkills.value, normalized].sort()
+  }
+
+  const removeActiveSkill = (name: string) => {
+    activeSkills.value = activeSkills.value.filter((item) => item !== name)
+  }
 
   const getSessionRecovery = async (projectId: string, sessionId: string) => {
     return pickBusinessRecord(await deps.getSessionRecovery(projectId, sessionId))
@@ -286,7 +321,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     foregroundEpoch += 1
     runtimeEventSource.value = null
     const normalizedSnapshot = pickBusinessRecord(snapshot) as {
-      session?: { sessionId?: string | number | null }
+      session?: { sessionId?: string | number | null; activeSkills?: unknown[] | null }
       activeRun?: {
         turnId?: string | number | null
         runId?: string | number | null
@@ -302,6 +337,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     currentConversationId.value =
       normalizedSnapshot?.session?.sessionId == null ? null : String(normalizedSnapshot.session.sessionId)
     preferredConversationId.value = currentConversationId.value
+    activeSkills.value = Array.isArray(normalizedSnapshot?.session?.activeSkills)
+      ? normalizedSnapshot.session.activeSkills.map(String).filter(Boolean).sort()
+      : []
     recoveredSelectedText.value = String(normalizedSnapshot?.workbenchContext?.selectedText ?? '')
     currentActiveRun.value = {
       sessionId: currentConversationId.value,
@@ -342,6 +380,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     agentStatusDetailText.value = ''
     streamingAssistantMsgId.value = null
     runtimeEventSource.value = null
+    activeSkills.value = []
     currentActiveRun.value = {
       sessionId: null,
       turnId: null,
@@ -357,6 +396,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     runTimeline.attempts.value = []
     chatInput.value = ''
     recoveredSelectedText.value = ''
+    activeSkills.value = []
     currentConversationId.value = sessionId
     preferredConversationId.value = sessionId
   }
@@ -561,7 +601,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   }
 
   const sendMessage = async () => {
-    if (!chatInput.value.trim() || isGenerating.value) return
+    if (!chatInput.value.trim() || isGenerating.value || canCancelRun.value) return
     const sendEpoch = foregroundEpoch
     const userText = chatInput.value.trim()
     const userMessage: ChatMessage = { id: msgIdCounter++, role: 'user', text: userText }
@@ -593,8 +633,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       return
     }
 
+    let resolvedSessionId = currentConversationId.value || ''
     try {
       const sessionId = await ensureSessionIdForSend(projectId, operatorId)
+      resolvedSessionId = sessionId || resolvedSessionId
       if (sendEpoch !== foregroundEpoch) return
       if (!sessionId) throw new Error('会话初始化失败')
       const modelConfigId = await deps.ensureModelConfigId(projectId)
@@ -608,6 +650,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
         await createTurn(projectId, sessionId, {
           operatorId,
           userMessage: userText,
+          activeSkills: [...activeSkills.value],
           taskRequest: {
             taskType: 'WRITE',
             chapterId: deps.getActiveChapterKey() || null,
@@ -650,8 +693,34 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       generationPhase.value = 'failed'
       generationTaskStatus.value = 'failed'
       const resolvedErrorMessage = runtime.getErrorMessage(error)
+      const appError = error as AppError
+      if (appError.errorCode === 'SKILL_NOT_FOUND') void loadSkillCatalog()
+      const hasCreatedRun = assistantMessage.runId != null && String(assistantMessage.runId).trim() !== ''
+      if (!hasCreatedRun) {
+        messages.value = messages.value.filter((item) => item.id !== userMessage.id && item.id !== assistantMessage.id)
+        if (!chatInput.value.trim()) chatInput.value = userText
+      }
+      if (appError.errorCode === 'SESSION_RUN_ACTIVE' && projectId && resolvedSessionId) {
+        const snapshot = pickBusinessRecord(
+          await deps.getSessionRecovery(projectId, resolvedSessionId),
+        ) as WorkbenchRecoverySnapshot
+        hydrateFromRecoverySnapshot(snapshot)
+        const activeRun = snapshot.activeRun
+        const runId = String(activeRun?.runId ?? '')
+        if (runId) {
+          await consumeRun(
+            projectId,
+            resolvedSessionId,
+            runId,
+            String(activeRun?.latestSequence ?? '0'),
+            String(activeRun?.turnId ?? ''),
+            true,
+          )
+        }
+        return
+      }
       agentStatusDetailText.value = resolvedErrorMessage
-      assistantMessage.text = `运行失败: ${resolvedErrorMessage}`
+      if (hasCreatedRun) assistantMessage.text = `运行失败: ${resolvedErrorMessage}`
       isGenerating.value = false
       streamingAssistantMsgId.value = null
       await scrollChat()
@@ -706,7 +775,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
             !item.runId,
         )
       if (predecessorAssistant) predecessorAssistant.runId = predecessorRunId
-      const retried = pickBusinessRecord(await deps.retryRun(projectId, predecessorRunId, { operatorId })) as ChatRecord
+      const retried = pickBusinessRecord(await deps.retryRun(projectId, predecessorRunId, {
+        operatorId,
+        activeSkills: [...activeSkills.value],
+      })) as ChatRecord
       if (actionEpoch !== foregroundEpoch) return
       const successorRunId = String(retried.runId ?? '').trim()
       if (!successorRunId || successorRunId === '0') {
@@ -734,6 +806,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     conversationList,
     runAttempts: runTimeline.attempts,
     chatInput,
+    skillCatalog,
+    activeSkills,
+    skillCatalogLoading,
     isGenerating,
     isCancelling,
     isRetrying,
@@ -755,6 +830,9 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
+    loadSkillCatalog,
+    addActiveSkill,
+    removeActiveSkill,
     detachCurrentSession,
     activateEmptySession,
     dispose: runtime.closeRunStream,

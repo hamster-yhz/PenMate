@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.run;
 
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
@@ -30,7 +31,8 @@ class AgentRunSuccessorServiceTest {
         when(sessions.rebindTurnRun(30L, 80L, 60L, 61L)).thenReturn(1);
         when(sessions.updateLastRun(10L, 30L, 61L)).thenReturn(1);
 
-        Long successorId = new AgentRunSuccessorService(runs, sessions, ids, events, dispatchRequests)
+        Long successorId = new AgentRunSuccessorService(runs, sessions, ids, events, dispatchRequests,
+                mock(AgentSkillActivationService.class))
                 .create(run(), input(), "trace-2");
 
         ArgumentCaptor<AgentRun> runCaptor = ArgumentCaptor.forClass(AgentRun.class);

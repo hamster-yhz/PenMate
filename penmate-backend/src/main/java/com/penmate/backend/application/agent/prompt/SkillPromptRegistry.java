@@ -6,5 +6,5 @@ public interface SkillPromptRegistry {
 
     List<SkillCatalogItem> listAvailableSkills();
 
-    SystemPromptDocument load(String skill);
+    LoadedSkill load(String skill);
 }

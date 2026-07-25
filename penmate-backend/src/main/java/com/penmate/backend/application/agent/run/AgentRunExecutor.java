@@ -4,9 +4,13 @@ import com.penmate.backend.application.agent.context.AgentRunContextArtifactServ
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
 import com.penmate.backend.application.agent.context.AgentRunDependencyValidator;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
+import com.penmate.backend.application.agent.orchestration.AgentPromptAssembler;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
+import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
@@ -32,6 +36,7 @@ public class AgentRunExecutor {
     private final AgentRunEventPublisher eventPublisher;
     private final AgentRunContextResolutionService contextResolutionService;
     private final PromptComposer promptComposer;
+    private final AgentPromptAssembler promptAssembler;
     private final AgentRunLlmLoop llmLoop;
     private final AgentModelRoutingService modelRoutingService;
     private final AgentRuntimeStateReducer stateReducer;
@@ -41,14 +46,17 @@ public class AgentRunExecutor {
     private final AgentRunRecoveryService recoveryService;
     private final AgentRunLeaseService leaseService;
     private final AgentRunDependencyValidator dependencyValidator;
+    private final AgentToolSelectionPolicy toolSelectionPolicy;
     private final AgentRunStateTransitionService stateTransitions;
     private final AgentRunContinuationArtifactService continuations;
     private final JsonCodec jsonCodec;
+    private final AgentSkillActivationService skillActivationService;
 
     public AgentRunExecutor(AgentRunRepository runRepository,
                             AgentRunEventPublisher eventPublisher,
                             AgentRunContextResolutionService contextResolutionService,
                             PromptComposer promptComposer,
+                            AgentPromptAssembler promptAssembler,
                             AgentRunLlmLoop llmLoop,
                             AgentModelRoutingService modelRoutingService,
                             AgentRuntimeStateReducer stateReducer,
@@ -58,13 +66,16 @@ public class AgentRunExecutor {
                             AgentRunRecoveryService recoveryService,
                             AgentRunLeaseService leaseService,
                             AgentRunDependencyValidator dependencyValidator,
+                            AgentToolSelectionPolicy toolSelectionPolicy,
                             AgentRunStateTransitionService stateTransitions,
                             AgentRunContinuationArtifactService continuations,
-                            JsonCodec jsonCodec) {
+                            JsonCodec jsonCodec,
+                            AgentSkillActivationService skillActivationService) {
         this.runRepository = runRepository;
         this.eventPublisher = eventPublisher;
         this.contextResolutionService = contextResolutionService;
         this.promptComposer = promptComposer;
+        this.promptAssembler = promptAssembler;
         this.llmLoop = llmLoop;
         this.modelRoutingService = modelRoutingService;
         this.stateReducer = stateReducer;
@@ -74,9 +85,11 @@ public class AgentRunExecutor {
         this.recoveryService = recoveryService;
         this.leaseService = leaseService;
         this.dependencyValidator = dependencyValidator;
+        this.toolSelectionPolicy = toolSelectionPolicy;
         this.stateTransitions = stateTransitions;
         this.continuations = continuations;
         this.jsonCodec = jsonCodec;
+        this.skillActivationService = skillActivationService;
     }
 
     public void execute(Long runId, String traceId, AgentRunLease lease) {
@@ -179,8 +192,9 @@ public class AgentRunExecutor {
         state = stateReducer.apply(state, evt);
 
         PromptPlan promptPlan = promptComposer.compose(taskProfile, contextResult.contextPackage(), input.promptSnapshot());
-        List<AgentLlmMessage> executionMessages = promptMessages(
-                promptPlan, input.promptSnapshot(), contextResult.conversationWindow());
+        String activatedSkills = skillActivationService.renderExplicitSkills(runId);
+        List<AgentLlmMessage> executionMessages = promptAssembler.buildExecutionMessages(
+                promptPlan, activatedSkills, input.promptSnapshot(), contextResult.conversationWindow());
         var promptRef = contextArtifacts.savePromptPlan(runId, promptPlan,
                 new AgentRunContextArtifactService.PromptManifest(
                         contextResult.epochBinding().epoch().epochId(),
@@ -206,6 +220,7 @@ public class AgentRunExecutor {
                 turnId,
                 traceId,
                 executionMessages,
+                promptPlan.toolSchemas(),
                 executionConfig,
                 userId,
                 lease.executionToken()
@@ -255,6 +270,7 @@ public class AgentRunExecutor {
             throw new IllegalStateException("Run Context Epoch does not match its immutable artifact");
         }
         if (lease != null && !continueIfDependenciesCurrent(run, input, contextArtifact, lease, traceId)) return;
+        var promptArtifact = contextArtifacts.loadPromptPlanForRun(runId, state.artifactRefs());
         var pending = pendingApprovals.findApprovedByRunId(runId);
         if (pending == null || !"APPROVED".equals(pending.pendingStatus())) {
             throw new IllegalStateException("Run approval is not ready for resume");
@@ -264,7 +280,8 @@ public class AgentRunExecutor {
                 ? AgentLlmExecutionConfig.builder().build()
                 : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
         AgentRunLoopResult result = llmLoop.resumeApproved(new AgentRunLoopRequest(
-                runId, run.projectId(), run.sessionId(), run.turnId(), traceId, List.of(), executionConfig,
+                runId, run.projectId(), run.sessionId(), run.turnId(), traceId, List.of(),
+                resolveToolSchemas(promptArtifact, input), executionConfig,
                 run.ownerUserId(), lease.executionToken()), pending);
         if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
             AgentEvent waiting = stateTransitions.waitingApproval(
@@ -325,7 +342,7 @@ public class AgentRunExecutor {
         leaseService.assertOwned(lease);
         AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
-                promptArtifact.messages(), executionConfig, run.ownerUserId(),
+                promptArtifact.messages(), resolveToolSchemas(promptArtifact, input), executionConfig, run.ownerUserId(),
                 lease.executionToken());
         AgentRunLoopResult result = continuations.loadLatestForRun(runId, state.artifactRefs())
                 .map(continuation -> llmLoop.resume(loopRequest, continuation))
@@ -361,16 +378,6 @@ public class AgentRunExecutor {
         checkpointService.checkpointIfNeeded(completed, stateReducer.apply(state, completed));
     }
 
-    private List<AgentLlmMessage> promptMessages(PromptPlan plan, String userRequest,
-                                                 List<AgentLlmMessage> conversationWindow) {
-        List<AgentLlmMessage> messages = new java.util.ArrayList<>();
-        messages.add(AgentLlmMessage.system(plan.stablePrefix()));
-        if (!plan.dynamicContext().isBlank()) messages.add(AgentLlmMessage.system(plan.dynamicContext()));
-        messages.addAll(conversationWindow == null ? List.of() : conversationWindow);
-        messages.add(AgentLlmMessage.user(userRequest));
-        return List.copyOf(messages);
-    }
-
     private String sha256(String value) {
         try {
             byte[] bytes = (value == null ? "" : value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -392,6 +399,14 @@ public class AgentRunExecutor {
             // ignore parse failures
         }
         return null;
+    }
+
+    private List<AgentLlmToolSchema> resolveToolSchemas(
+            AgentRunContextArtifactService.PromptArtifact artifact,
+            AgentRunInput input
+    ) {
+        if (artifact.schemaVersion() >= 3) return artifact.plan().toolSchemas();
+        return toolSelectionPolicy.select(TaskProfile.fromTaskType(input.taskType()));
     }
 
     private long positiveLong(Object value) {

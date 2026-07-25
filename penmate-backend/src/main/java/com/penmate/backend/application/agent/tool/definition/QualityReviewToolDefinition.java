@@ -96,7 +96,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
         return new AgentToolDescriptor(
                 "quality_review",
                 new ToolPresentation("质量审查"),
-                new ToolExposure(true, "审查正文质量并输出结构化质量报告与修订建议", PARAMETERS_JSON_SCHEMA),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "审查正文质量并输出结构化质量报告与修订建议", PARAMETERS_JSON_SCHEMA),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
                         1,

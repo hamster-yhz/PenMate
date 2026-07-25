@@ -2,13 +2,12 @@ package com.penmate.backend.application.agent.prompt;
 
 import com.penmate.backend.application.agent.context.ContextPackage;
 import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
-import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 /**
@@ -19,14 +18,17 @@ public class PromptComposer {
 
     private final SystemPromptProvider systemPromptProvider;
     private final SkillPromptRegistry skillPromptRegistry;
-    private final AgentToolDefinitionSource toolDefinitionSource;
+    private final AgentToolSelectionPolicy toolSelectionPolicy;
+    private final PromptContextRenderer contextRenderer;
 
     public PromptComposer(SystemPromptProvider systemPromptProvider,
                           SkillPromptRegistry skillPromptRegistry,
-                          AgentToolDefinitionSource toolDefinitionSource) {
+                          AgentToolSelectionPolicy toolSelectionPolicy,
+                          PromptContextRenderer contextRenderer) {
         this.systemPromptProvider = systemPromptProvider;
         this.skillPromptRegistry = skillPromptRegistry;
-        this.toolDefinitionSource = toolDefinitionSource;
+        this.toolSelectionPolicy = toolSelectionPolicy;
+        this.contextRenderer = contextRenderer;
     }
 
     public PromptPlan compose(TaskProfile taskProfile,
@@ -48,7 +50,7 @@ public class PromptComposer {
         ));
         stableSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
 
-        var registeredTools = toolDefinitionSource.listLlmSchemas();
+        var registeredTools = toolSelectionPolicy.select(taskProfile);
         var toolSchemas = (registeredTools == null ? List.<com.penmate.backend.application.agent.llm.AgentLlmToolSchema>of() : registeredTools).stream()
                 .sorted(java.util.Comparator.comparing(schema -> normalize(schema.toolCode())))
                 .toList();
@@ -60,7 +62,6 @@ public class PromptComposer {
         ));
         stableSections.add(buildToolCatalogPreview(toolSchemas));
 
-        List<String> profileSkills = taskProfile == null || taskProfile.skills() == null ? List.of() : taskProfile.skills();
         List<SkillCatalogItem> availableSkills = skillPromptRegistry.listAvailableSkills().stream()
                 .map(this::normalizeSkillCatalogItem)
                 .filter(skill -> !skill.name().isEmpty())
@@ -82,7 +83,7 @@ public class PromptComposer {
                 true,
                 "Immutable Context Epoch core Story Bible"
         ));
-        stableSections.add(String.join("\n", normalizedContext.coreStoryBibleEntries()));
+        stableSections.add(contextRenderer.renderEpochCore(normalizedContext));
 
         modules.add(new PromptModulePlan(
                 "context-package",
@@ -90,14 +91,14 @@ public class PromptComposer {
                 false,
                 "Dynamic history, Working Set and selected Story Bible context"
         ));
-        dynamicSections.add(buildDynamicContextPreview(normalizedContext));
+        dynamicSections.add(contextRenderer.renderRunContext(normalizedContext));
 
         String stablePrefix = stableSections.stream().filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"));
         String dynamicContext = dynamicSections.stream().filter(section -> !section.isBlank()).collect(Collectors.joining("\n\n"));
 
         return new PromptPlan(
                 modules,
-                profileSkills,
+                toolSchemas,
                 finalProfile,
                 stablePrefix,
                 dynamicContext,
@@ -106,28 +107,16 @@ public class PromptComposer {
         );
     }
 
-    private String buildDynamicContextPreview(ContextPackage contextPackage) {
-        StringJoiner joiner = new StringJoiner("\n");
-        if (!contextPackage.styleSnapshot().isBlank()) joiner.add(contextPackage.styleSnapshot());
-        contextPackage.workingSetEntries().forEach(joiner::add);
-        contextPackage.selectedStoryBibleEntries().forEach(joiner::add);
-        contextPackage.conflicts().forEach(joiner::add);
-        contextPackage.missingContextFlags().forEach(joiner::add);
-        return joiner.toString().trim();
-    }
-
     private String buildToolCatalogPreview(List<com.penmate.backend.application.agent.llm.AgentLlmToolSchema> schemas) {
         if (schemas.isEmpty()) return "Available tools:\n- none";
         return "Available tools:\n" + schemas.stream()
-                .map(schema -> "- " + normalize(schema.toolCode()) + ": " + normalize(schema.description())
-                        + "\n  parameters: " + normalize(schema.parametersJsonSchema()))
+                .map(schema -> "- " + normalize(schema.toolCode()) + ": " + normalize(schema.description()))
                 .collect(Collectors.joining("\n"));
     }
 
     private String describeContext(ContextPackage contextPackage) {
         return "context-package:sources=" + contextPackage.sources().size()
                 + "/storyBibleEntries=" + contextPackage.storyBibleEntries().size()
-                + "/ragRefs=" + contextPackage.ragRefs().size()
                 + "/conflicts=" + contextPackage.conflicts().size()
                 + "/missing=" + contextPackage.missingContextFlags().size();
     }
@@ -154,9 +143,13 @@ public class PromptComposer {
 
     private SkillCatalogItem normalizeSkillCatalogItem(SkillCatalogItem item) {
         if (item == null) {
-            return new SkillCatalogItem("", "");
+            return new SkillCatalogItem("", "", "");
         }
-        return new SkillCatalogItem(normalize(item.name()), normalize(item.description()));
+        return new SkillCatalogItem(
+                normalize(item.name()),
+                normalize(item.description()),
+                normalize(item.contentHash())
+        );
     }
 
     private String joinDocumentPaths(List<SystemPromptDocument> documents) {

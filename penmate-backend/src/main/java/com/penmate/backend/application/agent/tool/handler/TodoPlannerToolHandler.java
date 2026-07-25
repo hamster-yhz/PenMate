@@ -1,80 +1,26 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import com.penmate.backend.application.agent.AgentModelRoutingService;
-import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
-import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
-import com.penmate.backend.application.agent.llm.AgentLlmGateway;
-import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
-import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
-import com.penmate.backend.application.todo.TodoPlanItemView;
-import com.penmate.backend.application.todo.TodoPlanView;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.common.serialization.JsonValues;
-import com.penmate.backend.domain.agent.model.AgentLlmMessage;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.penmate.backend.application.todo.TodoCrudApplicationService;
+import com.penmate.backend.domain.todo.model.SessionTodo;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Todo planner tool 处理器。
- */
+/** Lets the primary agent read and mutate the current session's persisted todo plan. */
 @Component
-@Slf4j
+@RequiredArgsConstructor
 public class TodoPlannerToolHandler implements AgentToolHandler {
 
-    private static final Set<String> ALLOWED_PLANNING_MODES = Set.of(
-            "TASK_BREAKDOWN",
-            "QUALITY_REMEDIATION",
-            "FOLLOW_UP_MODIFICATION"
-    );
-
-    private static final Set<String> ALLOWED_SOURCE_TYPES = Set.of(
-            "USER_REQUEST",
-            "QUALITY_REVIEW",
-            "STORY_BIBLE_UPDATE",
-            "PLANNING"
-    );
-
-    private static final Set<String> ALLOWED_PRIORITIES = Set.of(
-            "P0",
-            "P1",
-            "P2",
-            "P3"
-    );
-
-    private static final Set<String> ALLOWED_RECOMMENDED_STATUSES = Set.of(
-            "TODO",
-            "IN_PROGRESS",
-            "BLOCKED",
-            "DONE"
-    );
-
-    private final AgentModelRoutingService agentModelRoutingService;
-    private final AgentLlmInvocationService llmInvocations;
+    private static final Set<String> OPERATIONS = Set.of("list", "create", "update", "complete", "delete");
+    private final TodoCrudApplicationService todoService;
     private final JsonCodec jsonCodec;
-
-    @Autowired
-    public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
-                                  AgentLlmInvocationService llmInvocations,
-                                  JsonCodec jsonCodec) {
-        this.agentModelRoutingService = agentModelRoutingService;
-        this.llmInvocations = llmInvocations;
-        this.jsonCodec = jsonCodec;
-    }
-
-    public TodoPlannerToolHandler(AgentModelRoutingService agentModelRoutingService,
-                                  AgentLlmGateway llmGateway,
-                                  JsonCodec jsonCodec) {
-        this(agentModelRoutingService, new AgentLlmInvocationService(llmGateway), jsonCodec);
-    }
 
     @Override
     public String toolCode() {
@@ -82,288 +28,162 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
     }
 
     @Override
+    public boolean mutatesState(ToolCallRequest request) {
+        return !"list".equalsIgnoreCase(operation(request));
+    }
+
+    @Override
     public void validate(ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
-        TodoPlannerCommand command = parseCommand(request.toolArgsJson());
-        validateCommand(command);
+        if (request.sessionId() == null || request.sessionId() < 1) {
+            throw new IllegalArgumentException("current session is required");
+        }
+        Map<String, Object> args = readArgs(request);
+        String operation = JsonValues.string(args, "operation").toLowerCase();
+        if (!OPERATIONS.contains(operation)) {
+            throw new IllegalArgumentException("operation must be one of " + OPERATIONS);
+        }
+        switch (operation) {
+            case "list" -> rejectUnexpectedFields(args, operation, Set.of("operation", "todoStatus"));
+            case "create" -> {
+                rejectUnexpectedFields(args, operation,
+                        Set.of("operation", "title", "description", "sourceType", "todoStatus"));
+                requireNonBlank(args, "title");
+                requireNonBlank(args, "sourceType");
+                requireNonBlank(args, "todoStatus");
+            }
+            case "update" -> {
+                rejectUnexpectedFields(args, operation,
+                        Set.of("operation", "todoId", "title", "description", "sourceType", "todoStatus"));
+                requirePositiveLong(args, "todoId");
+                requireNonBlank(args, "title");
+                requireNonBlank(args, "sourceType");
+                requireNonBlank(args, "todoStatus");
+            }
+            case "complete", "delete" -> {
+                rejectUnexpectedFields(args, operation, Set.of("operation", "todoId"));
+                requirePositiveLong(args, "todoId");
+            }
+            default -> throw new IllegalArgumentException("unsupported operation: " + operation);
+        }
     }
 
     @Override
     public ToolCallResult execute(ToolCallRequest request) {
-        if (request == null) {
-            log.warn("todo_planner 参数非法: runId=null, traceId=null, message=request must not be null");
-            return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", "request must not be null");
-        }
-        TodoPlannerCommand command;
         try {
-            command = parseCommand(request.toolArgsJson());
-            validateCommand(command);
-        } catch (IllegalArgumentException ex) {
-            String message = ex.getMessage() == null || ex.getMessage().isBlank()
-                    ? "todo planner execution failed"
-                    : ex.getMessage();
-            log.warn("todo_planner 参数非法: runId={}, traceId={}, message={}",
-                    request == null ? null : request.runId(),
-                    request == null ? null : request.traceId(),
-                    message);
-            return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", message);
-        }
-
-        try {
-            AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(
-                    request.operatorId(),
-                    null,
-                    request.traceId()
-            );
-            AgentLlmTurnResponse response = llmInvocations.invokeBuffered(
-                    new AgentLlmTurnRequest(List.of(AgentLlmMessage.user(buildPrompt(command))), List.of(), "none"),
-                    executionConfig
-            );
-            String planningJson = response.assistantText();
-            TodoPlanView planView = parsePlan(planningJson);
-            log.info("todo_planner 执行成功: projectId={}, runId={}, traceId={}, itemCount={}",
-                    request.projectId(), request.runId(), request.traceId(), planView.items().size());
-            return ToolCallResult.success(jsonCodec.write(toOutputMap(planView)));
+            validate(request);
+            Map<String, Object> args = readArgs(request);
+            String operation = JsonValues.string(args, "operation").toLowerCase();
+            Long todoId = JsonValues.longValue(args, "todoId");
+            Long sessionId = request.sessionId();
+            SessionTodo todo;
+            return switch (operation) {
+                case "list" -> list(request, args, sessionId);
+                case "create" -> {
+                    todo = todoService.createTodo(request.projectId(), sessionId, request.runId(), candidate(args),
+                            request.operatorId(), request.traceId());
+                    yield success(operation, todo);
+                }
+                case "update" -> {
+                    todo = todoService.updateTodo(request.projectId(), sessionId, todoId, request.runId(), candidate(args),
+                            request.operatorId(), request.traceId());
+                    yield success(operation, todo);
+                }
+                case "complete" -> {
+                    todo = todoService.completeTodo(request.projectId(), sessionId, todoId,
+                            request.operatorId(), request.traceId());
+                    yield success(operation, todo);
+                }
+                case "delete" -> {
+                    todoService.deleteTodo(request.projectId(), sessionId, todoId,
+                            request.operatorId(), request.traceId());
+                    yield ToolCallResult.success(jsonCodec.write(Map.of(
+                            "operation", "delete",
+                            "todoId", String.valueOf(todoId),
+                            "deleted", true
+                    )));
+                }
+                default -> throw new IllegalArgumentException("unsupported operation: " + operation);
+            };
         } catch (Exception ex) {
-            String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
-                    ? "todo planner execution failed"
-                    : ex.getMessage();
-            log.warn("todo_planner 执行失败: projectId={}, runId={}, traceId={}, message={}",
-                    request.projectId(), request.runId(), request.traceId(), errorMessage);
-            return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", errorMessage);
+            String message = ex.getMessage() == null || ex.getMessage().isBlank()
+                    ? "todo planner execution failed" : ex.getMessage();
+            return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", message);
         }
     }
 
-    private TodoPlannerCommand parseCommand(String toolArgsJson) {
+    private ToolCallResult list(ToolCallRequest request, Map<String, Object> args, Long sessionId) {
+        var todos = todoService.listSessionTodos(request.projectId(), sessionId,
+                JsonValues.nullableString(args, "todoStatus"));
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("operation", "list");
+        output.put("items", todos.stream().map(this::todoOutput).toList());
+        return ToolCallResult.success(jsonCodec.write(output));
+    }
+
+    private ToolCallResult success(String operation, SessionTodo todo) {
+        Map<String, Object> output = todoOutput(todo);
+        output.put("operation", operation);
+        return ToolCallResult.success(jsonCodec.write(output));
+    }
+
+    private SessionTodo candidate(Map<String, Object> args) {
+        SessionTodo todo = new SessionTodo();
+        todo.setTitle(JsonValues.string(args, "title"));
+        todo.setDescription(JsonValues.nullableString(args, "description"));
+        todo.setSourceType(JsonValues.string(args, "sourceType"));
+        todo.setTodoStatus(JsonValues.string(args, "todoStatus"));
+        return todo;
+    }
+
+    private Map<String, Object> todoOutput(SessionTodo todo) {
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("todoId", id(todo == null ? null : todo.getTodoId()));
+        output.put("title", todo == null ? null : todo.getTitle());
+        output.put("description", todo == null ? null : todo.getDescription());
+        output.put("sourceType", todo == null ? null : todo.getSourceType());
+        output.put("todoStatus", todo == null ? null : todo.getTodoStatus());
+        output.put("completedAt", todo == null || todo.getCompletedAt() == null ? null : todo.getCompletedAt().toString());
+        return output;
+    }
+
+    private Map<String, Object> readArgs(ToolCallRequest request) {
         try {
-            Map<String, Object> args = jsonCodec.readObject(toolArgsJson);
-            return new TodoPlannerCommand(
-                    JsonValues.string(args, "planningMode"),
-                    JsonValues.string(args, "userRequest"),
-                    toQualityIssues(JsonValues.list(args, "qualityIssues")),
-                    toStringList(JsonValues.list(args, "storyBibleUpdates")),
-                    toStringList(JsonValues.list(args, "planningContext")),
-                    toStringList(JsonValues.list(args, "existingTodos"))
-            );
+            return jsonCodec.readObject(request.toolArgsJson());
         } catch (Exception ex) {
             throw new IllegalArgumentException("toolArgsJson must be valid JSON", ex);
         }
     }
 
-    private List<QualityIssueInput> toQualityIssues(List<?> values) {
-        List<QualityIssueInput> result = new ArrayList<>();
-        for (Object value : values) {
-            Map<String, Object> item = mapValue(value);
-            result.add(new QualityIssueInput(
-                    JsonValues.string(item, "severity"),
-                    JsonValues.string(item, "summary"),
-                    JsonValues.string(item, "suggestion")
-            ));
-        }
-        return result;
+    private String operation(ToolCallRequest request) {
+        return request == null ? "" : JsonValues.string(readArgs(request), "operation");
     }
 
-    private List<String> toStringList(List<?> values) {
-        return values.stream()
-                .filter(value -> value != null)
-                .map(String::valueOf)
-                .toList();
-    }
-
-    private void validateCommand(TodoPlannerCommand command) {
-        if (!ALLOWED_PLANNING_MODES.contains(command.planningMode())) {
-            throw new IllegalArgumentException("planningMode must be one of [TASK_BREAKDOWN, QUALITY_REMEDIATION, FOLLOW_UP_MODIFICATION]");
-        }
-        if ("TASK_BREAKDOWN".equals(command.planningMode()) && command.userRequest().isBlank()) {
-            throw new IllegalArgumentException("userRequest must not be blank for TASK_BREAKDOWN");
-        }
-        if ("QUALITY_REMEDIATION".equals(command.planningMode()) && command.qualityIssues().isEmpty()) {
-            throw new IllegalArgumentException("qualityIssues must not be empty for QUALITY_REMEDIATION");
-        }
-        if (!"TASK_BREAKDOWN".equals(command.planningMode())
-                && command.userRequest().isBlank()
-                && command.qualityIssues().isEmpty()
-                && command.storyBibleUpdates().isEmpty()
-                && command.planningContext().isEmpty()
-                && command.existingTodos().isEmpty()) {
-            throw new IllegalArgumentException("at least one planning input is required");
-        }
-        for (QualityIssueInput issue : command.qualityIssues()) {
-            if (issue.severity().isBlank() || issue.summary().isBlank() || issue.suggestion().isBlank()) {
-                throw new IllegalArgumentException("qualityIssues must contain severity, summary and suggestion");
-            }
+    private void requireNonBlank(Map<String, Object> args, String field) {
+        if (JsonValues.string(args, field).isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
         }
     }
 
-    private TodoPlanView parsePlan(String planningJson) {
-        Map<String, Object> jsonObject;
-        try {
-            jsonObject = jsonCodec.readObject(planningJson);
-        } catch (Exception ex) {
-            throw new IllegalStateException("todo planner result must be valid JSON", ex);
+    private void requirePositiveLong(Map<String, Object> args, String field) {
+        Long value = JsonValues.longValue(args, field);
+        if (value == null) {
+            throw new IllegalArgumentException(field + " is required");
         }
-
-        String planTitle = JsonValues.string(jsonObject, "planTitle").trim();
-        String planSummary = JsonValues.string(jsonObject, "planSummary").trim();
-        String recommendedNextAction = JsonValues.string(jsonObject, "recommendedNextAction").trim();
-        if (planTitle.isBlank() || planSummary.isBlank() || recommendedNextAction.isBlank()) {
-            throw new IllegalStateException("todo planner result must contain planTitle, planSummary and recommendedNextAction");
-        }
-
-        List<?> itemsArray = JsonValues.list(jsonObject, "items");
-        if (itemsArray.isEmpty()) {
-            throw new IllegalStateException("todo planner result must contain structured items");
-        }
-
-        List<TodoPlanItemView> items = new ArrayList<>();
-        for (Object item : itemsArray) {
-            Map<String, Object> itemObject = mapValue(item);
-            String title = JsonValues.string(itemObject, "title").trim();
-            String description = JsonValues.string(itemObject, "description").trim();
-            String priority = JsonValues.string(itemObject, "priority").trim();
-            String sourceType = JsonValues.string(itemObject, "sourceType").trim();
-            String recommendedStatus = JsonValues.string(itemObject, "recommendedStatus").trim();
-            String rationale = JsonValues.string(itemObject, "rationale").trim();
-            boolean hasSuggestedAutoCreate = itemObject.containsKey("suggestedAutoCreate");
-            boolean suggestedAutoCreate = JsonValues.booleanValue(itemObject, "suggestedAutoCreate");
-            List<String> acceptanceCriteria = toStringList(JsonValues.list(itemObject, "acceptanceCriteria"));
-            List<String> dependsOn = toStringList(JsonValues.list(itemObject, "dependsOn"));
-            if (title.isBlank()
-                    || description.isBlank()
-                    || priority.isBlank()
-                    || sourceType.isBlank()
-                    || recommendedStatus.isBlank()
-                    || rationale.isBlank()
-                    || !hasSuggestedAutoCreate
-                    || acceptanceCriteria.isEmpty()) {
-                throw new IllegalStateException("todo planner items must contain title, description, priority, sourceType, recommendedStatus, suggestedAutoCreate, rationale and acceptanceCriteria");
-            }
-            if (!ALLOWED_PRIORITIES.contains(priority)) {
-                throw new IllegalStateException("todo planner priority must be one of [P0, P1, P2, P3]");
-            }
-            if (!ALLOWED_SOURCE_TYPES.contains(sourceType)) {
-                throw new IllegalStateException("todo planner sourceType must be one of [USER_REQUEST, QUALITY_REVIEW, STORY_BIBLE_UPDATE, PLANNING]");
-            }
-            if (!ALLOWED_RECOMMENDED_STATUSES.contains(recommendedStatus)) {
-                throw new IllegalStateException("todo planner recommendedStatus must be one of [TODO, IN_PROGRESS, BLOCKED, DONE]");
-            }
-            items.add(new TodoPlanItemView(
-                    title,
-                    description,
-                    priority,
-                    sourceType,
-                    recommendedStatus,
-                    suggestedAutoCreate,
-                    rationale,
-                    acceptanceCriteria,
-                    dependsOn
-            ));
-        }
-        return new TodoPlanView(planTitle, planSummary, recommendedNextAction, items);
-    }
-
-    private Map<String, Object> mapValue(Object value) {
-        if (!(value instanceof Map<?, ?> map)) {
-            return Map.of();
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        map.forEach((key, item) -> result.put(String.valueOf(key), item));
-        return result;
-    }
-
-    private Map<String, Object> toOutputMap(TodoPlanView planView) {
-        Map<String, Object> output = new LinkedHashMap<>();
-        output.put("planTitle", planView.planTitle());
-        output.put("planSummary", planView.planSummary());
-        output.put("recommendedNextAction", planView.recommendedNextAction());
-        List<Map<String, Object>> items = new ArrayList<>();
-        for (TodoPlanItemView item : planView.items()) {
-            Map<String, Object> itemMap = new LinkedHashMap<>();
-            itemMap.put("title", item.title());
-            itemMap.put("description", item.description());
-            itemMap.put("priority", item.priority());
-            itemMap.put("sourceType", item.sourceType());
-            itemMap.put("recommendedStatus", item.recommendedStatus());
-            itemMap.put("suggestedAutoCreate", item.suggestedAutoCreate());
-            itemMap.put("rationale", item.rationale());
-            itemMap.put("acceptanceCriteria", item.acceptanceCriteria());
-            itemMap.put("dependsOn", item.dependsOn());
-            items.add(itemMap);
-        }
-        output.put("items", items);
-        return output;
-    }
-
-    private String buildPrompt(TodoPlannerCommand command) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("你是 Todo Planner。\n")
-                .append("只输出 Todo 规划建议，不要直接创建或持久化 todo。\n")
-                .append("输出必须是可直接渲染前端卡片的 JSON 对象，不要输出 markdown，不要输出 bullet list。\n")
-                .append("顶层字段必须包含：planTitle、planSummary、recommendedNextAction、items。\n")
-                .append("items 每项必须包含：title、description、priority、sourceType、recommendedStatus、suggestedAutoCreate、rationale、acceptanceCriteria、dependsOn。\n")
-                .append("priority 只允许：P0、P1、P2、P3。\n")
-                .append("sourceType 只允许：USER_REQUEST、QUALITY_REVIEW、STORY_BIBLE_UPDATE、PLANNING。\n")
-                .append("recommendedStatus 只允许：TODO、IN_PROGRESS、BLOCKED、DONE。\n")
-                .append("suggestedAutoCreate 只能表示建议，不允许直接持久化创建。\n")
-                .append("planningMode: ").append(command.planningMode()).append("\n")
-                .append("用户请求：").append(command.userRequest()).append("\n");
-        appendQualityIssues(builder, command.qualityIssues());
-        appendSection(builder, "故事圣经待同步项", command.storyBibleUpdates());
-        appendSection(builder, "规划上下文", command.planningContext());
-        appendSection(builder, "现有待办", command.existingTodos());
-        builder.append("请将用户任务拆解、质量问题转待办、后续修改规划统一整理。\n");
-        return builder.toString().trim();
-    }
-
-    private void appendQualityIssues(StringBuilder builder, List<QualityIssueInput> issues) {
-        builder.append("质量问题:\n");
-        for (QualityIssueInput issue : issues) {
-            builder.append("- [")
-                    .append(issue.severity())
-                    .append("] ")
-                    .append(issue.summary())
-                    .append("；建议：")
-                    .append(issue.suggestion())
-                    .append("\n");
+        if (value < 1) {
+            throw new IllegalArgumentException(field + " must be greater than or equal to 1");
         }
     }
 
-    private void appendSection(StringBuilder builder, String title, List<String> items) {
-        builder.append(title).append(":\n");
-        for (String item : items) {
-            builder.append("- ").append(item == null ? "" : item).append("\n");
-        }
+    private void rejectUnexpectedFields(Map<String, Object> args, String operation, Set<String> allowed) {
+        args.keySet().stream().filter(field -> !allowed.contains(field)).findFirst().ifPresent(field -> {
+            throw new IllegalArgumentException("Unexpected field for operation " + operation + ": " + field);
+        });
     }
 
-    private record TodoPlannerCommand(
-            String planningMode,
-            String userRequest,
-            List<QualityIssueInput> qualityIssues,
-            List<String> storyBibleUpdates,
-            List<String> planningContext,
-            List<String> existingTodos
-    ) {
-        private TodoPlannerCommand {
-            planningMode = planningMode == null ? "" : planningMode.trim();
-            userRequest = userRequest == null ? "" : userRequest.trim();
-            qualityIssues = qualityIssues == null ? List.of() : List.copyOf(qualityIssues);
-            storyBibleUpdates = storyBibleUpdates == null ? List.of() : List.copyOf(storyBibleUpdates);
-            planningContext = planningContext == null ? List.of() : List.copyOf(planningContext);
-            existingTodos = existingTodos == null ? List.of() : List.copyOf(existingTodos);
-        }
-    }
-
-    private record QualityIssueInput(
-            String severity,
-            String summary,
-            String suggestion
-    ) {
-        private QualityIssueInput {
-            severity = severity == null ? "" : severity.trim();
-            summary = summary == null ? "" : summary.trim();
-            suggestion = suggestion == null ? "" : suggestion.trim();
-        }
+    private String id(Long value) {
+        return value == null ? null : String.valueOf(value);
     }
 }

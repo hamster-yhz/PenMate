@@ -1,9 +1,7 @@
 package com.penmate.backend.application.agent.orchestration;
 
-import com.penmate.backend.application.agent.context.ContextPackage;
+import com.penmate.backend.application.agent.prompt.PromptContextRenderer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
-import com.penmate.backend.application.agent.prompt.StructuredPromptBlockFormatter;
-import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import org.springframework.stereotype.Component;
@@ -12,75 +10,46 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.StringJoiner;
 
 @Component
 public class AgentPromptAssembler {
 
-    private final SystemPromptProvider systemPromptProvider;
-    private final StructuredPromptBlockFormatter structuredPromptBlockFormatter;
+    private final PromptContextRenderer contextRenderer;
 
-    public AgentPromptAssembler(SystemPromptProvider systemPromptProvider,
-                                StructuredPromptBlockFormatter structuredPromptBlockFormatter) {
-        this.systemPromptProvider = systemPromptProvider;
-        this.structuredPromptBlockFormatter = structuredPromptBlockFormatter;
+    public AgentPromptAssembler(PromptContextRenderer contextRenderer) {
+        this.contextRenderer = contextRenderer;
     }
 
     public List<Map<String, Object>> buildExecutionMessages(PromptPlan promptPlan,
-                                                            ContextPackage contextPackage,
-                                                            String userRequest) {
-        return toWireMessages(buildExecutionMessages(promptPlan, contextPackage, userRequest, List.of()));
+                                                             String userRequest) {
+        return toWireMessages(buildExecutionMessages(promptPlan, userRequest, List.of()));
     }
 
     public List<AgentLlmMessage> buildExecutionMessages(PromptPlan promptPlan,
-                                                        ContextPackage contextPackage,
-                                                        String userRequest,
-                                                        List<AgentLlmMessage> conversationWindow) {
-        ContextPackage resolvedContext = Objects.requireNonNull(contextPackage, "contextPackage");
-        String contextSystemMessage = buildExecutionContextSystemMessage(
-                resolvedContext.styleSnapshot(),
-                resolvedContext.storyBibleEntries(),
-                resolvedContext.conflicts(),
-                resolvedContext.missingContextFlags(),
-                resolvedContext.ragRefs()
-        );
-        String userRequestBlock = structuredPromptBlockFormatter.wrapBlock("user_request", userRequest == null ? "" : userRequest.trim());
+                                                         String userRequest,
+                                                         List<AgentLlmMessage> conversationWindow) {
+        return buildExecutionMessages(promptPlan, "", userRequest, conversationWindow);
+    }
 
+    public List<AgentLlmMessage> buildExecutionMessages(PromptPlan promptPlan,
+                                                         String activatedSkills,
+                                                         String userRequest,
+                                                         List<AgentLlmMessage> conversationWindow) {
         List<AgentLlmMessage> result = new ArrayList<>();
-        result.add(AgentLlmMessage.system(promptPlan == null ? "" : promptPlan.assembledPromptPreview()));
-        if (!contextSystemMessage.isBlank()) {
-            result.add(AgentLlmMessage.system(contextSystemMessage));
+        if (promptPlan != null && !promptPlan.stablePrefix().isBlank()) {
+            result.add(AgentLlmMessage.system(promptPlan.stablePrefix()));
+        }
+        if (activatedSkills != null && !activatedSkills.isBlank()) {
+            result.add(AgentLlmMessage.system(activatedSkills.trim()));
+        }
+        if (promptPlan != null && !promptPlan.dynamicContext().isBlank()) {
+            result.add(AgentLlmMessage.system(promptPlan.dynamicContext()));
         }
         if (conversationWindow != null && !conversationWindow.isEmpty()) {
             result.addAll(conversationWindow);
         }
-        result.add(AgentLlmMessage.user(userRequestBlock));
+        result.add(AgentLlmMessage.user(contextRenderer.renderUserRequest(userRequest)));
         return List.copyOf(result);
-    }
-
-    private String buildExecutionContextSystemMessage(String style,
-                                                      List<String> storyBibleEntries,
-                                                      List<String> conflicts,
-                                                      List<String> missingFlags,
-                                                      List<String> ragRefs) {
-        StringJoiner contextBuilder = new StringJoiner("\n\n");
-        if (style != null && !style.isBlank()) {
-            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", style));
-        }
-        if (storyBibleEntries != null && !storyBibleEntries.isEmpty()) {
-            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", String.join("\n", storyBibleEntries)));
-        }
-        if (conflicts != null && !conflicts.isEmpty()) {
-            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"conflict\"", String.join("\n", conflicts)));
-        }
-        if (missingFlags != null && !missingFlags.isEmpty()) {
-            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"missing\"", String.join("\n", missingFlags)));
-        }
-        if (ragRefs != null && !ragRefs.isEmpty()) {
-            contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", String.join("\n", ragRefs)));
-        }
-        return contextBuilder.toString();
     }
 
     private List<Map<String, Object>> toWireMessages(List<AgentLlmMessage> messages) {

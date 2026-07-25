@@ -16,7 +16,7 @@ class AgentLlmMessageTest {
         AgentLlmToolCallPayload payload = new AgentLlmToolCallPayload(
                 "call_1",
                 "function",
-                "context_enhancer",
+                "custom_tool",
                 "{\"prompt\":\"补充上下文\"}"
         );
 

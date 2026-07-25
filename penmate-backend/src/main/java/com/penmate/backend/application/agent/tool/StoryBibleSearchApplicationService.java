@@ -11,12 +11,16 @@ import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class StoryBibleSearchApplicationService {
@@ -69,16 +73,44 @@ public class StoryBibleSearchApplicationService {
                 routingMode, snapshot.storyBibleRevision(), snapshot.selectorCatalog(), List.of(), selectorConfig));
         List<Long> usedIds = resolved.nodes().stream().map(StoryBibleContextResolver.RenderedNode::nodeId).toList();
         workingSetPromotions.promoteBestEffort(run.sessionId(), run.turnId(), usedIds, BigDecimal.ONE);
-        List<Map<String, Object>> results = resolved.nodes().stream().map(node -> Map.<String, Object>of(
-                "nodeId", String.valueOf(node.nodeId()),
-                "title", node.title(),
-                "typeCode", node.typeCode(),
-                "effectiveState", node.effectiveState(),
-                "progressionIds", node.appliedProgressionIds().stream().map(String::valueOf).toList(),
-                "citation", "story-bible:" + run.contextEpochId() + ":" + node.nodeId()
-        )).toList();
+        Map<Long, StoryBibleRouteRequest.CatalogEntry> catalogById = snapshot.selectorCatalog().stream()
+                .collect(Collectors.toMap(StoryBibleRouteRequest.CatalogEntry::nodeId, Function.identity()));
+        List<Map<String, Object>> results = resolved.nodes().stream().map(node -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("nodeId", String.valueOf(node.nodeId()));
+            result.put("title", node.title());
+            result.put("typeCode", node.typeCode());
+            result.put("aliases", catalogById.containsKey(node.nodeId())
+                    ? catalogById.get(node.nodeId()).aliases() : List.of());
+            result.put("effectiveState", node.effectiveState());
+            result.put("relations", renderRelations(node.nodeId(), resolved.relations()));
+            result.put("progressionIds", node.appliedProgressionIds().stream().map(String::valueOf).toList());
+            result.put("citation", "story-bible:" + run.contextEpochId() + ":" + node.nodeId());
+            return result;
+        }).toList();
         try { return ToolCallResult.success(jsonCodec.write(results)); }
         catch (RuntimeException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_SERIALIZE", ex.getMessage()); }
+    }
+
+    private List<Map<String, Object>> renderRelations(
+            Long nodeId,
+            List<StoryBibleRelation> relations
+    ) {
+        return relations.stream()
+                .filter(relation -> nodeId.equals(relation.getSourceNodeId()) || nodeId.equals(relation.getTargetNodeId()))
+                .map(relation -> {
+                    boolean outgoing = nodeId.equals(relation.getSourceNodeId());
+                    Map<String, Object> value = new LinkedHashMap<>();
+                    value.put("relationId", String.valueOf(relation.getRelationId()));
+                    value.put("direction", outgoing ? "OUT" : "IN");
+                    value.put("relationType", relation.getRelationType());
+                    value.put("otherNodeId", String.valueOf(outgoing
+                            ? relation.getTargetNodeId() : relation.getSourceNodeId()));
+                    value.put("description", relation.getDescription());
+                    value.put("attributesJson", relation.getAttributesJson());
+                    return value;
+                })
+                .toList();
     }
 
     public record SearchArgs(String query, List<String> mentionedEntities) {

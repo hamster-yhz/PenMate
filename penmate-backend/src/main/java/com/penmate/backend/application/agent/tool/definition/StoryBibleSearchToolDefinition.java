@@ -24,7 +24,7 @@ public class StoryBibleSearchToolDefinition implements AgentToolDefinition {
         return new AgentToolDescriptor(
                 "story_bible_search",
                 new ToolPresentation("故事设定检索"),
-                new ToolExposure(true, "Search the Run-bound Story Bible context at the active manuscript chapter", SCHEMA),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "Search the Run-bound Story Bible context at the active manuscript chapter", SCHEMA),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 0, Map.of())
         );
     }

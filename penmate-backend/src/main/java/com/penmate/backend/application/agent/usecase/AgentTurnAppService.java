@@ -4,6 +4,9 @@ import com.penmate.backend.application.agent.run.AgentRunAppService;
 import com.penmate.backend.application.agent.run.AgentRunCommand;
 import com.penmate.backend.application.agent.run.AgentRunResult;
 import com.penmate.backend.application.agent.run.AgentRunDispatcher;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
+import com.penmate.backend.application.common.exception.BusinessErrorType;
+import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
@@ -23,19 +26,22 @@ public class AgentTurnAppService {
     private final AgentRunAppService agentRunAppService;
     private final AgentRunDispatcher runDispatcher;
     private final SessionStyleBindingAppService sessionStyleBindingAppService;
+    private final AgentSkillActivationService skillActivationService;
 
     public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
                                AgentRepository agentRepository,
                                AgentSessionRepository agentSessionRepository,
                                BusinessIdGenerator businessIdGenerator,
                                AgentRunAppService agentRunAppService,
-                               AgentRunDispatcher runDispatcher) {
+                               AgentRunDispatcher runDispatcher,
+                               AgentSkillActivationService skillActivationService) {
         this.sessionStyleBindingAppService = sessionStyleBindingAppService;
         this.agentRepository = agentRepository;
         this.agentSessionRepository = agentSessionRepository;
         this.businessIdGenerator = businessIdGenerator;
         this.agentRunAppService = agentRunAppService;
         this.runDispatcher = runDispatcher;
+        this.skillActivationService = skillActivationService;
     }
 
     @Transactional
@@ -45,6 +51,21 @@ public class AgentTurnAppService {
                                       String traceId) {
         log.info("Agent turn creation started: projectId={}, sessionId={}, traceId={}",
                 projectId, sessionId, traceId);
+
+        agentSessionRepository.lockSessionForTurnAppend(projectId, sessionId);
+        var session = agentSessionRepository.findSession(projectId, sessionId);
+        if (session == null) {
+            throw BusinessException.notFound("Agent session not found");
+        }
+        if (!session.getOwnerUserId().equals(command.operatorId())) {
+            throw BusinessException.forbidden("Agent session belongs to another user");
+        }
+        if (agentRepository.countActiveRuns(sessionId) > 0) {
+            throw BusinessException.of(BusinessErrorType.CONFLICT, "SESSION_RUN_ACTIVE",
+                    "This Agent session already has an active Run", null);
+        }
+        skillActivationService.replaceSessionSkills(sessionId,
+                command == null ? null : command.activeSkills());
 
         AgentMessage userMessage = createUserMessage(projectId, sessionId, command, traceId);
         persistMessage(sessionId, userMessage);
@@ -85,6 +106,7 @@ public class AgentTurnAppService {
                 null,
                 traceId
         ));
+        skillActivationService.bindSessionSkillsToRun(sessionId, runResult.runId());
         requireOne(agentSessionRepository.updateLastTurn(projectId, sessionId, turnId), "failed to update session last turn");
         requireOne(agentSessionRepository.updateLastRun(projectId, sessionId, runResult.runId()), "failed to update session last run");
 

@@ -28,7 +28,7 @@ public class SkillLoadToolDefinition implements AgentToolDefinition {
                 "skill_load",
                 new ToolPresentation("技能加载"),
                 new ToolExposure(
-                        true,
+                        ToolLifecycleStatus.ACTIVE,
                         "Load full skill instructions by skill name after reviewing the Available skills catalog.",
                         buildParametersJsonSchema()
                 ),

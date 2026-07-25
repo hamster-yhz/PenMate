@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent.prompt;
 
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
+
 import java.util.List;
 
 /**
@@ -10,7 +12,7 @@ import java.util.List;
  */
 public record PromptPlan(
         List<PromptModulePlan> modules,
-        List<String> skills,
+        List<AgentLlmToolSchema> toolSchemas,
         String finalProfile,
         String stablePrefix,
         String dynamicContext,
@@ -19,16 +21,16 @@ public record PromptPlan(
 
     public PromptPlan {
         modules = List.copyOf(modules == null ? List.of() : modules);
-        skills = List.copyOf(skills == null ? List.of() : skills);
+        toolSchemas = List.copyOf(toolSchemas == null ? List.of() : toolSchemas);
         finalProfile = normalize(finalProfile);
         stablePrefix = normalize(stablePrefix);
         dynamicContext = normalize(dynamicContext);
         assembledPromptPreview = normalize(assembledPromptPreview);
     }
 
-    public PromptPlan(List<PromptModulePlan> modules, List<String> skills, String finalProfile,
+    public PromptPlan(List<PromptModulePlan> modules, String finalProfile,
                       String assembledPromptPreview) {
-        this(modules, skills, finalProfile, assembledPromptPreview, "", assembledPromptPreview);
+        this(modules, List.of(), finalProfile, assembledPromptPreview, "", assembledPromptPreview);
     }
 
     private static String normalize(String value) {

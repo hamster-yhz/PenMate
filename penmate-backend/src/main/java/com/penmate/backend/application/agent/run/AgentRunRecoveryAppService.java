@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.run;
 
 import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
@@ -22,17 +23,20 @@ public class AgentRunRecoveryAppService {
     private final AgentRunPendingApprovalRepository pendingApprovals;
     private final AgentPartialMessageCheckpointStore partialMessages;
     private final ToolApprovalPreview toolApprovalPreview;
+    private final AgentSkillActivationService skillActivationService;
 
     public AgentRunRecoveryAppService(AgentSessionRepository agentSessionRepository,
                                       AgentRunProjectionRepository agentRunProjectionRepository,
                                       AgentRunPendingApprovalRepository pendingApprovals,
                                       AgentPartialMessageCheckpointStore partialMessages,
-                                      ToolApprovalPreview toolApprovalPreview) {
+                                      ToolApprovalPreview toolApprovalPreview,
+                                      AgentSkillActivationService skillActivationService) {
         this.agentSessionRepository = agentSessionRepository;
         this.agentRunProjectionRepository = agentRunProjectionRepository;
         this.pendingApprovals = pendingApprovals;
         this.partialMessages = partialMessages;
         this.toolApprovalPreview = toolApprovalPreview;
+        this.skillActivationService = skillActivationService;
     }
 
     public AgentRunRecoveryResult getRecovery(Long projectId, Long sessionId, String traceId) {
@@ -108,7 +112,8 @@ public class AgentRunRecoveryAppService {
                         session.getBoundStyleId() == null
                                 ? null
                                 : new AgentRunRecoveryResult.BoundStyleView(session.getBoundStyleId(), null),
-                        activeRun == null ? session.getLastRunStatus() : activeRun.runStatus()
+                        activeRun == null ? session.getLastRunStatus() : activeRun.runStatus(),
+                        skillActivationService.listSessionSkills(sessionId)
                 ),
                 activeRun,
                 pendingApproval,

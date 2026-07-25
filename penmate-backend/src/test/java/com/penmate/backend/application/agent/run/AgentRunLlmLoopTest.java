@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmCancellationPort;
 import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
@@ -66,7 +67,6 @@ class AgentRunLlmLoopTest {
 
     @Test
     void emits_llm_turn_events_and_bounded_message_delta_for_completed_text_response() {
-        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(llmGateway.generateTurn(any(), any()))
                 .thenReturn(new AgentLlmTurnResponse("stop", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabc", List.of(), "{}", new LlmTokenUsage(7, 9, 16)));
         AgentRunLlmLoop loop = newLoop();
@@ -78,6 +78,8 @@ class AgentRunLlmLoopTest {
                 50001L,
                 "trace-1",
                 List.of(AgentLlmMessage.user("Write")),
+                List.of(new AgentLlmToolSchema(
+                        "snapshot_tool", "Snapshot tool", "{\"type\":\"object\"}")),
                 AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(),
                 201L,
                 7L
@@ -91,11 +93,15 @@ class AgentRunLlmLoopTest {
         verify(eventPublisher).broadcastOnly(eq(70001L), eq("message.delta"), payloadCaptor.capture(), anyLong());
         assertThat(payloadCaptor.getValue().toString()).contains("abcdefghijklmnopqrstuvwxyz");
         verify(eventPublisher, never()).publish(eq(70001L), eq("message.completed"), any());
+        ArgumentCaptor<AgentLlmTurnRequest> llmRequest = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway).generateTurn(llmRequest.capture(), any());
+        assertThat(llmRequest.getValue().tools())
+                .extracting(AgentLlmToolSchema::toolCode)
+                .containsExactly("snapshot_tool");
     }
 
     @Test
     void sends_failed_tool_call_back_to_llm_before_completing_run() {
-        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(llmGateway.generateTurn(any(), any()))
                 .thenReturn(
                         new AgentLlmTurnResponse(
@@ -124,6 +130,8 @@ class AgentRunLlmLoopTest {
                 50001L,
                 "trace-1",
                 List.of(AgentLlmMessage.user("Create a book")),
+                List.of(new AgentLlmToolSchema(
+                        "book_crud", "Book CRUD", "{\"type\":\"object\"}")),
                 AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(),
                 201L,
                 7L
@@ -156,6 +164,35 @@ class AgentRunLlmLoopTest {
     }
 
     @Test
+    void rejects_a_fresh_tool_call_that_is_not_in_the_run_snapshot() {
+        when(llmGateway.generateTurn(any(), any()))
+                .thenReturn(
+                        new AgentLlmTurnResponse(
+                                "tool_calls", "",
+                                List.of(new AgentLlmToolCall("call-hidden", "book_crud", "{}")),
+                                "{}", new LlmTokenUsage(1, 1, 2)),
+                        new AgentLlmTurnResponse(
+                                "stop", "Not available", List.of(), "{}",
+                                new LlmTokenUsage(1, 1, 2))
+                );
+        AgentRunLlmLoop loop = newLoop();
+
+        AgentRunLoopResult result = loop.execute(new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace-allowlist",
+                List.of(AgentLlmMessage.user("Try a hidden tool")),
+                List.of(new AgentLlmToolSchema(
+                        "rag_query", "RAG", "{\"type\":\"object\"}")),
+                AgentLlmExecutionConfig.builder().build(), 201L, 7L));
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        verify(toolCallService, never()).executeToolCall(any());
+        ArgumentCaptor<Object> failedPayload = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publish(eq(70001L), eq("tool.call.failed"), failedPayload.capture());
+        assertThat(((Map<?, ?>) failedPayload.getValue()).get("errorCode"))
+                .isEqualTo("TOOL_NOT_ALLOWED_FOR_RUN");
+    }
+
+    @Test
     void resume_should_execute_remaining_sibling_tool_calls_before_requesting_the_llm_again() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         List<AgentLlmToolCallPayload> calls = List.of(
@@ -173,7 +210,6 @@ class AgentRunLlmLoopTest {
                 objectMapper.writeValueAsString(savedMessages), "70001:call-1", "APPROVED",
                 201L, "trace-1", null, null
         );
-        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(toolCallService.executeToolCall(any())).thenReturn(
                 ToolCallResult.success("{\"updated\":true}"),
                 ToolCallResult.success("{\"matches\":[\"Mira\"]}")
@@ -184,6 +220,7 @@ class AgentRunLlmLoopTest {
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
+                List.of(),
                 AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L, 7L
         ), pending);
 
@@ -232,6 +269,7 @@ class AgentRunLlmLoopTest {
 
         AgentRunLoopResult result = loop.resumeApproved(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace-1", List.of(),
+                List.of(),
                 AgentLlmExecutionConfig.builder().modelConfigId(1001L).build(), 201L, 7L
         ), pending);
 
@@ -262,13 +300,13 @@ class AgentRunLlmLoopTest {
                 70001L, messages, 2, 1, 0, "", new LlmTokenUsage(4, 2, 6));
         when(toolCallService.executeToolCall(any())).thenReturn(
                 ToolCallResult.success("{\"matches\":[\"Mira\"]}"));
-        when(toolDefinitionSource.listLlmSchemas()).thenReturn(List.of());
         when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
                 "stop", "Recovered", List.of(), "{}", new LlmTokenUsage(2, 1, 3)));
         AgentRunLlmLoop loop = newLoop();
 
         AgentRunLoopResult result = loop.resume(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace", List.of(),
+                List.of(),
                 AgentLlmExecutionConfig.builder().build(), 201L, 7L), continuation);
 
         assertThat(result.finalAssistantText()).isEqualTo("Recovered");
@@ -292,6 +330,7 @@ class AgentRunLlmLoopTest {
 
         AgentRunLoopResult result = loop.resume(new AgentRunLoopRequest(
                 70001L, 101L, 90001L, 50001L, "trace", List.of(),
+                List.of(),
                 AgentLlmExecutionConfig.builder().build(), 201L, 7L), continuation);
 
         assertThat(result.finalAssistantText()).isEqualTo("Already complete");

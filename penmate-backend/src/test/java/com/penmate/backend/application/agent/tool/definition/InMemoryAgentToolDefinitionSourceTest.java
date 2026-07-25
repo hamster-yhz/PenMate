@@ -16,8 +16,8 @@ class InMemoryAgentToolDefinitionSourceTest {
     @Test
     void exposes_descriptors_in_declaration_order_as_an_immutable_snapshot() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                definition("tool_a", true, governance(false, "", 1)),
-                definition("book_crud", true, new ToolGovernancePolicy(
+                definition("tool_a", ToolLifecycleStatus.ACTIVE, governance(false, "", 1)),
+                definition("book_crud", ToolLifecycleStatus.ACTIVE, new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""), 2,
                         Map.of("delete", new ToolOperationPolicy("delete", new ApprovalPolicyDecision(true, "BOOK_DELETE")))))
         ));
@@ -34,7 +34,7 @@ class InMemoryAgentToolDefinitionSourceTest {
     @Test
     void rejects_unknown_tool_codes() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                definition("context_enhancer", true, governance(false, "", 1))));
+                definition("custom_tool", ToolLifecycleStatus.ACTIVE, governance(false, "", 1))));
 
         assertThatThrownBy(() -> source.getRequired("missing_tool"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -42,18 +42,20 @@ class InMemoryAgentToolDefinitionSourceTest {
     }
 
     @Test
-    void derives_llm_schemas_only_from_exposed_descriptors() {
+    void derives_llm_schemas_only_from_active_descriptors() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                definition("context_enhancer", true, governance(false, "", 1)),
-                definition("book_crud", true, governance(false, "", 2)),
-                definition("internal_audit", false, governance(true, "AUDIT", 3))
+                definition("custom_tool", ToolLifecycleStatus.ACTIVE, governance(false, "", 1)),
+                definition("book_crud", ToolLifecycleStatus.ACTIVE, governance(false, "", 2)),
+                definition("internal_audit", ToolLifecycleStatus.DRAINING, governance(true, "AUDIT", 3)),
+                definition("retired_tool", ToolLifecycleStatus.DISABLED, governance(false, "", 1))
         ));
 
         Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
                 .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
 
-        assertThat(schemas.keySet()).containsExactlyInAnyOrder("context_enhancer", "book_crud");
+        assertThat(schemas.keySet()).containsExactlyInAnyOrder("custom_tool", "book_crud");
         assertThat(schemas).doesNotContainKey("internal_audit");
+        assertThat(schemas).doesNotContainKey("retired_tool");
         assertThat(schemas.get("book_crud").description()).isEqualTo("book_crud description");
     }
 
@@ -69,14 +71,16 @@ class InMemoryAgentToolDefinitionSourceTest {
         assertThat(schemas).doesNotContainKey("draft_generation");
         assertThat(schemas.get("chapter_edit").parametersJsonSchema()).contains("\"chapterId\"");
         assertThat(source.getRequired("todo_planner").presentation().displayName()).isNotBlank();
-        assertThat(schemas.get("todo_planner").parametersJsonSchema()).contains("\"planningMode\"");
+        assertThat(schemas.get("todo_planner").parametersJsonSchema())
+                .contains("\"operation\"", "\"create\"", "\"complete\"")
+                .doesNotContain("planningMode", "sessionId");
     }
 
     @Test
     void rejects_duplicate_tool_codes() {
         assertThatThrownBy(() -> new InMemoryAgentToolDefinitionSource(List.of(
-                definition("book_crud", true, governance(false, "", 1)),
-                definition("book_crud", true, governance(false, "", 2)))))
+                definition("book_crud", ToolLifecycleStatus.ACTIVE, governance(false, "", 1)),
+                definition("book_crud", ToolLifecycleStatus.ACTIVE, governance(false, "", 2)))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Duplicated tool definition: book_crud");
     }
@@ -87,7 +91,7 @@ class InMemoryAgentToolDefinitionSourceTest {
                 () -> new AgentToolDescriptor("book_crud", new ToolPresentation("Book CRUD"), null,
                         governance(false, "", 2)),
                 () -> new AgentToolDescriptor("book_crud", new ToolPresentation("Book CRUD"),
-                        new ToolExposure(true, "description", "{}"), null)
+                        new ToolExposure(ToolLifecycleStatus.ACTIVE, "description", "{}"), null)
         );
 
         assertThatThrownBy(() -> new InMemoryAgentToolDefinitionSource(List.of(invalidDefinitions.get(0))))
@@ -96,11 +100,11 @@ class InMemoryAgentToolDefinitionSourceTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("governancePolicy");
     }
 
-    private AgentToolDefinition definition(String toolCode, boolean exposed, ToolGovernancePolicy governance) {
+    private AgentToolDefinition definition(String toolCode, ToolLifecycleStatus status, ToolGovernancePolicy governance) {
         return () -> new AgentToolDescriptor(
                 toolCode,
                 new ToolPresentation(toolCode + " display"),
-                new ToolExposure(exposed, toolCode + " description", "{\"type\":\"object\"}"),
+                new ToolExposure(status, toolCode + " description", "{\"type\":\"object\"}"),
                 governance
         );
     }

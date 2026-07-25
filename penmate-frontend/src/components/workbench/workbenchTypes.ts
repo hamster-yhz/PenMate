@@ -13,6 +13,11 @@ export type ConversationItem = {
   deletedAt?: string | null
 }
 
+export type WorkbenchSkillCatalogItem = {
+  name: string
+  description: string
+}
+
 export type ChatMessage = {
   id: number | string
   role: 'user' | 'assistant' | 'system'

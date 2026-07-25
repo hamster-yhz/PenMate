@@ -73,7 +73,7 @@ public class InMemoryAgentToolDefinitionSource implements AgentToolDefinitionSou
     @Override
     public List<AgentLlmToolSchema> listLlmSchemas() {
         return descriptors.stream()
-                .filter(descriptor -> descriptor.exposure().exposedToLlm())
+                .filter(descriptor -> descriptor.exposure().lifecycleStatus().selectableForNewRuns())
                 .map(descriptor -> new AgentLlmToolSchema(
                         descriptor.toolCode(),
                         descriptor.exposure().llmDescription(),

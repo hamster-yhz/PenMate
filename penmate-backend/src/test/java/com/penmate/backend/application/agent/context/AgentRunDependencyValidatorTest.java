@@ -4,11 +4,12 @@ import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import org.junit.jupiter.api.Test;
+import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,7 +27,8 @@ class AgentRunDependencyValidatorTest {
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
                         StoryBibleRoutingMode.RETRIEVAL, null));
-        when(hashes.hashes(anyString())).thenReturn(new AgentContextCatalogHashService.Hashes("p", "s", "t"));
+        when(hashes.hashes(any(TaskProfile.class))).thenReturn(
+                new AgentContextCatalogHashService.Hashes("p", "s", "t"));
         when(sessions.findActiveStyleBindingRevision(30L)).thenReturn(9L);
         var expected = new AgentRunContextArtifactService.DependencyManifest(
                 3L, 7L, 40L, 11L, 9L, "RETRIEVAL", null, "p", "s", "t");
@@ -52,7 +54,8 @@ class AgentRunDependencyValidatorTest {
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
                         StoryBibleRoutingMode.RETRIEVAL, null));
-        when(hashes.hashes(anyString())).thenReturn(new AgentContextCatalogHashService.Hashes("p", "s", "t"));
+        when(hashes.hashes(any(TaskProfile.class))).thenReturn(
+                new AgentContextCatalogHashService.Hashes("p", "s", "t"));
         when(sessions.findActiveStyleBindingRevision(30L)).thenReturn(9L);
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
                 3L, 7L, 40L, 11L, 9L, "RETRIEVAL", null, "p", "s", "t");

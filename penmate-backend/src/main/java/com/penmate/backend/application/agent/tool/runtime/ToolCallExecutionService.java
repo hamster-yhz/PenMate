@@ -1,6 +1,5 @@
 package com.penmate.backend.application.agent.tool.runtime;
 
-import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecution;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecutionStatus;
@@ -14,26 +13,24 @@ import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Component
 @Slf4j
 public class ToolCallExecutionService {
 
-    private final List<AgentToolHandler> handlers;
+    private final AgentToolRegistry toolRegistry;
     private final AgentToolCallExecutionRepository executions;
     private final BusinessIdGenerator ids;
     private final AgentToolMutationGuard mutationGuard;
     private final JsonCodec jsonCodec;
 
-    public ToolCallExecutionService(List<AgentToolHandler> handlers,
+    public ToolCallExecutionService(AgentToolRegistry toolRegistry,
                                     AgentToolCallExecutionRepository executions,
                                     BusinessIdGenerator ids,
                                     AgentToolMutationGuard mutationGuard,
                                     JsonCodec jsonCodec) {
-        this.handlers = List.copyOf(handlers);
+        this.toolRegistry = toolRegistry;
         this.executions = executions;
         this.ids = ids;
         this.mutationGuard = mutationGuard;
@@ -41,14 +38,15 @@ public class ToolCallExecutionService {
     }
 
     public ToolCallResult validate(ToolCallRequest request) {
-        Optional<AgentToolHandler> handler = findHandler(request == null ? null : request.toolCode());
-        if (handler.isEmpty()) {
-            String toolCode = request == null ? null : request.toolCode();
-            return ToolCallResult.failed("TOOL_HANDLER_NOT_FOUND", "Tool handler not found: " + toolCode);
-        }
         try {
             validateIdentity(request);
-            handler.get().validate(request);
+            var descriptor = toolRegistry.getRequiredDescriptor(request.toolCode());
+            if (!descriptor.exposure().lifecycleStatus().executable()) {
+                return ToolCallResult.failed("TOOL_DISABLED", "Tool is disabled: " + request.toolCode());
+            }
+            var handler = toolRegistry.getRequiredHandler(request.toolCode());
+            toolRegistry.validateArguments(request.toolCode(), request.toolArgsJson());
+            handler.validate(request);
             mutationGuard.assertExecutable(request, false);
             return null;
         } catch (AgentToolMutationGuard.Rejection rejection) {
@@ -67,7 +65,7 @@ public class ToolCallExecutionService {
             return validationFailure;
         }
 
-        AgentToolHandler handler = findHandler(request.toolCode()).orElseThrow();
+        var handler = toolRegistry.getRequiredHandler(request.toolCode());
         String requestSha256 = requestSha256(request);
         AgentToolCallExecution candidate = AgentToolCallExecution.started(
                 ids.nextId(), request.runId(), request.toolCallId(), request.toolCode(), requestSha256,
@@ -240,10 +238,6 @@ public class ToolCallExecutionService {
         if (request.toolCode().length() > 100) {
             throw new IllegalArgumentException("toolCode must not exceed 100 characters");
         }
-    }
-
-    private Optional<AgentToolHandler> findHandler(String toolCode) {
-        return handlers.stream().filter(handler -> java.util.Objects.equals(handler.toolCode(), toolCode)).findFirst();
     }
 
     private String rootMessage(Throwable failure) {

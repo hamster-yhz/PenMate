@@ -263,7 +263,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         callLog.setProjectId(1L);
         callLog.setRunId(2L);
         callLog.setPluginCode("search-tool");
-        callLog.setToolName("context_enhancer");
+        callLog.setToolName("custom_tool");
         when(businessIdGenerator.nextId()).thenReturn(30003L);
         when(pluginRepository.insertCallLog(callLog)).thenReturn(1);
 
@@ -282,7 +282,7 @@ class PluginApplicationServiceTest extends BaseApplicationServiceTest {
         callLog.setProjectId(1L);
         callLog.setRunId(2L);
         callLog.setPluginCode("search-tool");
-        callLog.setToolName("context_enhancer");
+        callLog.setToolName("custom_tool");
         when(pluginRepository.insertCallLog(callLog)).thenReturn(1);
 
         pluginApplicationService.recordToolCall(callLog);

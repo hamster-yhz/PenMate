@@ -102,7 +102,7 @@ class ProviderChatClientStructuredTurnProtocolTest {
                         List.of(new AgentLlmToolCallPayload(
                                 "call_1",
                                 "function",
-                                "context_enhancer",
+                                "custom_tool",
                                 "{\"prompt\":\"hello\"}"
                         ))
                 ),
@@ -113,11 +113,11 @@ class ProviderChatClientStructuredTurnProtocolTest {
         assertThat(messages.get(0).type()).isEqualTo(ChatMessageType.AI);
         assertThat(((AiMessage) messages.get(0)).toolExecutionRequests())
                 .extracting(request -> request.id(), request -> request.name(), request -> request.arguments())
-                .containsExactly(tuple("call_1", "context_enhancer", "{\"prompt\":\"hello\"}"));
+                .containsExactly(tuple("call_1", "custom_tool", "{\"prompt\":\"hello\"}"));
         assertThat(messages.get(1).type()).isEqualTo(ChatMessageType.TOOL_EXECUTION_RESULT);
         ToolExecutionResultMessage toolResultMessage = (ToolExecutionResultMessage) messages.get(1);
         assertThat(toolResultMessage.id()).isEqualTo("call_1");
-        assertThat(toolResultMessage.toolName()).isEqualTo("context_enhancer");
+        assertThat(toolResultMessage.toolName()).isEqualTo("custom_tool");
         assertThat(toolResultMessage.text()).isEqualTo("tool output");
     }
 

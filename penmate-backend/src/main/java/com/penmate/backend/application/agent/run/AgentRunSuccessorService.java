@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.run;
 
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
@@ -18,15 +19,18 @@ public class AgentRunSuccessorService {
     private final BusinessIdGenerator ids;
     private final AgentRunEventPublisher events;
     private final AgentRunDispatchRequestPublisher dispatchRequests;
+    private final AgentSkillActivationService skillActivationService;
 
     public AgentRunSuccessorService(AgentRunRepository runs, AgentSessionRepository sessions,
                                     BusinessIdGenerator ids, AgentRunEventPublisher events,
-                                    AgentRunDispatchRequestPublisher dispatchRequests) {
+                                    AgentRunDispatchRequestPublisher dispatchRequests,
+                                    AgentSkillActivationService skillActivationService) {
         this.runs = runs;
         this.sessions = sessions;
         this.ids = ids;
         this.events = events;
         this.dispatchRequests = dispatchRequests;
+        this.skillActivationService = skillActivationService;
     }
 
     @Transactional
@@ -42,6 +46,7 @@ public class AgentRunSuccessorService {
                 oldInput.pluginBindingsJson(), oldInput.inputHash());
         requireOne(runs.insert(successor), "failed to insert successor Run");
         requireOne(runs.insertInput(input), "failed to insert successor Run input");
+        skillActivationService.bindSessionSkillsToRun(predecessor.sessionId(), runId);
         requireOne(sessions.rebindTurnRun(predecessor.sessionId(), predecessor.turnId(), predecessor.runId(), runId),
                 "failed to bind successor Run to Turn");
         requireOne(sessions.updateLastRun(predecessor.projectId(), predecessor.sessionId(), runId),

@@ -12,6 +12,8 @@ const mountChatComposer = (
     isRetrying: boolean
     currentModelName: string
     activePlugins: string[]
+    skillCatalog: Array<{ name: string; description: string }>
+    activeSkills: string[]
   }> = {},
 ) =>
   mount(ChatComposer, {
@@ -129,5 +131,37 @@ describe('ChatComposer', () => {
     await wrapper.get('[data-testid="open-model-settings"]').trigger('click')
 
     expect(wrapper.emitted('open-model-settings')).toEqual([[]])
+  })
+
+  it('activates_a_clicked_slash_candidate_without_leaving_the_token_in_user_text', async () => {
+    const wrapper = await mountChatComposer({
+      modelValue: '请用 /wri',
+      skillCatalog: [
+        { name: 'writer', description: '创作正文' },
+        { name: 'checker', description: '检查一致性' },
+      ],
+      activeSkills: [],
+    })
+    const textarea = wrapper.get('[data-testid="chat-input"]')
+    ;(textarea.element as HTMLTextAreaElement).setSelectionRange(7, 7)
+    await textarea.trigger('click')
+
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
+    await wrapper.get('[role="option"]').trigger('mousedown')
+
+    expect(wrapper.emitted('add-skill')).toEqual([['writer']])
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['请用 '])
+  })
+
+  it('renders_active_skills_as_removable_tags', async () => {
+    const wrapper = await mountChatComposer({
+      activeSkills: ['writer'],
+      skillCatalog: [{ name: 'writer', description: '创作正文' }],
+    })
+
+    const remove = wrapper.get('[aria-label="移除 writer"]')
+    await remove.trigger('click')
+
+    expect(wrapper.emitted('remove-skill')).toEqual([['writer']])
   })
 })

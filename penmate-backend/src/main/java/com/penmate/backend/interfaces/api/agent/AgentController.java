@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.run.AgentRunCancellationService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryAppService;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryResult;
 import com.penmate.backend.application.agent.run.AgentRunRetryService;
+import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
 import com.penmate.backend.application.agent.usecase.AgentConversationAppService;
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
@@ -19,10 +20,12 @@ import com.penmate.backend.interfaces.api.agent.dto.AgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunHistoryDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentSkillCatalogItemDto;
 import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.RetryAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.UpdateAgentSessionDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
@@ -58,6 +61,7 @@ public class AgentController {
     private final AgentRunCancellationService runCancellationService;
     private final AgentRunRetryService runRetryService;
     private final AgentRunHistoryQueryService runHistoryQueryService;
+    private final SkillPromptRegistry skillPromptRegistry;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
@@ -66,7 +70,8 @@ public class AgentController {
                            AgentRunEventStreamService agentRunEventStreamService,
                            AgentRunCancellationService runCancellationService,
                            AgentRunRetryService runRetryService,
-                           AgentRunHistoryQueryService runHistoryQueryService) {
+                           AgentRunHistoryQueryService runHistoryQueryService,
+                           SkillPromptRegistry skillPromptRegistry) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
@@ -75,6 +80,17 @@ public class AgentController {
         this.runCancellationService = runCancellationService;
         this.runRetryService = runRetryService;
         this.runHistoryQueryService = runHistoryQueryService;
+        this.skillPromptRegistry = skillPromptRegistry;
+    }
+
+    @GetMapping("/skills")
+    public ApiResponse<List<AgentSkillCatalogItemDto>> listSkills(
+            @PathVariable String projectId,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        requireLongId(projectId, "projectId");
+        return ApiResponse.success(skillPromptRegistry.listAvailableSkills().stream()
+                .map(skill -> new AgentSkillCatalogItemDto(skill.name(), skill.description()))
+                .toList(), traceId);
     }
 
     /**
@@ -223,12 +239,14 @@ public class AgentController {
     public ApiResponse<AgentRunDto.ActiveRunDto> retryRun(
             @PathVariable String projectId,
             @PathVariable String runId,
+            @Valid @RequestBody RetryAgentRunDto dto,
             Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         var run = runRetryService.retry(
                 requireLongId(projectId, "projectId"),
                 requireLongId(runId, "runId"),
                 principalId(authentication),
+                dto.getActiveSkills(),
                 traceId);
         return ApiResponse.success(new AgentRunDto.ActiveRunDto(
                 stringifyBusinessId(run.turnId()),
@@ -252,6 +270,7 @@ public class AgentController {
         return new AgentTurnCommand(
                 actorUserId,
                 dto.getUserMessage(),
+                dto.getActiveSkills(),
                 request == null
                         ? null
                         : new AgentTurnCommand.TaskRequest(
@@ -345,7 +364,8 @@ public class AgentController {
                         session == null ? null : session.title(),
                         session == null ? null : session.status(),
                         boundStyle == null ? null : new AgentRecoverySnapshotDto.BoundStyleDto(stringifyBusinessId(boundStyle.styleId()), boundStyle.name()),
-                        session == null ? null : session.lastRunStatus()
+                        session == null ? null : session.lastRunStatus(),
+                        session == null ? java.util.List.of() : session.activeSkills()
                 ),
                 activeRun == null ? null : new AgentRecoverySnapshotDto.ActiveRunDto(
                         stringifyBusinessId(activeRun.turnId()),
@@ -406,7 +426,8 @@ public class AgentController {
                         null,
                         null,
                         null,
-                        null
+                        null,
+                        java.util.List.of()
                 ),
                 activeRun == null ? null : new AgentRunDto.ActiveRunDto(
                         stringifyBusinessId(activeRun.turnId()),

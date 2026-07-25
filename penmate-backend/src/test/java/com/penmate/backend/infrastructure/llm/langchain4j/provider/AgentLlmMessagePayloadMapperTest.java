@@ -21,7 +21,7 @@ class AgentLlmMessagePayloadMapperTest {
                 AgentLlmMessage.assistant("", List.of(new AgentLlmToolCallPayload(
                         "call_1",
                         "function",
-                        "context_enhancer",
+                        "custom_tool",
                         "{\"prompt\":\"补充\"}"
                 ))),
                 AgentLlmMessage.tool("call_1", "{\"context\":\"补充背景\"}")

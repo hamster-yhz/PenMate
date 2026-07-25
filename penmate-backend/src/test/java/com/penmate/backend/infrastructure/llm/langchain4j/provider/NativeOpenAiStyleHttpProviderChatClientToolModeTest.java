@@ -8,13 +8,11 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.ChapterEditToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.ContextEnhancerToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.StoryBibleSearchToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.StoryBibleUpdateToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.TodoPlannerToolDefinition;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
@@ -40,7 +38,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
                         "id": "call_1",
                         "type": "function",
                         "function": {
-                          "name": "context_enhancer",
+                          "name": "custom_tool",
                           "arguments": "{\\"prompt\\":\\"hello\\"}"
                         }
                       }]
@@ -56,7 +54,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         assertThat(response.requestsToolCalls()).isTrue();
         assertThat(response.toolCalls()).singleElement().satisfies(call -> {
             assertThat(call.id()).isEqualTo("call_1");
-            assertThat(call.toolCode()).isEqualTo("context_enhancer");
+            assertThat(call.toolCode()).isEqualTo("custom_tool");
             assertThat(call.argumentsJson()).isEqualTo("{\"prompt\":\"hello\"}");
         });
     }
@@ -66,7 +64,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
                 List.of(AgentLlmMessage.user("hello")),
                 List.of(new AgentLlmToolSchema(
-                        "context_enhancer",
+                        "custom_tool",
                         "Add context",
                         """
                                 {
@@ -86,16 +84,16 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         assertThat(root.getStr("model")).isEqualTo("gpt-test");
         assertThat(root.getStr("tool_choice")).isEqualTo("auto");
         assertThat(root.getJSONArray("messages").getJSONObject(0).getStr("content")).isEqualTo("hello");
-        assertThat(function.getStr("name")).isEqualTo("context_enhancer");
+        assertThat(function.getStr("name")).isEqualTo("custom_tool");
         assertThat(function.getJSONObject("parameters").getJSONObject("properties")
                 .getJSONObject("prompt").getStr("type")).isEqualTo("string");
     }
 
     @Test
-    void builds_multiple_tools_in_definition_order() {
+    void omits_tools_that_are_registered_but_hidden_from_the_llm() {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
-                new ContextEnhancerToolDefinition(),
-                new BookCrudToolDefinition()
+                new BookCrudToolDefinition(),
+                new TodoPlannerToolDefinition()
         ));
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
                 List.of(AgentLlmMessage.user("hello")),
@@ -106,24 +104,20 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         JSONArray tools = AgentJsonCodec.parseObj(client.buildTurnRequestBody(request, "gpt-test"))
                 .getJSONArray("tools");
 
-        assertThat(tools).hasSize(2);
+        assertThat(tools).hasSize(1);
         assertThat(tools.getJSONObject(0).getJSONObject("function").getStr("name"))
-                .isEqualTo("context_enhancer");
-        assertThat(tools.getJSONObject(1).getJSONObject("function").getStr("name"))
-                .isEqualTo("book_crud");
+                .isEqualTo("todo_planner");
     }
 
     @Test
     void builds_complete_llm_tool_list_with_current_story_bible_contracts() {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
-                new ContextEnhancerToolDefinition(),
                 new BookCrudToolDefinition(),
                 new ChapterEditToolDefinition(),
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new StoryBibleSearchToolDefinition(),
                 new StoryBibleUpdateToolDefinition(),
-                new TodoCrudToolDefinition(),
                 new TodoPlannerToolDefinition()
         ));
         List<AgentLlmToolSchema> schemas = definitions.listLlmSchemas();
@@ -190,7 +184,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
                     "message": {
                       "content": "need tools",
                       "tool_calls": [
-                        {"id":"call_1","type":"function","function":{"name":"context_enhancer","arguments":"{}"}},
+                        {"id":"call_1","type":"function","function":{"name":"custom_tool","arguments":"{}"}},
                         {"id":"call_2","type":"function","function":{"name":"book_crud","arguments":"{}"}}
                       ]
                     }
@@ -201,7 +195,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         AgentLlmTurnResponse response = client.extractTurnResponse(responseBody);
 
         assertThat(response.toolCalls()).extracting(call -> call.toolCode())
-                .containsExactly("context_enhancer", "book_crud");
+                .containsExactly("custom_tool", "book_crud");
         assertThat(response.toolCalls()).extracting(call -> call.id())
                 .containsExactly("call_1", "call_2");
     }

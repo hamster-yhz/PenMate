@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 创建 agent turn 的请求 DTO。
  * <p>该结构用于承接“用户消息 + 任务请求上下文”的统一提交，
@@ -21,6 +23,9 @@ public class CreateAgentTurnDto {
      */
     @NotBlank(message = "userMessage must not be blank")
     private String userMessage;
+
+    @NotNull(message = "activeSkills must not be null")
+    private List<String> activeSkills;
 
     /**
      * 当前轮次要启动的任务请求。

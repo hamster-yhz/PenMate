@@ -83,7 +83,6 @@ export interface WorkbenchActiveRunRuntimeSnapshot {
 export interface WorkbenchTaskProfileSnapshot {
   intentTags?: string[] | null
   executionProfile?: string | null
-  skills?: string[] | null
   tools?: string[] | null
   hardConstraints?: string[] | null
   outputExpectation?: string | null
@@ -102,7 +101,6 @@ export interface WorkbenchPromptPlanModuleSnapshot {
 
 export interface WorkbenchPromptPlanSnapshot {
   modules?: WorkbenchPromptPlanModuleSnapshot[] | null
-  skills?: string[] | null
   finalProfile?: string | null
   assembledPromptPreview?: string | null
 }
@@ -112,7 +110,6 @@ export interface WorkbenchContextPackageSnapshot {
   missingContextFlags?: string[] | null
   conflicts?: string[] | null
   storyBibleEntries?: string[] | null
-  ragRefs?: string[] | null
   styleSnapshot?: string | null
   chapterScope?: string | null
 }
@@ -141,7 +138,6 @@ export interface WorkbenchRecoveryContextSnapshot {
   selectedText?: string | null
   activePlugins?: string[] | null
   modelConfigId?: string | null
-  ragRefs?: string[] | null
   outlineSnapshot?: Record<string, unknown> | null
   taskProfile?: WorkbenchTaskProfileSnapshot | null
   promptPlan?: WorkbenchPromptPlanSnapshot | null
@@ -155,6 +151,7 @@ export interface WorkbenchRecoverySnapshot {
     sessionId?: string | null
     title?: string | null
     status?: string | null
+    activeSkills?: string[] | null
     boundStyle?: {
       styleId?: string | null
       name?: string | null
@@ -170,4 +167,9 @@ export interface WorkbenchRecoverySnapshot {
   pendingApproval?: WorkbenchRuntimeApproval | Record<string, unknown> | null
   messages?: Array<Record<string, unknown>> | null
   workbenchContext?: WorkbenchRecoveryContextSnapshot | null
+}
+
+export interface AgentSkillCatalogItem {
+  name: string
+  description: string
 }

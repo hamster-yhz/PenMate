@@ -273,6 +273,9 @@ export const useWorkbenchPageController = () => {
     recentlyDeletedConversation,
     runAttempts,
     chatInput,
+    skillCatalog,
+    activeSkills,
+    skillCatalogLoading,
     isGenerating,
     isCancelling,
     isRetrying,
@@ -292,6 +295,9 @@ export const useWorkbenchPageController = () => {
     sendMessage: sendAgentMessage,
     cancelCurrentRun,
     retryCurrentRun,
+    loadSkillCatalog,
+    addActiveSkill,
+    removeActiveSkill,
     isApprovalBusy,
     handleApprove,
     handleReject,
@@ -483,6 +489,7 @@ export const useWorkbenchPageController = () => {
       const projectId = getCurrentProjectId()
       if (projectId) {
         await loadWorkbenchData(projectId)
+        await loadSkillCatalog()
         await resumeLatestSession()
       } else await refreshActiveModelInfo()
     } catch (error) {
@@ -660,6 +667,9 @@ export const useWorkbenchPageController = () => {
     recentlyDeletedConversation,
     runAttempts,
     chatInput,
+    skillCatalog,
+    activeSkills,
+    skillCatalogLoading,
     isGenerating,
     isCancelling,
     isRetrying,
@@ -678,6 +688,9 @@ export const useWorkbenchPageController = () => {
     sendMessage,
     cancelCurrentRun,
     retryCurrentRun,
+    loadSkillCatalog,
+    addActiveSkill,
+    removeActiveSkill,
     isApprovalBusy,
     handleApprove,
     handleReject,

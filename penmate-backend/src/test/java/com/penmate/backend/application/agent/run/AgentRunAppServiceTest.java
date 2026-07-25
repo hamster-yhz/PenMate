@@ -3,6 +3,7 @@ package com.penmate.backend.application.agent.run;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.model.AgentSession;
@@ -54,7 +55,8 @@ class AgentRunAppServiceTest {
                 sessionRepository,
                 idGenerator,
                 new AgentRunAppService(agentRunRepository, eventPublisher, runDispatcher),
-                runDispatcher
+                runDispatcher,
+                mock(AgentSkillActivationService.class)
         );
 
         AgentTurnResult result = service.createTurn(101L, 90001L, command(), "trace-1");
@@ -72,6 +74,7 @@ class AgentRunAppServiceTest {
         return new AgentTurnCommand(
                 201L,
                 "Write a suspense opening.",
+                java.util.List.of(),
                 new AgentTurnCommand.TaskRequest("WRITE", 30001L, 1001L, "selected text")
         );
     }

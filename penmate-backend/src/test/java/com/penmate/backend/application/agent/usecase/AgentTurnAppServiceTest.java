@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.usecase;
 
 import com.penmate.backend.application.agent.run.*;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.model.AgentSession;
@@ -30,7 +31,8 @@ class AgentTurnAppServiceTest {
                 sessionRepository(),
                 businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
                 runAppService,
-                runDispatcher
+                runDispatcher,
+                mock(AgentSkillActivationService.class)
         );
 
         Long projectId = 920001L;
@@ -38,6 +40,7 @@ class AgentTurnAppServiceTest {
         AgentTurnCommand command = new AgentTurnCommand(
                 1001L,
                 "write a chapter",
+                java.util.List.of(),
                 new AgentTurnCommand.TaskRequest("WRITE", 3001L, null, "selected text")
         );
 
@@ -62,13 +65,15 @@ class AgentTurnAppServiceTest {
                 sessionRepository(),
                 businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
                 runAppService,
-                runDispatcher
+                runDispatcher,
+                mock(AgentSkillActivationService.class)
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(
                 920001L,
                 920002L,
-                new AgentTurnCommand(1001L, "hello", new AgentTurnCommand.TaskRequest("WRITE", null, null, null)),
+                new AgentTurnCommand(1001L, "hello", java.util.List.of(),
+                        new AgentTurnCommand.TaskRequest("WRITE", null, null, null)),
                 "trace-2"
         );
 
@@ -108,6 +113,8 @@ class AgentTurnAppServiceTest {
         when(repository.insertSessionMessage(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
         when(repository.updateLastTurn(any(), any(), any())).thenReturn(1);
         when(repository.updateLastRun(any(), any(), any())).thenReturn(1);
+        when(repository.findSession(920001L, 920002L))
+                .thenReturn(AgentSession.active(920002L, 920001L, 1001L, "Session-A"));
         return repository;
     }
 }

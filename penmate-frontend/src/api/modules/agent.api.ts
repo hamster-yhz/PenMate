@@ -4,6 +4,7 @@ import {
   type AgentRunEventStream,
   type AgentRunStreamListener,
 } from '@/api/agentRunStream'
+import type { AgentSkillCatalogItem } from '@/api/types'
 
 type AnyRecord = Record<string, unknown>
 
@@ -51,6 +52,9 @@ const buildRunStreamUrl = (projectId: string, runId: string, after = '0') => {
 }
 
 export const agentApi = {
+  listSkills(projectId: string) {
+    return request.get<AgentSkillCatalogItem[]>(`/v1/novels/${projectId}/agent/skills`)
+  },
   listSessions(projectId: string, deleted = false) {
     return request.get<AgentSessionRecord[]>(`/v1/novels/${projectId}/agent/sessions`, { params: { deleted } })
   },
@@ -87,9 +91,11 @@ export const agentApi = {
   cancelRun(projectId: string, runId: string, payload: AnyRecord) {
     return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/cancel`, withoutActorFields(payload))
   },
-  retryRun(projectId: string, runId: string, _payload: AnyRecord) {
-    void _payload
-    return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/retry`)
+  retryRun(projectId: string, runId: string, payload: AnyRecord) {
+    return request.post<AgentRunRecord>(
+      `/v1/novels/${projectId}/agent/runs/${runId}/retry`,
+      withoutActorFields(payload),
+    )
   },
   getRunStreamUrl(projectId: string, runId: string, after = '0') {
     return buildRunStreamUrl(projectId, runId, after)

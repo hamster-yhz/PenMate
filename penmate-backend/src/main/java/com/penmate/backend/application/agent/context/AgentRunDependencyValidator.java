@@ -35,7 +35,7 @@ public class AgentRunDependencyValidator {
                                AgentRunContextArtifactService.ResolvedArtifact artifact) {
         var snapshot = snapshots.create(run.projectId(), input.chapterId());
         var preference = preferences.resolve(run.projectId(), run.sessionId(), run.ownerUserId());
-        var hashes = catalogHashes.hashes(TaskProfile.fromTaskType(input.taskType()).executionProfile());
+        var hashes = catalogHashes.hashes(TaskProfile.fromTaskType(input.taskType()));
         Long styleRevision = sessions.findActiveStyleBindingRevision(run.sessionId());
         var current = new AgentRunContextArtifactService.DependencyManifest(
                 snapshot.storyBibleRevision(), snapshot.manuscriptRevision(), input.chapterId(),
@@ -67,7 +67,6 @@ public class AgentRunDependencyValidator {
         compare(changed, "routingMode", expected.routingMode(), current.routingMode());
         compare(changed, "routerModelConfigId", expected.routerModelConfigId(), current.routerModelConfigId());
         compare(changed, "promptBundleHash", expected.promptBundleHash(), current.promptBundleHash());
-        compare(changed, "skillCatalogHash", expected.skillCatalogHash(), current.skillCatalogHash());
         compare(changed, "toolCatalogHash", expected.toolCatalogHash(), current.toolCatalogHash());
         return List.copyOf(changed);
     }

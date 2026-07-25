@@ -5,6 +5,7 @@ import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
+import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -115,14 +116,22 @@ class AgentRunContextArtifactServiceTest {
                 AgentLlmMessage.assistant("answer", List.of()), AgentLlmMessage.user("current"));
 
         var ref = service.savePromptPlan(70001L,
-                new PromptPlan(List.of(), List.of(), "default", "stable"), null, messages);
+                new PromptPlan(
+                        List.of(),
+                        List.of(new AgentLlmToolSchema(
+                                "rag_query", "Search", "{\"type\":\"object\"}")),
+                        "default", "stable", "", "stable"),
+                null, messages);
         ArgumentCaptor<AgentArtifact> row = ArgumentCaptor.forClass(AgentArtifact.class);
         verify(artifacts).save(row.capture());
         when(artifacts.findById(ref.artifactId())).thenReturn(row.getValue());
 
         var loaded = service.loadPromptPlan(ref.artifactId());
 
-        assertThat(loaded.schemaVersion()).isEqualTo(2);
+        assertThat(loaded.schemaVersion()).isEqualTo(3);
         assertThat(loaded.messages()).isEqualTo(messages);
+        assertThat(loaded.plan().toolSchemas())
+                .extracting(AgentLlmToolSchema::toolCode)
+                .containsExactly("rag_query");
     }
 }

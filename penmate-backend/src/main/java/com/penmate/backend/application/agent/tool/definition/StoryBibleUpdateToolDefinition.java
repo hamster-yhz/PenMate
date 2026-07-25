@@ -93,9 +93,10 @@ public class StoryBibleUpdateToolDefinition implements AgentToolDefinition {
         return new AgentToolDescriptor(
                 "story_bible_update",
                 new ToolPresentation("故事设定更新"),
-                new ToolExposure(true,
+                new ToolExposure(ToolLifecycleStatus.ACTIVE,
                         "Apply an ordered batch of Story Bible mutations after one user approval. Use story_bible_search for reads.",
-                        PARAMETERS_JSON_SCHEMA),
+                        PARAMETERS_JSON_SCHEMA,
+                        java.util.Set.of("default", "world-build")),
                 new ToolGovernancePolicy(
                         approval,
                         3,

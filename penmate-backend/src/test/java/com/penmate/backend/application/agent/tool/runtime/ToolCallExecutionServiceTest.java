@@ -2,11 +2,19 @@ package com.penmate.backend.application.agent.tool.runtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
+import com.penmate.backend.application.agent.tool.definition.ToolExposure;
+import com.penmate.backend.application.agent.tool.definition.ToolGovernancePolicy;
+import com.penmate.backend.application.agent.tool.definition.ToolLifecycleStatus;
+import com.penmate.backend.application.agent.tool.definition.ToolPresentation;
+import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecution;
 import com.penmate.backend.domain.agent.run.model.AgentToolCallExecutionStatus;
 import com.penmate.backend.domain.agent.run.repository.AgentToolCallExecutionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
+import com.penmate.backend.infrastructure.agent.tool.NetworkntAgentToolSchemaValidator;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -144,9 +152,52 @@ class ToolCallExecutionServiceTest {
         verify(handler, never()).execute(request);
     }
 
+    @Test
+    void disabled_tool_is_rejected_before_claiming_or_executing_the_handler() {
+        AgentToolHandler handler = handler(false, request -> ToolCallResult.success("should-not-run"));
+        ToolCallExecutionService service = service(handler, ToolLifecycleStatus.DISABLED);
+
+        ToolCallResult result = service.execute(request("call-disabled", "{}", 7L));
+
+        assertThat(result.errorCode()).isEqualTo("TOOL_DISABLED");
+        assertThat(((CountingHandler) handler).calls()).isZero();
+        assertThat(executions.find(11L, "call-disabled")).isNull();
+    }
+
+    @Test
+    void draining_tool_remains_executable_for_existing_calls() {
+        AgentToolHandler handler = handler(false, request -> ToolCallResult.success("drained"));
+
+        ToolCallResult result = service(handler, ToolLifecycleStatus.DRAINING)
+                .execute(request("call-draining", "{}", 7L));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        assertThat(result.toolOutput()).isEqualTo("drained");
+        assertThat(((CountingHandler) handler).calls()).isEqualTo(1);
+    }
+
     private ToolCallExecutionService service(AgentToolHandler handler) {
-        return new ToolCallExecutionService(java.util.List.of(handler), executions, ids, guard,
+        return service(handler, ToolLifecycleStatus.ACTIVE);
+    }
+
+    private ToolCallExecutionService service(AgentToolHandler handler, ToolLifecycleStatus status) {
+        return new ToolCallExecutionService(registry(handler, status), executions, ids, guard,
                 new JacksonJsonCodec(objectMapper));
+    }
+
+    private AgentToolRegistry registry(AgentToolHandler handler) {
+        return registry(handler, ToolLifecycleStatus.ACTIVE);
+    }
+
+    private AgentToolRegistry registry(AgentToolHandler handler, ToolLifecycleStatus status) {
+        AgentToolDefinitionSource definitions = mock(AgentToolDefinitionSource.class);
+        AgentToolDescriptor descriptor = new AgentToolDescriptor(
+                handler.toolCode(), new ToolPresentation("Test tool"),
+                new ToolExposure(status, "test", "{\"type\":\"object\"}"),
+                new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 0, Map.of()));
+        when(definitions.listAll()).thenReturn(java.util.List.of(descriptor));
+        return new AgentToolRegistry(definitions, java.util.List.of(handler),
+                new NetworkntAgentToolSchemaValidator(objectMapper));
     }
 
     private AgentToolHandler handler(boolean mutates, ToolAction action) {
@@ -161,7 +212,7 @@ class ToolCallExecutionServiceTest {
     private String hashFromFreshClaim(ToolCallRequest request) {
         InMemoryExecutions temporary = new InMemoryExecutions();
         ToolCallExecutionService hashingService = new ToolCallExecutionService(
-                java.util.List.of(handler(false, ignored -> ToolCallResult.success("ok"))), temporary,
+                registry(handler(false, ignored -> ToolCallResult.success("ok"))), temporary,
                 ids, guard, new JacksonJsonCodec(objectMapper));
         hashingService.execute(request);
         return temporary.find(request.runId(), request.toolCallId()).requestSha256();

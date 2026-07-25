@@ -167,7 +167,7 @@ public class AgentRunLlmLoop {
                         request.runId(),
                         new AgentLlmTurnRequest(
                                 List.copyOf(messages),
-                                toolDefinitionSource.listLlmSchemas(),
+                                request.toolSchemas(),
                                 "auto"
                         ),
                         request.executionConfig(),
@@ -248,12 +248,15 @@ public class AgentRunLlmLoop {
 
             Continuation context = new Continuation(turnIndex, iterationIndex, tokenUsage,
                     fullAssistantText.toString());
-            ToolCallResult result = toolCallService.executeToolCall(new ToolCallRequest(
-                    request.projectId(), request.runId(), request.sessionId(), request.turnId(),
-                    toolCall.functionName(), toolCall.argumentsJson(), request.operatorId(), request.traceId(),
-                    json(context), request.runId() + ":" + toolCall.id(), turnIndex, toolCall.id(),
-                    json(toolCalls), json(messages), null, null, request.executionToken()
-            ));
+            ToolCallResult result = !recovered && !isAllowedForRun(request, toolCall.functionName())
+                    ? ToolCallResult.failed("TOOL_NOT_ALLOWED_FOR_RUN",
+                            "Tool is not allowed for this Run: " + toolCall.functionName())
+                    : toolCallService.executeToolCall(new ToolCallRequest(
+                            request.projectId(), request.runId(), request.sessionId(), request.turnId(),
+                            toolCall.functionName(), toolCall.argumentsJson(), request.operatorId(), request.traceId(),
+                            json(context), request.runId() + ":" + toolCall.id(), turnIndex, toolCall.id(),
+                            json(toolCalls), json(messages), null, null, request.executionToken()
+                    ));
             if (result == null) {
                 result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
             }
@@ -334,6 +337,11 @@ public class AgentRunLlmLoop {
             if (toolCalls.get(index).id().equals(toolCallId)) return index;
         }
         return -1;
+    }
+
+    private boolean isAllowedForRun(AgentRunLoopRequest request, String toolCode) {
+        return request.toolSchemas().stream()
+                .anyMatch(schema -> Objects.equals(schema.toolCode(), toolCode));
     }
 
     private record Continuation(Integer llmTurnIndex, Integer iterationIndex,

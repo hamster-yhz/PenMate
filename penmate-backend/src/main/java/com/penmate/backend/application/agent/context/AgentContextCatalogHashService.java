@@ -2,7 +2,8 @@ package com.penmate.backend.application.agent.context;
 
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
-import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
+import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
+import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import org.springframework.stereotype.Service;
@@ -17,27 +18,33 @@ import java.util.HexFormat;
 public class AgentContextCatalogHashService {
     private final SystemPromptProvider prompts;
     private final SkillPromptRegistry skills;
-    private final AgentToolDefinitionSource tools;
+    private final AgentToolSelectionPolicy toolSelectionPolicy;
     private final JsonCodec jsonCodec;
 
     public AgentContextCatalogHashService(SystemPromptProvider prompts, SkillPromptRegistry skills,
-                                          AgentToolDefinitionSource tools, JsonCodec jsonCodec) {
+                                          AgentToolSelectionPolicy toolSelectionPolicy, JsonCodec jsonCodec) {
         this.prompts = prompts;
         this.skills = skills;
-        this.tools = tools;
+        this.toolSelectionPolicy = toolSelectionPolicy;
         this.jsonCodec = jsonCodec;
     }
 
-    public Hashes hashes(String executionProfile) {
+    public Hashes hashes(TaskProfile profile) {
+        String executionProfile = profile == null ? "default" : profile.executionProfile();
         var prompt = new PromptBundles(
                 prompts.loadBundle("execution", executionProfile),
                 prompts.loadBundle("context-selector", "default")
         );
         var skillCatalog = skills.listAvailableSkills().stream()
+                .map(item -> new SkillCatalogMetadata(item.name(), item.description()))
                 .sorted(Comparator.comparing(item -> item.name() == null ? "" : item.name())).toList();
-        var toolCatalog = tools.listLlmSchemas().stream()
+        var toolCatalog = toolSelectionPolicy.select(profile).stream()
                 .sorted(Comparator.comparing(schema -> schema.toolCode() == null ? "" : schema.toolCode())).toList();
         return new Hashes(hash(prompt), hash(skillCatalog), hash(toolCatalog));
+    }
+
+    public Hashes hashes(String executionProfile) {
+        return hashes(TaskProfile.fromTaskType(executionProfile));
     }
 
     private String hash(Object value) {
@@ -55,5 +62,8 @@ public class AgentContextCatalogHashService {
     }
 
     private record PromptBundles(Object execution, Object selector) {
+    }
+
+    private record SkillCatalogMetadata(String name, String description) {
     }
 }

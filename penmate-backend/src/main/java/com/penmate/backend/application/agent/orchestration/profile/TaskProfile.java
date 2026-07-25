@@ -13,7 +13,6 @@ import java.util.Locale;
 public record TaskProfile(
         List<TaskIntentTag> intentTags,
         String executionProfile,
-        List<String> skills,
         List<String> tools,
         List<String> hardConstraints,
         String outputExpectation,
@@ -26,7 +25,6 @@ public record TaskProfile(
     public TaskProfile {
         intentTags = List.copyOf(intentTags == null ? List.of() : intentTags);
         executionProfile = normalize(executionProfile);
-        skills = List.copyOf(skills == null ? List.of() : skills.stream().map(TaskProfile::normalizeSkill).toList());
         tools = List.copyOf(tools == null ? List.of() : tools);
         hardConstraints = List.copyOf(hardConstraints == null ? List.of() : hardConstraints);
         outputExpectation = normalize(outputExpectation);
@@ -38,7 +36,7 @@ public record TaskProfile(
         String profile = normalized.contains("rewrite") ? "rewrite"
                 : normalized.contains("world") ? "world-build" : "default";
         return new TaskProfile(
-                List.of(), profile, List.of(), List.of(), List.of(), null,
+                List.of(), profile, List.of(), List.of(), null,
                 false, true, false, "Explicit task type route"
         );
     }
@@ -47,14 +45,4 @@ public record TaskProfile(
         return value == null ? null : value.trim();
     }
 
-    private static String normalizeSkill(String value) {
-        if (value == null) {
-            return null;
-        }
-        return value.trim()
-                .toLowerCase(Locale.ROOT)
-                .replace('-', '_')
-                .replace(' ', '_')
-                .replaceAll("_+", "_");
-    }
 }

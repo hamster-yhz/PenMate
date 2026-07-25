@@ -6,7 +6,7 @@ import java.util.List;
  * Stable context builder output shared by workflow, snapshot persistence and recovery.
  * <p>
  * Snapshot policy: all fields are persisted. {@code styleSnapshot} is a snapshot field, while the values inside
- * {@code sources}, {@code missingContextFlags}, {@code conflicts}, {@code storyBibleEntries} and {@code ragRefs}
+ * {@code sources}, {@code missingContextFlags}, {@code conflicts} and {@code storyBibleEntries}
  * document how the snapshot was assembled.
  */
 public record ContextPackage(
@@ -17,9 +17,9 @@ public record ContextPackage(
         List<String> coreStoryBibleEntries,
         List<String> workingSetEntries,
         List<String> selectedStoryBibleEntries,
-        List<String> ragRefs,
         String styleSnapshot,
-        String chapterScope
+        String chapterScope,
+        String authorProfileSnapshot
 ) {
 
     public ContextPackage {
@@ -30,16 +30,23 @@ public record ContextPackage(
         coreStoryBibleEntries = List.copyOf(coreStoryBibleEntries == null ? List.of() : coreStoryBibleEntries);
         workingSetEntries = List.copyOf(workingSetEntries == null ? List.of() : workingSetEntries);
         selectedStoryBibleEntries = List.copyOf(selectedStoryBibleEntries == null ? List.of() : selectedStoryBibleEntries);
-        ragRefs = List.copyOf(ragRefs == null ? List.of() : ragRefs);
         styleSnapshot = normalize(styleSnapshot);
         chapterScope = normalize(chapterScope);
+        authorProfileSnapshot = normalize(authorProfileSnapshot);
     }
 
     public ContextPackage(List<String> sources, List<String> missingContextFlags, List<String> conflicts,
-                          List<String> storyBibleEntries, List<String> ragRefs,
+                          List<String> storyBibleEntries, List<String> coreStoryBibleEntries,
+                          List<String> workingSetEntries, List<String> selectedStoryBibleEntries,
                           String styleSnapshot, String chapterScope) {
+        this(sources, missingContextFlags, conflicts, storyBibleEntries, coreStoryBibleEntries,
+                workingSetEntries, selectedStoryBibleEntries, styleSnapshot, chapterScope, "");
+    }
+
+    public ContextPackage(List<String> sources, List<String> missingContextFlags, List<String> conflicts,
+                          List<String> storyBibleEntries, String styleSnapshot, String chapterScope) {
         this(sources, missingContextFlags, conflicts, storyBibleEntries, List.of(), List.of(),
-                storyBibleEntries, ragRefs, styleSnapshot, chapterScope);
+                storyBibleEntries, styleSnapshot, chapterScope, "");
     }
 
     private static String normalize(String value) {

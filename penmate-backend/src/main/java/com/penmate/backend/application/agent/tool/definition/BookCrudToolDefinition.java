@@ -47,7 +47,7 @@ public class BookCrudToolDefinition implements AgentToolDefinition {
         return new AgentToolDescriptor(
                 "book_crud",
                 new ToolPresentation("书籍 CRUD"),
-                new ToolExposure(true, "书籍 CRUD；必须提供 operation，并按 create/list/update/delete 传入对应字段", PARAMETERS_JSON_SCHEMA),
+                new ToolExposure(ToolLifecycleStatus.DRAINING, "书籍 CRUD；必须提供 operation，并按 create/list/update/delete 传入对应字段", PARAMETERS_JSON_SCHEMA),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
                         2,

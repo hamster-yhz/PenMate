@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.tool.handler;
 
-import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
-import com.penmate.backend.application.agent.prompt.SystemPromptDocument;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.common.serialization.JsonCodec;
@@ -15,11 +14,11 @@ import java.util.Objects;
 @Component
 public class SkillLoadToolHandler implements AgentToolHandler {
 
-    private final SkillPromptRegistry skillPromptRegistry;
+    private final AgentSkillActivationService skillActivationService;
     private final JsonCodec jsonCodec;
 
-    public SkillLoadToolHandler(SkillPromptRegistry skillPromptRegistry, JsonCodec jsonCodec) {
-        this.skillPromptRegistry = Objects.requireNonNull(skillPromptRegistry, "skillPromptRegistry");
+    public SkillLoadToolHandler(AgentSkillActivationService skillActivationService, JsonCodec jsonCodec) {
+        this.skillActivationService = Objects.requireNonNull(skillActivationService, "skillActivationService");
         this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
     }
 
@@ -45,12 +44,21 @@ public class SkillLoadToolHandler implements AgentToolHandler {
         try {
             Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
             String skill = JsonValues.string(args, "skill").trim();
-            SystemPromptDocument document = skillPromptRegistry.load(skill);
+            var activation = skillActivationService.activateAutomatically(
+                    request.runId(), skill, request.toolCallId());
+            var binding = activation.binding();
             Map<String, Object> output = new LinkedHashMap<>();
-            output.put("skill", skill);
-            output.put("path", document == null ? "" : document.path());
-            output.put("content", document == null ? "" : document.content());
+            output.put("requestedSkill", skill);
+            output.put("skill", binding.skillName());
+            output.put("contentHash", binding.contentHash());
+            output.put("status", activation.status());
+            if (!"ALREADY_ACTIVE".equals(activation.status())) {
+                output.put("path", activation.path());
+                output.put("content", binding.content());
+            }
             return ToolCallResult.success(jsonCodec.write(output));
+        } catch (AgentSkillActivationService.SkillActivationFailure ex) {
+            return ToolCallResult.failed(ex.errorCode(), ex.getMessage());
         } catch (Exception ex) {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "skill load failed"

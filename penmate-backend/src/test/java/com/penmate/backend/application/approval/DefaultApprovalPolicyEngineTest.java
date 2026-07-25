@@ -162,14 +162,17 @@ class DefaultApprovalPolicyEngineTest {
             Class<?> descriptorType = Class.forName("com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor");
             Class<?> presentationType = Class.forName("com.penmate.backend.application.agent.tool.definition.ToolPresentation");
             Class<?> exposureType = Class.forName("com.penmate.backend.application.agent.tool.definition.ToolExposure");
+            Class<?> lifecycleType = Class.forName("com.penmate.backend.application.agent.tool.definition.ToolLifecycleStatus");
             Class<?> governanceType = Class.forName("com.penmate.backend.application.agent.tool.definition.ToolGovernancePolicy");
 
             Object presentation = presentationType
                     .getDeclaredConstructor(String.class)
                     .newInstance(displayName);
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Object active = Enum.valueOf((Class<? extends Enum>) lifecycleType, "ACTIVE");
             Object exposure = exposureType
-                    .getDeclaredConstructor(boolean.class, String.class, String.class)
-                    .newInstance(true, llmDescription, "{\"type\":\"object\"}");
+                    .getDeclaredConstructor(lifecycleType, String.class, String.class)
+                    .newInstance(active, llmDescription, "{\"type\":\"object\"}");
             Object governance = governanceType
                     .getDeclaredConstructor(Class.forName("com.penmate.backend.application.approval.ApprovalPolicyDecision"), Integer.class, Map.class)
                     .newInstance(defaultDecision, riskLevel, operationPolicies);

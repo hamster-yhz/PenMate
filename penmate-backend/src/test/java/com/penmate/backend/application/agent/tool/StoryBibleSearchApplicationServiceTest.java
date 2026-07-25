@@ -13,6 +13,7 @@ import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,19 +50,27 @@ class StoryBibleSearchApplicationServiceTest {
         AgentRunInput input = new AgentRunInput(70001L, "Inspect Mira", "CHAT", 301L,
                 null, null, null, null, "hash");
         var catalog = List.of(new StoryBibleRouteRequest.CatalogEntry(
-                71L, "Mira", "CHARACTER", "Pilot", "AUTO_RETRIEVE", "CANON"));
+                71L, "CHARACTER", "CHARACTER", "Mira", List.of("Captain"), "Pilot", List.of(), "",
+                "AUTO_RETRIEVE", "CANON"));
         var snapshot = new ContextEpochSnapshotCodec.Snapshot(
                 1, 101L, 11L, 9L, 4L, 301L, List.of(), catalog);
         Map<String, Object> state = Map.of("title", "Mira", "rank", "captain");
         when(runs.findRun(70001L)).thenReturn(run);
         when(runs.findInput(70001L)).thenReturn(input);
         when(epochs.loadVerifiedSnapshot(88001L)).thenReturn(codec.encode(snapshot));
+        StoryBibleRelation relation = new StoryBibleRelation();
+        relation.setRelationId(81L);
+        relation.setSourceNodeId(71L);
+        relation.setTargetNodeId(72L);
+        relation.setRelationType("ALLY_OF");
+        relation.setDescription("Trusted ally");
+        relation.setAttributesJson("{}");
         when(resolver.resolve(any())).thenReturn(new StoryBibleContextResolver.ResolvedContext(
                 new StoryBibleRouteDecision(StoryBibleRoutingMode.RETRIEVAL, List.of(71L),
                         Map.of(71L, "exact_alias"), false, 0L, false, List.of()),
                 List.of(new StoryBibleContextResolver.RenderedNode(
                         71L, "Mira", "CHARACTER", state, List.of(91L), true)),
-                List.of()
+                List.of(relation)
         ));
 
         var result = service.execute(request("{\"query\":\"Mira\",\"mentionedEntities\":[\"Captain\"]}"));
@@ -69,6 +78,9 @@ class StoryBibleSearchApplicationServiceTest {
         assertThat(result.status()).isEqualTo("SUCCESS");
         assertThat(result.toolOutput()).contains("\"nodeId\":\"71\"")
                 .contains("\"progressionIds\":[\"91\"]")
+                .contains("\"aliases\":[\"Captain\"]")
+                .contains("\"relationType\":\"ALLY_OF\"")
+                .contains("\"otherNodeId\":\"72\"")
                 .contains("story-bible:88001:71")
                 .contains("captain");
         ArgumentCaptor<StoryBibleRouteRequest> route = ArgumentCaptor.forClass(StoryBibleRouteRequest.class);

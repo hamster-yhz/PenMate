@@ -28,7 +28,7 @@ public class RagQueryToolDefinition implements AgentToolDefinition {
         return new AgentToolDescriptor(
                 "rag_query",
                 new ToolPresentation("RAG 查询"),
-                new ToolExposure(true, "按需查询知识库并返回可引用片段", PARAMETERS_JSON_SCHEMA),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "按需查询知识库并返回可引用片段", PARAMETERS_JSON_SCHEMA),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
                         1,

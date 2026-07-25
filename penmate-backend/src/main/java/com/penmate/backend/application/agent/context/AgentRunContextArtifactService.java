@@ -88,7 +88,7 @@ public class AgentRunContextArtifactService {
 
     public ArtifactRef savePromptPlan(Long runId, PromptPlan plan, PromptManifest manifest,
                                       List<AgentLlmMessage> messages) {
-        String json = json(new PromptArtifact(2, plan, manifest, messages));
+        String json = json(new PromptArtifact(3, plan, manifest, messages));
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         String hash = sha256(bytes);
         Long artifactId = ids.nextId();

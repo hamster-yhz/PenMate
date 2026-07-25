@@ -8,6 +8,7 @@ import com.penmate.backend.application.agent.usecase.AgentConversationAppService
 import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
+import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.interfaces.api.agent.stream.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.common.GlobalExceptionHandler;
@@ -53,6 +54,8 @@ class AgentControllerRunContractTest {
     private AgentRunRetryService agentRunRetryService;
     @Mock
     private AgentRunHistoryQueryService agentRunHistoryQueryService;
+    @Mock
+    private SkillPromptRegistry skillPromptRegistry;
     @InjectMocks
     private AgentController agentController;
 
@@ -70,6 +73,7 @@ class AgentControllerRunContractTest {
                         .header("X-Trace-Id", traceId)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "userMessage", "Write a suspense opening.",
+                                "activeSkills", List.of(),
                                 "taskRequest", Map.of(
                                         "taskType", "WRITE",
                                         "chapterId", "30001",
@@ -108,14 +112,14 @@ class AgentControllerRunContractTest {
     @Test
     void retry_terminal_run_returns_successor_contract() throws Exception {
         String traceId = "trace-run-retry-1";
-        when(agentRunRetryService.retry(101L, 70001L, 201L, traceId))
+        when(agentRunRetryService.retry(101L, 70001L, 201L, List.of(), traceId))
                 .thenReturn(run(70002L, 70001L, "PENDING", "created", 1L));
 
         mockMvc().perform(post("/api/v1/novels/101/agent/runs/70001/retry")
                         .contentType(MediaType.APPLICATION_JSON)
                         .principal(principal("201"))
                         .header("X-Trace-Id", traceId)
-                        .content("{}"))
+                        .content("{\"activeSkills\":[]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.turnId").value("50001"))
                 .andExpect(jsonPath("$.data.runId").value("70002"))
@@ -123,7 +127,7 @@ class AgentControllerRunContractTest {
                 .andExpect(jsonPath("$.data.runPhase").value("created"))
                 .andExpect(jsonPath("$.data.latestSequence").value("1"));
 
-        verify(agentRunRetryService).retry(101L, 70001L, 201L, traceId);
+        verify(agentRunRetryService).retry(101L, 70001L, 201L, List.of(), traceId);
     }
 
     @Test

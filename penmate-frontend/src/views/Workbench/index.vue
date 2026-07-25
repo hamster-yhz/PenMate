@@ -127,6 +127,9 @@
           :streaming-assistant-msg-id="streamingAssistantMsgId"
           :is-approval-busy="isApprovalBusy"
           :chat-input="chatInput"
+          :skill-catalog="skillCatalog"
+          :active-skills="activeSkills"
+          :skill-catalog-loading="skillCatalogLoading"
           :active-plugins="activePlugins"
           :active-chapter-title="currentChapterTitle"
           :selected-text="selectedText"
@@ -148,6 +151,9 @@
           @reject="handleReject"
           @open-story-bible="openStoryBible"
           @update:chat-input="chatInput = $event"
+          @add-skill="addActiveSkill"
+          @remove-skill="removeActiveSkill"
+          @refresh-skill-catalog="loadSkillCatalog"
           @send="sendMessage"
           @cancel-run="cancelCurrentRun"
           @retry-run="retryCurrentRun"
@@ -261,6 +267,9 @@ const {
   recentlyDeletedConversation,
   runAttempts,
   chatInput,
+  skillCatalog,
+  activeSkills,
+  skillCatalogLoading,
   isGenerating,
   isCancelling,
   isRetrying,
@@ -279,6 +288,9 @@ const {
   sendMessage,
   cancelCurrentRun,
   retryCurrentRun,
+  loadSkillCatalog,
+  addActiveSkill,
+  removeActiveSkill,
   isApprovalBusy,
   handleApprove,
   handleReject,

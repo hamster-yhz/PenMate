@@ -4,7 +4,10 @@ import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.context.AgentRunContextArtifactService;
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
 import com.penmate.backend.application.agent.context.AgentRunDependencyValidator;
+import com.penmate.backend.application.agent.orchestration.AgentPromptAssembler;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
+import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
+import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
@@ -28,6 +31,7 @@ class AgentRunWiringTest {
             .withBean(AgentRunEventPublisher.class, () -> mock(AgentRunEventPublisher.class))
             .withBean(AgentRunContextResolutionService.class, () -> mock(AgentRunContextResolutionService.class))
             .withBean(PromptComposer.class, () -> mock(PromptComposer.class))
+            .withBean(AgentPromptAssembler.class, () -> mock(AgentPromptAssembler.class))
             .withBean(AgentRunLlmLoop.class, () -> mock(AgentRunLlmLoop.class))
             .withBean(AgentModelRoutingService.class, () -> mock(AgentModelRoutingService.class))
             .withBean(AgentRuntimeStateReducer.class, () -> mock(AgentRuntimeStateReducer.class))
@@ -38,6 +42,8 @@ class AgentRunWiringTest {
             .withBean(AgentRunLeaseService.class, () -> mock(AgentRunLeaseService.class))
             .withBean(AgentRunOutputEventService.class, () -> mock(AgentRunOutputEventService.class))
             .withBean(AgentRunDependencyValidator.class, () -> mock(AgentRunDependencyValidator.class))
+            .withBean(AgentToolSelectionPolicy.class, () -> mock(AgentToolSelectionPolicy.class))
+            .withBean(AgentSkillActivationService.class, () -> mock(AgentSkillActivationService.class))
             .withBean(AgentRunContinuationArtifactService.class,
                     () -> mock(AgentRunContinuationArtifactService.class))
             .withBean(AgentRunDispatchRequestPublisher.class,

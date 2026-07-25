@@ -15,11 +15,10 @@ class ContextPackageContractTest {
     @Test
     void should_round_trip_context_package_with_prd_contract_field_names() throws Exception {
         ContextPackage contextPackage = new ContextPackage(
-                List.of("style-profile", "story-bible", "rag"),
+                List.of("style-profile", "story-bible"),
                 List.of("missing-memory"),
                 List.of("story-bible:hero.identity vs user-request:hero.origin"),
                 List.of("hero.identity=林烬是守夜人见习生", "world.taboo=不可直呼古神真名"),
-                List.of("rag://chunk/9001", "rag://chunk/9002"),
                 "第一人称、冷峻、短句推进",
                 "chapter:3003"
         );
@@ -36,9 +35,9 @@ class ContextPackageContractTest {
                 "coreStoryBibleEntries",
                 "workingSetEntries",
                 "selectedStoryBibleEntries",
-                "ragRefs",
                 "styleSnapshot",
-                "chapterScope"
+                "chapterScope",
+                "authorProfileSnapshot"
         );
         assertThat(tree.get("styleSnapshot")).isEqualTo("第一人称、冷峻、短句推进");
         assertThat(tree.get("chapterScope")).isEqualTo("chapter:3003");
@@ -53,7 +52,6 @@ class ContextPackageContractTest {
                   "missingContextFlags": null,
                   "conflicts": null,
                   "storyBibleEntries": null,
-                  "ragRefs": null,
                   "styleSnapshot": "  第一人称、短句推进  ",
                   "chapterScope": "  chapter:3003  "
                 }
@@ -65,7 +63,6 @@ class ContextPackageContractTest {
         assertThat(restored.missingContextFlags()).isEmpty();
         assertThat(restored.conflicts()).isEmpty();
         assertThat(restored.storyBibleEntries()).isEmpty();
-        assertThat(restored.ragRefs()).isEmpty();
         assertThat(restored.styleSnapshot()).isEqualTo("第一人称、短句推进");
         assertThat(restored.chapterScope()).isEqualTo("chapter:3003");
         assertThat(restored.sources()).isUnmodifiable();

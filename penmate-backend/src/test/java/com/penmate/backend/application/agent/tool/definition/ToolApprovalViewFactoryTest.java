@@ -16,7 +16,7 @@ class ToolApprovalViewFactoryTest {
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud",
                 new ToolPresentation("书籍 CRUD"),
-                new ToolExposure(true, "desc", "{}"),
+                new ToolExposure(ToolLifecycleStatus.ACTIVE, "desc", "{}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 3, Map.of())
         );
 
