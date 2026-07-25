@@ -57,7 +57,7 @@ export const useWorkbenchEditor = (deps: UseWorkbenchEditorDeps) => {
 
   const replaceSelected = (message: ChatMessageLike) => {
     void message
-    // AI edits use the chapter_edit tool. Direct chat-to-selection mutation is intentionally unavailable.
+    // AI edits use deterministic chapter tools. Direct chat-to-selection mutation is intentionally unavailable.
   }
 
   const saveContent = async () => {

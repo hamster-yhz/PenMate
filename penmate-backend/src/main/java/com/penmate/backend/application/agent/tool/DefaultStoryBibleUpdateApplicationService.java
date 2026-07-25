@@ -299,6 +299,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         value.put("entityType", entityType);
         value.put("entityId", String.valueOf(entityId));
         value.put("status", kind.startsWith("delete_") || kind.startsWith("archive_") ? "deleted" : "applied");
+        value.put("changed", true);
         if (revision != null) value.put("revision", revision);
         if (entity != null) value.put("entity", entity);
         return value;

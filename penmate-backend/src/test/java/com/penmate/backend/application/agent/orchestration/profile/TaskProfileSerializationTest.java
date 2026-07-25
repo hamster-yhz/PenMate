@@ -26,7 +26,7 @@ class TaskProfileSerializationTest {
         TaskProfile profile = new TaskProfile(
                 List.of(TaskIntentTag.DRAFT_GENERATION, TaskIntentTag.STORY_BIBLE_QUERY),
                 "default",
-                List.of("chapter_edit", "story_bible_lookup"),
+                List.of("chapter_read", "chapter_patch", "story_bible_lookup"),
                 List.of("保留第一人称", "不得改写既有设定"),
                 "输出一段可直接进入正文的中文场景续写",
                 true,

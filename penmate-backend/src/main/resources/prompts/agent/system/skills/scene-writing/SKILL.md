@@ -51,3 +51,5 @@ Before delivery, silently verify:
 ## Output Contract
 
 Deliver the requested prose first. Do not prepend a scene plan, craft lecture, or self-evaluation unless asked. Respect requested length; when no length is given, write the shortest complete scene that achieves the intended state change.
+
+When the request is to write into the active chapter rather than only return prose in chat, call `chapter_read`, compose the complete intended result yourself, and persist it with `chapter_replace` (or `chapter_patch` for a bounded continuation). Do not pass creative instructions to a write tool; chapter write tools persist exact text only.

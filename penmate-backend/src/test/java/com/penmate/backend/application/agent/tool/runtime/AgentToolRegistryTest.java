@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.prompt.SkillCatalogItem;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.ChapterEditToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
@@ -44,7 +44,9 @@ class AgentToolRegistryTest {
         when(skills.listAvailableSkills()).thenReturn(List.of(new SkillCatalogItem("writer", "Write prose")));
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
                 new BookCrudToolDefinition(),
-                new ChapterEditToolDefinition(),
+                ChapterContentToolDefinitions.read(),
+                ChapterContentToolDefinitions.replace(),
+                ChapterContentToolDefinitions.patch(),
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new SkillLoadToolDefinition(skills, jsonCodec),
@@ -63,10 +65,10 @@ class AgentToolRegistryTest {
         AgentToolRegistry registry = new AgentToolRegistry(
                 definitions, handlers, new NetworkntAgentToolSchemaValidator(objectMapper));
 
-        assertThat(definitions.listAll()).hasSize(12);
+        assertThat(definitions.listAll()).hasSize(14);
         assertThat(definitions.listLlmSchemas())
                 .extracting(schema -> schema.toolCode())
-                .contains("todo_crud")
+                .contains("chapter_read", "chapter_replace", "chapter_patch", "todo_crud")
                 .doesNotContain("book_crud");
         assertThat(registry.getRequiredDescriptor("book_crud").exposure().lifecycleStatus())
                 .isEqualTo(ToolLifecycleStatus.DISABLED);

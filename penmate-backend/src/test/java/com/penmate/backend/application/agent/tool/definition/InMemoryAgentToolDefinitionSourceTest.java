@@ -69,16 +69,26 @@ class InMemoryAgentToolDefinitionSourceTest {
     }
 
     @Test
-    void exposes_chapter_edit_and_todo_crud() {
+    void exposes_deterministic_chapter_tools_and_todo_crud() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                new ChapterEditToolDefinition(), new TodoCrudToolDefinition()));
+                ChapterContentToolDefinitions.read(),
+                ChapterContentToolDefinitions.replace(),
+                ChapterContentToolDefinitions.patch(),
+                new TodoCrudToolDefinition()));
         Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
                 .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
 
         assertThatThrownBy(() -> source.getRequired("draft_generation"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(schemas).doesNotContainKey("draft_generation");
-        assertThat(schemas.get("chapter_edit").parametersJsonSchema()).doesNotContain("\"chapterId\"");
+        assertThat(schemas).containsKeys("chapter_read", "chapter_replace", "chapter_patch");
+        assertThat(schemas.get("chapter_read").parametersJsonSchema()).doesNotContain("\"chapterId\"");
+        assertThat(schemas.get("chapter_replace").parametersJsonSchema())
+                .contains("expectedRevision", "expectedContentHash", "content")
+                .doesNotContain("instruction");
+        assertThat(schemas.get("chapter_patch").parametersJsonSchema())
+                .contains("oldText", "newText", "expectedOccurrences")
+                .doesNotContain("instruction");
         assertThat(source.getRequired("todo_crud").presentation().displayName()).isNotBlank();
         assertThat(source.getRequired("todo_crud").exposure().lifecycleStatus())
                 .isEqualTo(ToolLifecycleStatus.ACTIVE);
@@ -92,7 +102,9 @@ class InMemoryAgentToolDefinitionSourceTest {
         ObjectMapper objectMapper = new ObjectMapper();
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
                 new BookCrudToolDefinition(),
-                new ChapterEditToolDefinition(),
+                ChapterContentToolDefinitions.read(),
+                ChapterContentToolDefinitions.replace(),
+                ChapterContentToolDefinitions.patch(),
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new SkillLoadToolDefinition(skills, new JacksonJsonCodec(objectMapper)),
@@ -120,7 +132,9 @@ class InMemoryAgentToolDefinitionSourceTest {
                     .as("authority fields exposed by %s", schema.toolCode())
                     .doesNotContainAnyElementsOf(forbidden);
         }
-        assertThat(schemas.get("chapter_edit").parametersJsonSchema()).doesNotContain("chapterId");
+        assertThat(schemas.get("chapter_read").parametersJsonSchema()).doesNotContain("chapterId");
+        assertThat(schemas.get("chapter_replace").parametersJsonSchema()).doesNotContain("chapterId");
+        assertThat(schemas.get("chapter_patch").parametersJsonSchema()).doesNotContain("chapterId");
         assertThat(schemas.get("quality_review").parametersJsonSchema())
                 .doesNotContain("chapterId", "draftId");
     }

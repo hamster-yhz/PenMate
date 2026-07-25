@@ -23,13 +23,13 @@ class AgentToolSelectionPolicyTest {
     @Test
     void selects_only_tools_supported_by_the_execution_profile() {
         AgentToolSelectionPolicy policy = policy(
-                definition("chapter_edit", ToolLifecycleStatus.ACTIVE, Set.of("default", "rewrite")),
+                definition("chapter_patch", ToolLifecycleStatus.ACTIVE, Set.of("default", "rewrite")),
                 definition("story_bible_node_write", ToolLifecycleStatus.ACTIVE, Set.of("default", "world-build")),
                 definition("book_crud", ToolLifecycleStatus.DRAINING, Set.of("*")));
 
         assertThat(policy.select(profile("rewrite", List.of())))
                 .extracting(schema -> schema.toolCode())
-                .containsExactly("chapter_edit");
+                .containsExactly("chapter_patch");
         assertThat(policy.select(profile("world-build", List.of())))
                 .extracting(schema -> schema.toolCode())
                 .containsExactly("story_bible_node_write");
@@ -49,14 +49,14 @@ class AgentToolSelectionPolicyTest {
     @Test
     void rejects_non_active_or_profile_incompatible_requested_tools() {
         AgentToolSelectionPolicy policy = policy(
-                definition("chapter_edit", ToolLifecycleStatus.ACTIVE, Set.of("rewrite")),
+                definition("chapter_patch", ToolLifecycleStatus.ACTIVE, Set.of("rewrite")),
                 definition("book_crud", ToolLifecycleStatus.DRAINING, Set.of("*")),
                 definition("retired_tool", ToolLifecycleStatus.DISABLED, Set.of("*")));
 
         assertThatThrownBy(() -> policy.select(profile("default", List.of("book_crud"))))
                 .hasMessage("Task profile requests an unavailable tool: book_crud");
-        assertThatThrownBy(() -> policy.select(profile("default", List.of("chapter_edit"))))
-                .hasMessage("Task profile requests an unavailable tool: chapter_edit");
+        assertThatThrownBy(() -> policy.select(profile("default", List.of("chapter_patch"))))
+                .hasMessage("Task profile requests an unavailable tool: chapter_patch");
         assertThatThrownBy(() -> policy.select(profile("default", List.of("retired_tool"))))
                 .hasMessage("Task profile requests an unavailable tool: retired_tool");
     }

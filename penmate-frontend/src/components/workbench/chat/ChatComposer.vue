@@ -149,6 +149,7 @@ const handleKeydown = (event: KeyboardEvent) => {
           :class="{ highlighted: index === highlightedSkill, active: activeSkillSet.has(skill.name) }"
           :disabled="activeSkills.length >= 4 && !activeSkillSet.has(skill.name)"
           @mouseenter="highlightedSkill = index"
+          @focus="highlightedSkill = index"
           @mousedown.prevent="selectSkill(skill)"
         >
           <span><strong>{{ skill.name }}</strong><small>{{ skill.description }}</small></span>

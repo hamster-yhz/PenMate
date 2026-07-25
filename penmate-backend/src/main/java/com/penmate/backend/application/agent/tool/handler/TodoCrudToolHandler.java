@@ -103,7 +103,8 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                     yield ToolCallResult.success(jsonCodec.write(Map.of(
                             "operation", "delete",
                             "todoId", String.valueOf(todoId),
-                            "deleted", true
+                            "deleted", true,
+                            "changed", true
                     )));
                 }
                 default -> throw new IllegalArgumentException("unsupported operation: " + operation);
@@ -120,6 +121,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
                 JsonValues.nullableString(args, "todoStatus"));
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("operation", "list");
+        output.put("changed", false);
         output.put("items", todos.stream().map(this::todoOutput).toList());
         return ToolCallResult.success(jsonCodec.write(output));
     }
@@ -127,6 +129,7 @@ public class TodoCrudToolHandler implements AgentToolHandler {
     private ToolCallResult success(String operation, SessionTodo todo) {
         Map<String, Object> output = todoOutput(todo);
         output.put("operation", operation);
+        output.put("changed", true);
         return ToolCallResult.success(jsonCodec.write(output));
     }
 

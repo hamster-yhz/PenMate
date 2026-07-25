@@ -7,7 +7,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.ChapterEditToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions;
 import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
@@ -110,7 +110,9 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
     void builds_complete_llm_tool_list_with_current_story_bible_contracts() {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
                 new BookCrudToolDefinition(),
-                new ChapterEditToolDefinition(),
+                ChapterContentToolDefinitions.read(),
+                ChapterContentToolDefinitions.replace(),
+                ChapterContentToolDefinitions.patch(),
                 new QualityReviewToolDefinition(),
                 new RagQueryToolDefinition(),
                 new StoryBibleSearchToolDefinition(),
@@ -132,7 +134,8 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
                 .extracting(item -> ((JSONObject) item).getJSONObject("function").getStr("name"))
                 .containsExactlyElementsOf(schemas.stream().map(AgentLlmToolSchema::toolCode).toList());
         assertThat(schemas).extracting(AgentLlmToolSchema::toolCode)
-                .contains("story_bible_inspect", "story_bible_node_write", "story_bible_relation_write",
+                .contains("chapter_read", "chapter_replace", "chapter_patch",
+                        "story_bible_inspect", "story_bible_node_write", "story_bible_relation_write",
                         "story_bible_progression_write", "story_bible_structure_write", "todo_crud");
         JSONObject nodeWrite = findParameters(tools, "story_bible_node_write");
         assertThat(nodeWrite.getJSONObject("properties").getJSONObject("attributes").getStr("type"))

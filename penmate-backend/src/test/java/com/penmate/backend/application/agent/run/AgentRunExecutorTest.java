@@ -103,7 +103,7 @@ class AgentRunExecutorTest {
         org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().executionToken()).isEqualTo(2L);
         org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().toolSchemas())
                 .extracting(AgentLlmToolSchema::toolCode)
-                .containsExactly("chapter_edit");
+                .containsExactly("chapter_read");
         org.assertj.core.api.Assertions.assertThat(loopRequest.getValue().messages())
                 .extracting(AgentLlmMessage::content)
                 .containsSubsequence("assembled prompt", "Earlier user request", "Earlier assistant answer",
@@ -169,7 +169,7 @@ class AgentRunExecutorTest {
         verify(llmLoop).resumeApproved(resumedRequest.capture(), eq(pending));
         org.assertj.core.api.Assertions.assertThat(resumedRequest.getValue().toolSchemas())
                 .extracting(AgentLlmToolSchema::toolCode)
-                .containsExactly("chapter_edit");
+                .containsExactly("chapter_read");
         verify(eventPublisher).publish(eq(70001L), eq("run.completed"), any());
     }
 
@@ -319,7 +319,7 @@ class AgentRunExecutorTest {
         return new PromptPlan(
                 List.of(),
                 List.of(new AgentLlmToolSchema(
-                        "chapter_edit", "Edit chapter", "{\"type\":\"object\"}")),
+                        "chapter_read", "Read chapter", "{\"type\":\"object\"}")),
                 "default", "assembled prompt", "", "assembled prompt");
     }
 

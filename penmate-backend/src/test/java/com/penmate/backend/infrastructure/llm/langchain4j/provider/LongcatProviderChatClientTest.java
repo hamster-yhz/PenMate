@@ -107,7 +107,9 @@ class LongcatProviderChatClientTest {
                         new com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource(List.of(
                                 new com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition(),
                                 new com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition(),
-                                new com.penmate.backend.application.agent.tool.definition.ChapterEditToolDefinition()
+                                com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions.read(),
+                                com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions.replace(),
+                                com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions.patch()
                         )).listLlmSchemas(),
                         "auto"
                 ),
@@ -124,7 +126,7 @@ class LongcatProviderChatClientTest {
 
         assertThat(actual.assistantText()).isEqualTo("ok");
         JSONObject root = AgentJsonCodec.parseObj(capturedRequestBody[0]);
-        assertThat(root.getJSONArray("tools")).hasSize(2);
+        assertThat(root.getJSONArray("tools")).hasSize(4);
         for (Object toolObject : root.getJSONArray("tools")) {
             JSONObject parameters = ((JSONObject) toolObject)
                     .getJSONObject("function")

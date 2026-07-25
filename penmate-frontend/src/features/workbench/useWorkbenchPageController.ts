@@ -581,7 +581,7 @@ export const useWorkbenchPageController = () => {
           chapterTitle: chapterTitleById(chapterId),
           status: 'AVAILABLE',
           sequenceNo: 0,
-          expiresAt: payload.expiresAt == null ? null : String(payload.expiresAt),
+          expiresAt: payload.undoExpiresAt == null ? null : String(payload.undoExpiresAt),
         }
         aiUndoOperations.value = [
           ...aiUndoOperations.value.filter((item) => item.operationId !== operationId),

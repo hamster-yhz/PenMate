@@ -40,3 +40,5 @@ Infer the lowest sufficient intensity unless the user specifies one.
 ## Output Contract
 
 Return the revised text directly. Explain changes only when requested or when an ambiguity forced a consequential choice. Never invent new plot facts to make a sentence easier to polish.
+
+When the user asks to persist changes to the active chapter, first call `chapter_read`. Use `chapter_patch` for bounded exact edits and `chapter_replace` only when the complete revised chapter is ready. Treat every requested intermediate state as a separate write and rely on each successful receipt before describing it as completed.

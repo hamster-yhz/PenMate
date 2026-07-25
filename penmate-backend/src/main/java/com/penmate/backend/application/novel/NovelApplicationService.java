@@ -507,9 +507,6 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.conflict("Chapter changed before AI commit");
         }
         String normalizedContent = value(content);
-        if (normalizedContent.isBlank()) {
-            throw com.penmate.backend.application.common.exception.BusinessException.badRequest("AI chapter content must not be blank");
-        }
         int wordCount = countWords(normalizedContent);
         int affected = novelGateway.updateAiChapterContent(projectId, chapterId, requireLeaseToken(leaseToken),
                 expectedRevision, normalizedContent, wordCount);

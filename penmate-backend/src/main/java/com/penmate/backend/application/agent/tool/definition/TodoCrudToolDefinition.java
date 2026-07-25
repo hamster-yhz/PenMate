@@ -43,7 +43,8 @@ public class TodoCrudToolDefinition implements AgentToolDefinition {
                         ToolLifecycleStatus.ACTIVE,
                         "List or maintain persisted Todos for the current session. The runtime supplies session scope. "
                                 + "Create and update require title, sourceType, and todoStatus; update, complete, and "
-                                + "delete require a todoId returned by list.",
+                                + "delete require a todoId returned by list. Mutation results return the persisted Todo "
+                                + "or deletion receipt with changed=true.",
                         PARAMETERS_JSON_SCHEMA
                 ),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())

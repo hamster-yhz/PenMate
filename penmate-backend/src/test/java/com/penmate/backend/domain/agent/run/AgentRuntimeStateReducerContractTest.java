@@ -27,7 +27,7 @@ class AgentRuntimeStateReducerContractTest {
         assertThat(s1.phase()).isEqualTo("routing");
         assertThat(s1.lastEventSeq()).isEqualTo(1L);
 
-        AgentRuntimeState s2 = reducer.apply(s1, event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"chapter_edit\"}"));
+        AgentRuntimeState s2 = reducer.apply(s1, event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"chapter_patch\"}"));
         assertThat(s2.phase()).isEqualTo("routing");
         assertThat(s2.lastEventSeq()).isEqualTo(2L);
 
@@ -45,7 +45,7 @@ class AgentRuntimeStateReducerContractTest {
         AgentRuntimeState state = AgentRuntimeState.empty(70001L);
         AgentRuntimeState reduced = reducer.applyAll(state, List.of(
                 event(1L, "run.started", "{\"phase\":\"routing\"}"),
-                event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"chapter_edit\"}"),
+                event(2L, "tool.call.started", "{\"toolCallId\":\"call-1\",\"toolCode\":\"chapter_patch\"}"),
                 event(3L, "tool.call.waiting_approval", "{\"toolCallId\":\"call-1\",\"approvalId\":88001}"),
                 event(4L, "message.delta", "{\"text\":\"abc\"}"),
                 event(5L, "llm.continuation.saved", "{\"artifactId\":99001}"),
