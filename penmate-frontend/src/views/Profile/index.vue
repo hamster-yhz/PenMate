@@ -38,6 +38,18 @@
           <ProfileAppearancePanel />
         </section>
 
+        <section v-else-if="activeSection === 'author'" class="section-content">
+          <ProfileAuthorPreferencesPanel
+            :profile="authorProfile"
+            :loading="authorProfileLoading"
+            :saving="authorProfileSaving"
+            :error="authorProfileError"
+            :saved="authorProfileSaved"
+            @save="saveAuthorProfile"
+            @retry="loadAuthorProfile"
+          />
+        </section>
+
         <section v-else-if="activeSection === 'models'" class="section-content">
           <ProfileModelServicesPanel />
         </section>
@@ -114,6 +126,7 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   BgColorsOutlined,
+  EditOutlined,
   DatabaseOutlined,
   KeyOutlined,
   RobotOutlined,
@@ -123,6 +136,7 @@ import {
 } from '@ant-design/icons-vue'
 import AppTopbar from '@/components/app/AppTopbar.vue'
 import ProfileAppearancePanel from '@/components/profile/ProfileAppearancePanel.vue'
+import ProfileAuthorPreferencesPanel from '@/components/profile/ProfileAuthorPreferencesPanel.vue'
 import ProfileAccountDeletionPanel from '@/components/profile/ProfileAccountDeletionPanel.vue'
 import ProfileModelServicesPanel from '@/components/profile/ProfileModelServicesPanel.vue'
 import ProfileDangerZone from '@/components/profile/ProfileDangerZone.vue'
@@ -132,15 +146,17 @@ import ProfileSecurityPanel from '@/components/profile/ProfileSecurityPanel.vue'
 import ProfileSessionsPanel from '@/components/profile/ProfileSessionsPanel.vue'
 import { useProfileSettings } from '@/composables/profile/useProfileSettings'
 import { useProfileSessions } from '@/composables/profile/useProfileSessions'
+import { useAuthorProfileSettings } from '@/composables/profile/useAuthorProfileSettings'
 import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
 
 const router = useRouter()
 const route = useRoute()
 const requestedSection = typeof route.query.section === 'string' ? route.query.section : 'profile'
-const activeSection = ref(['profile', 'appearance', 'models', 'agent', 'security', 'data'].includes(requestedSection) ? requestedSection : 'profile')
+const activeSection = ref(['profile', 'appearance', 'author', 'models', 'agent', 'security', 'data'].includes(requestedSection) ? requestedSection : 'profile')
 const sections = [
   { key: 'profile', label: '个人资料', icon: UserOutlined },
   { key: 'appearance', label: '外观与编辑器', icon: BgColorsOutlined },
+  { key: 'author', label: '作者偏好', icon: EditOutlined },
   { key: 'models', label: '模型服务', icon: KeyOutlined },
   { key: 'agent', label: '默认模型与 Agent', icon: RobotOutlined },
   { key: 'security', label: '安全', icon: SafetyCertificateOutlined },
@@ -161,11 +177,16 @@ const modelPreferenceSuccessMessage = ref('')
 const profileLoading = ref(true)
 const profileLoadError = ref('')
 const {
+  authorProfile, authorProfileLoading, authorProfileSaving, authorProfileError, authorProfileSaved, authorProfileLoaded,
+  loadAuthorProfile, saveAuthorProfile,
+} = useAuthorProfileSettings()
+const {
   authSessions, authSessionsLoading, authSessionsError, revokingSessionId, revokingOtherSessions,
   authSessionsActionError, loadAuthSessions, revokeAuthSession, revokeOtherAuthSessions,
 } = useProfileSessions()
 watch(activeSection, (section) => {
   if (section === 'security' && !authSessions.value.length) void loadAuthSessions()
+  if (section === 'author' && !authorProfileLoaded.value && !authorProfileLoading.value) void loadAuthorProfile()
 }, { immediate: true })
 
 const handleLoadProfile = async () => {

@@ -148,9 +148,10 @@ public interface IamUserMapper {
                        OR model_config_id IN (SELECT model_config_id FROM user_configs)),
             d02 AS (DELETE FROM model_user_preferences WHERE user_id IN (SELECT user_id FROM target)),
             d03 AS (DELETE FROM model_configurations WHERE model_config_id IN (SELECT model_config_id FROM user_configs)),
-            d04 AS (DELETE FROM user_ui_preferences WHERE user_id IN (SELECT user_id FROM target)),
-            d05 AS (DELETE FROM auth_sessions WHERE user_id IN (SELECT user_id FROM target)),
-            d06 AS (DELETE FROM iam_user_roles WHERE user_id IN (SELECT user_id FROM target))
+            d04 AS (DELETE FROM author_profiles WHERE user_id IN (SELECT user_id FROM target)),
+            d05 AS (DELETE FROM user_ui_preferences WHERE user_id IN (SELECT user_id FROM target)),
+            d06 AS (DELETE FROM auth_sessions WHERE user_id IN (SELECT user_id FROM target)),
+            d07 AS (DELETE FROM iam_user_roles WHERE user_id IN (SELECT user_id FROM target))
             DELETE FROM iam_users WHERE user_id IN (SELECT user_id FROM target)
             """)
     int purgePendingDeletion(@Param("userId") Long userId, @Param("now") java.time.Instant now);
