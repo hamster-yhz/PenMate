@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.tool.handler;
 
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 
@@ -14,7 +15,7 @@ public interface AgentToolHandler {
 
     String toolCode();
 
-    default boolean mutatesState(ToolCallRequest request) {
+    default boolean mutatesState(AuthorizedAgentRunContext context, ToolCallRequest request) {
         return false;
     }
 
@@ -24,7 +25,7 @@ public interface AgentToolHandler {
      * @param request 当前 tool 调用请求
      * @throws IllegalArgumentException 当参数结构非法或缺少必要字段时抛出
      */
-    default void validate(ToolCallRequest request) {
+    default void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         // 默认无额外校验
     }
 
@@ -34,5 +35,5 @@ public interface AgentToolHandler {
      * @param request 当前 tool 调用请求
      * @return tool 执行结果；成功、失败或等待审批由上层调用方按约定解释
      */
-    ToolCallResult execute(ToolCallRequest request);
+    ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request);
 }

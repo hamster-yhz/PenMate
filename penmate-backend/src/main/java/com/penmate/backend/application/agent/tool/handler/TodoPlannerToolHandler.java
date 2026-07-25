@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.tool.handler;
 
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.common.serialization.JsonCodec;
@@ -28,16 +29,16 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public boolean mutatesState(ToolCallRequest request) {
+    public boolean mutatesState(AuthorizedAgentRunContext context, ToolCallRequest request) {
         return !"list".equalsIgnoreCase(operation(request));
     }
 
     @Override
-    public void validate(ToolCallRequest request) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
-        if (request.sessionId() == null || request.sessionId() < 1) {
+        if (context.sessionId() < 1) {
             throw new IllegalArgumentException("current session is required");
         }
         Map<String, Object> args = readArgs(request);
@@ -71,34 +72,34 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public ToolCallResult execute(ToolCallRequest request) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         try {
-            validate(request);
+            validate(context, request);
             Map<String, Object> args = readArgs(request);
             String operation = JsonValues.string(args, "operation").toLowerCase();
             Long todoId = JsonValues.longValue(args, "todoId");
-            Long sessionId = request.sessionId();
+            Long sessionId = context.sessionId();
             SessionTodo todo;
             return switch (operation) {
-                case "list" -> list(request, args, sessionId);
+                case "list" -> list(context, args, sessionId);
                 case "create" -> {
-                    todo = todoService.createTodo(request.projectId(), sessionId, request.runId(), candidate(args),
-                            request.operatorId(), request.traceId());
+                    todo = todoService.createTodo(context.projectId(), sessionId, context.runId(), candidate(args),
+                            context.ownerUserId(), context.traceId());
                     yield success(operation, todo);
                 }
                 case "update" -> {
-                    todo = todoService.updateTodo(request.projectId(), sessionId, todoId, request.runId(), candidate(args),
-                            request.operatorId(), request.traceId());
+                    todo = todoService.updateTodo(context.projectId(), sessionId, todoId, context.runId(), candidate(args),
+                            context.ownerUserId(), context.traceId());
                     yield success(operation, todo);
                 }
                 case "complete" -> {
-                    todo = todoService.completeTodo(request.projectId(), sessionId, todoId,
-                            request.operatorId(), request.traceId());
+                    todo = todoService.completeTodo(context.projectId(), sessionId, todoId,
+                            context.ownerUserId(), context.traceId());
                     yield success(operation, todo);
                 }
                 case "delete" -> {
-                    todoService.deleteTodo(request.projectId(), sessionId, todoId,
-                            request.operatorId(), request.traceId());
+                    todoService.deleteTodo(context.projectId(), sessionId, todoId,
+                            context.ownerUserId(), context.traceId());
                     yield ToolCallResult.success(jsonCodec.write(Map.of(
                             "operation", "delete",
                             "todoId", String.valueOf(todoId),
@@ -114,8 +115,8 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
         }
     }
 
-    private ToolCallResult list(ToolCallRequest request, Map<String, Object> args, Long sessionId) {
-        var todos = todoService.listSessionTodos(request.projectId(), sessionId,
+    private ToolCallResult list(AuthorizedAgentRunContext context, Map<String, Object> args, Long sessionId) {
+        var todos = todoService.listSessionTodos(context.projectId(), sessionId,
                 JsonValues.nullableString(args, "todoStatus"));
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("operation", "list");

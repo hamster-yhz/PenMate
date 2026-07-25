@@ -40,7 +40,7 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
                 "todo_planner",
                 new ToolPresentation("任务计划"),
                 new ToolExposure(
-                        ToolLifecycleStatus.ACTIVE,
+                        ToolLifecycleStatus.DISABLED,
                         "读取或直接维护当前会话的任务计划。create/update 需要 title、sourceType 和 todoStatus；complete/delete 需要 todoId。",
                         PARAMETERS_JSON_SCHEMA
                 ),

@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.common.serialization.JsonCodec;
@@ -28,7 +29,7 @@ public class SkillLoadToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public void validate(ToolCallRequest request) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
@@ -40,12 +41,12 @@ public class SkillLoadToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public ToolCallResult execute(ToolCallRequest request) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         try {
             Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
             String skill = JsonValues.string(args, "skill").trim();
             var activation = skillActivationService.activateAutomatically(
-                    request.runId(), skill, request.toolCallId());
+                    context.runId(), skill, request.toolCallId());
             var binding = activation.binding();
             Map<String, Object> output = new LinkedHashMap<>();
             output.put("requestedSkill", skill);

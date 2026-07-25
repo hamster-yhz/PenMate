@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
 import com.penmate.backend.application.agent.tool.QualityReviewApplicationService;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +26,14 @@ public class QualityReviewToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public void validate(ToolCallRequest request) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
     }
 
     @Override
-    public ToolCallResult execute(ToolCallRequest request) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         try {
             if (request == null) {
                 throw new IllegalArgumentException("request must not be null");
@@ -42,20 +43,20 @@ public class QualityReviewToolHandler implements AgentToolHandler {
                     ? "quality review execution failed"
                     : ex.getMessage();
             log.warn("quality_review 参数非法: runId={}, traceId={}, message={}",
-                    request == null ? null : request.runId(),
-                    request == null ? null : request.traceId(),
+                    context == null ? null : context.runId(),
+                    context == null ? null : context.traceId(),
                     message);
             return new ToolCallResult("FAILED", null, null, "QUALITY_REVIEW_FAILED", message);
         }
 
         try {
-            return qualityReviewApplicationService.review(request);
+            return qualityReviewApplicationService.review(context, request);
         } catch (Exception ex) {
             String errorMessage = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "quality review execution failed"
                     : ex.getMessage();
             log.warn("quality_review 执行失败: projectId={}, runId={}, traceId={}, message={}",
-                    request.projectId(), request.runId(), request.traceId(), errorMessage);
+                    context.projectId(), context.runId(), context.traceId(), errorMessage);
             return new ToolCallResult("FAILED", null, null, "QUALITY_REVIEW_FAILED", errorMessage);
         }
     }

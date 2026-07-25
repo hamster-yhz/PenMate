@@ -4,7 +4,9 @@ import com.penmate.backend.application.agent.tool.definition.AgentToolDefinition
 import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalView;
 import com.penmate.backend.application.agent.tool.definition.ToolApprovalViewFactory;
-import com.penmate.backend.application.agent.tool.handler.AgentToolHandler;
+import com.penmate.backend.application.agent.tool.runtime.AgentRunExecutionContextResolver;
+import com.penmate.backend.application.agent.tool.runtime.AgentRunExecutionRejectedException;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -33,6 +35,7 @@ public class ToolCallApplicationService {
     private final ToolCallExecutionService toolCallExecutionService;
     private final ToolApprovalPreview toolApprovalPreview;
     private final JsonCodec jsonCodec;
+    private final AgentRunExecutionContextResolver executionContexts;
 
     public ToolCallApplicationService(AgentToolDefinitionSource toolDefinitionSource,
                                       DefaultApprovalPolicyEngine approvalPolicyEngine,
@@ -41,7 +44,8 @@ public class ToolCallApplicationService {
                                       AgentRunPendingApprovalRepository pendingApprovalRepository,
                                       ToolCallExecutionService toolCallExecutionService,
                                       ToolApprovalPreview toolApprovalPreview,
-                                      JsonCodec jsonCodec) {
+                                      JsonCodec jsonCodec,
+                                      AgentRunExecutionContextResolver executionContexts) {
         this.toolDefinitionSource = toolDefinitionSource;
         this.approvalPolicyEngine = approvalPolicyEngine;
         this.toolApprovalViewFactory = toolApprovalViewFactory;
@@ -50,21 +54,28 @@ public class ToolCallApplicationService {
         this.toolCallExecutionService = toolCallExecutionService;
         this.toolApprovalPreview = toolApprovalPreview;
         this.jsonCodec = jsonCodec;
+        this.executionContexts = executionContexts;
     }
 
     public ToolCallResult executeToolCall(ToolCallRequest request) {
+        AuthorizedAgentRunContext context;
+        try {
+            context = executionContexts.resolve(request);
+        } catch (AgentRunExecutionRejectedException rejection) {
+            return ToolCallResult.failed(rejection.errorCode(), rejection.getMessage());
+        }
         log.info("agent.tool.call.start: toolCode={}, projectId={}, runId={}, sessionId={}, traceId={}",
-                request.toolCode(), request.projectId(), request.runId(), request.sessionId(), request.traceId());
+                request.toolCode(), context.projectId(), context.runId(), context.sessionId(), context.traceId());
         AgentToolDescriptor descriptor = toolDefinitionSource.getRequired(request.toolCode());
         ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
         String operationCode = extractOperationCode(request);
         if (decision.approvalRequired()) {
             var approvalPreview = toolApprovalPreview.from(request.toolCode(), request.toolArgsJson());
-            ToolCallResult validationFailure = toolCallExecutionService.validate(request);
+            ToolCallResult validationFailure = toolCallExecutionService.validate(context, request);
             if (validationFailure != null) return validationFailure;
             AgentRunPendingApproval existing = pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey());
             if (existing != null) {
-                if (!matches(existing, request)) {
+                if (!matches(existing, context, request)) {
                     return ToolCallResult.failed("TOOL_CALL_REQUEST_MISMATCH",
                             "Tool approval idempotency key was already used by another request");
                 }
@@ -78,47 +89,47 @@ public class ToolCallApplicationService {
             }
             ToolApprovalView approvalView = toolApprovalViewFactory.create(descriptor, decision);
             ApprovalRequest approvalRequest = approvalApplicationService.create(new CreateApprovalCommand(
-                    request.projectId(),
-                    request.runId(),
+                    context.projectId(),
+                    context.runId(),
                     decision.approvalType(),
                     request.toolArgsJson(),
                     approvalView.riskLevel() == null ? descriptor.governancePolicy().riskLevel() : approvalView.riskLevel(),
-                    request.operatorId()
-            ), request.traceId());
+                    context.ownerUserId()
+            ), context.traceId());
             pendingApprovalRepository.save(new AgentRunPendingApproval(
                     null,
                     approvalRequest.getApprovalRequestId(),
                     approvalRequest.getApprovalRequestId(),
-                    request.runId(),
-                    request.projectId(),
-                    request.sessionId(),
-                    request.turnId(),
+                    context.runId(),
+                    context.projectId(),
+                    context.sessionId(),
+                    context.turnId(),
                     request.toolCallId(),
                     request.toolCode(),
                     request.toolArgsJson(),
-                    request.contextJson(),
+                    request.continuationJson(),
                     request.conversationMessagesJson(),
                     request.idempotencyKey(),
                     "PENDING",
-                    request.operatorId(),
-                    request.traceId(),
+                    context.ownerUserId(),
+                    context.traceId(),
                     null,
                     null
             ));
             log.info("agent.tool.call.waiting_approval: toolCode={}, operationCode={}, approvalId={}, runId={}, traceId={}",
-                    request.toolCode(), operationCode, approvalRequest.getApprovalRequestId(), request.runId(), request.traceId());
+                    request.toolCode(), operationCode, approvalRequest.getApprovalRequestId(), context.runId(), context.traceId());
             return ToolCallResult.waitingApproval(approvalRequest.getApprovalRequestId(), approvalPreview);
         }
-        ToolCallResult result = toolCallExecutionService.execute(request);
+        ToolCallResult result = toolCallExecutionService.execute(context, request);
         if (result != null && "SUCCESS".equals(result.status())) {
             log.info("agent.tool.call.success: toolCode={}, operationCode={}, runId={}, traceId={}",
-                    request.toolCode(), operationCode, request.runId(), request.traceId());
+                    request.toolCode(), operationCode, context.runId(), context.traceId());
         } else {
             log.warn("agent.tool.call.failed: toolCode={}, operationCode={}, status={}, errorCode={}, runId={}, traceId={}",
                     request.toolCode(), operationCode,
                     result == null ? null : result.status(),
                     result == null ? null : result.errorCode(),
-                    request.runId(), request.traceId());
+                    context.runId(), context.traceId());
         }
         return result;
     }
@@ -132,11 +143,12 @@ public class ToolCallApplicationService {
         }
     }
 
-    private boolean matches(AgentRunPendingApproval pending, ToolCallRequest request) {
-        return java.util.Objects.equals(pending.runId(), request.runId())
-                && java.util.Objects.equals(pending.projectId(), request.projectId())
-                && java.util.Objects.equals(pending.sessionId(), request.sessionId())
-                && java.util.Objects.equals(pending.turnId(), request.turnId())
+    private boolean matches(AgentRunPendingApproval pending, AuthorizedAgentRunContext context,
+                            ToolCallRequest request) {
+        return java.util.Objects.equals(pending.runId(), context.runId())
+                && java.util.Objects.equals(pending.projectId(), context.projectId())
+                && java.util.Objects.equals(pending.sessionId(), context.sessionId())
+                && java.util.Objects.equals(pending.turnId(), context.turnId())
                 && java.util.Objects.equals(pending.toolCallId(), request.toolCallId())
                 && java.util.Objects.equals(pending.toolCode(), request.toolCode())
                 && java.util.Objects.equals(pending.toolArgsJson(), request.toolArgsJson());

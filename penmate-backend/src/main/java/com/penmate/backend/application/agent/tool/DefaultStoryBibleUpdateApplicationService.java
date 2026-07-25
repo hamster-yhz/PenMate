@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.tool;
 
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.common.serialization.JsonCodec;
@@ -41,14 +42,14 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
 
     @Override
     @Transactional
-    public ToolCallResult execute(ToolCallRequest request) {
-        assertRunIdentity(request);
-        List<?> operations = parseOperations(request.toolArgsJson());
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        AuthorizedToolCall call = new AuthorizedToolCall(context, request);
+        List<?> operations = parseOperations(call.toolArgsJson());
         List<Map<String, Object>> results = new ArrayList<>(operations.size());
         for (int index = 0; index < operations.size(); index++) {
             Object operation = operations.get(index);
             try {
-                results.add(executeOperation(request, operation));
+                results.add(executeOperation(call, operation));
             } catch (RuntimeException ex) {
                 throw new IllegalArgumentException("operations[" + index + "] failed: " + message(ex), ex);
             }
@@ -85,7 +86,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         }
     }
 
-    private Map<String, Object> executeOperation(ToolCallRequest request, Object rawOperation) {
+    private Map<String, Object> executeOperation(AuthorizedToolCall request, Object rawOperation) {
         if (!(rawOperation instanceof Map<?, ?> values)) {
             throw new IllegalArgumentException("mutation must be a JSON object");
         }
@@ -114,7 +115,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         };
     }
 
-    private Map<String, Object> createNode(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> createNode(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         StoryBibleNode node = storyBibleApplicationService.createNode(request.projectId(),
                 new StoryBibleCommands.CreateNode(
                         requiredLong(op, "typeId"),
@@ -131,7 +132,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "NODE", node.getNodeId(), node.getRevision(), node);
     }
 
-    private Map<String, Object> updateNode(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> updateNode(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long nodeId = requiredLong(op, "nodeId");
         StoryBibleApplicationService.NodeDetails details = storyBibleApplicationService.getNodeDetails(request.projectId(), nodeId);
         StoryBibleNode existing = details.node();
@@ -152,14 +153,14 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "NODE", nodeId, node.getRevision(), node);
     }
 
-    private Map<String, Object> deleteNode(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> deleteNode(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long nodeId = requiredLong(op, "nodeId");
         storyBibleApplicationService.deleteNode(request.projectId(), nodeId, requiredLong(op, "expectedRevision"),
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
         return result(kind, "NODE", nodeId, null, null);
     }
 
-    private Map<String, Object> createRelation(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> createRelation(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         StoryBibleRelation relation = storyBibleApplicationService.createRelation(request.projectId(),
                 new StoryBibleCommands.CreateRelation(
                         requiredLong(op, "sourceNodeId"), requiredText(op, "relationType"),
@@ -169,7 +170,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "RELATION", relation.getRelationId(), relation.getRevision(), relation);
     }
 
-    private Map<String, Object> updateRelation(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> updateRelation(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long relationId = requiredLong(op, "relationId");
         StoryBibleRelation existing = requireRelation(request.projectId(), relationId);
         StoryBibleRelation relation = storyBibleApplicationService.updateRelation(request.projectId(), relationId,
@@ -183,14 +184,14 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "RELATION", relationId, relation.getRevision(), relation);
     }
 
-    private Map<String, Object> deleteRelation(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> deleteRelation(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long relationId = requiredLong(op, "relationId");
         storyBibleApplicationService.deleteRelation(request.projectId(), relationId, requiredLong(op, "expectedRevision"),
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
         return result(kind, "RELATION", relationId, null, null);
     }
 
-    private Map<String, Object> createProgression(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> createProgression(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         StoryBibleProgression progression = storyBibleApplicationService.createProgression(request.projectId(),
                 new StoryBibleCommands.CreateProgression(
                         requiredLong(op, "nodeId"), requiredLong(op, "anchorChapterId"),
@@ -200,7 +201,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "PROGRESSION", progression.getProgressionId(), progression.getRevision(), progression);
     }
 
-    private Map<String, Object> updateProgression(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> updateProgression(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long progressionId = requiredLong(op, "progressionId");
         StoryBibleProgression existing = requireProgression(request.projectId(), progressionId);
         StoryBibleProgression progression = storyBibleApplicationService.updateProgression(request.projectId(), progressionId,
@@ -215,14 +216,14 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "PROGRESSION", progressionId, progression.getRevision(), progression);
     }
 
-    private Map<String, Object> deleteProgression(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> deleteProgression(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long progressionId = requiredLong(op, "progressionId");
         storyBibleApplicationService.deleteProgression(request.projectId(), progressionId, requiredLong(op, "expectedRevision"),
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
         return result(kind, "PROGRESSION", progressionId, null, null);
     }
 
-    private Map<String, Object> createNodeType(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> createNodeType(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         StoryBibleNodeType type = storyBibleApplicationService.createNodeType(request.projectId(),
                 new StoryBibleCommands.CreateNodeType(
                         requiredText(op, "typeCode"), requiredEnum(op, "semanticFamily", StoryBibleSemanticFamily.class),
@@ -232,7 +233,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "NODE_TYPE", type.getTypeId(), null, type);
     }
 
-    private Map<String, Object> updateNodeType(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> updateNodeType(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long typeId = requiredLong(op, "typeId");
         StoryBibleNodeType existing = requireNodeType(request.projectId(), typeId);
         StoryBibleNodeType type = storyBibleApplicationService.updateNodeType(request.projectId(), typeId,
@@ -245,14 +246,14 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "NODE_TYPE", typeId, null, type);
     }
 
-    private Map<String, Object> archiveNodeType(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> archiveNodeType(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long typeId = requiredLong(op, "typeId");
         storyBibleApplicationService.archiveNodeType(request.projectId(), typeId,
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
         return result(kind, "NODE_TYPE", typeId, null, null);
     }
 
-    private Map<String, Object> createCategory(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> createCategory(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         StoryBibleCategory category = storyBibleApplicationService.createCategory(request.projectId(),
                 new StoryBibleCommands.CreateCategory(nullableLong(op, "parentCategoryId", null),
                         requiredText(op, "name"), integer(op, "sortOrder", 0)),
@@ -260,7 +261,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "CATEGORY", category.getCategoryId(), null, category);
     }
 
-    private Map<String, Object> updateCategory(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> updateCategory(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long categoryId = requiredLong(op, "categoryId");
         StoryBibleCategory existing = requireCategory(request.projectId(), categoryId);
         StoryBibleCategory category = storyBibleApplicationService.updateCategory(request.projectId(), categoryId,
@@ -271,21 +272,21 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "CATEGORY", categoryId, null, category);
     }
 
-    private Map<String, Object> deleteCategory(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> deleteCategory(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long categoryId = requiredLong(op, "categoryId");
         storyBibleApplicationService.deleteCategory(request.projectId(), categoryId,
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
         return result(kind, "CATEGORY", categoryId, null, null);
     }
 
-    private Map<String, Object> createTag(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> createTag(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         StoryBibleTag tag = storyBibleApplicationService.createTag(request.projectId(),
                 new StoryBibleCommands.CreateTag(requiredText(op, "name"), nullableText(op, "color", null)),
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
         return result(kind, "TAG", tag.getTagId(), null, tag);
     }
 
-    private Map<String, Object> updateTag(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> updateTag(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long tagId = requiredLong(op, "tagId");
         StoryBibleTag existing = requireTag(request.projectId(), tagId);
         StoryBibleTag tag = storyBibleApplicationService.updateTag(request.projectId(), tagId,
@@ -295,7 +296,7 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return result(kind, "TAG", tagId, null, tag);
     }
 
-    private Map<String, Object> deleteTag(ToolCallRequest request, String kind, Map<String, Object> op) {
+    private Map<String, Object> deleteTag(AuthorizedToolCall request, String kind, Map<String, Object> op) {
         Long tagId = requiredLong(op, "tagId");
         storyBibleApplicationService.deleteTag(request.projectId(), tagId,
                 StoryBibleActorType.AGENT, request.operatorId(), request.runId());
@@ -485,9 +486,10 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
                 ? error.getClass().getSimpleName() : error.getMessage();
     }
 
-    private void assertRunIdentity(ToolCallRequest request) {
-        if (request == null || request.projectId() == null || request.runId() == null || request.operatorId() == null) {
-            throw new IllegalStateException("run context is required for Story Bible mutations");
-        }
+    private record AuthorizedToolCall(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        Long projectId() { return context.projectId(); }
+        Long runId() { return context.runId(); }
+        Long operatorId() { return context.ownerUserId(); }
+        String toolArgsJson() { return request.toolArgsJson(); }
     }
 }

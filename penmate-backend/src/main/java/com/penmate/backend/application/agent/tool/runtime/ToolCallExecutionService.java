@@ -23,33 +23,48 @@ public class ToolCallExecutionService {
     private final AgentToolCallExecutionRepository executions;
     private final BusinessIdGenerator ids;
     private final AgentToolMutationGuard mutationGuard;
+    private final AgentRunExecutionContextResolver executionContexts;
     private final JsonCodec jsonCodec;
 
     public ToolCallExecutionService(AgentToolRegistry toolRegistry,
                                     AgentToolCallExecutionRepository executions,
                                     BusinessIdGenerator ids,
                                     AgentToolMutationGuard mutationGuard,
+                                    AgentRunExecutionContextResolver executionContexts,
                                     JsonCodec jsonCodec) {
         this.toolRegistry = toolRegistry;
         this.executions = executions;
         this.ids = ids;
         this.mutationGuard = mutationGuard;
+        this.executionContexts = executionContexts;
         this.jsonCodec = jsonCodec;
     }
 
     public ToolCallResult validate(ToolCallRequest request) {
         try {
+            AuthorizedAgentRunContext context = executionContexts.resolve(request);
+            return validate(context, request);
+        } catch (AgentRunExecutionRejectedException rejection) {
+            return ToolCallResult.failed(rejection.errorCode(), rejection.getMessage());
+        } catch (IllegalArgumentException ex) {
+            return ToolCallResult.failed("TOOL_VALIDATION_FAILED", rootMessage(ex));
+        }
+    }
+
+    public ToolCallResult validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        try {
             validateIdentity(request);
+            validateContextIdentity(context, request);
             var descriptor = toolRegistry.getRequiredDescriptor(request.toolCode());
             if (!descriptor.exposure().lifecycleStatus().executable()) {
                 return ToolCallResult.failed("TOOL_DISABLED", "Tool is disabled: " + request.toolCode());
             }
             var handler = toolRegistry.getRequiredHandler(request.toolCode());
             toolRegistry.validateArguments(request.toolCode(), request.toolArgsJson());
-            handler.validate(request);
-            mutationGuard.assertExecutable(request, false);
+            handler.validate(context, request);
+            mutationGuard.assertExecutable(context, false);
             return null;
-        } catch (AgentToolMutationGuard.Rejection rejection) {
+        } catch (AgentRunExecutionRejectedException rejection) {
             return ToolCallResult.failed(rejection.errorCode(), rejection.getMessage());
         } catch (IllegalArgumentException ex) {
             return ToolCallResult.failed("TOOL_VALIDATION_FAILED", rootMessage(ex));
@@ -57,16 +72,24 @@ public class ToolCallExecutionService {
     }
 
     public ToolCallResult execute(ToolCallRequest request) {
-        ToolCallResult validationFailure = validate(request);
+        try {
+            return execute(executionContexts.resolve(request), request);
+        } catch (AgentRunExecutionRejectedException rejection) {
+            return ToolCallResult.failed(rejection.errorCode(), rejection.getMessage());
+        }
+    }
+
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        ToolCallResult validationFailure = validate(context, request);
         if (validationFailure != null) {
             log.warn("tool call validation failed: toolCode={}, traceId={}, errorCode={}",
-                    request == null ? null : request.toolCode(), request == null ? null : request.traceId(),
+                    request == null ? null : request.toolCode(), context == null ? null : context.traceId(),
                     validationFailure.errorCode());
             return validationFailure;
         }
 
         var handler = toolRegistry.getRequiredHandler(request.toolCode());
-        String requestSha256 = requestSha256(request);
+        String requestSha256 = requestSha256(context, request);
         AgentToolCallExecution candidate = AgentToolCallExecution.started(
                 ids.nextId(), request.runId(), request.toolCallId(), request.toolCode(), requestSha256,
                 request.executionToken(), Instant.now());
@@ -76,8 +99,8 @@ public class ToolCallExecutionService {
         }
 
         try {
-            mutationGuard.assertExecutable(request, handler.mutatesState(request));
-        } catch (AgentToolMutationGuard.Rejection rejection) {
+            mutationGuard.assertExecutable(context, handler.mutatesState(context, request));
+        } catch (AgentRunExecutionRejectedException rejection) {
             ToolCallResult failed = ToolCallResult.failed(rejection.errorCode(), rejection.getMessage());
             return finish(candidate, AgentToolCallExecutionStatus.FAILED, failed)
                     ? failed
@@ -86,7 +109,7 @@ public class ToolCallExecutionService {
 
         ToolCallResult result;
         try {
-            result = handler.execute(request);
+            result = handler.execute(context, request);
             if (result == null) {
                 result = ToolCallResult.failed("TOOL_CALL_FAILED", "Tool call returned no result");
             }
@@ -189,13 +212,13 @@ public class ToolCallExecutionService {
         return ToolCallResult.failed("TOOL_CALL_AMBIGUOUS", message);
     }
 
-    private String requestSha256(ToolCallRequest request) {
+    private String requestSha256(AuthorizedAgentRunContext context, ToolCallRequest request) {
         Map<String, Object> intent = new LinkedHashMap<>();
-        intent.put("projectId", request.projectId());
-        intent.put("runId", request.runId());
-        intent.put("sessionId", request.sessionId());
-        intent.put("turnId", request.turnId());
-        intent.put("operatorId", request.operatorId());
+        intent.put("projectId", context.projectId());
+        intent.put("runId", context.runId());
+        intent.put("sessionId", context.sessionId());
+        intent.put("turnId", context.turnId());
+        intent.put("operatorId", context.ownerUserId());
         intent.put("toolCode", request.toolCode());
         try {
             intent.put("arguments", jsonCodec.read(request.toolArgsJson()));
@@ -237,6 +260,16 @@ public class ToolCallExecutionService {
         }
         if (request.toolCode().length() > 100) {
             throw new IllegalArgumentException("toolCode must not exceed 100 characters");
+        }
+    }
+
+    private void validateContextIdentity(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        if (context == null
+                || !java.util.Objects.equals(context.runId(), request.runId())
+                || !java.util.Objects.equals(context.executionToken(), request.executionToken())) {
+            throw new AgentRunExecutionRejectedException(
+                    "AGENT_RUN_EXECUTION_CONTEXT_MISMATCH",
+                    "Authorized Run context does not match the tool execution envelope");
         }
     }
 

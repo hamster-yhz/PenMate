@@ -8,6 +8,7 @@ import com.penmate.backend.application.agent.context.StoryBibleRouteRequest;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.agent.AgentModelRoutingService;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
@@ -53,26 +54,24 @@ public class StoryBibleSearchApplicationService {
         this(runs, epochs, codec, resolver, workingSetPromotions, jsonCodec, null);
     }
 
-    public ToolCallResult execute(ToolCallRequest request) {
-        var run = runs.findRun(request.runId());
-        var input = runs.findInput(request.runId());
-        if (run == null || input == null || run.contextEpochId() == null) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        if (context.contextEpochId() == null) {
             return ToolCallResult.failed("STORY_BIBLE_EPOCH_MISSING", "Run has no bound Context Epoch");
         }
         SearchArgs args;
         try { args = jsonCodec.read(request.toolArgsJson(), SearchArgs.class); }
         catch (RuntimeException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_INVALID", "Invalid search arguments"); }
-        var snapshot = codec.decode(epochs.loadVerifiedSnapshot(run.contextEpochId()));
-        var epoch = modelRouting == null ? null : epochs.get(run.contextEpochId());
+        var snapshot = codec.decode(epochs.loadVerifiedSnapshot(context.contextEpochId()));
+        var epoch = modelRouting == null ? null : epochs.get(context.contextEpochId());
         StoryBibleRoutingMode routingMode = epoch == null ? StoryBibleRoutingMode.RETRIEVAL
                 : StoryBibleRoutingMode.valueOf(epoch.routingMode());
         var selectorConfig = routingMode == StoryBibleRoutingMode.RETRIEVAL || modelRouting == null ? null
-                : modelRouting.resolveExecutionConfig(run.ownerUserId(), epoch.routerModelConfigId(), request.traceId());
+                : modelRouting.resolveExecutionConfig(context.ownerUserId(), epoch.routerModelConfigId(), context.traceId());
         var resolved = resolver.resolve(new StoryBibleRouteRequest(
-                run.projectId(), run.sessionId(), run.runId(), input.chapterId(), args.query(), args.mentionedEntities(),
+                context.projectId(), context.sessionId(), context.runId(), context.input().chapterId(), args.query(), args.mentionedEntities(),
                 routingMode, snapshot.storyBibleRevision(), snapshot.selectorCatalog(), List.of(), selectorConfig));
         List<Long> usedIds = resolved.nodes().stream().map(StoryBibleContextResolver.RenderedNode::nodeId).toList();
-        workingSetPromotions.promoteBestEffort(run.sessionId(), run.turnId(), usedIds, BigDecimal.ONE);
+        workingSetPromotions.promoteBestEffort(context.sessionId(), context.turnId(), usedIds, BigDecimal.ONE);
         Map<Long, StoryBibleRouteRequest.CatalogEntry> catalogById = snapshot.selectorCatalog().stream()
                 .collect(Collectors.toMap(StoryBibleRouteRequest.CatalogEntry::nodeId, Function.identity()));
         List<Map<String, Object>> results = resolved.nodes().stream().map(node -> {
@@ -85,7 +84,7 @@ public class StoryBibleSearchApplicationService {
             result.put("effectiveState", node.effectiveState());
             result.put("relations", renderRelations(node.nodeId(), resolved.relations()));
             result.put("progressionIds", node.appliedProgressionIds().stream().map(String::valueOf).toList());
-            result.put("citation", "story-bible:" + run.contextEpochId() + ":" + node.nodeId());
+            result.put("citation", "story-bible:" + context.contextEpochId() + ":" + node.nodeId());
             return result;
         }).toList();
         try { return ToolCallResult.success(jsonCodec.write(results)); }

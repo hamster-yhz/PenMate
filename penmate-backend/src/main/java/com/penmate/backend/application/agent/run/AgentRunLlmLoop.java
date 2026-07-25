@@ -83,17 +83,18 @@ public class AgentRunLlmLoop {
     }
 
     public AgentRunLoopResult resumeApproved(AgentRunLoopRequest request, AgentRunPendingApproval pending) {
+        Objects.requireNonNull(request, "request must not be null");
         Objects.requireNonNull(pending, "pending must not be null");
+        if (!request.runId().equals(pending.runId())) {
+            throw new IllegalArgumentException("Agent Run approval belongs to another Run");
+        }
         try {
             List<AgentLlmMessage> messages = new ArrayList<>(
                     jsonCodec.readList(pending.resumePayloadJson(), AgentLlmMessage.class));
             Continuation continuation = jsonCodec.read(pending.toolContextJson(), Continuation.class);
             ToolCallResult result = toolCallService.executeToolCall(new ToolCallRequest(
-                    pending.projectId(), pending.runId(), pending.sessionId(), pending.turnId(), pending.toolCode(),
-                    pending.toolArgsJson(),
-                    pending.operatorId() == null ? request.operatorId() : pending.operatorId(),
-                    request.traceId(), pending.toolContextJson(),
-                    pending.idempotencyKey(), continuation.llmTurnIndex(), pending.toolCallId(), null,
+                    pending.runId(), pending.toolCode(), pending.toolArgsJson(), pending.idempotencyKey(),
+                    continuation.llmTurnIndex(), pending.toolCallId(), pending.toolContextJson(), null,
                     pending.resumePayloadJson(), "APPROVED", pending.approvalId().toString(),
                     request.executionToken()
             ));
@@ -252,9 +253,8 @@ public class AgentRunLlmLoop {
                     ? ToolCallResult.failed("TOOL_NOT_ALLOWED_FOR_RUN",
                             "Tool is not allowed for this Run: " + toolCall.functionName())
                     : toolCallService.executeToolCall(new ToolCallRequest(
-                            request.projectId(), request.runId(), request.sessionId(), request.turnId(),
-                            toolCall.functionName(), toolCall.argumentsJson(), request.operatorId(), request.traceId(),
-                            json(context), request.runId() + ":" + toolCall.id(), turnIndex, toolCall.id(),
+                            request.runId(), toolCall.functionName(), toolCall.argumentsJson(),
+                            request.runId() + ":" + toolCall.id(), turnIndex, toolCall.id(), json(context),
                             json(toolCalls), json(messages), null, null, request.executionToken()
                     ));
             if (result == null) {

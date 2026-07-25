@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmGateway;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.support.QualityReportView;
@@ -72,20 +73,20 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
     }
 
     @Override
-    public ToolCallResult review(ToolCallRequest request) {
+    public ToolCallResult review(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
         QualityReviewCommand parsedCommand = qualityReviewCommandParser.parse(request.toolArgsJson());
         QualityReviewCommand command = isSparseIdentifierOnlyRequest(parsedCommand)
-                ? enrichCommand(parsedCommand, request)
+                ? enrichCommand(parsedCommand, context)
                 : parsedCommand;
         qualityReviewCommandParser.validate(command);
 
         AgentLlmExecutionConfig executionConfig = agentModelRoutingService.resolveExecutionConfig(
-                request.operatorId(),
+                context.ownerUserId(),
                 null,
-                request.traceId()
+                context.traceId()
         );
         AgentLlmTurnResponse response = llmInvocations.invokeBuffered(
                 new AgentLlmTurnRequest(List.of(AgentLlmMessage.user(buildPrompt(command))), List.of(), "none"),
@@ -104,7 +105,7 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
         output.put("revisionAllowed", reportView.revisionAllowed());
         output.put("reviewSummary", reportView.reviewSummary());
         log.info("quality_review 执行成功: projectId={}, runId={}, traceId={}, needsRevision={}, revisionAllowed={}",
-                request.projectId(), request.runId(), request.traceId(),
+                context.projectId(), context.runId(), context.traceId(),
                 reportView.needsRevision(), reportView.revisionAllowed());
         return ToolCallResult.success(jsonCodec.write(output));
     }
@@ -235,8 +236,8 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
         return values == null || values.stream().noneMatch(value -> value != null && !value.isBlank());
     }
 
-    private QualityReviewCommand enrichCommand(QualityReviewCommand command, ToolCallRequest request) {
-        String resolvedDraftText = resolveDraftText(command, request);
+    private QualityReviewCommand enrichCommand(QualityReviewCommand command, AuthorizedAgentRunContext context) {
+        String resolvedDraftText = resolveDraftText(command, context);
         return new QualityReviewCommand(
                 resolvedDraftText,
                 defaultIfEmpty(command == null ? null : command.userRequirements(), "Review against the current run request."),
@@ -250,19 +251,20 @@ public class DefaultQualityReviewApplicationService implements QualityReviewAppl
         );
     }
 
-    private String resolveDraftText(QualityReviewCommand command, ToolCallRequest request) {
+    private String resolveDraftText(QualityReviewCommand command, AuthorizedAgentRunContext context) {
         String draftText = command == null ? null : command.draftText();
         if (draftText != null && !draftText.isBlank()) {
             return draftText.trim();
         }
-        Long chapterId = extractLong(request == null ? null : request.toolArgsJson(), "chapterId");
-        if (request != null && request.projectId() != null && chapterId != null && novelApplicationService != null) {
-            String chapterContent = novelApplicationService.getChapterContentText(request.projectId(), chapterId);
+        Long chapterId = context == null ? null : context.input().chapterId();
+        if (context != null && chapterId != null && novelApplicationService != null) {
+            String chapterContent = novelApplicationService.getChapterContentText(context.projectId(), chapterId);
             if (chapterContent != null && !chapterContent.isBlank()) {
                 return chapterContent.trim();
             }
         }
-        return firstNonBlank(extractString(request == null ? null : request.contextJson(), "selectedText"), "No draft text was provided for this run.");
+        return firstNonBlank(context == null ? null : context.input().selectedText(),
+                "No draft text was provided for this run.");
     }
 
     private List<String> defaultIfEmpty(List<String> values, String fallback) {

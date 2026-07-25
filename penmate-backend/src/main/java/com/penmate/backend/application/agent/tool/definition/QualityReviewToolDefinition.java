@@ -15,14 +15,6 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
             {
               "type": "object",
               "properties": {
-                "chapterId": {
-                  "type": "integer",
-                  "minimum": 1
-                },
-                "draftId": {
-                  "type": "integer",
-                  "minimum": 1
-                },
                 "draftText": {
                   "type": "string",
                   "minLength": 1,

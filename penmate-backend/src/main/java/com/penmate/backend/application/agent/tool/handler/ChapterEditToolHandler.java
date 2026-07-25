@@ -7,6 +7,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmInvocationService;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.run.AgentRunEventPublisher;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.novel.NovelApplicationService;
@@ -54,48 +55,48 @@ public class ChapterEditToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public boolean mutatesState(ToolCallRequest request) {
+    public boolean mutatesState(AuthorizedAgentRunContext context, ToolCallRequest request) {
         return true;
     }
 
     @Override
-    public void validate(ToolCallRequest request) {
-        if (request == null || request.projectId() == null || request.runId() == null || request.operatorId() == null) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        if (request == null || context == null) {
             throw new IllegalArgumentException("chapter_edit requires project, run and operator context");
         }
         Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
-        if (JsonValues.longValue(args, "chapterId") == null) throw new IllegalArgumentException("chapterId is required");
+        if (context.input().chapterId() == null) throw new IllegalArgumentException("active chapter is required");
         String instruction = JsonValues.string(args, "instruction");
         if (instruction == null || instruction.isBlank()) throw new IllegalArgumentException("instruction is required");
         for (String field : args.keySet()) {
-            if (!"chapterId".equals(field) && !"instruction".equals(field)) {
+            if (!"instruction".equals(field)) {
                 throw new IllegalArgumentException("Unexpected chapter_edit field: " + field);
             }
         }
     }
 
     @Override
-    public ToolCallResult execute(ToolCallRequest request) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
-        Long chapterId = JsonValues.longValue(args, "chapterId");
+        Long chapterId = context.input().chapterId();
         String instruction = JsonValues.string(args, "instruction").trim();
         NovelApplicationService.ChapterLeaseView lease = null;
         PreviewStream preview = null;
         try {
-            lease = acquireLeaseWithWait(request, chapterId);
+            lease = acquireLeaseWithWait(context, chapterId);
             if (!lease.editable()) {
-                publish(request.runId(), "chapter.edit.failed", eventPayload(request, chapterId,
+                publish(context.runId(), "chapter.edit.failed", eventPayload(context, request, chapterId,
                         "errorCode", "CHAPTER_LOCKED", "errorMessage", lease.reason()));
                 return ToolCallResult.failed("CHAPTER_LOCKED", lease.reason());
             }
-            publish(request.runId(), "chapter.edit.started", eventPayload(request, chapterId,
+            publish(context.runId(), "chapter.edit.started", eventPayload(context, request, chapterId,
                     "contentRevision", lease.contentRevision(), "leaseExpiresAt", lease.expiresAt()));
 
             AgentLlmExecutionConfig executionConfig = modelRouting.resolveExecutionConfig(
-                    request.operatorId(), null, request.traceId());
-            preview = new PreviewStream(request, chapterId, lease.leaseToken());
+                    context.ownerUserId(), null, context.traceId());
+            preview = new PreviewStream(context, request, chapterId, lease.leaseToken());
             AgentLlmTurnResponse response = llmInvocations.invokeStreaming(
-                    request.runId(),
+                    context.runId(),
                     new AgentLlmTurnRequest(
                             List.of(AgentLlmMessage.user(buildPrompt(instruction, lease.content()))),
                             List.of(),
@@ -107,11 +108,11 @@ public class ChapterEditToolHandler implements AgentToolHandler {
             String finalContent = requireContent(response.assistantText());
             preview.complete(finalContent);
             NovelApplicationService.AiChapterEditResult saved = novels.saveAiChapterEdit(
-                    request.projectId(), chapterId, request.operatorId(), request.runId(), request.toolCallId(),
+                    context.projectId(), chapterId, context.ownerUserId(), context.runId(), request.toolCallId(),
                     lease.leaseToken(), lease.contentRevision(), finalContent);
-            releaseQuietly(request, chapterId, lease);
+            releaseQuietly(context, chapterId, lease);
             lease = null;
-            publish(request.runId(), "chapter.edit.completed", eventPayload(request, chapterId,
+            publish(context.runId(), "chapter.edit.completed", eventPayload(context, request, chapterId,
                     "operationId", String.valueOf(saved.undo().operationId()),
                     "contentRevision", saved.chapter().getContentRevision(),
                     "wordCount", saved.chapter().getWordCount(),
@@ -126,29 +127,31 @@ public class ChapterEditToolHandler implements AgentToolHandler {
             return ToolCallResult.success(jsonCodec.write(output));
         } catch (AgentLlmInvocationCancelledException ex) {
             if (preview != null) preview.flushPending();
-            releaseQuietly(request, chapterId, lease);
+            releaseQuietly(context, chapterId, lease);
             lease = null;
-            publish(request.runId(), "chapter.edit.cancelled", eventPayload(request, chapterId));
+            publish(context.runId(), "chapter.edit.cancelled", eventPayload(context, request, chapterId));
             return ToolCallResult.failed("CHAPTER_EDIT_CANCELLED", "Chapter edit was cancelled");
         } catch (Exception ex) {
             if (preview != null) preview.flushPending();
             String message = rootMessage(ex);
-            releaseQuietly(request, chapterId, lease);
+            releaseQuietly(context, chapterId, lease);
             lease = null;
-            publish(request.runId(), "chapter.edit.failed", eventPayload(request, chapterId,
+            publish(context.runId(), "chapter.edit.failed", eventPayload(context, request, chapterId,
                     "errorCode", "CHAPTER_EDIT_FAILED", "errorMessage", message));
             log.warn("chapter_edit failed: projectId={}, chapterId={}, runId={}, message={}",
-                    request.projectId(), chapterId, request.runId(), message);
+                    context.projectId(), chapterId, context.runId(), message);
             return ToolCallResult.failed("CHAPTER_EDIT_FAILED", message);
         } finally {
-            releaseQuietly(request, chapterId, lease);
+            releaseQuietly(context, chapterId, lease);
         }
     }
 
-    private NovelApplicationService.ChapterLeaseView acquireLeaseWithWait(ToolCallRequest request, Long chapterId) {
+    private NovelApplicationService.ChapterLeaseView acquireLeaseWithWait(AuthorizedAgentRunContext context,
+                                                                           Long chapterId) {
         NovelApplicationService.ChapterLeaseView lease = null;
         for (int attempt = 0; attempt < LEASE_ACQUIRE_ATTEMPTS; attempt++) {
-            lease = novels.acquireChapterAiLease(request.projectId(), chapterId, request.operatorId(), request.runId());
+            lease = novels.acquireChapterAiLease(
+                    context.projectId(), chapterId, context.ownerUserId(), context.runId());
             if (lease.editable()) return lease;
             if (attempt + 1 < LEASE_ACQUIRE_ATTEMPTS) {
                 try {
@@ -162,13 +165,13 @@ public class ChapterEditToolHandler implements AgentToolHandler {
         return lease;
     }
 
-    private void releaseQuietly(ToolCallRequest request, Long chapterId,
+    private void releaseQuietly(AuthorizedAgentRunContext context, Long chapterId,
                                 NovelApplicationService.ChapterLeaseView lease) {
         if (lease == null || !lease.editable() || lease.leaseToken() == null) return;
         try {
-            novels.releaseChapterAiLease(request.projectId(), chapterId, request.operatorId(), lease.leaseToken());
+            novels.releaseChapterAiLease(context.projectId(), chapterId, context.ownerUserId(), lease.leaseToken());
         } catch (Exception ex) {
-            log.warn("chapter_edit lease release failed: chapterId={}, runId={}", chapterId, request.runId(), ex);
+            log.warn("chapter_edit lease release failed: chapterId={}, runId={}", chapterId, context.runId(), ex);
         }
     }
 
@@ -194,11 +197,12 @@ public class ChapterEditToolHandler implements AgentToolHandler {
         events.publish(runId, eventType, payload);
     }
 
-    private Map<String, Object> eventPayload(ToolCallRequest request, Long chapterId, Object... additions) {
+    private Map<String, Object> eventPayload(AuthorizedAgentRunContext context, ToolCallRequest request,
+                                             Long chapterId, Object... additions) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("projectId", String.valueOf(request.projectId()));
+        payload.put("projectId", String.valueOf(context.projectId()));
         payload.put("chapterId", String.valueOf(chapterId));
-        payload.put("runId", String.valueOf(request.runId()));
+        payload.put("runId", String.valueOf(context.runId()));
         payload.put("toolCallId", request.toolCallId());
         for (int index = 0; index < additions.length; index += 2) {
             payload.put((String) additions[index], additions[index + 1]);
@@ -216,6 +220,7 @@ public class ChapterEditToolHandler implements AgentToolHandler {
 
     private final class PreviewStream {
         private final ToolCallRequest request;
+        private final AuthorizedAgentRunContext context;
         private final Long chapterId;
         private final String leaseToken;
         private final StringBuilder accumulated = new StringBuilder();
@@ -223,7 +228,9 @@ public class ChapterEditToolHandler implements AgentToolHandler {
         private long lastFlushNanos;
         private long lastLeaseRenewNanos = System.nanoTime();
 
-        private PreviewStream(ToolCallRequest request, Long chapterId, String leaseToken) {
+        private PreviewStream(AuthorizedAgentRunContext context, ToolCallRequest request,
+                              Long chapterId, String leaseToken) {
+            this.context = context;
             this.request = request;
             this.chapterId = chapterId;
             this.leaseToken = leaseToken;
@@ -235,7 +242,7 @@ public class ChapterEditToolHandler implements AgentToolHandler {
             pending.append(text);
             long now = System.nanoTime();
             if (now - lastLeaseRenewNanos >= LEASE_RENEW_INTERVAL_NANOS) {
-                novels.renewChapterAiLease(request.projectId(), chapterId, request.operatorId(), leaseToken);
+                novels.renewChapterAiLease(context.projectId(), chapterId, context.ownerUserId(), leaseToken);
                 lastLeaseRenewNanos = now;
             }
             if (lastFlushNanos == 0L || now - lastFlushNanos >= PREVIEW_FLUSH_INTERVAL_NANOS
@@ -252,7 +259,7 @@ public class ChapterEditToolHandler implements AgentToolHandler {
                 accumulated.setLength(0);
                 accumulated.append(finalContent);
                 pending.setLength(0);
-                events.broadcastOnly(request.runId(), "chapter.edit.snapshot", eventPayload(request, chapterId,
+                events.broadcastOnly(context.runId(), "chapter.edit.snapshot", eventPayload(context, request, chapterId,
                         "content", finalContent, "offset", 0, "contentLength", finalContent.length()), -1L);
                 return;
             }
@@ -268,7 +275,7 @@ public class ChapterEditToolHandler implements AgentToolHandler {
             int offset = accumulated.length() - pending.length();
             String chunk = pending.toString();
             pending.setLength(0);
-            events.broadcastOnly(request.runId(), "chapter.edit.delta", eventPayload(request, chapterId,
+            events.broadcastOnly(context.runId(), "chapter.edit.delta", eventPayload(context, request, chapterId,
                     "text", chunk, "offset", offset, "contentLength", accumulated.length()), -1L);
             lastFlushNanos = now;
         }

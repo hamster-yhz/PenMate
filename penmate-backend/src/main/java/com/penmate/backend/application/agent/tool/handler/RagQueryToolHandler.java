@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.tool.handler;
 
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.rag.RagRetrievalService;
@@ -32,7 +33,7 @@ public class RagQueryToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public void validate(ToolCallRequest request) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
@@ -44,15 +45,15 @@ public class RagQueryToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public ToolCallResult execute(ToolCallRequest request) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         try {
             Map<String, Object> args = jsonCodec.readObject(request.toolArgsJson());
             String query = JsonValues.string(args, "query");
             List<RagRetrievedChunk> chunks = ragRetrievalService.retrieve(
-                    request.projectId(),
-                    request.runId(),
+                    context.projectId(),
+                    context.runId(),
                     query,
-                    request.traceId()
+                    context.traceId()
             ).chunks();
             return ToolCallResult.success(formatChunks(chunks));
         } catch (BusinessException ex) {

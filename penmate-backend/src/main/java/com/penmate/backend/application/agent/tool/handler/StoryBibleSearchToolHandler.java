@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
 import com.penmate.backend.application.agent.tool.StoryBibleSearchApplicationService;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import org.springframework.stereotype.Component;
@@ -16,11 +17,13 @@ public class StoryBibleSearchToolHandler implements AgentToolHandler {
     @Override public String toolCode() { return "story_bible_search"; }
 
     @Override
-    public void validate(ToolCallRequest request) {
-        if (request == null || request.runId() == null || request.projectId() == null) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        if (request == null || context == null) {
             throw new IllegalArgumentException("Run context is required for Story Bible search");
         }
     }
 
-    @Override public ToolCallResult execute(ToolCallRequest request) { return service.execute(request); }
+    @Override public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        return service.execute(context, request);
+    }
 }

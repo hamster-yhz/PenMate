@@ -1,5 +1,6 @@
 package com.penmate.backend.application.agent.tool;
 
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 
@@ -8,5 +9,5 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
  */
 public interface QualityReviewApplicationService {
 
-    ToolCallResult review(ToolCallRequest request);
+    ToolCallResult review(AuthorizedAgentRunContext context, ToolCallRequest request);
 }

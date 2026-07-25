@@ -7,39 +7,36 @@ import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-
 @Component
 public class AgentToolMutationGuard {
 
     private final AgentRunRepository runs;
+    private final AgentRunExecutionContextResolver executionContexts;
     private final AgentRunContextArtifactService contextArtifacts;
     private final AgentRunDependencyValidator dependencyValidator;
 
     public AgentToolMutationGuard(AgentRunRepository runs,
+                                  AgentRunExecutionContextResolver executionContexts,
                                   AgentRunContextArtifactService contextArtifacts,
                                   AgentRunDependencyValidator dependencyValidator) {
         this.runs = runs;
+        this.executionContexts = executionContexts;
         this.contextArtifacts = contextArtifacts;
         this.dependencyValidator = dependencyValidator;
     }
 
-    public void assertExecutable(ToolCallRequest request, boolean mutatesState) {
-        if (request.runId() == null || request.executionToken() == null
-                || !runs.ownsExecutionToken(request.runId(), request.executionToken(), Instant.now())) {
-            throw new Rejection("AGENT_RUN_EXECUTION_FENCED",
-                    "Agent Run no longer owns the current execution token");
-        }
+    public void assertExecutable(AuthorizedAgentRunContext context, boolean mutatesState) {
+        executionContexts.assertExecutionOwned(context);
         if (!mutatesState) return;
 
-        AgentRun run = runs.findRun(request.runId());
-        AgentRunInput input = runs.findInput(request.runId());
+        AgentRun run = runs.findRun(context.runId());
+        AgentRunInput input = context.input();
         if (run == null || input == null) {
             throw new Rejection("AGENT_RUN_NOT_FOUND", "Agent Run or its immutable input is missing");
         }
         AgentRunContextArtifactService.ResolvedArtifact artifact;
         try {
-            artifact = contextArtifacts.loadLatestContextForRun(request.runId());
+            artifact = contextArtifacts.loadLatestContextForRun(context.runId());
         } catch (RuntimeException ex) {
             throw new Rejection("AGENT_RUN_CONTEXT_MISSING", "Agent Run resolved context is unavailable");
         }
@@ -54,16 +51,9 @@ public class AgentToolMutationGuard {
         }
     }
 
-    public static final class Rejection extends RuntimeException {
-        private final String errorCode;
-
+    public static final class Rejection extends AgentRunExecutionRejectedException {
         public Rejection(String errorCode, String message) {
-            super(message);
-            this.errorCode = errorCode;
-        }
-
-        public String errorCode() {
-            return errorCode;
+            super(errorCode, message);
         }
     }
 }

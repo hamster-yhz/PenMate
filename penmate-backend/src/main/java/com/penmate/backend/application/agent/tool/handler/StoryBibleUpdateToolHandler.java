@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
 import com.penmate.backend.application.agent.tool.StoryBibleUpdateApplicationService;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import org.springframework.stereotype.Component;
@@ -23,24 +24,24 @@ public class StoryBibleUpdateToolHandler implements AgentToolHandler {
     }
 
     @Override
-    public boolean mutatesState(ToolCallRequest request) {
+    public boolean mutatesState(AuthorizedAgentRunContext context, ToolCallRequest request) {
         return true;
     }
 
     @Override
-    public void validate(ToolCallRequest request) {
+    public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request must not be null");
         }
     }
 
     @Override
-    public ToolCallResult execute(ToolCallRequest request) {
+    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         if (request == null) {
             return new ToolCallResult("FAILED", null, null, "STORY_BIBLE_UPDATE_FAILED", "request must not be null");
         }
         try {
-            return storyBibleUpdateApplicationService.execute(request);
+            return storyBibleUpdateApplicationService.execute(context, request);
         } catch (Exception ex) {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
                     ? "story bible update execution failed"
