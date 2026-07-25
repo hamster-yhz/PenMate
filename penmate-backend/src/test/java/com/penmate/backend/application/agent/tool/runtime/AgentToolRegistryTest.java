@@ -62,9 +62,11 @@ class AgentToolRegistryTest {
         assertThat(definitions.listAll()).hasSize(8);
         assertThat(definitions.listLlmSchemas())
                 .extracting(schema -> schema.toolCode())
-                .doesNotContain("book_crud");
+                .doesNotContain("book_crud", "todo_planner");
         assertThat(registry.getRequiredDescriptor("book_crud").exposure().lifecycleStatus())
-                .isEqualTo(ToolLifecycleStatus.DRAINING);
+                .isEqualTo(ToolLifecycleStatus.DISABLED);
+        assertThat(registry.getRequiredDescriptor("todo_planner").exposure().lifecycleStatus())
+                .isEqualTo(ToolLifecycleStatus.DISABLED);
         assertThat(registry.getRequiredHandler("book_crud")).isNotNull();
     }
 

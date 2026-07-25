@@ -235,40 +235,20 @@ class DefaultApprovalPolicyEngineTest {
             Class<?> type = Class.forName("com.penmate.backend.application.agent.tool.runtime.ToolCallRequest");
             Constructor<?> constructor = type.getDeclaredConstructor(
                     Long.class,
-                    Long.class,
-                    Long.class,
-                    String.class,
-                    String.class,
-                    Long.class,
                     String.class,
                     String.class,
                     String.class,
                     String.class,
-                    Integer.class,
-                    String.class,
-                    String.class,
-                    String.class,
-                    String.class,
-                    String.class
+                    Long.class
             );
             constructor.setAccessible(true);
             return constructor.newInstance(
-                    projectId,
                     taskId,
-                    conversationId,
                     toolCode,
                     toolArgsJson,
-                    operatorId,
-                    traceId,
-                    contextJson,
                     idempotencyKey,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
+                    idempotencyKey,
+                    1L
             );
         } catch (Exception ex) {
             throw new AssertionError("expected tool invocation request type to be constructible", ex);

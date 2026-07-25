@@ -11,12 +11,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 class AgentToolMutationGuardTest {
 
     @Mock private AgentRunRepository runs;
+    @Mock private AgentRunExecutionContextResolver executionContexts;
     @Mock private AgentRunContextArtifactService contextArtifacts;
     @Mock private AgentRunDependencyValidator dependencies;
 
@@ -32,26 +33,26 @@ class AgentToolMutationGuardTest {
 
     @BeforeEach
     void setUp() {
-        guard = new AgentToolMutationGuard(runs, contextArtifacts, dependencies);
+        guard = new AgentToolMutationGuard(runs, executionContexts, contextArtifacts, dependencies);
     }
 
     @Test
     void rejects_lost_execution_token_before_loading_dependencies() {
-        ToolCallRequest request = request();
-        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(false);
+        AuthorizedAgentRunContext context = context();
+        doThrow(new AgentRunExecutionRejectedException(
+                "AGENT_RUN_EXECUTION_FENCED", "Agent Run no longer owns the current execution token"))
+                .when(executionContexts).assertExecutionOwned(context);
 
-        assertThatThrownBy(() -> guard.assertExecutable(request, true))
-                .isInstanceOf(AgentToolMutationGuard.Rejection.class)
-                .extracting(failure -> ((AgentToolMutationGuard.Rejection) failure).errorCode())
+        assertThatThrownBy(() -> guard.assertExecutable(context, true))
+                .isInstanceOf(AgentRunExecutionRejectedException.class)
+                .extracting(failure -> ((AgentRunExecutionRejectedException) failure).errorCode())
                 .isEqualTo("AGENT_RUN_EXECUTION_FENCED");
         verify(runs, never()).findRun(any());
     }
 
     @Test
     void read_only_call_only_requires_current_execution_token() {
-        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(true);
-
-        assertThatCode(() -> guard.assertExecutable(request(), false)).doesNotThrowAnyException();
+        assertThatCode(() -> guard.assertExecutable(context(), false)).doesNotThrowAnyException();
 
         verify(contextArtifacts, never()).loadLatestContextForRun(any());
         verify(dependencies, never()).validate(any(), any(), any());
@@ -59,19 +60,17 @@ class AgentToolMutationGuardTest {
 
     @Test
     void mutation_rejects_changed_dependency_manifest() {
-        ToolCallRequest request = request();
+        AuthorizedAgentRunContext context = context();
         AgentRun run = run();
         AgentRunInput input = input();
         var artifact = artifact();
-        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(true);
         when(runs.findRun(11L)).thenReturn(run);
-        when(runs.findInput(11L)).thenReturn(input);
         when(contextArtifacts.loadLatestContextForRun(11L)).thenReturn(artifact);
         when(dependencies.validate(run, input, artifact)).thenReturn(
                 new AgentRunDependencyValidator.Validation(false, null, null,
                         List.of("storyBibleRevision")));
 
-        assertThatThrownBy(() -> guard.assertExecutable(request, true))
+        assertThatThrownBy(() -> guard.assertExecutable(context, true))
                 .isInstanceOf(AgentToolMutationGuard.Rejection.class)
                 .hasMessageContaining("storyBibleRevision")
                 .extracting(failure -> ((AgentToolMutationGuard.Rejection) failure).errorCode())
@@ -80,23 +79,20 @@ class AgentToolMutationGuardTest {
 
     @Test
     void mutation_executes_when_token_epoch_and_dependencies_are_current() {
-        ToolCallRequest request = request();
+        AuthorizedAgentRunContext context = context();
         AgentRun run = run();
         AgentRunInput input = input();
         var artifact = artifact();
-        when(runs.ownsExecutionToken(any(), any(), any(Instant.class))).thenReturn(true);
         when(runs.findRun(11L)).thenReturn(run);
-        when(runs.findInput(11L)).thenReturn(input);
         when(contextArtifacts.loadLatestContextForRun(11L)).thenReturn(artifact);
         when(dependencies.validate(run, input, artifact)).thenReturn(
                 new AgentRunDependencyValidator.Validation(true, null, null, List.of()));
 
-        assertThatCode(() -> guard.assertExecutable(request, true)).doesNotThrowAnyException();
+        assertThatCode(() -> guard.assertExecutable(context, true)).doesNotThrowAnyException();
     }
 
-    private ToolCallRequest request() {
-        return new ToolCallRequest(1L, 11L, 2L, 3L, "story_bible_update", "{}", 4L,
-                "trace", "{}", "idem", 1, "call", "[]", "[]", null, null, 7L);
+    private AuthorizedAgentRunContext context() {
+        return AgentToolTestContext.context(1L, 11L, 2L, 3L, 4L, 9L, 7L, 5L, "trace");
     }
 
     private AgentRun run() {
@@ -105,7 +101,7 @@ class AgentToolMutationGuardTest {
     }
 
     private AgentRunInput input() {
-        return new AgentRunInput(11L, "prompt", "WRITE", 5L, null, null, null, null, "hash");
+        return new AgentRunInput(11L, "prompt", "CHAT", 5L, null, null, null, null, "hash");
     }
 
     private AgentRunContextArtifactService.ResolvedArtifact artifact() {

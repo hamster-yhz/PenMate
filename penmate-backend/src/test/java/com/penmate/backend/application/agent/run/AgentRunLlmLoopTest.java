@@ -193,7 +193,7 @@ class AgentRunLlmLoopTest {
     }
 
     @Test
-    void resume_should_execute_remaining_sibling_tool_calls_before_requesting_the_llm_again() throws Exception {
+    void resume_should_ignore_stale_pending_identity_and_execute_remaining_sibling_calls() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         List<AgentLlmToolCallPayload> calls = List.of(
                 new AgentLlmToolCallPayload("call-1", "function", "story_bible_update", "{\"operation\":\"batch\"}"),
@@ -204,11 +204,11 @@ class AgentRunLlmLoopTest {
                 AgentLlmMessage.assistant("", calls)
         );
         AgentRunPendingApproval pending = new AgentRunPendingApproval(
-                1L, 88001L, 88001L, 70001L, 101L, 90001L, 50001L,
+                1L, 88001L, 88001L, 70001L, 999L, 998L, 997L,
                 "call-1", "story_bible_update", "{\"operation\":\"batch\"}",
                 "{\"llmTurnIndex\":1,\"tokenUsage\":{\"promptTokens\":3,\"completionTokens\":2,\"totalTokens\":5},\"assistantText\":\"\"}",
                 objectMapper.writeValueAsString(savedMessages), "70001:call-1", "APPROVED",
-                201L, "trace-1", null, null
+                996L, "stale-snapshot-trace", null, null
         );
         when(toolCallService.executeToolCall(any())).thenReturn(
                 ToolCallResult.success("{\"updated\":true}"),

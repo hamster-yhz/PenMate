@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context;
 
 class StoryBibleUpdateToolHandlerTest {
 
@@ -43,32 +44,17 @@ class StoryBibleUpdateToolHandlerTest {
                 ]}
                 """);
         ToolCallResult expected = ToolCallResult.success("{\"delegated\":true}");
-        when(service.execute(request)).thenReturn(expected);
+        when(service.execute(context(), request)).thenReturn(expected);
 
         assertThat(handler.toolCode()).isEqualTo("story_bible_update");
-        assertThat(handler.mutatesState(request)).isTrue();
-        assertThat(handler.execute(request)).isSameAs(expected);
-        verify(service).execute(request);
+        assertThat(handler.mutatesState(context(), request)).isTrue();
+        assertThat(handler.execute(context(), request)).isSameAs(expected);
+        verify(service).execute(context(), request);
     }
 
     private static ToolCallRequest request(String toolCallId, String toolArgsJson) {
-        return new ToolCallRequest(
-                9001L,
-                8001L,
-                6001L,
-                "story_bible_update",
-                toolArgsJson,
-                1001L,
-                "trace-" + toolCallId,
-                "{}",
-                toolCallId + "-8001",
-                "trace-" + toolCallId + "-loop",
-                0,
-                toolCallId,
-                "[]",
-                "[]",
-                "RESUME_LOOP",
-                null
-        );
+        return new ToolCallRequest(8001L, "story_bible_update", toolArgsJson,
+                toolCallId + "-8001", 0, toolCallId, "{}", "[]", "[]",
+                "RESUME_LOOP", null, 1L);
     }
 }

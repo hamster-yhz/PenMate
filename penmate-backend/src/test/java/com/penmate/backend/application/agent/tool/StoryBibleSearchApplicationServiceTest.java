@@ -9,9 +9,8 @@ import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
 import com.penmate.backend.application.agent.context.StoryBibleRouteRequest;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.common.serialization.JsonCodec;
-import com.penmate.backend.domain.agent.run.model.AgentRun;
-import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
 import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
@@ -45,18 +44,12 @@ class StoryBibleSearchApplicationServiceTest {
         ContextEpochSnapshotCodec codec = new ContextEpochSnapshotCodec(jsonCodec);
         StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
                 runs, epochs, codec, resolver, workingSetPromotions, jsonCodec);
-        AgentRun run = new AgentRun(70001L, 101L, 90001L, 50001L, 201L,
-                "RUNNING", "executing", 88001L, null, 5L, null, "trace-1", null, null);
-        AgentRunInput input = new AgentRunInput(70001L, "Inspect Mira", "CHAT", 301L,
-                null, null, null, null, "hash");
         var catalog = List.of(new StoryBibleRouteRequest.CatalogEntry(
                 71L, "CHARACTER", "CHARACTER", "Mira", List.of("Captain"), "Pilot", List.of(), "",
                 "AUTO_RETRIEVE", "CANON"));
         var snapshot = new ContextEpochSnapshotCodec.Snapshot(
                 1, 101L, 11L, 9L, 4L, 301L, List.of(), catalog);
         Map<String, Object> state = Map.of("title", "Mira", "rank", "captain");
-        when(runs.findRun(70001L)).thenReturn(run);
-        when(runs.findInput(70001L)).thenReturn(input);
         when(epochs.loadVerifiedSnapshot(88001L)).thenReturn(codec.encode(snapshot));
         StoryBibleRelation relation = new StoryBibleRelation();
         relation.setRelationId(81L);
@@ -73,7 +66,8 @@ class StoryBibleSearchApplicationServiceTest {
                 List.of(relation)
         ));
 
-        var result = service.execute(request("{\"query\":\"Mira\",\"mentionedEntities\":[\"Captain\"]}"));
+        var result = service.execute(context(88001L),
+                request("{\"query\":\"Mira\",\"mentionedEntities\":[\"Captain\"]}"));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         assertThat(result.toolOutput()).contains("\"nodeId\":\"71\"")
@@ -97,19 +91,18 @@ class StoryBibleSearchApplicationServiceTest {
         JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
         StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
                 runs, epochs, new ContextEpochSnapshotCodec(jsonCodec), resolver, workingSetPromotions, jsonCodec);
-        when(runs.findRun(70001L)).thenReturn(new AgentRun(
-                70001L, 101L, 90001L, 50001L, 201L, "RUNNING", "executing",
-                null, null, 0L, null, "trace", null, null));
-        when(runs.findInput(70001L)).thenReturn(new AgentRunInput(
-                70001L, "query", "CHAT", 301L, null, null, null, null, "hash"));
-
-        assertThat(service.execute(request("{\"query\":\"Mira\"}"))).extracting(
+        assertThat(service.execute(context(null), request("{\"query\":\"Mira\"}"))).extracting(
                 value -> value.status(), value -> value.errorCode())
                 .containsExactly("FAILED", "STORY_BIBLE_EPOCH_MISSING");
     }
 
     private ToolCallRequest request(String args) {
-        return new ToolCallRequest(101L, 70001L, 90001L, 50001L, "story_bible_search", args,
-                201L, "trace-1", "{}", "idem", 1, "call-1", "[]", "[]", null, null);
+        return new ToolCallRequest(70001L, "story_bible_search", args, "idem", 1,
+                "call-1", "[]", "[]", null, null, null, 1L);
+    }
+
+    private AuthorizedAgentRunContext context(Long contextEpochId) {
+        return com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context(
+                101L, 70001L, 90001L, 50001L, 201L, contextEpochId, 1L, 301L, "trace-1");
     }
 }

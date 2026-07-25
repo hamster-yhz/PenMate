@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context;
 
 class SkillLoadToolHandlerTest {
 
@@ -30,7 +31,7 @@ class SkillLoadToolHandlerTest {
                                 "Full writer skill prompt", null),
                         "prompts/agent/system/skills/writer/SKILL.md"));
 
-        ToolCallResult result = handler.execute(request("{\"skill\":\"writer\"}"));
+        ToolCallResult result = handler.execute(context(), request("{\"skill\":\"writer\"}"));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         JSONObject output = AgentJsonCodec.parseObj(result.toolOutput());
@@ -47,7 +48,7 @@ class SkillLoadToolHandlerTest {
                 .thenThrow(new AgentSkillActivationService.SkillActivationFailure(
                         "SKILL_NOT_FOUND", "Skill not found: missing"));
 
-        ToolCallResult result = handler.execute(request("{\"skill\":\"missing\"}"));
+        ToolCallResult result = handler.execute(context(), request("{\"skill\":\"missing\"}"));
 
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.errorCode()).isEqualTo("SKILL_NOT_FOUND");
@@ -56,22 +57,12 @@ class SkillLoadToolHandlerTest {
 
     @Test
     void should_reject_missing_skill_argument() {
-        assertThatThrownBy(() -> handler.validate(request("{}")))
+        assertThatThrownBy(() -> handler.validate(context(), request("{}")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("skill is required");
     }
 
     private ToolCallRequest request(String toolArgsJson) {
-        return new ToolCallRequest(
-                9001L,
-                8001L,
-                7001L,
-                "skill_load",
-                toolArgsJson,
-                1001L,
-                "trace-1",
-                "{}",
-                "idem-1"
-        );
+        return new ToolCallRequest(8001L, "skill_load", toolArgsJson, "idem-1", null, 1L);
     }
 }

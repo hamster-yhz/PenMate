@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultStoryBibleUpdateApplicationServiceTest {
@@ -56,7 +57,7 @@ class DefaultStoryBibleUpdateApplicationServiceTest {
                 eq(41L), any(), eq(StoryBibleActorType.AGENT), eq(7L), eq(42L)))
                 .thenReturn(created);
 
-        ToolCallResult result = service.execute(request("""
+        ToolCallResult result = service.execute(context(41L, 42L, 43L, 44L, 7L, null, 1L, null, "trace-1"), request("""
                 {"operation":"batch","operations":[
                   {"kind":"create_tag","name":"clue","color":"#123456"},
                   {"kind":"delete_tag","tagId":71}
@@ -97,7 +98,7 @@ class DefaultStoryBibleUpdateApplicationServiceTest {
         when(storyBibleApplicationService.updateNode(eq(41L), eq(81L), any(),
                 eq(StoryBibleActorType.AGENT), eq(7L), eq(42L))).thenReturn(updated);
 
-        ToolCallResult result = service.execute(request("""
+        ToolCallResult result = service.execute(context(41L, 42L, 43L, 44L, 7L, null, 1L, null, "trace-1"), request("""
                 {"operation":"batch","operations":[
                   {"kind":"update_node","nodeId":81,"expectedRevision":3,"summary":"New pilot"}
                 ]}
@@ -116,7 +117,9 @@ class DefaultStoryBibleUpdateApplicationServiceTest {
 
     @Test
     void should_reject_legacy_read_operation_without_touching_story_bible() {
-        assertThatThrownBy(() -> service.execute(request("{\"operation\":\"list\"}")))
+        assertThatThrownBy(() -> service.execute(
+                context(41L, 42L, 43L, 44L, 7L, null, 1L, null, "trace-1"),
+                request("{\"operation\":\"list\"}")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("operation must be batch");
         verifyNoInteractions(storyBibleApplicationService);
@@ -132,7 +135,8 @@ class DefaultStoryBibleUpdateApplicationServiceTest {
                 .when(storyBibleApplicationService)
                 .deleteTag(41L, 71L, StoryBibleActorType.AGENT, 7L, 42L);
 
-        assertThatThrownBy(() -> service.execute(request("""
+        assertThatThrownBy(() -> service.execute(
+                context(41L, 42L, 43L, 44L, 7L, null, 1L, null, "trace-1"), request("""
                 {"operation":"batch","operations":[
                   {"kind":"create_tag","name":"clue"},
                   {"kind":"delete_tag","tagId":71},
@@ -146,9 +150,7 @@ class DefaultStoryBibleUpdateApplicationServiceTest {
     }
 
     private ToolCallRequest request(String args) {
-        return new ToolCallRequest(
-                41L, 42L, 43L, 44L, "story_bible_update", args, 7L,
-                "trace-1", "{}", "idem-1", 1, "call-1", "[]", "[]", "APPROVED", "approval-1"
-        );
+        return new ToolCallRequest(42L, "story_bible_update", args, "idem-1", 1,
+                "call-1", "[]", "[]", null, "APPROVED", "approval-1", 1L);
     }
 }

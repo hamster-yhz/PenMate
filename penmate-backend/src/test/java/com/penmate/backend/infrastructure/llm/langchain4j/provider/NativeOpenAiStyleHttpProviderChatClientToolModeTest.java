@@ -104,9 +104,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         JSONArray tools = AgentJsonCodec.parseObj(client.buildTurnRequestBody(request, "gpt-test"))
                 .getJSONArray("tools");
 
-        assertThat(tools).hasSize(1);
-        assertThat(tools.getJSONObject(0).getJSONObject("function").getStr("name"))
-                .isEqualTo("todo_planner");
+        assertThat(tools).isNull();
     }
 
     @Test

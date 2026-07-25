@@ -41,6 +41,7 @@ class ToolCallExecutionServiceTest {
     private final AtomicLong nextId = new AtomicLong(1000L);
     private final BusinessIdGenerator ids = nextId::incrementAndGet;
     private final AgentToolMutationGuard guard = mock(AgentToolMutationGuard.class);
+    private final AgentRunExecutionContextResolver executionContexts = mock(AgentRunExecutionContextResolver.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
@@ -140,16 +141,30 @@ class ToolCallExecutionServiceTest {
     void mutation_guard_rejection_is_a_definitive_failure_before_handler_execution() {
         AgentToolHandler handler = mock(AgentToolHandler.class);
         when(handler.toolCode()).thenReturn("test_tool");
-        when(handler.mutatesState(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(handler.mutatesState(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
         ToolCallRequest request = request("call-6", "{}", 7L);
+        AuthorizedAgentRunContext context = context(7L);
         doThrow(new AgentToolMutationGuard.Rejection("AGENT_RUN_DEPENDENCY_CHANGED", "stale"))
-                .when(guard).assertExecutable(request, true);
+                .when(guard).assertExecutable(context, true);
 
         ToolCallResult result = service(handler).execute(request);
 
         assertThat(result.errorCode()).isEqualTo("AGENT_RUN_DEPENDENCY_CHANGED");
         assertThat(executions.find(11L, "call-6").status()).isEqualTo(AgentToolCallExecutionStatus.FAILED);
-        verify(handler, never()).execute(request);
+        verify(handler, never()).execute(context, request);
+    }
+
+    @Test
+    void supplied_context_must_match_run_and_execution_token_in_envelope() {
+        AgentToolHandler handler = handler(false, request -> ToolCallResult.success("should-not-run"));
+        ToolCallRequest request = request("call-context-mismatch", "{}", 7L);
+
+        ToolCallResult result = service(handler).execute(context(8L), request);
+
+        assertThat(result.errorCode()).isEqualTo("AGENT_RUN_EXECUTION_CONTEXT_MISMATCH");
+        assertThat(((CountingHandler) handler).calls()).isZero();
+        assertThat(executions.find(11L, "call-context-mismatch")).isNull();
     }
 
     @Test
@@ -181,8 +196,12 @@ class ToolCallExecutionServiceTest {
     }
 
     private ToolCallExecutionService service(AgentToolHandler handler, ToolLifecycleStatus status) {
+        when(executionContexts.resolve(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            ToolCallRequest request = invocation.getArgument(0);
+            return context(request.executionToken());
+        });
         return new ToolCallExecutionService(registry(handler, status), executions, ids, guard,
-                new JacksonJsonCodec(objectMapper));
+                executionContexts, new JacksonJsonCodec(objectMapper));
     }
 
     private AgentToolRegistry registry(AgentToolHandler handler) {
@@ -205,15 +224,19 @@ class ToolCallExecutionServiceTest {
     }
 
     private ToolCallRequest request(String callId, String args, Long token) {
-        return new ToolCallRequest(1L, 11L, 2L, 3L, "test_tool", args, 4L, "trace",
-                "{}", "idem", 1, callId, "[]", "[]", null, null, token);
+        return new ToolCallRequest(11L, "test_tool", args, "idem", 1, callId,
+                "[]", "[]", null, null, null, token);
+    }
+
+    private AuthorizedAgentRunContext context(Long token) {
+        return AgentToolTestContext.context(1L, 11L, 2L, 3L, 4L, 9L, token, 5L, "trace");
     }
 
     private String hashFromFreshClaim(ToolCallRequest request) {
         InMemoryExecutions temporary = new InMemoryExecutions();
         ToolCallExecutionService hashingService = new ToolCallExecutionService(
                 registry(handler(false, ignored -> ToolCallResult.success("ok"))), temporary,
-                ids, guard, new JacksonJsonCodec(objectMapper));
+                ids, guard, executionContexts, new JacksonJsonCodec(objectMapper));
         hashingService.execute(request);
         return temporary.find(request.runId(), request.toolCallId()).requestSha256();
     }
@@ -243,8 +266,10 @@ class ToolCallExecutionServiceTest {
         }
 
         @Override public String toolCode() { return "test_tool"; }
-        @Override public boolean mutatesState(ToolCallRequest request) { return mutates; }
-        @Override public ToolCallResult execute(ToolCallRequest request) {
+        @Override public boolean mutatesState(AuthorizedAgentRunContext context, ToolCallRequest request) {
+            return mutates;
+        }
+        @Override public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
             calls.incrementAndGet();
             return action.execute(request);
         }

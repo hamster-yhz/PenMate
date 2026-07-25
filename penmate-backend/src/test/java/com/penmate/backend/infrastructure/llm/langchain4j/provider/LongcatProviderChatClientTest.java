@@ -124,7 +124,7 @@ class LongcatProviderChatClientTest {
 
         assertThat(actual.assistantText()).isEqualTo("ok");
         JSONObject root = AgentJsonCodec.parseObj(capturedRequestBody[0]);
-        assertThat(root.getJSONArray("tools")).hasSize(2);
+        assertThat(root.getJSONArray("tools")).hasSize(1);
         for (Object toolObject : root.getJSONArray("tools")) {
             JSONObject parameters = ((JSONObject) toolObject)
                     .getJSONObject("function")

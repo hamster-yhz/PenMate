@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context;
 
 class RagQueryToolHandlerTest {
 
@@ -30,7 +31,7 @@ class RagQueryToolHandlerTest {
                 }
                 """);
 
-        assertThatThrownBy(() -> handler.validate(request))
+        assertThatThrownBy(() -> handler.validate(context(), request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("query must not be blank");
     }
@@ -44,7 +45,7 @@ class RagQueryToolHandlerTest {
         when(ragRetrievalService.retrieve(9001L, 8001L, "王都位置", "trace-1"))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(chunk), 6001L));
 
-        ToolCallResult result = handler.execute(request("""
+        ToolCallResult result = handler.execute(context(), request("""
                 {
                   "query": "王都位置"
                 }
@@ -61,7 +62,7 @@ class RagQueryToolHandlerTest {
         when(ragRetrievalService.retrieve(9001L, 8001L, "冷门设定", "trace-1"))
                 .thenReturn(new RagRetrievalService.RetrievalResult(List.of(), 6002L));
 
-        ToolCallResult result = handler.execute(request("""
+        ToolCallResult result = handler.execute(context(), request("""
                 {
                   "query": "冷门设定"
                 }
@@ -76,7 +77,7 @@ class RagQueryToolHandlerTest {
         when(ragRetrievalService.retrieve(9001L, 8001L, "异常查询", "trace-1"))
                 .thenThrow(new RuntimeException());
 
-        ToolCallResult result = handler.execute(request("""
+        ToolCallResult result = handler.execute(context(), request("""
                 {
                   "query": "异常查询"
                 }
@@ -88,16 +89,6 @@ class RagQueryToolHandlerTest {
     }
 
     private ToolCallRequest request(String toolArgsJson) {
-        return new ToolCallRequest(
-                9001L,
-                8001L,
-                7001L,
-                "rag_query",
-                toolArgsJson,
-                1001L,
-                "trace-1",
-                "{}",
-                "idem-rag-1"
-        );
+        return new ToolCallRequest(8001L, "rag_query", toolArgsJson, "idem-rag-1", null, 1L);
     }
 }

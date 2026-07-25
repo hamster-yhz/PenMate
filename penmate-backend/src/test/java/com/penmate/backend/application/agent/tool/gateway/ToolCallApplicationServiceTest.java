@@ -13,6 +13,8 @@ import com.penmate.backend.application.agent.tool.runtime.ToolCallExecutionServi
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.agent.tool.runtime.ToolApprovalPreview;
+import com.penmate.backend.application.agent.tool.runtime.AgentRunExecutionContextResolver;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
@@ -69,6 +71,9 @@ class ToolCallApplicationServiceTest {
 
     private ToolCallExecutionService toolCallExecutionService;
 
+    @Mock
+    private AgentRunExecutionContextResolver executionContexts;
+
     @BeforeEach
     void setUp() {
         toolCallExecutionService = org.mockito.Mockito.mock(ToolCallExecutionService.class);
@@ -80,31 +85,18 @@ class ToolCallApplicationServiceTest {
                 pendingApprovalRepository,
                 toolCallExecutionService,
                 new ToolApprovalPreview(new JacksonJsonCodec(new ObjectMapper()), List.of()),
-                new JacksonJsonCodec(new ObjectMapper())
+                new JacksonJsonCodec(new ObjectMapper()),
+                executionContexts
         );
+        when(executionContexts.resolve(any())).thenAnswer(invocation ->
+                context(invocation.getArgument(0)));
     }
 
     @Test
     void UT_APP_AGENT_TOOL_CALL_APPLICATION_SERVICE_SHOULD_BUILD_WAITING_APPROVAL_FROM_DESCRIPTOR_SINGLE_SOURCE_OF_TRUTH() {
-        ToolCallRequest request = new ToolCallRequest(
-                1L,
-                11L,
-                9L,
-                501L,
-                "book_crud",
-                "{\"operation\":\"delete\",\"projectId\":9001}",
-                7L,
-                "trace-approval",
-                "{}",
-                "idem-1",
-                0,
-                "call-1",
-                "[{\"id\":\"call-1\"}]",
-                "[{\"role\":\"user\"}]",
-                "RESUME_LOOP",
-                null,
-                3L
-        );
+        ToolCallRequest request = new ToolCallRequest(11L, "book_crud", "{\"operation\":\"delete\"}",
+                "idem-1", 0, "call-1", "{}", "[{\"id\":\"call-1\"}]",
+                "[{\"role\":\"user\"}]", "RESUME_LOOP", null, 3L);
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud",
                 new ToolPresentation("书籍 CRUD"),
@@ -154,10 +146,8 @@ class ToolCallApplicationServiceTest {
 
     @Test
     void replays_existing_pending_approval_after_crash_without_creating_another_approval() {
-        ToolCallRequest request = new ToolCallRequest(
-                1L, 11L, 9L, 501L, "book_crud",
-                "{\"operation\":\"delete\",\"projectId\":9001}", 7L, "trace-recovery",
-                "{}", "11:call-recovery", 1, "call-recovery", "[]", "[]", null, null, 3L);
+        ToolCallRequest request = new ToolCallRequest(11L, "book_crud", "{\"operation\":\"delete\"}",
+                "11:call-recovery", 1, "call-recovery", "{}", "[]", "[]", null, null, 3L);
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "book_crud", new ToolPresentation("Book CRUD"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE, "desc", "{}"),
@@ -182,25 +172,9 @@ class ToolCallApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_TOOL_CALL_APPLICATION_SERVICE_SHOULD_RETURN_HANDLER_NOT_FOUND_WHEN_NO_MATCHED_HANDLER_EXISTS() {
-        ToolCallRequest request = new ToolCallRequest(
-                1L,
-                11L,
-                9L,
-                501L,
-                "missing_handler_tool",
-                "{}",
-                7L,
-                "trace-missing-handler",
-                "{}",
-                "idem-missing",
-                0,
-                "call-missing",
-                "[]",
-                "[]",
-                "RESUME_LOOP",
-                null,
-                3L
-        );
+        ToolCallRequest request = new ToolCallRequest(11L, "missing_handler_tool", "{}",
+                "idem-missing", 0, "call-missing", "{}", "[]", "[]",
+                "RESUME_LOOP", null, 3L);
 
         when(toolDefinitionSource.getRequired("missing_handler_tool")).thenReturn(new AgentToolDescriptor(
                 "missing_handler_tool",
@@ -210,7 +184,7 @@ class ToolCallApplicationServiceTest {
         ));
         when(approvalPolicyEngine.evaluate(org.mockito.ArgumentMatchers.any(), eq(request)))
                 .thenReturn(new ApprovalPolicyDecision(false, ""));
-        when(toolCallExecutionService.execute(request)).thenReturn(
+        when(toolCallExecutionService.execute(context(request), request)).thenReturn(
                 ToolCallResult.failed("TOOL_HANDLER_NOT_FOUND", "Tool handler not found: missing_handler_tool"));
  
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
@@ -222,25 +196,9 @@ class ToolCallApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_TOOL_CALL_APPLICATION_SERVICE_SHOULD_RETURN_VALIDATION_FAILED_WHEN_HANDLER_VALIDATE_THROWS() {
-        ToolCallRequest request = new ToolCallRequest(
-                1L,
-                11L,
-                9L,
-                501L,
-                "custom_tool",
-                "{}",
-                7L,
-                "trace-validate",
-                "{}",
-                "idem-validate",
-                0,
-                "call-validate",
-                "[]",
-                "[]",
-                "RESUME_LOOP",
-                null,
-                3L
-        );
+        ToolCallRequest request = new ToolCallRequest(11L, "custom_tool", "{}",
+                "idem-validate", 0, "call-validate", "{}", "[]", "[]",
+                "RESUME_LOOP", null, 3L);
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "custom_tool",
                 new ToolPresentation("上下文增强"),
@@ -250,7 +208,7 @@ class ToolCallApplicationServiceTest {
 
         when(toolDefinitionSource.getRequired("custom_tool")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
-        when(toolCallExecutionService.execute(request)).thenReturn(
+        when(toolCallExecutionService.execute(context(request), request)).thenReturn(
                 ToolCallResult.failed("TOOL_VALIDATION_FAILED", "prompt required"));
  
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
@@ -263,25 +221,9 @@ class ToolCallApplicationServiceTest {
 
     @Test
     void UT_APP_AGENT_TOOL_CALL_APPLICATION_SERVICE_SHOULD_EXECUTE_HANDLER_DIRECTLY_WHEN_APPROVAL_NOT_REQUIRED() {
-        ToolCallRequest request = new ToolCallRequest(
-                1L,
-                11L,
-                9L,
-                501L,
-                "custom_tool",
-                "{\"prompt\":\"hello\"}",
-                7L,
-                "trace-direct",
-                "{}",
-                "idem-2",
-                0,
-                "call-2",
-                "[]",
-                "[]",
-                "RESUME_LOOP",
-                null,
-                3L
-        );
+        ToolCallRequest request = new ToolCallRequest(11L, "custom_tool", "{\"prompt\":\"hello\"}",
+                "idem-2", 0, "call-2", "{}", "[]", "[]",
+                "RESUME_LOOP", null, 3L);
         AgentToolDescriptor descriptor = new AgentToolDescriptor(
                 "custom_tool",
                 new ToolPresentation("上下文增强"),
@@ -292,12 +234,25 @@ class ToolCallApplicationServiceTest {
 
         when(toolDefinitionSource.getRequired("custom_tool")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
-        when(toolCallExecutionService.execute(request)).thenReturn(success);
+        when(toolCallExecutionService.execute(context(request), request)).thenReturn(success);
 
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
         assertThat(result).isSameAs(success);
-        verify(toolCallExecutionService).execute(request);
+        verify(toolCallExecutionService).execute(context(request), request);
         verify(approvalApplicationService, never()).create(any(), any());
+    }
+
+    private AuthorizedAgentRunContext context(ToolCallRequest request) {
+        String traceId = switch (request.toolCallId()) {
+            case "call-1" -> "trace-approval";
+            case "call-recovery" -> "trace-recovery";
+            case "call-missing" -> "trace-missing-handler";
+            case "call-validate" -> "trace-validate";
+            case "call-2" -> "trace-direct";
+            default -> "trace-test";
+        };
+        return com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context(
+                1L, 11L, 9L, 501L, 7L, 601L, request.executionToken(), 701L, traceId);
     }
 }

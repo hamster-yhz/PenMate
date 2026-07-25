@@ -8,6 +8,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
+import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.agent.tool.support.QualityReviewCommandParser;
 import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
@@ -329,10 +330,11 @@ class QualityReviewApplicationServiceTest {
     }
 
     private static ToolCallResult review(Object service, ToolCallRequest request) throws Exception {
-        Method reviewMethod = service.getClass().getMethod("review", ToolCallRequest.class);
+        Method reviewMethod = service.getClass().getMethod(
+                "review", AuthorizedAgentRunContext.class, ToolCallRequest.class);
         reviewMethod.setAccessible(true);
         try {
-            return (ToolCallResult) reviewMethod.invoke(service, request);
+            return (ToolCallResult) reviewMethod.invoke(service, context(request.toolCallId()), request);
         } catch (InvocationTargetException ex) {
             Throwable target = ex.getTargetException();
             if (target instanceof Exception exception) {
@@ -343,24 +345,15 @@ class QualityReviewApplicationServiceTest {
     }
 
     private static ToolCallRequest request(String toolCallId, String toolArgsJson) {
-        return new ToolCallRequest(
-                9001L,
-                8001L,
-                6001L,
-                "quality_review",
-                toolArgsJson,
-                1001L,
-                "trace-" + toolCallId,
-                "{}",
-                toolCallId + "-8001",
-                "trace-" + toolCallId + "-loop",
-                0,
-                toolCallId,
-                "[]",
-                "[]",
-                "RESUME_LOOP",
-                null
-        );
+        return new ToolCallRequest(8001L, "quality_review", toolArgsJson,
+                toolCallId + "-8001", 0, toolCallId, "[]", "[]", null,
+                "RESUME_LOOP", null, 1L);
+    }
+
+    private static AuthorizedAgentRunContext context(String toolCallId) {
+        return com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context(
+                9001L, 8001L, 6001L, 5001L, 1001L, 4001L, 1L, 5001L,
+                "trace-" + toolCallId);
     }
 
     private static String validArgsJson() {

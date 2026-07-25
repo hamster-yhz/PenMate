@@ -1,15 +1,24 @@
 package com.penmate.backend.application.agent.tool.definition;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
+import com.penmate.backend.application.agent.prompt.SkillCatalogItem;
+import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
+import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class InMemoryAgentToolDefinitionSourceTest {
 
@@ -60,7 +69,7 @@ class InMemoryAgentToolDefinitionSourceTest {
     }
 
     @Test
-    void exposes_chapter_edit_and_todo_planner_without_the_removed_draft_tool() {
+    void exposes_chapter_edit_while_todo_planner_remains_disabled() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
                 new ChapterEditToolDefinition(), new TodoPlannerToolDefinition()));
         Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
@@ -69,11 +78,46 @@ class InMemoryAgentToolDefinitionSourceTest {
         assertThatThrownBy(() -> source.getRequired("draft_generation"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(schemas).doesNotContainKey("draft_generation");
-        assertThat(schemas.get("chapter_edit").parametersJsonSchema()).contains("\"chapterId\"");
+        assertThat(schemas.get("chapter_edit").parametersJsonSchema()).doesNotContain("\"chapterId\"");
         assertThat(source.getRequired("todo_planner").presentation().displayName()).isNotBlank();
-        assertThat(schemas.get("todo_planner").parametersJsonSchema())
-                .contains("\"operation\"", "\"create\"", "\"complete\"")
-                .doesNotContain("planningMode", "sessionId");
+        assertThat(source.getRequired("todo_planner").exposure().lifecycleStatus())
+                .isEqualTo(ToolLifecycleStatus.DISABLED);
+        assertThat(schemas).doesNotContainKey("todo_planner");
+    }
+
+    @Test
+    void selectable_tool_schemas_never_expose_authority_or_fencing_identifiers() throws Exception {
+        SkillPromptRegistry skills = mock(SkillPromptRegistry.class);
+        when(skills.listAvailableSkills()).thenReturn(List.of(new SkillCatalogItem("rewrite", "Rewrite")));
+        ObjectMapper objectMapper = new ObjectMapper();
+        InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
+                new BookCrudToolDefinition(),
+                new ChapterEditToolDefinition(),
+                new QualityReviewToolDefinition(),
+                new RagQueryToolDefinition(),
+                new SkillLoadToolDefinition(skills, new JacksonJsonCodec(objectMapper)),
+                new StoryBibleSearchToolDefinition(),
+                new StoryBibleUpdateToolDefinition(),
+                new TodoPlannerToolDefinition()
+        ));
+
+        Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
+                .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
+        Set<String> forbidden = Set.of(
+                "ownerId", "ownerUserId", "operatorId", "projectId", "sessionId", "runId",
+                "executionToken", "authToken", "approvalId", "approvalRequestId");
+
+        assertThat(schemas).doesNotContainKeys("book_crud", "todo_planner");
+        for (AgentLlmToolSchema schema : schemas.values()) {
+            Set<String> fieldNames = new HashSet<>();
+            collectFieldNames(objectMapper.readTree(schema.parametersJsonSchema()), fieldNames);
+            assertThat(fieldNames)
+                    .as("authority fields exposed by %s", schema.toolCode())
+                    .doesNotContainAnyElementsOf(forbidden);
+        }
+        assertThat(schemas.get("chapter_edit").parametersJsonSchema()).doesNotContain("chapterId");
+        assertThat(schemas.get("quality_review").parametersJsonSchema())
+                .doesNotContain("chapterId", "draftId");
     }
 
     @Test
@@ -112,5 +156,14 @@ class InMemoryAgentToolDefinitionSourceTest {
     private static ToolGovernancePolicy governance(boolean approvalRequired, String approvalType, int riskLevel) {
         return new ToolGovernancePolicy(
                 new ApprovalPolicyDecision(approvalRequired, approvalType), riskLevel, Map.of());
+    }
+
+    private void collectFieldNames(JsonNode node, Set<String> fieldNames) {
+        if (node == null) return;
+        node.fields().forEachRemaining(entry -> {
+            fieldNames.add(entry.getKey());
+            collectFieldNames(entry.getValue(), fieldNames);
+        });
+        node.elements().forEachRemaining(child -> collectFieldNames(child, fieldNames));
     }
 }
