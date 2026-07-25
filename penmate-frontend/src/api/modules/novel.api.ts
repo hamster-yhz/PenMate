@@ -4,7 +4,7 @@ import type { NovelCoverCrop } from '@/entities/novel/model'
 export type { NovelCoverCrop } from '@/entities/novel/model'
 
 export type AnyRecord = Record<string, unknown>
-export type NovelExportFormat = 'txt' | 'docx'
+export type NovelExportFormat = 'txt' | 'markdown' | 'docx'
 export interface NovelCoverState extends AnyRecord {
   coverUrl?: string
   thumbnailUrl?: string
@@ -29,19 +29,48 @@ export interface MoveNovelDirectoryItemPayload {
   expectedStructureRevision: number
 }
 
-export interface NovelTxtImportChapter {
+export interface NovelImportChapter {
   title: string
   content: string
 }
 
-export interface NovelTxtImportVolume {
+export interface NovelImportVolume {
   title: string
-  chapters: NovelTxtImportChapter[]
+  chapters: NovelImportChapter[]
 }
 
-export interface NovelTxtImportPreview {
+export interface NovelImportDiagnostic {
+  code: string
+  severity: 'INFO' | 'WARNING' | 'ERROR'
+  message: string
+  volumeIndex?: number | null
+  chapterIndex?: number | null
+}
+
+export interface NovelImportDraft {
   projectTitle: string
-  volumes: NovelTxtImportVolume[]
+  sourceFormat?: 'TXT' | 'MARKDOWN' | 'DOCX'
+  volumes: NovelImportVolume[]
+  diagnostics?: NovelImportDiagnostic[]
+}
+
+export interface NovelImportPreview {
+  sessionId: string
+  draft: NovelImportDraft
+}
+
+export interface NovelImportSession {
+  sessionId: string
+  status: 'DRAFT' | 'READY' | 'QUEUED' | 'IMPORTING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+  projectId?: string | null
+  jobId?: string | null
+  checkpointChapter?: number
+  totalChapters?: number
+  jobStatus?: string | null
+  progressCurrent?: number | null
+  progressTotal?: number | null
+  progressMessage?: string | null
+  errorMessage?: string | null
 }
 
 const normalizeProjectPayload = (payload: AnyRecord) => {
@@ -64,13 +93,28 @@ export const novelApi = {
   createProject(payload: AnyRecord) {
     return request.post<AnyRecord>('/v1/novels', normalizeProjectPayload(payload))
   },
-  previewTxtImport(file: File) {
+  previewNovelImport(file: File) {
     const form = new FormData()
     form.append('file', file)
-    return request.post<NovelTxtImportPreview>('/v1/novels/imports/txt/preview', form)
+    return request.post<NovelImportPreview>('/v1/novels/imports/preview', form, { timeout: 60_000 })
   },
-  importTxtProject(payload: NovelTxtImportPreview) {
-    return request.post<AnyRecord>('/v1/novels/imports/txt', payload)
+  confirmNovelImport(sessionId: string, payload: NovelImportDraft) {
+    return request.post<NovelImportSession>(`/v1/novels/imports/${sessionId}/confirm`, payload, { timeout: 60_000 })
+  },
+  getNovelImport(sessionId: string) {
+    return request.get<NovelImportSession>(`/v1/novels/imports/${sessionId}`)
+  },
+  pauseNovelImport(sessionId: string) {
+    return request.post<NovelImportSession>(`/v1/novels/imports/${sessionId}/pause`)
+  },
+  resumeNovelImport(sessionId: string) {
+    return request.post<NovelImportSession>(`/v1/novels/imports/${sessionId}/resume`)
+  },
+  cancelNovelImport(sessionId: string) {
+    return request.post<NovelImportSession>(`/v1/novels/imports/${sessionId}/cancel`)
+  },
+  retryNovelImport(sessionId: string) {
+    return request.post<NovelImportSession>(`/v1/novels/imports/${sessionId}/retry`)
   },
   getProject(projectId: string) {
     return request.get<AnyRecord>(`/v1/novels/${projectId}`)

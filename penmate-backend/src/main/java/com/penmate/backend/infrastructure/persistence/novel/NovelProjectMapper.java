@@ -31,7 +31,7 @@ public interface NovelProjectMapper {
                    COALESCE((SELECT COUNT(*) FROM novel_chapters c
                              WHERE c.project_id = p.project_id AND c.deleted_at IS NULL), 0) AS total_chapters
             FROM novel_projects p
-            WHERE p.deleted_at IS NULL
+            WHERE p.deleted_at IS NULL AND p.status <> 0
             ORDER BY p.updated_at DESC
             """)
     @Results(id = "projectResult", value = {
@@ -138,7 +138,7 @@ public interface NovelProjectMapper {
                    status, structure_revision,
                    created_at, updated_at, deleted_at
             FROM novel_projects
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND deleted_at IS NULL AND status <> 0
             """)
     @ResultMap("projectResult")
     NovelProject findByProjectId(@Param("projectId") Long projectId);
@@ -149,7 +149,7 @@ public interface NovelProjectMapper {
                    cover_pending_upload_id,
                    status, structure_revision, created_at, updated_at, deleted_at
             FROM novel_projects
-            WHERE project_id = #{projectId} AND deleted_at IS NULL
+            WHERE project_id = #{projectId} AND deleted_at IS NULL AND status <> 0
             FOR UPDATE
             """)
     @ResultMap("projectResult")

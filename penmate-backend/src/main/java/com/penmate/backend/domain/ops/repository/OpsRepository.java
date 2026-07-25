@@ -13,6 +13,8 @@ public interface OpsRepository {
 
     List<OpsAsyncJob> listJobs(String bizKey, String jobType);
 
+    OpsAsyncJob findLatestProjectJob(Long projectId, String jobType);
+
     int insertJob(OpsAsyncJob job);
 
     OpsAsyncJob claimNext(String workerId);

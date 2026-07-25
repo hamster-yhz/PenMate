@@ -36,8 +36,7 @@ public interface OpsMapper {
     @Select("SELECT " + JOB_COLUMNS + " FROM ops_async_jobs WHERE biz_key = #{bizKey} LIMIT 1")
     OpsAsyncJob findJobByBizKey(String bizKey);
 
-    @Select("""
-            SELECT """ + JOB_COLUMNS + """
+    @Select("SELECT " + JOB_COLUMNS + """
             FROM ops_async_jobs
             WHERE (#{bizKey,jdbcType=VARCHAR} IS NULL OR #{bizKey,jdbcType=VARCHAR} = '' OR biz_key = #{bizKey})
               AND (#{jobType,jdbcType=VARCHAR} IS NULL OR #{jobType,jdbcType=VARCHAR} = '' OR job_type = #{jobType})
@@ -45,6 +44,14 @@ public interface OpsMapper {
             LIMIT 100
             """)
     List<OpsAsyncJob> listJobs(@Param("bizKey") String bizKey, @Param("jobType") String jobType);
+
+    @Select("SELECT " + JOB_COLUMNS + """
+            FROM ops_async_jobs
+            WHERE project_id = #{projectId} AND job_type = #{jobType}
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """)
+    OpsAsyncJob findLatestProjectJob(@Param("projectId") Long projectId, @Param("jobType") String jobType);
 
     @Insert("""
             INSERT INTO ops_async_jobs(

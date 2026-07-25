@@ -46,6 +46,11 @@ public class OpsRepositoryImpl implements OpsRepository {
         return opsMapper.listJobs(bizKey, jobType);
     }
 
+    @Override
+    public OpsAsyncJob findLatestProjectJob(Long projectId, String jobType) {
+        return opsMapper.findLatestProjectJob(projectId, jobType);
+    }
+
     /**
      * 新增异步作业记录。
      *

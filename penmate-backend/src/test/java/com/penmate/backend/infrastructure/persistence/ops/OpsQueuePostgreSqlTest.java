@@ -84,6 +84,20 @@ class OpsQueuePostgreSqlTest {
         }
     }
 
+    @Test
+    void listsJobsAndFindsTheLatestProjectJob() {
+        insert(1003L, "project:1:revision:3");
+        insert(1004L, "project:1:revision:4");
+
+        try (SqlSession session = sessions.openSession(true)) {
+            OpsMapper mapper = session.getMapper(OpsMapper.class);
+            assertThat(mapper.listJobs(null, "RAG_REBUILD_PROJECT"))
+                    .extracting(OpsAsyncJob::getJobId)
+                    .containsExactly(1004L, 1003L);
+            assertThat(mapper.findLatestProjectJob(1L, "RAG_REBUILD_PROJECT").getJobId()).isEqualTo(1004L);
+        }
+    }
+
     private void insert(Long id, String key) {
         OpsAsyncJob job = new OpsAsyncJob();
         job.setJobId(id);

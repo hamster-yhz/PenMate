@@ -33,7 +33,7 @@
       </div>
       <button type="button" class="import-button" @click="$emit('import')">
         <ImportOutlined />
-        <span>导入 TXT</span>
+        <span>从文件创建作品</span>
       </button>
       <button type="button" class="create-button" data-testid="create-book-button" @click="$emit('create')">
         <PlusOutlined />
