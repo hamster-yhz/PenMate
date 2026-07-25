@@ -335,7 +335,7 @@ Expected:
 - 在 application/rag 层新增混合查询入参与结果视图，不新增平行 Story Bible 检索体系
 - 复用现有 RAG repository / embedding / 文档索引能力，额外传入结构化 filter
 - [`RagApplicationService`](penmate-backend/src/main/java/com/penmate/backend/application/rag/RagApplicationService.java:17) 记录 top_k、过滤条件、命中来源、过期判断日志
-- [`ContextPackage`](penmate-backend/src/main/java/com/penmate/backend/application/agent/context/ContextPackage.java) 增加 `ragRefs` 或等价结构化字段，由 Context Builder 统一排序、裁剪、去重
+- RAG 检索结果通过按需工具调用返回，不进入 `ContextPackage` 的首轮上下文
 - 注释说明：Story Bible 是长期知识库，RAG 是检索机制，进入 prompt 前必须经过 Context Builder
 
 **Step 4: 复跑测试**

@@ -15,7 +15,7 @@
 
 ### 2. 结果快照与恢复
 - `penmate-backend/src/main/java/com/penmate/backend/application/agent/orchestration/AgentTaskResultRecorder.java` 会从 tool trace 中提取 draftSummary、qualityReportSummary、todoSummary、storyBibleProposalSummary。
-- `penmate-backend/src/main/java/com/penmate/backend/infrastructure/persistence/agent/AgentSessionRepositoryImpl.java` 会把 chapterId、selectedText、activePlugins、modelConfigId、ragRefs、activeTaskRuntime、resultSummary 聚合进 recovery 输出。
+- `penmate-backend/src/main/java/com/penmate/backend/infrastructure/persistence/agent/AgentSessionRepositoryImpl.java` 会把 chapterId、selectedText、activePlugins、modelConfigId、activeTaskRuntime、resultSummary 聚合进 recovery 输出。
 
 ### 3. 前端运行态展示
 - `penmate-frontend/src/composables/workbench/useWorkbenchTaskRuntime.ts` 负责 SSE 订阅与事件归一化。

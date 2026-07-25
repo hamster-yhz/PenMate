@@ -83,14 +83,13 @@ Expected: FAIL because the current implementation still writes `style / story_bi
 - Modify: `penmate-backend/src/main/java/com/penmate/backend/application/agent/orchestration/AgentPromptAssembler.java`
 - Test: `penmate-backend/src/test/java/com/penmate/backend/application/agent/orchestration/AgentPromptAssemblerTest.java`
 
-- [ ] **Step 1: Add a helper that assembles execution context blocks in the fixed order `style -> story_bible -> conflict -> missing -> rag`**
+- [ ] **Step 1: Add a helper that assembles execution context blocks in the fixed order `style -> story_bible -> conflict -> missing`**
 
 ```java
 private String buildExecutionContextSystemMessage(String style,
                                                   List<String> storyBibleEntries,
                                                   List<String> conflicts,
-                                                  List<String> missingFlags,
-                                                  List<String> ragRefs) {
+                                                  List<String> missingFlags) {
     StringJoiner contextBuilder = new StringJoiner("\n\n");
     if (style != null && !style.isBlank()) {
         contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", style));
@@ -103,9 +102,6 @@ private String buildExecutionContextSystemMessage(String style,
     }
     if (missingFlags != null && !missingFlags.isEmpty()) {
         contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"missing\"", String.join("\n", missingFlags)));
-    }
-    if (ragRefs != null && !ragRefs.isEmpty()) {
-        contextBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", String.join("\n", ragRefs)));
     }
     return contextBuilder.toString();
 }
@@ -133,8 +129,7 @@ String contextSystemMessage = buildExecutionContextSystemMessage(
         style,
         storyBible.isEmpty() ? List.of() : List.of(storyBible),
         List.of(),
-        List.of(),
-        ragRefs
+        List.of()
 );
 ```
 

@@ -228,7 +228,7 @@ Use [test-driven-development] mode for this task.
 
 **Root Cause:**
 - [`AgentSessionRepositoryImpl.buildActiveTask()`](penmate-backend/src/main/java/com/penmate/backend/infrastructure/persistence/agent/AgentSessionRepositoryImpl.java:169) 已把 `taskProfileJson` / `promptPlanJson` / `contextPackageJson` 读入 `AgentTaskContext`。
-- 但 [`buildWorkbenchContext()`](penmate-backend/src/main/java/com/penmate/backend/infrastructure/persistence/agent/AgentSessionRepositoryImpl.java:247) 只输出 `chapterId`、`selectedText`、`activePlugins`、`modelConfigId`、`ragRefs`、`outlineSnapshot`、`activeTaskRuntime`、`resultSummary`。
+- 但 [`buildWorkbenchContext()`](penmate-backend/src/main/java/com/penmate/backend/infrastructure/persistence/agent/AgentSessionRepositoryImpl.java:247) 只输出 `chapterId`、`selectedText`、`activePlugins`、`modelConfigId`、`outlineSnapshot`、`activeTaskRuntime`、`resultSummary`。
 - recovery API 因此无法完整反映已持久化快照。
 
 **Impact Scope:**
@@ -249,7 +249,7 @@ Use [test-driven-development] mode for this task.
 1. 在 [`AgentWorkflowEndToEndContractTest`](penmate-backend/src/test/java/com/penmate/backend/interfaces/api/agent/AgentWorkflowEndToEndContractTest.java:221) 的 Case D 增加以下断言：
    - `$.data.workbenchContext.taskProfile.executionProfile`
    - `$.data.workbenchContext.promptPlan.finalProfile`
-   - `$.data.workbenchContext.contextPackage.ragRefs[0]`
+   - `$.data.workbenchContext.contextPackage.storyBibleEntries[0]`
 2. 在 [`AgentSessionRecoveryQueryServiceTest`](penmate-backend/src/test/java/com/penmate/backend/application/agent/query/AgentSessionRecoveryQueryServiceTest.java) 增加 case：
    - repository 返回包含 `taskProfileJson` / `promptPlanJson` / `contextPackageJson` 的 task context。
    - 断言 query / app service 最终产物把这些 JSON 以对象形式向外暴露，而不是丢弃。

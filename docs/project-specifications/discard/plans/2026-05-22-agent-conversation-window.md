@@ -1247,9 +1247,6 @@ public class AgentPromptAssembler {
         if (!resolvedContext.styleSnapshot().isBlank()) {
             userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"style\"", resolvedContext.styleSnapshot()));
         }
-        if (!resolvedContext.ragRefs().isEmpty()) {
-            userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"rag\"", String.join("\n", resolvedContext.ragRefs())));
-        }
         if (!resolvedContext.storyBibleEntries().isEmpty()) {
             userBuilder.add(structuredPromptBlockFormatter.wrapBlock("context type=\"story_bible\"", String.join("\n", resolvedContext.storyBibleEntries())));
         }

@@ -168,7 +168,7 @@ Run: [`git add penmate-backend/src/main/resources/db/migration/V12__init_story_b
 
 - `TaskProfile` 包含多标签 intent、executionProfile、需要的 skills、需要的 tools、hardConstraints、outputExpectation、needsApproval、includeStoryBible、includeRag、reasoningSummary
 - `PromptPlan` 包含 modules、skills、finalProfile、assembledPromptPreview
-- `ContextPackage` 包含 sources、missingContextFlags、conflicts、storyBibleEntries、ragRefs、styleSnapshot、chapterScope
+- `ContextPackage` 包含 sources、missingContextFlags、conflicts、storyBibleEntries、styleSnapshot、chapterScope
 - 所有对象可被 Jackson 序列化/反序列化
 
 **Step 2: 跑失败测试**

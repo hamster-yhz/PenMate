@@ -1699,7 +1699,6 @@ Response shape:
   "workbenchContext": {
     "selectedText": "...",
     "modelConfigId": "1001",
-    "ragRefs": [],
     "taskProfile": {},
     "promptPlan": {},
     "contextPackage": {},
