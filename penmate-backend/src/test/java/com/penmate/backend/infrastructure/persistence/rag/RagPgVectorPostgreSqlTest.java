@@ -56,5 +56,16 @@ class RagPgVectorPostgreSqlTest {
         assertThat(hits.getFirst().getContentText()).isEqualTo("hello world");
         assertThat(PostgreSqlTestDatabase.indexesOf(dataSource, "rag_vec_f32_93001"))
                 .anyMatch(index -> index.contains("hnsw"));
+
+        long replacementBuildId = 94002L;
+        repository.createBuild(replacementBuildId, projectId, modelId, spaceId, 0, 0);
+        repository.activateBuild(projectId, replacementBuildId, 0, 0);
+        assertThat(repository.findSupersededBuildIds(projectId)).containsExactly(buildId);
+        assertThat(repository.findSupersededBuilds())
+                .contains(new RagIndexRepository.BuildCleanupCandidate(buildId, projectId, 1L));
+        repository.deleteBuild(buildId);
+        assertThat(repository.findSupersededBuildIds(projectId)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM rag_vectors_f32 WHERE index_build_id = ?", Long.class, buildId))
+                .isZero();
     }
 }

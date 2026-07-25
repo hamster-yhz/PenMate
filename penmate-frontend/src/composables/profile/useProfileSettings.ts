@@ -55,6 +55,7 @@ export interface ProfileModelConfigOption {
   modelType?: string
   providerName?: string
   keySourceType?: string
+  scopeType?: 'SYSTEM' | 'USER'
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -289,6 +290,7 @@ export const useProfileSettings = () => {
           modelType: typeof item.modelType === 'string' ? item.modelType : undefined,
           providerName: typeof item.providerName === 'string' ? item.providerName : undefined,
           keySourceType: typeof item.keySourceType === 'string' ? item.keySourceType : undefined,
+          scopeType: item.scopeType === 'SYSTEM' ? 'SYSTEM' : 'USER',
         })
       }
       modelConfigOptions.value = normalizedOptions

@@ -5,6 +5,8 @@ import com.penmate.backend.domain.rag.repository.ProjectAiConfigurationRepositor
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+
 @Repository
 @RequiredArgsConstructor
 public class ProjectAiConfigurationRepositoryImpl implements ProjectAiConfigurationRepository {
@@ -12,6 +14,7 @@ public class ProjectAiConfigurationRepositoryImpl implements ProjectAiConfigurat
 
     @Override public ProjectAiConfiguration findByProjectId(Long projectId) { return mapper.findByProjectId(projectId); }
     @Override public ProjectAiConfiguration findByProjectIdForUpdate(Long projectId) { return mapper.findByProjectIdForUpdate(projectId); }
+    @Override public Instant findLastCompletedAt(Long projectId) { return mapper.findLastCompletedAt(projectId); }
     @Override public int insert(ProjectAiConfiguration configuration) { return mapper.insert(configuration); }
     @Override public int update(ProjectAiConfiguration configuration) { return mapper.update(configuration); }
 }

@@ -12,6 +12,7 @@ export const useProjectSettingsPage = () => {
   const settings = useProjectSettings(projectId)
 
   const goBackToWorkbench = () => router.push(`/workbench?projectId=${encodeURIComponent(projectId)}`)
+  const printProject = () => window.open(router.resolve(`/projects/${encodeURIComponent(projectId)}/print`).href, '_blank', 'noopener')
   const currentTitle = computed(() => settings.project.title || '作品设置')
 
   const requestSectionChange = (next: typeof settings.activeSection.value) => {
@@ -114,6 +115,7 @@ export const useProjectSettingsPage = () => {
     currentTitle,
     genres: bookshelfGenres,
     goBackToWorkbench,
+    printProject,
     saveAi,
     requestSectionChange,
     confirmTrash,

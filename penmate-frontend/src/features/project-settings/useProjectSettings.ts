@@ -1,11 +1,6 @@
 import { computed, getCurrentScope, onScopeDispose, reactive, ref, watch } from 'vue'
 import { modelApi } from '@/api/modules/model.api'
-import {
-  novelApi,
-  type AnyRecord,
-  type NovelCoverState,
-  type NovelExportFormat,
-} from '@/api/modules/novel.api'
+import { novelApi, type AnyRecord, type NovelCoverState, type NovelExportFormat } from '@/api/modules/novel.api'
 import type { NovelCoverCrop } from '@/entities/novel/model'
 import { ragApi } from '@/api/modules/rag.api'
 import { getSession } from '@/stores/session'
@@ -21,6 +16,7 @@ export interface ModelOption {
   modelName: string
   type: 'CHAT' | 'EMBEDDING'
   scope: 'SYSTEM' | 'USER'
+  providerName?: string
 }
 
 export interface ProjectGeneralSettings {
@@ -45,10 +41,17 @@ export interface ProjectIndexState {
   lastCompletedAt: string
   lastErrorMessage: string
   activeIndexBuildId: string
+  rebuildJobId: string
+  progressCurrent: number
+  progressTotal: number
+  progressMessage: string
 }
 
 const text = (value: unknown) => String(value ?? '').trim()
 const id = (value: unknown) => text(value) || ''
+const number = (value: unknown) => (Number.isFinite(Number(value)) ? Number(value) : 0)
+const ACTIVE_INDEX_STATUSES = new Set(['QUEUED', 'BUILDING', 'CANCELLING'])
+const INDEX_POLL_INTERVAL_MS = 1500
 
 export const useProjectSettings = (projectId: string) => {
   const session = getSession()
@@ -59,6 +62,7 @@ export const useProjectSettings = (projectId: string) => {
   const saveError = ref('')
   const saveSuccess = ref('')
   const rebuilding = ref(false)
+  const cancellingRebuild = ref(false)
   const exportingFormat = ref<NovelExportFormat | null>(null)
   const coverStatus = ref('EMPTY')
   const coverUploadId = ref('')
@@ -66,6 +70,8 @@ export const useProjectSettings = (projectId: string) => {
   const coverCrop = ref<NovelCoverCrop | null>(null)
   const coverBusy = computed(() => ['UPLOADING', 'PROCESSING'].includes(coverStatus.value))
   let coverPollTimer: ReturnType<typeof setTimeout> | null = null
+  let indexPollTimer: ReturnType<typeof setTimeout> | null = null
+  let indexPollFailures = 0
   let localPreviewUrl = ''
   let previousCoverUrl = ''
   let lastCoverFile: File | null = null
@@ -93,14 +99,13 @@ export const useProjectSettings = (projectId: string) => {
     lastCompletedAt: '',
     lastErrorMessage: '',
     activeIndexBuildId: '',
+    rebuildJobId: '',
+    progressCurrent: 0,
+    progressTotal: 0,
+    progressMessage: '',
   })
 
   const modelOptions = ref<ModelOption[]>([])
-  const accountDefaults = reactive({
-    creativeModelConfigId: '',
-    routerModelConfigId: '',
-    embeddingModelConfigId: '',
-  })
   const savedGeneral = ref({ title: '', summary: '', genre: '', customGenre: '', tagsText: '' })
   const savedAi = ref<ProjectAiSettings>({
     creativeModelConfigId: '',
@@ -111,11 +116,7 @@ export const useProjectSettings = (projectId: string) => {
   const chatModels = computed(() => modelOptions.value.filter((option) => option.type === 'CHAT'))
   const embeddingModels = computed(() => modelOptions.value.filter((option) => option.type === 'EMBEDDING'))
   const retrievalAvailable = computed(() => index.status === 'READY')
-  const modelLabel = (modelConfigId: string) =>
-    modelOptions.value.find((option) => option.id === modelConfigId)?.label || '未配置'
-  const inheritedCreativeLabel = computed(() => `继承账号默认（${modelLabel(accountDefaults.creativeModelConfigId)}）`)
-  const inheritedRouterLabel = computed(() => `继承账号默认（${modelLabel(accountDefaults.routerModelConfigId)}）`)
-  const inheritedEmbeddingLabel = computed(() => `继承账号默认（${modelLabel(accountDefaults.embeddingModelConfigId)}）`)
+  const canRebuildIndex = computed(() => Boolean(ai.embeddingModelConfigId))
   const generalSnapshot = () => ({
     title: project.title,
     summary: project.summary,
@@ -126,9 +127,7 @@ export const useProjectSettings = (projectId: string) => {
   const aiSnapshot = (): ProjectAiSettings => ({ ...ai })
   const generalDirty = computed(() => JSON.stringify(generalSnapshot()) !== JSON.stringify(savedGeneral.value))
   const aiDirty = computed(() => JSON.stringify(aiSnapshot()) !== JSON.stringify(savedAi.value))
-  const embeddingSelectionChanged = computed(
-    () => ai.embeddingModelConfigId !== savedAi.value.embeddingModelConfigId,
-  )
+  const embeddingSelectionChanged = computed(() => ai.embeddingModelConfigId !== savedAi.value.embeddingModelConfigId)
   const hasUnsavedChanges = computed(() => generalDirty.value || aiDirty.value)
   const isSectionDirty = (section: ProjectSettingsSection) =>
     section === 'general' ? generalDirty.value : section === 'ai' ? aiDirty.value : false
@@ -137,39 +136,42 @@ export const useProjectSettings = (projectId: string) => {
     if (section === 'ai') Object.assign(ai, savedAi.value)
   }
 
-  const mapModels = (items: AnyRecord[]) => items
-    .filter((item) => text(item.status || 'ACTIVE').toUpperCase() === 'ACTIVE')
-    .map((item): ModelOption | null => {
-      const modelConfigId = id(item.modelConfigId)
-      const modelType = text(item.modelType).toUpperCase()
-      if (!modelConfigId || (modelType !== 'CHAT' && modelType !== 'EMBEDDING')) return null
-      const modelName = text(item.modelName)
-      return {
-        id: modelConfigId,
-        label: text(item.displayName) || modelName,
-        modelName,
-        type: modelType,
-        scope: text(item.scopeType).toUpperCase() === 'SYSTEM' ? 'SYSTEM' : 'USER',
-      }
-    })
-    .filter((item): item is ModelOption => item !== null)
+  const mapModels = (items: AnyRecord[]) =>
+    items
+      .filter((item) => text(item.status || 'ACTIVE').toUpperCase() === 'ACTIVE')
+      .map((item): ModelOption | null => {
+        const modelConfigId = id(item.modelConfigId)
+        const modelType = text(item.modelType).toUpperCase()
+        if (!modelConfigId || (modelType !== 'CHAT' && modelType !== 'EMBEDDING')) return null
+        const modelName = text(item.modelName)
+        return {
+          id: modelConfigId,
+          label: text(item.displayName) || modelName,
+          modelName,
+          type: modelType,
+          scope: text(item.scopeType).toUpperCase() === 'SYSTEM' ? 'SYSTEM' : 'USER',
+          providerName: text(item.providerName || item.providerCode),
+        }
+      })
+      .filter((item): item is ModelOption => item !== null)
 
   const load = async () => {
     loading.value = true
     loadError.value = ''
     try {
-      const [projectResult, configurationResult, modelsResult, preferencesResult, coverResult] = await Promise.all([
+      const [projectResult, configurationResult, modelsResult, coverResult] = await Promise.all([
         novelApi.getProject(projectId),
         ragApi.getConfiguration(projectId),
         modelApi.listUserModelConfigs(session.userId || ''),
-        modelApi.getUserModelPreferences(session.userId || ''),
         novelApi.getCover(projectId),
       ])
       project.title = text(projectResult.title)
       project.summary = text(projectResult.summary ?? projectResult.description)
       project.genre = text(projectResult.genre) || '玄幻'
       project.customGenre = text(projectResult.customGenre)
-      project.tagsText = Array.isArray(projectResult.tags) ? projectResult.tags.map(String).join(', ') : text(projectResult.tags)
+      project.tagsText = Array.isArray(projectResult.tags)
+        ? projectResult.tags.map(String).join(', ')
+        : text(projectResult.tags)
       project.coverUrl = text(projectResult.coverUrl)
       applyCoverState(coverResult)
       if (coverStatus.value === 'PROCESSING') pollCover()
@@ -177,20 +179,16 @@ export const useProjectSettings = (projectId: string) => {
       ai.creativeModelConfigId = id(configurationResult.creativeModelConfigId)
       ai.routerModelConfigId = id(configurationResult.routerModelConfigId)
       ai.embeddingModelConfigId = id(configurationResult.embeddingModelConfigId)
-      accountDefaults.creativeModelConfigId = id(preferencesResult.defaultCreativeModelConfigId)
-      accountDefaults.routerModelConfigId = id(preferencesResult.defaultContextSelectorModelConfigId)
-      accountDefaults.embeddingModelConfigId = id(preferencesResult.defaultEmbeddingModelConfigId)
-      index.status = text(configurationResult.indexStatus) || 'UNBOUND'
-      index.lastCompletedAt = text(configurationResult.lastIndexCompletedAt)
-      index.lastErrorMessage = text(configurationResult.lastErrorMessage)
-      index.activeIndexBuildId = id(configurationResult.activeIndexBuildId)
+      applyIndexState(configurationResult)
       const routing = text(configurationResult.storyBibleRoutingMode)
-      ai.storyBibleRoutingMode = retrievalAvailable.value && (routing === 'RETRIEVAL' || routing === 'RETRIEVAL_THEN_LLM')
-        ? routing
-        : 'LLM_SELECTOR'
+      ai.storyBibleRoutingMode =
+        retrievalAvailable.value && (routing === 'RETRIEVAL' || routing === 'RETRIEVAL_THEN_LLM')
+          ? routing
+          : 'LLM_SELECTOR'
       modelOptions.value = mapModels(Array.isArray(modelsResult) ? modelsResult : [])
       savedGeneral.value = generalSnapshot()
       savedAi.value = aiSnapshot()
+      if (ACTIVE_INDEX_STATUSES.has(index.status)) pollIndexStatus(false)
     } catch (error: unknown) {
       loadError.value = getErrorMessage(error, '加载作品设置失败')
     } finally {
@@ -221,7 +219,14 @@ export const useProjectSettings = (projectId: string) => {
     }
     beginSave('general')
     try {
-      const tags = [...new Set(project.tagsText.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean))].slice(0, 10)
+      const tags = [
+        ...new Set(
+          project.tagsText
+            .split(/[,，]/)
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        ),
+      ].slice(0, 10)
       await novelApi.updateProject(projectId, {
         title: project.title.trim(),
         summary: project.summary.trim(),
@@ -251,11 +256,11 @@ export const useProjectSettings = (projectId: string) => {
         embeddingModelConfigId: ai.embeddingModelConfigId || null,
         storyBibleRoutingMode: ai.storyBibleRoutingMode,
       })
-      index.status = text(result.indexStatus) || index.status
+      applyIndexState(result)
       ai.creativeModelConfigId = id(result.creativeModelConfigId)
       ai.routerModelConfigId = id(result.routerModelConfigId)
       ai.embeddingModelConfigId = id(result.embeddingModelConfigId)
-      ai.storyBibleRoutingMode = text(result.storyBibleRoutingMode) as RoutingMode || 'LLM_SELECTOR'
+      ai.storyBibleRoutingMode = (text(result.storyBibleRoutingMode) as RoutingMode) || 'LLM_SELECTOR'
       savedAi.value = aiSnapshot()
       finishSave('AI 与上下文设置已保存')
       return true
@@ -267,18 +272,93 @@ export const useProjectSettings = (projectId: string) => {
 
   const rebuildIndex = async () => {
     rebuilding.value = true
+    cancellingRebuild.value = false
     saveError.value = ''
     saveSuccess.value = ''
+    index.rebuildJobId = ''
+    index.progressCurrent = 0
+    index.progressTotal = 0
+    index.progressMessage = ''
     try {
       const result = await ragApi.rebuild(projectId)
       index.status = text(result.status) || 'QUEUED'
-      index.activeIndexBuildId = id(result.jobId)
+      index.rebuildJobId = id(result.jobId)
       saveSuccess.value = '索引重建已开始'
+      pollIndexStatus(true)
     } catch (error: unknown) {
-      saveError.value = getErrorMessage(error, '启动索引重建失败')
-    } finally {
       rebuilding.value = false
+      saveError.value = getErrorMessage(error, '启动索引重建失败')
     }
+  }
+
+  const stopRebuild = async () => {
+    if (!rebuilding.value || !index.rebuildJobId || cancellingRebuild.value) return
+    cancellingRebuild.value = true
+    saveError.value = ''
+    saveSuccess.value = ''
+    try {
+      const result = await ragApi.cancelRebuild(projectId, index.rebuildJobId)
+      index.status = text(result.status).toUpperCase() || 'CANCELLING'
+      saveSuccess.value = index.status === 'CANCELLED' ? '索引重建已停止' : '正在停止索引重建'
+      pollIndexStatus(false)
+    } catch (error: unknown) {
+      cancellingRebuild.value = false
+      saveError.value = getErrorMessage(error, '停止索引重建失败')
+    }
+  }
+
+  const applyIndexState = (result: AnyRecord) => {
+    index.status = text(result.indexStatus).toUpperCase() || 'UNBOUND'
+    cancellingRebuild.value = index.status === 'CANCELLING'
+    index.lastCompletedAt = text(result.lastIndexCompletedAt)
+    index.lastErrorMessage = text(result.lastErrorMessage)
+    index.activeIndexBuildId = id(result.activeIndexBuildId)
+    index.rebuildJobId = id(result.rebuildJobId)
+    index.progressCurrent = number(result.rebuildProgressCurrent)
+    index.progressTotal = number(result.rebuildProgressTotal)
+    index.progressMessage = text(result.rebuildProgressMessage)
+  }
+
+  const clearIndexPoll = () => {
+    if (indexPollTimer) clearTimeout(indexPollTimer)
+    indexPollTimer = null
+  }
+
+  function pollIndexStatus(announceCompletion: boolean) {
+    clearIndexPoll()
+    rebuilding.value = true
+    indexPollTimer = setTimeout(async () => {
+      try {
+        const result = await ragApi.getConfiguration(projectId)
+        applyIndexState(result)
+        indexPollFailures = 0
+        if (ACTIVE_INDEX_STATUSES.has(index.status)) {
+          pollIndexStatus(announceCompletion)
+          return
+        }
+        rebuilding.value = false
+        cancellingRebuild.value = false
+        if (index.status === 'READY') {
+          if (announceCompletion) saveSuccess.value = '索引重建完成'
+        } else if (index.status === 'CANCELLED') {
+          saveError.value = ''
+          saveSuccess.value = '索引重建已停止'
+        } else if (index.status === 'FAILED') {
+          saveSuccess.value = ''
+          saveError.value = index.lastErrorMessage || '索引重建失败'
+        }
+      } catch (error: unknown) {
+        indexPollFailures += 1
+        if (indexPollFailures < 3) {
+          pollIndexStatus(announceCompletion)
+          return
+        }
+        rebuilding.value = false
+        cancellingRebuild.value = false
+        saveSuccess.value = ''
+        saveError.value = getErrorMessage(error, '获取索引重建状态失败')
+      }
+    }, INDEX_POLL_INTERVAL_MS)
   }
 
   const moveToTrash = () => novelApi.deleteProject(projectId, session.userId || '')
@@ -409,7 +489,7 @@ export const useProjectSettings = (projectId: string) => {
     try {
       const result = await novelApi.exportProject(projectId, format)
       const safeTitle = project.title.trim().replace(/[\\/:*?"<>|]/g, '_') || 'novel'
-      saveDownload(result.blob, result.contentDisposition, `${safeTitle}.${format}`)
+      saveDownload(result.blob, result.contentDisposition, `${safeTitle}.${format === 'markdown' ? 'md' : format}`)
       saveSuccess.value = `${format.toUpperCase()} 导出已开始下载`
       return true
     } catch (error: unknown) {
@@ -428,6 +508,7 @@ export const useProjectSettings = (projectId: string) => {
   if (getCurrentScope()) {
     onScopeDispose(() => {
       clearCoverPoll()
+      clearIndexPoll()
       releaseLocalPreview()
     })
   }
@@ -440,6 +521,7 @@ export const useProjectSettings = (projectId: string) => {
     saveError,
     saveSuccess,
     rebuilding,
+    cancellingRebuild,
     exportingFormat,
     coverStatus,
     coverUploadId,
@@ -451,9 +533,7 @@ export const useProjectSettings = (projectId: string) => {
     index,
     chatModels,
     embeddingModels,
-    inheritedCreativeLabel,
-    inheritedRouterLabel,
-    inheritedEmbeddingLabel,
+    canRebuildIndex,
     retrievalAvailable,
     generalDirty,
     aiDirty,
@@ -465,6 +545,7 @@ export const useProjectSettings = (projectId: string) => {
     saveGeneral,
     saveAi,
     rebuildIndex,
+    stopRebuild,
     exportProject,
     changeCover,
     retryCover,

@@ -18,7 +18,10 @@ public interface RagIndexRepository {
                       String sourceType, Long sourceId, List<ChunkWrite> chunks);
     void insertVectors(RagEmbeddingSpace space, Long buildId, Long projectId, List<VectorWrite> vectors);
     void activateBuild(Long projectId, Long buildId, int sourceCount, int chunkCount);
+    List<Long> findSupersededBuildIds(Long projectId);
+    List<BuildCleanupCandidate> findSupersededBuilds();
     void failBuild(Long projectId, Long buildId, String errorCode, String errorMessage);
+    void failProjectBuild(Long projectId, Long modelConfigId, String errorCode, String errorMessage);
     void activateSource(Long buildId, String sourceType, Long sourceId, Long sourceIndexId);
     void removeSource(Long projectId, String sourceType, Long sourceId);
     void deleteBuild(Long buildId);
@@ -29,5 +32,7 @@ public interface RagIndexRepository {
     record ChunkWrite(Long chunkId, int chunkNo, String content, String contentHash, String metadataJson) {
     }
     record VectorWrite(Long vectorId, Long chunkId, float[] embedding) {
+    }
+    record BuildCleanupCandidate(Long buildId, Long projectId, Long ownerUserId) {
     }
 }

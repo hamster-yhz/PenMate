@@ -52,7 +52,7 @@ class ModelMapperDbCaseTest {
                 assertThat(item.getOwnerUserId()).isEqualTo(920002L);
                 assertThat(item.getMaxContextTokens()).isEqualTo(64000);
                 assertThat(item.getMaskedApiKey()).isEqualTo("****2011");
-                assertThat(item.getProtocolCode()).isEqualTo("OPENAI_CHAT_COMPLETIONS");
+                assertThat(item.getProtocolCode()).isEqualTo("OPENAI_RESPONSES");
             });
         }
     }

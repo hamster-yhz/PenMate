@@ -2,9 +2,7 @@
   <div class="app-page project-settings-page">
     <AppTopbar :context-title="currentTitle">
       <template #actions>
-        <button class="back-workbench" type="button" @click="goBackToWorkbench">
-          <ArrowLeftOutlined />返回工作台
-        </button>
+        <button class="back-workbench" type="button" @click="goBackToWorkbench"><ArrowLeftOutlined />返回工作台</button>
       </template>
     </AppTopbar>
 
@@ -33,7 +31,7 @@
             :project="project"
             :genres="genres"
             :saving="savingSection === 'general'"
-            :busy="savingSection !== null"
+            :busy="savingSection !== null || rebuilding"
             :error="saveError"
             :success="saveSuccess"
             :cover-status="coverStatus"
@@ -50,9 +48,6 @@
             :ai="ai"
             :chat-models="chatModels"
             :embedding-models="embeddingModels"
-            :inherited-creative-label="inheritedCreativeLabel"
-            :inherited-router-label="inheritedRouterLabel"
-            :inherited-embedding-label="inheritedEmbeddingLabel"
             :retrieval-available="retrievalAvailable"
             :saving="savingSection === 'ai'"
             :busy="savingSection !== null"
@@ -65,10 +60,13 @@
             :ai="ai"
             :index="index"
             :embedding-models="embeddingModels"
+            :can-rebuild="canRebuildIndex"
             :rebuilding="rebuilding"
+            :cancelling="cancellingRebuild"
             :error="saveError"
             :success="saveSuccess"
             @rebuild="rebuildIndex"
+            @stop="stopRebuild"
           />
           <ProjectDataSection
             v-else-if="activeSection === 'data'"
@@ -76,6 +74,7 @@
             :error="saveError"
             :success="saveSuccess"
             @export="exportProject"
+            @print="printProject"
           />
           <ProjectDangerSection v-else :error="saveError" @trash="confirmTrash" />
         </template>
@@ -103,6 +102,7 @@ const {
   saveError,
   saveSuccess,
   rebuilding,
+  cancellingRebuild,
   exportingFormat,
   coverStatus,
   coverError,
@@ -113,9 +113,7 @@ const {
   index,
   chatModels,
   embeddingModels,
-  inheritedCreativeLabel,
-  inheritedRouterLabel,
-  inheritedEmbeddingLabel,
+  canRebuildIndex,
   retrievalAvailable,
   currentTitle,
   genres,
@@ -123,7 +121,9 @@ const {
   saveGeneral,
   saveAi,
   rebuildIndex,
+  stopRebuild,
   exportProject,
+  printProject,
   changeCover,
   retryCover,
   goBackToWorkbench,

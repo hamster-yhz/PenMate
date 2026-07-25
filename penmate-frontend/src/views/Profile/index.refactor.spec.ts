@@ -35,9 +35,9 @@ describe('Profile settings architecture', () => {
     providersMock.mockResolvedValue([])
     preferencesMock.mockResolvedValue({ defaultCreativeModelConfigId: '9001', defaultContextSelectorModelConfigId: '9002', defaultEmbeddingModelConfigId: '9003' })
     configurationsMock.mockResolvedValue([
-      { modelConfigId: '9001', displayName: '创作', modelName: 'gpt-5', modelType: 'CHAT' },
-      { modelConfigId: '9002', displayName: '筛选', modelName: 'gpt-5-mini', modelType: 'CHAT' },
-      { modelConfigId: '9003', displayName: '向量', modelName: 'embedding-3', modelType: 'EMBEDDING' },
+      { modelConfigId: '9001', displayName: '创作', modelName: 'gpt-5', modelType: 'CHAT', scopeType: 'SYSTEM' },
+      { modelConfigId: '9002', displayName: '筛选', modelName: 'gpt-5-mini', modelType: 'CHAT', scopeType: 'USER' },
+      { modelConfigId: '9003', displayName: '向量', modelName: 'embedding-3', modelType: 'EMBEDDING', scopeType: 'SYSTEM' },
     ])
     savePreferencesMock.mockResolvedValue({})
     listSessionsMock.mockResolvedValue([])
@@ -45,7 +45,7 @@ describe('Profile settings architecture', () => {
   })
 
   it('uses six focused settings sections instead of one long page', async () => {
-    const wrapper = mount(ProfileIndex)
+    const wrapper = mount(ProfileIndex, { global: { stubs: { teleport: true } } })
     await flushPromises()
 
     expect(wrapper.find('[data-testid="profile-hero-card"]').exists()).toBe(true)
@@ -61,7 +61,7 @@ describe('Profile settings architecture', () => {
   })
 
   it('edits the three approved model roles without Worker fields', async () => {
-    const wrapper = mount(ProfileIndex)
+    const wrapper = mount(ProfileIndex, { global: { stubs: { teleport: true } } })
     await flushPromises()
     await wrapper.findAll('.settings-nav nav button').find((button) => button.text().includes('默认模型'))!.trigger('click')
 
@@ -70,7 +70,9 @@ describe('Profile settings architecture', () => {
     expect(wrapper.text()).toContain('Embedding 模型')
     expect(wrapper.text()).not.toContain('脏活 Agent')
 
-    await wrapper.find('[data-testid="model-preference-creative-select"]').setValue('9002')
+    await wrapper.get('[data-testid="model-preference-creative-select"]').trigger('click')
+    expect(wrapper.text()).toContain('官方')
+    await wrapper.get('[data-model-id="9002"]').trigger('click')
     await wrapper.find('[data-testid="model-preference-save"]').trigger('click')
     await flushPromises()
 

@@ -41,6 +41,7 @@ public class RagIndexingService {
     private final BusinessIdGenerator ids;
     private final AsyncJobQueueService jobs;
     private final JsonCodec jsonCodec;
+    private final RagBuildCleanupService cleanup;
     private final DocumentChunker chunker;
     private final int batchSize;
     private final int batchMaxCharacters;
@@ -52,6 +53,7 @@ public class RagIndexingService {
                               EmbeddingGateway embeddings, ObjectStorageService storage,
                               DocumentContentParser parser, BusinessIdGenerator ids,
                               AsyncJobQueueService jobs, JsonCodec jsonCodec,
+                              RagBuildCleanupService cleanup,
                               RagIndexingSettings settings) {
         this.configurations = configurations;
         this.sourceCatalog = sourceCatalog;
@@ -64,6 +66,7 @@ public class RagIndexingService {
         this.ids = ids;
         this.jobs = jobs;
         this.jsonCodec = jsonCodec;
+        this.cleanup = cleanup;
         this.chunker = new DocumentChunker(settings.maxChunksPerSource());
         this.maxChunksPerProject = settings.maxChunksPerProject();
         this.batchSize = Math.min(32, settings.embeddingBatchSize());
@@ -75,6 +78,7 @@ public class RagIndexingService {
         var model = routing.resolve(ownerUserId, configuration.getEmbeddingModelConfigId());
         List<RagSourceContent> sourceSnapshot = sourceCatalog.listProjectSources(projectId);
         List<PreparedSource> prepared = prepareSources(sourceSnapshot, configuration);
+        if (context != null && context.cancellationRequested()) throw new AsyncJobExecutionContext.JobCancelledException();
         List<PreparedChunk> allChunks = prepared.stream().flatMap(source -> source.chunks().stream()).toList();
         if (allChunks.isEmpty()) throw BusinessException.of("Project has no indexable content");
         if (allChunks.size() > maxChunksPerProject) throw BusinessException.of("Project exceeds the maximum active chunk count");
@@ -82,6 +86,7 @@ public class RagIndexingService {
         Long buildId = null;
         try {
             List<Batch> batches = batches(allChunks);
+            if (context != null) context.heartbeat(0, allChunks.size(), "Preparing project index");
             List<float[]> firstVectors = embed(model, batches.getFirst());
             int dimension = dimension(firstVectors);
             RagEmbeddingSpace space = ensureSpace(model, dimension);
@@ -99,18 +104,29 @@ public class RagIndexingService {
                 completed += batch.chunks().size();
                 if (context != null) context.heartbeat(completed, allChunks.size(), "Embedding project sources");
             }
+            if (context != null && context.cancellationRequested()) throw new AsyncJobExecutionContext.JobCancelledException();
             ensureSnapshotCurrent(projectId, sourceSnapshot);
+            if (context != null && context.cancellationRequested()) throw new AsyncJobExecutionContext.JobCancelledException();
             indexes.activateBuild(projectId, buildId, prepared.size(), allChunks.size());
             for (PreparedSource source : prepared) {
                 if ("KNOWLEDGE_DOCUMENT".equals(source.source().sourceType())) {
                     documents.updateProcessingState(projectId, source.source().sourceId(), "DONE", "DONE", null, null);
                 }
             }
+            for (Long supersededBuildId : indexes.findSupersededBuildIds(projectId)) {
+                cleanup.enqueue(ownerUserId, projectId, supersededBuildId);
+            }
             return new BuildResult(buildId, space.embeddingSpaceId(), prepared.size(), allChunks.size(), dimension);
         } catch (RuntimeException exception) {
+            if (exception instanceof AsyncJobExecutionContext.JobCancelledException) {
+                if (buildId != null) cleanup.enqueue(ownerUserId, projectId, buildId);
+                throw exception;
+            }
             if (buildId != null) {
                 indexes.failBuild(projectId, buildId, "RAG_BUILD_FAILED", message(exception));
-                enqueueCleanup(ownerUserId, projectId, buildId);
+                cleanup.enqueue(ownerUserId, projectId, buildId);
+            } else {
+                indexes.failProjectBuild(projectId, model.modelConfigId(), "RAG_BUILD_FAILED", message(exception));
             }
             throw exception;
         }
@@ -290,11 +306,6 @@ public class RagIndexingService {
         jobs.enqueue("RAG_REBUILD_PROJECT", "rag:project:%d:rebuild:document:%d".formatted(projectId, revision),
                 ownerUserId, projectId, json(Map.of("projectId", projectId, "ownerUserId", ownerUserId,
                         "modelConfigId", modelConfigId, "sourceRevision", revision)));
-    }
-
-    private void enqueueCleanup(Long ownerUserId, Long projectId, Long buildId) {
-        jobs.enqueue("RAG_CLEANUP_EMBEDDING_SPACE", "rag:build:%d:cleanup".formatted(buildId), ownerUserId, projectId,
-                json(Map.of("buildId", buildId)));
     }
 
     private String json(Object value) {

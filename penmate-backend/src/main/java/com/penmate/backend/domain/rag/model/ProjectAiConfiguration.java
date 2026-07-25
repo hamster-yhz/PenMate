@@ -25,6 +25,7 @@ public class ProjectAiConfiguration {
     private Long activeIndexBuildId;
     private String lastErrorCode;
     private String lastErrorMessage;
+    private Instant lastIndexCompletedAt;
     private Instant createdAt;
     private Instant updatedAt;
 }

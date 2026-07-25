@@ -40,7 +40,8 @@ public class RagController {
     public ApiResponse<Map<String, Object>> getConfiguration(@PathVariable String projectId,
                                                               Authentication authentication,
                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(configurationView(configurations.get(id(projectId), actor(authentication))), traceId);
+        ProjectAiConfiguration configuration = configurations.get(id(projectId), actor(authentication));
+        return ApiResponse.success(configurationView(configuration, configurations.rebuildState(configuration)), traceId);
     }
 
     @PutMapping("/configuration")
@@ -53,7 +54,8 @@ public class RagController {
                 optionalId(dto.getRouterModelConfigId()), dto.getChunkTargetCharacters(),
                 dto.getChunkOverlapCharacters(), dto.getChunkMaxCharacters(), dto.getRetrievalCandidates(),
                 dto.getRetrievalTopK(), dto.getRetrievalMaxPerSource(), dto.getHnswEfSearch(), dto.getSimilarityThreshold());
-        return ApiResponse.success(configurationView(configurations.update(id(projectId), actor(authentication), request)), traceId);
+        ProjectAiConfiguration configuration = configurations.update(id(projectId), actor(authentication), request);
+        return ApiResponse.success(configurationView(configuration, configurations.rebuildState(configuration)), traceId);
     }
 
     @PostMapping("/rebuild")
@@ -61,6 +63,17 @@ public class RagController {
                                                      @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         var job = configurations.requestRebuild(id(projectId), actor(authentication));
         return ApiResponse.success(Map.of("jobId", String.valueOf(job.getJobId()), "status", job.getStatus()), traceId);
+    }
+
+    @PostMapping("/rebuild/{jobId}/cancel")
+    public ApiResponse<Map<String, Object>> cancelRebuild(@PathVariable String projectId,
+                                                           @PathVariable String jobId,
+                                                           Authentication authentication,
+                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var job = configurations.cancelRebuild(id(projectId), actor(authentication), id(jobId));
+        String status = "RUNNING".equals(job.getStatus()) && job.cancellationRequested()
+                ? "CANCELLING" : job.getStatus();
+        return ApiResponse.success(Map.of("jobId", String.valueOf(job.getJobId()), "status", status), traceId);
     }
 
     @GetMapping("/documents")
@@ -154,7 +167,8 @@ public class RagController {
         return result;
     }
 
-    private Map<String, Object> configurationView(ProjectAiConfiguration value) {
+    private Map<String, Object> configurationView(ProjectAiConfiguration value,
+                                                   ProjectAiConfigurationService.RebuildState rebuild) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("projectAiConfigId", string(value.getProjectAiConfigId()));
         result.put("projectId", string(value.getProjectId()));
@@ -170,10 +184,16 @@ public class RagController {
         result.put("retrievalMaxPerSource", value.getRetrievalMaxPerSource());
         result.put("hnswEfSearch", value.getHnswEfSearch());
         result.put("similarityThreshold", value.getSimilarityThreshold());
-        result.put("indexStatus", value.getIndexStatus());
+        result.put("indexStatus", rebuild == null ? value.getIndexStatus() : rebuild.status());
         result.put("activeIndexBuildId", string(value.getActiveIndexBuildId()));
+        result.put("lastIndexCompletedAt", value.getLastIndexCompletedAt());
         result.put("lastErrorCode", value.getLastErrorCode());
-        result.put("lastErrorMessage", value.getLastErrorMessage());
+        result.put("lastErrorMessage", rebuild != null && rebuild.errorMessage() != null
+                ? rebuild.errorMessage() : value.getLastErrorMessage());
+        result.put("rebuildJobId", rebuild == null ? null : string(rebuild.jobId()));
+        result.put("rebuildProgressCurrent", rebuild == null ? null : rebuild.progressCurrent());
+        result.put("rebuildProgressTotal", rebuild == null ? null : rebuild.progressTotal());
+        result.put("rebuildProgressMessage", rebuild == null ? null : rebuild.progressMessage());
         return result;
     }
 

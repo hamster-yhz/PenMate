@@ -22,13 +22,8 @@ public class EmbeddingModelRoutingService {
     }
 
     public EmbeddingExecutionConfig resolve(Long ownerUserId, Long modelConfigId) {
-        Long effectiveModelConfigId = modelConfigId;
-        if (effectiveModelConfigId == null) {
-            var preferences = models.findUserPreferences(ownerUserId);
-            effectiveModelConfigId = preferences == null ? null : preferences.getDefaultEmbeddingModelConfigId();
-        }
-        ModelConfiguration configuration = effectiveModelConfigId == null
-                ? null : models.findAccessibleConfiguration(ownerUserId, effectiveModelConfigId);
+        ModelConfiguration configuration = modelConfigId == null
+                ? null : models.findAccessibleConfiguration(ownerUserId, modelConfigId);
         if (configuration == null || !"EMBEDDING".equals(configuration.getModelType())
                 || !"ACTIVE".equalsIgnoreCase(configuration.getStatus())) {
             throw BusinessException.of("Embedding model configuration is unavailable");

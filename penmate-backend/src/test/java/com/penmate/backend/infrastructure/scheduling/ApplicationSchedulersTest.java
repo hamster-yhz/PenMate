@@ -9,6 +9,7 @@ import com.penmate.backend.application.novel.NovelTrashApplicationService;
 import com.penmate.backend.application.iam.AccountDeletionApplicationService;
 import com.penmate.backend.application.novel.NovelCoverApplicationService;
 import com.penmate.backend.application.ops.AsyncJobWorker;
+import com.penmate.backend.application.rag.RagBuildCleanupService;
 import com.penmate.backend.application.storybible.StoryBibleHistoryArchiveService;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -89,6 +90,19 @@ class ApplicationSchedulersTest {
                 .isEqualTo("PT1M");
         assertThat(schedule(OpsJobScheduler.class, "poll").fixedDelayString())
                 .isEqualTo("${penmate.jobs.poll-delay:PT1S}");
+    }
+
+    @Test
+    void rag_maintenance_enqueues_superseded_build_cleanup() throws Exception {
+        RagBuildCleanupService cleanup = mock(RagBuildCleanupService.class);
+        RagMaintenanceScheduler scheduler = new RagMaintenanceScheduler(cleanup);
+
+        scheduler.enqueueSupersededBuildCleanup();
+
+        verify(cleanup).enqueueSupersededBuilds();
+        Scheduled scheduled = schedule(RagMaintenanceScheduler.class, "enqueueSupersededBuildCleanup");
+        assertThat(scheduled.initialDelayString()).isEqualTo("${penmate.rag.cleanup-initial-delay:PT10S}");
+        assertThat(scheduled.fixedDelayString()).isEqualTo("${penmate.rag.cleanup-delay:PT1H}");
     }
 
     private Scheduled schedule(Class<?> type, String method) throws Exception {

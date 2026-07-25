@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.Instant;
+
 @Mapper
 public interface ProjectAiConfigurationMapper {
 
@@ -23,6 +25,17 @@ public interface ProjectAiConfigurationMapper {
 
     @Select("SELECT " + COLUMNS + " FROM project_ai_configurations WHERE project_id = #{projectId} FOR UPDATE")
     ProjectAiConfiguration findByProjectIdForUpdate(Long projectId);
+
+    @Select("""
+            SELECT finished_at
+            FROM rag_index_builds
+            WHERE project_id = #{projectId}
+              AND build_status IN ('ACTIVE', 'SUPERSEDED')
+              AND finished_at IS NOT NULL
+            ORDER BY finished_at DESC, id DESC
+            LIMIT 1
+            """)
+    Instant findLastCompletedAt(Long projectId);
 
     @Insert("""
             INSERT INTO project_ai_configurations(

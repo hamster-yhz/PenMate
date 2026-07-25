@@ -187,6 +187,28 @@ public class JdbcRagIndexRepository implements RagIndexRepository {
     }
 
     @Override
+    public List<Long> findSupersededBuildIds(Long projectId) {
+        return jdbc.queryForList("""
+                SELECT index_build_id
+                FROM rag_index_builds
+                WHERE project_id = ? AND build_status = 'SUPERSEDED'
+                ORDER BY finished_at, id
+                """, Long.class, projectId);
+    }
+
+    @Override
+    public List<BuildCleanupCandidate> findSupersededBuilds() {
+        return jdbc.query("""
+                SELECT build.index_build_id, build.project_id, project.owner_user_id
+                FROM rag_index_builds build
+                JOIN novel_projects project ON project.project_id = build.project_id
+                WHERE build.build_status = 'SUPERSEDED'
+                ORDER BY build.finished_at, build.id
+                """, (rs, rowNum) -> new BuildCleanupCandidate(
+                rs.getLong("index_build_id"), rs.getLong("project_id"), rs.getLong("owner_user_id")));
+    }
+
+    @Override
     @Transactional
     public void failBuild(Long projectId, Long buildId, String errorCode, String errorMessage) {
         jdbc.update("""
@@ -195,10 +217,20 @@ public class JdbcRagIndexRepository implements RagIndexRepository {
                 WHERE index_build_id = ? AND build_status = 'BUILDING'
                 """, errorCode, truncate(errorMessage, 500), buildId);
         jdbc.update("""
-                UPDATE project_ai_configurations SET index_status = 'REINDEX_REQUIRED', active_index_build_id = NULL,
+                UPDATE project_ai_configurations SET index_status = 'FAILED', active_index_build_id = NULL,
                     last_error_code = ?, last_error_message = ?, updated_at = CURRENT_TIMESTAMP(3)
-                WHERE project_id = ?
-                """, errorCode, truncate(errorMessage, 500), projectId);
+                WHERE project_id = ? AND embedding_model_config_id =
+                    (SELECT model_config_id FROM rag_index_builds WHERE index_build_id = ?)
+                """, errorCode, truncate(errorMessage, 500), projectId, buildId);
+    }
+
+    @Override
+    public void failProjectBuild(Long projectId, Long modelConfigId, String errorCode, String errorMessage) {
+        jdbc.update("""
+                UPDATE project_ai_configurations SET index_status = 'FAILED', active_index_build_id = NULL,
+                    last_error_code = ?, last_error_message = ?, updated_at = CURRENT_TIMESTAMP(3)
+                WHERE project_id = ? AND embedding_model_config_id = ?
+                """, errorCode, truncate(errorMessage, 500), projectId, modelConfigId);
     }
 
     @Override

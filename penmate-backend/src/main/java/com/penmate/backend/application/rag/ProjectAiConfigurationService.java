@@ -3,6 +3,7 @@ package com.penmate.backend.application.rag;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.ops.AsyncJobQueueService;
 import com.penmate.backend.domain.ops.model.OpsAsyncJob;
+import com.penmate.backend.domain.ops.repository.OpsRepository;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
 import com.penmate.backend.domain.novel.model.NovelProject;
@@ -24,22 +25,29 @@ public class ProjectAiConfigurationService {
     private final NovelGateway novels;
     private final BusinessIdGenerator ids;
     private final AsyncJobQueueService jobs;
+    private final OpsRepository ops;
 
     public ProjectAiConfigurationService(ProjectAiConfigurationRepository repository, ModelRepository models,
-                                         NovelGateway novels, BusinessIdGenerator ids, AsyncJobQueueService jobs) {
+                                         NovelGateway novels, BusinessIdGenerator ids, AsyncJobQueueService jobs,
+                                         OpsRepository ops) {
         this.repository = repository;
         this.models = models;
         this.novels = novels;
         this.ids = ids;
         this.jobs = jobs;
+        this.ops = ops;
     }
 
     @Transactional
     public ProjectAiConfiguration initializeProject(Long projectId, Long ownerUserId) {
-        if (repository.findByProjectId(projectId) != null) return repository.findByProjectId(projectId);
+        ProjectAiConfiguration existing = repository.findByProjectId(projectId);
+        if (existing != null) return hydrate(existing);
         ModelUserPreferences defaults = models.findUserPreferences(ownerUserId);
         ProjectAiConfiguration configuration = base(projectId);
         if (defaults != null) {
+            configuration.setCreativeModelConfigId(defaults.getDefaultCreativeModelConfigId());
+            configuration.setEmbeddingModelConfigId(defaults.getDefaultEmbeddingModelConfigId());
+            configuration.setRouterModelConfigId(defaults.getDefaultContextSelectorModelConfigId());
             configuration.setChunkTargetCharacters(value(defaults.getDefaultChunkTargetCharacters(), 800));
             configuration.setChunkOverlapCharacters(value(defaults.getDefaultChunkOverlapCharacters(), 120));
             configuration.setChunkMaxCharacters(value(defaults.getDefaultChunkMaxCharacters(), 1200));
@@ -51,17 +59,16 @@ public class ProjectAiConfigurationService {
             configuration.setIndexStatus("REINDEX_REQUIRED");
             configuration.setActiveIndexBuildId(null);
         }
-        validate(configuration, ownerUserId,
-                defaults == null ? null : defaults.getDefaultEmbeddingModelConfigId());
+        validate(configuration, ownerUserId, configuration.getEmbeddingModelConfigId());
         if (repository.insert(configuration) != 1) throw BusinessException.of("Failed to initialize project AI configuration");
-        return repository.findByProjectId(projectId);
+        return hydrate(repository.findByProjectId(projectId));
     }
 
     public ProjectAiConfiguration get(Long projectId, Long actorUserId) {
         requireOwner(projectId, actorUserId);
         ProjectAiConfiguration result = repository.findByProjectId(projectId);
         if (result == null) throw BusinessException.notFound("Project AI configuration not found");
-        return result;
+        return hydrate(result);
     }
 
     @Transactional
@@ -70,7 +77,9 @@ public class ProjectAiConfigurationService {
         Objects.requireNonNull(request, "request");
         ProjectAiConfiguration current = repository.findByProjectIdForUpdate(projectId);
         if (current == null) throw BusinessException.notFound("Project AI configuration not found");
-        ModelUserPreferences defaults = models.findUserPreferences(actorUserId);
+        if ("QUEUED".equals(current.getIndexStatus()) || "BUILDING".equals(current.getIndexStatus())) {
+            throw BusinessException.conflict("Wait for the current index rebuild before changing project AI configuration");
+        }
         ProjectAiConfiguration next = copy(current);
         next.setCreativeModelConfigId(request.creativeModelConfigId());
         next.setEmbeddingModelConfigId(request.embeddingModelConfigId());
@@ -84,10 +93,8 @@ public class ProjectAiConfigurationService {
         next.setRetrievalMaxPerSource(value(request.retrievalMaxPerSource(), current.getRetrievalMaxPerSource()));
         next.setHnswEfSearch(value(request.hnswEfSearch(), current.getHnswEfSearch()));
         next.setSimilarityThreshold(request.similarityThreshold());
-        Long currentEffectiveEmbedding = effectiveModel(
-                current.getEmbeddingModelConfigId(), defaults == null ? null : defaults.getDefaultEmbeddingModelConfigId());
-        Long nextEffectiveEmbedding = effectiveModel(
-                next.getEmbeddingModelConfigId(), defaults == null ? null : defaults.getDefaultEmbeddingModelConfigId());
+        Long currentEffectiveEmbedding = current.getEmbeddingModelConfigId();
+        Long nextEffectiveEmbedding = next.getEmbeddingModelConfigId();
         boolean indexIdentityChanged = !Objects.equals(currentEffectiveEmbedding, nextEffectiveEmbedding)
                 || !Objects.equals(current.getChunkTargetCharacters(), next.getChunkTargetCharacters())
                 || !Objects.equals(current.getChunkOverlapCharacters(), next.getChunkOverlapCharacters())
@@ -107,7 +114,7 @@ public class ProjectAiConfigurationService {
         }
         validate(next, actorUserId, nextEffectiveEmbedding);
         if (repository.update(next) != 1) throw BusinessException.of("Failed to update project AI configuration");
-        return repository.findByProjectId(projectId);
+        return hydrate(repository.findByProjectId(projectId));
     }
 
     @Transactional
@@ -115,14 +122,15 @@ public class ProjectAiConfigurationService {
         requireOwner(projectId, actorUserId);
         ProjectAiConfiguration current = repository.findByProjectIdForUpdate(projectId);
         if (current == null) throw BusinessException.notFound("Project AI configuration not found");
-        ModelUserPreferences defaults = models.findUserPreferences(actorUserId);
-        Long effectiveEmbeddingModelConfigId = effectiveModel(current.getEmbeddingModelConfigId(),
-                defaults == null ? null : defaults.getDefaultEmbeddingModelConfigId());
+        Long effectiveEmbeddingModelConfigId = current.getEmbeddingModelConfigId();
         if (effectiveEmbeddingModelConfigId == null) {
             throw BusinessException.badRequest("Bind an Embedding model before rebuilding the project index");
         }
+        if ("QUEUED".equals(current.getIndexStatus()) || "BUILDING".equals(current.getIndexStatus())) {
+            throw BusinessException.conflict("The project index is already being rebuilt");
+        }
         current.setStoryBibleRoutingMode("LLM_SELECTOR");
-        current.setIndexStatus("REINDEX_REQUIRED");
+        current.setIndexStatus("QUEUED");
         current.setActiveIndexBuildId(null);
         current.setLastErrorCode(null);
         current.setLastErrorMessage(null);
@@ -134,6 +142,50 @@ public class ProjectAiConfigurationService {
                 + ",\"requestId\":" + requestId + "}";
         return jobs.enqueue("RAG_REBUILD_PROJECT", "rag:project:" + projectId + ":rebuild:" + requestId,
                 actorUserId, projectId, payload);
+    }
+
+    @Transactional
+    public OpsAsyncJob cancelRebuild(Long projectId, Long actorUserId, Long jobId) {
+        requireOwner(projectId, actorUserId);
+        ProjectAiConfiguration configuration = repository.findByProjectIdForUpdate(projectId);
+        if (configuration == null) throw BusinessException.notFound("Project AI configuration not found");
+        OpsAsyncJob job = ops.findJobById(jobId);
+        if (job == null || !Objects.equals(projectId, job.getProjectId())
+                || !Objects.equals(actorUserId, job.getOwnerUserId())
+                || !"RAG_REBUILD_PROJECT".equals(job.getJobType())) {
+            throw BusinessException.notFound("Project index rebuild job not found");
+        }
+        if (job.terminal()) {
+            if ("CANCELLED".equals(job.getStatus())) return job;
+            throw BusinessException.conflict("Project index rebuild job has already finished");
+        }
+        jobs.requestCancel(jobId);
+        configuration.setIndexStatus("REINDEX_REQUIRED");
+        configuration.setActiveIndexBuildId(null);
+        configuration.setLastErrorCode(null);
+        configuration.setLastErrorMessage(null);
+        if (repository.update(configuration) != 1) {
+            throw BusinessException.of("Failed to update project index status after cancellation");
+        }
+        return ops.findJobById(jobId);
+    }
+
+    public RebuildState rebuildState(ProjectAiConfiguration configuration) {
+        if (configuration == null || configuration.getProjectId() == null) return null;
+        boolean cancellationState = "REINDEX_REQUIRED".equals(configuration.getIndexStatus());
+        if (!cancellationState && !List.of("QUEUED", "BUILDING", "FAILED").contains(configuration.getIndexStatus())) return null;
+        OpsAsyncJob job = ops.findLatestProjectJob(configuration.getProjectId(), "RAG_REBUILD_PROJECT");
+        if (job == null) return null;
+        if (cancellationState && !"CANCELLED".equals(job.getStatus()) && !job.cancellationRequested()) return null;
+        String status = switch (job.getStatus()) {
+            case "RUNNING" -> job.cancellationRequested() ? "CANCELLING" : "BUILDING";
+            case "QUEUED", "RETRY_WAIT" -> "QUEUED";
+            case "FAILED" -> "FAILED";
+            case "CANCELLED" -> "CANCELLED";
+            default -> configuration.getIndexStatus();
+        };
+        return new RebuildState(job.getJobId(), status, job.getProgressCurrent(), job.getProgressTotal(),
+                job.getProgressMessage(), job.getLastErrorMessage());
     }
 
     private ProjectAiConfiguration base(Long projectId) {
@@ -191,8 +243,11 @@ public class ProjectAiConfigurationService {
 
     private int value(Integer candidate, Integer fallback) { return candidate == null ? fallback : candidate; }
 
-    private Long effectiveModel(Long projectOverride, Long accountDefault) {
-        return projectOverride == null ? accountDefault : projectOverride;
+    private ProjectAiConfiguration hydrate(ProjectAiConfiguration configuration) {
+        if (configuration != null) {
+            configuration.setLastIndexCompletedAt(repository.findLastCompletedAt(configuration.getProjectId()));
+        }
+        return configuration;
     }
 
     private ProjectAiConfiguration copy(ProjectAiConfiguration source) {
@@ -235,5 +290,9 @@ public class ProjectAiConfigurationService {
                     retrievalCandidates, retrievalTopK, retrievalMaxPerSource, hnswEfSearch,
                     similarityThreshold);
         }
+    }
+
+    public record RebuildState(Long jobId, String status, Long progressCurrent, Long progressTotal,
+                               String progressMessage, String errorMessage) {
     }
 }

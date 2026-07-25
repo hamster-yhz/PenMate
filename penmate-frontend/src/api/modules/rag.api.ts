@@ -12,6 +12,9 @@ export const ragApi = {
   rebuild(projectId: string) {
     return request.post<AnyRecord>(`/v1/novels/${projectId}/rag/rebuild`)
   },
+  cancelRebuild(projectId: string, jobId: string) {
+    return request.post<AnyRecord>(`/v1/novels/${projectId}/rag/rebuild/${jobId}/cancel`)
+  },
   listDocuments(projectId: string) {
     return request.get<AnyRecord[]>(`/v1/novels/${projectId}/rag/documents`)
   },
