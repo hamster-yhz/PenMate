@@ -12,8 +12,8 @@ import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDe
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.SkillLoadToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.StoryBibleSearchToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.StoryBibleUpdateToolDefinition;
-import com.penmate.backend.application.agent.tool.definition.TodoPlannerToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.StoryBibleV2ToolDefinitions;
+import com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.ToolExposure;
 import com.penmate.backend.application.agent.tool.definition.ToolGovernancePolicy;
 import com.penmate.backend.application.agent.tool.definition.ToolLifecycleStatus;
@@ -49,8 +49,12 @@ class AgentToolRegistryTest {
                 new RagQueryToolDefinition(),
                 new SkillLoadToolDefinition(skills, jsonCodec),
                 new StoryBibleSearchToolDefinition(),
-                new StoryBibleUpdateToolDefinition(),
-                new TodoPlannerToolDefinition()
+                StoryBibleV2ToolDefinitions.inspect(),
+                StoryBibleV2ToolDefinitions.nodeWrite(),
+                StoryBibleV2ToolDefinitions.relationWrite(),
+                StoryBibleV2ToolDefinitions.progressionWrite(),
+                StoryBibleV2ToolDefinitions.structureWrite(),
+                new TodoCrudToolDefinition()
         ));
         List<AgentToolHandler> handlers = definitions.listAll().stream()
                 .map(descriptor -> handler(descriptor.toolCode()))
@@ -59,15 +63,17 @@ class AgentToolRegistryTest {
         AgentToolRegistry registry = new AgentToolRegistry(
                 definitions, handlers, new NetworkntAgentToolSchemaValidator(objectMapper));
 
-        assertThat(definitions.listAll()).hasSize(8);
+        assertThat(definitions.listAll()).hasSize(12);
         assertThat(definitions.listLlmSchemas())
                 .extracting(schema -> schema.toolCode())
-                .doesNotContain("book_crud", "todo_planner");
+                .contains("todo_crud")
+                .doesNotContain("book_crud");
         assertThat(registry.getRequiredDescriptor("book_crud").exposure().lifecycleStatus())
                 .isEqualTo(ToolLifecycleStatus.DISABLED);
-        assertThat(registry.getRequiredDescriptor("todo_planner").exposure().lifecycleStatus())
-                .isEqualTo(ToolLifecycleStatus.DISABLED);
+        assertThat(registry.getRequiredDescriptor("todo_crud").exposure().lifecycleStatus())
+                .isEqualTo(ToolLifecycleStatus.ACTIVE);
         assertThat(registry.getRequiredHandler("book_crud")).isNotNull();
+        assertThat(registry.getRequiredHandler("todo_crud")).isNotNull();
     }
 
     @Test

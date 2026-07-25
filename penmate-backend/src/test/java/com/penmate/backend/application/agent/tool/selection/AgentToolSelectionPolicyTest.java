@@ -24,7 +24,7 @@ class AgentToolSelectionPolicyTest {
     void selects_only_tools_supported_by_the_execution_profile() {
         AgentToolSelectionPolicy policy = policy(
                 definition("chapter_edit", ToolLifecycleStatus.ACTIVE, Set.of("default", "rewrite")),
-                definition("story_bible_update", ToolLifecycleStatus.ACTIVE, Set.of("default", "world-build")),
+                definition("story_bible_node_write", ToolLifecycleStatus.ACTIVE, Set.of("default", "world-build")),
                 definition("book_crud", ToolLifecycleStatus.DRAINING, Set.of("*")));
 
         assertThat(policy.select(profile("rewrite", List.of())))
@@ -32,7 +32,7 @@ class AgentToolSelectionPolicyTest {
                 .containsExactly("chapter_edit");
         assertThat(policy.select(profile("world-build", List.of())))
                 .extracting(schema -> schema.toolCode())
-                .containsExactly("story_bible_update");
+                .containsExactly("story_bible_node_write");
     }
 
     @Test

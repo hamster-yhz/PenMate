@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.tool;
 
 import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
-import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
@@ -29,8 +28,6 @@ import java.util.Map;
 @Service
 public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpdateApplicationService {
 
-    private static final int MAX_BATCH_SIZE = 32;
-
     private final StoryBibleApplicationService storyBibleApplicationService;
     private final JsonCodec jsonCodec;
 
@@ -42,48 +39,11 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
 
     @Override
     @Transactional
-    public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
-        AuthorizedToolCall call = new AuthorizedToolCall(context, request);
-        List<?> operations = parseOperations(call.toolArgsJson());
-        List<Map<String, Object>> results = new ArrayList<>(operations.size());
-        for (int index = 0; index < operations.size(); index++) {
-            Object operation = operations.get(index);
-            try {
-                results.add(executeOperation(call, operation));
-            } catch (RuntimeException ex) {
-                throw new IllegalArgumentException("operations[" + index + "] failed: " + message(ex), ex);
-            }
-        }
-        return ToolCallResult.success(json(Map.of(
-                "operation", "batch",
-                "appliedCount", results.size(),
-                "results", results
-        )));
-    }
-
-    private List<?> parseOperations(String rawJson) {
-        try {
-            Object decoded = jsonCodec.read(rawJson);
-            if (!(decoded instanceof Map<?, ?> values)) {
-                throw new IllegalArgumentException("tool arguments must be a JSON object");
-            }
-            Map<String, Object> root = stringKeyMap(values);
-            if (!"batch".equals(text(root, "operation", null))) {
-                throw new IllegalArgumentException("operation must be batch");
-            }
-            Object rawOperations = root.get("operations");
-            if (!(rawOperations instanceof List<?> operations) || operations.isEmpty()) {
-                throw new IllegalArgumentException("operations must be a non-empty array");
-            }
-            if (operations.size() > MAX_BATCH_SIZE) {
-                throw new IllegalArgumentException("operations must contain at most " + MAX_BATCH_SIZE + " items");
-            }
-            return operations;
-        } catch (IllegalArgumentException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("tool arguments must be valid JSON", ex);
-        }
+    public ToolCallResult execute(AuthorizedAgentRunContext context, String mutationKind,
+                                  Map<String, Object> mutation) {
+        Map<String, Object> operation = new LinkedHashMap<>(mutation == null ? Map.of() : mutation);
+        operation.put("kind", mutationKind);
+        return ToolCallResult.success(json(executeOperation(new AuthorizedToolCall(context), operation)));
     }
 
     private Map<String, Object> executeOperation(AuthorizedToolCall request, Object rawOperation) {
@@ -486,10 +446,9 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
                 ? error.getClass().getSimpleName() : error.getMessage();
     }
 
-    private record AuthorizedToolCall(AuthorizedAgentRunContext context, ToolCallRequest request) {
+    private record AuthorizedToolCall(AuthorizedAgentRunContext context) {
         Long projectId() { return context.projectId(); }
         Long runId() { return context.runId(); }
         Long operatorId() { return context.ownerUserId(); }
-        String toolArgsJson() { return request.toolArgsJson(); }
     }
 }

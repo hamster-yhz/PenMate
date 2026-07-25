@@ -81,7 +81,7 @@ Examples:
 - Every built-in type receives a small, ordered schema with sections, descriptions, controls, placeholders, and enum labels.
 - Fields are optional by default. Authors can start with a title and summary and enrich the entry later.
 - Stable field keys are English identifiers. Display labels are localized metadata and can change without destroying stored values.
-- Built-in schemas accept legacy extra properties during the upgrade window so existing data is not rejected.
+- Built-in schemas reject undeclared properties. A field must exist in the selected type schema before a node can store it.
 - The first-party editor supports text, multiline text, integer/number, boolean, enum, and string-list controls.
 - Nested objects are not used in built-in schemas because they are harder for authors, agents, patches, and mobile UI to edit reliably.
 
@@ -98,3 +98,63 @@ The agent should search and reconcile before proposing a change. It should produ
 5. Custom types can create and edit stable keys, labels, control types, sections, hints, and enum options without raw JSON editing.
 6. Node CRUD round-trips structured values without coercing arrays, booleans, numbers, or empty values incorrectly.
 7. Desktop and mobile layouts keep labels, help text, and controls readable without nested-card clutter.
+
+## V2 Freeze Audit (2026-07-25)
+
+The first catalog pass proved that type-specific fields work, but it also mixed durable canon with author preferences and manuscript planning. V2 freezes the built-in catalog at 19 types and reduces the field set from 178 to 169. PenMate had not shipped when this structure was finalized, so V2 deliberately has no old-attribute compatibility path: undeclared attributes are invalid and removed fields are not part of the storage contract.
+
+### Removed recommended fields
+
+| Type | Fields | Decision |
+| --- | --- | --- |
+| `STORY_CORE` | `targetAudience`, `contentRating`, `chapterTargetWords`, `softPreferences` | Audience, market rating, length targets, and soft workflow preferences belong in project or author settings. They are not claims about the fictional world. |
+| `LOCATION` | `atmosphere`, `narrativeFunction` | Repeatable sensory identity remains in `sensoryAnchors`; rich mood belongs in summary/body. Narrative function is planning metadata and should live in plot or outline context. |
+| `ITEM` | `narrativeSignificance` | Plot and symbolic use belongs in a plotline, setup/payoff node, relation, or body note. It is not a mechanical property of the item. |
+| `PLOTLINE` | `plannedBeats` | Chapter and scene beats remain in the manuscript outline, avoiding a second editable outline in the Story Bible. |
+| `EVENT` | `knowledgeSpread` | Knowledge differs by character and chapter. Store it as character progressions or explicit facts instead of one unstructured event field. |
+
+### Deliberately retained distinctions
+
+| Pair | Boundary |
+| --- | --- |
+| `ORGANIZATION` / `FACTION` | An organization has formal persistent structure and membership. A faction is an alignment or interest bloc that can cross organizations. |
+| `MAGIC_SYSTEM` / `TECHNOLOGY` | Both have rules and limits, but their narrative semantics and genre expectations differ enough to justify dedicated forms. |
+| `FACT` / `CONTINUITY_CONSTRAINT` | A fact states what is true or believed. A constraint is a check derived from facts that later writing must satisfy. |
+| Base state / progression | A base field is generally true. A progression records when that field changes over a chapter range. |
+
+`participantIntentions` remains on `EVENT`: narrative-planning research consistently treats intent as distinct from trigger, conflict, and outcome. `toneKeywords` remains on `STORY_CORE` because it is a project-specific creative contract that overrides cross-project AuthorProfile defaults.
+
+No additional built-in types were added in V2. Chapters and scenes would duplicate manuscript structure; species, religions, vehicles, planets, governments, schools, and legal systems are not universal enough to impose on every novel and remain valid custom types.
+
+## Agent Tool and Skill Design Research
+
+The user-specified [collection-claude-code-source-code](https://github.com/chauncygu/collection-claude-code-source-code) repository was inspected at its `main` branch on 2026-07-25. The repository is an unofficial source collection, so it is used as an implementation reference rather than an authority claim about Anthropic internals.
+
+Relevant source observations:
+
+1. [`FileEditTool/prompt.ts`](https://github.com/chauncygu/collection-claude-code-source-code/blob/main/claude-code-source-code/src/tools/FileEditTool/prompt.ts) says a read must occur before edit and that the tool errors without it.
+2. [`FileEditTool/FileEditTool.ts`](https://github.com/chauncygu/collection-claude-code-source-code/blob/main/claude-code-source-code/src/tools/FileEditTool/FileEditTool.ts) declares strict input handling, validates inputs, and checks read-file state before mutation.
+3. [`ConfigTool/ConfigTool.ts`](https://github.com/chauncygu/collection-claude-code-source-code/blob/main/claude-code-source-code/src/tools/ConfigTool/ConfigTool.ts) uses strict objects and explicitly distinguishes read-only calls.
+4. [`Tool.ts`](https://github.com/chauncygu/collection-claude-code-source-code/blob/main/claude-code-source-code/src/Tool.ts) separates schemas, validation, read-only/destructive classification, permissions, and bounded results rather than treating a tool as only a name plus prompt.
+5. [`skillify.ts`](https://github.com/chauncygu/collection-claude-code-source-code/blob/main/claude-code-source-code/src/skills/bundled/skillify.ts) requires ordered steps, success criteria, human checkpoints, and hard rules in workflow skills.
+6. [`loadSkillsDir.ts`](https://github.com/chauncygu/collection-claude-code-source-code/blob/main/claude-code-source-code/src/skills/loadSkillsDir.ts) uses one `SKILL.md` per skill and progressive loading.
+
+Official cross-checks:
+
+- The [Model Context Protocol tool specification](https://modelcontextprotocol.io/specification/2025-06-18/server/tools) defines discoverable tool names, descriptions, input schemas, optional output schemas, and explicit user confirmation for sensitive operations.
+- OpenAI's [function calling guide](https://platform.openai.com/docs/guides/function-calling) recommends clear function names/descriptions, enums and object structure, strict validation where supported, and keeping the active function set small enough for reliable selection.
+
+### Resulting PenMate contracts
+
+| Tool | Responsibility |
+| --- | --- |
+| `story_bible_search` | Bounded relevance search against the Run-bound chapter context. It intentionally does not provide mutation revisions. |
+| `story_bible_inspect` | Readiness, exact catalog/schema lookup, and complete single-node inspection including revisions, relations, and progressions. |
+| `story_bible_node_write` | One node create, minimal update, or archive using structured attributes. |
+| `story_bible_relation_write` | One durable relation create, update, or delete. |
+| `story_bible_progression_write` | One chapter-scoped RFC 6902 progression create, update, or delete. |
+| `story_bible_structure_write` | Custom type/category/tag administration, exposed only to world-building runs. |
+
+The old 18-kind `story_bible_update` tool, handler, approval preview, exposed schema, and internal batch envelope were removed entirely. Each narrow write now dispatches one structured mutation directly to the transactional application service. Exact update/delete operations require optimistic revisions that only `story_bible_inspect` returns. Tool schemas reject unknown top-level arguments and accept attributes as structured objects instead of model-authored JSON strings. Every mutation class receives its own approval reason and bounded preview.
+
+Universal state-truth rules remain in the base system prompt. Ontology selection, initialization, minimal mutation, conflict recovery, human confirmation, and success criteria live in `canon-maintenance/SKILL.md` so they are loaded only when relevant.

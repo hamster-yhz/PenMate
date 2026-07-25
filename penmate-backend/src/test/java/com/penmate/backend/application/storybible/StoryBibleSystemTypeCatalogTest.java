@@ -24,7 +24,8 @@ class StoryBibleSystemTypeCatalogTest {
         catalog.definitions().forEach(definition -> {
             validation.parseSchema(definition.fieldSchemaJson());
             assertThat(jsonCodec.readObject(definition.fieldSchemaJson()))
-                    .containsKeys("properties", "x-penmate-sections", "x-penmate-description");
+                    .containsKeys("properties", "x-penmate-sections", "x-penmate-description")
+                    .containsEntry("additionalProperties", false);
         });
     }
 

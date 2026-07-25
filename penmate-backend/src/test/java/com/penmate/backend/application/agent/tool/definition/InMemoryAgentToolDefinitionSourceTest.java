@@ -69,9 +69,9 @@ class InMemoryAgentToolDefinitionSourceTest {
     }
 
     @Test
-    void exposes_chapter_edit_while_todo_planner_remains_disabled() {
+    void exposes_chapter_edit_and_todo_crud() {
         InMemoryAgentToolDefinitionSource source = new InMemoryAgentToolDefinitionSource(List.of(
-                new ChapterEditToolDefinition(), new TodoPlannerToolDefinition()));
+                new ChapterEditToolDefinition(), new TodoCrudToolDefinition()));
         Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
                 .collect(Collectors.toMap(AgentLlmToolSchema::toolCode, schema -> schema));
 
@@ -79,10 +79,10 @@ class InMemoryAgentToolDefinitionSourceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(schemas).doesNotContainKey("draft_generation");
         assertThat(schemas.get("chapter_edit").parametersJsonSchema()).doesNotContain("\"chapterId\"");
-        assertThat(source.getRequired("todo_planner").presentation().displayName()).isNotBlank();
-        assertThat(source.getRequired("todo_planner").exposure().lifecycleStatus())
-                .isEqualTo(ToolLifecycleStatus.DISABLED);
-        assertThat(schemas).doesNotContainKey("todo_planner");
+        assertThat(source.getRequired("todo_crud").presentation().displayName()).isNotBlank();
+        assertThat(source.getRequired("todo_crud").exposure().lifecycleStatus())
+                .isEqualTo(ToolLifecycleStatus.ACTIVE);
+        assertThat(schemas).containsKey("todo_crud");
     }
 
     @Test
@@ -97,8 +97,12 @@ class InMemoryAgentToolDefinitionSourceTest {
                 new RagQueryToolDefinition(),
                 new SkillLoadToolDefinition(skills, new JacksonJsonCodec(objectMapper)),
                 new StoryBibleSearchToolDefinition(),
-                new StoryBibleUpdateToolDefinition(),
-                new TodoPlannerToolDefinition()
+                StoryBibleV2ToolDefinitions.inspect(),
+                StoryBibleV2ToolDefinitions.nodeWrite(),
+                StoryBibleV2ToolDefinitions.relationWrite(),
+                StoryBibleV2ToolDefinitions.progressionWrite(),
+                StoryBibleV2ToolDefinitions.structureWrite(),
+                new TodoCrudToolDefinition()
         ));
 
         Map<String, AgentLlmToolSchema> schemas = source.listLlmSchemas().stream()
@@ -107,7 +111,8 @@ class InMemoryAgentToolDefinitionSourceTest {
                 "ownerId", "ownerUserId", "operatorId", "projectId", "sessionId", "runId",
                 "executionToken", "authToken", "approvalId", "approvalRequestId");
 
-        assertThat(schemas).doesNotContainKeys("book_crud", "todo_planner");
+        assertThat(schemas).doesNotContainKey("book_crud");
+        assertThat(schemas).containsKey("todo_crud");
         for (AgentLlmToolSchema schema : schemas.values()) {
             Set<String> fieldNames = new HashSet<>();
             collectFieldNames(objectMapper.readTree(schema.parametersJsonSchema()), fieldNames);

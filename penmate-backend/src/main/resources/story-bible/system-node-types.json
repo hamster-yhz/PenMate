@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "types": [
     {
       "code": "STORY_CORE",
@@ -21,14 +21,10 @@
         { "key": "genre", "label": "主要类型", "type": "string", "section": "foundation", "order": 20, "placeholder": "例如：都市悬疑" },
         { "key": "subgenres", "label": "类型标签", "type": "string-list", "section": "foundation", "order": 30, "placeholder": "每行一个，例如：成长、群像" },
         { "key": "themes", "label": "主题", "type": "string-list", "section": "foundation", "order": 40, "placeholder": "每行一个需要反复拷问的主题" },
-        { "key": "targetAudience", "label": "目标读者", "type": "string", "section": "foundation", "order": 50 },
-        { "key": "contentRating", "label": "内容分级", "type": "enum", "section": "foundation", "order": 60, "options": [{ "value": "GENERAL", "label": "全年龄" }, { "value": "TEEN", "label": "青少年" }, { "value": "MATURE", "label": "成人" }] },
         { "key": "narrativePov", "label": "叙事视角", "type": "enum", "section": "voice", "order": 10, "options": [{ "value": "FIRST_PERSON", "label": "第一人称" }, { "value": "SECOND_PERSON", "label": "第二人称" }, { "value": "THIRD_LIMITED", "label": "第三人称限知" }, { "value": "THIRD_OMNISCIENT", "label": "第三人称全知" }, { "value": "MULTIPLE", "label": "多视角" }] },
         { "key": "tense", "label": "叙事时态", "type": "enum", "section": "voice", "order": 20, "options": [{ "value": "PAST", "label": "过去时" }, { "value": "PRESENT", "label": "现在时" }, { "value": "MIXED", "label": "混合时态" }] },
         { "key": "toneKeywords", "label": "基调关键词", "type": "string-list", "section": "voice", "order": 30, "placeholder": "例如：克制、冷峻、黑色幽默" },
-        { "key": "chapterTargetWords", "label": "章节目标字数", "type": "integer", "section": "voice", "order": 40, "minimum": 100, "maximum": 50000 },
         { "key": "hardConstraints", "label": "硬约束", "type": "string-list", "section": "guardrails", "order": 10, "help": "违反后会破坏作品身份或正史的规则。" },
-        { "key": "softPreferences", "label": "软偏好", "type": "string-list", "section": "guardrails", "order": 20 },
         { "key": "forbiddenElements", "label": "禁用元素", "type": "string-list", "section": "guardrails", "order": 30 }
       ]
     },
@@ -126,12 +122,10 @@
         { "key": "locationKind", "label": "地点类型", "type": "enum", "section": "profile", "order": 10, "options": [{ "value": "REGION", "label": "区域" }, { "value": "SETTLEMENT", "label": "聚居地" }, { "value": "BUILDING", "label": "建筑" }, { "value": "ROOM", "label": "房间" }, { "value": "LANDMARK", "label": "地标" }, { "value": "ROUTE", "label": "路径" }, { "value": "OTHER", "label": "其他" }] },
         { "key": "scale", "label": "空间尺度", "type": "enum", "section": "profile", "order": 20, "options": [{ "value": "WORLD", "label": "世界" }, { "value": "REGIONAL", "label": "区域" }, { "value": "LOCAL", "label": "局部" }, { "value": "INTERIOR", "label": "室内" }] },
         { "key": "physicalFeatures", "label": "物理特征", "type": "string-list", "section": "profile", "order": 30 },
-        { "key": "atmosphere", "label": "整体氛围", "type": "multiline", "section": "profile", "order": 40 },
         { "key": "climate", "label": "气候 / 环境", "type": "string", "section": "profile", "order": 50 },
         { "key": "accessRules", "label": "进入与离开条件", "type": "multiline", "section": "constraints", "order": 10 },
         { "key": "hazards", "label": "风险", "type": "string-list", "section": "constraints", "order": 20 },
         { "key": "resources", "label": "可用资源", "type": "string-list", "section": "constraints", "order": 30 },
-        { "key": "narrativeFunction", "label": "叙事功能", "type": "multiline", "section": "story", "order": 10 },
         { "key": "sensoryAnchors", "label": "感官锚点", "type": "string-list", "section": "story", "order": 20, "placeholder": "可重复出现的声音、气味、颜色或触感" }
       ]
     },
@@ -142,7 +136,7 @@
       "iconCode": "building",
       "color": "#287A8C",
       "sortOrder": 50,
-      "description": "具有持续结构、成员规则和行动能力的机构。成员、领导者和总部使用关系连接。",
+      "description": "具有正式身份、持续结构、成员规则和行动能力的机构。若只是跨组织的立场阵营或利益联盟，请使用势力。成员、领导者和总部使用关系连接。",
       "titlePlaceholder": "组织名称",
       "summaryPlaceholder": "组织公开身份和实际作用",
       "sections": [{ "key": "identity", "title": "组织定位", "description": "组织为何存在，对外如何自我定义。" }, { "key": "structure", "title": "结构与资源", "description": "组织如何运转并产生行动能力。" }, { "key": "agenda", "title": "目标与手段", "description": "公开诉求、真实目的和惯用方式。" }],
@@ -166,7 +160,7 @@
       "iconCode": "shield",
       "color": "#5D6B3C",
       "sortOrder": 60,
-      "description": "围绕共同立场争夺资源或影响力的行动集团，强调冲突位置而非行政结构。",
+      "description": "围绕共同立场争夺资源或影响力、可以跨越多个正式组织的阵营或利益联盟，强调冲突位置而非行政结构。具有正式层级和成员制度的实体请使用组织。",
       "titlePlaceholder": "势力名称",
       "summaryPlaceholder": "它想得到什么，又反对谁",
       "sections": [{ "key": "position", "title": "立场", "description": "势力相信什么、如何被外界看待。" }, { "key": "conflict", "title": "冲突能力", "description": "势力如何争夺目标并承受内部压力。" }],
@@ -239,7 +233,7 @@
       "description": "具有剧情功能或需要保持连续性的具体物品。当前持有者使用关系连接。",
       "titlePlaceholder": "物品名称",
       "summaryPlaceholder": "它为什么值得进入故事圣经",
-      "sections": [{ "key": "profile", "title": "物品档案", "description": "外观、来源和用途。" }, { "key": "mechanics", "title": "能力与限制", "description": "防止物品在剧情中无条件解决问题。" }, { "key": "story", "title": "剧情意义", "description": "物品承担的象征或结构作用。" }],
+      "sections": [{ "key": "profile", "title": "物品档案", "description": "外观、来源和用途。" }, { "key": "mechanics", "title": "能力与限制", "description": "防止物品在剧情中无条件解决问题。" }],
       "fields": [
         { "key": "itemKind", "label": "物品类型", "type": "enum", "section": "profile", "order": 10, "options": [{ "value": "EVERYDAY", "label": "日常物品" }, { "value": "WEAPON", "label": "武器" }, { "value": "TOOL", "label": "工具" }, { "value": "ARTIFACT", "label": "特殊造物" }, { "value": "DOCUMENT", "label": "文书 / 信息载体" }, { "value": "RESOURCE", "label": "资源" }, { "value": "OTHER", "label": "其他" }] },
         { "key": "appearance", "label": "外观识别点", "type": "multiline", "section": "profile", "order": 20 },
@@ -248,8 +242,7 @@
         { "key": "capabilities", "label": "能力", "type": "string-list", "section": "mechanics", "order": 10 },
         { "key": "limitations", "label": "限制", "type": "string-list", "section": "mechanics", "order": 20 },
         { "key": "activation", "label": "使用条件", "type": "multiline", "section": "mechanics", "order": 30 },
-        { "key": "conditionBaseline", "label": "初始状态", "type": "string", "section": "mechanics", "order": 40, "help": "损坏、丢失等后续变化使用状态演化。" },
-        { "key": "narrativeSignificance", "label": "剧情 / 象征意义", "type": "multiline", "section": "story", "order": 10 }
+        { "key": "conditionBaseline", "label": "初始状态", "type": "string", "section": "mechanics", "order": 40, "help": "损坏、丢失等后续变化使用状态演化。" }
       ]
     },
     {
@@ -336,7 +329,6 @@
         { "key": "stakes", "label": "失败代价", "type": "multiline", "section": "conflict", "order": 40 },
         { "key": "opposition", "label": "主要阻力", "type": "multiline", "section": "conflict", "order": 50 },
         { "key": "openingSituation", "label": "起始局面", "type": "multiline", "section": "plan", "order": 10 },
-        { "key": "plannedBeats", "label": "关键节拍", "type": "string-list", "section": "plan", "order": 20 },
         { "key": "climax", "label": "高潮设计", "type": "multiline", "section": "plan", "order": 30 },
         { "key": "resolution", "label": "解决方式", "type": "multiline", "section": "plan", "order": 40 },
         { "key": "planningStatus", "label": "规划状态", "type": "enum", "section": "plan", "order": 50, "options": [{ "value": "PLANNED", "label": "计划中" }, { "value": "ACTIVE", "label": "推进中" }, { "value": "RESOLVED", "label": "已解决" }, { "value": "DROPPED", "label": "已放弃" }] }
@@ -407,7 +399,6 @@
         { "key": "conflict", "label": "核心冲突", "type": "multiline", "section": "causality", "order": 30 },
         { "key": "outcome", "label": "直接结果", "type": "multiline", "section": "causality", "order": 40 },
         { "key": "consequences", "label": "后续影响", "type": "string-list", "section": "causality", "order": 50 },
-        { "key": "knowledgeSpread", "label": "信息传播", "type": "multiline", "section": "knowledge", "order": 10 },
         { "key": "certainty", "label": "事实状态", "type": "enum", "section": "knowledge", "order": 20, "options": [{ "value": "CONFIRMED", "label": "已确认" }, { "value": "REPORTED", "label": "传闻 / 报告" }, { "value": "DISPUTED", "label": "存在争议" }, { "value": "PLANNED", "label": "尚未发生的计划" }] }
       ]
     },
@@ -418,7 +409,7 @@
       "iconCode": "check",
       "color": "#3C7D5E",
       "sortOrder": 160,
-      "description": "需要被明确检索、核验或约束后续创作的原子事实。",
+      "description": "需要被明确检索或核验、但不值得单独建实体的原子事实。事实描述世界是什么；不要在这里存放写作检查规则。",
       "titlePlaceholder": "事实简称",
       "summaryPlaceholder": "用一个可判断真假的句子陈述事实",
       "sections": [{ "key": "claim", "title": "事实陈述", "description": "事实是什么、影响谁。" }, { "key": "evidence", "title": "证据与置信度", "description": "说明事实来自哪里以及是否存在例外。" }],
@@ -440,7 +431,7 @@
       "iconCode": "lock",
       "color": "#8F3E3E",
       "sortOrder": 170,
-      "description": "写作和审校时必须检查的连续性规则，例如时间、空间、知识边界和能力上限。",
+      "description": "从正史事实推导出的写作检查条件，例如时间、空间、知识边界和能力上限。它描述必须如何保持一致，而不是重复陈述世界事实。",
       "titlePlaceholder": "约束简称",
       "summaryPlaceholder": "什么情况绝对不能发生",
       "sections": [{ "key": "rule", "title": "约束规则", "description": "规则、严重程度和存在理由。" }, { "key": "review", "title": "审校方式", "description": "Agent 应如何检查例外和修复冲突。" }],

@@ -43,7 +43,9 @@ class ClasspathMarkdownSystemPromptProviderTest {
         assertThat(bundle.assembledPrompt())
                 .contains("你是 PenMate 的小说项目 Agent")
                 .contains("项目事实以当前 CANON Story Bible")
-                .contains("工具用于读取或改变真实项目状态");
+                .contains("工具用于读取或改变真实项目状态")
+                .contains("`todo_crud`")
+                .doesNotContain("todo_planner", "story_bible_update");
     }
 
     @Test

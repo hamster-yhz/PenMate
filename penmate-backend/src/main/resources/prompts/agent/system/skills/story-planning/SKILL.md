@@ -1,11 +1,11 @@
 ---
 name: story-planning
-description: Design or repair a novel, arc, outline, chapter sequence, or scene plan with causal structure, character agency, escalation, pacing, and setup-payoff control.
+description: Design or repair a novel, arc, outline, chapter sequence, or scene plan with causal structure, character agency, escalation, pacing, and setup-payoff control. Use for premise development, outlining, plot repair, arc design, chapter planning, and beat design.
 ---
 
 # Story Planning
 
-Use this skill for premise development, outlines, plot repair, arc design, chapter planning, beat design, and turning an idea into an executable scene sequence. Do not force a full outline when the user only wants prose or a local sentence edit.
+Do not force a full outline when the user only wants prose or a local edit.
 
 ## Working Model
 
@@ -41,11 +41,9 @@ Match the plan's granularity to the request. Prefer a compact outline with expli
 
 ## Quality Failures To Avoid
 
-- Events connected only by “and then”.
+- Events connected only by "and then".
 - Stakes described abstractly but never converted into choices or losses.
 - Passive protagonists carried by coincidences or side characters.
 - Repeated confrontation beats with no state change.
 - Twists unsupported by setup, or setup with no later function.
 - Premature detail that makes revision expensive before the spine works.
-
-Method basis: hierarchical outline control, plan-and-write, recursive revision, narrative planning, and pacing-aware long-form generation research.

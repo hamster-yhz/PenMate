@@ -1,11 +1,9 @@
 ---
 name: scene-writing
-description: Draft a new novel scene or chapter as immersive prose with controlled POV, concrete action, subtext, rhythm, state change, and continuity.
+description: Draft a new novel scene or chapter as immersive prose with controlled POV, concrete action, subtext, rhythm, state change, and continuity. Use for new narrative prose, scene continuation, or chapter drafting, not outlines or reviews.
 ---
 
 # Scene Writing
-
-Use this skill when the user wants new narrative prose, a scene continuation, or a chapter draft. Do not use it as the main method for outlines, reviews, or sentence-level polishing.
 
 ## Silent Scene Contract
 
@@ -45,7 +43,7 @@ Before delivery, silently verify:
 
 - Repeatedly naming emotions after already showing them.
 - Generic sensory lists, decorative metaphors, or atmosphere unrelated to viewpoint.
-- Characters constantly nodding, sighing, smiling faintly, clenching fists, or “letting out a breath”.
+- Characters constantly nodding, sighing, smiling faintly, clenching fists, or "letting out a breath".
 - Every line of dialogue followed by an explanatory action beat.
 - Overusing contrast formulas, fragments, rhetorical questions, and summary conclusions.
 - Making all characters equally articulate, self-aware, or emotionally explicit.

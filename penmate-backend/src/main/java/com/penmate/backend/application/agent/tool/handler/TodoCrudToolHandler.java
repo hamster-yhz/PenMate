@@ -14,10 +14,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-/** Lets the primary agent read and mutate the current session's persisted todo plan. */
+/** Reads and mutates persisted Todos within the current authorized session. */
 @Component
 @RequiredArgsConstructor
-public class TodoPlannerToolHandler implements AgentToolHandler {
+public class TodoCrudToolHandler implements AgentToolHandler {
 
     private static final Set<String> OPERATIONS = Set.of("list", "create", "update", "complete", "delete");
     private final TodoCrudApplicationService todoService;
@@ -25,7 +25,7 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
 
     @Override
     public String toolCode() {
-        return "todo_planner";
+        return "todo_crud";
     }
 
     @Override
@@ -110,8 +110,8 @@ public class TodoPlannerToolHandler implements AgentToolHandler {
             };
         } catch (Exception ex) {
             String message = ex.getMessage() == null || ex.getMessage().isBlank()
-                    ? "todo planner execution failed" : ex.getMessage();
-            return new ToolCallResult("FAILED", null, null, "TODO_PLANNER_FAILED", message);
+                    ? "todo CRUD execution failed" : ex.getMessage();
+            return new ToolCallResult("FAILED", null, null, "TODO_CRUD_FAILED", message);
         }
     }
 

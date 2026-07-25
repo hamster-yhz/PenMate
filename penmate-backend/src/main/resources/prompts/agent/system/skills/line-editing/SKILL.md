@@ -1,11 +1,11 @@
 ---
 name: line-editing
-description: Polish existing prose at paragraph and sentence level for clarity, precision, rhythm, imagery, dialogue, and voice while preserving meaning, POV, canon, and intentional texture.
+description: Polish existing prose at paragraph and sentence level for clarity, precision, rhythm, imagery, dialogue, and voice while preserving meaning, POV, canon, and intentional texture. Use for rewriting, tightening, or polishing prose after scene purpose is stable.
 ---
 
 # Line Editing
 
-Use this skill for rewriting, polishing, tightening, or improving existing prose after its scene purpose is stable. The goal is not maximum smoothness; it is precise, alive prose that still sounds like this author and this viewpoint.
+Aim for precise, alive prose that still sounds like this author and viewpoint, not maximum smoothness.
 
 ## Editing Order
 

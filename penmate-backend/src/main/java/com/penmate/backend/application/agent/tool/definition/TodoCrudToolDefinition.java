@@ -5,9 +5,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/** Static definition for direct manipulation of the current session's todo plan. */
+/** Exposes current-session Todo CRUD without performing planning on the agent's behalf. */
 @Component
-public class TodoPlannerToolDefinition implements AgentToolDefinition {
+public class TodoCrudToolDefinition implements AgentToolDefinition {
 
     private static final String PARAMETERS_JSON_SCHEMA = """
             {
@@ -37,11 +37,13 @@ public class TodoPlannerToolDefinition implements AgentToolDefinition {
     @Override
     public AgentToolDescriptor descriptor() {
         return new AgentToolDescriptor(
-                "todo_planner",
-                new ToolPresentation("任务计划"),
+                "todo_crud",
+                new ToolPresentation("Todo CRUD"),
                 new ToolExposure(
-                        ToolLifecycleStatus.DISABLED,
-                        "读取或直接维护当前会话的任务计划。create/update 需要 title、sourceType 和 todoStatus；complete/delete 需要 todoId。",
+                        ToolLifecycleStatus.ACTIVE,
+                        "List or maintain persisted Todos for the current session. The runtime supplies session scope. "
+                                + "Create and update require title, sourceType, and todoStatus; update, complete, and "
+                                + "delete require a todoId returned by list.",
                         PARAMETERS_JSON_SCHEMA
                 ),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())

@@ -1,7 +1,7 @@
 package com.penmate.backend.application.agent.tool.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.penmate.backend.application.agent.tool.definition.TodoPlannerToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.todo.TodoCrudApplicationService;
 import com.penmate.backend.domain.todo.model.SessionTodo;
@@ -10,29 +10,29 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context;
 
-class TodoPlannerToolHandlerTest {
+class TodoCrudToolHandlerTest {
 
     private final TodoCrudApplicationService service = mock(TodoCrudApplicationService.class);
-    private final TodoPlannerToolHandler handler = new TodoPlannerToolHandler(
+    private final TodoCrudToolHandler handler = new TodoCrudToolHandler(
             service, new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
-    void exposes_direct_todo_operations_without_planning_inputs_or_session_id() {
-        var descriptor = new TodoPlannerToolDefinition().descriptor();
+    void exposes_active_crud_operations_without_planning_inputs_or_session_id() {
+        var descriptor = new TodoCrudToolDefinition().descriptor();
 
-        assertThat(descriptor.toolCode()).isEqualTo("todo_planner");
+        assertThat(descriptor.toolCode()).isEqualTo("todo_crud");
         assertThat(descriptor.exposure().parametersJsonSchema())
                 .contains("\"operation\"", "\"list\"", "\"create\"", "\"update\"", "\"complete\"", "\"delete\"")
                 .doesNotContain("planningMode", "userRequest", "qualityIssues", "sessionId");
-        assertThat(descriptor.exposure().lifecycleStatus().name()).isEqualTo("DISABLED");
+        assertThat(descriptor.exposure().lifecycleStatus().name()).isEqualTo("ACTIVE");
         assertThat(handler.mutatesState(todoContext(), request("{\"operation\":\"list\"}"))).isFalse();
         assertThat(handler.mutatesState(todoContext(), request("{\"operation\":\"create\",\"title\":\"x\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}"))).isTrue();
     }
@@ -71,7 +71,7 @@ class TodoPlannerToolHandlerTest {
     }
 
     private ToolCallRequest request(String args) {
-        return new ToolCallRequest(77L, "todo_planner", args, "todo-call", null, 1L);
+        return new ToolCallRequest(77L, "todo_crud", args, "todo-call", null, 1L);
     }
 
     private com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext todoContext() {

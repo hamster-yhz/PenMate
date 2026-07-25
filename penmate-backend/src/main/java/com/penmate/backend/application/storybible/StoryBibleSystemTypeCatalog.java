@@ -87,8 +87,7 @@ public class StoryBibleSystemTypeCatalog {
             properties.put(key, property);
         }
         schema.put("properties", properties);
-        // Existing projects could already contain API-written custom attributes on a system type.
-        schema.put("additionalProperties", true);
+        schema.put("additionalProperties", false);
         return schema;
     }
 

@@ -6,7 +6,6 @@ import com.penmate.backend.domain.agent.context.repository.AgentRoutingPreferenc
 import com.penmate.backend.domain.agent.model.AgentSession;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
-import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
 import com.penmate.backend.domain.novel.model.NovelProject;
 import com.penmate.backend.domain.novel.repository.NovelGateway;
@@ -36,20 +35,13 @@ public class StoryBibleRoutingPreferenceResolver {
             return new EffectivePreference(StoryBibleRoutingMode.LLM_SELECTOR, null);
         }
         StoryBibleRoutingMode mode = parseMode(preference.storyBibleRoutingMode());
-        ModelUserPreferences defaults = models.findUserPreferences(userId);
-        Long effectiveEmbeddingModelId = preference.embeddingModelConfigId() != null
-                ? preference.embeddingModelConfigId()
-                : defaults == null ? null : defaults.getDefaultEmbeddingModelConfigId();
-        boolean activeEmbedding = effectiveEmbeddingModelId != null
+        boolean activeEmbedding = preference.embeddingModelConfigId() != null
                 && "READY".equalsIgnoreCase(preference.indexStatus());
         if (!activeEmbedding && mode != StoryBibleRoutingMode.LLM_SELECTOR) {
             mode = StoryBibleRoutingMode.LLM_SELECTOR;
         }
-        Long effectiveRouterModelId = preference.routerModelConfigId() != null
-                ? preference.routerModelConfigId()
-                : defaults == null ? null : defaults.getDefaultContextSelectorModelConfigId();
-        validateRouterModel(userId, effectiveRouterModelId);
-        return new EffectivePreference(mode, effectiveRouterModelId);
+        validateRouterModel(userId, preference.routerModelConfigId());
+        return new EffectivePreference(mode, preference.routerModelConfigId());
     }
 
     private void requireOwnedSession(Long projectId, Long sessionId, Long userId) {

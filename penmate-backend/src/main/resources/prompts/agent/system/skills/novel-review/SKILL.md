@@ -1,11 +1,11 @@
 ---
 name: novel-review
-description: Review a novel, outline, chapter, or excerpt with evidence-based findings on coherence, character, pacing, engagement, continuity, prose, and constraint compliance.
+description: Review a novel, outline, chapter, or excerpt with evidence-based findings on coherence, character, pacing, engagement, continuity, prose, and constraint compliance. Use for critique, diagnosis, beta-reader feedback, quality review, or pre-delivery audit.
 ---
 
 # Novel Review
 
-Use this skill when the user asks for critique, evaluation, diagnosis, beta-reader feedback, quality review, or a pre-delivery audit. A review is not a rewrite unless explicitly requested.
+A review is not a rewrite unless the user explicitly requests one.
 
 ## Review Method
 
@@ -37,5 +37,3 @@ Use this skill when the user asks for critique, evaluation, diagnosis, beta-read
 ## Output Contract
 
 Lead with findings, highest severity first. Keep praise brief and specific; never use praise to cushion unclear criticism. Do not assign numeric scores unless asked. If no material issue exists, say so and identify the remaining uncertainty caused by limited scope.
-
-Method basis: reader-response and narrative engagement research, multi-critic revision, and professional developmental review practice.

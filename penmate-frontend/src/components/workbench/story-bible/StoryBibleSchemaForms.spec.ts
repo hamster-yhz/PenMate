@@ -120,6 +120,7 @@ describe('Story Bible schema forms', () => {
     const emittedSchema = JSON.parse(payload.fieldSchemaJson)
     expect(emittedSchema.properties.population.title).toBe('常住人口')
     expect(Object.keys(emittedSchema.properties)).toEqual(['population'])
+    expect(emittedSchema.additionalProperties).toBe(false)
   })
 
   it('locks Story Core type, canon status and inclusion policy', () => {

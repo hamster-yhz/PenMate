@@ -189,7 +189,7 @@ const submitType = () => {
   if (invalidEnum) { typeFormError.value = `“${invalidEnum.label}”至少需要一个枚举选项`; return }
   const properties = Object.fromEntries(typeFields.value.map((field, index) => [field.key.trim(), propertyFrom(field, (index + 1) * 10)]))
   const sectionTitles = typeFields.value.map((field) => field.section.trim() || '专属字段').filter((value, index, all) => all.indexOf(value) === index)
-  const schema: RawSchema = { ...originalSchema.value, type: 'object', title: typeDraft.displayName, properties, additionalProperties: true, 'x-penmate-color': typeColorValue.value, 'x-penmate-description': typeDescription.value || undefined, 'x-penmate-title-placeholder': titlePlaceholder.value || undefined, 'x-penmate-summary-placeholder': summaryPlaceholder.value || undefined, 'x-penmate-sections': sectionTitles.map((title, index) => ({ key: title, title, order: (index + 1) * 10 })) }
+  const schema: RawSchema = { ...originalSchema.value, type: 'object', title: typeDraft.displayName, properties, additionalProperties: false, 'x-penmate-color': typeColorValue.value, 'x-penmate-description': typeDescription.value || undefined, 'x-penmate-title-placeholder': titlePlaceholder.value || undefined, 'x-penmate-summary-placeholder': summaryPlaceholder.value || undefined, 'x-penmate-sections': sectionTitles.map((title, index) => ({ key: title, title, order: (index + 1) * 10 })) }
   if (Array.isArray(schema.required)) schema.required = schema.required.filter((key) => keys.includes(String(key)))
   emit('saveType', { ...typeDraft, typeCode: typeDraft.typeCode || `CUSTOM_${Date.now().toString(36).toUpperCase()}`, fieldSchemaJson: JSON.stringify(schema) })
   resetTypeDraft()

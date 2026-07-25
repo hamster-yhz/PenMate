@@ -1,11 +1,11 @@
 ---
 name: developmental-editing
-description: Diagnose and revise story-level problems in premise, structure, causality, character arcs, stakes, pacing, viewpoint strategy, and setup-payoff without line-polishing too early.
+description: Diagnose and revise story-level problems in premise, structure, causality, character arcs, stakes, pacing, viewpoint strategy, and setup-payoff. Use for macro editing of a novel, arc, chapter sequence, or scene whose structural purpose is in question.
 ---
 
 # Developmental Editing
 
-Use this skill for macro editing of a novel, arc, chapter sequence, or scene whose structural purpose is in question. Keep it separate from line editing: solve story mechanics before polishing sentences that may be cut.
+Solve story mechanics before polishing sentences that may be cut.
 
 ## Procedure
 
