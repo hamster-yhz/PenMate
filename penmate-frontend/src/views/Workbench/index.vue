@@ -139,6 +139,8 @@
           :ai-undo-operations="aiUndoOperations"
           :ai-undo-busy-operation-id="aiUndoBusyOperationId"
           :ai-undo-busy-run-id="aiUndoBusyRunId"
+          :ai-undo-dismiss-busy-operation-id="aiUndoDismissBusyOperationId"
+          :ai-undo-dismiss-all-busy="aiUndoDismissAllBusy"
           @toggle-collapse="toggleRightPanel"
           @toggle-focus="chatFocused = !chatFocused"
           @update:panel-width="chatPanelWidth = $event"
@@ -165,6 +167,8 @@
           @scroll-to-bottom="scrollChatToBottom"
           @undo-ai="undoAiEdit"
           @undo-ai-run="undoAiRun"
+          @dismiss-ai-undo="dismissAiUndo"
+          @dismiss-all-ai-undo="dismissAllAiUndo"
         />
         <template #fallback><div class="workbench-panel-skeleton ai-skeleton" :class="{ collapsed: rightCollapsed && mobilePane !== 'ai', 'mobile-pane-hidden': mobilePane !== 'ai', 'mobile-pane-active': mobilePane === 'ai' }" aria-label="正在加载 AI 面板"></div></template>
       </Suspense>
@@ -255,8 +259,12 @@ const {
   aiUndoOperations,
   aiUndoBusyOperationId,
   aiUndoBusyRunId,
+  aiUndoDismissBusyOperationId,
+  aiUndoDismissAllBusy,
   undoAiEdit,
   undoAiRun,
+  dismissAiUndo,
+  dismissAllAiUndo,
   onEditorInput,
   updateCursorPos,
   saveContent,

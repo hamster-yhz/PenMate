@@ -40,8 +40,6 @@ const eventMeta: Record<string, { label: string; tone: string; icon: typeof ApiO
   'run.started': { label: '已开始', tone: 'progress', icon: ClockCircleOutlined },
   'turn.route.completed': { label: '正在准备上下文', tone: 'context', icon: ApiOutlined },
   'context.resolved': { label: '上下文准备完成', tone: 'context', icon: CheckCircleOutlined },
-  'llm.turn.started': { label: '正在生成回复', tone: 'progress', icon: ClockCircleOutlined },
-  'llm.turn.completed': { label: '模型轮次完成', tone: 'success', icon: CheckCircleOutlined },
   'model.commentary.snapshot': { label: '过程说明', tone: 'commentary', icon: MessageOutlined },
   'model.commentary.completed': { label: '过程说明', tone: 'commentary', icon: MessageOutlined },
   'model.reasoning_summary.snapshot': { label: '分析过程', tone: 'reasoning', icon: BulbOutlined },
@@ -68,10 +66,6 @@ const meta = (event: AgentTimelineEvent) =>
   eventMeta[event.type] ?? { label: '', tone: 'muted', icon: CodeOutlined }
 
 const eventGroupKey = (event: AgentTimelineEvent) => {
-  if (event.type.startsWith('llm.turn.')) {
-    const index = String(event.payload.llmTurnIndex ?? event.payload.turnIndex ?? '')
-    return `llm:${index}:${event.type}`
-  }
   if (event.type.startsWith('model.commentary.')) {
     return `model:commentary:${String(event.payload.llmTurnIndex ?? '')}`
   }
@@ -96,13 +90,7 @@ const visibleEvents = computed(() => {
     if (key) latest.set(key, event)
   }
   const events = [...latest.values()].sort(compareTimelineEvents)
-  const llmTurnCount = new Set(
-    events
-      .filter((event) => event.type.startsWith('llm.turn.'))
-      .map((event) => String(event.payload.llmTurnIndex ?? event.payload.turnIndex ?? '')),
-  ).size
   return events.filter((event) => {
-    if (event.type === 'llm.turn.completed' && llmTurnCount <= 1) return false
     if (event.type === 'message.completed') return !events.some((item) => item.type === 'run.completed')
     if (event.type === 'stream.reset') return !events.some((item) => item.type === 'stream.error')
     return true

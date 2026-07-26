@@ -13,6 +13,7 @@
       @dragstart.stop="handleDragStart"
       @dragover.prevent
       @drop.prevent.stop="handleDrop"
+      @contextmenu.stop
     >
     <span class="chapter-no">{{ displayNo }}</span>
     <input
@@ -30,6 +31,8 @@
     </div>
     <template #overlay>
       <a-menu @click="handleMenuClick">
+        <a-menu-item key="add"><FileAddOutlined />在本卷新建章节</a-menu-item>
+        <a-menu-divider />
         <a-menu-item key="rename"><EditOutlined />重命名</a-menu-item>
         <a-menu-item key="up"><ArrowUpOutlined />上移</a-menu-item>
         <a-menu-item key="down"><ArrowDownOutlined />下移</a-menu-item>
@@ -42,7 +45,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
-import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons-vue'
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined, FileAddOutlined } from '@ant-design/icons-vue'
 import { Dropdown as ADropdown, Menu as AMenu, MenuDivider as AMenuDivider, MenuItem as AMenuItem, Modal } from 'ant-design-vue'
 
 import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
@@ -63,6 +66,7 @@ const emit = defineEmits<{
   (event: 'select-chapter', chapter: OutlineChapterNode): void
   (event: 'rename-node', payload: RenameNodePayload): void
   (event: 'move-node', payload: MoveNodePayload): void
+  (event: 'add-chapter'): void
   (event: 'delete-chapter', payload: DeleteChapterPayload): void
 }>()
 
@@ -149,6 +153,7 @@ const confirmDelete = () => {
 
 const handleMenuClick = ({ key, domEvent }: { key: string | number; domEvent: Event }) => {
   domEvent.stopPropagation()
+  if (key === 'add') emit('add-chapter')
   if (key === 'rename') void startRename()
   if (key === 'up') emitMove(-1)
   if (key === 'down') emitMove(1)

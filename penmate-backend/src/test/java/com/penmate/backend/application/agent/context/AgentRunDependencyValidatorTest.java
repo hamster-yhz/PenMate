@@ -16,14 +16,14 @@ import static org.mockito.Mockito.when;
 class AgentRunDependencyValidatorTest {
 
     @Test
-    void detects_active_chapter_body_change_without_coarse_project_change() {
+    void accepts_domain_content_changes_that_are_guarded_by_tool_preconditions() {
         ContextEpochSnapshotFactory snapshots = mock(ContextEpochSnapshotFactory.class);
         StoryBibleRoutingPreferenceResolver preferences = mock(StoryBibleRoutingPreferenceResolver.class);
         AgentContextCatalogHashService hashes = mock(AgentContextCatalogHashService.class);
         AgentSessionRepository sessions = mock(AgentSessionRepository.class);
         AgentContextEpochService epochs = mock(AgentContextEpochService.class);
         when(snapshots.create(10L, 40L)).thenReturn(new ContextEpochSnapshotCodec.Snapshot(
-                1, 10L, 20L, 3L, 7L, 40L, 12L, List.of(), List.of()));
+                1, 10L, 20L, 4L, 8L, 40L, 12L, List.of(), List.of()));
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
                         StoryBibleRoutingMode.RETRIEVAL, null));
@@ -38,8 +38,8 @@ class AgentRunDependencyValidatorTest {
         var result = new AgentRunDependencyValidator(snapshots, preferences, hashes, sessions, epochs)
                 .validate(run(), input(), artifact);
 
-        assertThat(result.current()).isFalse();
-        assertThat(result.changedFields()).containsExactly("activeChapterContentRevision");
+        assertThat(result.current()).isTrue();
+        assertThat(result.changedFields()).isEmpty();
     }
 
     @Test

@@ -16,4 +16,16 @@ describe('WorkbenchLeftPanel', () => {
     await wrapper.get('.panel-toggle').trigger('click')
     expect(wrapper.emitted('toggle-collapse')).toHaveLength(1)
   })
+
+  it('shows_a_centered_edge_control_when_the_directory_is_collapsed', async () => {
+    const wrapper = mount(WorkbenchLeftPanel, {
+      props: { ...props, collapsed: true },
+      global: { stubs: { OutlineTree: true } },
+    })
+
+    expect(wrapper.find('.panel-toggle').exists()).toBe(false)
+    expect(wrapper.get('.panel-reopen').attributes('aria-label')).toBe('展开作品目录')
+    await wrapper.get('.panel-reopen').trigger('click')
+    expect(wrapper.emitted('toggle-collapse')).toHaveLength(1)
+  })
 })

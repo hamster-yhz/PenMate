@@ -171,7 +171,7 @@ public class AgentRunExecutor {
         ));
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
-        log.info("agent.context.resolved: projectId={}, sessionId={}, runId={}, epochId={}, contentRevision={}, "
+        log.info("agent.context.resolved: projectId={}, sessionId={}, runId={}, epochId={}, storyBibleRevision={}, "
                         + "routingMode={}, selectorUsed={}, semanticRetrieverAvailable={}, exactAliasCount={}, "
                         + "lexicalCandidateCount={}, selectedNodeCount={}, workingSetCandidateCount={}, "
                         + "workingSetPromotedCount={}, workingSetEvictedCount={}, selectorTokenUsage={}, "

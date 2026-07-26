@@ -221,10 +221,21 @@ export const useWorkbenchPageController = () => {
   const aiUndoOperations = ref<ChapterAiUndoOperation[]>([])
   const aiUndoBusyOperationId = ref('')
   const aiUndoBusyRunId = ref('')
+  const aiUndoDismissBusyOperationId = ref('')
+  const aiUndoDismissAllBusy = ref(false)
+  const aiUndoClock = ref(Date.now())
+  const availableAiUndoOperations = computed(() => aiUndoOperations.value
+    .filter((operation) => {
+      if (operation.status !== 'AVAILABLE') return false
+      if (!operation.expiresAt) return true
+      const expiresAt = Date.parse(operation.expiresAt)
+      return !Number.isFinite(expiresAt) || expiresAt > aiUndoClock.value
+    })
+    .sort((left, right) => right.sequenceNo - left.sequenceNo))
   const aiEditingCurrentChapter = computed(() => Boolean(activeChapter.value)
     && (aiEditingChapterId.value === activeChapter.value || chapterEditing.leaseOwnerType.value === 'AI'))
   const aiPreviewContent = computed(() => aiGeneratedContent.value || editorContent.value)
-  const currentChapterAiUndo = computed(() => aiUndoOperations.value.find(
+  const currentChapterAiUndo = computed(() => availableAiUndoOperations.value.find(
     (operation) => operation.chapterId === activeChapter.value && operation.status === 'AVAILABLE',
   ) || null)
   const chapterConflictPending = computed(() => chapterConflict.value?.chapterId === activeChapter.value)
@@ -402,11 +413,7 @@ export const useWorkbenchPageController = () => {
     const projectId = getCurrentProjectId()
     if (!projectId || !chapterId) return
     try {
-      const operations = await chapterApi.listAiUndo(projectId, chapterId)
-      aiUndoOperations.value = [
-        ...aiUndoOperations.value.filter((operation) => operation.chapterId !== chapterId),
-        ...operations,
-      ]
+      aiUndoOperations.value = await chapterApi.listProjectAiUndo(projectId)
     } catch {
       // Undo availability is supplemental; chapter editing remains usable when this lookup fails.
     }
@@ -478,6 +485,39 @@ export const useWorkbenchPageController = () => {
     }
   }
 
+  const dismissAiUndo = async (operationId: string) => {
+    const projectId = getCurrentProjectId()
+    if (!projectId || !operationId || aiUndoDismissBusyOperationId.value || aiUndoDismissAllBusy.value) return
+    aiUndoDismissBusyOperationId.value = operationId
+    try {
+      const result = await chapterApi.dismissAiUndo(projectId, [operationId])
+      const dismissedIds = new Set((result.operationIds || [operationId]).map(String))
+      aiUndoOperations.value = aiUndoOperations.value.filter((item) => !dismissedIds.has(item.operationId))
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '无法放弃这条撤回记录')
+      if (activeChapter.value) await refreshChapterAiUndo(activeChapter.value)
+    } finally {
+      aiUndoDismissBusyOperationId.value = ''
+    }
+  }
+
+  const dismissAllAiUndo = async () => {
+    const projectId = getCurrentProjectId()
+    const operationIds = availableAiUndoOperations.value.map((operation) => operation.operationId)
+    if (!projectId || !operationIds.length || aiUndoDismissAllBusy.value) return
+    aiUndoDismissAllBusy.value = true
+    try {
+      const result = await chapterApi.dismissAiUndo(projectId, operationIds)
+      const dismissedIds = new Set((result.operationIds || operationIds).map(String))
+      aiUndoOperations.value = aiUndoOperations.value.filter((item) => !dismissedIds.has(item.operationId))
+    } catch (error) {
+      message.warning(error instanceof Error ? error.message : '无法放弃全部撤回记录')
+      if (activeChapter.value) await refreshChapterAiUndo(activeChapter.value)
+    } finally {
+      aiUndoDismissAllBusy.value = false
+    }
+  }
+
   const sendMessage = async () => {
     if (activeChapter.value) {
       await saveContent()
@@ -527,11 +567,16 @@ export const useWorkbenchPageController = () => {
     }
   }
 
+  let undoExpiryTimerId: number | null = null
   onMounted(() => {
     window.addEventListener('resize', updateViewportWidth)
     window.addEventListener('online', updateConnectivity)
     window.addEventListener('offline', updateConnectivity)
     window.addEventListener('blur', handleWindowBlur)
+    undoExpiryTimerId = window.setInterval(() => {
+      aiUndoClock.value = Date.now()
+      if (activeChapter.value) void refreshChapterAiUndo(activeChapter.value)
+    }, 30_000)
     updateViewportWidth()
     updateConnectivity()
     void initializeWorkbench()
@@ -541,6 +586,7 @@ export const useWorkbenchPageController = () => {
     window.removeEventListener('online', updateConnectivity)
     window.removeEventListener('offline', updateConnectivity)
     window.removeEventListener('blur', handleWindowBlur)
+    if (undoExpiryTimerId !== null) window.clearInterval(undoExpiryTimerId)
     disposeChat()
     void saveContent().finally(() => chapterEditing.dispose())
   })
@@ -667,11 +713,15 @@ export const useWorkbenchPageController = () => {
     aiEditingCurrentChapter,
     aiPreviewContent,
     currentChapterAiUndo,
-    aiUndoOperations,
+    aiUndoOperations: availableAiUndoOperations,
     aiUndoBusyOperationId,
     aiUndoBusyRunId,
+    aiUndoDismissBusyOperationId,
+    aiUndoDismissAllBusy,
     undoAiEdit,
     undoAiRun,
+    dismissAiUndo,
+    dismissAllAiUndo,
     onEditorInput,
     updateCursorPos,
     editorUndo,

@@ -63,14 +63,14 @@ public class AgentRunDependencyValidator {
     private List<String> differences(AgentRunContextArtifactService.DependencyManifest expected,
                                      AgentRunContextArtifactService.DependencyManifest current) {
         List<String> changed = new ArrayList<>();
-        compare(changed, "storyBibleRevision", expected.storyBibleRevision(), current.storyBibleRevision());
-        compare(changed, "projectStructureRevision", expected.projectStructureRevision(), current.projectStructureRevision());
+        // Domain content is intentionally mutable during a Run. Mutation tools protect those
+        // resources with the revision/hash returned by their corresponding read/inspect tool.
         compare(changed, "activeChapterId", expected.activeChapterId(), current.activeChapterId());
-        compare(changed, "activeChapterContentRevision", expected.activeChapterContentRevision(), current.activeChapterContentRevision());
         compare(changed, "styleBindingRevision", expected.styleBindingRevision(), current.styleBindingRevision());
         compare(changed, "routingMode", expected.routingMode(), current.routingMode());
         compare(changed, "routerModelConfigId", expected.routerModelConfigId(), current.routerModelConfigId());
         compare(changed, "promptBundleHash", expected.promptBundleHash(), current.promptBundleHash());
+        compare(changed, "skillCatalogHash", expected.skillCatalogHash(), current.skillCatalogHash());
         compare(changed, "toolCatalogHash", expected.toolCatalogHash(), current.toolCatalogHash());
         return List.copyOf(changed);
     }

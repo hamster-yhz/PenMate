@@ -46,6 +46,8 @@ const props = withDefaults(defineProps<{
   aiUndoOperations?: ChapterAiUndoOperation[]
   aiUndoBusyOperationId?: string
   aiUndoBusyRunId?: string
+  aiUndoDismissBusyOperationId?: string
+  aiUndoDismissAllBusy?: boolean
 }>(), {
   focused: false, panelWidth: 440, currentModelName: '', generationStatusText: '', agentStatusDetailText: '',
   isGenerating: false, canCancelRun: false, isCancelling: false, canRetryRun: false, isRetrying: false,
@@ -56,6 +58,7 @@ const props = withDefaults(defineProps<{
   skillCatalog: () => [], activeSkills: () => [], skillCatalogLoading: false,
   activeChapterTitle: '', selectedText: '', showScrollToBottom: false,
   aiUndoOperations: () => [], aiUndoBusyOperationId: '', aiUndoBusyRunId: '',
+  aiUndoDismissBusyOperationId: '', aiUndoDismissAllBusy: false,
 })
 
 const emit = defineEmits<{
@@ -69,6 +72,7 @@ const emit = defineEmits<{
   'clear-selected-text': [];
   'scroll-to-bottom': [];
   'undo-ai': [operationId: string]; 'undo-ai-run': [runId: string];
+  'dismiss-ai-undo': [operationId: string]; 'dismiss-all-ai-undo': [];
 }>()
 
 const chatContainerRef = ref<HTMLElement | null>(null)
@@ -158,8 +162,12 @@ onUnmounted(() => stopResize?.())
         :operations="aiUndoOperations"
         :busy-operation-id="aiUndoBusyOperationId"
         :busy-run-id="aiUndoBusyRunId"
+        :dismiss-busy-operation-id="aiUndoDismissBusyOperationId"
+        :dismiss-all-busy="aiUndoDismissAllBusy"
         @undo="emit('undo-ai', $event)"
         @undo-run="emit('undo-ai-run', $event)"
+        @dismiss="emit('dismiss-ai-undo', $event)"
+        @dismiss-all="emit('dismiss-all-ai-undo')"
       />
       <ChatComposer
         :model-value="chatInput" :is-generating="isGenerating" :can-cancel-run="canCancelRun"

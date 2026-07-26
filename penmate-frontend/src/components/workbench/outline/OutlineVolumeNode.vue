@@ -1,5 +1,5 @@
 <template>
-  <div class="tree-node">
+  <div class="tree-node" @contextmenu.stop>
     <a-dropdown :trigger="['contextmenu']">
       <div
         class="tree-item volume"
@@ -31,7 +31,7 @@
       </div>
       <template #overlay>
         <a-menu @click="handleMenuClick">
-          <a-menu-item key="add"><FileAddOutlined />新建章节</a-menu-item>
+          <a-menu-item key="add"><FileAddOutlined />在本卷新建章节</a-menu-item>
           <a-menu-item key="rename"><EditOutlined />重命名</a-menu-item>
           <a-menu-item key="up"><ArrowUpOutlined />上移</a-menu-item>
           <a-menu-item key="down"><ArrowDownOutlined />下移</a-menu-item>
@@ -52,6 +52,7 @@
         @select-chapter="emit('select-chapter', $event)"
         @rename-node="emit('rename-node', $event)"
         @move-node="emit('move-node', $event)"
+        @add-chapter="emit('add-chapter', volume)"
         @delete-chapter="emit('delete-chapter', $event)"
       />
     </div>
