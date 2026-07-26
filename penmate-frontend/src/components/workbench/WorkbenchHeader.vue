@@ -56,6 +56,7 @@
           </a-menu>
         </template>
       </a-dropdown>
+      <ThemeToggleButton class="header-theme-toggle" />
       <a-dropdown placement="bottomRight" :trigger="['click']">
         <button type="button" class="user-button" aria-label="打开账户菜单">
           <span>{{ username.charAt(0).toUpperCase() }}</span>
@@ -90,6 +91,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons-vue'
 import type { WorkbenchLayoutPreset } from '@/features/workbench/workbenchLayout'
+import ThemeToggleButton from '@/components/app/ThemeToggleButton.vue'
 
 withDefaults(defineProps<{
   novelTitle: string
@@ -158,6 +160,7 @@ const handleUserMenu = ({ key }: { key: string | number }) => {
 .workspace-mode button + button { border-left: 1px solid var(--border-subtle); }
 .workspace-mode button.active { color: var(--accent); background: var(--accent-soft); font-weight: 650; }
 .header-actions { justify-content: flex-end; min-width: 0; gap: 9px; }
+.header-theme-toggle { width: 30px; height: 30px; }
 .layout-button { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; color: var(--text-secondary); background: transparent; border: 1px solid transparent; border-radius: var(--radius-md); cursor: pointer; }
 .layout-button:hover, .layout-button:focus-visible { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-border); outline: 0; }
 .save-hint { color: var(--text-muted); font-size: 11px; }

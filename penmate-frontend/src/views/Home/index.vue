@@ -9,6 +9,7 @@
         <nav class="nav-links" aria-label="首页导航">
           <a href="#workspace" data-testid="home-nav-link-workspace">工作台</a>
           <a href="#features" data-testid="home-nav-link-features">核心能力</a>
+          <ThemeToggleButton />
           <button type="button" data-testid="home-nav-enter" @click="goToLogin">登录</button>
         </nav>
       </div>
@@ -31,6 +32,7 @@ import HomeFeatures from '@/components/home/HomeFeatures.vue'
 import HomeFooter from '@/components/home/HomeFooter.vue'
 import HomeHero from '@/components/home/HomeHero.vue'
 import HomePreview from '@/components/home/HomePreview.vue'
+import ThemeToggleButton from '@/components/app/ThemeToggleButton.vue'
 import workbenchPreview from '@/assets/images/workbench-preview.webp'
 
 const router = useRouter()
@@ -43,11 +45,11 @@ const goToLogin = () => router.push('/login')
 .nav-inner { display: flex; width: min(1180px, calc(100% - 40px)); height: 100%; align-items: center; justify-content: space-between; margin: 0 auto; }
 .home-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text-primary); font-size: 15px; font-weight: 750; text-decoration: none; }
 .brand-mark { display: grid; width: 30px; height: 30px; place-items: center; color: var(--text-inverse); background: var(--accent); border-radius: var(--radius-md); font-size: 14px; }
-.nav-links { display: flex; align-items: center; gap: 24px; }
+.nav-links { display: flex; align-items: center; gap: 18px; }
 .nav-links a { color: var(--text-secondary); font-size: 13px; text-decoration: none; }
 .nav-links a:hover, .nav-links a:focus-visible { color: var(--accent); outline: 0; }
-.nav-links button { min-height: 34px; padding: 0 15px; color: var(--text-inverse); background: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-md); cursor: pointer; font-size: 13px; font-weight: 650; }
-.nav-links button:hover, .nav-links button:focus-visible { background: var(--accent-hover); outline: 2px solid var(--accent-border); outline-offset: 2px; }
+.nav-links [data-testid="home-nav-enter"] { min-height: 34px; padding: 0 15px; color: var(--text-inverse); background: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-md); cursor: pointer; font-size: 13px; font-weight: 650; }
+.nav-links [data-testid="home-nav-enter"]:hover, .nav-links [data-testid="home-nav-enter"]:focus-visible { background: var(--accent-hover); outline: 2px solid var(--accent-border); outline-offset: 2px; }
 @media (max-width: 640px) {
   .nav-inner { width: calc(100% - 24px); }
   .nav-links { gap: 12px; }

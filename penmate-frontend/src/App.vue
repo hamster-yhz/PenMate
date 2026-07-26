@@ -5,13 +5,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { ConfigProvider, theme } from 'ant-design-vue'
 import { useAppearance } from '@/composables/useAppearance'
 import { loadUserUiPreferences } from '@/composables/useUserUiPreferences'
 import { getSession } from '@/stores/session'
 
 const { isDark } = useAppearance()
+const session = getSession()
 const antTheme = computed(() => ({
   algorithm: isDark.value ? theme.darkAlgorithm : theme.defaultAlgorithm,
   token: {
@@ -23,9 +24,13 @@ const antTheme = computed(() => ({
   },
 }))
 
-onMounted(() => {
-  if (getSession().userId) void loadUserUiPreferences().catch(() => undefined)
-})
+watch(
+  [() => session.userId, () => session.accessToken],
+  ([userId, accessToken]) => {
+    if (userId && accessToken) void loadUserUiPreferences().catch(() => undefined)
+  },
+  { immediate: true },
+)
 </script>
 
 <style>
