@@ -38,11 +38,15 @@ export const useLoginSubmit = () => {
       const uid = String(profile.userId ?? profile.id ?? profile.uid ?? '').trim()
       const email = String(profile.email ?? profile.userEmail ?? username)
       const name = String(profile.displayName ?? profile.username ?? profile.name ?? '创作者')
+      const permissionCodes = (profile.permissions || [])
+        .map((permission) => String(permission.code || '').trim())
+        .filter(Boolean)
 
       setSession({
         userId: uid || undefined,
         userEmail: email,
         userName: name,
+        permissionCodes,
       })
 
       return { success: true } satisfies LoginSubmitResult

@@ -93,6 +93,8 @@ const pickerOptions = computed<ModelPickerOption[]>(() =>
     providerName: option.providerName,
     type: option.modelType === 'EMBEDDING' ? 'EMBEDDING' : 'CHAT',
     official: option.scopeType === 'SYSTEM' || option.keySourceType === 'OFFICIAL_KEY',
+    usable: option.usable,
+    unavailableReason: option.unavailableReason,
   })),
 )
 const chatOptions = computed(() => pickerOptions.value.filter((option) => option.type === 'CHAT'))

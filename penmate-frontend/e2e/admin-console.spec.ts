@@ -83,36 +83,62 @@ const mockAdminApi = async (page: Page) => {
 }
 
 test('administrator workspace integrates RBAC and official model management', async ({ page }, testInfo) => {
+  const isMobile = testInfo.project.name.includes('mobile')
   await mockAdminApi(page)
   await page.goto('/admin/rbac')
 
   await expect(page.getByRole('heading', { level: 1, name: '角色与权限' })).toBeVisible()
-  await expect(page.getByText('权限接口已接入')).toBeVisible()
-  if (testInfo.project.name.includes('mobile')) {
+  if (isMobile) {
+    await expect(page.getByText('身份与权限接口已接入')).toBeHidden()
     await expect(page.getByText('请使用桌面端管理角色与权限')).toBeVisible()
-    await expect(page.getByTestId('rbac-tab-users')).toBeHidden()
+    await expect(page.getByTestId('rbac-role-workspace')).toBeHidden()
   } else {
-    await expect(page.getByTestId('rbac-tab-users')).toBeVisible()
-    await page.getByTestId('rbac-tab-roles').click()
+    await expect(page.getByText('身份与权限接口已接入')).toBeVisible()
+    await expect(page.getByTestId('rbac-role-workspace')).toBeVisible()
     await expect(page.getByRole('heading', { level: 3, name: '权限分配' })).toBeVisible()
-    await expect(page.getByText('权限与角色')).toBeVisible()
-    await expect(page.getByText('作品管理')).toBeVisible()
+    await expect(page.locator('.permission-group > header strong', { hasText: '权限与角色' })).toBeVisible()
+    await expect(page.locator('.permission-group > header strong', { hasText: '作品管理' })).toBeVisible()
     await expect(page.getByTestId('rbac-permission-search')).toBeVisible()
     const permissionWidth = await page.getByTestId('rbac-permission-search').evaluate((element) =>
       element.getBoundingClientRect().width,
     )
-    expect(permissionWidth).toBeGreaterThan(700)
+    expect(permissionWidth).toBeGreaterThan(550)
+
+    const adminMain = page.locator('.admin-main')
+    const sidebarTop = await page.locator('.admin-sidebar').evaluate((element) => element.getBoundingClientRect().top)
+    await adminMain.evaluate((element) => { element.scrollTop = element.scrollHeight })
+    await expect.poll(() => adminMain.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    expect(await page.locator('.admin-sidebar').evaluate((element) => element.getBoundingClientRect().top)).toBe(sidebarTop)
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+    await adminMain.evaluate((element) => { element.scrollTop = 0 })
+    await expect.poll(() => adminMain.evaluate((element) => element.scrollTop)).toBe(0)
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('admin-rbac.png'), fullPage: true })
 
+  await page.getByRole('button', { name: '用户管理' }).click()
+  await expect(page).toHaveURL(/\/admin\/users$/)
+  await expect(page.getByRole('heading', { level: 1, name: '用户管理' })).toBeVisible()
+  if (isMobile) {
+    await expect(page.getByText('请使用桌面端管理用户')).toBeVisible()
+    await expect(page.getByTestId('rbac-user-workspace')).toBeHidden()
+  } else {
+    await expect(page.getByTestId('rbac-user-workspace')).toBeVisible()
+    await expect(page.getByRole('table', { name: '用户列表' })).toBeVisible()
+    await expect(page.getByTestId('rbac-active-user-name')).toContainText('系统管理员')
+    await expect(page.locator('.admin-main')).toHaveJSProperty('scrollTop', 0)
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('admin-users.png'), fullPage: true })
+
   await page.getByRole('button', { name: '官方模型' }).click()
   await expect(page).toHaveURL(/\/admin\/models$/)
-  await expect(page.getByText('模型接口已接入')).toBeVisible()
+  if (isMobile) await expect(page.getByText('模型接口已接入')).toBeHidden()
+  else await expect(page.getByText('模型接口已接入')).toBeVisible()
   await expect(page.getByRole('table', { name: '官方模型列表' })).toBeVisible()
   await expect(page.getByText('官方长篇创作')).toBeVisible()
   await page.getByRole('button', { name: '测试连接：官方长篇创作' }).click()
-  if (testInfo.project.name.includes('mobile')) await expect(page.getByText('连接成功，86 ms')).toBeVisible()
+  if (isMobile) await expect(page.getByText('连接成功，86 ms')).toBeVisible()
   else await expect(page.getByText('成功 · 86 ms')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('admin-models.png'), fullPage: true })

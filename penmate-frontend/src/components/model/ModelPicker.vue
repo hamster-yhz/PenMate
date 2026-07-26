@@ -20,6 +20,7 @@
           <span v-if="selectedOption?.official" class="official-badge">
             <SafetyCertificateOutlined />官方
           </span>
+          <span v-if="selectedOption?.usable === false" class="locked-badge"><LockOutlined />不可用</span>
         </span>
         <small v-if="selectedOption">{{ optionMeta(selectedOption) }}</small>
         <small v-else>选择一个可用模型</small>
@@ -73,9 +74,11 @@
                 :key="option.id"
                 type="button"
                 class="model-picker-option"
-                :class="{ selected: option.id === modelValue }"
+                :class="{ selected: option.id === modelValue, unavailable: option.usable === false }"
                 :data-model-id="option.id"
-                @click="select(option.id)"
+                :disabled="option.usable === false"
+                :title="option.usable === false ? unavailableLabel(option) : undefined"
+                @click="select(option)"
               >
                 <span class="model-option-icon" aria-hidden="true">
                   <DatabaseOutlined v-if="option.type === 'EMBEDDING'" />
@@ -88,9 +91,10 @@
                       <SafetyCertificateOutlined />官方
                     </span>
                   </span>
-                  <small>{{ optionMeta(option) }}</small>
+                  <small>{{ option.usable === false ? unavailableLabel(option) : optionMeta(option) }}</small>
                 </span>
                 <CheckOutlined v-if="option.id === modelValue" class="model-option-check" />
+                <LockOutlined v-else-if="option.usable === false" class="model-option-lock" />
               </button>
             </div>
           </section>
@@ -118,6 +122,7 @@ import {
   RobotOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  LockOutlined,
 } from '@ant-design/icons-vue'
 import { useDialogFocus } from '@/composables/useDialogFocus'
 
@@ -128,6 +133,8 @@ export interface ModelPickerOption {
   providerName?: string
   type: 'CHAT' | 'EMBEDDING'
   official: boolean
+  usable?: boolean
+  unavailableReason?: string | null
 }
 
 const props = withDefaults(
@@ -167,6 +174,10 @@ const groups = computed(() =>
 
 const optionMeta = (option: ModelPickerOption) =>
   [option.providerName, option.modelName].filter(Boolean).join(' · ')
+const unavailableLabel = (option: ModelPickerOption) =>
+  option.unavailableReason === 'OFFICIAL_MODEL_PERMISSION_REQUIRED'
+    ? '需要管理员授予官方模型使用权限'
+    : '当前账号没有使用此模型的权限'
 const openPicker = () => {
   if (!props.disabled) open.value = true
 }
@@ -174,8 +185,9 @@ const closePicker = () => {
   open.value = false
   query.value = ''
 }
-const select = (value: string | null) => {
-  emit('update:modelValue', value)
+const select = (option: ModelPickerOption | null) => {
+  if (option?.usable === false) return
+  emit('update:modelValue', option?.id ?? null)
   closePicker()
 }
 
@@ -196,6 +208,7 @@ useDialogFocus({ open: () => open.value, dialog, close: closePicker })
 .model-picker-trigger-copy small, .model-option-copy small, .model-picker-description { overflow: hidden; color: var(--text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .model-picker-chevron { justify-self: end; color: var(--text-muted); font-size: 12px; }
 .official-badge { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; padding: 2px 5px; color: var(--warning); background: var(--warning-soft); border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent); border-radius: 4px; font-size: 10px; font-weight: 650; line-height: 1.2; }
+.locked-badge { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; padding: 2px 5px; color: var(--text-muted); background: var(--bg-muted); border-radius: 4px; font-size: 10px; }
 
 .model-picker-layer { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: var(--overlay); }
 .model-picker-dialog { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; width: min(590px, 100%); max-height: min(680px, calc(100vh - 40px)); overflow: hidden; color: var(--text-primary); background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 8px; box-shadow: var(--shadow-md); }
@@ -216,9 +229,12 @@ useDialogFocus({ open: () => open.value, dialog, close: closePicker })
 .model-picker-option { display: grid; grid-template-columns: 34px minmax(0, 1fr) 20px; width: 100%; min-height: 60px; align-items: center; gap: 10px; padding: 8px 10px; color: var(--text-primary); background: transparent; border: 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer; text-align: left; }
 .model-picker-option:last-child { border-bottom: 0; }
 .model-picker-option:hover { background: var(--bg-subtle); }
+.model-picker-option.unavailable { cursor: not-allowed; background: var(--bg-subtle); opacity: .66; }
+.model-picker-option.unavailable:hover { background: var(--bg-subtle); }
 .model-picker-option.selected { background: var(--accent-soft); }
 .model-picker-option.selected .model-option-icon { color: var(--text-inverse); background: var(--accent); }
 .model-option-check { justify-self: end; color: var(--accent); }
+.model-option-lock { justify-self: end; color: var(--text-muted); }
 .model-picker-empty { display: grid; min-height: 190px; place-items: center; align-content: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
 .model-picker-dialog > footer { display: flex; min-height: 56px; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 14px; background: var(--bg-surface); border-top: 1px solid var(--border-subtle); }
 .model-picker-dialog > footer button { min-height: 34px; padding: 0 11px; color: var(--text-secondary); background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: 4px; cursor: pointer; }

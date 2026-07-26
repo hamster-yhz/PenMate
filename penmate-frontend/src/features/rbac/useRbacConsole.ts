@@ -15,7 +15,7 @@ import {
   type RbacWorkspaceKey,
 } from './rbacModel'
 
-const USER_PAGE_SIZE = 2
+const USER_PAGE_SIZE = 8
 
 export const useRbacConsole = () => {
   const router = useRouter()
@@ -36,7 +36,7 @@ export const useRbacConsole = () => {
   const errorMessage = ref('')
   const loading = ref(false)
   const loadFailed = ref(false)
-  const createUserForm = ref({ email: '', displayName: '', authMethod: 'local' })
+  const createUserForm = ref({ email: '', displayName: '', initialPassword: '', confirmPassword: '' })
   const userDetailForm = ref({ displayName: '', status: 1 })
   const assignRoleForm = ref({ roleId: '' })
   const assignPermissionForm = ref({ permissionId: '' })
@@ -84,8 +84,7 @@ export const useRbacConsole = () => {
         const matchesKeyword =
           !keyword ||
           user.displayName.toLowerCase().includes(keyword) ||
-          user.email.toLowerCase().includes(keyword) ||
-          (user.authMethod || 'local').toLowerCase().includes(keyword)
+          user.email.toLowerCase().includes(keyword)
         const matchesStatus = userStatusFilter.value === 'all' || String(user.status) === userStatusFilter.value
         return matchesKeyword && matchesStatus
       })
@@ -268,14 +267,22 @@ export const useRbacConsole = () => {
 
   const createUser = async () => {
     errorMessage.value = ''
+    if (createUserForm.value.initialPassword.length < 8) {
+      errorMessage.value = '初始密码至少需要 8 个字符'
+      return
+    }
+    if (createUserForm.value.initialPassword !== createUserForm.value.confirmPassword) {
+      errorMessage.value = '两次输入的密码不一致'
+      return
+    }
     try {
       const createdUser = await rbacApi.createUser({
         email: createUserForm.value.email,
         displayName: createUserForm.value.displayName,
         status: 1,
-        authMethod: createUserForm.value.authMethod || 'local',
+        initialPassword: createUserForm.value.initialPassword,
       })
-      createUserForm.value = { email: '', displayName: '', authMethod: 'local' }
+      createUserForm.value = { email: '', displayName: '', initialPassword: '', confirmPassword: '' }
       createUserExpanded.value = false
       await loadPage()
       const createdUserId = toBusinessId(createdUser?.userId)

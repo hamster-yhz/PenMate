@@ -20,6 +20,13 @@ vi.mock('@/components/admin/AdminOfficialModels.vue', () => ({
   default: { template: '<section data-testid="official-models">official models</section>' },
 }))
 
+vi.mock('@/views/AdminRbac/index.vue', () => ({
+  default: {
+    props: ['workspace'],
+    template: '<section data-testid="admin-rbac-workspace" :data-workspace="workspace"></section>',
+  },
+}))
+
 import AdminView from './index.vue'
 
 describe('Admin sections', () => {
@@ -28,7 +35,7 @@ describe('Admin sections', () => {
     pushMock.mockReset()
   })
 
-  it.each(['overview', 'users', 'tasks', 'audit'])(
+  it.each(['overview', 'tasks', 'audit'])(
     'does not initialize RBAC requests while rendering the %s placeholder',
     (section) => {
       routeState.meta = { adminSection: section }
@@ -40,6 +47,18 @@ describe('Admin sections', () => {
       wrapper.unmount()
     },
   )
+
+  it.each(['users', 'rbac'])('renders the connected %s identity workspace', (section) => {
+    routeState.meta = { adminSection: section }
+
+    const wrapper = mount(AdminView)
+
+    expect(wrapper.find('.integration-state.connected').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="admin-rbac-workspace"]').attributes('data-workspace')).toBe(
+      section === 'users' ? 'users' : 'roles',
+    )
+    wrapper.unmount()
+  })
 
   it('marks official models as integrated without initializing RBAC requests', () => {
     routeState.meta = { adminSection: 'models' }

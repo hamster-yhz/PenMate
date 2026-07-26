@@ -17,6 +17,8 @@ export interface ModelOption {
   type: 'CHAT' | 'EMBEDDING'
   scope: 'SYSTEM' | 'USER'
   providerName?: string
+  usable?: boolean
+  unavailableReason?: string | null
 }
 
 export interface ProjectGeneralSettings {
@@ -151,6 +153,8 @@ export const useProjectSettings = (projectId: string) => {
           type: modelType,
           scope: text(item.scopeType).toUpperCase() === 'SYSTEM' ? 'SYSTEM' : 'USER',
           providerName: text(item.providerName || item.providerCode),
+          usable: item.usable !== false,
+          unavailableReason: text(item.unavailableReason) || null,
         }
       })
       .filter((item): item is ModelOption => item !== null)

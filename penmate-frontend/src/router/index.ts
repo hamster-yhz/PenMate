@@ -27,6 +27,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Profile/index.vue'),
   },
   {
+    path: '/restricted',
+    name: 'RestrictedAccount',
+    meta: { requiresAuth: true },
+    component: () => import('@/views/RestrictedAccount/index.vue'),
+  },
+  {
     path: '/projects/:projectId/settings',
     name: 'ProjectSettings',
     meta: { requiresAuth: true },
@@ -87,6 +93,9 @@ const restoreSessionFromCookie = () => {
         userId: String(profile.userId ?? profile.id ?? '').trim() || undefined,
         userEmail: String(profile.email ?? '').trim() || undefined,
         userName: String(profile.displayName ?? profile.username ?? profile.name ?? '').trim() || undefined,
+        permissionCodes: (profile.permissions || [])
+          .map((permission) => String(permission.code || '').trim())
+          .filter(Boolean),
       })
       return true
     } catch {
@@ -107,6 +116,14 @@ router.beforeEach(async (to) => {
       return { path: '/login', query: { redirect: to.fullPath } }
     }
   }
+
+  const permissions = getSession().permissionCodes
+  const authorizationKnown = Array.isArray(permissions)
+  const canAccessApp = permissions?.includes('app:access') === true
+  if (authorizationKnown && !canAccessApp && !['/profile', '/restricted'].includes(to.path)) {
+    return '/restricted'
+  }
+  if (authorizationKnown && canAccessApp && to.path === '/restricted') return '/mybooks'
 
   if (!to.path.startsWith('/admin')) return true
 

@@ -50,4 +50,28 @@ describe('ModelPicker', () => {
     await wrapper.get('.model-picker-clear').trigger('click')
     expect(wrapper.emitted('update:modelValue')).toEqual([[null]])
   })
+
+  it('keeps unavailable official models visible but prevents selecting them', async () => {
+    const restrictedOptions: ModelPickerOption[] = [
+      {
+        ...options[0],
+        usable: false,
+        unavailableReason: 'OFFICIAL_MODEL_PERMISSION_REQUIRED',
+      },
+      options[1],
+    ]
+    const wrapper = mount(ModelPicker, {
+      props: { modelValue: 'personal-1', label: 'Model', options: restrictedOptions },
+      global: { stubs: { teleport: true } },
+    })
+
+    await wrapper.get('.model-picker-trigger').trigger('click')
+
+    const officialOption = wrapper.get('[data-model-id="official-1"]')
+    expect(officialOption.attributes('disabled')).toBeDefined()
+    expect(officialOption.find('.model-option-lock').exists()).toBe(true)
+    await officialOption.trigger('click')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.find('[data-model-id="official-1"]').exists()).toBe(true)
+  })
 })

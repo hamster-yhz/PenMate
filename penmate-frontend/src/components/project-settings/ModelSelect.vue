@@ -29,6 +29,8 @@ const pickerOptions = computed<ModelPickerOption[]>(() =>
     providerName: option.providerName,
     type: option.type,
     official: option.scope === 'SYSTEM',
+    usable: option.usable,
+    unavailableReason: option.unavailableReason,
   })),
 )
 </script>

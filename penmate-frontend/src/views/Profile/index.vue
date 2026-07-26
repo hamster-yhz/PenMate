@@ -1,6 +1,6 @@
 <template>
   <div class="app-page profile-page">
-    <AppTopbar context-title="个人设置" back-to="/mybooks" back-label="返回书架" />
+    <AppTopbar context-title="个人设置" :show-admin="canAccessAdmin" />
 
     <div class="profile-layout">
       <aside class="settings-nav">
@@ -101,14 +101,14 @@
         </section>
 
         <section v-else class="section-content">
-          <div class="settings-surface">
+          <div v-if="hasAppAccess" class="settings-surface">
             <header><h2>作品数据</h2><p>管理已删除作品，或前往作品设置导出整本正文。</p></header>
             <div class="setting-line">
               <span><strong>回收站</strong><small>恢复 30 天内删除的作品，或永久清理作品数据。</small></span>
               <button type="button" @click="router.push('/mybooks?view=trash')">打开回收站</button>
             </div>
             <div class="setting-line">
-              <span><strong>导出作品</strong><small>TXT 和 DOCX 导出位于每部作品的设置页面。</small></span>
+              <span><strong>导出作品</strong><small>TXT、Markdown、DOCX 和 EPUB 导出位于每部作品的设置页面。</small></span>
               <button type="button" @click="router.push('/mybooks')">前往书架</button>
             </div>
           </div>
@@ -148,12 +148,15 @@ import { useProfileSettings } from '@/composables/profile/useProfileSettings'
 import { useProfileSessions } from '@/composables/profile/useProfileSessions'
 import { useAuthorProfileSettings } from '@/composables/profile/useAuthorProfileSettings'
 import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
+import { useAdminAccess } from '@/composables/useAdminAccess'
+import { getSession } from '@/stores/session'
 
 const router = useRouter()
 const route = useRoute()
+const { canAccessAdmin, loadAdminAccess } = useAdminAccess()
 const requestedSection = typeof route.query.section === 'string' ? route.query.section : 'profile'
-const activeSection = ref(['profile', 'appearance', 'author', 'models', 'agent', 'security', 'data'].includes(requestedSection) ? requestedSection : 'profile')
-const sections = [
+const hasAppAccess = computed(() => getSession().permissionCodes?.includes('app:access') !== false)
+const allSections = [
   { key: 'profile', label: '个人资料', icon: UserOutlined },
   { key: 'appearance', label: '外观与编辑器', icon: BgColorsOutlined },
   { key: 'author', label: '作者偏好', icon: EditOutlined },
@@ -162,7 +165,11 @@ const sections = [
   { key: 'security', label: '安全', icon: SafetyCertificateOutlined },
   { key: 'data', label: '数据与账户', icon: DatabaseOutlined },
 ]
-const currentSection = computed(() => sections.find((item) => item.key === activeSection.value) || sections[0])
+const sections = computed(() => hasAppAccess.value
+  ? allSections
+  : allSections.filter((item) => ['profile', 'appearance', 'security', 'data'].includes(item.key)))
+const activeSection = ref(sections.value.some((item) => item.key === requestedSection) ? requestedSection : 'profile')
+const currentSection = computed(() => sections.value.find((item) => item.key === activeSection.value) || sections.value[0])
 
 const {
   profile, saveProfile, saveEmail, savePassword,
@@ -211,7 +218,11 @@ const handleSaveModelPreferences = async () => {
   catch { modelPreferenceError.value = '保存默认模型失败' }
   finally { modelPreferenceSaving.value = false }
 }
-onMounted(() => { void Promise.allSettled([handleLoadProfile(), handleLoadModelPreferences()]) })
+onMounted(() => {
+  const tasks: Promise<unknown>[] = [handleLoadProfile()]
+  if (hasAppAccess.value) tasks.push(handleLoadModelPreferences(), loadAdminAccess())
+  void Promise.allSettled(tasks)
+})
 const handleCredentialChanged = async (kind: 'email' | 'password') => {
   message.success(kind === 'email' ? '登录邮箱已更新，请使用新邮箱重新登录' : '密码已更新，请重新登录')
   await router.replace('/login')

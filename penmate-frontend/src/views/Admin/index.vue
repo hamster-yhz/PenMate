@@ -24,33 +24,40 @@
           @click="router.push(item.path)"
         >
           <component :is="item.icon" />
-          <span v-if="!collapsed">{{ item.label }}</span>
+          <span v-if="!collapsed" class="admin-nav-label">{{ item.label }}</span>
         </button>
       </nav>
 
       <button type="button" class="back-button" aria-label="返回书架" title="返回书架" @click="router.push('/mybooks')">
         <ArrowLeftOutlined />
-        <span v-if="!collapsed">返回书架</span>
+        <span v-if="!collapsed" class="back-button-label">返回书架</span>
       </button>
     </aside>
 
-    <main class="admin-main">
+    <main ref="adminMain" class="admin-main">
       <header class="admin-header">
         <div>
           <p>管理员工作台</p>
           <h1>{{ currentNavigation.label }}</h1>
         </div>
-        <span v-if="section === 'rbac'" class="integration-state connected"><SafetyCertificateOutlined />权限接口已接入</span>
-        <span v-else-if="section === 'models'" class="integration-state connected"><ApiOutlined />模型接口已接入</span>
-        <span v-else class="integration-state"><DisconnectOutlined />后端接口暂未接入</span>
+        <div class="admin-header-actions">
+          <span v-if="section === 'rbac' || section === 'users'" class="integration-state connected"><SafetyCertificateOutlined />身份与权限接口已接入</span>
+          <span v-else-if="section === 'models'" class="integration-state connected"><ApiOutlined />模型接口已接入</span>
+          <span v-else class="integration-state"><DisconnectOutlined />后端接口暂未接入</span>
+          <ThemeToggleButton />
+        </div>
       </header>
 
-      <section v-if="section === 'rbac'" class="admin-mobile-boundary" role="status">
+      <section v-if="section === 'rbac' || section === 'users'" class="admin-mobile-boundary" role="status">
         <SafetyCertificateOutlined />
-        <strong>请使用桌面端管理角色与权限</strong>
-        <span>权限批量分配需要更大的操作空间，移动端暂不提供编辑。</span>
+        <strong>请使用桌面端管理{{ section === 'users' ? '用户' : '角色与权限' }}</strong>
+        <span>身份与授权管理需要完整展示目录、详情和变更影响，移动端暂不提供编辑。</span>
       </section>
-      <AdminRbac v-if="section === 'rbac'" class="admin-rbac-desktop" />
+      <AdminRbac
+        v-if="section === 'rbac' || section === 'users'"
+        class="admin-rbac-desktop"
+        :workspace="section === 'users' ? 'users' : 'roles'"
+      />
 
       <template v-else>
         <section v-if="section === 'overview'" class="admin-content overview-content">
@@ -85,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AlertOutlined,
@@ -104,10 +111,12 @@ import {
 } from '@ant-design/icons-vue'
 import AdminRbac from '@/views/AdminRbac/index.vue'
 import AdminOfficialModels from '@/components/admin/AdminOfficialModels.vue'
+import ThemeToggleButton from '@/components/app/ThemeToggleButton.vue'
 
 const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
+const adminMain = ref<HTMLElement | null>(null)
 
 const navigation = [
   { key: 'overview', label: '总览', path: '/admin', icon: ClusterOutlined, description: '运行治理与异常处置。' },
@@ -120,6 +129,10 @@ const navigation = [
 
 const section = computed(() => String(route.meta.adminSection || 'overview'))
 const currentNavigation = computed(() => navigation.find((item) => item.key === section.value) || navigation[0])
+watch(section, async () => {
+  await nextTick()
+  if (adminMain.value) adminMain.value.scrollTop = 0
+})
 const overviewRows = [
   { title: '失败的 Agent Run', description: '定位执行失败、模型错误与未完成任务。', icon: AlertOutlined },
   { title: '阻塞的后台任务', description: '处理长时间未推进的索引与清理任务。', icon: ToolOutlined },
@@ -129,8 +142,8 @@ const overviewRows = [
 </script>
 
 <style scoped>
-.admin-page { display: flex; min-height: 100vh; color: var(--text-primary); background: var(--bg-primary); }
-.admin-sidebar { position: sticky; top: 0; display: flex; width: 232px; height: 100vh; flex: 0 0 auto; flex-direction: column; padding: 14px 10px; color: #eef1f4; background: #20262b; border-right: 1px solid #343c42; transition: width 160ms ease; }
+.admin-page { display: flex; height: 100vh; height: 100dvh; overflow: hidden; color: var(--text-primary); background: var(--bg-primary); }
+.admin-sidebar { display: flex; width: 232px; height: 100%; flex: 0 0 auto; flex-direction: column; overflow-y: auto; padding: 14px 10px; color: #eef1f4; background: #20262b; border-right: 1px solid #343c42; transition: width 160ms ease; }
 .admin-sidebar.collapsed { width: 68px; }
 .admin-brand { display: flex; min-height: 48px; align-items: center; gap: 10px; padding: 0 4px 14px; border-bottom: 1px solid #343c42; }
 .admin-mark { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; color: white; background: #a33b32; border: 0; border-radius: 5px; font-weight: 700; cursor: pointer; }
@@ -144,10 +157,11 @@ const overviewRows = [
 .admin-nav button.active { color: white; background: #3a444b; box-shadow: inset 3px 0 #cf5b4f; }
 .admin-nav button :deep(svg), .back-button :deep(svg) { flex: 0 0 auto; font-size: 16px; }
 .back-button { margin-top: auto; }
-.admin-main { min-width: 0; flex: 1; }
+.admin-main { min-width: 0; height: 100%; flex: 1; overflow-y: auto; overscroll-behavior-y: contain; }
 .admin-header { display: flex; min-height: 78px; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 28px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); }
 .admin-header p { margin: 0 0 3px; color: var(--text-muted); font-size: 11px; }
 .admin-header h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+.admin-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .integration-state { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 12px; }
 .integration-state.connected { color: var(--accent); }
 .admin-content { width: min(1240px, calc(100% - 48px)); margin: 0 auto; padding: 26px 0 60px; }
@@ -176,42 +190,7 @@ const overviewRows = [
 .data-row { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr 0.8fr 0.9fr 32px; gap: 12px; min-height: 40px; align-items: center; padding: 0 13px; }
 .data-header { color: var(--text-muted); background: var(--bg-subtle); border-bottom: 1px solid var(--border-subtle); font-size: 11px; }
 .standalone { min-height: 320px; }
-.admin-main :deep(.admin-rbac-page) { min-height: 0; padding: 24px; color: var(--text-primary); background: transparent; }
-.admin-main :deep(.admin-rbac-page .rbac-header) { display: none; }
-.admin-main :deep(.admin-rbac-page .summary-grid),
-.admin-main :deep(.admin-rbac-page .workspace-tabs),
-.admin-main :deep(.admin-rbac-page .rbac-layout),
-.admin-main :deep(.admin-rbac-page .error-banner) { max-width: 1240px; }
-.admin-main :deep(.admin-rbac-page .summary-grid) { grid-template-columns: 1.5fr repeat(3, minmax(120px, 0.6fr)); gap: 8px; margin-bottom: 14px; }
-.admin-main :deep(.admin-rbac-page .summary-card),
-.admin-main :deep(.admin-rbac-page .panel) { color: var(--text-primary); background: var(--bg-surface); border-color: var(--border-subtle); border-radius: 5px; }
-.admin-main :deep(.admin-rbac-page .summary-card) { padding: 12px 14px; }
-.admin-main :deep(.admin-rbac-page .summary-card strong) { font-size: 18px; }
-.admin-main :deep(.admin-rbac-page .subtitle),
-.admin-main :deep(.admin-rbac-page .muted),
-.admin-main :deep(.admin-rbac-page .summary-label),
-.admin-main :deep(.admin-rbac-page .user-card span),
-.admin-main :deep(.admin-rbac-page .user-card small),
-.admin-main :deep(.admin-rbac-page .token-list span),
-.admin-main :deep(.admin-rbac-page .menu-list span) { color: var(--text-muted); }
-.admin-main :deep(.admin-rbac-page .workspace-tabs) { gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border-subtle); }
-.admin-main :deep(.admin-rbac-page .workspace-tab) { min-height: 36px; padding: 0 12px; color: var(--text-secondary); background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; }
-.admin-main :deep(.admin-rbac-page .workspace-tab.active) { color: var(--accent); background: transparent; border-bottom-color: var(--accent); }
-.admin-main :deep(.admin-rbac-page .rbac-layout) { grid-template-columns: minmax(290px, 360px) minmax(0, 1fr); gap: 12px; }
-.admin-main :deep(.admin-rbac-page .rbac-layout.rbac-layout-single) { grid-template-columns: minmax(0, 1fr); }
-.admin-main :deep(.admin-rbac-page .panel) { padding: 14px; }
-.admin-main :deep(.admin-rbac-page .panel-stack) { gap: 0; }
-.admin-main :deep(.admin-rbac-page .panel .sub-panel) { padding: 14px 0; color: var(--text-primary); background: transparent; border: 0; border-radius: 0; }
-.admin-main :deep(.admin-rbac-page .panel .sub-panel + .sub-panel) { border-top: 1px solid var(--border-subtle); }
-.admin-main :deep(.admin-rbac-page .field-input),
-.admin-main :deep(.admin-rbac-page .role-select-btn),
-.admin-main :deep(.admin-rbac-page .user-card),
-.admin-main :deep(.admin-rbac-page .token-list li),
-.admin-main :deep(.admin-rbac-page .menu-list li) { color: var(--text-primary); background: var(--bg-subtle); border-color: var(--border-subtle); border-radius: 4px; }
-.admin-main :deep(.admin-rbac-page .primary-btn) { color: var(--text-inverse); background: var(--accent); border-radius: 4px; }
-.admin-main :deep(.admin-rbac-page .ghost-btn) { color: var(--text-secondary); border-color: var(--border-strong); border-radius: 4px; }
-.admin-main :deep(.admin-rbac-page .user-card.active),
-.admin-main :deep(.admin-rbac-page .role-select-btn.active) { border-color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
 .admin-mobile-boundary { display: none; }
-@media (max-width: 760px) { .admin-sidebar { width: 58px; padding-inline: 7px; } .admin-sidebar:not(.collapsed) { width: 58px; } .admin-sidebar .admin-brand div, .admin-sidebar .admin-nav span, .admin-sidebar .back-button span, .collapse-button { display: none; } .admin-content { width: calc(100% - 28px); } .admin-header { align-items: flex-start; padding: 14px; } .integration-state { max-width: 130px; text-align: right; } .data-row { grid-template-columns: 1fr 1fr; } .data-row span:nth-child(n+3) { display: none; } .model-toolbar { flex-wrap: wrap; } .admin-rbac-desktop { display: none; } .admin-mobile-boundary { display: grid; width: calc(100% - 28px); min-height: 240px; place-items: center; align-content: center; gap: 9px; margin: 24px auto; padding: 24px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border-subtle); text-align: center; } .admin-mobile-boundary :deep(svg) { color: var(--accent); font-size: 26px; } .admin-mobile-boundary strong { color: var(--text-primary); font-size: 15px; } .admin-mobile-boundary span { max-width: 280px; font-size: 12px; line-height: 1.7; } }
+@media (max-width: 760px) { .admin-sidebar { width: 58px; padding-inline: 7px; } .admin-sidebar:not(.collapsed) { width: 58px; } .admin-sidebar .admin-brand div, .admin-sidebar .admin-nav-label, .admin-sidebar .back-button-label, .collapse-button { display: none; } .admin-content { width: calc(100% - 28px); } .admin-header { align-items: flex-start; padding: 14px; } .integration-state { max-width: 130px; text-align: right; } .data-row { grid-template-columns: 1fr 1fr; } .data-row span:nth-child(n+3) { display: none; } .model-toolbar { flex-wrap: wrap; } .admin-rbac-desktop { display: none; } .admin-mobile-boundary { display: grid; width: calc(100% - 28px); min-height: 240px; place-items: center; align-content: center; gap: 9px; margin: 24px auto; padding: 24px; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border-subtle); text-align: center; } .admin-mobile-boundary :deep(svg) { color: var(--accent); font-size: 26px; } .admin-mobile-boundary strong { color: var(--text-primary); font-size: 15px; } .admin-mobile-boundary span { max-width: 280px; font-size: 12px; line-height: 1.7; } }
+@media (max-width: 480px) { .integration-state { display: none; } }
 </style>

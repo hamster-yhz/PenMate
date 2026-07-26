@@ -4,8 +4,10 @@ export type RbacUser = {
   displayName: string
   status: number
   authMethod?: string
+  lastLoginAt?: string
   deletionRequestedAt?: string
   deletionDueAt?: string
+  rbacRevision?: number
 }
 
 export type RbacRole = {
@@ -14,6 +16,7 @@ export type RbacRole = {
   name: string
   description?: string
   isSystem?: boolean
+  rbacRevision?: number
 }
 
 export type RbacPermission = {
@@ -62,6 +65,8 @@ export const normalizeRbacUser = (value: unknown): RbacUser | null => {
     status,
     authMethod:
       typeof candidate.authMethod === 'string' && candidate.authMethod.trim() ? candidate.authMethod : undefined,
+    lastLoginAt:
+      typeof candidate.lastLoginAt === 'string' && candidate.lastLoginAt.trim() ? candidate.lastLoginAt : undefined,
     deletionRequestedAt:
       typeof candidate.deletionRequestedAt === 'string' && candidate.deletionRequestedAt.trim()
         ? candidate.deletionRequestedAt
@@ -70,6 +75,7 @@ export const normalizeRbacUser = (value: unknown): RbacUser | null => {
       typeof candidate.deletionDueAt === 'string' && candidate.deletionDueAt.trim()
         ? candidate.deletionDueAt
         : undefined,
+    rbacRevision: typeof candidate.rbacRevision === 'number' ? candidate.rbacRevision : undefined,
   }
 }
 
@@ -89,6 +95,7 @@ export const normalizeRbacRole = (value: unknown): RbacRole | null => {
     description:
       typeof candidate.description === 'string' && candidate.description.trim() ? candidate.description : undefined,
     isSystem: typeof candidate.isSystem === 'boolean' ? candidate.isSystem : undefined,
+    rbacRevision: typeof candidate.rbacRevision === 'number' ? candidate.rbacRevision : undefined,
   }
 }
 

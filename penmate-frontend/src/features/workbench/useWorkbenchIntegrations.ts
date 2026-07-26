@@ -16,7 +16,8 @@ const modelConfigId = (item: Record<string, unknown>) => {
 
 const isActiveChatModel = (item: Record<string, unknown>) =>
   String(item.modelType ?? '').trim().toUpperCase() === 'CHAT' &&
-  String(item.status ?? '').trim().toUpperCase() === 'ACTIVE'
+  String(item.status ?? '').trim().toUpperCase() === 'ACTIVE' &&
+  item.usable !== false
 
 const preferenceRecord = (payload: unknown): Record<string, unknown> => {
   if (!payload || typeof payload !== 'object') return {}

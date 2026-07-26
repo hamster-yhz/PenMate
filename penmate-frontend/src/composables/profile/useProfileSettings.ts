@@ -56,6 +56,8 @@ export interface ProfileModelConfigOption {
   providerName?: string
   keySourceType?: string
   scopeType?: 'SYSTEM' | 'USER'
+  usable?: boolean
+  unavailableReason?: string | null
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -291,6 +293,8 @@ export const useProfileSettings = () => {
           providerName: typeof item.providerName === 'string' ? item.providerName : undefined,
           keySourceType: typeof item.keySourceType === 'string' ? item.keySourceType : undefined,
           scopeType: item.scopeType === 'SYSTEM' ? 'SYSTEM' : 'USER',
+          usable: item.usable !== false,
+          unavailableReason: typeof item.unavailableReason === 'string' ? item.unavailableReason : null,
         })
       }
       modelConfigOptions.value = normalizedOptions

@@ -7,6 +7,7 @@
       <ArrowLeftOutlined />
       <span>返回首页</span>
     </button>
+    <ThemeToggleButton class="login-theme-toggle" />
 
     <div class="login-panel">
       <AuthCardShell>
@@ -30,6 +31,8 @@ import loginBg from '@/assets/images/login-bg.webp'
 import AuthCardShell from '@/components/auth/AuthCardShell.vue'
 import LoginForm, { type LoginFormSubmitPayload } from '@/components/auth/LoginForm.vue'
 import { useLoginSubmit } from '@/composables/auth/useLoginSubmit'
+import ThemeToggleButton from '@/components/app/ThemeToggleButton.vue'
+import { getSession } from '@/stores/session'
 
 const router = useRouter()
 const route = useRoute()
@@ -46,7 +49,7 @@ const handleLoginSubmit = async (payload: LoginFormSubmitPayload) => {
   }
   const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
     ? route.query.redirect
-    : '/mybooks'
+    : getSession().permissionCodes?.includes('app:access') ? '/mybooks' : '/restricted'
   await router.replace(redirect)
 }
 </script>
@@ -91,6 +94,16 @@ const handleLoginSubmit = async (payload: LoginFormSubmitPayload) => {
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-md);
   cursor: pointer;
+}
+
+.login-theme-toggle {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  z-index: 2;
+  color: #ffffff;
+  background: rgba(18, 24, 21, 0.56);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .login-panel {

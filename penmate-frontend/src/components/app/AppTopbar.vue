@@ -1,7 +1,7 @@
 <template>
   <header class="app-topbar" :class="{ 'has-search': searchable }">
     <div class="topbar-leading">
-      <button class="brand-button" type="button" aria-label="进入书架" @click="router.push('/mybooks')">
+      <button class="brand-button" type="button" aria-label="进入 PenMate" @click="router.push(defaultDestination)">
         <span class="brand-mark" aria-hidden="true">P</span>
         <span class="brand-name">PenMate</span>
       </button>
@@ -26,9 +26,7 @@
 
     <div class="topbar-actions">
       <slot name="actions"></slot>
-      <button class="icon-button" type="button" :title="isDark ? '切换到浅色主题' : '切换到深色主题'" @click="toggleTheme">
-        <BulbOutlined />
-      </button>
+      <ThemeToggleButton />
       <a-dropdown placement="bottomRight" :trigger="['click']">
         <button class="account-button" type="button" aria-label="打开账户菜单">
           <span class="account-avatar">{{ accountInitial }}</span>
@@ -37,7 +35,7 @@
         </button>
         <template #overlay>
           <a-menu class="account-menu" @click="handleMenuClick">
-            <a-menu-item key="books"><BookOutlined />书架</a-menu-item>
+            <a-menu-item v-if="canAccessWorkspace" key="books"><BookOutlined />书架</a-menu-item>
             <a-menu-item key="settings"><SettingOutlined />个人设置</a-menu-item>
             <a-menu-item v-if="showAdmin" key="admin"><SafetyCertificateOutlined />管理员工作台</a-menu-item>
             <a-menu-divider />
@@ -56,7 +54,6 @@ import { Dropdown as ADropdown, Menu as AMenu, MenuDivider as AMenuDivider, Menu
 import {
   BookOutlined,
   ArrowLeftOutlined,
-  BulbOutlined,
   DownOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
@@ -65,7 +62,7 @@ import {
 } from '@ant-design/icons-vue'
 import { getSession } from '@/stores/session'
 import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
-import { useAppearance } from '@/composables/useAppearance'
+import ThemeToggleButton from '@/components/app/ThemeToggleButton.vue'
 
 withDefaults(defineProps<{
   contextTitle?: string
@@ -91,9 +88,10 @@ defineEmits<{
 
 const router = useRouter()
 const session = getSession()
-const { isDark, toggleTheme } = useAppearance()
 const accountName = computed(() => session.userName || session.userEmail || '账户')
 const accountInitial = computed(() => accountName.value.trim().charAt(0).toUpperCase() || 'P')
+const canAccessWorkspace = computed(() => session.permissionCodes?.includes('app:access') !== false)
+const defaultDestination = computed(() => canAccessWorkspace.value ? '/mybooks' : '/restricted')
 
 const handleMenuClick = async ({ key }: { key: string | number }) => {
   if (key === 'books') await router.push('/mybooks')
@@ -141,8 +139,7 @@ const handleMenuClick = async ({ key }: { key: string | number }) => {
 
 .brand-button,
 .back-button,
-.account-button,
-.icon-button {
+.account-button {
   color: var(--text-primary);
   background: transparent;
   border: 0;
@@ -236,15 +233,6 @@ const handleMenuClick = async ({ key }: { key: string | number }) => {
   gap: 8px;
 }
 
-.icon-button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: var(--radius-md);
-}
-
-.icon-button:hover,
 .account-button:hover {
   background: var(--bg-subtle);
 }

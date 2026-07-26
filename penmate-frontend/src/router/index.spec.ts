@@ -50,12 +50,16 @@ vi.mock('@/views/Profile/index.vue', () => ({
   default: { template: '<div>profile</div>' },
 }))
 
+vi.mock('@/views/RestrictedAccount/index.vue', () => ({
+  default: { template: '<div>restricted</div>' },
+}))
+
 vi.mock('@/views/Workbench/index.vue', () => ({
   default: { template: '<div>workbench</div>' },
 }))
 
-vi.mock('@/views/AdminRbac/index.vue', () => ({
-  default: { template: '<div>admin-rbac</div>' },
+vi.mock('@/views/Admin/index.vue', () => ({
+  default: { template: '<div>admin</div>' },
 }))
 
 const loadRouter = async () => {
@@ -83,6 +87,16 @@ describe('router admin rbac guard', () => {
 
     expect(listProfileMenusMock).not.toHaveBeenCalled()
     expect(router.currentRoute.value.fullPath).toBe('/profile')
+  })
+
+  it('redirects an authenticated user with no permissions to the restricted account page', async () => {
+    getSessionMock.mockReturnValue({ userId: 1002, accessToken: 'atk', permissionCodes: [] })
+
+    const router = await loadRouter()
+    await router.push('/mybooks')
+
+    expect(listProfileMenusMock).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.fullPath).toBe('/restricted')
   })
 
   it('redirects_unauthenticated_users_to_login_when_entering_admin_rbac_route', async () => {

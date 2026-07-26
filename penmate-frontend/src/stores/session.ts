@@ -5,6 +5,7 @@ export interface SessionState {
   userId?: string
   userName?: string
   userEmail?: string
+  permissionCodes?: string[]
 }
 
 const SESSION_KEY = 'penmate.session'
@@ -23,6 +24,9 @@ const safeParse = (value: string | null): SessionState | null => {
       userId: parsed.userId,
       userName: parsed.userName,
       userEmail: parsed.userEmail,
+      permissionCodes: Array.isArray(parsed.permissionCodes)
+        ? parsed.permissionCodes.filter((item): item is string => typeof item === 'string')
+        : undefined,
     }
   } catch {
     return null
@@ -41,8 +45,8 @@ export const getSession = () => state
 
 export const setSession = (patch: Partial<SessionState>) => {
   Object.assign(state, patch)
-  const { userId, userName, userEmail } = state
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, userName, userEmail }))
+  const { userId, userName, userEmail, permissionCodes } = state
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, userName, userEmail, permissionCodes }))
   return state
 }
 
@@ -52,6 +56,7 @@ export const clearSession = () => {
     userId: undefined,
     userName: undefined,
     userEmail: undefined,
+    permissionCodes: undefined,
   })
   localStorage.removeItem(SESSION_KEY)
 }

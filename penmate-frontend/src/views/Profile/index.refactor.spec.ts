@@ -2,10 +2,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearSession, setSession } from '@/stores/session'
 import ProfileIndex from './index.vue'
+import AppTopbar from '@/components/app/AppTopbar.vue'
 
-const { pushMock, replaceMock, preferencesMock, configurationsMock, savePreferencesMock, listKeysMock, providersMock, meMock, listSessionsMock, revokeSessionMock } = vi.hoisted(() => ({
+const { pushMock, replaceMock, preferencesMock, configurationsMock, savePreferencesMock, listKeysMock, providersMock, meMock, listSessionsMock, revokeSessionMock, adminMenusMock } = vi.hoisted(() => ({
   pushMock: vi.fn(), replaceMock: vi.fn(), preferencesMock: vi.fn(), configurationsMock: vi.fn(),
-  savePreferencesMock: vi.fn(), listKeysMock: vi.fn(), providersMock: vi.fn(), meMock: vi.fn(), listSessionsMock: vi.fn(), revokeSessionMock: vi.fn(),
+  savePreferencesMock: vi.fn(), listKeysMock: vi.fn(), providersMock: vi.fn(), meMock: vi.fn(), listSessionsMock: vi.fn(), revokeSessionMock: vi.fn(), adminMenusMock: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -24,6 +25,9 @@ vi.mock('@/api/modules/novel.api', async () => {
   const actual = await vi.importActual<typeof import('@/api/modules/novel.api')>('@/api/modules/novel.api')
   return { ...actual, novelApi: { ...actual.novelApi, listProjects: vi.fn().mockResolvedValue([]) } }
 })
+vi.mock('@/api/modules/rbac.api', () => ({
+  rbacApi: { listProfileMenus: adminMenusMock },
+}))
 
 describe('Profile settings architecture', () => {
   beforeEach(() => {
@@ -42,6 +46,7 @@ describe('Profile settings architecture', () => {
     savePreferencesMock.mockResolvedValue({})
     listSessionsMock.mockResolvedValue([])
     revokeSessionMock.mockResolvedValue('ok')
+    adminMenusMock.mockResolvedValue([{ path: '/admin' }])
   })
 
   it('uses six focused settings sections instead of one long page', async () => {
@@ -49,6 +54,8 @@ describe('Profile settings architecture', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="profile-hero-card"]').exists()).toBe(true)
+    expect(wrapper.find('.back-button').exists()).toBe(false)
+    expect(wrapper.findComponent(AppTopbar).props('showAdmin')).toBe(true)
     expect(wrapper.text()).toContain('外观与编辑器')
     expect(wrapper.text()).toContain('默认模型与 Agent')
 
