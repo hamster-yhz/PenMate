@@ -2,6 +2,9 @@ package com.penmate.backend.interfaces.api.model;
 
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.model.ModelApplicationService;
+import com.penmate.backend.application.model.ModelCatalogDiscoveryService;
+import com.penmate.backend.application.iam.CapabilityAuthorizationService;
+import com.penmate.backend.application.iam.IamPermissionCodes;
 import com.penmate.backend.application.model.ModelConnectionTestService;
 import com.penmate.backend.application.model.command.ModelCommands;
 import com.penmate.backend.application.ratelimit.RateLimitAction;
@@ -11,6 +14,7 @@ import com.penmate.backend.domain.model.model.ModelProviderCapability;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
 import com.penmate.backend.interfaces.api.model.dto.CreateModelConfigurationDto;
+import com.penmate.backend.interfaces.api.model.dto.DiscoverModelsDto;
 import com.penmate.backend.interfaces.api.model.dto.ProbeEmbeddingDimensionDto;
 import com.penmate.backend.interfaces.api.model.dto.SaveModelPreferencesDto;
 import com.penmate.backend.interfaces.api.model.dto.UpdateModelConfigurationDto;
@@ -31,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/model")
@@ -38,8 +43,10 @@ import java.util.Map;
 public class ModelController {
 
     private final ModelApplicationService service;
+    private final ModelCatalogDiscoveryService catalogDiscovery;
     private final ModelConnectionTestService connectionTests;
     private final RateLimitApplicationService rateLimits;
+    private final CapabilityAuthorizationService authorization;
 
     @GetMapping("/providers")
     public ApiResponse<List<Map<String, Object>>> listProviders(
@@ -51,8 +58,10 @@ public class ModelController {
     public ApiResponse<List<Map<String, Object>>> listConfigurations(
             Authentication authentication,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(service.listAccessibleConfigurations(actor(authentication)).stream()
-                .map(this::configurationView).toList(), traceId);
+        Long actor = actor(authentication);
+        Set<String> permissions = authorization.currentSnapshot(actor).permissions();
+        return ApiResponse.success(service.listAccessibleConfigurations(actor).stream()
+                .map(configuration -> configurationView(configuration, permissions)).toList(), traceId);
     }
 
     @PostMapping("/configurations")
@@ -60,8 +69,9 @@ public class ModelController {
             Authentication authentication,
             @Valid @RequestBody CreateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long actor = actor(authentication);
         return ApiResponse.success(configurationView(service.createConfiguration(
-                actor(authentication), false, createCommand(dto))), traceId);
+                actor, false, createCommand(dto)), authorization.currentSnapshot(actor).permissions()), traceId);
     }
 
     @PostMapping("/embedding-dimension-probes")
@@ -72,6 +82,27 @@ public class ModelController {
         rateLimits.consume(RateLimitAction.EMBEDDING_DIMENSION_PROBE, actor(authentication).toString());
         return ApiResponse.success(probeView(service.probeEmbeddingDimensions(
                 actor(authentication), false, probeCommand(dto))), traceId);
+    }
+
+    @PostMapping("/model-discoveries")
+    public ApiResponse<ModelCatalogDiscoveryService.DiscoveryResult> discoverUserModels(
+            Authentication authentication,
+            @Valid @RequestBody DiscoverModelsDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long actor = actor(authentication);
+        rateLimits.consume(RateLimitAction.MODEL_CATALOG_DISCOVERY, actor.toString());
+        return ApiResponse.success(catalogDiscovery.discover(actor, false, discoveryCommand(dto)), traceId);
+    }
+
+    @PostMapping("/system-model-discoveries")
+    @PreAuthorize("hasAuthority('model:system:write')")
+    public ApiResponse<ModelCatalogDiscoveryService.DiscoveryResult> discoverSystemModels(
+            Authentication authentication,
+            @Valid @RequestBody DiscoverModelsDto dto,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long actor = actor(authentication);
+        rateLimits.consume(RateLimitAction.MODEL_CATALOG_DISCOVERY, actor.toString());
+        return ApiResponse.success(catalogDiscovery.discover(actor, true, discoveryCommand(dto)), traceId);
     }
 
     @PostMapping("/system-embedding-dimension-probes")
@@ -112,8 +143,9 @@ public class ModelController {
             Authentication authentication,
             @Valid @RequestBody CreateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        Long actor = actor(authentication);
         return ApiResponse.success(configurationView(service.createConfiguration(
-                actor(authentication), true, createCommand(dto))), traceId);
+                actor, true, createCommand(dto)), authorization.currentSnapshot(actor).permissions()), traceId);
     }
 
     @PostMapping("/configurations/{modelConfigId}/impact")
@@ -143,8 +175,10 @@ public class ModelController {
             @PathVariable String modelConfigId,
             @Valid @RequestBody UpdateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(configurationView(service.updateConfiguration(actor(authentication),
-                id(modelConfigId, "modelConfigId"), false, updateCommand(dto))), traceId);
+        Long actor = actor(authentication);
+        return ApiResponse.success(configurationView(service.updateConfiguration(actor,
+                id(modelConfigId, "modelConfigId"), false, updateCommand(dto)),
+                authorization.currentSnapshot(actor).permissions()), traceId);
     }
 
     @PutMapping("/system-configurations/{modelConfigId}")
@@ -154,8 +188,10 @@ public class ModelController {
             @PathVariable String modelConfigId,
             @Valid @RequestBody UpdateModelConfigurationDto dto,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return ApiResponse.success(configurationView(service.updateConfiguration(actor(authentication),
-                id(modelConfigId, "modelConfigId"), true, updateCommand(dto))), traceId);
+        Long actor = actor(authentication);
+        return ApiResponse.success(configurationView(service.updateConfiguration(actor,
+                id(modelConfigId, "modelConfigId"), true, updateCommand(dto)),
+                authorization.currentSnapshot(actor).permissions()), traceId);
     }
 
     @PostMapping("/configurations/{modelConfigId}/unbind")
@@ -236,6 +272,13 @@ public class ModelController {
                 dto.getEmbeddingDimensions(), dto.getApiKey());
     }
 
+    private ModelCommands.DiscoverModelsCommand discoveryCommand(DiscoverModelsDto dto) {
+        return new ModelCommands.DiscoverModelsCommand(
+                optionalId(dto.getModelConfigId(), "modelConfigId"),
+                optionalId(dto.getProviderId(), "providerId"), dto.getModelType(),
+                dto.getBaseUrl(), dto.getApiKey());
+    }
+
     private Map<String, Object> probeView(ModelApplicationService.EmbeddingDimensionProbeResult result) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("dimensions", result.dimensions());
@@ -259,7 +302,7 @@ public class ModelController {
         return Map.of("capabilityCode", capability.getCapabilityCode(), "protocolCode", capability.getProtocolCode());
     }
 
-    private Map<String, Object> configurationView(ModelConfiguration configuration) {
+    private Map<String, Object> configurationView(ModelConfiguration configuration, Set<String> permissions) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("modelConfigId", string(configuration.getModelConfigId()));
         result.put("scopeType", configuration.getScopeType());
@@ -286,6 +329,13 @@ public class ModelController {
         result.put("lastTestedAt", configuration.getLastTestedAt());
         result.put("createdAt", configuration.getCreatedAt());
         result.put("updatedAt", configuration.getUpdatedAt());
+        boolean official = "SYSTEM".equalsIgnoreCase(configuration.getScopeType());
+        boolean usable = permissions.contains(official
+                ? IamPermissionCodes.MODEL_OFFICIAL_USE
+                : IamPermissionCodes.MODEL_USER_USE);
+        result.put("usable", usable);
+        result.put("unavailableReason", usable ? null
+                : official ? "OFFICIAL_MODEL_PERMISSION_REQUIRED" : "USER_MODEL_PERMISSION_REQUIRED");
         return result;
     }
 

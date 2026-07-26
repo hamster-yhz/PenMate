@@ -9,7 +9,8 @@ public enum RateLimitAction {
     REFRESH_IP("refresh-ip", 60, Duration.ofSeconds(1), true),
     PASSWORD_CHANGE("password-change", 5, Duration.ofMinutes(12), false),
     EMBEDDING_DIMENSION_PROBE("embedding-dimension-probe", 10, Duration.ofSeconds(6), false),
-    MODEL_CONNECTION_TEST("model-connection-test", 10, Duration.ofSeconds(6), false);
+    MODEL_CONNECTION_TEST("model-connection-test", 10, Duration.ofSeconds(6), false),
+    MODEL_CATALOG_DISCOVERY("model-catalog-discovery", 10, Duration.ofSeconds(6), false);
 
     private final String namespace;
     private final int capacity;

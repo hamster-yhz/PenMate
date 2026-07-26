@@ -45,7 +45,7 @@
           <label><span>模型类型</span><select v-model="form.modelType" data-dialog-initial-focus :disabled="Boolean(editingId)"><option value="CHAT">聊天模型</option><option value="EMBEDDING">Embedding 模型</option></select></label>
           <label><span>服务商</span><select v-model="form.providerId" required><option value="" disabled>选择服务商</option><option v-for="provider in compatibleProviders" :key="provider.providerId" :value="provider.providerId">{{ provider.name }}</option></select></label>
           <label><span>展示名称</span><input v-model.trim="form.displayName" maxlength="120" placeholder="例如：官方长篇创作" required /></label>
-          <label><span>真实模型 ID</span><input v-model.trim="form.modelName" maxlength="120" placeholder="例如：gpt-5" required /></label>
+          <ModelDiscoveryField v-model="form.modelName" :provider-id="form.providerId" :model-type="form.modelType" :base-url="form.baseUrl" :api-key="form.apiKey" :model-config-id="editingId || undefined" system-scope @select="handleModelSelected" />
           <label><span>Base URL</span><input v-model.trim="form.baseUrl" maxlength="500" placeholder="留空使用服务商默认地址" /></label>
           <label><span>官方 API Key</span><input v-model.trim="form.apiKey" type="password" autocomplete="new-password" :placeholder="editingId ? '留空保留现有密钥' : '输入 API Key'" /><small>保存后只显示掩码，不能再次查看明文。</small></label>
           <template v-if="form.modelType === 'EMBEDDING'">
@@ -68,6 +68,7 @@ import { message, Modal } from 'ant-design-vue'
 import { ApiOutlined, CloseOutlined, DatabaseOutlined, DeleteOutlined, EditOutlined, PlusOutlined, RadarChartOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { useDialogFocus } from '@/composables/useDialogFocus'
 import { useAdminModelServices, type AdminModelTypeFilter, type ModelConfigurationItem } from '@/features/admin-models/useAdminModelServices'
+import ModelDiscoveryField from '@/components/model/ModelDiscoveryField.vue'
 
 const tabs: Array<{ label: string; value: AdminModelTypeFilter }> = [{ label: '全部', value: 'ALL' }, { label: '聊天', value: 'CHAT' }, { label: 'Embedding', value: 'EMBEDDING' }]
 const drawer = ref<HTMLElement | null>(null)
@@ -80,6 +81,7 @@ const {
 
 useDialogFocus({ open: () => drawerOpen.value, dialog: drawer, close: closeDrawer })
 const handleSave = async () => { if (await save()) message.success('官方模型已保存') }
+const handleModelSelected = (model: string) => { if (!form.displayName.trim()) form.displayName = model }
 const handleProbe = async () => { const dimensions = await probeEmbeddingDimensions(); if (dimensions) message.success(`已探测到 ${dimensions} 维`) }
 const remove = (item: ModelConfigurationItem) => Modal.confirm({
   title: `删除“${item.displayName || item.modelName}”？`,

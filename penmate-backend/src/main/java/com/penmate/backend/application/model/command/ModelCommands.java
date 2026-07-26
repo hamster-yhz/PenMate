@@ -66,4 +66,13 @@ public final class ModelCommands {
             String apiKey
     ) {
     }
+
+    public record DiscoverModelsCommand(
+            Long modelConfigId,
+            Long providerId,
+            String modelType,
+            String baseUrl,
+            String apiKey
+    ) {
+    }
 }

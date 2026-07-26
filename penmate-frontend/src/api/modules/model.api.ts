@@ -32,6 +32,8 @@ export interface ModelConfigurationItem extends AnyRecord {
   lastTestLatencyMs?: number | null
   lastTestError?: string | null
   lastTestedAt?: string | null
+  usable?: boolean
+  unavailableReason?: 'OFFICIAL_MODEL_PERMISSION_REQUIRED' | 'USER_MODEL_PERMISSION_REQUIRED' | string | null
 }
 
 export interface ModelConnectionTestResult {
@@ -40,6 +42,11 @@ export interface ModelConnectionTestResult {
   testedAt: string
   error?: string | null
   dimensions?: number | null
+}
+
+export interface ModelCatalogDiscoveryResult {
+  models: string[]
+  count: number
 }
 
 const normalizeBusinessStringId = (value: unknown) => {
@@ -160,6 +167,12 @@ export const modelApi = {
       ? '/v1/model/system-embedding-dimension-probes'
       : '/v1/model/embedding-dimension-probes'
     return request.post<AnyRecord>(endpoint, payload)
+  },
+  discoverModels(payload: AnyRecord, systemScope = false) {
+    const endpoint = systemScope
+      ? '/v1/model/system-model-discoveries'
+      : '/v1/model/model-discoveries'
+    return request.post<ModelCatalogDiscoveryResult>(endpoint, payload)
   },
   deleteUserModelConfig(_userId: string, businessModelConfigId: string, _operatorId: string) {
     void _userId

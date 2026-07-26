@@ -60,6 +60,8 @@ penmate:
     key-secret: ${RATE_LIMIT_KEY_SECRET:}
     trust-proxy-headers: ${RATE_LIMIT_TRUST_PROXY_HEADERS:false}
   model:
+    catalog-connect-timeout: ${MODEL_CATALOG_CONNECT_TIMEOUT:5s}
+    catalog-response-timeout: ${MODEL_CATALOG_RESPONSE_TIMEOUT:15s}
     embedding-probe-connect-timeout: ${EMBEDDING_PROBE_CONNECT_TIMEOUT:5s}
     embedding-probe-response-timeout: ${EMBEDDING_PROBE_RESPONSE_TIMEOUT:15s}
   idempotency:

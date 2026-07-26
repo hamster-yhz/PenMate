@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminOfficialModels from './AdminOfficialModels.vue'
 
 const {
-  listMock, providersMock, createMock, updateMock, deleteMock, testMock, probeMock,
+  listMock, providersMock, createMock, updateMock, deleteMock, testMock, probeMock, discoverMock,
   successMock, errorMock, confirmMock,
 } = vi.hoisted(() => ({
   listMock: vi.fn(), providersMock: vi.fn(), createMock: vi.fn(), updateMock: vi.fn(), deleteMock: vi.fn(),
-  testMock: vi.fn(), probeMock: vi.fn(), successMock: vi.fn(), errorMock: vi.fn(), confirmMock: vi.fn(),
+  testMock: vi.fn(), probeMock: vi.fn(), discoverMock: vi.fn(), successMock: vi.fn(), errorMock: vi.fn(), confirmMock: vi.fn(),
 }))
 
 vi.mock('@/api/modules/model.api', async () => {
@@ -23,6 +23,7 @@ vi.mock('@/api/modules/model.api', async () => {
       deleteSystemModelConfig: deleteMock,
       testSystemModelConnection: testMock,
       probeEmbeddingDimensions: probeMock,
+      discoverModels: discoverMock,
     },
   }
 })
@@ -48,6 +49,7 @@ describe('AdminOfficialModels', () => {
     }])
     testMock.mockResolvedValue({ success: true, latencyMs: 96, testedAt: '2026-07-22T03:00:00Z' })
     updateMock.mockResolvedValue(officialModel)
+    discoverMock.mockResolvedValue({ models: ['gpt-5', 'gpt-5-mini'], count: 2 })
   })
 
   it('loads official configurations and uses the system connection-test endpoint', async () => {
@@ -74,5 +76,19 @@ describe('AdminOfficialModels', () => {
     expect(updateMock).toHaveBeenCalledWith('501', expect.objectContaining({
       displayName: '官方创作模型', apiKey: '', status: 'ACTIVE',
     }))
+  })
+
+  it('discovers official models through the protected system endpoint', async () => {
+    const wrapper = mount(AdminOfficialModels, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="编辑官方模型"]').trigger('click')
+    await wrapper.get('.discover-button').trigger('click')
+    await flushPromises()
+
+    expect(discoverMock).toHaveBeenCalledWith(expect.objectContaining({
+      modelConfigId: '501', providerId: '11', apiKey: undefined,
+    }), true)
+    expect(wrapper.get('[role="listbox"]').text()).toContain('gpt-5-mini')
   })
 })
