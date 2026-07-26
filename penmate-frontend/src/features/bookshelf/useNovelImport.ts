@@ -9,7 +9,7 @@ import { getErrorMessage } from '@/utils/errors'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 const PAGE_SIZE = 100
-const supportedFile = /\.(txt|md|markdown|docx)$/i
+const supportedFile = /\.(txt|md|markdown|docx|epub)$/i
 
 const copyDraft = (draft: NovelImportDraft): NovelImportDraft => ({
   projectTitle: String(draft.projectTitle || '').trim(),
@@ -108,7 +108,7 @@ export const useNovelImport = () => {
 
   const selectFile = async (file: File) => {
     error.value = ''
-    if (!supportedFile.test(file.name)) { error.value = '请选择 TXT、Markdown 或 DOCX 文件'; return false }
+    if (!supportedFile.test(file.name)) { error.value = '请选择 TXT、Markdown、DOCX 或 EPUB 文件'; return false }
     if (file.size > MAX_FILE_SIZE) { error.value = '文件不能超过 20 MB'; return false }
     previewing.value = true
     try {

@@ -282,6 +282,38 @@ class NovelApplicationServiceTest extends BaseApplicationServiceTest {
     }
 
     @Test
+    void dismissing_an_undo_also_dismisses_older_entries_in_the_same_chapter_stack() {
+        NovelProject project = new NovelProject();
+        project.setProjectId(920002L);
+        project.setOwnerUserId(920001L);
+        ChapterAiUndoOperation older = availableUndo(950001L, 920101L, 1L);
+        ChapterAiUndoOperation selected = availableUndo(950002L, 920101L, 2L);
+        when(novelGateway.findProjectById(920002L)).thenReturn(project);
+        when(novelGateway.findAiUndoByOperationId(920002L, 950002L)).thenReturn(selected);
+        when(novelGateway.listAvailableAiUndoByChapter(920002L, 920101L))
+                .thenReturn(List.of(selected, older));
+        when(novelGateway.dismissAvailableAiUndoThrough(920002L, 920101L, 2L)).thenReturn(2);
+
+        NovelApplicationService.AiUndoDismissResult result = novelApplicationService.dismissAiUndo(
+                920002L, List.of(950002L), 920001L);
+
+        assertThat(result.operationIds()).containsExactly(950002L, 950001L);
+        verify(novelGateway).dismissAvailableAiUndoThrough(920002L, 920101L, 2L);
+    }
+
+    private ChapterAiUndoOperation availableUndo(Long operationId, Long chapterId, Long sequenceNo) {
+        ChapterAiUndoOperation operation = new ChapterAiUndoOperation();
+        operation.setOperationId(operationId);
+        operation.setProjectId(920002L);
+        operation.setChapterId(chapterId);
+        operation.setRunId(940001L + sequenceNo);
+        operation.setSequenceNo(sequenceNo);
+        operation.setStatus("AVAILABLE");
+        operation.setExpiresAt(java.time.Instant.now().plusSeconds(3600));
+        return operation;
+    }
+
+    @Test
     void rejects_a_stale_user_revision_with_a_specific_conflict_code() {
         NovelProject project = new NovelProject();
         project.setProjectId(920002L);

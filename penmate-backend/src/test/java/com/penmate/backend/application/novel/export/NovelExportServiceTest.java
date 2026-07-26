@@ -66,12 +66,26 @@ class NovelExportServiceTest {
     }
 
     @Test
+    void returns_epub_download_metadata() {
+        when(novelGateway.findProjectById(2001L)).thenReturn(project(2001L, 1001L, "长夜"));
+        when(novelGateway.findVolumesByProjectId(2001L)).thenReturn(List.of());
+        when(novelGateway.findChaptersByProjectId(2001L)).thenReturn(List.of());
+        when(renderer.render(eq(NovelExportFormat.EPUB), any())).thenReturn("epub".getBytes(StandardCharsets.UTF_8));
+
+        NovelExportService.ExportedNovel result = service.export(2001L, 1001L, "epub");
+
+        assertThat(result.fileName()).isEqualTo("长夜.epub");
+        assertThat(result.contentType()).isEqualTo("application/epub+zip");
+        verify(renderer).render(eq(NovelExportFormat.EPUB), any());
+    }
+
+    @Test
     void rejects_unknown_format_before_rendering() {
         when(novelGateway.findProjectById(2001L)).thenReturn(project(2001L, 1001L, "Novel"));
 
         assertThatThrownBy(() -> service.export(2001L, 1001L, "pdf"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("[txt, markdown, docx]");
+                .hasMessageContaining("[txt, markdown, docx, epub]");
         verifyNoInteractions(renderer);
     }
 

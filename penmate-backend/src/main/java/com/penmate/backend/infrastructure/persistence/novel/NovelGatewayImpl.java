@@ -259,6 +259,11 @@ public class NovelGatewayImpl implements NovelGateway {
     }
 
     @Override
+    public List<ChapterAiUndoOperation> listAvailableAiUndoByProject(Long projectId) {
+        return chapterAiUndoMapper.listAvailableByProject(projectId);
+    }
+
+    @Override
     public List<ChapterAiUndoOperation> listAvailableAiUndoByRun(Long projectId, Long runId) {
         return chapterAiUndoMapper.listAvailableByRun(projectId, runId);
     }
@@ -279,6 +284,11 @@ public class NovelGatewayImpl implements NovelGateway {
     @Override
     public int invalidateAvailableAiUndoByChapter(Long projectId, Long chapterId) {
         return chapterAiUndoMapper.invalidateAvailableByChapter(projectId, chapterId);
+    }
+
+    @Override
+    public int dismissAvailableAiUndoThrough(Long projectId, Long chapterId, Long sequenceNo) {
+        return chapterAiUndoMapper.dismissAvailableThrough(projectId, chapterId, sequenceNo);
     }
 
     @Override

@@ -10,8 +10,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NovelImportSourceParserTest {
     @Test
@@ -64,5 +67,52 @@ class NovelImportSourceParserTest {
         assertThat(draft.projectTitle()).isEqualTo("长夜");
         assertThat(draft.chapterCount()).isEqualTo(1);
         assertThat(draft.volumes().getFirst().chapters().getFirst().content()).isEqualTo("正文。");
+    }
+
+    @Test
+    void exported_epub_can_be_imported_with_volume_order_and_paragraphs_preserved() throws Exception {
+        var manuscript = new NovelManuscript("长夜 & 微光", List.of(
+                new NovelManuscript.Volume("上卷", List.of(
+                        new NovelManuscript.Chapter("第一章 <来客>", "第一段。\n\n第二段。"),
+                        new NovelManuscript.Chapter("第二章", "风停了。")
+                )),
+                new NovelManuscript.Volume("下卷", List.of(
+                        new NovelManuscript.Chapter("第三章", "灯亮了。\n又熄灭了。")
+                ))
+        ));
+        byte[] exported = new OpenXmlNovelDocumentRenderer().render(NovelExportFormat.EPUB, manuscript);
+
+        var draft = new EpubNovelImportSourceParser().parse("fallback.epub", new ByteArrayInputStream(exported));
+
+        assertThat(draft.projectTitle()).isEqualTo("长夜 & 微光");
+        assertThat(draft.sourceFormat().name()).isEqualTo("EPUB");
+        assertThat(draft.volumes()).extracting(volume -> volume.title()).containsExactly("上卷", "下卷");
+        assertThat(draft.volumes().getFirst().chapters()).extracting(chapter -> chapter.title())
+                .containsExactly("第一章 <来客>", "第二章");
+        assertThat(draft.volumes().getFirst().chapters().getFirst().content())
+                .isEqualTo("第一段。\n\n第二段。");
+        assertThat(draft.volumes().get(1).chapters().getFirst().content())
+                .isEqualTo("灯亮了。\n又熄灭了。");
+    }
+
+    @Test
+    void rejects_epub_archive_paths_that_escape_the_package() throws Exception {
+        byte[] archive;
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+             ZipOutputStream zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
+            zip.putNextEntry(new ZipEntry("mimetype"));
+            zip.write("application/epub+zip".getBytes(StandardCharsets.US_ASCII));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("../outside.xhtml"));
+            zip.write("outside".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.finish();
+            archive = output.toByteArray();
+        }
+
+        assertThatThrownBy(() -> new EpubNovelImportSourceParser().parse(
+                "unsafe.epub", new ByteArrayInputStream(archive)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("escapes the archive");
     }
 }

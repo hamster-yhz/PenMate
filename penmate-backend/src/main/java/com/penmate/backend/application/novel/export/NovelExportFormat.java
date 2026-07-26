@@ -7,7 +7,8 @@ import java.util.Locale;
 public enum NovelExportFormat {
     TXT("txt", "text/plain;charset=UTF-8"),
     MARKDOWN("md", "text/markdown;charset=UTF-8"),
-    DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    DOCX("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    EPUB("epub", "application/epub+zip");
 
     private final String extension;
     private final String contentType;
@@ -33,7 +34,7 @@ public enum NovelExportFormat {
         try {
             return valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw BusinessException.badRequest("Export format must be one of [txt, markdown, docx]");
+            throw BusinessException.badRequest("Export format must be one of [txt, markdown, docx, epub]");
         }
     }
 }

@@ -9,7 +9,8 @@ describe('ProjectDataSection', () => {
     })
 
     await wrapper.findAll('button')[2].trigger('click')
-    expect(wrapper.emitted('export')).toEqual([['docx']])
+    await wrapper.findAll('button')[3].trigger('click')
+    expect(wrapper.emitted('export')).toEqual([['docx'], ['epub']])
 
     await wrapper.setProps({ exportingFormat: 'docx' })
     expect(wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined)).toBe(true)

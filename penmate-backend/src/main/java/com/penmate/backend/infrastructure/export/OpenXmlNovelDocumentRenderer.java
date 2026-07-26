@@ -26,6 +26,7 @@ public class OpenXmlNovelDocumentRenderer implements NovelDocumentRenderer {
             case TXT -> withBom(renderText(manuscript).getBytes(StandardCharsets.UTF_8));
             case MARKDOWN -> withBom(renderMarkdown(manuscript).getBytes(StandardCharsets.UTF_8));
             case DOCX -> renderDocx(manuscript);
+            case EPUB -> EpubNovelDocumentRenderer.render(manuscript);
         };
     }
 

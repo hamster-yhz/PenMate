@@ -14,10 +14,10 @@
           <button type="button" role="tab" :class="{ active: sourceMode === 'file' }" @click="sourceMode = 'file'"><FileOutlined />文件</button>
           <button type="button" role="tab" :class="{ active: sourceMode === 'paste' }" @click="sourceMode = 'paste'"><SnippetsOutlined />粘贴</button>
         </div>
-        <input ref="fileInput" class="sr-only" type="file" accept=".txt,.md,.markdown,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-label="选择导入文件" @change="handleFileChange" />
+        <input ref="fileInput" class="sr-only" type="file" accept=".txt,.md,.markdown,.docx,.epub,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/epub+zip" aria-label="选择导入文件" @change="handleFileChange" />
         <button v-if="sourceMode === 'file'" type="button" class="file-drop" data-dialog-initial-focus :disabled="previewing" @click="fileInput?.click()" @dragover.prevent @drop.prevent="handleDrop">
           <UploadOutlined />
-          <strong>{{ previewing ? '正在分析目录' : 'TXT、Markdown 或 DOCX' }}</strong>
+          <strong>{{ previewing ? '正在分析目录' : 'TXT、Markdown、DOCX 或 EPUB' }}</strong>
           <span>最大 20 MB</span>
           <span class="file-command"><LoadingOutlined v-if="previewing" spin /><UploadOutlined v-else />{{ previewing ? '正在解析' : '选择文件' }}</span>
         </button>

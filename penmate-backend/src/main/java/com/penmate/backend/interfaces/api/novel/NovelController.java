@@ -17,6 +17,7 @@ import com.penmate.backend.interfaces.api.novel.dto.PermanentlyDeleteNovelProjec
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelProjectDto;
 import com.penmate.backend.interfaces.api.novel.dto.UpdateNovelVolumeDto;
 import com.penmate.backend.interfaces.api.novel.dto.SaveChapterContentDto;
+import com.penmate.backend.interfaces.api.novel.dto.DismissAiUndoDto;
 import com.penmate.backend.interfaces.api.novel.dto.CompleteNovelCoverUploadDto;
 import com.penmate.backend.interfaces.api.novel.dto.InitializeNovelCoverUploadDto;
 import com.penmate.backend.interfaces.api.novel.dto.NovelCoverCropDto;
@@ -411,6 +412,28 @@ public class NovelController {
         return ApiResponse.success(novelApplicationService.listAvailableAiUndoForChapter(
                 requireLongId(projectId, "projectId"), requireLongId(chapterId, "chapterId"),
                 id(authentication)), traceId);
+    }
+
+    @GetMapping("/{projectId}/ai-undo")
+    public ApiResponse<List<NovelApplicationService.AiUndoView>> listProjectAiUndo(
+            @PathVariable String projectId,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return ApiResponse.success(novelApplicationService.listAvailableAiUndoForProject(
+                requireLongId(projectId, "projectId"), id(authentication)), traceId);
+    }
+
+    @PostMapping("/{projectId}/ai-edits/dismiss")
+    public ApiResponse<NovelApplicationService.AiUndoDismissResult> dismissAiUndo(
+            @PathVariable String projectId,
+            @Valid @RequestBody DismissAiUndoDto dto,
+            Authentication authentication,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        List<Long> operationIds = dto.operationIds().stream()
+                .map(operationId -> requireLongId(operationId, "operationId"))
+                .toList();
+        return ApiResponse.success(novelApplicationService.dismissAiUndo(
+                requireLongId(projectId, "projectId"), operationIds, id(authentication)), traceId);
     }
 
     @PostMapping("/{projectId}/ai-edits/{operationId}/undo")

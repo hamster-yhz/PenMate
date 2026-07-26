@@ -18,7 +18,7 @@ test('multi-format import reviews the manuscript before publishing the project',
       return route.fulfill({ json: envelope({
         sessionId: '8001',
         draft: {
-          projectTitle: '长夜', sourceFormat: 'TXT', diagnostics: [],
+          projectTitle: '长夜', sourceFormat: 'EPUB', diagnostics: [],
           volumes: [{
             title: '第一卷',
             chapters: [
@@ -46,7 +46,7 @@ test('multi-format import reviews the manuscript before publishing the project',
   await page.goto('/mybooks')
   await page.getByRole('button', { name: '从文件创建作品' }).click()
   await page.locator('input[type="file"]').setInputFiles({
-    name: '长夜.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 来客\n雨水落下。'),
+    name: '长夜.epub', mimeType: 'application/epub+zip', buffer: Buffer.from('mock epub'),
   })
 
   await expect(page.getByRole('dialog', { name: '从内容创建作品' })).toBeVisible()

@@ -562,6 +562,49 @@ public class NovelApplicationService {
                 .toList();
     }
 
+    public List<AiUndoView> listAvailableAiUndoForProject(Long projectId, Long actorUserId) {
+        requireOwnedProject(projectId, actorUserId);
+        Map<Long, String> chapterTitles = novelGateway.findChaptersByProjectId(projectId).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        NovelChapter::getChapterId, NovelChapter::getTitle, (left, right) -> left));
+        return novelGateway.listAvailableAiUndoByProject(projectId).stream()
+                .map(operation -> toUndoView(operation,
+                        chapterTitles.getOrDefault(operation.getChapterId(), "未命名章节")))
+                .toList();
+    }
+
+    @Transactional
+    public AiUndoDismissResult dismissAiUndo(Long projectId, List<Long> operationIds, Long actorUserId) {
+        requireOwnedProject(projectId, actorUserId);
+        if (operationIds == null || operationIds.isEmpty()) {
+            throw com.penmate.backend.application.common.exception.BusinessException.badRequest(
+                    "At least one AI undo operation is required");
+        }
+
+        Map<Long, Long> dismissThroughByChapter = new java.util.LinkedHashMap<>();
+        for (Long operationId : new LinkedHashSet<>(operationIds)) {
+            if (operationId == null) continue;
+            ChapterAiUndoOperation operation = novelGateway.findAiUndoByOperationId(projectId, operationId);
+            if (operation == null || !"AVAILABLE".equals(operation.getStatus())
+                    || operation.getExpiresAt() == null || !operation.getExpiresAt().isAfter(Instant.now())) {
+                continue;
+            }
+            dismissThroughByChapter.merge(operation.getChapterId(), operation.getSequenceNo(), Math::max);
+        }
+
+        List<Long> dismissedOperationIds = new ArrayList<>();
+        for (Map.Entry<Long, Long> entry : dismissThroughByChapter.entrySet()) {
+            Long chapterId = entry.getKey();
+            Long sequenceNo = entry.getValue();
+            novelGateway.listAvailableAiUndoByChapter(projectId, chapterId).stream()
+                    .filter(operation -> operation.getSequenceNo() <= sequenceNo)
+                    .map(ChapterAiUndoOperation::getOperationId)
+                    .forEach(dismissedOperationIds::add);
+            novelGateway.dismissAvailableAiUndoThrough(projectId, chapterId, sequenceNo);
+        }
+        return new AiUndoDismissResult(List.copyOf(dismissedOperationIds));
+    }
+
     @Transactional
     public AiUndoView undoAiChapterEdit(Long projectId, Long operationId, Long actorUserId) {
         requireOwnedProject(projectId, actorUserId);
@@ -706,6 +749,9 @@ public class NovelApplicationService {
 
     public record AiUndoView(Long operationId, Long runId, Long chapterId, String chapterTitle, String status,
                              Long sequenceNo, Instant createdAt, Instant expiresAt, Instant undoneAt) {
+    }
+
+    public record AiUndoDismissResult(List<Long> operationIds) {
     }
 
     public record NovelDirectoryView(Long structureRevision, List<NovelVolume> volumes,

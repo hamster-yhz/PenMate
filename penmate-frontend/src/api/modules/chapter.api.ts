@@ -18,10 +18,16 @@ export const chapterApi = {
   listAiUndo(projectId: string, chapterId: string) {
     return request.get<ChapterAiUndoOperation[]>(`/v1/novels/${projectId}/chapters/${chapterId}/ai-undo`)
   },
+  listProjectAiUndo(projectId: string) {
+    return request.get<ChapterAiUndoOperation[]>(`/v1/novels/${projectId}/ai-undo`)
+  },
   undoAiEdit(projectId: string, operationId: string) {
     return request.post<ChapterAiUndoOperation>(`/v1/novels/${projectId}/ai-edits/${operationId}/undo`)
   },
   undoRunAiEdits(projectId: string, runId: string) {
     return request.post<ChapterAiUndoOperation[]>(`/v1/novels/${projectId}/agent-runs/${runId}/chapter-edits/undo`)
+  },
+  dismissAiUndo(projectId: string, operationIds: string[]) {
+    return request.post<{ operationIds: string[] }>(`/v1/novels/${projectId}/ai-edits/dismiss`, { operationIds })
   },
 }

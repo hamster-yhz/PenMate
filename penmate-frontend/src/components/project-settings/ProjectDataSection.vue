@@ -33,6 +33,15 @@
     </div>
 
     <div class="command-row">
+      <div><strong>EPUB</strong><p>生成带目录与卷章结构的电子书。</p></div>
+      <button type="button" :disabled="exportingFormat !== null" @click="emit('export', 'epub')">
+        <LoadingOutlined v-if="exportingFormat === 'epub'" spin />
+        <DownloadOutlined v-else />
+        {{ exportingFormat === 'epub' ? '正在导出' : '导出 EPUB' }}
+      </button>
+    </div>
+
+    <div class="command-row">
       <div><strong>打印 / PDF</strong><p>打开排版视图，可直接打印或保存为 PDF。</p></div>
       <button type="button" :disabled="exportingFormat !== null" @click="emit('print')">
         <PrinterOutlined />打开打印视图
@@ -47,7 +56,7 @@
 <script setup lang="ts">
 import { DownloadOutlined, LoadingOutlined, PrinterOutlined } from '@ant-design/icons-vue'
 
-type NovelExportFormat = 'txt' | 'markdown' | 'docx'
+type NovelExportFormat = 'txt' | 'markdown' | 'docx' | 'epub'
 
 defineProps<{
   exportingFormat: NovelExportFormat | null

@@ -1,16 +1,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { rbacApi } from '@/api/modules/rbac.api'
 import { useBookshelf, type BookshelfBook } from '@/composables/bookshelf/useBookshelf'
-import { getSession } from '@/stores/session'
+import { useAdminAccess } from '@/composables/useAdminAccess'
 import { getErrorMessage } from '@/utils/errors'
 
 export const useBookshelfPage = () => {
   const router = useRouter()
   const route = useRoute()
-  const session = getSession()
   const bookshelf = useBookshelf()
-  const adminMenuPaths = ref<string[]>([])
+  const { canAccessAdmin, loadAdminAccess } = useAdminAccess()
   const createError = ref('')
   const deleteError = ref('')
   const trashActionError = ref('')
@@ -18,7 +16,6 @@ export const useBookshelfPage = () => {
   const permanentDeleteBook = ref<BookshelfBook | null>(null)
   const showImportDialog = ref(false)
   const showPermanentDeleteDialog = computed(() => permanentDeleteBook.value != null)
-  const canAccessAdmin = computed(() => adminMenuPaths.value.some((path) => path.startsWith('/admin')))
 
   const openBook = (book: BookshelfBook) => router.push(`/workbench?projectId=${encodeURIComponent(book.id)}`)
   const openProjectSettings = (book: BookshelfBook) => router.push(`/projects/${encodeURIComponent(book.id)}/settings`)
@@ -106,16 +103,6 @@ export const useBookshelfPage = () => {
     if (visible) return
     deleteError.value = ''
     bookshelf.closeDeleteDialog()
-  }
-
-  const loadAdminAccess = async () => {
-    if (!session.userId) return
-    try {
-      const menus = await rbacApi.listProfileMenus(session.userId)
-      adminMenuPaths.value = (menus || []).map((menu) => String(menu.path || '')).filter(Boolean)
-    } catch {
-      adminMenuPaths.value = []
-    }
   }
 
   onMounted(() => {

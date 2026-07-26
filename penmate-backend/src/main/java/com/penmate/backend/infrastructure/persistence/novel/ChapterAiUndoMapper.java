@@ -60,6 +60,17 @@ public interface ChapterAiUndoMapper {
                    before_word_count, result_content_hash, sequence_no, applied_revision, status,
                    created_at, updated_at, expires_at, undone_at
             FROM novel_chapter_ai_undo_operations
+            WHERE project_id = #{projectId}
+              AND status = 'AVAILABLE' AND expires_at > CURRENT_TIMESTAMP(3)
+            ORDER BY chapter_id ASC, sequence_no DESC
+            """)
+    List<ChapterAiUndoOperation> listAvailableByProject(@Param("projectId") Long projectId);
+
+    @Select("""
+            SELECT id, operation_id, project_id, chapter_id, run_id, tool_call_id, before_content,
+                   before_word_count, result_content_hash, sequence_no, applied_revision, status,
+                   created_at, updated_at, expires_at, undone_at
+            FROM novel_chapter_ai_undo_operations
             WHERE project_id = #{projectId} AND run_id = #{runId}
               AND status = 'AVAILABLE' AND expires_at > CURRENT_TIMESTAMP(3)
             ORDER BY chapter_id ASC, sequence_no DESC
@@ -100,6 +111,16 @@ public interface ChapterAiUndoMapper {
             WHERE project_id = #{projectId} AND chapter_id = #{chapterId} AND status = 'AVAILABLE'
             """)
     int invalidateAvailableByChapter(@Param("projectId") Long projectId, @Param("chapterId") Long chapterId);
+
+    @Update("""
+            UPDATE novel_chapter_ai_undo_operations
+            SET status = 'DISMISSED', updated_at = CURRENT_TIMESTAMP(3)
+            WHERE project_id = #{projectId} AND chapter_id = #{chapterId}
+              AND sequence_no <= #{sequenceNo} AND status = 'AVAILABLE'
+            """)
+    int dismissAvailableThrough(@Param("projectId") Long projectId,
+                                @Param("chapterId") Long chapterId,
+                                @Param("sequenceNo") Long sequenceNo);
 
     @Update("""
             UPDATE novel_chapter_ai_undo_operations

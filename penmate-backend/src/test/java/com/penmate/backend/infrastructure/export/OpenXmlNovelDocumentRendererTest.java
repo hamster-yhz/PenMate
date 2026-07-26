@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,6 +59,33 @@ class OpenXmlNovelDocumentRendererTest {
                 .contains("w:val=\"Heading1\"")
                 .contains("w:val=\"Heading2\"");
         assertThat(new String(entries.get("docProps/core.xml"), StandardCharsets.UTF_8)).contains("长夜");
+    }
+
+    @Test
+    void renders_a_valid_epub3_package_with_uncompressed_mimetype_first() throws Exception {
+        byte[] result = renderer.render(NovelExportFormat.EPUB, manuscript);
+
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(result), StandardCharsets.UTF_8)) {
+            ZipEntry first = zip.getNextEntry();
+            assertThat(first.getName()).isEqualTo("mimetype");
+            assertThat(first.getMethod()).isEqualTo(ZipEntry.STORED);
+            assertThat(new String(zip.readAllBytes(), StandardCharsets.US_ASCII)).isEqualTo("application/epub+zip");
+        }
+        Map<String, byte[]> entries = unzip(result);
+        assertThat(entries.keySet()).contains(
+                "META-INF/container.xml",
+                "EPUB/package.opf",
+                "EPUB/nav.xhtml",
+                "EPUB/styles/book.css",
+                "EPUB/text/chapter-0001.xhtml"
+        );
+        assertThat(new String(entries.get("EPUB/package.opf"), StandardCharsets.UTF_8))
+                .contains("version=\"3.0\"")
+                .contains("<dc:title>长夜</dc:title>")
+                .contains("properties=\"nav\"");
+        assertThat(new String(entries.get("EPUB/nav.xhtml"), StandardCharsets.UTF_8))
+                .contains("<span>第一卷</span>")
+                .contains(">第一章</a>");
     }
 
     private Map<String, byte[]> unzip(byte[] value) throws Exception {

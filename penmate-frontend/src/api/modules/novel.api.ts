@@ -4,7 +4,7 @@ import type { NovelCoverCrop } from '@/entities/novel/model'
 export type { NovelCoverCrop } from '@/entities/novel/model'
 
 export type AnyRecord = Record<string, unknown>
-export type NovelExportFormat = 'txt' | 'markdown' | 'docx'
+export type NovelExportFormat = 'txt' | 'markdown' | 'docx' | 'epub'
 export interface NovelCoverState extends AnyRecord {
   coverUrl?: string
   thumbnailUrl?: string
@@ -49,7 +49,7 @@ export interface NovelImportDiagnostic {
 
 export interface NovelImportDraft {
   projectTitle: string
-  sourceFormat?: 'TXT' | 'MARKDOWN' | 'DOCX'
+  sourceFormat?: 'TXT' | 'MARKDOWN' | 'DOCX' | 'EPUB'
   volumes: NovelImportVolume[]
   diagnostics?: NovelImportDiagnostic[]
 }

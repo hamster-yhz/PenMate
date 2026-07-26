@@ -82,6 +82,8 @@ public interface NovelGateway {
 
     List<ChapterAiUndoOperation> listAvailableAiUndoByChapter(Long projectId, Long chapterId);
 
+    List<ChapterAiUndoOperation> listAvailableAiUndoByProject(Long projectId);
+
     List<ChapterAiUndoOperation> listAvailableAiUndoByRun(Long projectId, Long runId);
 
     long nextAiUndoSequence(Long projectId, Long chapterId);
@@ -91,6 +93,8 @@ public interface NovelGateway {
     int updateMergedAiUndo(ChapterAiUndoOperation operation);
 
     int invalidateAvailableAiUndoByChapter(Long projectId, Long chapterId);
+
+    int dismissAvailableAiUndoThrough(Long projectId, Long chapterId, Long sequenceNo);
 
     int markAiUndoUndone(Long operationId);
 

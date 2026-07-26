@@ -54,10 +54,21 @@ describe('useNovelImport', () => {
     }))
   })
 
-  it('accepts the three file formats and rejects unsupported files', async () => {
+  it('accepts EPUB and rejects unsupported files before upload', async () => {
     const importer = useNovelImport()
     await expect(importer.selectFile(new File(['x'], 'novel.pdf'))).resolves.toBe(false)
-    expect(importer.error.value).toBe('请选择 TXT、Markdown 或 DOCX 文件')
+    expect(importer.error.value).toBe('请选择 TXT、Markdown、DOCX 或 EPUB 文件')
     expect(novelApi.previewNovelImport).not.toHaveBeenCalled()
+
+    vi.mocked(novelApi.previewNovelImport).mockResolvedValue({
+      sessionId: '8002',
+      draft: {
+        projectTitle: '电子书', sourceFormat: 'EPUB',
+        volumes: [{ title: '第一卷', chapters: [{ title: '第一章', content: '正文' }] }],
+      },
+    })
+    await expect(importer.selectFile(new File(['epub'], 'novel.epub', { type: 'application/epub+zip' })))
+      .resolves.toBe(true)
+    expect(novelApi.previewNovelImport).toHaveBeenCalledOnce()
   })
 })
