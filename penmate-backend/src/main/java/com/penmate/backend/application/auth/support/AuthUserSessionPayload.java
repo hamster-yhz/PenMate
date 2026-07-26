@@ -18,6 +18,8 @@ public class AuthUserSessionPayload {
 
     private Integer status;
 
+    private Long authorizationVersion;
+
     private List<Map<String, Object>> roles;
 
     private List<Map<String, Object>> permissions;

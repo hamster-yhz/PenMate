@@ -2,6 +2,8 @@ package com.penmate.backend.application.agent;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.iam.CapabilityAuthorizationService;
+import com.penmate.backend.application.iam.IamPermissionCodes;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
@@ -18,6 +20,7 @@ public class AgentModelRoutingService {
 
     private final ModelRepository modelRepository;
     private final SecretCryptoService secretCryptoService;
+    private final CapabilityAuthorizationService authorization;
 
     public AgentLlmExecutionConfig resolveExecutionConfig(Long userId, Long modelConfigId, String traceId) {
         Long resolvedModelConfigId = modelConfigId;
@@ -35,6 +38,9 @@ public class AgentModelRoutingService {
         if (!"CHAT".equals(config.getModelType()) || !"ACTIVE".equalsIgnoreCase(config.getStatus())) {
             throw BusinessException.of("Chat model configuration is unavailable");
         }
+        authorization.require(userId, "SYSTEM".equalsIgnoreCase(config.getScopeType())
+                ? IamPermissionCodes.MODEL_OFFICIAL_USE
+                : IamPermissionCodes.MODEL_USER_USE);
         ModelCredential credential = modelRepository.findCredential(config);
         String apiKey = "NONE".equalsIgnoreCase(config.getProviderAuthType()) ? "" : decrypt(credential, traceId);
         String baseUrl = config.getBaseUrl() == null || config.getBaseUrl().isBlank()

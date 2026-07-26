@@ -5,11 +5,13 @@ import com.penmate.backend.domain.iam.model.IamPermission;
 import com.penmate.backend.domain.iam.model.IamRole;
 import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
+import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -23,6 +25,11 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
 
     @Mock
     private IamGateway iamGateway;
+
+    @Mock private BusinessIdGenerator businessIdGenerator;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private AdminSafetyPolicy adminSafetyPolicy;
+    @Mock private AuthorizationChangeDispatcher authorizationChanges;
 
     @InjectMocks
     private IamQueryApplicationService iamQueryApplicationService;
@@ -73,9 +80,28 @@ class IamQueryApplicationServiceTest extends BaseApplicationServiceTest {
         role.setIsSystem(true);
         when(iamGateway.findRoleByRoleId(1L)).thenReturn(role);
 
-        assertThatThrownBy(() -> iamQueryApplicationService.deleteRole(1L))
+        assertThatThrownBy(() -> iamQueryApplicationService.deleteRole(1L, 1001L))
                 .isExactlyInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
                 .hasMessage("System role cannot be deleted");
+    }
+
+    @Test
+    void creates_a_local_user_with_encoded_password_and_default_user_role() {
+        IamRole defaultRole = new IamRole();
+        defaultRole.setRoleId(2L);
+        defaultRole.setCode(SystemRoleCodes.USER);
+        when(iamGateway.findRoleByCode(SystemRoleCodes.USER)).thenReturn(defaultRole);
+        when(businessIdGenerator.nextId()).thenReturn(1001L);
+        when(passwordEncoder.encode("initial-pass")).thenReturn("$2a$encoded");
+
+        IamUser created = iamQueryApplicationService.createUser(
+                "Writer@Example.com", "Writer", 1, "initial-pass");
+
+        assertThat(created.getUserId()).isEqualTo(1001L);
+        assertThat(created.getEmail()).isEqualTo("writer@example.com");
+        assertThat(created.getAuthMethod()).isEqualTo("local");
+        assertThat(created.getPasswordHash()).isEqualTo("$2a$encoded");
+        verify(iamGateway).addUserRoles(1001L, List.of(2L));
     }
 
 }

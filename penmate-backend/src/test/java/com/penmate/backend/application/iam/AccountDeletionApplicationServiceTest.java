@@ -30,11 +30,12 @@ class AccountDeletionApplicationServiceTest {
     private final AuthSessionRepository sessions = mock(AuthSessionRepository.class);
     private final AuthSessionCache cache = mock(AuthSessionCache.class);
     private final AccountPurgeService purge = mock(AccountPurgeService.class);
+    private final AdminSafetyPolicy adminSafety = mock(AdminSafetyPolicy.class);
     private AccountDeletionApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new AccountDeletionApplicationService(iam, passwords, sessions, cache, purge);
+        service = new AccountDeletionApplicationService(iam, passwords, sessions, cache, purge, adminSafety);
     }
 
     @Test

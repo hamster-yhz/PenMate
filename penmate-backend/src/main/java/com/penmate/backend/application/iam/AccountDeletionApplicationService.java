@@ -25,15 +25,18 @@ public class AccountDeletionApplicationService {
     private final AuthSessionRepository sessions;
     private final AuthSessionCache sessionCache;
     private final AccountPurgeService purgeService;
+    private final AdminSafetyPolicy adminSafetyPolicy;
 
     public AccountDeletionApplicationService(IamGateway iam, PasswordEncoder passwordEncoder,
                                              AuthSessionRepository sessions, AuthSessionCache sessionCache,
-                                             AccountPurgeService purgeService) {
+                                             AccountPurgeService purgeService,
+                                             AdminSafetyPolicy adminSafetyPolicy) {
         this.iam = iam;
         this.passwordEncoder = passwordEncoder;
         this.sessions = sessions;
         this.sessionCache = sessionCache;
         this.purgeService = purgeService;
+        this.adminSafetyPolicy = adminSafetyPolicy;
     }
 
     @Transactional
@@ -43,6 +46,7 @@ public class AccountDeletionApplicationService {
         if (user == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw BusinessException.badRequest("Current password is incorrect");
         }
+        adminSafetyPolicy.requireAccountMutationAllowed(userId, userId);
         List<AuthSession> activeSessions = sessions.listByUser(userId);
         Instant requestedAt = Instant.now();
         Instant dueAt = requestedAt.plus(WAITING_PERIOD);

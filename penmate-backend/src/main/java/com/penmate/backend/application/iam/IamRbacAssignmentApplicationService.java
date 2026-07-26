@@ -22,11 +22,17 @@ import java.util.Set;
 public class IamRbacAssignmentApplicationService {
     private final IamGateway iamGateway;
     private final BusinessIdGenerator businessIdGenerator;
+    private final AdminSafetyPolicy adminSafetyPolicy;
+    private final AuthorizationChangeDispatcher authorizationChanges;
 
     public IamRbacAssignmentApplicationService(IamGateway iamGateway,
-                                               BusinessIdGenerator businessIdGenerator) {
+                                               BusinessIdGenerator businessIdGenerator,
+                                               AdminSafetyPolicy adminSafetyPolicy,
+                                               AuthorizationChangeDispatcher authorizationChanges) {
         this.iamGateway = iamGateway;
         this.businessIdGenerator = businessIdGenerator;
+        this.adminSafetyPolicy = adminSafetyPolicy;
+        this.authorizationChanges = authorizationChanges;
     }
 
     public RbacAssignmentSnapshot<IamRole> getUserRoleAssignments(Long userId) {
@@ -53,10 +59,13 @@ public class IamRbacAssignmentApplicationService {
 
         List<IamRole> selectedRoles = new ArrayList<>(roleIds.size());
         for (Long roleId : roleIds) selectedRoles.add(requireRole(roleId));
-        List<Long> beforeIds = iamGateway.findRolesByUserId(userId).stream()
+        List<IamRole> beforeRoles = iamGateway.findRolesByUserId(userId);
+        List<Long> beforeIds = beforeRoles.stream()
                 .map(IamRole::getRoleId).sorted().toList();
         List<Long> afterIds = roleIds.stream().sorted().toList();
         if (beforeIds.equals(afterIds)) return new RbacAssignmentSnapshot<>(actualRevision, selectedRoles);
+
+        adminSafetyPolicy.requireRoleReplacementAllowed(actorUserId, userId, beforeRoles, selectedRoles);
 
         if (iamGateway.replaceUserRoles(userId, roleIds, actualRevision) != 1) {
             throw revisionConflict(expectedRevision, actualRevision);
@@ -65,6 +74,8 @@ public class IamRbacAssignmentApplicationService {
         iamGateway.insertRbacAssignmentAudit(new IamRbacAssignmentAudit(
                 businessIdGenerator.nextId(), actorUserId, "USER_ROLES", userId,
                 beforeIds, afterIds, actualRevision, nextRevision, traceId));
+        authorizationChanges.revokeSessionsAfterCommit(List.of(userId),
+                "user:%d:roles:r%d".formatted(userId, nextRevision), actorUserId);
         return new RbacAssignmentSnapshot<>(nextRevision, selectedRoles);
     }
 
@@ -75,6 +86,10 @@ public class IamRbacAssignmentApplicationService {
                                                                         Long actorUserId,
                                                                         String traceId) {
         List<Long> permissionIds = uniqueIds(requestedPermissionIds, "permissionIds");
+        IamRole role = requireRole(roleId);
+        if (Boolean.TRUE.equals(role.getIsSystem())) {
+            throw BusinessException.forbidden("System role permissions are managed by the application baseline");
+        }
         Long actualRevision = iamGateway.lockRoleRbacRevision(roleId);
         if (actualRevision == null) throw BusinessException.notFound("Role not found");
         requireExpectedRevision(expectedRevision, actualRevision);
@@ -93,6 +108,9 @@ public class IamRbacAssignmentApplicationService {
         iamGateway.insertRbacAssignmentAudit(new IamRbacAssignmentAudit(
                 businessIdGenerator.nextId(), actorUserId, "ROLE_PERMISSIONS", roleId,
                 beforeIds, afterIds, actualRevision, nextRevision, traceId));
+        List<Long> affectedUserIds = iamGateway.incrementAuthorizationVersionsByRoleId(roleId);
+        authorizationChanges.revokeSessionsAfterCommit(affectedUserIds,
+                "role:%d:permissions:r%d".formatted(roleId, nextRevision), actorUserId);
         return new RbacAssignmentSnapshot<>(nextRevision, selectedPermissions);
     }
 

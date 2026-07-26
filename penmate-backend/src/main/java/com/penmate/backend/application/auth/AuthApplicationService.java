@@ -65,19 +65,21 @@ public class AuthApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }
         if (!passwordEncoder.matches(command.password(), user.getPasswordHash())) {
-            log.warn("登录失败: userId={}, reason=invalid_password", user.getId());
+            log.warn("登录失败: userId={}, reason=invalid_password", user.getUserId());
             throw com.penmate.backend.application.common.exception.BusinessException.of("Invalid credentials");
         }
 
-        List<IamRole> roles = iamGateway.findRolesByUserId(user.getId());
-        List<IamPermission> permissions = iamGateway.findPermissionsByUserId(user.getId());
+        Long userId = user.getUserId();
+        List<IamRole> roles = iamGateway.findRolesByUserId(userId);
+        List<IamPermission> permissions = iamGateway.findPermissionsByUserId(userId);
 
         AuthUserSessionPayload payload = new AuthUserSessionPayload();
-        payload.setUserId(user.getId());
+        payload.setUserId(userId);
         payload.setEmail(user.getEmail());
         payload.setDisplayName(user.getDisplayName());
         payload.setBio(user.getBio());
         payload.setStatus(user.getStatus());
+        payload.setAuthorizationVersion(user.getAuthorizationVersion() == null ? 0L : user.getAuthorizationVersion());
         payload.setRoles(toRoleMaps(roles));
         payload.setPermissions(toPermissionMaps(permissions));
 
@@ -90,7 +92,7 @@ public class AuthApplicationService {
         UserAgentSummary userAgent = UserAgentSummary.parse(command.userAgent());
         AuthSession session = new AuthSession();
         session.setSessionId(sessionId);
-        session.setUserId(user.getId());
+        session.setUserId(userId);
         session.setCurrentAccessJti(bundle.accessJti());
         session.setCurrentRefreshJtiHash(AuthTokenFingerprint.sha256(bundle.refreshJti()));
         session.setDeviceName(userAgent.deviceName());
@@ -103,16 +105,16 @@ public class AuthApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Failed to create auth session");
         }
         authSessionCache.saveSession(payload, bundle);
-        iamGateway.touchLastLoginByUserId(user.getId());
+        iamGateway.touchLastLoginByUserId(userId);
 
-        writeAudit(traceId, user.getId(), "auth", "login", "redis_auth_tokens", bundle.accessJti(), command.email(), 200);
+        writeAudit(traceId, userId, "auth", "login", "redis_auth_tokens", bundle.accessJti(), command.email(), 200);
 
         Map<String, Object> result = new HashMap<>();
         result.put("accessToken", bundle.accessToken());
         result.put("refreshToken", bundle.refreshToken());
         result.put("accessExpiresAt", bundle.accessExpiresAt());
         result.put("refreshExpiresAt", bundle.refreshExpiresAt());
-        log.info("登录成功: userId={}, accessJti={}", user.getId(), bundle.accessJti());
+        log.info("登录成功: userId={}, accessJti={}", userId, bundle.accessJti());
         return result;
     }
 
@@ -157,6 +159,12 @@ public class AuthApplicationService {
         if (payload == null) {
             log.warn("刷新令牌失败: reason=invalid_or_expired");
             throw com.penmate.backend.application.common.exception.BusinessException.of("Refresh token invalid or expired");
+        }
+        Long currentAuthorizationVersion = iamGateway.findAuthorizationVersion(payload.getUserId());
+        if (currentAuthorizationVersion == null
+                || !currentAuthorizationVersion.equals(payload.getAuthorizationVersion())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized(
+                    "Authorization changed; sign in again");
         }
         AuthTokenBundle bundle = authTokenService.issueTokens(payload);
         String sessionId = payload.getSessionId();
@@ -221,6 +229,12 @@ public class AuthApplicationService {
         AuthUserSessionPayload payload = authSessionCache.getByAccessJti(parsed.tokenId());
         if (payload == null) {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Login required");
+        }
+        Long currentAuthorizationVersion = iamGateway.findAuthorizationVersion(payload.getUserId());
+        if (currentAuthorizationVersion == null
+                || !currentAuthorizationVersion.equals(payload.getAuthorizationVersion())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.unauthorized(
+                    "Authorization changed; sign in again");
         }
 
         IamUser user = iamGateway.findUserByUserId(parsed.userId());

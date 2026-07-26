@@ -21,9 +21,13 @@ public interface IamGateway {
 
     List<IamPermission> findPermissionsByUserId(Long userId);
 
+    Long findAuthorizationVersion(Long userId);
+
     List<IamUser> findAllUsers();
 
     int insertUser(IamUser user);
+
+    int addUserRoles(Long userId, List<Long> roleIds);
 
     int updateUserBasic(IamUser user);
 
@@ -51,11 +55,21 @@ public interface IamGateway {
 
     IamRole findRoleByRoleId(Long roleId);
 
+    IamRole findRoleByCode(String code);
+
+    List<Long> findUserIdsByRoleId(Long roleId);
+
+    List<Long> incrementAuthorizationVersionsByRoleId(Long roleId);
+
+    int countActiveUsersByRoleCode(String roleCode);
+
     int insertRole(IamRole role);
 
     int updateRoleBasic(IamRole role);
 
     int softDeleteRoleByRoleId(Long roleId);
+
+    int deleteUserRoleAssignments(Long roleId);
 
     Long lockRoleRbacRevision(Long roleId);
 

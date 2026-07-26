@@ -32,6 +32,7 @@ public class IamUser {
     private Instant deletionDueAt;
     /** 用户角色关系的乐观并发修订号。 */
     private Long rbacRevision;
+    private Long authorizationVersion;
 
 }
 

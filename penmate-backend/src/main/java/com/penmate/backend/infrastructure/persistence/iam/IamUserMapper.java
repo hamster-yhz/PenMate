@@ -22,7 +22,7 @@ public interface IamUserMapper {
 
     @Select("""
             SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method, last_login_at,
-                   deletion_requested_at, deletion_due_at, rbac_revision
+                   deletion_requested_at, deletion_due_at, rbac_revision, authorization_version
             FROM iam_users
             WHERE lower(email) = lower(#{email}) AND deleted_at IS NULL AND deletion_requested_at IS NULL
             """)
@@ -30,7 +30,7 @@ public interface IamUserMapper {
 
     @Select("""
             SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method, last_login_at,
-                   deletion_requested_at, deletion_due_at, rbac_revision
+                   deletion_requested_at, deletion_due_at, rbac_revision, authorization_version
             FROM iam_users
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
@@ -45,12 +45,20 @@ public interface IamUserMapper {
 
     @Select("""
             SELECT id, user_id, email, password_hash, display_name, bio, status, auth_method, last_login_at,
-                   deletion_requested_at, deletion_due_at, rbac_revision
+                   deletion_requested_at, deletion_due_at, rbac_revision, authorization_version
             FROM iam_users
             WHERE deleted_at IS NULL
             ORDER BY id DESC
             """)
     List<IamUser> findAll();
+
+    @Select("""
+            SELECT authorization_version
+            FROM iam_users
+            WHERE user_id = #{userId} AND status = 1 AND deleted_at IS NULL
+              AND deletion_requested_at IS NULL
+            """)
+    Long findAuthorizationVersion(@Param("userId") Long userId);
 
     @Select("""
             SELECT r.id, r.role_id, r.name, r.code, r.description, r.is_system, r.rbac_revision
@@ -66,6 +74,7 @@ public interface IamUserMapper {
             FROM iam_permissions p
             JOIN iam_role_permissions rp ON rp.permission_id = p.permission_id
             JOIN iam_user_roles ur ON ur.role_id = rp.role_id
+            JOIN iam_roles r ON r.role_id = ur.role_id AND r.deleted_at IS NULL
             WHERE ur.user_id = #{userId}
             ORDER BY p.id DESC
             """)
@@ -81,7 +90,8 @@ public interface IamUserMapper {
     @Update("""
             UPDATE iam_users
             SET display_name = #{displayName},
-                status = #{status}
+                authorization_version = authorization_version + CASE WHEN status <> #{status} THEN 1 ELSE 0 END,
+                status = #{status}, updated_at = CURRENT_TIMESTAMP(3)
             WHERE user_id = #{userId} AND deleted_at IS NULL
             """)
     int updateBasic(IamUser user);
@@ -110,7 +120,7 @@ public interface IamUserMapper {
     @Update("""
             UPDATE iam_users
             SET status = 0, deletion_requested_at = #{requestedAt}, deletion_due_at = #{dueAt},
-                updated_at = CURRENT_TIMESTAMP(3)
+                authorization_version = authorization_version + 1, updated_at = CURRENT_TIMESTAMP(3)
             WHERE user_id = #{userId} AND deleted_at IS NULL AND deletion_requested_at IS NULL
             """)
     int requestDeletion(@Param("userId") Long userId,
@@ -120,7 +130,7 @@ public interface IamUserMapper {
     @Update("""
             UPDATE iam_users
             SET status = 1, deletion_requested_at = NULL, deletion_due_at = NULL,
-                updated_at = CURRENT_TIMESTAMP(3)
+                authorization_version = authorization_version + 1, updated_at = CURRENT_TIMESTAMP(3)
             WHERE user_id = #{userId} AND deleted_at IS NULL AND deletion_requested_at IS NOT NULL
             """)
     int restorePendingDeletion(@Param("userId") Long userId);
@@ -187,7 +197,9 @@ public interface IamUserMapper {
 
     @Update("""
             UPDATE iam_users
-            SET rbac_revision = rbac_revision + 1, updated_at = CURRENT_TIMESTAMP(3)
+            SET rbac_revision = rbac_revision + 1,
+                authorization_version = authorization_version + 1,
+                updated_at = CURRENT_TIMESTAMP(3)
             WHERE user_id = #{userId} AND deleted_at IS NULL AND rbac_revision = #{expectedRevision}
             """)
     int incrementRbacRevision(@Param("userId") Long userId, @Param("expectedRevision") Long expectedRevision);

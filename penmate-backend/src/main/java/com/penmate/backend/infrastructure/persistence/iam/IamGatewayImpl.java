@@ -90,6 +90,11 @@ public class IamGatewayImpl implements IamGateway {
         return iamUserMapper.findPermissionsByUserId(userId);
     }
 
+    @Override
+    public Long findAuthorizationVersion(Long userId) {
+        return iamUserMapper.findAuthorizationVersion(userId);
+    }
+
     /**
      * 处理业务请求。
      *
@@ -109,6 +114,12 @@ public class IamGatewayImpl implements IamGateway {
     @Override
     public int insertUser(IamUser user) {
         return iamUserMapper.insert(user);
+    }
+
+    @Override
+    public int addUserRoles(Long userId, List<Long> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) return 0;
+        return iamUserMapper.insertRoles(userId, roleIds);
     }
 
     /**
@@ -211,6 +222,26 @@ public class IamGatewayImpl implements IamGateway {
         return iamRoleMapper.findByRoleId(roleId);
     }
 
+    @Override
+    public IamRole findRoleByCode(String code) {
+        return iamRoleMapper.findByCode(code);
+    }
+
+    @Override
+    public List<Long> findUserIdsByRoleId(Long roleId) {
+        return iamRoleMapper.findUserIdsByRoleId(roleId);
+    }
+
+    @Override
+    public List<Long> incrementAuthorizationVersionsByRoleId(Long roleId) {
+        return iamRoleMapper.incrementAuthorizationVersionsByRoleId(roleId);
+    }
+
+    @Override
+    public int countActiveUsersByRoleCode(String roleCode) {
+        return iamRoleMapper.countActiveUsersByRoleCode(roleCode);
+    }
+
     /**
      * 处理业务请求。
      *
@@ -242,6 +273,11 @@ public class IamGatewayImpl implements IamGateway {
     @Override
     public int softDeleteRoleByRoleId(Long roleId) {
         return iamRoleMapper.softDeleteByRoleId(roleId);
+    }
+
+    @Override
+    public int deleteUserRoleAssignments(Long roleId) {
+        return iamRoleMapper.deleteUserRoleAssignments(roleId);
     }
 
     /**

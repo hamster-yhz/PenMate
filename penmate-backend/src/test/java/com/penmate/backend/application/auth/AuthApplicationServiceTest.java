@@ -62,8 +62,10 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         String traceId = "UT-TRACE-AUTH-LOGIN-SUCCESS";
         IamUser user = new IamUser();
         user.setId(1001L);
+        user.setUserId(1001L);
         user.setEmail("author@penmate.ai");
         user.setStatus(1);
+        user.setAuthorizationVersion(4L);
         user.setPasswordHash("StrongPass!23");
         when(iamGateway.findUserByEmail("author@penmate.ai")).thenReturn(user);
         when(passwordEncoder.matches("StrongPass!23", "StrongPass!23")).thenReturn(true);
@@ -82,6 +84,8 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         ArgumentCaptor<AuthSession> sessionCaptor = ArgumentCaptor.forClass(AuthSession.class);
         verify(authSessions).insert(sessionCaptor.capture());
         verify(iamGateway).touchLastLoginByUserId(1001L);
+        verify(iamGateway).findRolesByUserId(1001L);
+        verify(iamGateway).findPermissionsByUserId(1001L);
         assertThat(payloadCaptor.getValue().getUserId()).isEqualTo(1001L);
         assertThat(payloadCaptor.getValue().getEmail()).isEqualTo("author@penmate.ai");
         assertThat(sessionCaptor.getValue().getCurrentRefreshJtiHash())
@@ -148,12 +152,14 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         payload.setSessionId("session-1");
         payload.setAccessJti("old-access");
         payload.setRefreshJti("old-refresh");
+        payload.setAuthorizationVersion(3L);
         java.time.Instant accessExpiry = java.time.Instant.now().plusSeconds(1800);
         java.time.Instant refreshExpiry = java.time.Instant.now().plusSeconds(604800);
         AuthTokenBundle bundle = new AuthTokenBundle(
                 "new-at", "new-rt", "new-access", "new-refresh", accessExpiry, refreshExpiry);
         when(authTokenService.parseRefreshToken("old-token")).thenReturn(parsed);
         when(authSessionCache.getByRefreshJti("old-refresh")).thenReturn(payload);
+        when(iamGateway.findAuthorizationVersion(1001L)).thenReturn(3L);
         when(authTokenService.issueTokens(payload)).thenReturn(bundle);
         when(authSessions.rotate(eq("session-1"), eq(1001L),
                 eq(AuthTokenFingerprint.sha256("old-refresh")), eq("new-access"),
@@ -177,10 +183,13 @@ class AuthApplicationServiceTest extends BaseApplicationServiceTest {
         payload.setEmail("writer@example.com");
         payload.setRoles(List.of());
         payload.setPermissions(List.of());
+        payload.setAuthorizationVersion(2L);
         when(authSessionCache.getByAccessJti("ajti_1")).thenReturn(payload);
+        when(iamGateway.findAuthorizationVersion(1001L)).thenReturn(2L);
 
         IamUser user = new IamUser();
-        user.setId(1001L);
+        user.setId(99L);
+        user.setUserId(1001L);
         user.setEmail("writer@example.com");
         when(iamGateway.findUserByUserId(1001L)).thenReturn(user);
         when(iamGateway.updateOwnProfile(user)).thenReturn(1);

@@ -1,6 +1,8 @@
 package com.penmate.backend.application.rag;
 
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.iam.CapabilityAuthorizationService;
+import com.penmate.backend.application.iam.IamPermissionCodes;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.repository.ModelRepository;
@@ -13,12 +15,15 @@ public class EmbeddingModelRoutingService {
     private final ModelRepository models;
     private final SecretCryptoService crypto;
     private final ModelEndpointPolicy endpointPolicy;
+    private final CapabilityAuthorizationService authorization;
 
     public EmbeddingModelRoutingService(ModelRepository models, SecretCryptoService crypto,
-                                        ModelEndpointPolicy endpointPolicy) {
+                                        ModelEndpointPolicy endpointPolicy,
+                                        CapabilityAuthorizationService authorization) {
         this.models = models;
         this.crypto = crypto;
         this.endpointPolicy = endpointPolicy;
+        this.authorization = authorization;
     }
 
     public EmbeddingExecutionConfig resolve(Long ownerUserId, Long modelConfigId) {
@@ -28,6 +33,9 @@ public class EmbeddingModelRoutingService {
                 || !"ACTIVE".equalsIgnoreCase(configuration.getStatus())) {
             throw BusinessException.of("Embedding model configuration is unavailable");
         }
+        authorization.require(ownerUserId, "SYSTEM".equalsIgnoreCase(configuration.getScopeType())
+                ? IamPermissionCodes.MODEL_OFFICIAL_USE
+                : IamPermissionCodes.MODEL_USER_USE);
         ModelCredential credential = models.findCredential(configuration);
         String apiKey = "NONE".equalsIgnoreCase(configuration.getProviderAuthType()) ? "" : decrypt(credential);
         String baseUrl = configuration.getBaseUrl() == null || configuration.getBaseUrl().isBlank()

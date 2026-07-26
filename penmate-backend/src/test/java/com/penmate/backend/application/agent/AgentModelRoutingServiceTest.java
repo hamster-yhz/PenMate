@@ -1,6 +1,9 @@
 package com.penmate.backend.application.agent;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.application.iam.CapabilityAuthorizationService;
+import com.penmate.backend.application.iam.IamPermissionCodes;
 import com.penmate.backend.domain.model.model.ModelConfiguration;
 import com.penmate.backend.domain.model.model.ModelCredential;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
@@ -13,6 +16,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,6 +29,9 @@ class AgentModelRoutingServiceTest {
 
     @Mock
     private SecretCryptoService secretCryptoService;
+
+    @Mock
+    private CapabilityAuthorizationService authorization;
 
     @InjectMocks
     private AgentModelRoutingService agentModelRoutingService;
@@ -72,5 +81,23 @@ class AgentModelRoutingServiceTest {
 
         assertThat(config.modelConfigId()).isEqualTo(9001L);
         assertThat(config.modelName()).isEqualTo("creative-model");
+    }
+
+    @Test
+    void requires_official_model_permission_before_resolving_credentials() {
+        ModelConfiguration model = new ModelConfiguration();
+        model.setModelConfigId(9001L);
+        model.setScopeType("SYSTEM");
+        model.setModelType("CHAT");
+        model.setStatus("ACTIVE");
+        when(modelRepository.findAccessibleConfiguration(1001L, 9001L)).thenReturn(model);
+        doThrow(BusinessException.forbidden("official model denied"))
+                .when(authorization).require(1001L, IamPermissionCodes.MODEL_OFFICIAL_USE);
+
+        assertThatThrownBy(() -> agentModelRoutingService.resolveExecutionConfig(1001L, 9001L, "trace-denied"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("official model denied");
+
+        verify(authorization).require(1001L, IamPermissionCodes.MODEL_OFFICIAL_USE);
     }
 }

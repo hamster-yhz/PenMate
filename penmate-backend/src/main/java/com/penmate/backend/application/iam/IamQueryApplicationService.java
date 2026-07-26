@@ -7,7 +7,9 @@ import com.penmate.backend.domain.iam.model.IamUser;
 import com.penmate.backend.domain.iam.repository.IamGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -21,11 +23,20 @@ public class IamQueryApplicationService {
 
     private final IamGateway iamGateway;
     private final BusinessIdGenerator businessIdGenerator;
+    private final PasswordEncoder passwordEncoder;
+    private final AdminSafetyPolicy adminSafetyPolicy;
+    private final AuthorizationChangeDispatcher authorizationChanges;
 
     public IamQueryApplicationService(IamGateway iamGateway,
-                                      BusinessIdGenerator businessIdGenerator) {
+                                      BusinessIdGenerator businessIdGenerator,
+                                      PasswordEncoder passwordEncoder,
+                                      AdminSafetyPolicy adminSafetyPolicy,
+                                      AuthorizationChangeDispatcher authorizationChanges) {
         this.iamGateway = iamGateway;
         this.businessIdGenerator = businessIdGenerator;
+        this.passwordEncoder = passwordEncoder;
+        this.adminSafetyPolicy = adminSafetyPolicy;
+        this.authorizationChanges = authorizationChanges;
     }
 
     /**
@@ -111,16 +122,23 @@ public class IamQueryApplicationService {
      * @param authMethod 入参：authMethod
      * @return 出参：处理结果
      */
-    public IamUser createUser(String email, String displayName, Integer status, String authMethod) {
-        log.info("创建用户: email={}, displayName={}, status={}, authMethod={}", email, displayName, status, authMethod);
+    @Transactional
+    public IamUser createUser(String email, String displayName, Integer status, String initialPassword) {
+        IamRole defaultRole = iamGateway.findRoleByCode(SystemRoleCodes.USER);
+        if (defaultRole == null) {
+            throw com.penmate.backend.application.common.exception.BusinessException.of(
+                    "Default user role is unavailable");
+        }
+        log.info("创建本地用户: email={}, displayName={}, status={}", email, displayName, status);
         IamUser user = new IamUser();
         user.setUserId(businessIdGenerator.nextId());
-        user.setEmail(email);
+        user.setEmail(email.trim().toLowerCase(java.util.Locale.ROOT));
         user.setDisplayName(displayName);
         user.setStatus(status);
-        user.setAuthMethod(authMethod == null || authMethod.isBlank() ? "local" : authMethod);
-        user.setPasswordHash("{noop}changeme");
+        user.setAuthMethod("local");
+        user.setPasswordHash(passwordEncoder.encode(initialPassword));
         iamGateway.insertUser(user);
+        iamGateway.addUserRoles(user.getUserId(), List.of(defaultRole.getRoleId()));
         log.info("创建用户成功: userId={}, email={}", user.getUserId(), user.getEmail());
         return user;
     }
@@ -133,15 +151,24 @@ public class IamQueryApplicationService {
      * @param status 入参：status
      * @return 出参：处理结果
      */
-    public IamUser updateUser(Long id, String displayName, Integer status) {
+    @Transactional
+    public IamUser updateUser(Long id, String displayName, Integer status, Long actorUserId) {
         log.info("更新用户: userId={}, displayName={}, status={}", id, displayName, status);
         IamUser user = getUser(id);
+        boolean statusChanged = !java.util.Objects.equals(user.getStatus(), status);
+        if (statusChanged && status != null && status != 1) {
+            adminSafetyPolicy.requireAccountMutationAllowed(actorUserId, id);
+        }
         user.setDisplayName(displayName);
         user.setStatus(status);
         int affected = iamGateway.updateUserBasic(user);
         if (affected <= 0) {
             log.warn("更新用户失败: userId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
+        }
+        if (statusChanged) {
+            authorizationChanges.revokeSessionsAfterCommit(List.of(id),
+                    "user:%d:status:%d".formatted(id, System.nanoTime()), actorUserId);
         }
         log.info("更新用户成功: userId={}", id);
         return getUser(id);
@@ -152,13 +179,17 @@ public class IamQueryApplicationService {
      *
      * @param id 入参：id
      */
-    public void deleteUser(Long id) {
+    @Transactional
+    public void deleteUser(Long id, Long actorUserId) {
         log.info("删除用户: userId={}", id);
+        adminSafetyPolicy.requireAccountMutationAllowed(actorUserId, id);
         int affected = iamGateway.softDeleteUserByUserId(id);
         if (affected <= 0) {
             log.warn("删除用户失败: userId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("User not found");
         }
+        authorizationChanges.revokeSessionsAfterCommit(List.of(id),
+                "user:%d:delete:%d".formatted(id, System.nanoTime()), actorUserId);
         log.info("删除用户成功: userId={}", id);
     }
 
@@ -181,6 +212,10 @@ public class IamQueryApplicationService {
      */
     public IamRole createRole(String name, String code, String description, Boolean isSystem) {
         log.info("创建角色: code={}, name={}, isSystem={}", code, name, isSystem);
+        if (Boolean.TRUE.equals(isSystem)) {
+            throw com.penmate.backend.application.common.exception.BusinessException.forbidden(
+                    "System roles can only be created by the application baseline");
+        }
         IamRole role = new IamRole();
         role.setRoleId(businessIdGenerator.nextId());
         role.setName(name);
@@ -207,6 +242,10 @@ public class IamQueryApplicationService {
             log.warn("更新角色失败: roleId={}, reason=not_found", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
+        if (Boolean.TRUE.equals(role.getIsSystem())) {
+            throw com.penmate.backend.application.common.exception.BusinessException.forbidden(
+                    "System roles cannot be modified");
+        }
         role.setName(name);
         role.setDescription(description);
         int affected = iamGateway.updateRoleBasic(role);
@@ -223,7 +262,8 @@ public class IamQueryApplicationService {
      *
      * @param id 入参：id
      */
-    public void deleteRole(Long id) {
+    @Transactional
+    public void deleteRole(Long id, Long actorUserId) {
         log.info("删除角色: roleId={}", id);
         IamRole role = iamGateway.findRoleByRoleId(id);
         if (role == null) {
@@ -234,11 +274,15 @@ public class IamQueryApplicationService {
             log.warn("删除角色失败: roleId={}, reason=system_role", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("System role cannot be deleted");
         }
+        List<Long> affectedUserIds = iamGateway.incrementAuthorizationVersionsByRoleId(id);
         int affected = iamGateway.softDeleteRoleByRoleId(id);
         if (affected <= 0) {
             log.warn("删除角色失败: roleId={}, reason=not_found_after_delete", id);
             throw com.penmate.backend.application.common.exception.BusinessException.of("Role not found");
         }
+        iamGateway.deleteUserRoleAssignments(id);
+        authorizationChanges.revokeSessionsAfterCommit(affectedUserIds,
+                "role:%d:delete:%d".formatted(id, System.nanoTime()), actorUserId);
         log.info("删除角色成功: roleId={}", id);
     }
 

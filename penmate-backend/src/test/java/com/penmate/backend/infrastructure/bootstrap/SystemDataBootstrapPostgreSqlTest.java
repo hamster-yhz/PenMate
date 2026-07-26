@@ -42,6 +42,16 @@ class SystemDataBootstrapPostgreSqlTest {
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM iam_user_roles WHERE user_id = 1 AND role_id = 1", Integer.class))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM iam_roles WHERE is_system", Integer.class))
+                .isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM iam_permissions", Integer.class))
+                .isEqualTo(33);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM iam_role_permissions WHERE role_id = 2", Integer.class))
+                .isEqualTo(17);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM iam_role_permissions WHERE role_id = 3", Integer.class))
+                .isEqualTo(1);
 
         properties.getAdmin().setEmail("second@penmate.local");
         properties.getAdmin().setPassword("second-password");

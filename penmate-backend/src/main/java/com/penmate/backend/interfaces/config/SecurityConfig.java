@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpMethod;
@@ -19,6 +20,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
+
+import static com.penmate.backend.application.iam.IamPermissionCodes.*;
 
 @Configuration
 @EnableWebSecurity
@@ -65,15 +69,71 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh"
                         ).permitAll()
-                        .requestMatchers("/api/v1/users/**", "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/menus/**")
-                        .hasAuthority("rbac:admin:access")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/ops/**").hasAuthority("ops:job:read")
-                        .requestMatchers("/api/v1/ops/**").hasAuthority("ops:job:write")
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/v1/auth/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/profile/menus").access(require(APP_ACCESS))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/author-profile").access(require(PROFILE_READ))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/author-profile").access(require(PROFILE_WRITE))
+
+                        .requestMatchers("/api/v1/novels/imports/**").access(require(NOVEL_IMPORT))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/novels/*/exports/**").access(require(NOVEL_EXPORT))
+                        .requestMatchers("/api/v1/novels/*/agent/**").access(require(AGENT_USE))
+                        .requestMatchers("/api/v1/novels/*/approvals/**").access(require(AGENT_USE))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/novels/*/styles/analyze-sample")
+                        .access(require(NOVEL_WRITE, AGENT_USE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/novels/*/styles/**").access(require(NOVEL_READ))
+                        .requestMatchers("/api/v1/novels/*/styles/**").access(require(NOVEL_WRITE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/novels/*/story-bible/**").access(require(STORY_BIBLE_READ))
+                        .requestMatchers("/api/v1/novels/*/story-bible/**").access(require(STORY_BIBLE_WRITE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/novels/*/rag/**").access(require(RAG_READ))
+                        .requestMatchers("/api/v1/novels/*/rag/**").access(require(RAG_WRITE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/plugins/**", "/api/v1/novels/*/plugins/**")
+                        .access(require(PLUGIN_READ))
+                        .requestMatchers("/api/v1/plugins/**", "/api/v1/novels/*/plugins/**").access(require(PLUGIN_WRITE))
+
+                        .requestMatchers("/api/v1/model/system-*", "/api/v1/model/system-*/**")
+                        .access(require(MODEL_SYSTEM_WRITE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/model/**").access(require(MODEL_USER_USE))
+                        .requestMatchers("/api/v1/model/**").access(require(MODEL_USER_WRITE))
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users", "/api/v1/users/*", "/api/v1/users/*/roles")
+                        .access(require(RBAC_USER_READ))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users").access(require(RBAC_USER_WRITE))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/*").access(require(RBAC_USER_WRITE))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/*/restore-deletion").access(require(RBAC_USER_WRITE))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/*").access(require(RBAC_USER_DELETE))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/roles").access(require(RBAC_USER_BIND_ROLE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/roles").access(require(RBAC_ROLE_READ))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/roles/*/permissions").access(require(RBAC_PERMISSION_READ))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/roles").access(require(RBAC_ROLE_WRITE))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/roles/*").access(require(RBAC_ROLE_WRITE))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/roles/*").access(require(RBAC_ROLE_DELETE))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/roles/*/permissions")
+                        .access(require(RBAC_ROLE_BIND_PERMISSION))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/permissions").access(require(RBAC_PERMISSION_READ))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/menus").access(require(RBAC_MENU_READ))
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/jobs", "/api/v1/jobs/**").access(require(OPS_JOB_READ))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/jobs/**").access(require(OPS_JOB_WRITE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/migrations/**").access(require(OPS_MIGRATION_READ))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/migrations/**").access(require(OPS_MIGRATION_WRITE))
+
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/novels/trash/*").access(require(NOVEL_DELETE))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/novels/**").access(require(NOVEL_READ))
+                        .requestMatchers("/api/v1/novels/**").access(require(NOVEL_WRITE))
+                        .anyRequest().hasAuthority(APP_ACCESS))
                 .addFilterBefore(bearerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(traceIdFilter, BearerAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private static WebExpressionAuthorizationManager require(String... permissionCodes) {
+        String expression = Stream.concat(Stream.of(APP_ACCESS), Stream.of(permissionCodes))
+                .distinct()
+                .map(code -> "hasAuthority('" + code + "')")
+                .reduce((left, right) -> left + " and " + right)
+                .orElse("authenticated");
+        return new WebExpressionAuthorizationManager(expression);
     }
 
     @Bean

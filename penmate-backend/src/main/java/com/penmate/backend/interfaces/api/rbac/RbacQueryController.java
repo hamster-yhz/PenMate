@@ -126,7 +126,8 @@ public class RbacQueryController {
     @PostMapping("/users")
     public ApiResponse<Map<String, Object>> createUser(@Valid @RequestBody CreateUserDto dto,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        IamUser user = iamQueryApplicationService.createUser(dto.getEmail(), dto.getDisplayName(), dto.getStatus(), dto.getAuthMethod());
+        IamUser user = iamQueryApplicationService.createUser(
+                dto.getEmail(), dto.getDisplayName(), dto.getStatus(), dto.getInitialPassword());
         return ApiResponse.success(toSafeUser(user), traceId);
     }
 
@@ -139,8 +140,11 @@ public class RbacQueryController {
     @PutMapping("/users/{userId}")
     public ApiResponse<Map<String, Object>> updateUser(@PathVariable String userId,
                                                        @Valid @RequestBody UpdateUserDto dto,
+                                                       Authentication authentication,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        IamUser user = iamQueryApplicationService.updateUser(requireLongId(userId, "userId"), dto.getDisplayName(), dto.getStatus());
+        IamUser user = iamQueryApplicationService.updateUser(
+                requireLongId(userId, "userId"), dto.getDisplayName(), dto.getStatus(),
+                AuthenticatedActor.id(authentication));
         return ApiResponse.success(toSafeUser(user), traceId);
     }
 
@@ -151,8 +155,10 @@ public class RbacQueryController {
      */
     @DeleteMapping("/users/{userId}")
     public ApiResponse<Map<String, Object>> deleteUser(@PathVariable String userId,
+                                                       Authentication authentication,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.deleteUser(requireLongId(userId, "userId"));
+        iamQueryApplicationService.deleteUser(
+                requireLongId(userId, "userId"), AuthenticatedActor.id(authentication));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deleted", true);
         return ApiResponse.success(data, traceId);
@@ -200,8 +206,10 @@ public class RbacQueryController {
      */
     @DeleteMapping("/roles/{roleId}")
     public ApiResponse<Map<String, Object>> deleteRole(@PathVariable String roleId,
+                                                       Authentication authentication,
                                                        @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        iamQueryApplicationService.deleteRole(requireLongId(roleId, "roleId"));
+        iamQueryApplicationService.deleteRole(
+                requireLongId(roleId, "roleId"), AuthenticatedActor.id(authentication));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deleted", true);
         return ApiResponse.success(data, traceId);

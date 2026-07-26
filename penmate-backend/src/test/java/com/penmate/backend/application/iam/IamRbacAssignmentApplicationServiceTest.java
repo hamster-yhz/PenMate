@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 class IamRbacAssignmentApplicationServiceTest {
     @Mock private IamGateway iamGateway;
     @Mock private BusinessIdGenerator businessIdGenerator;
+    @Mock private AdminSafetyPolicy adminSafetyPolicy;
+    @Mock private AuthorizationChangeDispatcher authorizationChanges;
     @InjectMocks private IamRbacAssignmentApplicationService service;
 
     @Test
@@ -51,6 +53,7 @@ class IamRbacAssignmentApplicationServiceTest {
 
     @Test
     void rejects_stale_role_permission_revision_without_writing_assignments() {
+        when(iamGateway.findRoleByRoleId(2001L)).thenReturn(role(2001L, "CUSTOM"));
         when(iamGateway.lockRoleRbacRevision(2001L)).thenReturn(8L);
 
         assertThatThrownBy(() -> service.replaceRolePermissions(

@@ -4,6 +4,7 @@ import com.penmate.backend.application.auth.support.AuthSessionCache;
 import com.penmate.backend.application.auth.support.AuthTokenService;
 import com.penmate.backend.application.auth.support.AuthUserSessionPayload;
 import com.penmate.backend.application.auth.support.ParsedToken;
+import com.penmate.backend.domain.iam.repository.IamGateway;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,10 +28,14 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
 
     private final AuthTokenService authTokenService;
     private final AuthSessionCache authSessionCache;
+    private final IamGateway iamGateway;
 
-    public BearerAuthenticationFilter(AuthTokenService authTokenService, AuthSessionCache authSessionCache) {
+    public BearerAuthenticationFilter(AuthTokenService authTokenService,
+                                      AuthSessionCache authSessionCache,
+                                      IamGateway iamGateway) {
         this.authTokenService = authTokenService;
         this.authSessionCache = authSessionCache;
+        this.iamGateway = iamGateway;
     }
 
     @Override
@@ -49,6 +54,13 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
             if (session == null || !Objects.equals(parsed.userId(), session.getUserId())) {
                 SecurityContextHolder.clearContext();
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access session is missing or revoked");
+                return;
+            }
+            Long currentAuthorizationVersion = iamGateway.findAuthorizationVersion(session.getUserId());
+            if (currentAuthorizationVersion == null
+                    || !currentAuthorizationVersion.equals(session.getAuthorizationVersion())) {
+                SecurityContextHolder.clearContext();
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authorization changed; sign in again");
                 return;
             }
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
