@@ -15,10 +15,12 @@ CREATE TABLE IF NOT EXISTS iam_users (
     deletion_requested_at TIMESTAMPTZ(3) NULL,
     deletion_due_at TIMESTAMPTZ(3) NULL,
     rbac_revision BIGINT NOT NULL DEFAULT 0,
+    authorization_version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     deleted_at TIMESTAMPTZ(3) NULL,
-    CONSTRAINT uk_iam_users_user_id UNIQUE (user_id)
+    CONSTRAINT uk_iam_users_user_id UNIQUE (user_id),
+    CONSTRAINT ck_iam_users_auth_method CHECK (auth_method = 'local')
 );
 
 CREATE INDEX idx_iam_users_status_deleted ON iam_users (status, deleted_at);
