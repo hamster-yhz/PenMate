@@ -2,7 +2,9 @@ package com.penmate.backend.application.agent.orchestration;
 
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentMessage;
+import com.penmate.backend.domain.agent.model.AgentSessionContextSummary;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.agent.repository.AgentSessionContextSummaryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,6 +21,9 @@ class ConversationWindowBuilderTest {
 
     @Mock
     private AgentRepository agentRepository;
+
+    @Mock
+    private AgentSessionContextSummaryRepository contextSummaries;
 
     @InjectMocks
     private ConversationWindowBuilder conversationWindowBuilder;
@@ -57,6 +62,24 @@ class ConversationWindowBuilderTest {
 
         assertThat(result).extracting(AgentLlmMessage::content)
                 .containsExactly("Earlier request", "Earlier answer");
+    }
+
+    @Test
+    void prepends_the_persistent_summary_and_excludes_messages_at_or_before_its_cutoff() {
+        when(contextSummaries.find(9L)).thenReturn(new AgentSessionContextSummary(
+                9L, 8L, 7L, "{\"summary\":\"compressed history\"}", 2, 10, 3, null));
+        when(agentRepository.listMessages(9L)).thenReturn(List.of(
+                message(1001L, "user", "old request", 1),
+                message(1002L, "assistant", "old answer", 2),
+                message(1003L, "user", "new request", 3),
+                message(1004L, "assistant", "new answer", 4)));
+
+        List<AgentLlmMessage> result = conversationWindowBuilder.build(9L, null, 8);
+
+        assertThat(result).extracting(AgentLlmMessage::content)
+                .containsExactly(
+                        "Earlier conversation context (compressed):\n{\"summary\":\"compressed history\"}",
+                        "new request", "new answer");
     }
 
     private AgentMessage message(Long messageId, String role, String content, int seqNo) {

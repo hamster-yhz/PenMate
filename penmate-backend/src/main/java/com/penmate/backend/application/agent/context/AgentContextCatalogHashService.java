@@ -2,7 +2,6 @@ package com.penmate.backend.application.agent.context;
 
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
 import com.penmate.backend.application.agent.prompt.SystemPromptProvider;
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.common.serialization.JsonCodec;
@@ -29,22 +28,17 @@ public class AgentContextCatalogHashService {
         this.jsonCodec = jsonCodec;
     }
 
-    public Hashes hashes(TaskProfile profile) {
-        String executionProfile = profile == null ? "default" : profile.executionProfile();
+    public Hashes hashes() {
         var prompt = new PromptBundles(
-                prompts.loadBundle("execution", executionProfile),
-                prompts.loadBundle("context-selector", "default")
+                prompts.loadBundle("execution"),
+                prompts.loadBundle("context-selector")
         );
         var skillCatalog = skills.listAvailableSkills().stream()
                 .map(item -> new SkillCatalogMetadata(item.name(), item.description()))
                 .sorted(Comparator.comparing(item -> item.name() == null ? "" : item.name())).toList();
-        var toolCatalog = toolSelectionPolicy.select(profile).stream()
+        var toolCatalog = toolSelectionPolicy.select().stream()
                 .sorted(Comparator.comparing(schema -> schema.toolCode() == null ? "" : schema.toolCode())).toList();
         return new Hashes(hash(prompt), hash(skillCatalog), hash(toolCatalog));
-    }
-
-    public Hashes hashes(String executionProfile) {
-        return hashes(TaskProfile.fromTaskType(executionProfile));
     }
 
     private String hash(Object value) {

@@ -35,7 +35,7 @@ class ChapterContentToolHandlersTest {
         when(novels.getChapter(9001L, 3001L)).thenReturn(chapter);
         ChapterReadToolHandler handler = new ChapterReadToolHandler(novels, jsonCodec);
 
-        var result = handler.execute(context(), request("chapter_read", "{}"));
+        var result = handler.execute(context(), request("chapter_read", "{\"chapterId\":3001}"));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         assertThat(result.toolOutput())
@@ -46,12 +46,28 @@ class ChapterContentToolHandlersTest {
     }
 
     @Test
-    void read_rejects_model_supplied_chapter_identity() {
+    void read_requires_model_supplied_chapter_identity() {
         ChapterReadToolHandler handler = new ChapterReadToolHandler(novels, jsonCodec);
 
-        assertThatThrownBy(() -> handler.validate(context(), request("chapter_read", "{\"chapterId\":99}")))
+        assertThatThrownBy(() -> handler.validate(context(), request("chapter_read", "{}")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("accepts no fields");
+                .hasMessageContaining("chapterId must be a positive integer");
+    }
+
+    @Test
+    void reads_requested_chapter_without_active_chapter_context() {
+        NovelChapter chapter = chapter("other", 2L);
+        chapter.setChapterId(4002L);
+        when(novels.getChapter(9001L, 4002L)).thenReturn(chapter);
+        ChapterReadToolHandler handler = new ChapterReadToolHandler(novels, jsonCodec);
+
+        var noActiveChapter = context(9001L, 8001L, 7001L, 6001L, 1001L, 5001L, 1L, null, "trace-1");
+        handler.validate(noActiveChapter, request("chapter_read", "{\"chapterId\":4002}"));
+        var result = handler.execute(noActiveChapter, request("chapter_read", "{\"chapterId\":4002}"));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        assertThat(result.toolOutput()).contains("\"chapterId\":\"4002\"");
+        verify(novels).getChapter(9001L, 4002L);
     }
 
     @Test
@@ -64,7 +80,7 @@ class ChapterContentToolHandlersTest {
         ChapterReplaceToolHandler handler = new ChapterReplaceToolHandler(novels, jsonCodec, events);
 
         var result = handler.execute(context(), request("chapter_replace", """
-                {"expectedRevision":4,"expectedContentHash":"%s","content":"新正文\\n保持原样"}
+                {"chapterId":3001,"expectedRevision":4,"expectedContentHash":"%s","content":"新正文\\n保持原样"}
                 """.formatted(ChapterToolSupport.sha256(before))));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
@@ -77,12 +93,36 @@ class ChapterContentToolHandlersTest {
     }
 
     @Test
+    void replaces_requested_chapter_without_active_chapter_context() {
+        String before = "before";
+        String after = "after";
+        when(novels.acquireChapterAiLease(9001L, 4002L, 1001L, 8001L))
+                .thenReturn(new NovelApplicationService.AiChapterLeaseView(
+                        true, "lease-2", Instant.parse("2026-07-26T01:00:00Z"), 3L, before, null));
+        NovelApplicationService.AiChapterEditResult saved = saved(after, 4L);
+        saved.chapter().setChapterId(4002L);
+        when(novels.saveAiChapterEdit(9001L, 4002L, 1001L, 8001L, "call-1",
+                "lease-2", 3L, after)).thenReturn(saved);
+        ChapterReplaceToolHandler handler = new ChapterReplaceToolHandler(novels, jsonCodec, events);
+        var noActiveChapter = context(9001L, 8001L, 7001L, 6001L, 1001L, 5001L, 1L, null, "trace-1");
+
+        var result = handler.execute(noActiveChapter, request("chapter_replace", """
+                {"chapterId":4002,"expectedRevision":3,"expectedContentHash":"%s","content":"after"}
+                """.formatted(ChapterToolSupport.sha256(before))));
+
+        assertThat(result.status()).isEqualTo("SUCCESS");
+        verify(novels).saveAiChapterEdit(9001L, 4002L, 1001L, 8001L, "call-1",
+                "lease-2", 3L, after);
+        verify(novels).releaseChapterAiLease(9001L, 4002L, 1001L, "lease-2");
+    }
+
+    @Test
     void rejects_stale_hash_without_writing() {
         stubLease("current", 4L);
         ChapterReplaceToolHandler handler = new ChapterReplaceToolHandler(novels, jsonCodec, events);
 
         var result = handler.execute(context(), request("chapter_replace", """
-                {"expectedRevision":4,"expectedContentHash":"%s","content":"replacement"}
+                {"chapterId":3001,"expectedRevision":4,"expectedContentHash":"%s","content":"replacement"}
                 """.formatted("0".repeat(64))));
 
         assertThat(result.status()).isEqualTo("FAILED");
@@ -101,7 +141,7 @@ class ChapterContentToolHandlersTest {
         ChapterPatchToolHandler handler = new ChapterPatchToolHandler(novels, jsonCodec, events);
 
         var result = handler.execute(context(), request("chapter_patch", """
-                {"expectedRevision":7,"expectedContentHash":"%s","replacements":[
+                {"chapterId":3001,"expectedRevision":7,"expectedContentHash":"%s","replacements":[
                   {"oldText":"甲","newText":"丙","expectedOccurrences":2},
                   {"oldText":"丙乙丙","newText":"完成","expectedOccurrences":1}
                 ]}
@@ -119,7 +159,7 @@ class ChapterContentToolHandlersTest {
         ChapterPatchToolHandler handler = new ChapterPatchToolHandler(novels, jsonCodec, events);
 
         var result = handler.execute(context(), request("chapter_patch", """
-                {"expectedRevision":2,"expectedContentHash":"%s","replacements":[
+                {"chapterId":3001,"expectedRevision":2,"expectedContentHash":"%s","replacements":[
                   {"oldText":"唯一","newText":"第一步","expectedOccurrences":1},
                   {"oldText":"不存在","newText":"第二步","expectedOccurrences":1}
                 ]}
@@ -138,7 +178,7 @@ class ChapterContentToolHandlersTest {
         ChapterReplaceToolHandler handler = new ChapterReplaceToolHandler(novels, jsonCodec, events);
 
         var result = handler.execute(context(), request("chapter_replace", """
-                {"expectedRevision":9,"expectedContentHash":"%s","content":"不变"}
+                {"chapterId":3001,"expectedRevision":9,"expectedContentHash":"%s","content":"不变"}
                 """.formatted(ChapterToolSupport.sha256(before))));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
@@ -167,12 +207,12 @@ class ChapterContentToolHandlersTest {
         ChapterPatchToolHandler handler = new ChapterPatchToolHandler(novels, jsonCodec, events);
 
         var first = handler.execute(context(), request("chapter_patch", """
-                {"expectedRevision":1,"expectedContentHash":"%s","replacements":[
+                {"chapterId":3001,"expectedRevision":1,"expectedContentHash":"%s","replacements":[
                   {"oldText":"第一版","newText":"第二版","expectedOccurrences":1}
                 ]}
                 """.formatted(ChapterToolSupport.sha256(initial)), "call-1"));
         var secondResult = handler.execute(context(), request("chapter_patch", """
-                {"expectedRevision":2,"expectedContentHash":"%s","replacements":[
+                {"chapterId":3001,"expectedRevision":2,"expectedContentHash":"%s","replacements":[
                   {"oldText":"第二版","newText":"第三版","expectedOccurrences":1}
                 ]}
                 """.formatted(ChapterToolSupport.sha256(second)), "call-2"));

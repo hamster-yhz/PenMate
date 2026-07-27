@@ -93,7 +93,7 @@ public class QualityReviewToolDefinition implements AgentToolDefinition {
                         PARAMETERS_JSON_SCHEMA),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
-                        1,
+                        0,
                         Map.of()
                 )
         );

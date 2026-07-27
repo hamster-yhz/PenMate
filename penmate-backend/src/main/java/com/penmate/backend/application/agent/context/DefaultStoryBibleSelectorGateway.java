@@ -49,7 +49,7 @@ public class DefaultStoryBibleSelectorGateway implements StoryBibleSelectorGatew
                                             SystemPromptProvider promptProvider) {
         this.llmInvocations = llmInvocations;
         this.jsonCodec = jsonCodec;
-        this.systemPrompt = promptProvider.loadBundle("context-selector", "default").assembledPrompt();
+        this.systemPrompt = promptProvider.loadBundle("context-selector").assembledPrompt();
     }
 
     @Override

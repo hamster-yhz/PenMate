@@ -81,10 +81,10 @@ class AgentRunExecutorTest {
         when(runRepository.findRun(70001L)).thenReturn(run());
         when(modelRoutingService.resolveExecutionConfig(anyLong(), anyLong(), anyString()))
                 .thenReturn(AgentLlmExecutionConfig.builder().build());
-        when(contextResolutionService.resolveInitial(any(), any(), any(), any(), any())).thenReturn(contextRoutingResult());
+        when(contextResolutionService.resolveInitial(any(), any(), any(), any())).thenReturn(contextRoutingResult());
         when(contextResolutionService.promoteAfterDurable(anyLong(), anyLong(), anyList())).thenReturn(
                 new AgentWorkingSetPromotionService.PromotionSummary(1, 1, 0, true));
-        when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
+        when(promptComposer.compose(any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
         when(contextArtifacts.savePromptPlan(anyLong(), any(), any(), anyList()))
                 .thenReturn(new AgentRunContextArtifactService.ArtifactRef(89L, "prompt", "hash", 10));
         when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("completed", new LlmTokenUsage(10, 5, 15)));
@@ -113,13 +113,13 @@ class AgentRunExecutorTest {
     @Test
     void executor_treats_null_model_config_snapshot_as_default_config() {
         when(runRepository.findInput(70001L)).thenReturn(new AgentRunInput(
-                70001L, "Write a suspense opening.", "WRITE", 30001L, "selected text",
-                "{\"styleId\":81}", "{\"operatorId\":920001,\"modelConfigId\":null}", null, "hash-70001"));
+                70001L, "Write a suspense opening.", 30001L, java.util.List.of(30001L), "selected text",
+                "{\"styleId\":81}", "{\"operatorId\":920001,\"modelConfigId\":null}", null, "STANDARD", "hash-70001"));
         when(runRepository.findRun(70001L)).thenReturn(run());
-        when(contextResolutionService.resolveInitial(any(), any(), any(), any(), any())).thenReturn(contextRoutingResult());
+        when(contextResolutionService.resolveInitial(any(), any(), any(), any())).thenReturn(contextRoutingResult());
         when(contextResolutionService.promoteAfterDurable(anyLong(), anyLong(), anyList())).thenReturn(
                 new AgentWorkingSetPromotionService.PromotionSummary(1, 1, 0, true));
-        when(promptComposer.compose(any(), any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
+        when(promptComposer.compose(any(), eq("Write a suspense opening."))).thenReturn(promptPlan());
         when(contextArtifacts.savePromptPlan(anyLong(), any(), any(), anyList()))
                 .thenReturn(new AgentRunContextArtifactService.ArtifactRef(89L, "prompt", "hash", 10));
         when(llmLoop.execute(any())).thenReturn(AgentRunLoopResult.completed("completed", new LlmTokenUsage(10, 5, 15)));
@@ -164,7 +164,7 @@ class AgentRunExecutorTest {
 
         executor().recover(70001L, "trace-1", lease());
 
-        verify(contextResolutionService, never()).resolveInitial(any(), any(), any(), any(), any());
+        verify(contextResolutionService, never()).resolveInitial(any(), any(), any(), any());
         ArgumentCaptor<AgentRunLoopRequest> resumedRequest = ArgumentCaptor.forClass(AgentRunLoopRequest.class);
         verify(llmLoop).resumeApproved(resumedRequest.capture(), eq(pending));
         org.assertj.core.api.Assertions.assertThat(resumedRequest.getValue().toolSchemas())
@@ -290,8 +290,8 @@ class AgentRunExecutorTest {
     }
 
     private AgentRunInput runInput() {
-        return new AgentRunInput(70001L, "Write a suspense opening.", "WRITE", 30001L,
-                "selected text", "{\"styleId\":81}", "{\"modelConfigId\":1001}", null, "hash-70001");
+        return new AgentRunInput(70001L, "Write a suspense opening.", 30001L, java.util.List.of(30001L),
+                "selected text", "{\"styleId\":81}", "{\"modelConfigId\":1001}", null, "STANDARD", "hash-70001");
     }
 
     private AgentEvent event() {
@@ -320,7 +320,7 @@ class AgentRunExecutorTest {
                 List.of(),
                 List.of(new AgentLlmToolSchema(
                         "chapter_read", "Read chapter", "{\"type\":\"object\"}")),
-                "default", "assembled prompt", "", "assembled prompt");
+                "assembled prompt", "", "assembled prompt");
     }
 
     private Object containsText(String expected) {

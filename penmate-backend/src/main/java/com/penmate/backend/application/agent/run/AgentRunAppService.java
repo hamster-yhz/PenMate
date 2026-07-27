@@ -45,12 +45,13 @@ public class AgentRunAppService {
         AgentRunInput input = new AgentRunInput(
                 command.runId(),
                 command.promptSnapshot(),
-                command.taskType(),
                 command.chapterId(),
+                command.chapterIds(),
                 command.selectedText(),
                 command.styleSnapshotJson(),
                 command.modelSnapshotJson(),
                 command.pluginBindingsJson(),
+                command.safetyMode(),
                 command.inputHash()
         );
         requireOne(agentRunRepository.insert(run), "failed to insert agent run");

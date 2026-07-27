@@ -31,7 +31,7 @@ class DefaultStoryBibleSelectorGatewayTest {
     private final AgentLlmCancellationPort cancellations = mock(AgentLlmCancellationPort.class);
     private final DefaultStoryBibleSelectorGateway gateway = new DefaultStoryBibleSelectorGateway(
             new AgentLlmInvocationService(llm, cancellations), new JacksonJsonCodec(new ObjectMapper()),
-            (stage, profile) -> new SystemPromptBundle(stage, profile, List.of(), "selector prompt"));
+            stage -> new SystemPromptBundle(stage, List.of(), "selector prompt"));
     private final AgentLlmExecutionConfig config = AgentLlmExecutionConfig.builder().providerCode("test").build();
 
     @Test

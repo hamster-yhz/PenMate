@@ -2,6 +2,8 @@ package com.penmate.backend.application.agent.tool.runtime;
 
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 
+import java.util.List;
+
 public final class AgentToolTestContext {
     private AgentToolTestContext() {
     }
@@ -11,8 +13,9 @@ public final class AgentToolTestContext {
                                                     Long executionToken, Long chapterId, String traceId) {
         return new AuthorizedAgentRunContext(
                 runId, projectId, sessionId, turnId, ownerUserId, contextEpochId, executionToken, traceId,
-                new AgentRunInput(runId, "prompt", "CHAT", chapterId, null,
-                        null, null, null, "hash"));
+                new AgentRunInput(runId, "prompt", chapterId,
+                        chapterId == null ? List.of() : List.of(chapterId), null,
+                        null, null, null, "STANDARD", "hash"));
     }
 
     public static AuthorizedAgentRunContext context() {

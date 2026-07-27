@@ -4,7 +4,6 @@ import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
 import org.junit.jupiter.api.Test;
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 
 import java.util.List;
 
@@ -22,12 +21,12 @@ class AgentRunDependencyValidatorTest {
         AgentContextCatalogHashService hashes = mock(AgentContextCatalogHashService.class);
         AgentSessionRepository sessions = mock(AgentSessionRepository.class);
         AgentContextEpochService epochs = mock(AgentContextEpochService.class);
-        when(snapshots.create(10L, 40L)).thenReturn(new ContextEpochSnapshotCodec.Snapshot(
+        when(snapshots.create(10L, 40L, StoryBibleRoutingMode.RETRIEVAL)).thenReturn(new ContextEpochSnapshotCodec.Snapshot(
                 1, 10L, 20L, 4L, 8L, 40L, 12L, List.of(), List.of()));
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
                         StoryBibleRoutingMode.RETRIEVAL, null));
-        when(hashes.hashes(any(TaskProfile.class))).thenReturn(
+        when(hashes.hashes()).thenReturn(
                 new AgentContextCatalogHashService.Hashes("p", "s", "t"));
         when(sessions.findActiveStyleBindingRevision(30L)).thenReturn(9L);
         var expected = new AgentRunContextArtifactService.DependencyManifest(
@@ -49,12 +48,12 @@ class AgentRunDependencyValidatorTest {
         AgentContextCatalogHashService hashes = mock(AgentContextCatalogHashService.class);
         AgentSessionRepository sessions = mock(AgentSessionRepository.class);
         AgentContextEpochService epochs = mock(AgentContextEpochService.class);
-        when(snapshots.create(10L, 40L)).thenReturn(new ContextEpochSnapshotCodec.Snapshot(
+        when(snapshots.create(10L, 40L, StoryBibleRoutingMode.RETRIEVAL)).thenReturn(new ContextEpochSnapshotCodec.Snapshot(
                 1, 10L, 20L, 3L, 7L, 40L, 11L, List.of(), List.of()));
         when(preferences.resolve(10L, 30L, 50L)).thenReturn(
                 new StoryBibleRoutingPreferenceResolver.EffectivePreference(
                         StoryBibleRoutingMode.RETRIEVAL, null));
-        when(hashes.hashes(any(TaskProfile.class))).thenReturn(
+        when(hashes.hashes()).thenReturn(
                 new AgentContextCatalogHashService.Hashes("p", "s", "t"));
         when(sessions.findActiveStyleBindingRevision(30L)).thenReturn(9L);
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
@@ -74,7 +73,7 @@ class AgentRunDependencyValidatorTest {
     }
 
     private AgentRunInput input() {
-        return new AgentRunInput(60L, "continue", "WRITE", 40L,
-                null, null, null, null, "hash");
+        return new AgentRunInput(60L, "continue", 40L, java.util.List.of(40L),
+                null, null, null, null, "STANDARD", "hash");
     }
 }

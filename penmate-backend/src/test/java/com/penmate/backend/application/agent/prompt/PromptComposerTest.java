@@ -1,8 +1,6 @@
 package com.penmate.backend.application.agent.prompt;
 
 import com.penmate.backend.application.agent.context.ContextPackage;
-import com.penmate.backend.application.agent.orchestration.profile.TaskIntentTag;
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.definition.ToolExposure;
@@ -45,7 +43,7 @@ class PromptComposerTest {
         )));
 
         PromptPlan plan = promptComposer.compose(
-                profileFor("default", List.of()), emptyContextPackage(), "Find Mira");
+                emptyContextPackage(), "Find Mira");
 
         assertThat(plan.toolSchemas()).extracting(schema -> schema.toolCode()).containsExactly("rag_query");
         assertThat(plan.stablePrefix())
@@ -64,17 +62,6 @@ class PromptComposerTest {
         ));
 
         PromptPlan promptPlan = promptComposer.compose(
-                new TaskProfile(
-                        List.of(TaskIntentTag.DRAFT_GENERATION),
-                        "default",
-                        List.of(),
-                        List.of("keep explicit user perspective"),
-                        "draft output",
-                        false,
-                        false,
-                        false,
-                        "draft request"
-                ),
                 new ContextPackage(
                         List.of("style-snapshot"),
                         List.of(),
@@ -86,7 +73,6 @@ class PromptComposerTest {
                 "Please write in first person."
         );
 
-        assertThat(promptPlan.finalProfile()).isEqualTo("default");
         assertThat(promptPlan.assembledPromptPreview())
                 .contains("execution base")
                 .contains("Available skills")
@@ -99,7 +85,7 @@ class PromptComposerTest {
         verify(skillPromptRegistry, never()).load("writer");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
+                .containsExactly("execution", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::source)
                 .containsExactly(
@@ -122,7 +108,6 @@ class PromptComposerTest {
         ));
 
         PromptPlan promptPlan = promptComposer.compose(
-                profileFor("default", List.of("planner", "checker")),
                 emptyContextPackage(),
                 "Generate a plot outline."
         );
@@ -137,26 +122,7 @@ class PromptComposerTest {
         verify(skillPromptRegistry, never()).load("checker");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
-    }
-
-    @Test
-    void should_align_execution_bundle_with_world_build_rewrite_and_default_profiles() {
-        stubExecutionBundle("world-build", "world build base");
-        stubExecutionBundle("rewrite", "rewrite base");
-        stubExecutionBundle("default", "default base");
-        when(skillPromptRegistry.listAvailableSkills()).thenReturn(List.of());
-
-        PromptPlan worldBuildPlan = promptComposer.compose(profileFor("world-build", List.of()), emptyContextPackage(), "Complete setting");
-        PromptPlan rewritePlan = promptComposer.compose(profileFor("rewrite", List.of()), emptyContextPackage(), "Rewrite copy");
-        PromptPlan defaultPlan = promptComposer.compose(profileFor("default", List.of()), emptyContextPackage(), "Continue draft");
-
-        assertThat(worldBuildPlan.finalProfile()).isEqualTo("world-build");
-        assertThat(worldBuildPlan.assembledPromptPreview()).contains("world build base");
-        assertThat(rewritePlan.finalProfile()).isEqualTo("rewrite");
-        assertThat(rewritePlan.assembledPromptPreview()).contains("rewrite base");
-        assertThat(defaultPlan.finalProfile()).isEqualTo("default");
-        assertThat(defaultPlan.assembledPromptPreview()).contains("default base");
+                .containsExactly("execution", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
     }
 
     @Test
@@ -174,7 +140,6 @@ class PromptComposerTest {
         );
 
         PromptPlan promptPlan = promptComposer.compose(
-                profileFor("default", List.of()),
                 contextPackage,
                 "Continue after checking continuity."
         );
@@ -205,7 +170,7 @@ class PromptComposerTest {
         );
 
         PromptPlan promptPlan = promptComposer.compose(
-                profileFor("default", List.of()), contextPackage, "Continue");
+                contextPackage, "Continue");
 
         assertThat(promptPlan.stablePrefix())
                 .contains("<context type=\"story_bible\" scope=\"epoch_core\">")
@@ -219,9 +184,8 @@ class PromptComposerTest {
 
     @Test
     void should_include_module_sources_for_logging_and_snapshot() {
-        when(systemPromptProvider.loadBundle("execution", "default")).thenReturn(new SystemPromptBundle(
+        when(systemPromptProvider.loadBundle("execution")).thenReturn(new SystemPromptBundle(
                 "execution",
-                "default",
                 List.of(
                         new SystemPromptDocument(
                                 "00-base-role.md",
@@ -241,14 +205,13 @@ class PromptComposerTest {
         ));
 
         PromptPlan promptPlan = promptComposer.compose(
-                profileFor("default", List.of("editor")),
                 emptyContextPackage(),
                 "Polish paragraph"
         );
 
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::moduleKey)
-                .containsExactly("execution:default", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
+                .containsExactly("execution", "tool-catalog", "skill-catalog", "context-epoch-core", "context-package");
         assertThat(promptPlan.modules())
                 .extracting(PromptModulePlan::source)
                 .containsExactly(
@@ -261,9 +224,8 @@ class PromptComposerTest {
     }
 
     private void stubExecutionBundle(String profile, String content) {
-        when(systemPromptProvider.loadBundle("execution", profile)).thenReturn(new SystemPromptBundle(
+        when(systemPromptProvider.loadBundle("execution")).thenReturn(new SystemPromptBundle(
                 "execution",
-                profile,
                 List.of(new SystemPromptDocument(
                         "00-base-role.md",
                         "prompts/agent/system/execution/" + profile + "/00-base-role.md",
@@ -271,20 +233,6 @@ class PromptComposerTest {
                 )),
                 content
         ));
-    }
-
-    private TaskProfile profileFor(String executionProfile, List<String> skills) {
-        return new TaskProfile(
-                List.of(TaskIntentTag.DRAFT_GENERATION),
-                executionProfile,
-                List.of(),
-                List.of(),
-                "draft output",
-                false,
-                true,
-                false,
-                "test profile"
-        );
     }
 
     private ContextPackage emptyContextPackage() {

@@ -120,7 +120,7 @@ class ToolCallApplicationServiceTest {
         approvalRequest.setApprovalRequestId(88001L);
 
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
-        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(decision);
+        when(approvalPolicyEngine.evaluate(descriptor, request, "STANDARD")).thenReturn(decision);
         when(toolApprovalViewFactory.create(descriptor, decision)).thenReturn(approvalView);
         when(approvalApplicationService.create(any(CreateApprovalCommand.class), eq("trace-approval"))).thenReturn(approvalRequest);
 
@@ -140,6 +140,8 @@ class ToolCallApplicationServiceTest {
         verify(pendingApprovalRepository).save(pendingCaptor.capture());
         assertThat(pendingCaptor.getValue().approvalId()).isEqualTo(88001L);
         assertThat(pendingCaptor.getValue().pendingApprovalId()).isEqualTo(88001L);
+        assertThat(pendingCaptor.getValue().approvalBindingJson())
+                .contains("book_crud", "toolArgsHash", "contextEpochId", "safetyMode", "expectedState");
         verify(toolDefinitionSource).getRequired("book_crud");
         verify(toolApprovalViewFactory).create(descriptor, decision);
     }
@@ -157,7 +159,7 @@ class ToolCallApplicationServiceTest {
                 request.toolArgsJson(), "{}", "[]", request.idempotencyKey(), "PENDING",
                 7L, "trace-original", null, null);
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
-        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(
+        when(approvalPolicyEngine.evaluate(descriptor, request, "STANDARD")).thenReturn(
                 new ApprovalPolicyDecision(true, "BOOK_DELETE"));
         when(pendingApprovalRepository.findByIdempotencyKey(request.idempotencyKey())).thenReturn(pending);
 
@@ -182,7 +184,7 @@ class ToolCallApplicationServiceTest {
                 new ToolExposure(ToolLifecycleStatus.ACTIVE, "desc", "{}"),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 1, Map.of())
         ));
-        when(approvalPolicyEngine.evaluate(org.mockito.ArgumentMatchers.any(), eq(request)))
+        when(approvalPolicyEngine.evaluate(org.mockito.ArgumentMatchers.any(), eq(request), eq("STANDARD")))
                 .thenReturn(new ApprovalPolicyDecision(false, ""));
         when(toolCallExecutionService.execute(context(request), request)).thenReturn(
                 ToolCallResult.failed("TOOL_HANDLER_NOT_FOUND", "Tool handler not found: missing_handler_tool"));
@@ -207,7 +209,7 @@ class ToolCallApplicationServiceTest {
         );
 
         when(toolDefinitionSource.getRequired("custom_tool")).thenReturn(descriptor);
-        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
+        when(approvalPolicyEngine.evaluate(descriptor, request, "STANDARD")).thenReturn(new ApprovalPolicyDecision(false, ""));
         when(toolCallExecutionService.execute(context(request), request)).thenReturn(
                 ToolCallResult.failed("TOOL_VALIDATION_FAILED", "prompt required"));
  
@@ -233,7 +235,7 @@ class ToolCallApplicationServiceTest {
         ToolCallResult success = ToolCallResult.success("{\"context\":\"ok\"}");
 
         when(toolDefinitionSource.getRequired("custom_tool")).thenReturn(descriptor);
-        when(approvalPolicyEngine.evaluate(descriptor, request)).thenReturn(new ApprovalPolicyDecision(false, ""));
+        when(approvalPolicyEngine.evaluate(descriptor, request, "STANDARD")).thenReturn(new ApprovalPolicyDecision(false, ""));
         when(toolCallExecutionService.execute(context(request), request)).thenReturn(success);
 
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
@@ -243,6 +245,20 @@ class ToolCallApplicationServiceTest {
         verify(approvalApplicationService, never()).create(any(), any());
     }
 
+    @Test
+    void rejects_an_approved_call_when_its_immutable_binding_does_not_match() {
+        ToolCallRequest request = new ToolCallRequest(11L, "custom_tool", "{\"expectedRevision\":2}",
+                "idem-stale", 1, "call-stale", "{}", "[]", "[]",
+                "APPROVED", "{\"toolCode\":\"other_tool\"}", 3L);
+
+        ToolCallResult result = toolCallApplicationService.executeToolCall(request);
+
+        assertThat(result.status()).isEqualTo("FAILED");
+        assertThat(result.errorCode()).isEqualTo("TOOL_APPROVAL_STALE");
+        verify(toolDefinitionSource, never()).getRequired(any());
+        verify(toolCallExecutionService, never()).execute(any(), any());
+    }
+
     private AuthorizedAgentRunContext context(ToolCallRequest request) {
         String traceId = switch (request.toolCallId()) {
             case "call-1" -> "trace-approval";
@@ -250,6 +266,7 @@ class ToolCallApplicationServiceTest {
             case "call-missing" -> "trace-missing-handler";
             case "call-validate" -> "trace-validate";
             case "call-2" -> "trace-direct";
+            case "call-stale" -> "trace-stale";
             default -> "trace-test";
         };
         return com.penmate.backend.application.agent.tool.runtime.AgentToolTestContext.context(

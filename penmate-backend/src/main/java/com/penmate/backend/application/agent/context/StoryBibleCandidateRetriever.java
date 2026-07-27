@@ -40,11 +40,12 @@ public class StoryBibleCandidateRetriever {
         LinkedHashSet<Long> exactAliasIds = new LinkedHashSet<>();
         LinkedHashSet<Long> lexicalIds = new LinkedHashSet<>();
         LinkedHashSet<Long> semanticIds = new LinkedHashSet<>();
-        repository.findAlwaysIncludeNodes(root.getStoryBibleId()).stream()
-                .forEach(node -> {
-                    alwaysIncludeIds.add(node.getNodeId());
-                    merge(merged, node.getNodeId(), 100d, "always_include");
-                });
+        if (request.routingMode() != StoryBibleRoutingMode.AGENT_DRIVEN) {
+            repository.findAlwaysIncludeNodes(root.getStoryBibleId()).forEach(node -> {
+                alwaysIncludeIds.add(node.getNodeId());
+                merge(merged, node.getNodeId(), 100d, "always_include");
+            });
+        }
 
         for (String entity : request.userMentionedEntities()) {
             if (entity == null || entity.isBlank()) continue;
@@ -70,8 +71,9 @@ public class StoryBibleCandidateRetriever {
                 merge(merged, node.getNodeId(), 50d, "lexical");
             }
         }
-        StoryBibleSemanticRetriever.SemanticResult semantic = semanticRetriever.retrieve(
-                request.projectId(), root.getStoryBibleId(), request.userMessage(), LIMIT);
+        StoryBibleSemanticRetriever.SemanticResult semantic = request.routingMode().usesRetrieval()
+                ? semanticRetriever.retrieve(request.projectId(), root.getStoryBibleId(), request.userMessage(), LIMIT)
+                : new StoryBibleSemanticRetriever.SemanticResult(false, List.of());
         for (Candidate candidate : semantic.candidates()) {
             semanticIds.add(candidate.nodeId());
             for (String reason : candidate.reasons()) merge(merged, candidate.nodeId(), candidate.score(), reason);
@@ -79,7 +81,7 @@ public class StoryBibleCandidateRetriever {
         java.util.Set<Long> epochNodeIds = request.epochCatalog().stream()
                 .map(StoryBibleRouteRequest.CatalogEntry::nodeId).collect(java.util.stream.Collectors.toSet());
         List<Candidate> candidates = merged.values().stream()
-                .filter(candidate -> epochNodeIds.contains(candidate.nodeId()))
+                .filter(candidate -> epochNodeIds.isEmpty() || epochNodeIds.contains(candidate.nodeId()))
                 .toList();
         alwaysIncludeIds.retainAll(epochNodeIds);
         exactAliasIds.retainAll(epochNodeIds);

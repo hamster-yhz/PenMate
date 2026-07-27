@@ -39,6 +39,12 @@ public class StoryBibleContextResolver {
     }
 
     public ResolvedContext resolve(StoryBibleRouteRequest request) {
+        if (request.routingMode() == StoryBibleRoutingMode.AGENT_DRIVEN) {
+            StoryBibleRouteDecision decision = new StoryBibleRouteDecision(
+                    StoryBibleRoutingMode.AGENT_DRIVEN, List.of(), List.of(), List.of(), Map.of(),
+                    false, 0L, 0d, null, false, StoryBibleRetrievalTrace.EMPTY, List.of());
+            return new ResolvedContext(decision, List.of(), List.of());
+        }
         long started = System.nanoTime();
         StoryBibleCandidateRetriever.Retrieval retrieval = candidateRetriever.retrieve(request);
         if (retrieval.storyBible() == null) {
@@ -52,7 +58,7 @@ public class StoryBibleContextResolver {
         List<Long> selected;
         Map<Long, String> reasons = new LinkedHashMap<>();
         StoryBibleSelectorGateway.Selection selection = new StoryBibleSelectorGateway.Selection(List.of(), Map.of());
-        boolean selectorAttempted = request.routingMode() != StoryBibleRoutingMode.RETRIEVAL;
+        boolean selectorAttempted = request.routingMode().usesSelector();
         boolean selectorUsed = selectorAttempted;
         boolean selectorFailed = false;
         if (!selectorUsed) {
@@ -91,10 +97,11 @@ public class StoryBibleContextResolver {
         List<StoryBibleRelation> relations = repository.findRelations(retrieval.storyBible().getStoryBibleId(), selected);
         Set<Long> epochIds = request.epochCatalog().stream().map(StoryBibleRouteRequest.CatalogEntry::nodeId)
                 .collect(java.util.stream.Collectors.toSet());
+        boolean unrestricted = epochIds.isEmpty();
         LinkedHashSet<Long> expanded = new LinkedHashSet<>(selected);
-        request.workingSetNodeIds().stream().filter(epochIds::contains).forEach(expanded::add);
+        request.workingSetNodeIds().stream().filter(id -> unrestricted || epochIds.contains(id)).forEach(expanded::add);
         if (selectorUsed) {
-            selection.relationExpansionNodeIds().stream().filter(epochIds::contains).forEach(expanded::add);
+            selection.relationExpansionNodeIds().stream().filter(id -> unrestricted || epochIds.contains(id)).forEach(expanded::add);
         } else {
             for (StoryBibleRelation relation : relations) {
                 if (expanded.contains(relation.getSourceNodeId()) || expanded.contains(relation.getTargetNodeId())) {

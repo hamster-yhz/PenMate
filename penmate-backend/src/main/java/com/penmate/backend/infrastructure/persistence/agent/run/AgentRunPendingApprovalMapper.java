@@ -16,12 +16,13 @@ public interface AgentRunPendingApprovalMapper {
             INSERT INTO agent_run_pending_approvals(
                 pending_approval_id, approval_id, run_id, project_id, session_id, turn_id,
                 tool_call_id, tool_code, tool_args_json, tool_context_json, resume_payload_json,
-                idempotency_key, pending_status, operator_id, trace_id
+                idempotency_key, pending_status, operator_id, trace_id, approval_binding_json
             )
             VALUES(
                 #{pendingApprovalId}, #{approvalId}, #{runId}, #{projectId}, #{sessionId}, #{turnId},
                 #{toolCallId}, #{toolCode}, #{toolArgsJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{toolContextJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{resumePayloadJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
-                #{idempotencyKey}, #{pendingStatus}, #{operatorId}, #{traceId}
+                #{idempotencyKey}, #{pendingStatus}, #{operatorId}, #{traceId},
+                #{approvalBindingJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}
             )
             """)
     int insert(AgentRunPendingApproval pendingApproval);
@@ -44,6 +45,7 @@ public interface AgentRunPendingApprovalMapper {
                 pending_status AS pendingStatus,
                 operator_id AS operatorId,
                 trace_id AS traceId,
+                approval_binding_json AS approvalBindingJson,
                 created_at AS createdAt,
                 updated_at AS updatedAt
             FROM agent_run_pending_approvals
@@ -57,7 +59,7 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
             FROM agent_run_pending_approvals
             WHERE idempotency_key = #{idempotencyKey}
             """)
@@ -69,7 +71,7 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
             FROM agent_run_pending_approvals
             WHERE run_id = #{runId} AND pending_status = 'APPROVED'
             ORDER BY updated_at DESC, id DESC LIMIT 1
@@ -82,7 +84,20 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
+            FROM agent_run_pending_approvals
+            WHERE run_id = #{runId} AND pending_status = 'REJECTED'
+            ORDER BY updated_at DESC, id DESC LIMIT 1
+            """)
+    AgentRunPendingApproval findRejectedByRunId(Long runId);
+
+    @Select("""
+            SELECT id, pending_approval_id AS pendingApprovalId, approval_id AS approvalId, run_id AS runId,
+                   project_id AS projectId, session_id AS sessionId, turn_id AS turnId,
+                   tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
+                   tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
+                   idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
+                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
             FROM agent_run_pending_approvals
             WHERE run_id = #{runId} AND pending_status = 'PENDING'
             ORDER BY updated_at DESC, id DESC LIMIT 1
@@ -131,6 +146,7 @@ public interface AgentRunPendingApprovalMapper {
                 pending_status AS pendingStatus,
                 operator_id AS operatorId,
                 trace_id AS traceId,
+                approval_binding_json AS approvalBindingJson,
                 created_at AS createdAt,
                 updated_at AS updatedAt
             FROM agent_run_pending_approvals

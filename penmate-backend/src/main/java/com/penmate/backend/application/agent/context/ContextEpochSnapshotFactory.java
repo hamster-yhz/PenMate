@@ -44,11 +44,21 @@ public class ContextEpochSnapshotFactory {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public ContextEpochSnapshotCodec.Snapshot create(Long projectId, Long activeChapterId) {
+    public ContextEpochSnapshotCodec.Snapshot create(Long projectId, Long activeChapterId,
+                                                     StoryBibleRoutingMode routingMode) {
         StoryBible root = storyBibles.findByProjectId(projectId);
         if (root == null) throw BusinessException.notFound("Story Bible not found");
         NovelProject project = novels.findProjectById(projectId);
         if (project == null) throw BusinessException.notFound("Novel project not found");
+        NovelChapter activeChapter = activeChapterId == null ? null
+                : novels.findChapterByIdAndProjectId(projectId, activeChapterId);
+        long chapterRevision = activeChapter == null || activeChapter.getContentRevision() == null
+                ? 0L : activeChapter.getContentRevision();
+        if (routingMode == StoryBibleRoutingMode.AGENT_DRIVEN) {
+            return new ContextEpochSnapshotCodec.Snapshot(2, projectId, root.getStoryBibleId(),
+                    root.getContentRevision(), project.getStructureRevision() == null ? 0L : project.getStructureRevision(),
+                    activeChapterId, chapterRevision, List.of(), List.of());
+        }
         Map<Long, StoryBibleNodeType> types = new HashMap<>();
         for (StoryBibleNodeType type : storyBibles.findNodeTypes(root.getStoryBibleId())) types.put(type.getTypeId(), type);
         List<StoryBibleNode> nodes = storyBibles.findNodes(
@@ -95,10 +105,6 @@ public class ContextEpochSnapshotFactory {
                     currentStateSummary(state),
                     node.getInclusionPolicy().name(), node.getCanonStatus().name());
         }).toList();
-        NovelChapter activeChapter = activeChapterId == null ? null
-                : novels.findChapterByIdAndProjectId(projectId, activeChapterId);
-        long chapterRevision = activeChapter == null || activeChapter.getContentRevision() == null
-                ? 0L : activeChapter.getContentRevision();
         return new ContextEpochSnapshotCodec.Snapshot(2, projectId, root.getStoryBibleId(), root.getContentRevision(),
                 project.getStructureRevision() == null ? 0L : project.getStructureRevision(), activeChapterId,
                 chapterRevision, core, catalog);

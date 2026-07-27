@@ -36,6 +36,11 @@ public class AgentRunPendingApprovalRepositoryImpl implements AgentRunPendingApp
     }
 
     @Override
+    public AgentRunPendingApproval findRejectedByRunId(Long runId) {
+        return mapper.findRejectedByRunId(runId);
+    }
+
+    @Override
     public AgentRunPendingApproval findPendingByRunId(Long runId) {
         return mapper.findPendingByRunId(runId);
     }

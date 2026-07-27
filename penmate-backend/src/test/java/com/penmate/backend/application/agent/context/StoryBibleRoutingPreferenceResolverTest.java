@@ -29,7 +29,7 @@ class StoryBibleRoutingPreferenceResolverTest {
         when(sessions.findSession(20L, 30L)).thenReturn(AgentSession.active(30L, 20L, 9L, "Draft"));
         when(novels.findProjectById(20L)).thenReturn(project(20L, 9L));
         when(preferences.findProjectPreference(20L)).thenReturn(
-                new AgentRoutingPreference(20L, "RETRIEVAL_THEN_LLM", 70L, 80L, "READY"));
+                new AgentRoutingPreference(20L, "RETRIEVAL_THEN_LLM", true, 70L, 80L, "READY"));
         ModelConfiguration router = new ModelConfiguration();
         router.setModelType("CHAT");
         router.setStatus("ACTIVE");
@@ -42,12 +42,12 @@ class StoryBibleRoutingPreferenceResolverTest {
     }
 
     @Test
-    void forcesLlmSelectorWhenEmbeddingIndexIsUnavailable() {
+    void temporarily_uses_agent_driven_when_embedding_index_is_unavailable() {
         when(novels.findProjectById(20L)).thenReturn(project(20L, 9L));
         when(preferences.findProjectPreference(20L)).thenReturn(
-                new AgentRoutingPreference(20L, "RETRIEVAL", null, 80L, "REINDEX_REQUIRED"));
+                new AgentRoutingPreference(20L, "RETRIEVAL", true, null, 80L, "REINDEX_REQUIRED"));
 
-        assertThat(resolver.resolveProject(20L, 9L).mode()).isEqualTo(StoryBibleRoutingMode.LLM_SELECTOR);
+        assertThat(resolver.resolveProject(20L, 9L).mode()).isEqualTo(StoryBibleRoutingMode.AGENT_DRIVEN);
     }
 
     @Test

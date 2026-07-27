@@ -41,9 +41,10 @@ public class AgentRunSuccessorService {
                 predecessor.ownerUserId(), predecessor.runId(), "PENDING", "created", null, null,
                 null, null, 0L, 0, null, null, null, 0L, null, traceId, null, null);
         AgentRunInput input = new AgentRunInput(
-                runId, oldInput.promptSnapshot(), oldInput.taskType(), oldInput.chapterId(),
+                runId, oldInput.promptSnapshot(), oldInput.chapterId(),
+                oldInput.chapterIds(),
                 oldInput.selectedText(), oldInput.styleSnapshotJson(), oldInput.modelSnapshotJson(),
-                oldInput.pluginBindingsJson(), oldInput.inputHash());
+                oldInput.pluginBindingsJson(), oldInput.safetyMode(), oldInput.inputHash());
         requireOne(runs.insert(successor), "failed to insert successor Run");
         requireOne(runs.insertInput(input), "failed to insert successor Run input");
         skillActivationService.bindSessionSkillsToRun(predecessor.sessionId(), runId);

@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.tool.definition.ToolOperationPolicy
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.application.common.serialization.JsonValues;
+import com.penmate.backend.domain.agent.model.AgentSafetyMode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,11 @@ public class DefaultApprovalPolicyEngine {
     }
 
     public ApprovalPolicyDecision evaluate(AgentToolDescriptor descriptor, ToolCallRequest request) {
+        return evaluate(descriptor, request, null);
+    }
+
+    public ApprovalPolicyDecision evaluate(AgentToolDescriptor descriptor, ToolCallRequest request,
+                                           String safetyModeSnapshot) {
         if (descriptor == null || request == null) {
             throw new IllegalArgumentException("descriptor and request must not be null");
         }
@@ -34,10 +40,26 @@ public class DefaultApprovalPolicyEngine {
         ToolOperationPolicy operationPolicy = findOperationPolicy(governance, operation);
         ApprovalPolicyDecision resolved = enrichDecision(
                 operationPolicy == null ? governance.defaultDecision() : operationPolicy.decision(),
-                governance.riskLevel(), operation, descriptor.presentation().displayName());
+                operationPolicy == null || operationPolicy.riskLevel() == null
+                        ? governance.riskLevel() : operationPolicy.riskLevel(),
+                operation, descriptor.presentation().displayName());
+        if (safetyModeSnapshot != null) {
+            resolved = applySafetyMode(resolved, AgentSafetyMode.parse(safetyModeSnapshot));
+        }
         log.debug("approval policy evaluated: toolCode={}, operation={}, required={}, runId={}",
                 descriptor.toolCode(), operation, resolved.approvalRequired(), request.runId());
         return resolved;
+    }
+
+    private ApprovalPolicyDecision applySafetyMode(ApprovalPolicyDecision decision, AgentSafetyMode mode) {
+        int risk = decision.riskLevel() == null ? 0 : decision.riskLevel();
+        boolean approvalRequired = risk > mode.maximumAutomaticRisk();
+        String approvalType = decision.approvalType();
+        if (approvalRequired && (approvalType == null || approvalType.isBlank())) {
+            approvalType = "TOOL_RISK_LEVEL_" + risk;
+        }
+        return new ApprovalPolicyDecision(approvalRequired, approvalType, risk,
+                decision.operationCode(), decision.displayName());
     }
 
     private ToolOperationPolicy findOperationPolicy(ToolGovernancePolicy governance, String operation) {

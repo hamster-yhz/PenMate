@@ -143,7 +143,7 @@ class AgentToolMutationGuardTest {
     }
 
     private AgentRunInput input() {
-        return new AgentRunInput(11L, "prompt", "CHAT", 5L, null, null, null, null, "hash");
+        return new AgentRunInput(11L, "prompt", 5L, java.util.List.of(5L), null, null, null, null, "STANDARD", "hash");
     }
 
     private AgentRunContextArtifactService.ResolvedArtifact artifact() {

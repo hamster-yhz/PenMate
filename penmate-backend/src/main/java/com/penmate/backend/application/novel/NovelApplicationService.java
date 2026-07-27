@@ -8,6 +8,7 @@ import com.penmate.backend.domain.novel.repository.NovelGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
 import com.penmate.backend.application.rag.ProjectAiConfigurationService;
+import com.penmate.backend.application.rag.RagSourceSyncService;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateChapterCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateProjectCommand;
 import com.penmate.backend.application.novel.command.NovelCommands.CreateVolumeCommand;
@@ -21,6 +22,7 @@ import com.penmate.backend.application.novel.command.NovelCommands.UpdateProject
 import com.penmate.backend.application.novel.command.NovelCommands.UpdateVolumeCommand;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -53,6 +55,7 @@ public class NovelApplicationService {
     private final BusinessIdGenerator businessIdGenerator;
     private final StoryBibleApplicationService storyBibleApplicationService;
     private final ProjectAiConfigurationService projectAiConfigurationService;
+    private RagSourceSyncService ragSourceSyncService;
 
     public NovelApplicationService(NovelGateway novelGateway,
                                    BusinessIdGenerator businessIdGenerator,
@@ -62,6 +65,11 @@ public class NovelApplicationService {
         this.businessIdGenerator = businessIdGenerator;
         this.storyBibleApplicationService = storyBibleApplicationService;
         this.projectAiConfigurationService = projectAiConfigurationService;
+    }
+
+    @Autowired
+    void setRagSourceSyncService(RagSourceSyncService ragSourceSyncService) {
+        this.ragSourceSyncService = ragSourceSyncService;
     }
 
     /**
@@ -491,7 +499,9 @@ public class NovelApplicationService {
                     Map.of("contentRevision", current.getContentRevision()));
         }
         novelGateway.invalidateAvailableAiUndoByChapter(projectId, chapterId);
-        return getChapter(projectId, chapterId);
+        NovelChapter saved = getChapter(projectId, chapterId);
+        scheduleUserChapter(projectId, actorUserId, chapterId);
+        return saved;
     }
 
     @Transactional
@@ -551,6 +561,7 @@ public class NovelApplicationService {
             }
         }
         NovelChapter saved = getChapter(projectId, chapterId);
+        scheduleAiChapter(projectId, actorUserId, chapterId);
         return new AiChapterEditResult(saved, toUndoView(operation, saved.getTitle()));
     }
 
@@ -612,7 +623,9 @@ public class NovelApplicationService {
         if (operation == null) {
             throw com.penmate.backend.application.common.exception.BusinessException.notFound("AI edit operation not found");
         }
-        return restoreAiOperation(operation);
+        AiUndoView restored = restoreAiOperation(operation);
+        scheduleAiChapter(projectId, actorUserId, operation.getChapterId());
+        return restored;
     }
 
     @Transactional
@@ -629,6 +642,7 @@ public class NovelApplicationService {
         List<AiUndoView> restored = new ArrayList<>();
         for (ChapterAiUndoOperation operation : operations) {
             restored.add(restoreAiOperation(operation));
+            scheduleAiChapter(projectId, actorUserId, operation.getChapterId());
         }
         return List.copyOf(restored);
     }
@@ -816,7 +830,9 @@ public class NovelApplicationService {
         }
 
         log.info("更新章节成功: projectId={}, chapterId={}", projectId, chapterId);
-        return getChapter(projectId, chapterId);
+        NovelChapter saved = getChapter(projectId, chapterId);
+        scheduleUserChapter(projectId, operatorId, chapterId);
+        return saved;
     }
 
     @Transactional
@@ -960,6 +976,9 @@ public class NovelApplicationService {
             throw com.penmate.backend.application.common.exception.BusinessException.of("Chapter not found or already deleted");
         }
         incrementStructureRevision(projectId);
+        if (ragSourceSyncService != null) {
+            ragSourceSyncService.delete(projectId, operatorId, RagSourceSyncService.MANUSCRIPT, chapterId);
+        }
          
         log.info("删除章节成功: projectId={}, chapterId={}", projectId, chapterId);
     }
@@ -971,6 +990,14 @@ public class NovelApplicationService {
      * @param chapterId 入参：chapterId
      * @return 出参：章节正文文本
      */
+    private void scheduleUserChapter(Long projectId, Long ownerUserId, Long chapterId) {
+        if (ragSourceSyncService != null) ragSourceSyncService.scheduleUserChapter(projectId, ownerUserId, chapterId);
+    }
+
+    private void scheduleAiChapter(Long projectId, Long ownerUserId, Long chapterId) {
+        if (ragSourceSyncService != null) ragSourceSyncService.scheduleAiChapter(projectId, ownerUserId, chapterId);
+    }
+
     public String getChapterContentText(Long projectId, Long chapterId) {
         Objects.requireNonNull(projectId, "projectId must not be null");
         Objects.requireNonNull(chapterId, "chapterId must not be null");

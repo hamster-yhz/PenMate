@@ -25,7 +25,7 @@ public record StoryBibleRouteRequest(
         epochCatalog = List.copyOf(epochCatalog == null ? List.of() : epochCatalog);
         workingSetNodeIds = List.copyOf(workingSetNodeIds == null ? List.of() : workingSetNodeIds);
         conversationWindow = List.copyOf(conversationWindow == null ? List.of() : conversationWindow);
-        routingMode = routingMode == null ? StoryBibleRoutingMode.RETRIEVAL_THEN_LLM : routingMode;
+        routingMode = routingMode == null ? StoryBibleRoutingMode.AGENT_DRIVEN : routingMode;
     }
 
     public StoryBibleRouteRequest(Long projectId, Long sessionId, Long runId, Long chapterId,

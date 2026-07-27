@@ -57,7 +57,8 @@ class AgentRunAppServiceTest {
                 new AgentRunAppService(agentRunRepository, eventPublisher, runDispatcher),
                 runDispatcher,
                 mock(AgentSkillActivationService.class),
-                passthroughRecoveryPrompts()
+                passthroughRecoveryPrompts(),
+                mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class)
         );
 
         AgentTurnResult result = service.createTurn(101L, 90001L, command(), "trace-1");
@@ -76,7 +77,7 @@ class AgentRunAppServiceTest {
                 201L,
                 "Write a suspense opening.",
                 java.util.List.of(),
-                new AgentTurnCommand.TaskRequest("WRITE", 30001L, 1001L, "selected text")
+                new AgentTurnCommand.TaskRequest(30001L, java.util.List.of(30001L), 1001L, "selected text")
         );
     }
 

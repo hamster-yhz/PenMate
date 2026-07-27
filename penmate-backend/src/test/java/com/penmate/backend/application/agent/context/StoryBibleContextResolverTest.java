@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class StoryBibleContextResolverTest {
@@ -30,6 +31,16 @@ class StoryBibleContextResolverTest {
     private final StoryBibleRepository repository = mock(StoryBibleRepository.class);
     private final StoryBibleEffectiveStateResolver effective = mock(StoryBibleEffectiveStateResolver.class);
     private final StoryBibleContextResolver resolver = new StoryBibleContextResolver(candidates, selector, repository, effective);
+
+    @Test
+    void agent_driven_mode_should_preload_nothing_and_skip_story_bible_access() {
+        var result = resolver.resolve(request(StoryBibleRoutingMode.AGENT_DRIVEN));
+
+        assertThat(result.nodes()).isEmpty();
+        assertThat(result.relations()).isEmpty();
+        assertThat(result.decision().selectedNodeIds()).isEmpty();
+        verifyNoInteractions(candidates, selector, repository, effective);
+    }
 
     @Test
     void retrieval_mode_should_not_call_llm_and_should_expand_one_hop_relations() {

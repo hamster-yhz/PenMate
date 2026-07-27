@@ -53,7 +53,7 @@ class AgentRunSuccessorServiceTest {
     }
 
     private AgentRunInput input() {
-        return new AgentRunInput(60L, "continue", "WRITE", 40L,
-                "selection", "style", "model", "plugins", "hash");
+        return new AgentRunInput(60L, "continue", 40L, java.util.List.of(40L),
+                "selection", "style", "model", "plugins", "STANDARD", "hash");
     }
 }

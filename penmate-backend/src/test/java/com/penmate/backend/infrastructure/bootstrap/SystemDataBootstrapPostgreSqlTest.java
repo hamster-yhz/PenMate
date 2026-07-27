@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.bootstrap;
 
+import com.penmate.backend.application.model.ModelCapabilityCatalogService;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,8 @@ class SystemDataBootstrapPostgreSqlTest {
 
         SystemBootstrapProperties properties = properties(
                 "Admin@PenMate.Local", "first-password", "first-key", "first-model");
-        SystemDataBootstrap bootstrap = new SystemDataBootstrap(jdbc, passwordEncoder, crypto, properties);
+        SystemDataBootstrap bootstrap = new SystemDataBootstrap(
+                jdbc, passwordEncoder, crypto, properties, new ModelCapabilityCatalogService());
 
         bootstrap.run(mock(ApplicationArguments.class));
 

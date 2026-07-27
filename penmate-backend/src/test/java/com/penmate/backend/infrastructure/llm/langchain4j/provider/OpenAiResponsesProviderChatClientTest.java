@@ -32,6 +32,7 @@ class OpenAiResponsesProviderChatClientTest {
             .apiKey("sk-test")
             .modelName("gpt-5")
             .reasoningPolicy(new AgentReasoningPolicy("medium", "auto"))
+            .maxOutputTokens(4321)
             .build();
 
     @Test
@@ -47,6 +48,7 @@ class OpenAiResponsesProviderChatClientTest {
 
         assertThat(body.getBool("stream")).isTrue();
         assertThat(body.getBool("store")).isFalse();
+        assertThat(body.getInt("max_output_tokens")).isEqualTo(4321);
         assertThat(body.getJSONObject("reasoning").getStr("effort")).isEqualTo("medium");
         assertThat(body.getJSONObject("reasoning").getStr("summary")).isEqualTo("auto");
         assertThat(tool.getStr("type")).isEqualTo("function");

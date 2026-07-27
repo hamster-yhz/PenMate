@@ -9,6 +9,13 @@ public record SessionTokenUsageView(
         Double usageRatio,
         Integer promptTokens,
         Integer completionTokens,
-        String modelName
+        String modelName,
+        String usageSource,
+        String contextCapacitySource
 ) {
+    public SessionTokenUsageView(Integer usedTokens, Integer maxContextTokens, Double usageRatio,
+                                 Integer promptTokens, Integer completionTokens, String modelName) {
+        this(usedTokens, maxContextTokens, usageRatio, promptTokens, completionTokens,
+                modelName, "ESTIMATE", "FALLBACK");
+    }
 }

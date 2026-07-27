@@ -78,8 +78,9 @@ public class AgentRunStateTransitionService {
 
     private void completeApproval(Long approvalId) {
         if (approvalId == null) return;
-        if (pendingApprovals.markStatus(approvalId, "APPROVED", "COMPLETED") != 1) {
-            throw new IllegalStateException("Approved Agent tool continuation is no longer current");
+        if (pendingApprovals.markStatus(approvalId, "APPROVED", "COMPLETED") != 1
+                && pendingApprovals.markStatus(approvalId, "REJECTED", "COMPLETED") != 1) {
+            throw new IllegalStateException("Reviewed Agent tool continuation is no longer current");
         }
     }
 

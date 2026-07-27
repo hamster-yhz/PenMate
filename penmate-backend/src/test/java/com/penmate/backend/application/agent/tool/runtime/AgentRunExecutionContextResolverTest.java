@@ -132,8 +132,8 @@ class AgentRunExecutionContextResolverTest {
     }
 
     private AgentRunInput input(Long runId) {
-        return new AgentRunInput(runId, "prompt", "WRITE", 801L,
-                null, null, null, null, "hash");
+        return new AgentRunInput(runId, "prompt", 801L, java.util.List.of(801L),
+                null, null, null, null, "STANDARD", "hash");
     }
 
     private NovelProject project() {

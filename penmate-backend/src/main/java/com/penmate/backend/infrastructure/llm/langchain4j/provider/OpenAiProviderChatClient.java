@@ -30,5 +30,10 @@ public class OpenAiProviderChatClient extends AbstractOpenAiCompatibleProviderCh
         return supports(executionConfig == null ? null : executionConfig.providerCode())
                 && AgentLlmProtocol.from(executionConfig.protocolCode()) != AgentLlmProtocol.OPENAI_RESPONSES;
     }
+
+    @Override
+    protected String outputTokenField() {
+        return "max_completion_tokens";
+    }
 }
 

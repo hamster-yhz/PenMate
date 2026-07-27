@@ -105,7 +105,6 @@ class LongcatProviderChatClientTest {
                 new AgentLlmTurnRequest(
                         List.of(com.penmate.backend.domain.agent.model.AgentLlmMessage.user("继续写第 3 章")),
                         new com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource(List.of(
-                                new com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition(),
                                 new com.penmate.backend.application.agent.tool.definition.TodoCrudToolDefinition(),
                                 com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions.read(),
                                 com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions.replace(),
@@ -126,7 +125,7 @@ class LongcatProviderChatClientTest {
 
         assertThat(actual.assistantText()).isEqualTo("ok");
         JSONObject root = AgentJsonCodec.parseObj(capturedRequestBody[0]);
-        assertThat(root.getJSONArray("tools")).hasSize(4);
+        assertThat(root.getJSONArray("tools")).hasSize(3);
         for (Object toolObject : root.getJSONArray("tools")) {
             JSONObject parameters = ((JSONObject) toolObject)
                     .getJSONObject("function")

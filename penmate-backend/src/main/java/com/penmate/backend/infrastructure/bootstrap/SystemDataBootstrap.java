@@ -1,5 +1,6 @@
 package com.penmate.backend.infrastructure.bootstrap;
 
+import com.penmate.backend.application.model.ModelCapabilityCatalogService;
 import com.penmate.backend.domain.shared.service.SecretCryptoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.util.Locale;
 
 @Slf4j
@@ -28,6 +30,7 @@ public class SystemDataBootstrap implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final SecretCryptoService secretCryptoService;
     private final SystemBootstrapProperties properties;
+    private final ModelCapabilityCatalogService capabilityCatalog;
 
     @Override
     @Transactional
@@ -82,6 +85,8 @@ public class SystemDataBootstrap implements ApplicationRunner {
             return null;
         }
         long providerId = requireProviderId(group.getProvider(), modelType);
+        ModelCapabilityCatalogService.Resolution capacity = capabilityCatalog.resolveForSave(
+                group.getProvider(), group.getModelName(), null, null);
         Integer configCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM model_configurations WHERE model_config_id = ? AND deleted_at IS NULL",
                 Integer.class,
@@ -92,20 +97,28 @@ public class SystemDataBootstrap implements ApplicationRunner {
                     INSERT INTO model_configurations(
                         model_config_id, scope_type, owner_user_id, provider_id, display_name,
                         model_type, model_name, base_url, distance_metric, context_window_turns,
-                        max_context_tokens, status, created_by, updated_by
-                    ) VALUES (?, 'SYSTEM', NULL, ?, ?, ?, ?, ?, ?, 6, 128000, 'ACTIVE', ?, ?)
+                        max_context_tokens, max_output_tokens, context_capacity_source,
+                        context_capacity_source_url, context_capacity_verified_at,
+                        status, created_by, updated_by
+                    ) VALUES (?, 'SYSTEM', NULL, ?, ?, ?, ?, ?, ?, 6, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)
                     """, modelConfigId, providerId, bootstrapDisplayName(modelType, group.getModelName()),
                     modelType, group.getModelName().trim(), group.getBaseUrl().trim(), distanceMetric,
+                    capacity.maxContextTokens(), capacity.maxOutputTokens(), capacity.source(),
+                    capacity.sourceUrl(), timestamp(capacity),
                     ADMIN_USER_ID, ADMIN_USER_ID);
         } else if (properties.isReconcile()) {
             jdbcTemplate.update("""
                     UPDATE model_configurations
                     SET provider_id = ?, display_name = ?, model_name = ?, base_url = ?,
-                        distance_metric = ?, status = 'ACTIVE', updated_by = ?,
+                        distance_metric = ?, max_context_tokens = ?, max_output_tokens = ?,
+                        context_capacity_source = ?, context_capacity_source_url = ?,
+                        context_capacity_verified_at = ?, status = 'ACTIVE', updated_by = ?,
                         updated_at = CURRENT_TIMESTAMP(3)
                     WHERE model_config_id = ? AND scope_type = 'SYSTEM' AND deleted_at IS NULL
                     """, providerId, bootstrapDisplayName(modelType, group.getModelName()),
                     group.getModelName().trim(), group.getBaseUrl().trim(), distanceMetric,
+                    capacity.maxContextTokens(), capacity.maxOutputTokens(), capacity.source(),
+                    capacity.sourceUrl(), timestamp(capacity),
                     ADMIN_USER_ID, modelConfigId);
         }
 
@@ -139,7 +152,7 @@ public class SystemDataBootstrap implements ApplicationRunner {
                 INSERT INTO model_user_preferences(
                     user_id, default_creative_model_config_id, default_context_selector_model_config_id,
                     default_embedding_model_config_id, default_story_bible_routing_mode
-                ) VALUES (?, ?, ?, ?, 'LLM_SELECTOR')
+                ) VALUES (?, ?, ?, ?, 'AGENT_DRIVEN')
                 ON CONFLICT (user_id) DO NOTHING
                 """, ADMIN_USER_ID, chatConfigId, chatConfigId, embeddingConfigId);
         if (properties.isReconcile()) {
@@ -212,5 +225,9 @@ public class SystemDataBootstrap implements ApplicationRunner {
         String normalized = apiKey.trim();
         int visible = Math.min(4, normalized.length());
         return "****" + normalized.substring(normalized.length() - visible);
+    }
+
+    private Timestamp timestamp(ModelCapabilityCatalogService.Resolution capacity) {
+        return capacity.verifiedAt() == null ? null : Timestamp.from(capacity.verifiedAt());
     }
 }

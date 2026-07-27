@@ -9,6 +9,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
+import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolParameters;
@@ -47,7 +48,8 @@ public class ClaudeProviderChatClient implements ProviderChatClient {
 
         AnthropicChatModel.AnthropicChatModelBuilder builder = AnthropicChatModel.builder()
                 .apiKey(apiKey)
-                .modelName(modelName);
+                .modelName(modelName)
+                .maxTokens(executionConfig.maxOutputTokens());
         if (baseUrl != null && !baseUrl.isBlank()) {
             builder.baseUrl(baseUrl);
         }
@@ -72,7 +74,8 @@ public class ClaudeProviderChatClient implements ProviderChatClient {
 
         AnthropicChatModel.AnthropicChatModelBuilder builder = AnthropicChatModel.builder()
                 .apiKey(apiKey)
-                .modelName(modelName);
+                .modelName(modelName)
+                .maxTokens(executionConfig.maxOutputTokens());
         if (baseUrl != null && !baseUrl.isBlank()) {
             builder.baseUrl(baseUrl);
         }
@@ -176,12 +179,22 @@ public class ClaudeProviderChatClient implements ProviderChatClient {
         String finishReason = response != null && response.finishReason() == FinishReason.TOOL_EXECUTION
                 ? "tool_calls"
                 : "stop";
+        dev.langchain4j.model.output.TokenUsage rawUsage = response == null ? null : response.tokenUsage();
+        LlmTokenUsage tokenUsage = rawUsage == null ? LlmTokenUsage.ZERO : new LlmTokenUsage(
+                value(rawUsage.inputTokenCount()),
+                value(rawUsage.outputTokenCount()),
+                value(rawUsage.totalTokenCount()));
         return new AgentLlmTurnResponse(
                 finishReason,
                 content == null ? "" : content.text(),
                 toolCalls,
-                response == null ? "{}" : String.valueOf(response)
+                response == null ? "{}" : String.valueOf(response),
+                tokenUsage
         );
+    }
+
+    private int value(Integer value) {
+        return value == null ? 0 : Math.max(0, value);
     }
 
     private List<?> toList(Object value) {

@@ -3,11 +3,12 @@ package com.penmate.backend.application.agent.tool.runtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.prompt.SkillCatalogItem;
 import com.penmate.backend.application.agent.prompt.SkillPromptRegistry;
-import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDescriptor;
 import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
+import com.penmate.backend.application.agent.tool.definition.LedgerCrudToolDefinition;
+import com.penmate.backend.application.agent.tool.definition.ManuscriptReadToolDefinitions;
 import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.RagQueryToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.SkillLoadToolDefinition;
@@ -43,7 +44,6 @@ class AgentToolRegistryTest {
         SkillPromptRegistry skills = mock(SkillPromptRegistry.class);
         when(skills.listAvailableSkills()).thenReturn(List.of(new SkillCatalogItem("writer", "Write prose")));
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
-                new BookCrudToolDefinition(),
                 ChapterContentToolDefinitions.read(),
                 ChapterContentToolDefinitions.replace(),
                 ChapterContentToolDefinitions.patch(),
@@ -56,6 +56,9 @@ class AgentToolRegistryTest {
                 StoryBibleV2ToolDefinitions.relationWrite(),
                 StoryBibleV2ToolDefinitions.progressionWrite(),
                 StoryBibleV2ToolDefinitions.structureWrite(),
+                new LedgerCrudToolDefinition(),
+                ManuscriptReadToolDefinitions.manifest(),
+                ManuscriptReadToolDefinitions.chapterRead(),
                 new TodoCrudToolDefinition()
         ));
         List<AgentToolHandler> handlers = definitions.listAll().stream()
@@ -65,16 +68,17 @@ class AgentToolRegistryTest {
         AgentToolRegistry registry = new AgentToolRegistry(
                 definitions, handlers, new NetworkntAgentToolSchemaValidator(objectMapper));
 
-        assertThat(definitions.listAll()).hasSize(14);
+        assertThat(definitions.listAll()).hasSize(16);
         assertThat(definitions.listLlmSchemas())
                 .extracting(schema -> schema.toolCode())
-                .contains("chapter_read", "chapter_replace", "chapter_patch", "todo_crud")
+                .contains("chapter_read", "chapter_replace", "chapter_patch", "ledger_crud",
+                        "manuscript_manifest", "manuscript_chapter_read")
+                .doesNotContain("todo_crud")
                 .doesNotContain("book_crud");
-        assertThat(registry.getRequiredDescriptor("book_crud").exposure().lifecycleStatus())
-                .isEqualTo(ToolLifecycleStatus.DISABLED);
         assertThat(registry.getRequiredDescriptor("todo_crud").exposure().lifecycleStatus())
+                .isEqualTo(ToolLifecycleStatus.DISABLED);
+        assertThat(registry.getRequiredDescriptor("ledger_crud").exposure().lifecycleStatus())
                 .isEqualTo(ToolLifecycleStatus.ACTIVE);
-        assertThat(registry.getRequiredHandler("book_crud")).isNotNull();
         assertThat(registry.getRequiredHandler("todo_crud")).isNotNull();
     }
 

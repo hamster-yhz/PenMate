@@ -6,7 +6,6 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
-import com.penmate.backend.application.agent.tool.definition.BookCrudToolDefinition;
 import com.penmate.backend.application.agent.tool.definition.ChapterContentToolDefinitions;
 import com.penmate.backend.application.agent.tool.definition.InMemoryAgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.definition.QualityReviewToolDefinition;
@@ -92,7 +91,7 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
     @Test
     void omits_tools_that_are_registered_but_hidden_from_the_llm() {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
-                new BookCrudToolDefinition()
+                new TodoCrudToolDefinition()
         ));
         AgentLlmTurnRequest request = new AgentLlmTurnRequest(
                 List.of(AgentLlmMessage.user("hello")),
@@ -109,7 +108,6 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
     @Test
     void builds_complete_llm_tool_list_with_current_story_bible_contracts() {
         AgentToolDefinitionSource definitions = new InMemoryAgentToolDefinitionSource(List.of(
-                new BookCrudToolDefinition(),
                 ChapterContentToolDefinitions.read(),
                 ChapterContentToolDefinitions.replace(),
                 ChapterContentToolDefinitions.patch(),
@@ -136,9 +134,12 @@ class NativeOpenAiStyleHttpProviderChatClientToolModeTest {
         assertThat(schemas).extracting(AgentLlmToolSchema::toolCode)
                 .contains("chapter_read", "chapter_replace", "chapter_patch",
                         "story_bible_inspect", "story_bible_node_write", "story_bible_relation_write",
-                        "story_bible_progression_write", "story_bible_structure_write", "todo_crud");
+                        "story_bible_progression_write", "story_bible_structure_write")
+                .doesNotContain("todo_crud", "book_crud");
         JSONObject nodeWrite = findParameters(tools, "story_bible_node_write");
-        assertThat(nodeWrite.getJSONObject("properties").getJSONObject("attributes").getStr("type"))
+        assertThat(nodeWrite.getJSONObject("properties").getJSONObject("items")
+                .getJSONObject("items").getJSONObject("properties")
+                .getJSONObject("attributes").getStr("type"))
                 .isEqualTo("object");
     }
 

@@ -3,7 +3,6 @@ package com.penmate.backend.interfaces.api.agent.dto;
 public record AgentRunDto(
         AgentRecoverySnapshotDto.SessionDto session,
         ActiveRunDto activeRun,
-        String taskType,
         String userMessage
 ) {
 

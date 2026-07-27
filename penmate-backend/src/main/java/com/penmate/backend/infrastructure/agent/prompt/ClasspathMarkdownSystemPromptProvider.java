@@ -31,14 +31,14 @@ public class ClasspathMarkdownSystemPromptProvider implements SystemPromptProvid
     private static final String DOCUMENTS_PROPERTY = "documents";
 
     @Override
-    public SystemPromptBundle loadBundle(String stage, String profile) {
-        String bundlePath = PROMPT_ROOT + "/" + stage + "/" + profile;
+    public SystemPromptBundle loadBundle(String stage) {
+        String bundlePath = PROMPT_ROOT + "/" + stage + "/default";
         List<SystemPromptDocument> documents = loadDocuments(stage, bundlePath);
         String assembledPrompt = documents.stream()
                 .map(SystemPromptDocument::content)
                 .reduce((left, right) -> left + "\n\n" + right)
                 .orElse("");
-        return new SystemPromptBundle(stage, profile, List.copyOf(documents), assembledPrompt);
+        return new SystemPromptBundle(stage, List.copyOf(documents), assembledPrompt);
     }
 
     private List<SystemPromptDocument> loadDocuments(String stage, String bundlePath) {

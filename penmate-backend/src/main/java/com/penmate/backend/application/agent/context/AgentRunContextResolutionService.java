@@ -2,10 +2,10 @@ package com.penmate.backend.application.agent.context;
 
 import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.orchestration.ConversationWindowBuilder;
 import com.penmate.backend.application.author.AuthorProfileApplicationService;
 import com.penmate.backend.application.common.serialization.JsonCodec;
+import com.penmate.backend.application.novel.NovelApplicationService;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.context.model.AgentWorkingSetEntry;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
@@ -35,6 +35,7 @@ public class AgentRunContextResolutionService {
     private final AgentSessionRepository sessionRepository;
     private final ConversationWindowBuilder conversationWindows;
     private final AuthorProfileApplicationService authorProfiles;
+    private final NovelApplicationService novels;
 
     public AgentRunContextResolutionService(
             StoryBibleRoutingPreferenceResolver preferences,
@@ -50,7 +51,8 @@ public class AgentRunContextResolutionService {
             JsonCodec jsonCodec,
             AgentSessionRepository sessionRepository,
             ConversationWindowBuilder conversationWindows,
-            AuthorProfileApplicationService authorProfiles
+            AuthorProfileApplicationService authorProfiles,
+            NovelApplicationService novels
     ) {
         this.preferences = preferences;
         this.snapshotFactory = snapshotFactory;
@@ -66,13 +68,14 @@ public class AgentRunContextResolutionService {
         this.sessionRepository = sessionRepository;
         this.conversationWindows = conversationWindows;
         this.authorProfiles = authorProfiles;
+        this.novels = novels;
     }
 
-    public Resolution resolveInitial(AgentRun run, AgentRunInput input, TaskProfile profile,
+    public Resolution resolveInitial(AgentRun run, AgentRunInput input,
                                      AgentLlmExecutionConfig executionConfig, String traceId) {
         var preference = preferences.resolve(run.projectId(), run.sessionId(), run.ownerUserId());
-        var newSnapshot = snapshotFactory.create(run.projectId(), input.chapterId());
-        var catalogHashes = hashes.hashes(profile);
+        var newSnapshot = snapshotFactory.create(run.projectId(), input.chapterId(), preference.mode());
+        var catalogHashes = hashes.hashes();
         String snapshotJson = snapshotCodec.encode(newSnapshot);
         Long styleBindingRevision = sessionRepository.findActiveStyleBindingRevision(run.sessionId());
         var binding = epochs.bind(new AgentContextEpochService.BindRequest(
@@ -95,7 +98,8 @@ public class AgentRunContextResolutionService {
                 preference.mode(), boundSnapshot.storyBibleRevision(), boundSnapshot.selectorCatalog(), workingSetIds,
                 selectorConfig, conversationWindow));
         ContextPackage contextPackage = toContextPackage(resolved, boundSnapshot, workingSetIds,
-                input.styleSnapshotJson(), input.chapterId(), authorProfiles.promptSnapshot(run.ownerUserId()));
+                input.styleSnapshotJson(), renderChapterScope(run.projectId(), input),
+                authorProfiles.promptSnapshot(run.ownerUserId()));
         var manifest = new AgentRunContextArtifactService.DependencyManifest(
                 newSnapshot.storyBibleRevision(), newSnapshot.manuscriptRevision(), input.chapterId(),
                 newSnapshot.activeChapterContentRevision(), styleBindingRevision == null ? 0L : styleBindingRevision,
@@ -130,7 +134,7 @@ public class AgentRunContextResolutionService {
 
     private ContextPackage toContextPackage(StoryBibleContextResolver.ResolvedContext resolved,
                                             ContextEpochSnapshotCodec.Snapshot snapshot,
-                                            List<Long> workingSetIds, String styleSnapshot, Long chapterId,
+                                            List<Long> workingSetIds, String styleSnapshot, String chapterScope,
                                             String authorProfileSnapshot) {
         java.util.Set<Long> coreIds = snapshot.coreContext().stream()
                 .map(ContextEpochSnapshotCodec.CoreNode::nodeId).collect(java.util.stream.Collectors.toSet());
@@ -148,7 +152,25 @@ public class AgentRunContextResolutionService {
         }
         return new ContextPackage(List.of("story-bible"), resolved.decision().missingFlags(), List.of(), rendered,
                 core, working, selected, styleSnapshot,
-                chapterId == null ? "" : "chapter:" + chapterId, authorProfileSnapshot);
+                chapterScope, authorProfileSnapshot);
+    }
+
+    private String renderChapterScope(Long projectId, AgentRunInput input) {
+        if (input.chapterIds().isEmpty()) return "";
+        List<java.util.Map<String, Object>> attached = new ArrayList<>();
+        for (int index = 0; index < input.chapterIds().size(); index++) {
+            Long chapterId = input.chapterIds().get(index);
+            var chapter = novels.getChapter(projectId, chapterId);
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("position", index + 1);
+            item.put("chapterId", String.valueOf(chapterId));
+            item.put("title", chapter.getTitle());
+            attached.add(item);
+        }
+        java.util.Map<String, Object> scope = new java.util.LinkedHashMap<>();
+        scope.put("primaryChapterId", String.valueOf(input.chapterId()));
+        scope.put("attachedChapters", attached);
+        return json(scope);
     }
 
     private String json(Object value) {

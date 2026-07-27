@@ -34,7 +34,7 @@ public class SkillLoadToolDefinition implements AgentToolDefinition {
                 ),
                 new ToolGovernancePolicy(
                         new ApprovalPolicyDecision(false, ""),
-                        1,
+                        0,
                         Map.of()
                 )
         );

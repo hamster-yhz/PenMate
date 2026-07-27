@@ -23,6 +23,8 @@ import com.penmate.backend.application.common.serialization.JsonValues;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Component
 @Slf4j
 public class ToolCallApplicationService {
@@ -66,8 +68,11 @@ public class ToolCallApplicationService {
         }
         log.info("agent.tool.call.start: toolCode={}, projectId={}, runId={}, sessionId={}, traceId={}",
                 request.toolCode(), context.projectId(), context.runId(), context.sessionId(), context.traceId());
+        ToolCallResult approvalBindingFailure = validateApprovalBinding(context, request);
+        if (approvalBindingFailure != null) return approvalBindingFailure;
         AgentToolDescriptor descriptor = toolDefinitionSource.getRequired(request.toolCode());
-        ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(descriptor, request);
+        ApprovalPolicyDecision decision = approvalPolicyEngine.evaluate(
+                descriptor, request, context.input().safetyMode());
         String operationCode = extractOperationCode(request);
         if (decision.approvalRequired()) {
             var approvalPreview = toolApprovalPreview.from(request.toolCode(), request.toolArgsJson());
@@ -96,6 +101,7 @@ public class ToolCallApplicationService {
                     approvalView.riskLevel() == null ? descriptor.governancePolicy().riskLevel() : approvalView.riskLevel(),
                     context.ownerUserId()
             ), context.traceId());
+            String approvalBinding = approvalBinding(context, request);
             pendingApprovalRepository.save(new AgentRunPendingApproval(
                     null,
                     approvalRequest.getApprovalRequestId(),
@@ -114,7 +120,8 @@ public class ToolCallApplicationService {
                     context.ownerUserId(),
                     context.traceId(),
                     null,
-                    null
+                    null,
+                    approvalBinding
             ));
             log.info("agent.tool.call.waiting_approval: toolCode={}, operationCode={}, approvalId={}, runId={}, traceId={}",
                     request.toolCode(), operationCode, approvalRequest.getApprovalRequestId(), context.runId(), context.traceId());
@@ -152,5 +159,74 @@ public class ToolCallApplicationService {
                 && java.util.Objects.equals(pending.toolCallId(), request.toolCallId())
                 && java.util.Objects.equals(pending.toolCode(), request.toolCode())
                 && java.util.Objects.equals(pending.toolArgsJson(), request.toolArgsJson());
+    }
+
+    private ToolCallResult validateApprovalBinding(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        if (!"APPROVED".equals(request.resumeMode())) return null;
+        try {
+            Map<String, Object> binding = jsonCodec.readObject(request.approvalSummaryJson());
+            boolean matches = java.util.Objects.equals(binding.get("toolCode"), request.toolCode())
+                    && java.util.Objects.equals(binding.get("toolArgsHash"), argsHash(request.toolArgsJson()))
+                    && java.util.Objects.equals(longValue(binding.get("contextEpochId")), context.contextEpochId())
+                    && java.util.Objects.equals(binding.get("safetyMode"), context.input().safetyMode())
+                    && java.util.Objects.equals(binding.get("expectedState"), expectedState(jsonCodec.read(request.toolArgsJson())));
+            return matches ? null : ToolCallResult.failed("TOOL_APPROVAL_STALE",
+                    "Approved tool request no longer matches its immutable approval binding");
+        } catch (RuntimeException exception) {
+            return ToolCallResult.failed("TOOL_APPROVAL_STALE", "Approved tool request has an invalid approval binding");
+        }
+    }
+
+    private String approvalBinding(AuthorizedAgentRunContext context, ToolCallRequest request) {
+        Map<String, Object> binding = new java.util.LinkedHashMap<>();
+        binding.put("toolCode", request.toolCode());
+        binding.put("toolArgsHash", argsHash(request.toolArgsJson()));
+        binding.put("contextEpochId", context.contextEpochId());
+        binding.put("safetyMode", context.input().safetyMode());
+        binding.put("expectedState", expectedState(jsonCodec.read(request.toolArgsJson())));
+        return jsonCodec.writeCanonical(binding);
+    }
+
+    private Object expectedState(Object value) {
+        if (value instanceof Map<?, ?> source) {
+            Map<String, Object> result = new java.util.TreeMap<>();
+            for (var entry : source.entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                Object nested = expectedState(entry.getValue());
+                if (key.startsWith("expected") || nested instanceof Map<?, ?> map && !map.isEmpty()
+                        || nested instanceof java.util.List<?> list && !list.isEmpty()) {
+                    result.put(key, key.startsWith("expected") ? entry.getValue() : nested);
+                }
+            }
+            return result;
+        }
+        if (value instanceof java.util.List<?> source) {
+            java.util.List<Object> result = new java.util.ArrayList<>();
+            for (int index = 0; index < source.size(); index++) {
+                Object nested = expectedState(source.get(index));
+                if (nested instanceof Map<?, ?> map && !map.isEmpty()) {
+                    result.add(Map.of("index", index, "value", nested));
+                }
+            }
+            return result;
+        }
+        return null;
+    }
+
+    private String argsHash(String argsJson) {
+        try {
+            String canonical = jsonCodec.writeCanonical(jsonCodec.read(argsJson));
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    private Long longValue(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number number) return number.longValue();
+        return Long.valueOf(String.valueOf(value));
     }
 }

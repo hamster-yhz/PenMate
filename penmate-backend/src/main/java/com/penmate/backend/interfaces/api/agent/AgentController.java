@@ -14,6 +14,7 @@ import com.penmate.backend.application.agent.usecase.AgentSessionTokenUsageAppSe
 import com.penmate.backend.application.agent.usecase.AgentTurnAppService;
 import com.penmate.backend.application.agent.usecase.AgentTurnCommand;
 import com.penmate.backend.application.agent.usecase.AgentTurnResult;
+import com.penmate.backend.application.agent.usecase.AgentQueuedRequestApplicationService;
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.interfaces.api.agent.stream.AgentRunEventStreamService;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRecoverySnapshotDto;
@@ -21,11 +22,13 @@ import com.penmate.backend.interfaces.api.agent.dto.AgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunEventDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentRunHistoryDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.AgentQueuedRequestDto;
 import com.penmate.backend.interfaces.api.agent.dto.AgentSkillCatalogItemDto;
 import com.penmate.backend.interfaces.api.agent.dto.CancelAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentConversationDto;
 import com.penmate.backend.interfaces.api.agent.dto.CreateAgentTurnDto;
 import com.penmate.backend.interfaces.api.agent.dto.ResumeAgentSessionDto;
+import com.penmate.backend.interfaces.api.agent.dto.RegisterAgentQueuedRequestDto;
 import com.penmate.backend.interfaces.api.agent.dto.RetryAgentRunDto;
 import com.penmate.backend.interfaces.api.agent.dto.UpdateAgentSessionDto;
 import com.penmate.backend.interfaces.api.common.ApiResponse;
@@ -65,6 +68,7 @@ public class AgentController {
     private final AgentRunHistoryQueryService runHistoryQueryService;
     private final SkillPromptRegistry skillPromptRegistry;
     private final AgentResourceAccessGuard accessGuard;
+    private final AgentQueuedRequestApplicationService queuedRequests;
 
     public AgentController(AgentConversationAppService agentConversationAppService,
                            AgentRunRecoveryAppService agentRunRecoveryAppService,
@@ -75,7 +79,8 @@ public class AgentController {
                            AgentRunRetryService runRetryService,
                            AgentRunHistoryQueryService runHistoryQueryService,
                            SkillPromptRegistry skillPromptRegistry,
-                           AgentResourceAccessGuard accessGuard) {
+                           AgentResourceAccessGuard accessGuard,
+                           AgentQueuedRequestApplicationService queuedRequests) {
         this.agentConversationAppService = agentConversationAppService;
         this.agentRunRecoveryAppService = agentRunRecoveryAppService;
         this.agentSessionTokenUsageAppService = agentSessionTokenUsageAppService;
@@ -86,6 +91,7 @@ public class AgentController {
         this.runHistoryQueryService = runHistoryQueryService;
         this.skillPromptRegistry = skillPromptRegistry;
         this.accessGuard = accessGuard;
+        this.queuedRequests = queuedRequests;
     }
 
     @GetMapping("/skills")
@@ -193,14 +199,55 @@ public class AgentController {
                                                @Valid @RequestBody CreateAgentTurnDto dto,
                                                Authentication authentication,
                                                @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, taskType={}, traceId={}",
-                projectId, sessionId, principalId(authentication), dto.getTaskRequest().getTaskType(), traceId);
+        log.info("Create agent turn request: projectId={}, sessionId={}, operatorId={}, traceId={}",
+                projectId, sessionId, principalId(authentication), traceId);
         AgentTurnResult result = agentTurnAppService.createTurn(
                 requireLongId(projectId, "projectId"),
                 requireLongId(sessionId, "sessionId"),
                 toCommand(dto, principalId(authentication)),
                 traceId);
         return ApiResponse.success(toRunDto(result, requireLongId(sessionId, "sessionId")), traceId);
+    }
+
+    @GetMapping("/sessions/{sessionId}/queued-request")
+    public ApiResponse<AgentQueuedRequestDto> getQueuedRequest(@PathVariable String projectId,
+                                                               @PathVariable String sessionId,
+                                                               Authentication authentication,
+                                                               @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var request = queuedRequests.get(requireLongId(projectId, "projectId"),
+                requireLongId(sessionId, "sessionId"), principalId(authentication));
+        return ApiResponse.success(toQueuedRequestDto(request), traceId);
+    }
+
+    @PostMapping("/sessions/{sessionId}/queued-request")
+    public ApiResponse<AgentQueuedRequestDto> registerQueuedRequest(@PathVariable String projectId,
+                                                                    @PathVariable String sessionId,
+                                                                    @Valid @RequestBody RegisterAgentQueuedRequestDto dto,
+                                                                    Authentication authentication,
+                                                                    @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var task = dto.getTaskRequest();
+        var payload = "MESSAGE".equalsIgnoreCase(dto.getType())
+                ? new AgentQueuedRequestApplicationService.QueueMessagePayload(
+                        dto.getUserMessage(), dto.getActiveSkills(), task == null ? null
+                        : new AgentQueuedRequestApplicationService.TaskRequest(
+                                optionalLongId(task.getChapterId(), "chapterId"),
+                                optionalLongIds(task.getChapterIds(), "chapterIds"),
+                                optionalLongId(task.getModelConfigId(), "modelConfigId"), task.getSelectedText()))
+                : null;
+        var request = queuedRequests.register(requireLongId(projectId, "projectId"),
+                requireLongId(sessionId, "sessionId"), principalId(authentication), dto.getType(), payload);
+        return ApiResponse.success(toQueuedRequestDto(request), traceId);
+    }
+
+    @DeleteMapping("/sessions/{sessionId}/queued-request/{requestId}")
+    public ApiResponse<String> withdrawQueuedRequest(@PathVariable String projectId,
+                                                     @PathVariable String sessionId,
+                                                     @PathVariable String requestId,
+                                                     Authentication authentication,
+                                                     @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        queuedRequests.withdraw(requireLongId(projectId, "projectId"), requireLongId(sessionId, "sessionId"),
+                requireLongId(requestId, "requestId"), principalId(authentication));
+        return ApiResponse.success("withdrawn", traceId);
     }
 
     @GetMapping(path = "/runs/{runId}/stream", produces = "text/event-stream")
@@ -286,11 +333,19 @@ public class AgentController {
                 request == null
                         ? null
                         : new AgentTurnCommand.TaskRequest(
-                                request.getTaskType(),
                                 optionalLongId(request.getChapterId(), "chapterId"),
+                                optionalLongIds(request.getChapterIds(), "chapterIds"),
                                 optionalLongId(request.getModelConfigId(), "modelConfigId"),
                                 request.getSelectedText())
         );
+    }
+
+    private List<Long> optionalLongIds(List<String> values, String fieldName) {
+        if (values == null) return List.of();
+        return values.stream()
+                .map(value -> requireLongId(value, fieldName))
+                .distinct()
+                .toList();
     }
 
     private Long requireLongId(String rawValue, String fieldName) {
@@ -448,9 +503,14 @@ public class AgentController {
                         activeRun.runPhase(),
                         stringifyBusinessId(activeRun.latestSequence())
                 ),
-                null,
                 null
         );
+    }
+
+    private AgentQueuedRequestDto toQueuedRequestDto(com.penmate.backend.domain.agent.model.AgentQueuedRequest request) {
+        return request == null ? null : new AgentQueuedRequestDto(stringifyBusinessId(request.requestId()),
+                request.requestType(), request.requestStatus(), request.payloadJson(), request.attemptCount(),
+                instant(request.createdAt()), instant(request.updatedAt()));
     }
 
     private Long optionalSequence(String rawValue) {

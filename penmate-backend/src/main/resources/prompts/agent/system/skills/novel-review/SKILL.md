@@ -10,6 +10,7 @@ A review is not a rewrite unless the user explicitly requests one.
 ## Review Method
 
 1. Establish scope and intent: what text is available, what stage it is in, who it is for, and what experience it promises.
+   For manuscript-wide requests, call `manuscript_manifest` first and read selected chapters with `manuscript_chapter_read`. Track exact chapter IDs, revisions, hashes, and character counts actually reviewed.
 2. Read first for the reader's experience. Track orientation, curiosity, tension, emotional alignment, surprise, confusion, and fatigue over time.
 3. Read again for mechanics:
    - causality and scene state changes;
@@ -37,3 +38,5 @@ A review is not a rewrite unless the user explicitly requests one.
 ## Output Contract
 
 Lead with findings, highest severity first. Keep praise brief and specific; never use praise to cushion unclear criticism. Do not assign numeric scores unless asked. If no material issue exists, say so and identify the remaining uncertainty caused by limited scope.
+
+Always report actual manuscript coverage. Never label a sampled or partial review as a full-novel review; state omitted chapters and the resulting uncertainty.

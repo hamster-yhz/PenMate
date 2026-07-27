@@ -13,7 +13,6 @@ import java.util.List;
 public record PromptPlan(
         List<PromptModulePlan> modules,
         List<AgentLlmToolSchema> toolSchemas,
-        String finalProfile,
         String stablePrefix,
         String dynamicContext,
         String assembledPromptPreview
@@ -22,15 +21,13 @@ public record PromptPlan(
     public PromptPlan {
         modules = List.copyOf(modules == null ? List.of() : modules);
         toolSchemas = List.copyOf(toolSchemas == null ? List.of() : toolSchemas);
-        finalProfile = normalize(finalProfile);
         stablePrefix = normalize(stablePrefix);
         dynamicContext = normalize(dynamicContext);
         assembledPromptPreview = normalize(assembledPromptPreview);
     }
 
-    public PromptPlan(List<PromptModulePlan> modules, String finalProfile,
-                      String assembledPromptPreview) {
-        this(modules, List.of(), finalProfile, assembledPromptPreview, "", assembledPromptPreview);
+    public PromptPlan(List<PromptModulePlan> modules, String assembledPromptPreview) {
+        this(modules, List.of(), assembledPromptPreview, "", assembledPromptPreview);
     }
 
     private static String normalize(String value) {

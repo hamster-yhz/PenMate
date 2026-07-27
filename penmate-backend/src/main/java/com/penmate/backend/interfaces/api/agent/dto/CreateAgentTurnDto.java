@@ -41,15 +41,12 @@ public class CreateAgentTurnDto {
     public static class TaskRequest {
 
         /**
-         * 任务类型，例如 WRITE。
-         */
-        @NotBlank(message = "taskType must not be blank")
-        private String taskType;
-
-        /**
          * 关联章节业务 ID。
          */
         private String chapterId;
+
+        @NotNull(message = "chapterIds must not be null")
+        private List<String> chapterIds;
 
         /**
          * 当前轮次显式模型配置业务 ID。

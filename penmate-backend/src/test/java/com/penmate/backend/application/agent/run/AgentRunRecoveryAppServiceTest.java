@@ -65,7 +65,7 @@ class AgentRunRecoveryAppServiceTest {
                 "runPhase", "waiting_approval", "latestSequence", 8L));
         when(approvals.findPendingByRunId(50L)).thenReturn(new AgentRunPendingApproval(
                 1L, 60L, 60L, 50L, 10L, 20L, 40L, "call-1", "story_bible_node_write",
-                "{\"operation\":\"update\",\"nodeId\":71,\"expectedRevision\":3}",
+                "{\"items\":[{\"operation\":\"update\",\"nodeId\":71,\"expectedRevision\":3}]}",
                 "{}", "[]", "50:call-1", "PENDING", 30L, "trace", null, null));
 
         AgentRunRecoveryResult result = new AgentRunRecoveryAppService(

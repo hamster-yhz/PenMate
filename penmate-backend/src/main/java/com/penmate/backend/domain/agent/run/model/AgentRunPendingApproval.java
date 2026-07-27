@@ -21,8 +21,19 @@ public record AgentRunPendingApproval(
         Long operatorId,
         String traceId,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String approvalBindingJson
 ) {
+
+    public AgentRunPendingApproval(Long id, Long pendingApprovalId, Long approvalId, Long runId,
+                                   Long projectId, Long sessionId, Long turnId, String toolCallId,
+                                   String toolCode, String toolArgsJson, String toolContextJson,
+                                   String resumePayloadJson, String idempotencyKey, String pendingStatus,
+                                   Long operatorId, String traceId, Instant createdAt, Instant updatedAt) {
+        this(id, pendingApprovalId, approvalId, runId, projectId, sessionId, turnId, toolCallId,
+                toolCode, toolArgsJson, toolContextJson, resumePayloadJson, idempotencyKey, pendingStatus,
+                operatorId, traceId, createdAt, updatedAt, null);
+    }
 
     public AgentRunPendingApproval {
         approvalId = Objects.requireNonNull(approvalId, "approvalId must not be null");

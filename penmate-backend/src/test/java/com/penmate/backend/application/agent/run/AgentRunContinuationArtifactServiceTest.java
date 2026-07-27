@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.run.model.AgentArtifact;
 import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
+import com.penmate.backend.domain.agent.run.model.AgentRunNoProgressState;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.domain.agent.run.repository.AgentArtifactRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -45,10 +46,12 @@ class AgentRunContinuationArtifactServiceTest {
         when(storage.readBytes(any())).thenAnswer(invocation ->
                 storedJson.get().getBytes(StandardCharsets.UTF_8));
 
+        AgentRunNoProgressState noProgressState = AgentRunNoProgressState.EMPTY.append(
+                "story_bible_node_write\nnonce=1", java.util.Set.of("nodeId=71"), false);
         AgentRunContinuation continuation = AgentRunContinuation.readyForTool(
                 70001L,
                 List.of(AgentLlmMessage.user("write")),
-                2, 1, 0, "draft", new LlmTokenUsage(3, 2, 5));
+                2, 1, 0, "draft", new LlmTokenUsage(3, 2, 5), noProgressState);
         AgentRunContinuationArtifactService.ArtifactRef ref = service.save(continuation);
 
         ArgumentCaptor<AgentArtifact> row = ArgumentCaptor.forClass(AgentArtifact.class);

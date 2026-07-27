@@ -1,7 +1,6 @@
 package com.penmate.backend.application.agent.prompt;
 
 import com.penmate.backend.application.agent.context.ContextPackage;
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.tool.selection.AgentToolSelectionPolicy;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +10,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * Composes execution prompt plan from profiled task, already-built context and modular skill catalog.
+ * Composes the unified execution prompt from already-built context and the modular skill catalog.
  */
 @Component
 public class PromptComposer {
@@ -31,26 +30,24 @@ public class PromptComposer {
         this.contextRenderer = contextRenderer;
     }
 
-    public PromptPlan compose(TaskProfile taskProfile,
-                              ContextPackage contextPackage,
+    public PromptPlan compose(ContextPackage contextPackage,
                               String userRequest) {
-        String finalProfile = normalizeProfile(taskProfile == null ? null : taskProfile.executionProfile());
         ContextPackage normalizedContext = Objects.requireNonNull(contextPackage, "contextPackage");
 
-        SystemPromptBundle executionBundle = systemPromptProvider.loadBundle("execution", finalProfile);
+        SystemPromptBundle executionBundle = systemPromptProvider.loadBundle("execution");
         List<PromptModulePlan> modules = new ArrayList<>();
         List<String> stableSections = new ArrayList<>();
         List<String> dynamicSections = new ArrayList<>();
 
         modules.add(new PromptModulePlan(
-                "execution:" + finalProfile,
+                "execution",
                 joinDocumentPaths(executionBundle == null ? null : executionBundle.documents()),
                 true,
-                "Execution base module for task profile=" + finalProfile
+                "Unified execution base module"
         ));
         stableSections.add(normalize(executionBundle == null ? null : executionBundle.assembledPrompt()));
 
-        var registeredTools = toolSelectionPolicy.select(taskProfile);
+        var registeredTools = toolSelectionPolicy.select();
         var toolSchemas = (registeredTools == null ? List.<com.penmate.backend.application.agent.llm.AgentLlmToolSchema>of() : registeredTools).stream()
                 .sorted(java.util.Comparator.comparing(schema -> normalize(schema.toolCode())))
                 .toList();
@@ -99,7 +96,6 @@ public class PromptComposer {
         return new PromptPlan(
                 modules,
                 toolSchemas,
-                finalProfile,
                 stablePrefix,
                 dynamicContext,
                 java.util.stream.Stream.of(stablePrefix, dynamicContext)
@@ -161,11 +157,6 @@ public class PromptComposer {
                 .map(this::normalize)
                 .filter(path -> !path.isEmpty())
                 .collect(Collectors.joining(","));
-    }
-
-    private String normalizeProfile(String profile) {
-        String normalized = normalize(profile);
-        return normalized.isEmpty() ? "default" : normalized;
     }
 
     private String normalize(String value) {

@@ -2,6 +2,7 @@ package com.penmate.backend.infrastructure.persistence.agent;
 
 import com.penmate.backend.domain.agent.model.AgentConversation;
 import com.penmate.backend.domain.agent.model.AgentSession;
+import com.penmate.backend.domain.agent.model.AgentSessionContextUsageSource;
 import com.penmate.backend.domain.agent.model.AgentTurn;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -43,16 +44,22 @@ public class AgentSessionRepositoryImpl implements AgentSessionRepository {
     }
 
     @Override
-    public Map<String, Object> findSessionTokenUsageSummary(Long projectId, Long sessionId) {
-        Map<String, Object> sessionRow = agentSessionMapper.findSessionRow(projectId, sessionId);
-        if (sessionRow == null) {
-            return null;
-        }
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("promptTokens", intValue(valueOf(sessionRow, "totalPromptTokens")));
-        summary.put("completionTokens", intValue(valueOf(sessionRow, "totalCompletionTokens")));
-        summary.put("totalTokens", intValue(valueOf(sessionRow, "totalTokens")));
-        return summary;
+    public AgentSessionContextUsageSource findSessionContextUsageSource(Long projectId, Long sessionId) {
+        Map<String, Object> sessionRow = agentSessionMapper.findSessionContextUsageRow(projectId, sessionId);
+        if (sessionRow == null) return null;
+        return new AgentSessionContextUsageSource(
+                longValue(valueOf(sessionRow, "sessionId")),
+                longValue(valueOf(sessionRow, "contextUtf8Bytes")),
+                longValue(valueOf(sessionRow, "modelConfigId")),
+                stringValue(valueOf(sessionRow, "modelName")),
+                intValue(valueOf(sessionRow, "maxContextTokens")),
+                intValue(valueOf(sessionRow, "maxOutputTokens")),
+                stringValue(valueOf(sessionRow, "contextCapacitySource")),
+                longValue(valueOf(sessionRow, "latestUsageModelConfigId")),
+                intValue(valueOf(sessionRow, "latestInputTokens")),
+                intValue(valueOf(sessionRow, "latestReservedOutputTokens")),
+                intValue(valueOf(sessionRow, "latestProtectedTokens")),
+                stringValue(valueOf(sessionRow, "latestUsageSource")));
     }
 
     @Override

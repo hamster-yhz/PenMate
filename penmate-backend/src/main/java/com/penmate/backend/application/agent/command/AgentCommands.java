@@ -38,7 +38,6 @@ public final class AgentCommands {
     public record CreateGenerationCommand(Long conversationId,
                                           Long chapterId,
                                           Long modelConfigId,
-                                          String taskType,
                                           String promptSnapshot,
                                           String pluginSnapshot,
                                           Long operatorId) {

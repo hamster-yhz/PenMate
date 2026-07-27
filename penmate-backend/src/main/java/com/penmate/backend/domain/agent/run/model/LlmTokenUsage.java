@@ -26,4 +26,9 @@ public record LlmTokenUsage(
                 cacheCreationPromptTokens + other.cacheCreationPromptTokens
         );
     }
+
+    /** Logical input tokens occupying the provider context window. Cache fields are informational subsets. */
+    public int contextInputTokens() {
+        return Math.max(0, promptTokens);
+    }
 }

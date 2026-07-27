@@ -137,6 +137,7 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
             body.put("reasoning", reasoning);
         }
         body.put("store", false);
+        body.put("max_output_tokens", executionConfig.maxOutputTokens());
         if (streaming) body.put("stream", true);
         return AgentJsonCodec.toJson(body);
     }

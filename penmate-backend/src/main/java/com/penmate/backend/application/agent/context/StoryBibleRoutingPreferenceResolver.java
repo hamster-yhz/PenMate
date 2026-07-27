@@ -32,13 +32,14 @@ public class StoryBibleRoutingPreferenceResolver {
         requireOwnedProject(projectId, userId);
         AgentRoutingPreference preference = preferences.findProjectPreference(projectId);
         if (preference == null) {
-            return new EffectivePreference(StoryBibleRoutingMode.LLM_SELECTOR, null);
+            return new EffectivePreference(StoryBibleRoutingMode.AGENT_DRIVEN, null);
         }
         StoryBibleRoutingMode mode = parseMode(preference.storyBibleRoutingMode());
-        boolean activeEmbedding = preference.embeddingModelConfigId() != null
+        boolean activeEmbedding = preference.ragEnabled() && preference.embeddingModelConfigId() != null
                 && "READY".equalsIgnoreCase(preference.indexStatus());
-        if (!activeEmbedding && mode != StoryBibleRoutingMode.LLM_SELECTOR) {
-            mode = StoryBibleRoutingMode.LLM_SELECTOR;
+        if (!activeEmbedding && (mode == StoryBibleRoutingMode.RETRIEVAL
+                || mode == StoryBibleRoutingMode.RETRIEVAL_THEN_LLM)) {
+            mode = StoryBibleRoutingMode.AGENT_DRIVEN;
         }
         validateRouterModel(userId, preference.routerModelConfigId());
         return new EffectivePreference(mode, preference.routerModelConfigId());

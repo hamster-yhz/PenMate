@@ -6,7 +6,6 @@ import com.penmate.backend.application.agent.context.AgentRunDependencyValidator
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.orchestration.AgentPromptAssembler;
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
 import com.penmate.backend.application.agent.prompt.PromptPlan;
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
@@ -122,14 +121,12 @@ public class AgentRunExecutor {
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
 
-        TaskProfile taskProfile = TaskProfile.fromTaskType(input.taskType());
-
         evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "epoch_binding"));
         state = stateReducer.apply(state, evt);
         checkpointService.checkpointIfNeeded(evt, state);
 
         AgentRunContextResolutionService.Resolution contextResult = contextResolutionService.resolveInitial(
-                run, input, taskProfile, executionConfig, traceId);
+                run, input, executionConfig, traceId);
         evt = eventPublisher.publish(runId, "context.epoch.bound", Map.of(
                 "contextEpochId", contextResult.epochBinding().epoch().epochId(),
                 "reused", contextResult.epochBinding().reused()
@@ -191,7 +188,7 @@ public class AgentRunExecutor {
         evt = eventPublisher.publish(runId, "run.phase.changed", Map.of("phase", "prompt"));
         state = stateReducer.apply(state, evt);
 
-        PromptPlan promptPlan = promptComposer.compose(taskProfile, contextResult.contextPackage(), input.promptSnapshot());
+        PromptPlan promptPlan = promptComposer.compose(contextResult.contextPackage(), input.promptSnapshot());
         String activatedSkills = skillActivationService.renderExplicitSkills(runId);
         List<AgentLlmMessage> executionMessages = promptAssembler.buildExecutionMessages(
                 promptPlan, activatedSkills, input.promptSnapshot(), contextResult.conversationWindow());
@@ -272,17 +269,22 @@ public class AgentRunExecutor {
         if (lease != null && !continueIfDependenciesCurrent(run, input, contextArtifact, lease, traceId)) return;
         var promptArtifact = contextArtifacts.loadPromptPlanForRun(runId, state.artifactRefs());
         var pending = pendingApprovals.findApprovedByRunId(runId);
-        if (pending == null || !"APPROVED".equals(pending.pendingStatus())) {
+        if (pending == null) pending = pendingApprovals.findRejectedByRunId(runId);
+        if (pending == null || !("APPROVED".equals(pending.pendingStatus())
+                || "REJECTED".equals(pending.pendingStatus()))) {
             throw new IllegalStateException("Run approval is not ready for resume");
         }
         Long modelConfigId = extractModelConfigIdFromSnapshot(input.modelSnapshotJson());
         AgentLlmExecutionConfig executionConfig = modelConfigId == null
                 ? AgentLlmExecutionConfig.builder().build()
                 : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
-        AgentRunLoopResult result = llmLoop.resumeApproved(new AgentRunLoopRequest(
+        AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId, List.of(),
-                resolveToolSchemas(promptArtifact, input), executionConfig,
-                run.ownerUserId(), lease.executionToken()), pending);
+                resolveToolSchemas(promptArtifact), executionConfig,
+                run.ownerUserId(), lease.executionToken());
+        AgentRunLoopResult result = "APPROVED".equals(pending.pendingStatus())
+                ? llmLoop.resumeApproved(loopRequest, pending)
+                : llmLoop.resumeRejected(loopRequest, pending);
         if (result.status() == AgentRunLoopResult.Status.WAITING_APPROVAL) {
             AgentEvent waiting = stateTransitions.waitingApproval(
                     lease, result.approvalId(), pending.approvalId()).stateEvent();
@@ -303,7 +305,8 @@ public class AgentRunExecutor {
     }
 
     public void recover(Long runId, String traceId, AgentRunLease lease) {
-        if (pendingApprovals.findApprovedByRunId(runId) != null) {
+        if (pendingApprovals.findApprovedByRunId(runId) != null
+                || pendingApprovals.findRejectedByRunId(runId) != null) {
             resume(runId, traceId, lease);
             return;
         }
@@ -342,7 +345,7 @@ public class AgentRunExecutor {
         leaseService.assertOwned(lease);
         AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
-                promptArtifact.messages(), resolveToolSchemas(promptArtifact, input), executionConfig, run.ownerUserId(),
+                promptArtifact.messages(), resolveToolSchemas(promptArtifact), executionConfig, run.ownerUserId(),
                 lease.executionToken());
         AgentRunLoopResult result = continuations.loadLatestForRun(runId, state.artifactRefs())
                 .map(continuation -> llmLoop.resume(loopRequest, continuation))
@@ -402,11 +405,9 @@ public class AgentRunExecutor {
     }
 
     private List<AgentLlmToolSchema> resolveToolSchemas(
-            AgentRunContextArtifactService.PromptArtifact artifact,
-            AgentRunInput input
+            AgentRunContextArtifactService.PromptArtifact artifact
     ) {
-        if (artifact.schemaVersion() >= 3) return artifact.plan().toolSchemas();
-        return toolSelectionPolicy.select(TaskProfile.fromTaskType(input.taskType()));
+        return artifact.plan().toolSchemas();
     }
 
     private long positiveLong(Object value) {

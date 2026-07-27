@@ -24,6 +24,7 @@ public class GeminiProviderChatClient extends AbstractOpenAiCompatibleProviderCh
         ChatLanguageModel model = GoogleAiGeminiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)
+                .maxOutputTokens(executionConfig.maxOutputTokens())
                 .build();
         return model.generate(prompt);
     }

@@ -87,7 +87,8 @@ class AgentTurnPersistenceContractTest {
                     ),
                     dispatcher,
                     mock(AgentSkillActivationService.class),
-                    passthroughRecoveryPrompts()
+                    passthroughRecoveryPrompts(),
+                    mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class)
             );
 
             AgentTurnResult result = service.createTurn(
@@ -142,7 +143,8 @@ class AgentTurnPersistenceContractTest {
                     new AgentRunAppService(runRepository, eventPublisher, mock(AgentRunDispatcher.class)),
                     mock(AgentRunDispatcher.class),
                     mock(AgentSkillActivationService.class),
-                    passthroughRecoveryPrompts()
+                    passthroughRecoveryPrompts(),
+                    mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class)
             );
 
             service.createTurn(
@@ -156,9 +158,9 @@ class AgentTurnPersistenceContractTest {
 
             assertThat(input).isNotNull();
             assertThat(input.runId()).isEqualTo(950011L);
-            assertThat(input.taskType()).isEqualTo("WRITE");
             assertThat(input.promptSnapshot()).isEqualTo("Recover this turn.");
             assertThat(input.chapterId()).isEqualTo(3002L);
+            assertThat(input.chapterIds()).containsExactly(3002L);
             assertThat(input.selectedText()).isEqualTo("recovery selection");
             JsonNode modelSnapshot = JSON.readTree(input.modelSnapshotJson());
             assertThat(modelSnapshot.path("operatorId").asLong()).isEqualTo(1001L);
@@ -248,7 +250,9 @@ class AgentTurnPersistenceContractTest {
                 1001L,
                 message,
                 java.util.List.of(),
-                new AgentTurnCommand.TaskRequest("WRITE", chapterId, modelConfigId, selectedText)
+                new AgentTurnCommand.TaskRequest(chapterId,
+                        chapterId == null ? java.util.List.of() : java.util.List.of(chapterId),
+                        modelConfigId, selectedText)
         );
     }
 

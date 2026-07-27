@@ -1,6 +1,7 @@
 package com.penmate.backend.domain.agent.repository;
 
 import com.penmate.backend.domain.agent.model.AgentSession;
+import com.penmate.backend.domain.agent.model.AgentSessionContextUsageSource;
 import com.penmate.backend.domain.agent.model.AgentTurn;
 
 import java.util.List;
@@ -12,7 +13,7 @@ public interface AgentSessionRepository {
 
     List<AgentTurn> listTurns(Long sessionId);
 
-    Map<String, Object> findSessionTokenUsageSummary(Long projectId, Long sessionId);
+    AgentSessionContextUsageSource findSessionContextUsageSource(Long projectId, Long sessionId);
 
     List<Map<String, Object>> listMessageRows(Long sessionId);
 

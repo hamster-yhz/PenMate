@@ -186,6 +186,61 @@ public interface AgentSessionMapper {
                                        @Param("sessionId") Long sessionId);
 
     @Select("""
+            SELECT s.session_id AS "sessionId",
+                   COALESCE(OCTET_LENGTH(cs.summary_json::text), 0) + COALESCE((
+                       SELECT SUM(OCTET_LENGTH(m.content_markdown))
+                       FROM agent_messages m
+                       WHERE m.session_id = s.session_id
+                         AND m.seq_no > COALESCE(cs.cutoff_message_seq, 0)
+                         AND m.role IN ('user', 'assistant')
+                   ), 0) AS "contextUtf8Bytes",
+                   model.model_config_id AS "modelConfigId",
+                   model.model_name AS "modelName",
+                   model.max_context_tokens AS "maxContextTokens",
+                   model.max_output_tokens AS "maxOutputTokens",
+                   model.context_capacity_source AS "contextCapacitySource",
+                   latest_usage."modelConfigId" AS "latestUsageModelConfigId",
+                   latest_usage."estimatedInputTokens" AS "latestInputTokens",
+                   latest_usage."reservedOutputTokens" AS "latestReservedOutputTokens",
+                   latest_usage."protectedTokens" AS "latestProtectedTokens",
+                   latest_usage."usageSource" AS "latestUsageSource"
+            FROM agent_sessions s
+            LEFT JOIN agent_session_context_summaries cs ON cs.session_id = s.session_id
+            LEFT JOIN model_user_preferences preferences ON preferences.user_id = s.owner_user_id
+            LEFT JOIN LATERAL (
+                SELECT mc.model_config_id, mc.model_name, mc.max_context_tokens, mc.max_output_tokens,
+                       mc.context_capacity_source
+                FROM model_configurations mc
+                WHERE mc.model_config_id = COALESCE((
+                    SELECT NULLIF(i.model_snapshot_json->>'modelConfigId', '')::BIGINT
+                    FROM agent_runs r
+                    JOIN agent_run_inputs i ON i.run_id = r.run_id
+                    WHERE r.session_id = s.session_id
+                      AND r.run_status IN ('PENDING', 'RUNNING', 'WAITING_APPROVAL', 'SUSPENDED')
+                      AND NULLIF(i.model_snapshot_json->>'modelConfigId', '') IS NOT NULL
+                    ORDER BY r.created_at DESC, r.id DESC
+                    LIMIT 1
+                ), preferences.default_creative_model_config_id)
+                LIMIT 1
+            ) model ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT NULLIF(e.payload_json->>'modelConfigId', '')::BIGINT AS "modelConfigId",
+                       NULLIF(e.payload_json->>'estimatedInputTokens', '')::INTEGER AS "estimatedInputTokens",
+                       NULLIF(e.payload_json->>'reservedOutputTokens', '')::INTEGER AS "reservedOutputTokens",
+                       NULLIF(e.payload_json->>'protectedTokens', '')::INTEGER AS "protectedTokens",
+                       e.payload_json->>'usageSource' AS "usageSource"
+                FROM agent_events e
+                WHERE e.session_id = s.session_id AND e.event_type = 'context.usage.updated'
+                ORDER BY e.created_at DESC, e.id DESC
+                LIMIT 1
+            ) latest_usage ON TRUE
+            WHERE s.project_id = #{projectId} AND s.session_id = #{sessionId} AND s.deleted_at IS NULL
+            LIMIT 1
+            """)
+    Map<String, Object> findSessionContextUsageRow(@Param("projectId") Long projectId,
+                                                    @Param("sessionId") Long sessionId);
+
+    @Select("""
             SELECT id
             FROM agent_sessions
             WHERE (#{projectId,jdbcType=BIGINT} IS NULL OR project_id = #{projectId,jdbcType=BIGINT})

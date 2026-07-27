@@ -14,9 +14,10 @@ public record AgentRunContinuation(
         int iterationIndex,
         int nextToolCallIndex,
         String assistantText,
-        LlmTokenUsage tokenUsage
+        LlmTokenUsage tokenUsage,
+        AgentRunNoProgressState noProgressState
 ) {
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
     public AgentRunContinuation {
         if (schemaVersion != CURRENT_SCHEMA_VERSION) {
@@ -34,6 +35,7 @@ public record AgentRunContinuation(
         }
         assistantText = assistantText == null ? "" : assistantText;
         tokenUsage = tokenUsage == null ? LlmTokenUsage.ZERO : tokenUsage;
+        noProgressState = noProgressState == null ? AgentRunNoProgressState.EMPTY : noProgressState;
     }
 
     public AgentRunContinuationStage stage() {
@@ -43,25 +45,50 @@ public record AgentRunContinuation(
     public static AgentRunContinuation readyForLlm(Long runId, List<AgentLlmMessage> messages,
                                                     int llmTurnIndex, int iterationIndex,
                                                     String assistantText, LlmTokenUsage tokenUsage) {
+        return readyForLlm(runId, messages, llmTurnIndex, iterationIndex, assistantText, tokenUsage,
+                AgentRunNoProgressState.EMPTY);
+    }
+
+    public static AgentRunContinuation readyForLlm(Long runId, List<AgentLlmMessage> messages,
+                                                    int llmTurnIndex, int iterationIndex,
+                                                    String assistantText, LlmTokenUsage tokenUsage,
+                                                    AgentRunNoProgressState noProgressState) {
         return new AgentRunContinuation(CURRENT_SCHEMA_VERSION, runId,
                 AgentRunContinuationStage.READY_FOR_LLM.name(), messages, llmTurnIndex,
-                iterationIndex, 0, assistantText, tokenUsage);
+                iterationIndex, 0, assistantText, tokenUsage, noProgressState);
     }
 
     public static AgentRunContinuation readyForTool(Long runId, List<AgentLlmMessage> messages,
                                                      int llmTurnIndex, int iterationIndex,
                                                      int nextToolCallIndex, String assistantText,
                                                      LlmTokenUsage tokenUsage) {
+        return readyForTool(runId, messages, llmTurnIndex, iterationIndex, nextToolCallIndex,
+                assistantText, tokenUsage, AgentRunNoProgressState.EMPTY);
+    }
+
+    public static AgentRunContinuation readyForTool(Long runId, List<AgentLlmMessage> messages,
+                                                     int llmTurnIndex, int iterationIndex,
+                                                     int nextToolCallIndex, String assistantText,
+                                                     LlmTokenUsage tokenUsage,
+                                                     AgentRunNoProgressState noProgressState) {
         return new AgentRunContinuation(CURRENT_SCHEMA_VERSION, runId,
                 AgentRunContinuationStage.READY_FOR_TOOL.name(), messages, llmTurnIndex,
-                iterationIndex, nextToolCallIndex, assistantText, tokenUsage);
+                iterationIndex, nextToolCallIndex, assistantText, tokenUsage, noProgressState);
     }
 
     public static AgentRunContinuation completed(Long runId, List<AgentLlmMessage> messages,
                                                   int llmTurnIndex, int iterationIndex,
                                                   String assistantText, LlmTokenUsage tokenUsage) {
+        return completed(runId, messages, llmTurnIndex, iterationIndex, assistantText, tokenUsage,
+                AgentRunNoProgressState.EMPTY);
+    }
+
+    public static AgentRunContinuation completed(Long runId, List<AgentLlmMessage> messages,
+                                                  int llmTurnIndex, int iterationIndex,
+                                                  String assistantText, LlmTokenUsage tokenUsage,
+                                                  AgentRunNoProgressState noProgressState) {
         return new AgentRunContinuation(CURRENT_SCHEMA_VERSION, runId,
                 AgentRunContinuationStage.COMPLETED.name(), messages, llmTurnIndex,
-                iterationIndex, 0, assistantText, tokenUsage);
+                iterationIndex, 0, assistantText, tokenUsage, noProgressState);
     }
 }

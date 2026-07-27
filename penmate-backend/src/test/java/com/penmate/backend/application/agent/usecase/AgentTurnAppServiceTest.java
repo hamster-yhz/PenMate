@@ -35,7 +35,8 @@ class AgentTurnAppServiceTest {
                 runAppService,
                 runDispatcher,
                 mock(AgentSkillActivationService.class),
-                recoveryPrompts()
+                recoveryPrompts(),
+                mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class)
         );
 
         Long projectId = 920001L;
@@ -44,7 +45,7 @@ class AgentTurnAppServiceTest {
                 1001L,
                 "write a chapter",
                 java.util.List.of(),
-                new AgentTurnCommand.TaskRequest("WRITE", 3001L, null, "selected text")
+                new AgentTurnCommand.TaskRequest(3001L, java.util.List.of(3001L), null, "selected text")
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(projectId, sessionId, command, "trace-turn-1");
@@ -70,14 +71,15 @@ class AgentTurnAppServiceTest {
                 runAppService,
                 runDispatcher,
                 mock(AgentSkillActivationService.class),
-                recoveryPrompts()
+                recoveryPrompts(),
+                mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class)
         );
 
         AgentTurnResult result = agentTurnAppService.createTurn(
                 920001L,
                 920002L,
                 new AgentTurnCommand(1001L, "hello", java.util.List.of(),
-                        new AgentTurnCommand.TaskRequest("WRITE", null, null, null)),
+                        new AgentTurnCommand.TaskRequest(null, java.util.List.of(), null, null)),
                 "trace-2"
         );
 
@@ -100,12 +102,13 @@ class AgentTurnAppServiceTest {
                 runAppService,
                 mock(AgentRunDispatcher.class),
                 mock(AgentSkillActivationService.class),
-                recovery
+                recovery,
+                mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class)
         );
 
         service.createTurn(920001L, 920002L,
                 new AgentTurnCommand(1001L, "continue", java.util.List.of(),
-                        new AgentTurnCommand.TaskRequest("WRITE", null, null, null)),
+                        new AgentTurnCommand.TaskRequest(null, java.util.List.of(), null, null)),
                 "trace-recovery");
 
         verify(runAppService).createRun(argThat(command ->

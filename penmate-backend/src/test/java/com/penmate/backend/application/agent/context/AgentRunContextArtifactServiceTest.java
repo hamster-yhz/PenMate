@@ -120,7 +120,7 @@ class AgentRunContextArtifactServiceTest {
                         List.of(),
                         List.of(new AgentLlmToolSchema(
                                 "rag_query", "Search", "{\"type\":\"object\"}")),
-                        "default", "stable", "", "stable"),
+                        "stable", "", "stable"),
                 null, messages);
         ArgumentCaptor<AgentArtifact> row = ArgumentCaptor.forClass(AgentArtifact.class);
         verify(artifacts).save(row.capture());

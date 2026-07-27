@@ -112,6 +112,31 @@ class ApprovalApplicationServiceRunFlowTest {
     }
 
     @Test
+    void rejection_resumes_run_instead_of_cancelling_it() {
+        ApprovalRequestRepository approvals = mock(ApprovalRequestRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovals = mock(AgentRunPendingApprovalRepository.class);
+        AgentRunEventPublisher events = mock(AgentRunEventPublisher.class);
+        AgentRunResumeDispatcher resumes = mock(AgentRunResumeDispatcher.class);
+        AgentRunLeaseService leases = mock(AgentRunLeaseService.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
+        ApprovalApplicationService service = new ApprovalApplicationService(
+                approvals, pendingApprovals, events, resumes, leases,
+                mock(BusinessIdGenerator.class), accessGuard);
+        ApprovalRequest approval = approvalRequest(88001L, 70001L);
+        when(accessGuard.requireApproval(9001L, 88001L, 201L)).thenReturn(approval);
+        when(approvals.rejectByApprovalRequestId(9001L, 88001L, 201L, "no")).thenReturn(1);
+        when(pendingApprovals.findByApprovalId(88001L)).thenReturn(pendingApproval(88001L, 70001L));
+        when(pendingApprovals.markStatus(88001L, "PENDING", "REJECTED")).thenReturn(1);
+
+        service.reject(9001L, 88001L, new ReviewApprovalCommand(201L, "no"), "trace-reject");
+
+        verify(events).publish(eq(70001L), eq("approval.rejected"), any(Map.class));
+        verify(resumes).dispatchResume(70001L, "trace-reject");
+        verify(leases, never()).cancelWaitingApproval(any(), any(), any());
+        verify(events, never()).publish(eq(70001L), eq("run.cancelled"), any());
+    }
+
+    @Test
     void create_approval_uses_run_id_not_task_id() {
         ApprovalRequestRepository approvalRequestRepository = mock(ApprovalRequestRepository.class);
         AgentRunPendingApprovalRepository pendingApprovalRepository = mock(AgentRunPendingApprovalRepository.class);

@@ -2,6 +2,7 @@ package com.penmate.backend.application.agent.query;
 
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.common.exception.BusinessErrorType;
+import com.penmate.backend.domain.agent.model.AgentSessionContextUsageSource;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
@@ -19,13 +20,10 @@ class AgentSessionTokenUsageQueryServiceTest {
                 repositoryClass.getClassLoader(),
                 new Class[]{repositoryClass},
                 (proxy, method, args) -> {
-                    if (method.getName().equals("findSessionTokenUsageSummary")) {
-                        return java.util.Map.of(
-                                "promptTokens", 48000,
-                                "completionTokens", 16000,
-                                "maxContextTokens", 128000,
-                                "modelName", "gpt-4.1"
-                        );
+                    if (method.getName().equals("findSessionContextUsageSource")) {
+                        return new AgentSessionContextUsageSource(
+                                90001L, 144_000L, 101L, "gpt-4.1", 128_000, 16_000,
+                                "CATALOG", null, null, null, null, null);
                     }
                     if (method.getReturnType().equals(int.class)) {
                         return 0;
@@ -64,7 +62,7 @@ class AgentSessionTokenUsageQueryServiceTest {
                 repositoryClass.getClassLoader(),
                 new Class[]{repositoryClass},
                 (proxy, method, args) -> {
-                    if (method.getName().equals("findSessionTokenUsageSummary")) {
+                    if (method.getName().equals("findSessionContextUsageSource")) {
                         return null;
                     }
                     if (method.getReturnType().equals(int.class)) {

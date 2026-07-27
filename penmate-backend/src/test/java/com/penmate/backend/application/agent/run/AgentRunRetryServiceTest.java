@@ -104,7 +104,7 @@ class AgentRunRetryServiceTest {
     }
 
     private AgentRunInput input(Long runId) {
-        return new AgentRunInput(runId, "continue", "WRITE", 40L,
-                "selection", "style", "model", "plugins", "hash");
+        return new AgentRunInput(runId, "continue", 40L, java.util.List.of(40L),
+                "selection", "style", "model", "plugins", "STANDARD", "hash");
     }
 }

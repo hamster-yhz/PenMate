@@ -18,7 +18,7 @@ class AgentPromptAssemblerTest {
 
     @Test
     void should_render_stable_dynamic_history_and_user_messages_in_contract_order() {
-        PromptPlan plan = new PromptPlan(List.of(), List.of(), "default",
+        PromptPlan plan = new PromptPlan(List.of(), List.of(),
                 "stable instructions", "<context type=\"rag\">\nreference\n</context>", "preview");
         List<AgentLlmMessage> history = List.of(
                 AgentLlmMessage.user("earlier request"),
@@ -43,7 +43,7 @@ class AgentPromptAssemblerTest {
 
     @Test
     void should_insert_activated_skills_between_stable_prefix_and_dynamic_context() {
-        PromptPlan plan = new PromptPlan(List.of(), List.of(), "default",
+        PromptPlan plan = new PromptPlan(List.of(), List.of(),
                 "stable", "dynamic", "preview");
 
         List<AgentLlmMessage> messages = assembler.buildExecutionMessages(

@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.run.AgentRunResult;
 import com.penmate.backend.application.agent.run.AgentRunDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryPromptService;
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
+import com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService;
 import com.penmate.backend.application.common.exception.BusinessErrorType;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
@@ -29,6 +30,7 @@ public class AgentTurnAppService {
     private final SessionStyleBindingAppService sessionStyleBindingAppService;
     private final AgentSkillActivationService skillActivationService;
     private final AgentRunRecoveryPromptService recoveryPromptService;
+    private final AgentSafetyModeApplicationService safetyModes;
 
     public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
                                AgentRepository agentRepository,
@@ -37,7 +39,8 @@ public class AgentTurnAppService {
                                AgentRunAppService agentRunAppService,
                                AgentRunDispatcher runDispatcher,
                                AgentSkillActivationService skillActivationService,
-                               AgentRunRecoveryPromptService recoveryPromptService) {
+                               AgentRunRecoveryPromptService recoveryPromptService,
+                               AgentSafetyModeApplicationService safetyModes) {
         this.sessionStyleBindingAppService = sessionStyleBindingAppService;
         this.agentRepository = agentRepository;
         this.agentSessionRepository = agentSessionRepository;
@@ -46,6 +49,7 @@ public class AgentTurnAppService {
         this.runDispatcher = runDispatcher;
         this.skillActivationService = skillActivationService;
         this.recoveryPromptService = recoveryPromptService;
+        this.safetyModes = safetyModes;
     }
 
     @Transactional
@@ -94,22 +98,24 @@ public class AgentTurnAppService {
                 + (modelConfigId == null ? "null" : modelConfigId) + "}";
         String styleSnapshotJson = sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, sessionId);
         String promptText = effectiveRequest;
+        var safetyMode = safetyModes.get(operatorId);
         AgentRunResult runResult = agentRunAppService.createRun(new AgentRunCommand(
                 projectId,
                 sessionId,
                 turnId,
                 operatorId,
                 runId,
-                command == null || command.taskRequest() == null ? "WRITE"
-                        : command.taskRequest().taskType(),
                 promptText,
                 command == null || command.taskRequest() == null ? null
                         : command.taskRequest().chapterId(),
+                command == null || command.taskRequest() == null ? java.util.List.of()
+                        : command.taskRequest().chapterIds(),
                 command == null || command.taskRequest() == null ? null
                         : command.taskRequest().selectedText(),
                 styleSnapshotJson,
                 modelSnapshotJson,
                 null,
+                safetyMode == null ? com.penmate.backend.domain.agent.model.AgentSafetyMode.STANDARD.name() : safetyMode.name(),
                 null,
                 traceId
         ));

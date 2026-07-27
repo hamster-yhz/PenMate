@@ -38,6 +38,22 @@ import static org.mockito.Mockito.when;
 class NativeOpenAiStyleHttpProviderChatClientTest {
 
     @Test
+    void uses_the_provider_specific_output_token_field() {
+        AgentLlmTurnRequest request = new AgentLlmTurnRequest(List.of(
+                com.penmate.backend.domain.agent.model.AgentLlmMessage.user("hello")), List.of(), "none");
+        AgentLlmExecutionConfig config = AgentLlmExecutionConfig.builder()
+                .modelName("gpt-test").maxOutputTokens(4321).build();
+
+        JSONObject compatible = AgentJsonCodec.parseObj(new TestNativeClient().turnBody(request, config));
+        JSONObject openAi = AgentJsonCodec.parseObj(new TestOpenAiClient().turnBody(request, config));
+        JSONObject geminiCompatible = AgentJsonCodec.parseObj(new TestGeminiClient().turnBody(request, config));
+
+        assertThat(compatible.getInt("max_tokens")).isEqualTo(4321);
+        assertThat(openAi.getInt("max_completion_tokens")).isEqualTo(4321);
+        assertThat(geminiCompatible.getInt("max_tokens")).isEqualTo(4321);
+    }
+
+    @Test
     void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_BUILDS_TEXT_REQUEST_BODY_WITH_SINGLE_USER_MESSAGE() {
         TestNativeClient client = new TestNativeClient();
 
@@ -465,9 +481,25 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
 
     private static final class TestNativeClient extends NativeOpenAiStyleHttpProviderChatClient {
 
+        private String turnBody(AgentLlmTurnRequest request, AgentLlmExecutionConfig config) {
+            return buildTurnRequestBody(request, config.modelName(), config, "/chat/completions");
+        }
+
         @Override
         public boolean supports(String providerCode) {
             return true;
+        }
+    }
+
+    private static final class TestOpenAiClient extends OpenAiProviderChatClient {
+        private String turnBody(AgentLlmTurnRequest request, AgentLlmExecutionConfig config) {
+            return buildTurnRequestBody(request, config.modelName(), config, "/chat/completions");
+        }
+    }
+
+    private static final class TestGeminiClient extends GeminiProviderChatClient {
+        private String turnBody(AgentLlmTurnRequest request, AgentLlmExecutionConfig config) {
+            return buildTurnRequestBody(request, config.modelName(), config, "/chat/completions");
         }
     }
 

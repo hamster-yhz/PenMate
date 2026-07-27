@@ -3,6 +3,7 @@ package com.penmate.backend.application.agent.orchestration;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentMessage;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
+import com.penmate.backend.domain.agent.repository.AgentSessionContextSummaryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -16,13 +17,14 @@ import java.util.Locale;
 public class ConversationWindowBuilder {
 
     private final AgentRepository agentRepository;
+    private final AgentSessionContextSummaryRepository contextSummaries;
 
     public List<AgentLlmMessage> build(Long conversationId, String currentPrompt, Integer contextWindowTurns) {
         if (conversationId == null || contextWindowTurns == null || contextWindowTurns <= 0) {
             return List.of();
         }
 
-        return build(agentRepository.listMessages(conversationId), currentPrompt, contextWindowTurns);
+        return buildWithSummary(conversationId, agentRepository.listMessages(conversationId), currentPrompt, contextWindowTurns);
     }
 
     public List<AgentLlmMessage> buildBeforeTurn(Long conversationId, Long turnId, Integer contextWindowTurns) {
@@ -30,7 +32,22 @@ public class ConversationWindowBuilder {
             return List.of();
         }
 
-        return build(agentRepository.listMessagesBeforeTurn(conversationId, turnId), null, contextWindowTurns);
+        return buildWithSummary(conversationId, agentRepository.listMessagesBeforeTurn(conversationId, turnId), null, contextWindowTurns);
+    }
+
+    private List<AgentLlmMessage> buildWithSummary(Long conversationId, List<AgentMessage> messages,
+                                                   String currentPrompt, int contextWindowTurns) {
+        var summary = contextSummaries == null ? null : contextSummaries.find(conversationId);
+        int cutoff = summary == null || summary.cutoffMessageSeq() == null ? 0 : summary.cutoffMessageSeq();
+        List<AgentMessage> tail = (messages == null ? List.<AgentMessage>of() : messages).stream()
+                .filter(message -> message != null && message.getSeqNo() != null && message.getSeqNo() > cutoff)
+                .toList();
+        List<AgentLlmMessage> window = new ArrayList<>();
+        if (summary != null && summary.summaryJson() != null && !summary.summaryJson().isBlank()) {
+            window.add(AgentLlmMessage.system("Earlier conversation context (compressed):\n" + summary.summaryJson()));
+        }
+        window.addAll(build(tail, currentPrompt, contextWindowTurns));
+        return List.copyOf(window);
     }
 
     private List<AgentLlmMessage> build(List<AgentMessage> messages, String currentPrompt, int contextWindowTurns) {

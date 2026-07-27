@@ -281,6 +281,7 @@ public interface NovelProjectMapper {
             d38 AS (DELETE FROM rag_vectors_f16 WHERE project_id IN (SELECT project_id FROM target_project)),
             d39 AS (DELETE FROM rag_chunks WHERE project_id IN (SELECT project_id FROM target_project)),
             d40 AS (DELETE FROM rag_index_sources WHERE project_id IN (SELECT project_id FROM target_project)),
+            d40_sync AS (DELETE FROM rag_source_sync_states WHERE project_id IN (SELECT project_id FROM target_project)),
             d41 AS (DELETE FROM rag_index_builds WHERE project_id IN (SELECT project_id FROM target_project)),
             d42 AS (DELETE FROM rag_retrieval_logs WHERE project_id IN (SELECT project_id FROM target_project)),
             d43 AS (DELETE FROM rag_documents WHERE project_id IN (SELECT project_id FROM target_project)),

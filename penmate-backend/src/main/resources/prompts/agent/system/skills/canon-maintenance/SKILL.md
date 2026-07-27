@@ -13,8 +13,8 @@ Treat canon maintenance as controlled state management, not free-form note takin
 2. Search for relevance, then inspect for exactness. `story_bible_search` finds candidates; `story_bible_inspect` supplies mutation prerequisites.
 3. Inspect the exact node before every update or archive. Use only the returned current revision.
 4. Never promote an inference, suggestion, planned possibility, or temporary prose detail to CANON without user authority.
-5. Do not silently initialize a blank Story Bible. Present the proposed initialization set and wait for explicit user confirmation.
-6. Keep one approval conceptually coherent. Do not mix unrelated canon changes merely to reduce tool calls.
+5. An explicit user request to initialize the Story Bible is sufficient authority to perform the initialization in the same Run. Do not ask for duplicate confirmation.
+6. Keep each atomic batch conceptually coherent. Use 1-25 items and do not mix unrelated canon changes merely to reduce tool calls.
 7. After a successful write, inspect the affected node again. A tool failure, rejection, or conflict means nothing was confirmed.
 8. On revision conflict, re-inspect and re-plan. Never retry with a guessed or incremented revision.
 
@@ -24,7 +24,7 @@ Treat canon maintenance as controlled state management, not free-form note takin
 - A chapter-scoped progression overrides base node state only in its valid chapter range.
 - Story Core contains project-wide premise, narrative voice, tone, and hard creative constraints.
 - Narrative nodes such as plotlines, mysteries, arcs, and foreshadowing describe approved plans, not events that have already happened.
-- Manuscript evidence may reveal missing or stale canon, but it does not silently rewrite canon.
+- A user-authorized manuscript change also authorizes synchronizing the stable facts created by that exact change. It does not authorize unrelated retcons or silently replacing conflicting existing canon.
 - AuthorProfile is cross-project preference and is never project canon.
 - Unknown is not false. Missing context remains unknown until confirmed.
 
@@ -54,15 +54,17 @@ Do not duplicate relation targets inside attributes. Do not copy chapter-scoped 
 - `MAGIC_SYSTEM`: supernatural rules and costs. `TECHNOLOGY`: reproducible material or engineered systems.
 - `FACT`: what is true or believed. `CONTINUITY_CONSTRAINT`: how later writing must remain consistent with facts.
 - `EVENT`: something that happened, is reported, disputed, or explicitly planned. Do not use EVENT to duplicate a chapter or scene.
-- Use a custom type only when no built-in type fits and the concept will recur enough to justify its own schema.
+- Prefer the system-provided Story Bible types, categories, and tags. Inspect the complete catalog before considering any structural mutation.
+- Never create a custom type, category, or tag merely to fit one node, avoid a built-in schema, or rename an existing system concept.
+- A custom structure is justified only when no built-in structure can represent a recurring durable concept. If either condition is uncertain, keep the existing structure and ask or continue with the closest valid built-in type.
 
 ## Read Procedure
 
-1. Run `story_bible_inspect` with `operation=readiness` when initialization state is unknown.
+1. Run `story_bible_inspect` with `operation=overview` when initialization state or completeness is unknown.
 2. Use `story_bible_search` with concrete entities and concepts to find relevant candidates.
 3. Run `story_bible_inspect` with `operation=node` for every candidate that may be changed.
 4. Use `operation=catalog` before creating a node or choosing fields. Never infer `typeId` from a type name.
-5. Build a continuity ledger for the affected scope:
+5. When the task benefits from durable multi-step working state, use `ledger_crud` to maintain a continuity or initialization ledger for the affected scope:
    - chronology, duration, travel, and location;
    - character knowledge, belief, goal, condition, and relationship;
    - possession, damage, resources, obligations, and permissions;
@@ -75,18 +77,19 @@ Classify each candidate statement as confirmed existing fact, proposed durable f
 
 Initialization means useful canon content, not database existence. PenMate already creates the Story Bible root, system type catalog, and blank Story Core.
 
-1. Inspect readiness and the complete type catalog.
-2. Read the available manuscript, outline, user brief, and project context without writing.
+1. Inspect `overview` and the complete type catalog.
+2. Call `manuscript_manifest` to establish exact volume/chapter coverage, revisions, hashes, and character counts. Read chapters with `manuscript_chapter_read` in one or more bounded calls; choose single chapters, batches, ranges, or representative samples based on the task.
 3. Separate explicit facts, strong inferences, contradictions, and open questions.
-4. Propose a minimal initialization plan containing:
+4. Record a minimal initialization plan in a project AI ledger containing:
    - Story Core fields to fill;
    - essential characters, locations, organizations or factions, systems, items, and terms;
    - only the narrative plans already authorized by the user;
    - essential relations and initial continuity constraints;
    - excluded guesses and questions requiring answers.
-5. Show the plan to the user with proposed CANON versus DRAFT status and wait for explicit confirmation.
-6. Apply only the confirmed set. Prefer CANON for explicit facts and DRAFT for approved but unresolved proposals.
-7. Inspect each affected node and report what was persisted, what remains open, and any conflicts.
+5. If the user explicitly requested initialization, apply the supported set immediately using atomic Story Bible batches. Prefer CANON for explicit facts and DRAFT for authorized but unresolved proposals.
+6. Inspect affected nodes and batch receipts, then report what was persisted, what remains open, conflicts, and exact manuscript coverage.
+
+Never claim full-book initialization unless every manifest chapter was actually read at the revision/hash reported by the manifest. Partial or sampled reading may produce a partial initialization only and must name its coverage limits.
 
 Do not create encyclopedic filler. A useful minimum is better than a comprehensive speculative bible.
 
@@ -94,10 +97,10 @@ Do not create encyclopedic filler. A useful minimum is better than a comprehensi
 
 Use the narrowest tool:
 
-- `story_bible_node_write`: create, minimally update, or archive one node.
-- `story_bible_relation_write`: maintain one durable connection.
-- `story_bible_progression_write`: maintain one RFC 6902 chapter-scoped state change.
-- `story_bible_structure_write`: manage custom types, categories, or tags only during explicit world-building structure work.
+- `story_bible_node_write`: atomically create, minimally update, or archive 1-25 nodes.
+- `story_bible_relation_write`: atomically maintain 1-25 durable connections.
+- `story_bible_progression_write`: atomically maintain 1-25 RFC 6902 chapter-scoped state changes.
+- `story_bible_structure_write`: last-resort structural mutation for 1-25 custom types, categories, or tags. Call it only after inspecting the complete catalog and establishing that no built-in structure can represent a recurring durable concept; never call it for a one-off node.
 
 For node creation, pass `attributes` as a structured object matching the inspected type schema. Leave unknown optional fields absent; do not insert placeholders such as `TBD`, empty arrays, or invented defaults.
 

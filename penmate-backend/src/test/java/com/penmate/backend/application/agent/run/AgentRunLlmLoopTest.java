@@ -20,6 +20,7 @@ import com.penmate.backend.domain.agent.model.AgentLlmMessageRole;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.model.AgentRunContinuation;
+import com.penmate.backend.domain.agent.run.model.AgentRunNoProgressState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -336,6 +338,195 @@ class AgentRunLlmLoopTest {
         assertThat(result.finalAssistantText()).isEqualTo("Already complete");
         verify(llmGateway, never()).generateTurn(any(), any());
         verify(toolCallService, never()).executeToolCall(any());
+    }
+
+    @Test
+    void continues_past_ten_tool_turns_when_each_call_makes_progress() {
+        AtomicInteger llmTurn = new AtomicInteger();
+        when(llmGateway.generateTurn(any(), any())).thenAnswer(invocation -> {
+            int turn = llmTurn.incrementAndGet();
+            if (turn == 12) {
+                return new AgentLlmTurnResponse("stop", "Done after eleven calls", List.of(), "{}",
+                        new LlmTokenUsage(1, 1, 2));
+            }
+            return new AgentLlmTurnResponse("tool_calls", "", List.of(
+                    new AgentLlmToolCall("call-" + turn, "manuscript_chapter_read",
+                            "{\"chapterId\":" + turn + "}")), "{}", new LlmTokenUsage(1, 1, 2));
+        });
+        AtomicInteger toolTurn = new AtomicInteger();
+        when(toolCallService.executeToolCall(any())).thenAnswer(invocation ->
+                ToolCallResult.success("{\"chapterId\":" + toolTurn.incrementAndGet()
+                        + ",\"revision\":1}"));
+
+        AgentRunLoopResult result = newLoop().execute(requestWithTool("manuscript_chapter_read"));
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        assertThat(result.finalAssistantText()).isEqualTo("Done after eleven calls");
+        verify(llmGateway, org.mockito.Mockito.times(12)).generateTurn(any(), any());
+        verify(toolCallService, org.mockito.Mockito.times(11)).executeToolCall(any());
+    }
+
+    @Test
+    void fails_after_eight_identical_normalized_tool_calls_and_results() {
+        AtomicInteger llmTurn = new AtomicInteger();
+        when(llmGateway.generateTurn(any(), any())).thenAnswer(invocation -> {
+            int turn = llmTurn.incrementAndGet();
+            return new AgentLlmTurnResponse("tool_calls", "", List.of(
+                    new AgentLlmToolCall("call-" + turn, "story_bible_search",
+                            "{ \"query\" : \"Mira\" }")), "{}", new LlmTokenUsage(1, 1, 2));
+        });
+        when(toolCallService.executeToolCall(any()))
+                .thenReturn(ToolCallResult.success("{\"matches\":[]}"));
+
+        AgentRunLoopResult result = newLoop().execute(requestWithTool("story_bible_search"));
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.FAILED);
+        assertThat(result.finalAssistantText()).contains("IDENTICAL_CALL_REPEATED");
+        verify(llmGateway, org.mockito.Mockito.times(8)).generateTurn(any(), any());
+        verify(eventPublisher).publish(eq(70001L), eq("run.no_progress_detected"), any());
+    }
+
+    @Test
+    void fails_when_twenty_consecutive_distinct_writes_report_no_state_change() {
+        AtomicInteger llmTurn = new AtomicInteger();
+        when(llmGateway.generateTurn(any(), any())).thenAnswer(invocation -> {
+            AgentLlmTurnRequest request = invocation.getArgument(0);
+            if (request.tools().isEmpty()) {
+                return new AgentLlmTurnResponse("stop", "{\"summary\":\"No state changes yet\"}",
+                        List.of(), "{}", new LlmTokenUsage(10, 5, 15));
+            }
+            int turn = llmTurn.incrementAndGet();
+            return new AgentLlmTurnResponse("tool_calls", "", List.of(
+                    new AgentLlmToolCall("call-" + turn, "story_bible_node_write",
+                            "{\"items\":[{\"operation\":\"update\",\"nonce\":" + turn + "}]}")),
+                    "{}", new LlmTokenUsage(1, 1, 2));
+        });
+        when(toolCallService.executeToolCall(any())).thenReturn(
+                ToolCallResult.success("{\"changed\":false,\"nodeId\":71,\"revision\":3}"));
+
+        AgentRunLoopRequest request = new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace",
+                List.of(AgentLlmMessage.user("x".repeat(145_000))),
+                List.of(new AgentLlmToolSchema("story_bible_node_write", "write",
+                        "{\"type\":\"object\"}")),
+                AgentLlmExecutionConfig.builder().maxContextTokens(50_000).maxOutputTokens(100).build(),
+                201L, 7L);
+        AgentRunLoopResult result = newLoop().execute(request);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.FAILED);
+        assertThat(result.finalAssistantText()).contains("NO_PROGRESS_IN_LAST_20_CALLS");
+        verify(toolCallService, org.mockito.Mockito.times(21)).executeToolCall(any());
+        verify(eventPublisher).publish(eq(70001L), eq("context.compression.completed"), any());
+        verify(eventPublisher).publish(eq(70001L), eq("run.no_progress_detected"), any());
+    }
+
+    @Test
+    void preserves_no_progress_window_when_resuming_a_tool_continuation() {
+        AgentRunNoProgressState state = AgentRunNoProgressState.EMPTY;
+        for (int index = 1; index <= 20; index++) {
+            state = state.append("story_bible_node_write\nnonce=" + index,
+                    java.util.Set.of("nodeId=71", "revision=3"), false);
+        }
+        AgentLlmToolCallPayload call = new AgentLlmToolCallPayload(
+                "call-21", "function", "story_bible_node_write", "{\"nonce\":21}");
+        AgentRunContinuation continuation = AgentRunContinuation.readyForTool(
+                70001L, List.of(AgentLlmMessage.assistant("", List.of(call))),
+                21, 20, 0, "", new LlmTokenUsage(20, 20, 40), state);
+        when(toolCallService.executeToolCall(any())).thenReturn(
+                ToolCallResult.success("{\"changed\":false,\"nodeId\":71,\"revision\":3}"));
+
+        AgentRunLoopResult result = newLoop().resume(
+                requestWithTool("story_bible_node_write"), continuation);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.FAILED);
+        assertThat(result.finalAssistantText()).contains("NO_PROGRESS_IN_LAST_20_CALLS");
+        verify(toolCallService).executeToolCall(any());
+        verify(llmGateway, never()).generateTurn(any(), any());
+    }
+
+    @Test
+    void rejected_approval_resumes_with_user_rejected_result_and_caches_same_call() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        AgentLlmToolCallPayload rejectedCall = new AgentLlmToolCallPayload(
+                "call-rejected", "function", "story_bible_node_write", "{\"items\":[{\"operation\":\"update\"}]}" );
+        List<AgentLlmMessage> savedMessages = List.of(
+                AgentLlmMessage.user("Update canon"),
+                AgentLlmMessage.assistant("", List.of(rejectedCall)));
+        AgentRunPendingApproval pending = new AgentRunPendingApproval(
+                1L, 88001L, 88001L, 70001L, 101L, 90001L, 50001L,
+                "call-rejected", "story_bible_node_write", rejectedCall.argumentsJson(),
+                "{\"llmTurnIndex\":1,\"iterationIndex\":0,\"tokenUsage\":{\"promptTokens\":1,\"completionTokens\":1,\"totalTokens\":2},\"assistantText\":\"\"}",
+                objectMapper.writeValueAsString(savedMessages), "70001:call-rejected", "REJECTED",
+                201L, "trace", null, null);
+        when(llmGateway.generateTurn(any(), any())).thenReturn(
+                new AgentLlmTurnResponse("tool_calls", "", List.of(
+                        new AgentLlmToolCall("call-again", "story_bible_node_write",
+                                "{\"items\":[{\"operation\":\"update\"}]}")), "{}", new LlmTokenUsage(1, 1, 2)),
+                new AgentLlmTurnResponse("stop", "Understood", List.of(), "{}", new LlmTokenUsage(1, 1, 2)));
+
+        AgentRunLoopResult result = newLoop().resumeRejected(
+                requestWithTool("story_bible_node_write"), pending);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        assertThat(result.finalAssistantText()).isEqualTo("Understood");
+        verify(toolCallService, never()).executeToolCall(any());
+        ArgumentCaptor<AgentLlmTurnRequest> requests = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway, org.mockito.Mockito.times(2)).generateTurn(requests.capture(), any());
+        assertThat(requests.getAllValues().get(1).messages().getLast().content())
+                .contains("USER_REJECTED");
+    }
+
+    @Test
+    void automatically_compresses_once_at_ninety_five_percent_before_main_invocation() {
+        when(llmGateway.generateTurn(any(), any())).thenReturn(
+                new AgentLlmTurnResponse("stop", """
+                        {"summary":"Keep the active request","decisions":[],"completed":[],
+                         "resourceState":[],"unresolved":[],"nextAction":"Continue"}
+                        """, List.of(), "{}", new LlmTokenUsage(40, 10, 50)),
+                new AgentLlmTurnResponse("stop", "Completed", List.of(), "{}",
+                        new LlmTokenUsage(30, 5, 35)));
+        AgentRunLoopRequest request = new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace",
+                List.of(AgentLlmMessage.user("x".repeat(3_000))), List.of(),
+                AgentLlmExecutionConfig.builder().maxContextTokens(1_000).maxOutputTokens(100).build(),
+                201L, 7L);
+
+        AgentRunLoopResult result = newLoop().execute(request);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        assertThat(result.tokenUsage().totalTokens()).isEqualTo(85);
+        ArgumentCaptor<AgentLlmTurnRequest> requests = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway, org.mockito.Mockito.times(2)).generateTurn(requests.capture(), any());
+        assertThat(requests.getAllValues().get(0).tools()).isEmpty();
+        assertThat(requests.getAllValues().get(0).toolChoice()).isEqualTo("none");
+        assertThat(requests.getAllValues().get(1).messages())
+                .anyMatch(message -> message.content().startsWith("<compacted_conversation_context>"));
+        verify(eventPublisher).publish(eq(70001L), eq("context.compression.completed"), any());
+    }
+
+    @Test
+    void compression_failure_fails_run_without_a_second_attempt() {
+        when(llmGateway.generateTurn(any(), any())).thenReturn(
+                new AgentLlmTurnResponse("stop", "not json", List.of(), "{}", LlmTokenUsage.ZERO));
+        AgentRunLoopRequest request = new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace",
+                List.of(AgentLlmMessage.user("x".repeat(3_000))), List.of(),
+                AgentLlmExecutionConfig.builder().maxContextTokens(1_000).maxOutputTokens(100).build(),
+                201L, 7L);
+
+        AgentRunLoopResult result = newLoop().execute(request);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.FAILED);
+        assertThat(result.finalAssistantText()).contains("invalid structured summary");
+        verify(llmGateway).generateTurn(any(), any());
+        verify(eventPublisher).publish(eq(70001L), eq("context.compression.failed"), any());
+    }
+
+    private AgentRunLoopRequest requestWithTool(String toolCode) {
+        return new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace", List.of(AgentLlmMessage.user("Work")),
+                List.of(new AgentLlmToolSchema(toolCode, toolCode, "{\"type\":\"object\"}")),
+                AgentLlmExecutionConfig.builder().build(), 201L, 7L);
     }
 
     private AgentRunLlmLoop newLoop() {

@@ -28,6 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ContextEpochSnapshotFactoryTest {
@@ -35,7 +37,7 @@ class ContextEpochSnapshotFactoryTest {
     @Test
     void reads_each_epoch_snapshot_from_one_repeatable_database_view() throws Exception {
         Transactional transaction = ContextEpochSnapshotFactory.class
-                .getMethod("create", Long.class, Long.class).getAnnotation(Transactional.class);
+                .getMethod("create", Long.class, Long.class, StoryBibleRoutingMode.class).getAnnotation(Transactional.class);
 
         assertThat(transaction).isNotNull();
         assertThat(transaction.readOnly()).isTrue();
@@ -89,7 +91,7 @@ class ContextEpochSnapshotFactoryTest {
             return new StoryBibleEffectiveStateResolver.EffectiveState(state, List.of(99L), List.of(), List.of(), true);
         });
 
-        var snapshot = factory.create(1L, 50L);
+        var snapshot = factory.create(1L, 50L, StoryBibleRoutingMode.LLM_SELECTOR);
 
         assertThat(snapshot.schemaVersion()).isEqualTo(2);
         assertThat(snapshot.coreContext()).singleElement().satisfies(core -> {
@@ -105,6 +107,35 @@ class ContextEpochSnapshotFactoryTest {
             });
             assertThat(entry.currentChapterStateSummary()).contains("Mira at chapter 5");
         });
+    }
+
+    @Test
+    void agent_driven_snapshot_binds_revisions_without_preloading_story_bible_content() {
+        StoryBibleRepository bibles = mock(StoryBibleRepository.class);
+        NovelGateway novels = mock(NovelGateway.class);
+        StoryBibleEffectiveStateResolver states = mock(StoryBibleEffectiveStateResolver.class);
+        ContextEpochSnapshotFactory factory = new ContextEpochSnapshotFactory(
+                bibles, novels, states, new JacksonJsonCodec(new ObjectMapper()));
+        StoryBible root = new StoryBible();
+        root.setStoryBibleId(10L);
+        root.setContentRevision(7L);
+        when(bibles.findByProjectId(1L)).thenReturn(root);
+        NovelProject project = new NovelProject();
+        project.setStructureRevision(4L);
+        when(novels.findProjectById(1L)).thenReturn(project);
+        NovelChapter chapter = new NovelChapter();
+        chapter.setContentRevision(3L);
+        when(novels.findChapterByIdAndProjectId(1L, 50L)).thenReturn(chapter);
+
+        var snapshot = factory.create(1L, 50L, StoryBibleRoutingMode.AGENT_DRIVEN);
+
+        assertThat(snapshot.storyBibleRevision()).isEqualTo(7L);
+        assertThat(snapshot.manuscriptRevision()).isEqualTo(4L);
+        assertThat(snapshot.activeChapterContentRevision()).isEqualTo(3L);
+        assertThat(snapshot.coreContext()).isEmpty();
+        assertThat(snapshot.selectorCatalog()).isEmpty();
+        verify(bibles, never()).findNodeTypes(10L);
+        verify(bibles, never()).findNodes(eq(10L), any(), any(), any());
     }
 
     private StoryBibleNode node(Long id, String title, StoryBibleInclusionPolicy policy) {

@@ -18,10 +18,18 @@ public record AgentTurnCommand(
     }
 
     public record TaskRequest(
-            String taskType,
             Long chapterId,
+            List<Long> chapterIds,
             Long modelConfigId,
             String selectedText
     ) {
+        public TaskRequest {
+            chapterIds = chapterIds == null ? List.of() : chapterIds.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .filter(id -> id > 0)
+                    .distinct()
+                    .toList();
+            chapterId = chapterIds.isEmpty() ? null : chapterIds.getFirst();
+        }
     }
 }

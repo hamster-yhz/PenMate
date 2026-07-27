@@ -8,6 +8,10 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
  */
 public record ToolOperationPolicy(
         String operationCode,
-        ApprovalPolicyDecision decision
+        ApprovalPolicyDecision decision,
+        Integer riskLevel
 ) {
+    public ToolOperationPolicy(String operationCode, ApprovalPolicyDecision decision) {
+        this(operationCode, decision, null);
+    }
 }

@@ -36,7 +36,10 @@ class ChapterReadToolDefinition implements AgentToolDefinition {
     private static final String SCHEMA = """
             {
               "type": "object",
-              "properties": {},
+              "properties": {
+                "chapterId": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["chapterId"],
               "additionalProperties": false
             }
             """;
@@ -48,10 +51,9 @@ class ChapterReadToolDefinition implements AgentToolDefinition {
                 new ToolPresentation("Read chapter"),
                 new ToolExposure(
                         ToolLifecycleStatus.ACTIVE,
-                        "Read the exact active chapter content and its current revision and SHA-256 hash. "
+                        "Read the exact project chapter identified by chapterId and return its current revision and SHA-256 hash. "
                                 + "Call this before chapter_replace or chapter_patch and again when a write reports a conflict.",
-                        SCHEMA,
-                        Set.of("default", "rewrite")),
+                        SCHEMA),
                 ChapterContentToolDefinitions.readOnly());
     }
 }
@@ -62,11 +64,12 @@ class ChapterReplaceToolDefinition implements AgentToolDefinition {
             {
               "type": "object",
               "properties": {
+                "chapterId": { "type": "integer", "minimum": 1 },
                 "expectedRevision": { "type": "integer", "minimum": 1 },
                 "expectedContentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
                 "content": { "type": "string" }
               },
-              "required": ["expectedRevision", "expectedContentHash", "content"],
+              "required": ["chapterId", "expectedRevision", "expectedContentHash", "content"],
               "additionalProperties": false
             }
             """;
@@ -78,11 +81,10 @@ class ChapterReplaceToolDefinition implements AgentToolDefinition {
                 new ToolPresentation("Replace chapter"),
                 new ToolExposure(
                         ToolLifecycleStatus.ACTIVE,
-                        "Atomically replace the active chapter with the exact content supplied. "
+                        "Atomically replace the project chapter identified by chapterId with the exact content supplied. "
                                 + "Use the revision and hash returned by chapter_read or the preceding successful chapter write. "
                                 + "This tool performs no rewriting or interpretation: supplied content is persisted verbatim.",
-                        SCHEMA,
-                        Set.of("default", "rewrite")),
+                        SCHEMA),
                 ChapterContentToolDefinitions.write());
     }
 }
@@ -93,6 +95,7 @@ class ChapterPatchToolDefinition implements AgentToolDefinition {
             {
               "type": "object",
               "properties": {
+                "chapterId": { "type": "integer", "minimum": 1 },
                 "expectedRevision": { "type": "integer", "minimum": 1 },
                 "expectedContentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
                 "replacements": {
@@ -110,7 +113,7 @@ class ChapterPatchToolDefinition implements AgentToolDefinition {
                   }
                 }
               },
-              "required": ["expectedRevision", "expectedContentHash", "replacements"],
+              "required": ["chapterId", "expectedRevision", "expectedContentHash", "replacements"],
               "additionalProperties": false
             }
             """;
@@ -122,11 +125,10 @@ class ChapterPatchToolDefinition implements AgentToolDefinition {
                 new ToolPresentation("Patch chapter"),
                 new ToolExposure(
                         ToolLifecycleStatus.ACTIVE,
-                        "Atomically apply ordered exact-text replacements to the active chapter. "
+                        "Atomically apply ordered exact-text replacements to the project chapter identified by chapterId. "
                                 + "Every oldText must occur exactly expectedOccurrences times at its step or the entire call is rejected without writing. "
                                 + "Use one call for one requested state transition and never encode multiple editing stages as prose instructions.",
-                        SCHEMA,
-                        Set.of("default", "rewrite")),
+                        SCHEMA),
                 ChapterContentToolDefinitions.write());
     }
 }

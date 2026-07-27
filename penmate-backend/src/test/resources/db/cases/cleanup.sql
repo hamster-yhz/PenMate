@@ -24,6 +24,7 @@ DELETE FROM plugin_catalog WHERE plugin_id BETWEEN 920000 AND 922999;
 
 DELETE FROM rag_chunks WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM rag_index_sources WHERE project_id BETWEEN 920000 AND 922999;
+DELETE FROM rag_source_sync_states WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM rag_index_builds WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM project_ai_configurations WHERE project_id BETWEEN 920000 AND 922999;
 DELETE FROM rag_retrieval_logs WHERE project_id BETWEEN 920000 AND 922999;

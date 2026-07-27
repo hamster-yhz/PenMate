@@ -41,12 +41,14 @@ class ChapterReadToolHandler implements AgentToolHandler {
     public void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         ChapterToolSupport.requireContext(context, request);
         Map<String, Object> arguments = jsonCodec.readObject(request.toolArgsJson());
-        if (!arguments.isEmpty()) throw new IllegalArgumentException("chapter_read accepts no fields");
+        ChapterToolSupport.rejectUnexpected(arguments, Set.of("chapterId"), toolCode());
+        ChapterToolSupport.requireChapterId(arguments);
     }
 
     @Override
     public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
-        NovelChapter chapter = novels.getChapter(context.projectId(), context.input().chapterId());
+        Map<String, Object> arguments = jsonCodec.readObject(request.toolArgsJson());
+        NovelChapter chapter = novels.getChapter(context.projectId(), ChapterToolSupport.requireChapterId(arguments));
         return ToolCallResult.success(jsonCodec.write(ChapterToolSupport.readOutput(chapter)));
     }
 }
@@ -77,6 +79,7 @@ abstract class AbstractChapterMutationToolHandler implements AgentToolHandler {
     public final void validate(AuthorizedAgentRunContext context, ToolCallRequest request) {
         ChapterToolSupport.requireContext(context, request);
         Map<String, Object> arguments = jsonCodec.readObject(request.toolArgsJson());
+        ChapterToolSupport.requireChapterId(arguments);
         ChapterToolSupport.requireExpectedState(arguments);
         validateMutation(arguments);
     }
@@ -88,7 +91,7 @@ abstract class AbstractChapterMutationToolHandler implements AgentToolHandler {
     @Override
     public final ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request) {
         Map<String, Object> arguments = jsonCodec.readObject(request.toolArgsJson());
-        Long chapterId = context.input().chapterId();
+        Long chapterId = ChapterToolSupport.requireChapterId(arguments);
         NovelApplicationService.AiChapterLeaseView lease = null;
         try {
             lease = acquireLease(context, chapterId);
@@ -222,7 +225,7 @@ class ChapterReplaceToolHandler extends AbstractChapterMutationToolHandler {
     @Override
     protected void validateMutation(Map<String, Object> arguments) {
         ChapterToolSupport.rejectUnexpected(arguments,
-                Set.of("expectedRevision", "expectedContentHash", "content"), toolCode());
+                Set.of("chapterId", "expectedRevision", "expectedContentHash", "content"), toolCode());
         if (!(arguments.get("content") instanceof String)) {
             throw new IllegalArgumentException("content must be a string");
         }
@@ -250,7 +253,7 @@ class ChapterPatchToolHandler extends AbstractChapterMutationToolHandler {
     @Override
     protected void validateMutation(Map<String, Object> arguments) {
         ChapterToolSupport.rejectUnexpected(arguments,
-                Set.of("expectedRevision", "expectedContentHash", "replacements"), toolCode());
+                Set.of("chapterId", "expectedRevision", "expectedContentHash", "replacements"), toolCode());
         parseReplacements(arguments);
     }
 
@@ -326,9 +329,14 @@ final class ChapterToolSupport {
         if (context == null || request == null) {
             throw new IllegalArgumentException("chapter tool requires project, run and operator context");
         }
-        if (context.input() == null || context.input().chapterId() == null) {
-            throw new IllegalArgumentException("active chapter is required");
+    }
+
+    static Long requireChapterId(Map<String, Object> arguments) {
+        Long chapterId = JsonValues.longValue(arguments, "chapterId");
+        if (chapterId == null || chapterId < 1) {
+            throw new IllegalArgumentException("chapterId must be a positive integer");
         }
+        return chapterId;
     }
 
     static void requireExpectedState(Map<String, Object> arguments) {

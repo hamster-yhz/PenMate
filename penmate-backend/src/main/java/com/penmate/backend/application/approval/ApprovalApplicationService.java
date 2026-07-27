@@ -158,19 +158,13 @@ public class ApprovalApplicationService {
             log.info("审批驳回重复 pending 状态迁移跳过: approvalId={}", approvalId);
             return;
         }
-        runLeaseService.cancelWaitingApproval(pendingApproval.runId(),
-                "AGENT_APPROVAL_REJECTED", "Approval rejected");
         eventPublisher.publish(pendingApproval.runId(), "approval.rejected", Map.of(
                 "approvalId", approvalId,
                 "reviewedBy", command.reviewedBy(),
                 "comment", command.comment() == null ? "" : command.comment(),
                 "traceId", traceId
         ));
-        eventPublisher.publish(pendingApproval.runId(), "run.cancelled", Map.of(
-                "errorCode", "AGENT_APPROVAL_REJECTED",
-                "errorMessage", "Approval rejected",
-                "approvalId", approvalId
-        ));
+        runResumeDispatcher.dispatchResume(pendingApproval.runId(), traceId);
         writeAudit(traceId, command.reviewedBy(), "approval", "reject", "agent_approval_requests", String.valueOf(approvalId), command.comment(), 200);
         log.info("审批驳回成功: approvalId={}, runId={}, reviewedBy={}", approvalId, pendingApproval.runId(), command.reviewedBy());
     }

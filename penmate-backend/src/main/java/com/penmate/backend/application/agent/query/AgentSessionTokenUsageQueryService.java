@@ -2,13 +2,13 @@ package com.penmate.backend.application.agent.query;
 
 import com.penmate.backend.application.agent.runtime.SessionTokenUsageView;
 import com.penmate.backend.application.common.exception.BusinessException;
+import com.penmate.backend.domain.agent.model.AgentSessionContextUsageSource;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Map;
 
 /**
  * Session token 使用查询服务。
@@ -25,16 +25,24 @@ public class AgentSessionTokenUsageQueryService {
 
     public SessionTokenUsageView getTokenUsage(Long projectId, Long sessionId, String traceId) {
         log.info("Agent session token usage query started: projectId={}, sessionId={}, traceId={}", projectId, sessionId, traceId);
-        Map<String, Object> summary = agentSessionRepository.findSessionTokenUsageSummary(projectId, sessionId);
-        if (summary == null) {
+        AgentSessionContextUsageSource source = agentSessionRepository.findSessionContextUsageSource(projectId, sessionId);
+        if (source == null) {
             log.warn("Agent session token usage session not found: projectId={}, sessionId={}, traceId={}", projectId, sessionId, traceId);
             throw BusinessException.notFound("Agent session not found");
         }
-        Integer promptTokens = intValue(valueOf(summary, "promptTokens"), 0);
-        Integer completionTokens = intValue(valueOf(summary, "completionTokens"), 0);
-        Integer usedTokens = intValue(valueOf(summary, "totalTokens"), promptTokens + completionTokens);
-        Integer maxContextTokens = intValue(valueOf(summary, "maxContextTokens"), null);
-        String modelName = stringValue(valueOf(summary, "modelName"));
+        boolean providerAnchored = source.latestProtectedTokens() != null
+                && source.latestProtectedTokens() > 0
+                && source.modelConfigId() != null
+                && source.modelConfigId().equals(source.latestUsageModelConfigId());
+        int promptTokens = providerAnchored && source.latestInputTokens() != null
+                ? source.latestInputTokens() : estimateTokens(source.contextUtf8Bytes());
+        int completionTokens = providerAnchored && source.latestReservedOutputTokens() != null
+                ? source.latestReservedOutputTokens()
+                : source.maxOutputTokens() == null || source.maxOutputTokens() <= 0
+                    ? 8_192 : source.maxOutputTokens();
+        int usedTokens = providerAnchored ? source.latestProtectedTokens() : promptTokens + completionTokens;
+        Integer maxContextTokens = source.maxContextTokens();
+        String modelName = source.modelName();
         Double usageRatio = computeUsageRatio(usedTokens, maxContextTokens);
         log.info("Agent session token usage query resolved: projectId={}, sessionId={}, traceId={}, usedTokens={}, maxContextTokens={}, modelName={}",
                 projectId,
@@ -49,7 +57,10 @@ public class AgentSessionTokenUsageQueryService {
                 usageRatio,
                 promptTokens,
                 completionTokens,
-                modelName
+                modelName,
+                providerAnchored && source.latestUsageSource() != null
+                        ? source.latestUsageSource() : "ESTIMATE",
+                source.contextCapacitySource() == null ? "FALLBACK" : source.contextCapacitySource()
         );
     }
 
@@ -62,37 +73,8 @@ public class AgentSessionTokenUsageQueryService {
                 .doubleValue();
     }
 
-    private Object valueOf(Map<String, Object> row, String key) {
-        if (row == null || key == null) {
-            return null;
-        }
-        if (row.containsKey(key)) {
-            return row.get(key);
-        }
-        String normalizedExpected = normalizeKey(key);
-        for (Map.Entry<String, Object> entry : row.entrySet()) {
-            if (normalizedExpected.equals(normalizeKey(entry.getKey()))) {
-                return entry.getValue();
-            }
-        }
-        return null;
-    }
-
-    private String normalizeKey(String key) {
-        return key == null ? null : key.replace("_", "").toLowerCase();
-    }
-
-    private Integer intValue(Object value, Integer defaultValue) {
-        if (value == null) {
-            return defaultValue;
-        }
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        return Integer.valueOf(String.valueOf(value));
-    }
-
-    private String stringValue(Object value) {
-        return value == null ? null : String.valueOf(value);
+    private int estimateTokens(Long utf8Bytes) {
+        if (utf8Bytes == null || utf8Bytes <= 0) return 0;
+        return Math.toIntExact(Math.max(1L, (utf8Bytes + 2L) / 3L));
     }
 }

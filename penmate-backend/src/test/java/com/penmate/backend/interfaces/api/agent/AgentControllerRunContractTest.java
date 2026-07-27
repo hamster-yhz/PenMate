@@ -81,8 +81,8 @@ class AgentControllerRunContractTest {
                                 "userMessage", "Write a suspense opening.",
                                 "activeSkills", List.of(),
                                 "taskRequest", Map.of(
-                                        "taskType", "WRITE",
                                         "chapterId", "30001",
+                                        "chapterIds", List.of("30001", "30002"),
                                         "selectedText", "selected text"
                                 )
                         ))))

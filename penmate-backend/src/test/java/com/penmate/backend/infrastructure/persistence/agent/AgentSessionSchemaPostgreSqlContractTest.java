@@ -34,7 +34,7 @@ class AgentSessionSchemaPostgreSqlContractTest {
                         "attempt_count", "next_retry_at", "latest_event_seq", "latest_checkpoint_id");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_run_inputs"))
                 .contains(
-                        "run_id", "prompt_snapshot", "task_type", "style_snapshot_json",
+                        "run_id", "prompt_snapshot", "chapter_id", "chapter_ids_json", "style_snapshot_json",
                         "model_snapshot_json", "plugin_bindings_json", "input_hash");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_events"))
                 .contains("run_id", "session_id", "turn_id", "sequence", "schema_version", "event_type", "payload_json");
@@ -43,7 +43,11 @@ class AgentSessionSchemaPostgreSqlContractTest {
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_run_projections"))
                 .contains("run_id", "session_id", "turn_id", "run_status", "run_phase", "latest_sequence");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_run_pending_approvals"))
-                .contains("run_id", "session_id", "turn_id", "resume_payload_json", "pending_status");
+                .contains("run_id", "session_id", "turn_id", "resume_payload_json", "pending_status", "approval_binding_json");
+        assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_session_context_summaries"))
+                .contains("session_id", "summary_json", "cutoff_message_seq", "prompt_tokens", "completion_tokens");
+        assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_session_queued_requests"))
+                .contains("request_id", "session_id", "request_type", "request_status", "attempt_count", "last_error");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "agent_artifacts"))
                 .contains("event_id", "payload_json", "content_type");
     }
@@ -70,5 +74,7 @@ class AgentSessionSchemaPostgreSqlContractTest {
                         "uk_agent_run_pending_approvals_idempotency",
                         "idx_agent_run_pending_approvals_run_status",
                         "idx_agent_run_pending_approvals_session_status");
+        assertThat(PostgreSqlTestDatabase.indexesOf(dataSource, "agent_session_queued_requests"))
+                .contains("uk_agent_session_queued_requests_open", "idx_agent_session_queued_requests_poll");
     }
 }

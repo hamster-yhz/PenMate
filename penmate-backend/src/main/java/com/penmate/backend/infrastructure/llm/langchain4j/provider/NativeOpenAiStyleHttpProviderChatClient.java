@@ -93,7 +93,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             throw BusinessException.of("LLM execution config is incomplete");
         }
 
-        String requestBody = buildTurnRequestBody(turnRequest, modelName, endpoint);
+        String requestBody = buildTurnRequestBody(turnRequest, modelName, executionConfig, endpoint);
         log.info("llm.turn.request.dispatch: endpoint={}, modelName={}, messageCount={}, toolCount={}",
                 endpoint,
                 modelName,
@@ -154,7 +154,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             throw BusinessException.of("LLM execution config is incomplete");
         }
 
-        String requestBody = buildStreamingTurnRequestBody(turnRequest, modelName, endpoint);
+        String requestBody = buildStreamingTurnRequestBody(turnRequest, modelName, executionConfig, endpoint);
         HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
                 .timeout(Duration.ofMinutes(5))
                 .header("Accept", "text/event-stream")
@@ -247,10 +247,32 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         }
     }
 
+    protected String buildTurnRequestBody(AgentLlmTurnRequest request, String modelName,
+                                          AgentLlmExecutionConfig executionConfig, String endpoint) {
+        JSONObject body = AgentJsonCodec.parseObj(buildTurnRequestBody(request, modelName, endpoint));
+        if (executionConfig != null && executionConfig.maxOutputTokens() != null) {
+            body.set(outputTokenField(), executionConfig.maxOutputTokens());
+        }
+        return body.toString();
+    }
+
+    protected String outputTokenField() {
+        return "max_tokens";
+    }
+
     protected String buildStreamingTurnRequestBody(AgentLlmTurnRequest request,
                                                     String modelName,
                                                     String endpoint) {
         JSONObject body = AgentJsonCodec.parseObj(buildTurnRequestBody(request, modelName, endpoint));
+        body.set("stream", true);
+        return body.toString();
+    }
+
+    protected String buildStreamingTurnRequestBody(AgentLlmTurnRequest request,
+                                                    String modelName,
+                                                    AgentLlmExecutionConfig executionConfig,
+                                                    String endpoint) {
+        JSONObject body = AgentJsonCodec.parseObj(buildTurnRequestBody(request, modelName, executionConfig, endpoint));
         body.set("stream", true);
         return body.toString();
     }
@@ -571,12 +593,19 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             return LlmTokenUsage.ZERO;
         }
         Integer promptTokens = usage.getInt("prompt_tokens");
+        boolean anthropicShape = promptTokens == null && usage.getInt("input_tokens") != null;
+        if (anthropicShape) promptTokens = usage.getInt("input_tokens");
         Integer completionTokens = usage.getInt("completion_tokens");
         Integer totalTokens = usage.getInt("total_tokens");
         JSONObject promptDetails = usage.getJSONObject("prompt_tokens_details");
         Integer cachedTokens = promptDetails == null ? null : promptDetails.getInt("cached_tokens");
         if (cachedTokens == null) cachedTokens = usage.getInt("cache_read_input_tokens");
         Integer cacheCreationTokens = usage.getInt("cache_creation_input_tokens");
+        if (anthropicShape) {
+            promptTokens = (promptTokens == null ? 0 : promptTokens)
+                    + (cachedTokens == null ? 0 : cachedTokens)
+                    + (cacheCreationTokens == null ? 0 : cacheCreationTokens);
+        }
         return new LlmTokenUsage(
                 promptTokens == null ? 0 : promptTokens,
                 completionTokens == null ? 0 : completionTokens,

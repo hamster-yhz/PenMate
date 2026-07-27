@@ -30,12 +30,12 @@ public interface AgentRunMapper {
 
     @Insert("""
             INSERT INTO agent_run_inputs(
-                run_id, prompt_snapshot, task_type, chapter_id, selected_text,
-                style_snapshot_json, model_snapshot_json, plugin_bindings_json, input_hash
+                run_id, prompt_snapshot, chapter_id, chapter_ids_json, selected_text,
+                style_snapshot_json, model_snapshot_json, plugin_bindings_json, safety_mode, input_hash
             )
             VALUES(
-                #{runId}, #{promptSnapshot}, #{taskType}, #{chapterId}, #{selectedText},
-                #{styleSnapshotJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{modelSnapshotJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{pluginBindingsJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{inputHash}
+                #{runId}, #{promptSnapshot}, #{chapterId}, #{chapterIds,typeHandler=com.penmate.backend.infrastructure.persistence.support.LongListJsonbTypeHandler}, #{selectedText},
+                #{styleSnapshotJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{modelSnapshotJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{pluginBindingsJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler}, #{safetyMode}, #{inputHash}
             )
             """)
     int insertInput(AgentRunInput input);
@@ -44,16 +44,30 @@ public interface AgentRunMapper {
             SELECT
                 run_id AS runId,
                 prompt_snapshot AS promptSnapshot,
-                task_type AS taskType,
                 chapter_id AS chapterId,
+                chapter_ids_json AS chapterIds,
                 selected_text AS selectedText,
                 style_snapshot_json AS styleSnapshotJson,
                 model_snapshot_json AS modelSnapshotJson,
                 plugin_bindings_json AS pluginBindingsJson,
+                safety_mode AS safetyMode,
                 input_hash AS inputHash
             FROM agent_run_inputs
             WHERE run_id = #{runId}
             """)
+    @org.apache.ibatis.annotations.ConstructorArgs({
+            @org.apache.ibatis.annotations.Arg(column = "runId", javaType = Long.class),
+            @org.apache.ibatis.annotations.Arg(column = "promptSnapshot", javaType = String.class),
+            @org.apache.ibatis.annotations.Arg(column = "chapterId", javaType = Long.class),
+            @org.apache.ibatis.annotations.Arg(column = "chapterIds", javaType = List.class,
+                    typeHandler = com.penmate.backend.infrastructure.persistence.support.LongListJsonbTypeHandler.class),
+            @org.apache.ibatis.annotations.Arg(column = "selectedText", javaType = String.class),
+            @org.apache.ibatis.annotations.Arg(column = "styleSnapshotJson", javaType = String.class),
+            @org.apache.ibatis.annotations.Arg(column = "modelSnapshotJson", javaType = String.class),
+            @org.apache.ibatis.annotations.Arg(column = "pluginBindingsJson", javaType = String.class),
+            @org.apache.ibatis.annotations.Arg(column = "safetyMode", javaType = String.class),
+            @org.apache.ibatis.annotations.Arg(column = "inputHash", javaType = String.class)
+    })
     AgentRunInput findInput(Long runId);
 
     @Select("""
@@ -171,7 +185,7 @@ public interface AgentRunMapper {
                     OR (run_status = 'SUSPENDED' AND (next_retry_at IS NULL OR next_retry_at <= #{now}))
                     OR (run_status = 'WAITING_APPROVAL' AND EXISTS (
                         SELECT 1 FROM agent_run_pending_approvals p
-                        WHERE p.run_id = agent_runs.run_id AND p.pending_status = 'APPROVED'
+                        WHERE p.run_id = agent_runs.run_id AND p.pending_status IN ('APPROVED', 'REJECTED')
                     ))
                   )
                   AND (lease_until IS NULL OR lease_until < #{now})
@@ -319,7 +333,7 @@ public interface AgentRunMapper {
                 OR (r.run_status = 'SUSPENDED' AND (r.next_retry_at IS NULL OR r.next_retry_at <= #{now}))
                 OR (r.run_status = 'WAITING_APPROVAL' AND EXISTS (
                     SELECT 1 FROM agent_run_pending_approvals p
-                    WHERE p.run_id = r.run_id AND p.pending_status = 'APPROVED'
+                    WHERE p.run_id = r.run_id AND p.pending_status IN ('APPROVED', 'REJECTED')
                 ))
             )
               AND (r.lease_until IS NULL OR r.lease_until < #{now})

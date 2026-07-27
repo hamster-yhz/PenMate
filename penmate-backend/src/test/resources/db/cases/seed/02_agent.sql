@@ -32,10 +32,10 @@ ON CONFLICT (run_id) DO UPDATE SET
     updated_at = CURRENT_TIMESTAMP(3);
 
 INSERT INTO agent_run_inputs(
-    run_id, prompt_snapshot, task_type, chapter_id, selected_text,
+    run_id, prompt_snapshot, chapter_id, selected_text,
     style_snapshot_json, model_snapshot_json, plugin_bindings_json, input_hash)
 VALUES (
-    920831, 'Continue the gate scene.', 'WRITE', 920301, NULL,
+    920831, 'Continue the gate scene.', 920301, NULL,
     '{"styleId":920701}'::jsonb, '{"model":"demo"}'::jsonb, '[]'::jsonb,
     'demo-input-920831')
 ON CONFLICT (run_id) DO UPDATE SET prompt_snapshot = EXCLUDED.prompt_snapshot;

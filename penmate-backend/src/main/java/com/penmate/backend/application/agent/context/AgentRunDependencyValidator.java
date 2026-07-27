@@ -1,6 +1,5 @@
 package com.penmate.backend.application.agent.context;
 
-import com.penmate.backend.application.agent.orchestration.profile.TaskProfile;
 import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.agent.run.model.AgentRun;
 import com.penmate.backend.domain.agent.run.model.AgentRunInput;
@@ -40,9 +39,9 @@ public class AgentRunDependencyValidator {
     }
 
     public AgentRunContextArtifactService.DependencyManifest currentManifest(AgentRun run, AgentRunInput input) {
-        var snapshot = snapshots.create(run.projectId(), input.chapterId());
         var preference = preferences.resolve(run.projectId(), run.sessionId(), run.ownerUserId());
-        var hashes = catalogHashes.hashes(TaskProfile.fromTaskType(input.taskType()));
+        var snapshot = snapshots.create(run.projectId(), input.chapterId(), preference.mode());
+        var hashes = catalogHashes.hashes();
         Long styleRevision = sessions.findActiveStyleBindingRevision(run.sessionId());
         return new AgentRunContextArtifactService.DependencyManifest(
                 snapshot.storyBibleRevision(), snapshot.manuscriptRevision(), input.chapterId(),

@@ -25,14 +25,14 @@ class TodoCrudToolHandlerTest {
             service, new JacksonJsonCodec(new ObjectMapper()));
 
     @Test
-    void exposes_active_crud_operations_without_planning_inputs_or_session_id() {
+    void keeps_crud_implementation_but_disables_agent_exposure() {
         var descriptor = new TodoCrudToolDefinition().descriptor();
 
         assertThat(descriptor.toolCode()).isEqualTo("todo_crud");
         assertThat(descriptor.exposure().parametersJsonSchema())
                 .contains("\"operation\"", "\"list\"", "\"create\"", "\"update\"", "\"complete\"", "\"delete\"")
                 .doesNotContain("planningMode", "userRequest", "qualityIssues", "sessionId");
-        assertThat(descriptor.exposure().lifecycleStatus().name()).isEqualTo("ACTIVE");
+        assertThat(descriptor.exposure().lifecycleStatus().name()).isEqualTo("DISABLED");
         assertThat(handler.mutatesState(todoContext(), request("{\"operation\":\"list\"}"))).isFalse();
         assertThat(handler.mutatesState(todoContext(), request("{\"operation\":\"create\",\"title\":\"x\",\"sourceType\":\"PLANNING\",\"todoStatus\":\"TODO\"}"))).isTrue();
     }
