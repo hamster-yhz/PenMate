@@ -25,7 +25,7 @@ FROM nginx:1.27-alpine AS runtime
 COPY penmate-frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/penmate-frontend/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8443
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=5 \
   CMD wget --no-check-certificate -qO- https://127.0.0.1:8443/ >/dev/null || exit 1
