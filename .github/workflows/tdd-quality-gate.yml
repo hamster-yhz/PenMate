@@ -45,6 +45,7 @@ jobs:
               - 'docker-compose.prod.yml'
               - '.env.example'
               - 'scripts/deploy-remote.sh'
+              - 'scripts/init-secrets.sh'
 
   backend-test:
     needs: changes
@@ -103,7 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate deployment shell script
-        run: bash -n scripts/deploy-remote.sh
+        run: bash -n scripts/deploy-remote.sh scripts/init-secrets.sh
       - name: Validate production Compose configuration
         run: docker compose --env-file .env.example -f docker-compose.prod.yml config --quiet
 

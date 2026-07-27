@@ -19,37 +19,43 @@ PenMate 使用 GitHub Actions 构建前后端镜像并推送到 GHCR，再通过
 sudo mkdir -p /opt/penmate
 sudo chown "$USER":"$USER" /opt/penmate
 cd /opt/penmate
-cp .env.example .env
-chmod 600 .env
+bash ./scripts/init-secrets.sh
+# 编辑 .env，填写脚本列出的环境相关配置。
 ```
 
-至少填写以下值：
+数据库、JWT、加密和管理员初始密码已由脚本写入 `.env`，不要再改成示例文本。仍需填写镜像、S3 和管理员邮箱：
 
 ```env
-DB_NAME=penmate
-DB_USER=penmate
-DB_PASS=<strong-database-password>
-JWT_SECRET=<openssl-rand-base64-32>
-MODEL_KEY_ENCRYPTION_KEY_BASE64=<base64-encoded-16-24-or-32-byte-key>
-RATE_LIMIT_KEY_SECRET=<independent-openssl-rand-base64-32>
-BOOTSTRAP_ADMIN_EMAIL=admin@example.com
-BOOTSTRAP_ADMIN_PASSWORD=<strong-admin-password>
+BACKEND_IMAGE=<real-backend-image>
+FRONTEND_IMAGE=<real-frontend-image>
+STORAGE_ENDPOINT=<real-s3-endpoint>
+STORAGE_PUBLIC_ENDPOINT=<real-s3-public-endpoint>
+STORAGE_ACCESS_KEY=<real-s3-access-key>
+STORAGE_SECRET_KEY=<real-s3-secret-key>
+BOOTSTRAP_ADMIN_EMAIL=<real-admin-email>
+```
+
+如需在首次启动时预置模型，再完整填写对应的四项；不需要时保持四项全空：
+
+```env
 BOOTSTRAP_CHAT_PROVIDER=openai
 BOOTSTRAP_CHAT_BASE_URL=https://api.openai.com/v1
-BOOTSTRAP_CHAT_API_KEY=<model-api-key>
+BOOTSTRAP_CHAT_API_KEY=<real-model-api-key>
 BOOTSTRAP_CHAT_MODEL_NAME=gpt-4o-mini
 BOOTSTRAP_EMBEDDING_PROVIDER=openai
 BOOTSTRAP_EMBEDDING_BASE_URL=https://api.openai.com/v1
-BOOTSTRAP_EMBEDDING_API_KEY=<embedding-api-key>
+BOOTSTRAP_EMBEDDING_API_KEY=<real-embedding-api-key>
 BOOTSTRAP_EMBEDDING_MODEL_NAME=text-embedding-3-small
 ```
+
+`CERT_DIR`（默认 `./certs`）下还必须存在 `origin.pem` 和 `origin.key`。
 
 Bootstrap 默认只创建缺失的一个管理员账户、管理员角色绑定、一个官方模型密钥和一个模型配置。只有临时设置 `BOOTSTRAP_RECONCILE=true` 才会覆盖已存在的 Bootstrap 数据。
 
 ## 本地 Compose
 
 ```bash
-cp .env.example .env
+DEPLOY_PATH="$PWD" bash ./scripts/init-secrets.sh
 docker compose --env-file .env up -d --build
 docker compose --env-file .env ps
 curl -fsS http://127.0.0.1:8090/actuator/health

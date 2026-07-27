@@ -55,6 +55,7 @@ jobs:
               - 'docker-compose.prod.yml'
               - '.env.example'
               - 'scripts/deploy-remote.sh'
+              - 'scripts/init-secrets.sh'
 
   backend-test:
     needs: changes
@@ -113,7 +114,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate deployment shell script
-        run: bash -n scripts/deploy-remote.sh
+        run: bash -n scripts/deploy-remote.sh scripts/init-secrets.sh
       - name: Validate production Compose configuration
         run: docker compose --env-file .env.example -f docker-compose.prod.yml config --quiet
 
@@ -226,7 +227,7 @@ jobs:
         run: |
           mkdir -p deploy-bundle/scripts
           cp docker-compose.prod.yml .env.example deploy-bundle/
-          cp scripts/deploy-remote.sh deploy-bundle/scripts/
+          cp scripts/deploy-remote.sh scripts/init-secrets.sh deploy-bundle/scripts/
           tar -czf deploy-bundle.tgz -C deploy-bundle .
 
       - name: Upload deployment bundle
@@ -264,6 +265,8 @@ jobs:
           sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=accept-new "${SSH_USER}@${SSH_HOST}" "DEPLOY_PATH='${deploy_path}' bash -s" <<EOF
           set -euo pipefail
           cd "\$DEPLOY_PATH"
+          export GHCR_USERNAME='${ghcr_username}'
+          export GHCR_TOKEN='${GHCR_TOKEN}'
           if [ -n '${backend_image}' ]; then export BACKEND_IMAGE='${backend_image}'; fi
           if [ -n '${frontend_image}' ]; then export FRONTEND_IMAGE='${frontend_image}'; fi
           ./scripts/deploy-remote.sh
