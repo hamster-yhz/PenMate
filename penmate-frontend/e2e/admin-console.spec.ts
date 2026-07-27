@@ -18,7 +18,12 @@ const mockAdminApi = async (page: Page) => {
     }
     if (path.endsWith('/v1/auth/me')) {
       return route.fulfill({
-        json: envelope({ id: '1', displayName: '系统管理员', email: 'admin@penmate.local' }),
+        json: envelope({
+          id: '1',
+          displayName: '系统管理员',
+          email: 'admin@penmate.local',
+          permissions: [{ code: 'app:access' }],
+        }),
       })
     }
     if (path.endsWith('/v1/profile/menus')) {

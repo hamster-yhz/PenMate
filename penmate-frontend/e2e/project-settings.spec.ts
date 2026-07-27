@@ -17,7 +17,16 @@ const mockProjectSettings = async (page: Page) => {
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/v1/auth/refresh')) return route.fulfill({ json: envelope({ accessToken: 'visual-access-token' }) })
-    if (path.endsWith('/v1/auth/me')) return route.fulfill({ json: envelope({ id: '1001', displayName: '测试作者', email: 'writer@example.com' }) })
+    if (path.endsWith('/v1/auth/me')) {
+      return route.fulfill({
+        json: envelope({
+          id: '1001',
+          displayName: '测试作者',
+          email: 'writer@example.com',
+          permissions: [{ code: 'app:access' }],
+        }),
+      })
+    }
     if (path.endsWith('/v1/auth/ui-preferences')) return route.fulfill({ json: envelope({ themeMode: 'LIGHT', editorFontFamily: 'SERIF' }) })
     if (path.endsWith('/v1/model/configurations')) return route.fulfill({ json: envelope([
       { modelConfigId: '501', scopeType: 'USER', displayName: '长篇创作', modelType: 'CHAT', modelName: 'writer-pro', status: 'ACTIVE' },

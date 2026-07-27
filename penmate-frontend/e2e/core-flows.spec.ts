@@ -13,7 +13,13 @@ const mockAuthenticatedApi = async (page: Page) => {
     }
     if (path.endsWith('/v1/auth/me')) {
       return route.fulfill({
-        json: envelope({ id: '1001', email: 'writer@example.com', displayName: '测试作者', bio: '真实资料' }),
+        json: envelope({
+          id: '1001',
+          email: 'writer@example.com',
+          displayName: '测试作者',
+          bio: '真实资料',
+          permissions: [{ code: 'app:access' }],
+        }),
       })
     }
     if (path.endsWith('/v1/auth/logout')) return route.fulfill({ json: envelope('ok') })

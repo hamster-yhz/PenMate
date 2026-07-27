@@ -34,7 +34,16 @@ const mockStoryBible = async (page: Page, themeMode: 'LIGHT' | 'DARK') => {
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url()); const path = url.pathname
     if (path.endsWith('/v1/auth/refresh')) return route.fulfill({ json: envelope({ accessToken: 'visual-access-token' }) })
-    if (path.endsWith('/v1/auth/me')) return route.fulfill({ json: envelope({ id: '1001', displayName: '测试作者', email: 'writer@example.com' }) })
+    if (path.endsWith('/v1/auth/me')) {
+      return route.fulfill({
+        json: envelope({
+          id: '1001',
+          displayName: '测试作者',
+          email: 'writer@example.com',
+          permissions: [{ code: 'app:access' }],
+        }),
+      })
+    }
     if (path.endsWith('/v1/auth/ui-preferences')) return route.fulfill({ json: envelope({ themeMode, editorFontFamily: 'SERIF', editorFontSize: 17, editorLineHeight: 1.9, editorParagraphSpacing: 0.35, editorContentWidth: 760, typewriterMode: false, highlightCurrentParagraph: true }) })
     if (path.endsWith('/v1/novels/2001/volumes')) return route.fulfill({ json: envelope([{ volumeId: '2101', projectId: '2001', title: '第一卷', sortOrder: 1 }]) })
     if (path.endsWith('/v1/novels/2001/chapters')) return route.fulfill({ json: envelope([{ chapterId: '3001', projectId: '2001', volumeId: '2101', title: '雨夜来客', sortOrder: 1, displayNo: 1 }]) })

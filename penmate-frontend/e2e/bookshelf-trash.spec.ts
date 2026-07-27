@@ -11,7 +11,16 @@ const mockTrash = async (page: Page) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path.endsWith('/v1/auth/refresh')) return route.fulfill({ json: envelope({ accessToken: 'trash-token' }) })
-    if (path.endsWith('/v1/auth/me')) return route.fulfill({ json: envelope({ id: '1001', displayName: '测试作者', email: 'writer@example.com' }) })
+    if (path.endsWith('/v1/auth/me')) {
+      return route.fulfill({
+        json: envelope({
+          id: '1001',
+          displayName: '测试作者',
+          email: 'writer@example.com',
+          permissions: [{ code: 'app:access' }],
+        }),
+      })
+    }
     if (path.endsWith('/v1/novels/trash') && request.method() === 'GET') return route.fulfill({ json: envelope(deletedProjects) })
     if (path.endsWith('/v1/novels/trash/2001/restore')) {
       deletedProjects = deletedProjects.filter((project) => project.projectId !== '2001')

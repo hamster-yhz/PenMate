@@ -13,7 +13,11 @@ test('multi-format import reviews the manuscript before publishing the project',
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path.endsWith('/v1/auth/refresh')) return route.fulfill({ json: envelope({ accessToken: 'access' }) })
-    if (path.endsWith('/v1/auth/me')) return route.fulfill({ json: envelope({ id: '1001', displayName: '测试作者' }) })
+    if (path.endsWith('/v1/auth/me')) {
+      return route.fulfill({
+        json: envelope({ id: '1001', displayName: '测试作者', permissions: [{ code: 'app:access' }] }),
+      })
+    }
     if (path.endsWith('/v1/novels/imports/preview')) {
       return route.fulfill({ json: envelope({
         sessionId: '8001',
