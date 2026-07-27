@@ -31,7 +31,7 @@ class OpenAiResponsesProviderChatClientTest {
             .baseUrl("https://api.openai.com/v1")
             .apiKey("sk-test")
             .modelName("gpt-5")
-            .reasoningPolicy(new AgentReasoningPolicy("medium", "auto"))
+            .reasoningPolicy(new AgentReasoningPolicy("high", "detailed", "pro"))
             .maxOutputTokens(4321)
             .build();
 
@@ -49,11 +49,28 @@ class OpenAiResponsesProviderChatClientTest {
         assertThat(body.getBool("stream")).isTrue();
         assertThat(body.getBool("store")).isFalse();
         assertThat(body.getInt("max_output_tokens")).isEqualTo(4321);
-        assertThat(body.getJSONObject("reasoning").getStr("effort")).isEqualTo("medium");
-        assertThat(body.getJSONObject("reasoning").getStr("summary")).isEqualTo("auto");
+        assertThat(body.getJSONObject("reasoning").getStr("effort")).isEqualTo("high");
+        assertThat(body.getJSONObject("reasoning").getStr("summary")).isEqualTo("detailed");
+        assertThat(body.getJSONObject("reasoning").getStr("mode")).isEqualTo("pro");
         assertThat(tool.getStr("type")).isEqualTo("function");
         assertThat(tool.getStr("name")).isEqualTo("story_search");
         assertThat(tool.getJSONObject("parameters").getStr("type")).isEqualTo("object");
+    }
+
+    @Test
+    void sends_explicit_none_effort_when_reasoning_is_disabled() {
+        AgentLlmExecutionConfig disabledConfig = config.toBuilder()
+                .reasoningPolicy(AgentReasoningPolicy.DISABLED)
+                .build();
+        AgentLlmTurnRequest request = new AgentLlmTurnRequest(
+                List.of(AgentLlmMessage.user("Answer directly.")), List.of(), "auto");
+
+        JSONObject body = AgentJsonCodec.parseObj(
+                client.buildRequestBody(request, disabledConfig, false, true));
+
+        assertThat(body.getJSONObject("reasoning").getStr("effort")).isEqualTo("none");
+        assertThat(body.getJSONObject("reasoning").containsKey("mode")).isFalse();
+        assertThat(body.getJSONObject("reasoning").containsKey("summary")).isFalse();
     }
 
     @Test
@@ -96,7 +113,7 @@ class OpenAiResponsesProviderChatClientTest {
                     {"id":"msg_1","type":"message","phase":"commentary","content":[{"type":"output_text","text":"正在检查设定"}]},
                     {"id":"fc_1","type":"function_call","call_id":"call_1","name":"story_search","arguments":"{\\"query\\":\\"Mira\\"}"}
                   ],
-                  "usage":{"input_tokens":10,"output_tokens":7,"total_tokens":17,"input_tokens_details":{"cached_tokens":2}}
+                  "usage":{"input_tokens":10,"output_tokens":7,"total_tokens":17,"input_tokens_details":{"cached_tokens":2},"output_tokens_details":{"reasoning_tokens":4}}
                 }
                 """);
 
@@ -109,6 +126,7 @@ class OpenAiResponsesProviderChatClientTest {
         });
         assertThat(response.providerItems()).hasSize(3);
         assertThat(response.tokenUsage().cachedPromptTokens()).isEqualTo(2);
+        assertThat(response.tokenUsage().reasoningTokens()).isEqualTo(4);
     }
 
     @Test

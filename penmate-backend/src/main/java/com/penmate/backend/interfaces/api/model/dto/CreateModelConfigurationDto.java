@@ -25,5 +25,8 @@ public class CreateModelConfigurationDto {
     @PositiveOrZero private Integer contextWindowTurns;
     @Positive private Integer maxContextTokens;
     @Positive private Integer maxOutputTokens;
+    @Pattern(regexp = "AUTO|NONE|MINIMAL|LOW|MEDIUM|HIGH|XHIGH|MAX") private String reasoningEffort;
+    @Pattern(regexp = "AUTO|STANDARD|PRO|ADAPTIVE|DISABLED") private String reasoningMode;
+    @Pattern(regexp = "AUTO|NONE|CONCISE|DETAILED") private String reasoningSummary;
     private Boolean autoDetectCapacity;
 }

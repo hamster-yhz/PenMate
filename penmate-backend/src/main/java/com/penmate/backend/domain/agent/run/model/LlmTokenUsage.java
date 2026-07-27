@@ -5,13 +5,19 @@ public record LlmTokenUsage(
         int completionTokens,
         int totalTokens,
         int cachedPromptTokens,
-        int cacheCreationPromptTokens
+        int cacheCreationPromptTokens,
+        int reasoningTokens
 ) {
 
-    public static final LlmTokenUsage ZERO = new LlmTokenUsage(0, 0, 0, 0, 0);
+    public static final LlmTokenUsage ZERO = new LlmTokenUsage(0, 0, 0, 0, 0, 0);
 
     public LlmTokenUsage(int promptTokens, int completionTokens, int totalTokens) {
-        this(promptTokens, completionTokens, totalTokens, 0, 0);
+        this(promptTokens, completionTokens, totalTokens, 0, 0, 0);
+    }
+
+    public LlmTokenUsage(int promptTokens, int completionTokens, int totalTokens,
+                         int cachedPromptTokens, int cacheCreationPromptTokens) {
+        this(promptTokens, completionTokens, totalTokens, cachedPromptTokens, cacheCreationPromptTokens, 0);
     }
 
     public LlmTokenUsage add(LlmTokenUsage other) {
@@ -23,7 +29,8 @@ public record LlmTokenUsage(
                 completionTokens + other.completionTokens,
                 totalTokens + other.totalTokens,
                 cachedPromptTokens + other.cachedPromptTokens,
-                cacheCreationPromptTokens + other.cacheCreationPromptTokens
+                cacheCreationPromptTokens + other.cacheCreationPromptTokens,
+                reasoningTokens + other.reasoningTokens
         );
     }
 

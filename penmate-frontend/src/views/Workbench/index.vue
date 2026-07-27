@@ -112,6 +112,7 @@
           :focused="chatFocused"
           :panel-width="effectiveChatPanelWidth"
           :current-model-name="currentModelName"
+          :current-reasoning-label="currentReasoningLabel"
           :generation-status-text="generationStatusText"
           :agent-status-detail-text="agentStatusDetailText"
           :is-generating="isGenerating"
@@ -292,6 +293,7 @@ const {
   activePlugins,
   boundStyleName,
   currentModelName,
+  currentReasoningLabel,
   visibleMessages,
   showConversationPanel,
   conversationLoading,

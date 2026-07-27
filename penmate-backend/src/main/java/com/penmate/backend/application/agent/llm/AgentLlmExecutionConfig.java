@@ -5,7 +5,7 @@ import lombok.Builder;
 /**
  * Agent 单次模型调用执行配置。
  */
-@Builder
+@Builder(toBuilder = true)
 public record AgentLlmExecutionConfig(
         Long modelConfigId,
         String providerCode,
@@ -34,5 +34,10 @@ public record AgentLlmExecutionConfig(
         reasoningPolicy = reasoningPolicy == null ? AgentReasoningPolicy.AUTO : reasoningPolicy;
         maxContextTokens = maxContextTokens == null || maxContextTokens <= 0 ? 128_000 : maxContextTokens;
         maxOutputTokens = maxOutputTokens == null || maxOutputTokens <= 0 ? 8_192 : maxOutputTokens;
+    }
+
+    public AgentLlmExecutionConfig withReasoningPolicy(AgentReasoningPolicy policy) {
+        return new AgentLlmExecutionConfig(modelConfigId, providerCode, baseUrl, apiKey, modelName,
+                keySource, contextWindowTurns, protocolCode, policy, maxContextTokens, maxOutputTokens);
     }
 }

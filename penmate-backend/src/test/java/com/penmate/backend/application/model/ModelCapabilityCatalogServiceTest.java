@@ -43,4 +43,19 @@ class ModelCapabilityCatalogServiceTest {
         assertThat(unknown.source()).isEqualTo("FALLBACK");
         assertThat(unknown.maxContextTokens()).isEqualTo(128_000);
     }
+
+    @Test
+    void resolves_model_specific_reasoning_controls_and_protocol_fallbacks() {
+        var claude46 = service.resolveReasoning("anthropic", "claude-sonnet-4-6", "ANTHROPIC_MESSAGES");
+        var claude5 = service.resolveReasoning("claude", "claude-sonnet-5-20260701", "ANTHROPIC_MESSAGES");
+        var gemini3 = service.resolveReasoning("google-gemini", "models/gemini-3.1-pro", "OPENAI_CHAT_COMPLETIONS");
+        var privateModel = service.resolveReasoning("openai-compatible", "private-reasoner", "OPENAI_CHAT_COMPLETIONS");
+
+        assertThat(claude46.efforts()).containsExactly("AUTO", "LOW", "MEDIUM", "HIGH", "MAX");
+        assertThat(claude46.modes()).containsExactly("AUTO", "ADAPTIVE", "DISABLED");
+        assertThat(claude5.efforts()).contains("XHIGH", "MAX");
+        assertThat(gemini3.efforts()).containsExactly("AUTO", "MINIMAL", "LOW", "MEDIUM", "HIGH");
+        assertThat(gemini3.efforts()).doesNotContain("NONE");
+        assertThat(privateModel.source()).isEqualTo("PROTOCOL");
+    }
 }

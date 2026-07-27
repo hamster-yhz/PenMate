@@ -26,6 +26,9 @@ export interface ModelConfigurationItem extends AnyRecord {
   contextWindowTurns?: number
   maxContextTokens?: number
   maxOutputTokens?: number
+  reasoningEffort?: 'AUTO' | 'NONE' | 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'XHIGH' | 'MAX'
+  reasoningMode?: 'AUTO' | 'STANDARD' | 'PRO' | 'ADAPTIVE' | 'DISABLED'
+  reasoningSummary?: 'AUTO' | 'NONE' | 'CONCISE' | 'DETAILED'
   contextCapacitySource?: 'MANUAL' | 'PROVIDER' | 'CATALOG' | 'FALLBACK'
   contextCapacitySourceUrl?: string | null
   contextCapacityVerifiedAt?: string | null
@@ -51,6 +54,15 @@ export interface ModelConnectionTestResult {
 export interface ModelCatalogDiscoveryResult {
   models: string[]
   count: number
+}
+
+export interface ModelReasoningCapabilities {
+  efforts: Array<NonNullable<ModelConfigurationItem['reasoningEffort']>>
+  modes: Array<NonNullable<ModelConfigurationItem['reasoningMode']>>
+  summaries: Array<NonNullable<ModelConfigurationItem['reasoningSummary']>>
+  source: 'CATALOG' | 'PROTOCOL' | 'UNSUPPORTED'
+  sourceUrl?: string | null
+  verifiedAt?: string | null
 }
 
 const normalizeBusinessStringId = (value: unknown) => {
@@ -153,6 +165,11 @@ export const modelApi = {
   listUserModelConfigs(_userId: string) {
     void _userId
     return request.get<ModelConfigurationItem[]>('/v1/model/configurations')
+  },
+  getReasoningCapabilities(providerId: string, modelName: string) {
+    return request.get<ModelReasoningCapabilities>('/v1/model/reasoning-capabilities', {
+      params: { providerId, modelName },
+    })
   },
   async listSystemModelConfigs() {
     const configurations = await request.get<ModelConfigurationItem[]>('/v1/model/configurations')

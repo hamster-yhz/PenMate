@@ -23,7 +23,8 @@ class ModelUserConfigurationSchemaPostgreSqlContractTest {
     void should_define_unified_model_configuration_context_columns() throws Exception {
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "model_configurations"))
                 .contains("model_config_id", "scope_type", "owner_user_id", "model_type",
-                        "context_window_turns", "max_context_tokens");
+                        "context_window_turns", "max_context_tokens", "reasoning_effort",
+                        "reasoning_mode", "reasoning_summary");
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "model_user_configurations")).isEmpty();
         assertThat(PostgreSqlTestDatabase.columnsOf(dataSource, "model_user_api_keys"))
                 .contains("model_config_id", "user_id", "encrypted_api_key", "masked_api_key");

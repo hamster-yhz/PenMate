@@ -24,6 +24,9 @@ public class ModelConfiguration {
     private Integer contextWindowTurns;
     private Integer maxContextTokens;
     private Integer maxOutputTokens;
+    private String reasoningEffort;
+    private String reasoningMode;
+    private String reasoningSummary;
     private String contextCapacitySource;
     private String contextCapacitySourceUrl;
     private Instant contextCapacityVerifiedAt;

@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminOfficialModels from './AdminOfficialModels.vue'
 
 const {
-  listMock, providersMock, createMock, updateMock, deleteMock, testMock, probeMock, discoverMock,
+  listMock, providersMock, reasoningMock, createMock, updateMock, deleteMock, testMock, probeMock, discoverMock,
   successMock, errorMock, confirmMock,
 } = vi.hoisted(() => ({
-  listMock: vi.fn(), providersMock: vi.fn(), createMock: vi.fn(), updateMock: vi.fn(), deleteMock: vi.fn(),
+  listMock: vi.fn(), providersMock: vi.fn(), reasoningMock: vi.fn(), createMock: vi.fn(), updateMock: vi.fn(), deleteMock: vi.fn(),
   testMock: vi.fn(), probeMock: vi.fn(), discoverMock: vi.fn(), successMock: vi.fn(), errorMock: vi.fn(), confirmMock: vi.fn(),
 }))
 
@@ -18,6 +18,7 @@ vi.mock('@/api/modules/model.api', async () => {
       ...actual.modelApi,
       listSystemModelConfigs: listMock,
       listProviders: providersMock,
+      getReasoningCapabilities: reasoningMock,
       createSystemModelConfig: createMock,
       updateSystemModelConfig: updateMock,
       deleteSystemModelConfig: deleteMock,
@@ -47,6 +48,7 @@ describe('AdminOfficialModels', () => {
       providerId: '11', name: 'OpenAI', code: 'openai',
       capabilities: [{ capabilityCode: 'CHAT', protocolCode: 'OPENAI_CHAT_COMPLETIONS' }],
     }])
+    reasoningMock.mockResolvedValue({ efforts: ['AUTO', 'LOW', 'HIGH'], modes: ['AUTO'], summaries: ['AUTO'], source: 'CATALOG' })
     testMock.mockResolvedValue({ success: true, latencyMs: 96, testedAt: '2026-07-22T03:00:00Z' })
     updateMock.mockResolvedValue(officialModel)
     discoverMock.mockResolvedValue({ models: ['gpt-5', 'gpt-5-mini'], count: 2 })

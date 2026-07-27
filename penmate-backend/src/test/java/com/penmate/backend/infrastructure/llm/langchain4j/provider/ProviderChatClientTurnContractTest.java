@@ -1,6 +1,7 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentReasoningPolicy;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ProviderChatClientTurnContractTest {
@@ -46,6 +48,23 @@ class ProviderChatClientTurnContractTest {
         assertThatThrownBy(() -> client.generateTurn(TURN_REQUEST, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("LLM execution config is required");
+    }
+
+    @Test
+    void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_ACCEPTS_SUPPORTED_REASONING_CONTROLS() {
+        ClaudeProviderChatClient client = new ClaudeProviderChatClient();
+        AgentLlmExecutionConfig config = AgentLlmExecutionConfig.builder()
+                .providerCode("claude")
+                .baseUrl("https://api.anthropic.com")
+                .apiKey("test")
+                .modelName("claude-sonnet-4-6")
+                .reasoningPolicy(new AgentReasoningPolicy("high", "auto", "adaptive"))
+                .build();
+
+        String body = client.buildRequestBody(TURN_REQUEST, config);
+
+        assertThat(body).contains("\"thinking\":{\"type\":\"adaptive\"}")
+                .contains("\"output_config\":{\"effort\":\"high\"}");
     }
 
     @Test

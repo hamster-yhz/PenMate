@@ -71,10 +71,18 @@ class ModelMapperDbCaseTest {
             assertThat(mapper.insertConfiguration(configuration)).isEqualTo(1);
             assertThat(mapper.insertUserCredential(configuration, credential)).isEqualTo(1);
             configuration.setMaxContextTokens(32000);
+            configuration.setReasoningEffort("HIGH");
+            configuration.setReasoningMode("STANDARD");
+            configuration.setReasoningSummary("DETAILED");
             assertThat(mapper.updateConfiguration(configuration)).isEqualTo(1);
 
             assertThat(singleLong("SELECT max_context_tokens FROM model_configurations WHERE model_config_id = 920031"))
                     .isEqualTo(32000L);
+            assertThat(mapper.findAccessibleConfiguration(920002L, 920031L)).satisfies(saved -> {
+                assertThat(saved.getReasoningEffort()).isEqualTo("HIGH");
+                assertThat(saved.getReasoningMode()).isEqualTo("STANDARD");
+                assertThat(saved.getReasoningSummary()).isEqualTo("DETAILED");
+            });
             assertThat(mapper.findUserCredential(920002L, 920031L).getMaskedApiKey()).isEqualTo("****0032");
         }
     }
@@ -118,6 +126,9 @@ class ModelMapperDbCaseTest {
         configuration.setModelName("gpt-4.1");
         configuration.setContextWindowTurns(8);
         configuration.setMaxContextTokens(maxTokens);
+        configuration.setReasoningEffort("AUTO");
+        configuration.setReasoningMode("AUTO");
+        configuration.setReasoningSummary("AUTO");
         configuration.setStatus("ACTIVE");
         configuration.setCreatedBy(920002L);
         configuration.setUpdatedBy(920002L);

@@ -5,6 +5,7 @@ import com.penmate.backend.application.agent.run.AgentRunCommand;
 import com.penmate.backend.application.agent.run.AgentRunResult;
 import com.penmate.backend.application.agent.run.AgentRunDispatcher;
 import com.penmate.backend.application.agent.run.AgentRunRecoveryPromptService;
+import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService;
 import com.penmate.backend.application.common.exception.BusinessErrorType;
@@ -16,6 +17,7 @@ import com.penmate.backend.domain.agent.repository.AgentSessionRepository;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -31,6 +33,30 @@ public class AgentTurnAppService {
     private final AgentSkillActivationService skillActivationService;
     private final AgentRunRecoveryPromptService recoveryPromptService;
     private final AgentSafetyModeApplicationService safetyModes;
+    private final AgentModelRoutingService modelRoutingService;
+
+    @Autowired
+    public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
+                               AgentRepository agentRepository,
+                               AgentSessionRepository agentSessionRepository,
+                               BusinessIdGenerator businessIdGenerator,
+                               AgentRunAppService agentRunAppService,
+                               AgentRunDispatcher runDispatcher,
+                               AgentSkillActivationService skillActivationService,
+                               AgentRunRecoveryPromptService recoveryPromptService,
+                               AgentSafetyModeApplicationService safetyModes,
+                               AgentModelRoutingService modelRoutingService) {
+        this.sessionStyleBindingAppService = sessionStyleBindingAppService;
+        this.agentRepository = agentRepository;
+        this.agentSessionRepository = agentSessionRepository;
+        this.businessIdGenerator = businessIdGenerator;
+        this.agentRunAppService = agentRunAppService;
+        this.runDispatcher = runDispatcher;
+        this.skillActivationService = skillActivationService;
+        this.recoveryPromptService = recoveryPromptService;
+        this.safetyModes = safetyModes;
+        this.modelRoutingService = modelRoutingService;
+    }
 
     public AgentTurnAppService(SessionStyleBindingAppService sessionStyleBindingAppService,
                                AgentRepository agentRepository,
@@ -41,15 +67,9 @@ public class AgentTurnAppService {
                                AgentSkillActivationService skillActivationService,
                                AgentRunRecoveryPromptService recoveryPromptService,
                                AgentSafetyModeApplicationService safetyModes) {
-        this.sessionStyleBindingAppService = sessionStyleBindingAppService;
-        this.agentRepository = agentRepository;
-        this.agentSessionRepository = agentSessionRepository;
-        this.businessIdGenerator = businessIdGenerator;
-        this.agentRunAppService = agentRunAppService;
-        this.runDispatcher = runDispatcher;
-        this.skillActivationService = skillActivationService;
-        this.recoveryPromptService = recoveryPromptService;
-        this.safetyModes = safetyModes;
+        this(sessionStyleBindingAppService, agentRepository, agentSessionRepository, businessIdGenerator,
+                agentRunAppService, runDispatcher, skillActivationService, recoveryPromptService,
+                safetyModes, null);
     }
 
     @Transactional
@@ -94,8 +114,7 @@ public class AgentTurnAppService {
         Long modelConfigId = command == null || command.taskRequest() == null
                 ? null : command.taskRequest().modelConfigId();
         Long operatorId = command == null ? 0L : command.operatorId();
-        String modelSnapshotJson = "{\"operatorId\":" + operatorId + ",\"modelConfigId\":"
-                + (modelConfigId == null ? "null" : modelConfigId) + "}";
+        String modelSnapshotJson = modelSnapshot(operatorId, modelConfigId);
         String styleSnapshotJson = sessionStyleBindingAppService.getBoundStyleSnapshotJson(projectId, sessionId);
         String promptText = effectiveRequest;
         var safetyMode = safetyModes.get(operatorId);
@@ -133,6 +152,20 @@ public class AgentTurnAppService {
                 runResult.runPhase(),
                 runResult.latestSequence()
         );
+    }
+
+    private String modelSnapshot(Long operatorId, Long modelConfigId) {
+        if (modelRoutingService == null) {
+            return "{\"operatorId\":" + operatorId + ",\"modelConfigId\":"
+                    + (modelConfigId == null ? "null" : modelConfigId) + "}";
+        }
+        var snapshot = modelRoutingService.resolveSnapshot(operatorId, modelConfigId);
+        var policy = snapshot.reasoningPolicy();
+        return "{\"operatorId\":" + operatorId
+                + ",\"modelConfigId\":" + snapshot.modelConfigId()
+                + ",\"reasoningEffort\":\"" + policy.effort()
+                + "\",\"reasoningMode\":\"" + policy.mode()
+                + "\",\"reasoningSummary\":\"" + policy.summary() + "\"}";
     }
 
     private AgentMessage createUserMessage(Long projectId,

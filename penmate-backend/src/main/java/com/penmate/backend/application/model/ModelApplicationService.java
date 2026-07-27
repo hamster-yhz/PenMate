@@ -128,6 +128,10 @@ public class ModelApplicationService {
                 command.maxContextTokens(), command.maxOutputTokens());
         configuration.setMaxContextTokens(capacity.maxContextTokens());
         configuration.setMaxOutputTokens(capacity.maxOutputTokens());
+        configuration.setReasoningEffort(normalizeReasoningEffort(modelType, command.reasoningEffort(), null));
+        configuration.setReasoningMode(normalizeReasoningMode(modelType, command.reasoningMode(), null));
+        configuration.setReasoningSummary(normalizeReasoningSummary(modelType, command.reasoningSummary(), null));
+        validateReasoning(configuration);
         configuration.setContextCapacitySource(capacity.source());
         configuration.setContextCapacitySourceUrl(capacity.sourceUrl());
         configuration.setContextCapacityVerifiedAt(capacity.verifiedAt());
@@ -282,6 +286,13 @@ public class ModelApplicationService {
                 : null);
         merged.setContextWindowTurns(command.contextWindowTurns() == null
                 ? existing.getContextWindowTurns() : normalizeContextTurns(command.contextWindowTurns()));
+        merged.setReasoningEffort(normalizeReasoningEffort(existing.getModelType(), command.reasoningEffort(),
+                existing.getReasoningEffort()));
+        merged.setReasoningMode(normalizeReasoningMode(existing.getModelType(), command.reasoningMode(),
+                existing.getReasoningMode()));
+        merged.setReasoningSummary(normalizeReasoningSummary(existing.getModelType(), command.reasoningSummary(),
+                existing.getReasoningSummary()));
+        validateReasoning(merged);
         boolean autoDetectCapacity = Boolean.TRUE.equals(command.autoDetectCapacity());
         boolean manualCapacity = !autoDetectCapacity && (command.maxContextTokens() != null
                 || "MANUAL".equalsIgnoreCase(existing.getContextCapacitySource()));
@@ -545,6 +556,63 @@ public class ModelApplicationService {
         int result = value == null ? 8_192 : value;
         if (result <= 0) throw BusinessException.of("maxOutputTokens must be positive");
         return result;
+    }
+
+    private String normalizeReasoningEffort(String modelType, String value, String fallback) {
+        return normalizeReasoningSetting(modelType, value, fallback, "reasoningEffort",
+                List.of("AUTO", "NONE", "MINIMAL", "LOW", "MEDIUM", "HIGH", "XHIGH", "MAX"));
+    }
+
+    private String normalizeReasoningMode(String modelType, String value, String fallback) {
+        return normalizeReasoningSetting(modelType, value, fallback, "reasoningMode",
+                List.of("AUTO", "STANDARD", "PRO", "ADAPTIVE", "DISABLED"));
+    }
+
+    private String normalizeReasoningSummary(String modelType, String value, String fallback) {
+        return normalizeReasoningSetting(modelType, value, fallback, "reasoningSummary",
+                List.of("AUTO", "NONE", "CONCISE", "DETAILED"));
+    }
+
+    private String normalizeReasoningSetting(String modelType, String value, String fallback,
+                                             String field, List<String> allowed) {
+        if (!"CHAT".equals(modelType)) return "AUTO";
+        String candidate = value == null || value.isBlank() ? fallback : value;
+        String normalized = candidate == null || candidate.isBlank()
+                ? "AUTO" : candidate.trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(normalized)) throw BusinessException.of("Unsupported " + field);
+        return normalized;
+    }
+
+    public ModelCapabilityCatalogService.ReasoningCapabilities resolveReasoningCapabilities(
+            Long actorUserId, Long providerId, String modelName) {
+        requireActor(actorUserId);
+        ModelProvider provider = requireProvider(providerId);
+        ModelProviderCapability capability = requireCapability(providerId, "CHAT");
+        return reasoningCapabilities(provider.getCode(), requireText(modelName, "modelName"),
+                capability.getProtocolCode());
+    }
+
+    private void validateReasoning(ModelConfiguration configuration) {
+        var capabilities = reasoningCapabilities(configuration.getProviderCode(), configuration.getModelName(),
+                configuration.getProtocolCode());
+        validateReasoningValue("reasoningEffort", configuration.getReasoningEffort(), capabilities.efforts());
+        validateReasoningValue("reasoningMode", configuration.getReasoningMode(), capabilities.modes());
+        validateReasoningValue("reasoningSummary", configuration.getReasoningSummary(), capabilities.summaries());
+    }
+
+    private ModelCapabilityCatalogService.ReasoningCapabilities reasoningCapabilities(
+            String providerCode, String modelName, String protocolCode) {
+        if (capabilityCatalog != null) {
+            var resolved = capabilityCatalog.resolveReasoning(providerCode, modelName, protocolCode);
+            if (resolved != null) return resolved;
+        }
+        return ModelCapabilityCatalogService.protocolReasoningCapabilities(providerCode, protocolCode);
+    }
+
+    private void validateReasoningValue(String field, String value, List<String> supported) {
+        if (!supported.contains(value)) {
+            throw BusinessException.of(field + " " + value + " is not supported by this model");
+        }
     }
 
     private void validateChunking(int target, int overlap, int max) {

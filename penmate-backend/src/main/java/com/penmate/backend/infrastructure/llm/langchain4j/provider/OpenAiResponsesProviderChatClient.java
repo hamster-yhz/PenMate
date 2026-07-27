@@ -124,7 +124,12 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
                             boolean includeReasoning) {
         LinkedHashMap<String, Object> body = new LinkedHashMap<>();
         body.put("model", executionConfig.modelName());
-        body.put("input", toResponsesInput(request.messages()));
+        String cacheKey = ProviderPromptCacheSupport.cacheKey(request, executionConfig);
+        boolean explicitCache = cacheKey != null
+                && ProviderPromptCacheSupport.useExplicitOpenAiBreakpoint(executionConfig);
+        if (cacheKey != null) body.put("prompt_cache_key", cacheKey);
+        if (explicitCache) body.put("prompt_cache_options", Map.of("mode", "explicit"));
+        body.put("input", toResponsesInput(request.messages(), explicitCache));
         if (!request.tools().isEmpty()) {
             body.put("tools", request.tools().stream().map(this::toResponsesTool).toList());
             body.put("tool_choice", request.toolChoice());
@@ -132,7 +137,15 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
         AgentReasoningPolicy policy = executionConfig.reasoningPolicy();
         if (includeReasoning && policy != null && policy.requestsReasoning()) {
             LinkedHashMap<String, Object> reasoning = new LinkedHashMap<>();
-            reasoning.put("effort", policy.effort());
+            if ("adaptive".equals(policy.mode())) {
+                throw BusinessException.of("OpenAI Responses does not support adaptive reasoning mode");
+            }
+            if (policy.disabled()) {
+                reasoning.put("effort", "none");
+            } else if (policy.explicitEffort()) {
+                reasoning.put("effort", policy.effort());
+            }
+            if (policy.explicitMode()) reasoning.put("mode", policy.mode());
             if (policy.requestsSummary()) reasoning.put("summary", policy.summary());
             body.put("reasoning", reasoning);
         }
@@ -234,7 +247,8 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
     private HttpResponse<String> sendBuffered(ResolvedRequest resolved, boolean allowReasoningFallback) {
         String requestBody = buildRequestBody(resolved.request, resolved.config, false, true);
         HttpResponse<String> response = sendString(resolved, requestBody);
-        if (allowReasoningFallback && response.statusCode() == 400 && requestBody.contains("\"reasoning\"")) {
+        if (allowReasoningFallback && resolved.config.reasoningPolicy().allowsCompatibilityFallback()
+                && response.statusCode() == 400 && requestBody.contains("\"reasoning\"")) {
             response = sendString(resolved, buildRequestBody(resolved.request, resolved.config, false, false));
         }
         return response;
@@ -256,7 +270,8 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
                                                     boolean allowReasoningFallback) {
         String body = buildRequestBody(resolved.request, resolved.config, true, true);
         HttpResponse<InputStream> response = sendInputStream(resolved, body, observer);
-        if (allowReasoningFallback && response.statusCode() == 400 && body.contains("\"reasoning\"")) {
+        if (allowReasoningFallback && resolved.config.reasoningPolicy().allowsCompatibilityFallback()
+                && response.statusCode() == 400 && body.contains("\"reasoning\"")) {
             closeQuietly(response.body());
             response = sendInputStream(resolved,
                     buildRequestBody(resolved.request, resolved.config, true, false), observer);
@@ -302,8 +317,9 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
         return baseUrl + "/responses";
     }
 
-    private List<Object> toResponsesInput(List<AgentLlmMessage> messages) {
+    private List<Object> toResponsesInput(List<AgentLlmMessage> messages, boolean explicitCache) {
         List<Object> input = new ArrayList<>();
+        boolean cacheBreakpointAdded = false;
         for (AgentLlmMessage message : messages) {
             if (!message.providerItems().isEmpty()) {
                 boolean added = false;
@@ -319,8 +335,20 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
                 if (added) continue;
             }
             switch (message.role()) {
-                case SYSTEM, USER -> input.add(Map.of(
-                        "role", message.role().wireValue(), "content", message.content()));
+                case SYSTEM, USER -> {
+                    if (explicitCache && !cacheBreakpointAdded
+                            && message.role() == com.penmate.backend.domain.agent.model.AgentLlmMessageRole.SYSTEM) {
+                        input.add(Map.of(
+                                "role", "system",
+                                "content", List.of(Map.of(
+                                        "type", "input_text",
+                                        "text", message.content(),
+                                        "prompt_cache_breakpoint", Map.of("mode", "explicit")))));
+                        cacheBreakpointAdded = true;
+                    } else {
+                        input.add(Map.of("role", message.role().wireValue(), "content", message.content()));
+                    }
+                }
                 case ASSISTANT -> {
                     if (!message.content().isBlank()) {
                         input.add(Map.of("role", "assistant", "content", message.content()));
@@ -418,7 +446,11 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
         int total = intValue(usage, "total_tokens");
         JSONObject details = usage.getJSONObject("input_tokens_details");
         int cached = details == null ? 0 : intValue(details, "cached_tokens");
-        return new LlmTokenUsage(input, output, total, cached, 0);
+        int cacheWrite = details == null ? 0 : intValue(details, "cache_write_tokens");
+        if (cacheWrite == 0) cacheWrite = intValue(usage, "cache_write_tokens");
+        JSONObject outputDetails = usage.getJSONObject("output_tokens_details");
+        int reasoning = outputDetails == null ? 0 : intValue(outputDetails, "reasoning_tokens");
+        return new LlmTokenUsage(input, output, total, cached, cacheWrite, reasoning);
     }
 
     private int intValue(JSONObject object, String key) {

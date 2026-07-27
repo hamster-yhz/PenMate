@@ -359,7 +359,7 @@ export const useWorkbenchPageController = () => {
     return true
   }
 
-  const { activePlugins, currentModelName, loadActivePlugins, refreshActiveModelInfo, ensureModelConfigId } =
+  const { activePlugins, currentModelName, currentReasoningLabel, loadActivePlugins, refreshActiveModelInfo, ensureModelConfigId } =
     useWorkbenchIntegrations({ getUserId: () => session.userId, getProjectId: getCurrentProjectId })
   const {
     boundStyleName,
@@ -809,6 +809,7 @@ export const useWorkbenchPageController = () => {
     activePlugins,
     boundStyleName,
     currentModelName,
+    currentReasoningLabel,
     visibleMessages,
     showConversationPanel,
     conversationLoading,

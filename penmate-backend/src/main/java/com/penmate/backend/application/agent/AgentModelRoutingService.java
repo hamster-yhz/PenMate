@@ -1,6 +1,7 @@
 package com.penmate.backend.application.agent;
 
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentReasoningPolicy;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.iam.CapabilityAuthorizationService;
 import com.penmate.backend.application.iam.IamPermissionCodes;
@@ -23,6 +24,34 @@ public class AgentModelRoutingService {
     private final CapabilityAuthorizationService authorization;
 
     public AgentLlmExecutionConfig resolveExecutionConfig(Long userId, Long modelConfigId, String traceId) {
+        ResolvedModel resolved = resolveModel(userId, modelConfigId);
+        Long resolvedModelConfigId = resolved.modelConfigId();
+        ModelConfiguration config = resolved.configuration();
+        ModelCredential credential = modelRepository.findCredential(config);
+        String apiKey = "NONE".equalsIgnoreCase(config.getProviderAuthType()) ? "" : decrypt(credential, traceId);
+        String baseUrl = config.getBaseUrl() == null || config.getBaseUrl().isBlank()
+                ? config.getProviderBaseUrl() : config.getBaseUrl();
+        return AgentLlmExecutionConfig.builder()
+                .modelConfigId(resolvedModelConfigId)
+                .providerCode(config.getProviderCode())
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .modelName(config.getModelName())
+                .keySource("MODEL_CONFIG")
+                .contextWindowTurns(config.getContextWindowTurns() == null ? 6 : config.getContextWindowTurns())
+                .maxContextTokens(config.getMaxContextTokens())
+                .maxOutputTokens(config.getMaxOutputTokens())
+                .reasoningPolicy(reasoningPolicy(config))
+                .protocolCode(config.getProtocolCode())
+                .build();
+    }
+
+    public ModelExecutionSnapshot resolveSnapshot(Long userId, Long modelConfigId) {
+        ResolvedModel resolved = resolveModel(userId, modelConfigId);
+        return new ModelExecutionSnapshot(resolved.modelConfigId(), reasoningPolicy(resolved.configuration()));
+    }
+
+    private ResolvedModel resolveModel(Long userId, Long modelConfigId) {
         Long resolvedModelConfigId = modelConfigId;
         if (resolvedModelConfigId == null) {
             ModelUserPreferences preferences = modelRepository.findUserPreferences(userId);
@@ -41,22 +70,12 @@ public class AgentModelRoutingService {
         authorization.require(userId, "SYSTEM".equalsIgnoreCase(config.getScopeType())
                 ? IamPermissionCodes.MODEL_OFFICIAL_USE
                 : IamPermissionCodes.MODEL_USER_USE);
-        ModelCredential credential = modelRepository.findCredential(config);
-        String apiKey = "NONE".equalsIgnoreCase(config.getProviderAuthType()) ? "" : decrypt(credential, traceId);
-        String baseUrl = config.getBaseUrl() == null || config.getBaseUrl().isBlank()
-                ? config.getProviderBaseUrl() : config.getBaseUrl();
-        return AgentLlmExecutionConfig.builder()
-                .modelConfigId(resolvedModelConfigId)
-                .providerCode(config.getProviderCode())
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .modelName(config.getModelName())
-                .keySource("MODEL_CONFIG")
-                .contextWindowTurns(config.getContextWindowTurns() == null ? 6 : config.getContextWindowTurns())
-                .maxContextTokens(config.getMaxContextTokens())
-                .maxOutputTokens(config.getMaxOutputTokens())
-                .protocolCode(config.getProtocolCode())
-                .build();
+        return new ResolvedModel(resolvedModelConfigId, config);
+    }
+
+    private AgentReasoningPolicy reasoningPolicy(ModelConfiguration config) {
+        return new AgentReasoningPolicy(
+                config.getReasoningEffort(), config.getReasoningSummary(), config.getReasoningMode());
     }
 
     private String decrypt(ModelCredential credential, String traceId) {
@@ -72,4 +91,8 @@ public class AgentModelRoutingService {
         }
         return plain;
     }
+
+    public record ModelExecutionSnapshot(Long modelConfigId, AgentReasoningPolicy reasoningPolicy) {}
+
+    private record ResolvedModel(Long modelConfigId, ModelConfiguration configuration) {}
 }

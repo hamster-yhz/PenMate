@@ -18,7 +18,7 @@
     <div v-else class="model-list" role="table" aria-label="个人模型列表">
       <div class="model-row model-header" role="row"><span>模型</span><span>服务商</span><span>密钥</span><span>连接测试</span><span></span></div>
       <div v-for="item in filteredConfigurations" :key="item.modelConfigId" class="model-row" role="row">
-        <div class="model-identity"><strong>{{ item.displayName || item.modelName }}</strong><small>{{ item.modelName }}</small><small v-if="item.modelType === 'CHAT'">{{ capacityLabel(item) }}</small></div>
+        <div class="model-identity"><strong>{{ item.displayName || item.modelName }}</strong><small>{{ item.modelName }}</small><small v-if="item.modelType === 'CHAT'">{{ capacityLabel(item) }}</small><small v-if="item.modelType === 'CHAT'">{{ reasoningLabel(item) }}</small></div>
         <span>{{ item.providerName || item.providerCode || '未知' }}</span>
         <code>{{ item.maskedApiKey || (item.credentialConfigured ? '已配置' : '无需密钥') }}</code>
         <div class="test-state" :class="item.lastTestStatus?.toLowerCase()">
@@ -49,6 +49,9 @@
             <label><span>向量维度</span><input v-model.number="form.embeddingDimensions" type="number" min="1" max="4000" placeholder="可在保存后测试获取" /></label>
           </template>
           <template v-else>
+            <label v-if="supportsReasoningEffort"><span>推理强度</span><select v-model="form.reasoningEffort"><option v-for="option in availableReasoningEffortOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+            <label v-if="supportsReasoningMode"><span>推理模式</span><select v-model="form.reasoningMode"><option v-for="option in availableReasoningModeOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+            <label v-if="supportsReasoningSummary"><span>推理摘要</span><select v-model="form.reasoningSummary"><option v-for="option in availableReasoningSummaryOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
             <label class="switch-line"><span>自动识别模型容量<small>已知模型按能力目录填写，无法识别时使用未验证回退值。</small></span><input v-model="form.autoDetectCapacity" type="checkbox" role="switch" @change="initializeManualCapacity" /></label>
             <template v-if="!form.autoDetectCapacity">
               <label><span>最大上下文 Token</span><input v-model.number="form.maxContextTokens" type="number" min="1" required /></label>
@@ -65,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { ApiOutlined, CloseOutlined, DatabaseOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { useProfileModelServices, type ModelConfigurationItem, type ModelTypeFilter } from '@/features/profile-model-services/useProfileModelServices'
@@ -90,6 +93,10 @@ const {
   form,
   filteredConfigurations,
   compatibleProviders,
+  reasoningCapabilities,
+  supportsReasoningEffort,
+  supportsReasoningMode,
+  supportsReasoningSummary,
   load,
   openCreate,
   openEdit,
@@ -124,6 +131,32 @@ const initializeManualCapacity = () => {
 const capacityLabel = (item: ModelConfigurationItem) => {
   const source = { MANUAL: '手工', PROVIDER: '供应商', CATALOG: '能力目录', FALLBACK: '未验证' }[item.contextCapacitySource || 'FALLBACK']
   return `${Number(item.maxContextTokens || 0).toLocaleString()} Token · ${source}`
+}
+const reasoningEffortOptions = [
+  { value: 'AUTO', label: '自动' }, { value: 'NONE', label: '关闭' },
+  { value: 'MINIMAL', label: '最小' }, { value: 'LOW', label: '低' },
+  { value: 'MEDIUM', label: '中' }, { value: 'HIGH', label: '高' },
+  { value: 'XHIGH', label: '超高' }, { value: 'MAX', label: '最高' },
+] as const
+const reasoningModeOptions = [
+  { value: 'AUTO', label: '自动' }, { value: 'STANDARD', label: '标准' },
+  { value: 'PRO', label: '专业' }, { value: 'ADAPTIVE', label: '自适应' },
+  { value: 'DISABLED', label: '关闭' },
+] as const
+const reasoningSummaryOptions = [
+  { value: 'AUTO', label: '自动' }, { value: 'NONE', label: '关闭' },
+  { value: 'CONCISE', label: '简要' }, { value: 'DETAILED', label: '详细' },
+] as const
+const availableReasoningEffortOptions = computed(() => reasoningEffortOptions
+  .filter((option) => reasoningCapabilities.value.efforts.includes(option.value)))
+const availableReasoningModeOptions = computed(() => reasoningModeOptions
+  .filter((option) => reasoningCapabilities.value.modes.includes(option.value)))
+const availableReasoningSummaryOptions = computed(() => reasoningSummaryOptions
+  .filter((option) => reasoningCapabilities.value.summaries.includes(option.value)))
+const reasoningLabel = (item: ModelConfigurationItem) => {
+  const effort = reasoningEffortOptions.find((option) => option.value === (item.reasoningEffort || 'AUTO'))?.label || '自动'
+  const mode = reasoningModeOptions.find((option) => option.value === (item.reasoningMode || 'AUTO'))?.label || '自动'
+  return `推理 ${effort} · ${mode}`
 }
 const formatTime = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 </script>

@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearSession, setSession } from '@/stores/session'
 import ProfileModelServicesPanel from './ProfileModelServicesPanel.vue'
 
-const { listConfigsMock, listProvidersMock, updateMock, createMock, deleteMock, testMock, successMock, errorMock } = vi.hoisted(() => ({
-  listConfigsMock: vi.fn(), listProvidersMock: vi.fn(), updateMock: vi.fn(), createMock: vi.fn(), deleteMock: vi.fn(), testMock: vi.fn(), successMock: vi.fn(), errorMock: vi.fn(),
+const { listConfigsMock, listProvidersMock, reasoningMock, updateMock, createMock, deleteMock, testMock, successMock, errorMock } = vi.hoisted(() => ({
+  listConfigsMock: vi.fn(), listProvidersMock: vi.fn(), reasoningMock: vi.fn(), updateMock: vi.fn(), createMock: vi.fn(), deleteMock: vi.fn(), testMock: vi.fn(), successMock: vi.fn(), errorMock: vi.fn(),
 }))
 
 vi.mock('@/api/modules/model.api', async () => {
   const actual = await vi.importActual<typeof import('@/api/modules/model.api')>('@/api/modules/model.api')
-  return { ...actual, modelApi: { ...actual.modelApi, listUserModelConfigs: listConfigsMock, listProviders: listProvidersMock, updateUserModelConfig: updateMock, createUserModelConfig: createMock, deleteUserModelConfig: deleteMock, testUserModelConnection: testMock } }
+  return { ...actual, modelApi: { ...actual.modelApi, listUserModelConfigs: listConfigsMock, listProviders: listProvidersMock, getReasoningCapabilities: reasoningMock, updateUserModelConfig: updateMock, createUserModelConfig: createMock, deleteUserModelConfig: deleteMock, testUserModelConnection: testMock } }
 })
 vi.mock('ant-design-vue', () => ({
   message: { success: successMock, error: errorMock },
@@ -27,6 +27,7 @@ describe('ProfileModelServicesPanel', () => {
     clearSession(); setSession({ userId: '7' })
     listConfigsMock.mockResolvedValue([userModel, { ...userModel, modelConfigId: '202', scopeType: 'SYSTEM', displayName: '官方模型' }])
     listProvidersMock.mockResolvedValue([{ providerId: '1', name: 'OpenAI', code: 'openai', capabilities: [{ capabilityCode: 'CHAT', protocolCode: 'OPENAI_CHAT_COMPLETIONS' }] }])
+    reasoningMock.mockResolvedValue({ efforts: ['AUTO', 'LOW', 'HIGH'], modes: ['AUTO'], summaries: ['AUTO'], source: 'CATALOG' })
     testMock.mockResolvedValue({ success: true, latencyMs: 128, testedAt: '2026-07-22T03:00:00Z' })
     updateMock.mockResolvedValue(userModel)
   })
@@ -59,5 +60,21 @@ describe('ProfileModelServicesPanel', () => {
       apiKey: '',
       status: 'ACTIVE',
     }))
+  })
+
+  it('shows only reasoning efforts supported by the selected model', async () => {
+    const wrapper = mount(ProfileModelServicesPanel, { global: { stubs: { teleport: true } } })
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="编辑模型"]').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 230))
+    await flushPromises()
+
+    expect(reasoningMock).toHaveBeenCalledWith('1', 'gpt-5')
+    const reasoningSelect = wrapper.findAll('.model-drawer select')
+      .find((select) => select.find('option[value="LOW"]').exists())
+    expect(reasoningSelect).toBeDefined()
+    expect(reasoningSelect!.findAll('option').map((option) => option.attributes('value')))
+      .toEqual(['AUTO', 'LOW', 'HIGH'])
   })
 })

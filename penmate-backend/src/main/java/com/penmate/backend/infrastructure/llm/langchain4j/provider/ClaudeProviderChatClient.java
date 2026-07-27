@@ -1,92 +1,79 @@
 package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
-import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.application.agent.llm.AgentLlmCapabilities;
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmProtocol;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
-import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.domain.agent.model.AgentLlmProviderItem;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.agent.tool.ToolParameters;
-import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.anthropic.AnthropicChatModel;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.output.FinishReason;
-import dev.langchain4j.model.output.Response;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class ClaudeProviderChatClient implements ProviderChatClient {
 
+    private static final String ANTHROPIC_VERSION = "2023-06-01";
+    private final HttpClient httpClient;
+
+    public ClaudeProviderChatClient() {
+        this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build());
+    }
+
+    ClaudeProviderChatClient(HttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
+
     @Override
     public String generate(String prompt, AgentLlmExecutionConfig executionConfig) {
-        if (executionConfig == null) {
-            throw BusinessException.of("LLM execution config is required");
-        }
-
-        String apiKey = executionConfig.apiKey();
-        String baseUrl = executionConfig.baseUrl() == null ? null : executionConfig.baseUrl().trim();
-        String modelName = executionConfig.modelName() == null ? null : executionConfig.modelName().trim();
-        if (apiKey == null || apiKey.isBlank() || modelName == null || modelName.isBlank()) {
-            throw BusinessException.of("LLM execution config is incomplete");
-        }
-
-        AnthropicChatModel.AnthropicChatModelBuilder builder = AnthropicChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(modelName)
-                .maxTokens(executionConfig.maxOutputTokens());
-        if (baseUrl != null && !baseUrl.isBlank()) {
-            builder.baseUrl(baseUrl);
-        }
-
-        ChatLanguageModel model = builder.build();
-        return model.generate(prompt);
+        return generateTurn(new AgentLlmTurnRequest(
+                List.of(AgentLlmMessage.user(prompt)), List.of(), "none"), executionConfig).assistantText();
     }
 
     @Override
     public AgentLlmTurnResponse generateTurn(AgentLlmTurnRequest request,
                                              AgentLlmExecutionConfig executionConfig) {
-        if (executionConfig == null) {
-            throw BusinessException.of("LLM execution config is required");
+        ResolvedRequest resolved = resolve(request, executionConfig);
+        String body = buildRequestBody(request, executionConfig);
+        HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(resolved.endpoint()))
+                .timeout(request.timeout())
+                .header("Content-Type", "application/json")
+                .header("x-api-key", executionConfig.apiKey())
+                .header("anthropic-version", ANTHROPIC_VERSION)
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        try {
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw BusinessException.of("Claude Messages request failed: " + response.body());
+            }
+            return extractTurnResponse(response.body());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw BusinessException.of("Claude Messages request interrupted");
+        } catch (IOException ex) {
+            throw BusinessException.of("Claude Messages request failed: " + ex.getMessage());
         }
-
-        String apiKey = executionConfig.apiKey();
-        String baseUrl = executionConfig.baseUrl() == null ? null : executionConfig.baseUrl().trim();
-        String modelName = executionConfig.modelName() == null ? null : executionConfig.modelName().trim();
-        if (apiKey == null || apiKey.isBlank() || modelName == null || modelName.isBlank()) {
-            throw BusinessException.of("LLM execution config is incomplete");
-        }
-
-        AnthropicChatModel.AnthropicChatModelBuilder builder = AnthropicChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(modelName)
-                .maxTokens(executionConfig.maxOutputTokens());
-        if (baseUrl != null && !baseUrl.isBlank()) {
-            builder.baseUrl(baseUrl);
-        }
-
-        AnthropicChatModel model = builder.build();
-        List<ChatMessage> messages = toChatMessages(request == null ? List.of() : request.messages());
-        List<ToolSpecification> toolSpecifications = toToolSpecifications(request == null ? List.of() : request.tools());
-        Response<AiMessage> response = toolSpecifications.isEmpty()
-                ? model.generate(messages)
-                : model.generate(messages, toolSpecifications);
-        return toTurnResponse(response);
     }
 
     @Override
@@ -94,130 +81,233 @@ public class ClaudeProviderChatClient implements ProviderChatClient {
         return "claude".equalsIgnoreCase(providerCode);
     }
 
-    private List<ChatMessage> toChatMessages(List<AgentLlmMessage> rawMessages) {
-        List<ChatMessage> messages = new ArrayList<>();
-        Map<String, String> toolNamesById = new LinkedHashMap<>();
-        for (AgentLlmMessage rawMessage : rawMessages) {
-            if (rawMessage == null || rawMessage.role() == null) {
-                continue;
-            }
-            switch (rawMessage.role()) {
-                case SYSTEM -> messages.add(SystemMessage.from(rawMessage.content()));
-                case USER -> messages.add(UserMessage.from(rawMessage.content()));
-                case ASSISTANT -> {
-                    List<ToolExecutionRequest> requests = toToolExecutionRequests(rawMessage.toolCalls());
-                    requests.forEach(request -> toolNamesById.put(request.id(), request.name()));
-                    messages.add(AiMessage.from(rawMessage.content(), requests));
-                }
-                case TOOL -> {
-                    String toolCallId = rawMessage.toolCallId();
-                    String toolName = toolNamesById.get(toolCallId);
-                    if (toolName == null || toolName.isBlank()) {
-                        throw BusinessException.of("Claude tool result message is missing matching assistant tool call");
-                    }
-                    messages.add(ToolExecutionResultMessage.from(
-                            toolCallId,
-                            toolName,
-                            rawMessage.content()
-                    ));
-                }
-            }
-        }
-        return messages;
+    @Override
+    public AgentLlmCapabilities capabilities(AgentLlmExecutionConfig executionConfig) {
+        return new AgentLlmCapabilities(AgentLlmProtocol.ANTHROPIC_MESSAGES,
+                false, true, false, false, false);
     }
 
-    private List<ToolExecutionRequest> toToolExecutionRequests(List<AgentLlmToolCallPayload> toolCalls) {
-        List<ToolExecutionRequest> requests = new ArrayList<>();
-        for (AgentLlmToolCallPayload payload : toolCalls == null ? List.<AgentLlmToolCallPayload>of() : toolCalls) {
-            requests.add(ToolExecutionRequest.builder()
-                    .id(payload.id())
-                    .name(payload.functionName())
-                    .arguments(payload.argumentsJson())
-                    .build());
+    String buildRequestBody(AgentLlmTurnRequest request, AgentLlmExecutionConfig config) {
+        LinkedHashMap<String, Object> body = new LinkedHashMap<>();
+        body.put("model", config.modelName());
+        body.put("max_tokens", config.maxOutputTokens());
+
+        List<Map<String, Object>> system = toSystemBlocks(request.messages());
+        if (!system.isEmpty()) body.put("system", system);
+        List<Map<String, Object>> messages = toMessages(request.messages());
+        body.put("messages", messages);
+        applyReasoningControls(body, config);
+
+        if (!request.tools().isEmpty() && !"none".equalsIgnoreCase(request.toolChoice())) {
+            List<Map<String, Object>> tools = request.tools().stream().map(this::toTool).toList();
+            if (system.isEmpty()) {
+                tools.get(tools.size() - 1).put("cache_control", Map.of("type", "ephemeral"));
+            }
+            body.put("tools", tools);
+            body.put("tool_choice", Map.of("type",
+                    "required".equalsIgnoreCase(request.toolChoice()) ? "any" : "auto"));
+        } else if (system.isEmpty()) {
+            addMessageCacheBreakpoint(messages);
         }
-        return requests;
+        return AgentJsonCodec.toJson(body);
     }
 
-    private List<ToolSpecification> toToolSpecifications(List<AgentLlmToolSchema> schemas) {
-        List<ToolSpecification> specifications = new ArrayList<>();
-        for (AgentLlmToolSchema schema : schemas) {
-            JSONObject parametersRoot = AgentJsonCodec.parseObj(schema.parametersJsonSchema());
-            JSONObject propertiesObject = parametersRoot.getJSONObject("properties");
-            Map<String, Map<String, Object>> properties = new LinkedHashMap<>();
-            if (propertiesObject != null) {
-                for (String key : propertiesObject.keySet()) {
-                    properties.put(key, new LinkedHashMap<>(mapValue(propertiesObject.get(key))));
-                }
-            }
-            List<String> required = new ArrayList<>();
-            Object requiredValue = parametersRoot.get("required");
-            for (Object item : toList(requiredValue)) {
-                required.add(String.valueOf(item));
-            }
-            ToolParameters parameters = ToolParameters.builder()
-                    .type(parametersRoot.getStr("type", "object"))
-                    .properties(properties)
-                    .required(required)
-                    .build();
-            specifications.add(ToolSpecification.builder()
-                    .name(schema.toolCode())
-                    .description(schema.description())
-                    .parameters(parameters)
-                    .build());
-        }
-        return specifications;
-    }
-
-    private AgentLlmTurnResponse toTurnResponse(Response<AiMessage> response) {
-        AiMessage content = response == null ? null : response.content();
+    AgentLlmTurnResponse extractTurnResponse(String responseBody) {
+        JSONObject root = AgentJsonCodec.parseObj(responseBody);
+        JSONArray content = root.getJSONArray("content");
+        StringBuilder text = new StringBuilder();
         List<AgentLlmToolCall> toolCalls = new ArrayList<>();
-        if (content != null && content.toolExecutionRequests() != null) {
-            for (ToolExecutionRequest request : content.toolExecutionRequests()) {
-                toolCalls.add(new AgentLlmToolCall(request.id(), request.name(), request.arguments()));
+        List<AgentLlmProviderItem> providerItems = new ArrayList<>();
+        if (content != null) {
+            for (Object rawBlock : content) {
+                if (!(rawBlock instanceof JSONObject block)) continue;
+                if ("text".equals(block.getStr("type", ""))) {
+                    text.append(block.getStr("text", ""));
+                } else if ("tool_use".equals(block.getStr("type", ""))) {
+                    Object input = block.get("input");
+                    toolCalls.add(new AgentLlmToolCall(
+                            block.getStr("id", ""),
+                            block.getStr("name", ""),
+                            input == null ? "{}" : AgentJsonCodec.toJson(input)));
+                } else if (isThinkingBlock(block.getStr("type", ""))) {
+                    providerItems.add(new AgentLlmProviderItem(
+                            AgentLlmProtocol.ANTHROPIC_MESSAGES.name(), block.toString()));
+                }
             }
         }
-        String finishReason = response != null && response.finishReason() == FinishReason.TOOL_EXECUTION
-                ? "tool_calls"
-                : "stop";
-        dev.langchain4j.model.output.TokenUsage rawUsage = response == null ? null : response.tokenUsage();
-        LlmTokenUsage tokenUsage = rawUsage == null ? LlmTokenUsage.ZERO : new LlmTokenUsage(
-                value(rawUsage.inputTokenCount()),
-                value(rawUsage.outputTokenCount()),
-                value(rawUsage.totalTokenCount()));
-        return new AgentLlmTurnResponse(
-                finishReason,
-                content == null ? "" : content.text(),
-                toolCalls,
-                response == null ? "{}" : String.valueOf(response),
-                tokenUsage
-        );
+
+        JSONObject usage = root.getJSONObject("usage");
+        int uncachedInput = intValue(usage, "input_tokens");
+        int cacheRead = intValue(usage, "cache_read_input_tokens");
+        int cacheWrite = intValue(usage, "cache_creation_input_tokens");
+        int output = intValue(usage, "output_tokens");
+        int totalInput = uncachedInput + cacheRead + cacheWrite;
+        LlmTokenUsage tokenUsage = new LlmTokenUsage(
+                totalInput, output, totalInput + output, cacheRead, cacheWrite);
+        return new AgentLlmTurnResponse(toolCalls.isEmpty() ? "stop" : "tool_calls",
+                text.toString(), toolCalls, responseBody, tokenUsage, "", "", providerItems);
     }
 
-    private int value(Integer value) {
+    private List<Map<String, Object>> toSystemBlocks(List<AgentLlmMessage> messages) {
+        List<Map<String, Object>> blocks = new ArrayList<>();
+        boolean cacheBreakpointAdded = false;
+        for (AgentLlmMessage message : messages) {
+            if (message.role() != com.penmate.backend.domain.agent.model.AgentLlmMessageRole.SYSTEM) continue;
+            LinkedHashMap<String, Object> block = new LinkedHashMap<>();
+            block.put("type", "text");
+            block.put("text", message.content());
+            if (!cacheBreakpointAdded) {
+                block.put("cache_control", Map.of("type", "ephemeral"));
+                cacheBreakpointAdded = true;
+            }
+            blocks.add(block);
+        }
+        return blocks;
+    }
+
+    private List<Map<String, Object>> toMessages(List<AgentLlmMessage> messages) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        Set<String> pendingToolCalls = new HashSet<>();
+        for (AgentLlmMessage message : messages) {
+            if (message.role() == com.penmate.backend.domain.agent.model.AgentLlmMessageRole.SYSTEM) continue;
+            if (message.role() == com.penmate.backend.domain.agent.model.AgentLlmMessageRole.ASSISTANT) {
+                message.toolCalls().forEach(call -> pendingToolCalls.add(call.id()));
+            } else if (message.role() == com.penmate.backend.domain.agent.model.AgentLlmMessageRole.TOOL
+                    && !pendingToolCalls.remove(message.toolCallId())) {
+                throw BusinessException.of(
+                        "Claude tool result message is missing matching assistant tool call");
+            }
+            String role = message.role() == com.penmate.backend.domain.agent.model.AgentLlmMessageRole.ASSISTANT
+                    ? "assistant" : "user";
+            List<Map<String, Object>> blocks = toContentBlocks(message);
+            if (blocks.isEmpty()) continue;
+            appendOrMerge(result, role, blocks);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addMessageCacheBreakpoint(List<Map<String, Object>> messages) {
+        if (messages.isEmpty()) return;
+        Object content = messages.get(0).get("content");
+        if (!(content instanceof List<?> blocks) || blocks.isEmpty()) return;
+        Object rawBlock = blocks.get(0);
+        if (rawBlock instanceof Map<?, ?> block) {
+            LinkedHashMap<String, Object> cachedBlock = new LinkedHashMap<>((Map<String, Object>) block);
+            cachedBlock.put("cache_control", Map.of("type", "ephemeral"));
+            ((List<Object>) blocks).set(0, cachedBlock);
+        }
+    }
+
+    private List<Map<String, Object>> toContentBlocks(AgentLlmMessage message) {
+        List<Map<String, Object>> blocks = new ArrayList<>();
+        switch (message.role()) {
+            case USER -> blocks.add(Map.of("type", "text", "text", message.content()));
+            case ASSISTANT -> {
+                for (AgentLlmProviderItem item : message.providerItems()) {
+                    if (!AgentLlmProtocol.ANTHROPIC_MESSAGES.name().equalsIgnoreCase(item.protocolCode())) continue;
+                    JSONObject block = AgentJsonCodec.parseObj(item.payloadJson());
+                    if (isThinkingBlock(block.getStr("type", ""))) {
+                        blocks.add(new LinkedHashMap<>(block));
+                    }
+                }
+                if (!message.content().isBlank()) {
+                    blocks.add(Map.of("type", "text", "text", message.content()));
+                }
+                for (AgentLlmToolCallPayload call : message.toolCalls()) {
+                    blocks.add(Map.of(
+                            "type", "tool_use",
+                            "id", call.id(),
+                            "name", call.functionName(),
+                            "input", AgentJsonCodec.parseObj(call.argumentsJson())));
+                }
+            }
+            case TOOL -> blocks.add(Map.of(
+                    "type", "tool_result",
+                    "tool_use_id", message.toolCallId(),
+                    "content", message.content()));
+            case SYSTEM -> {
+                // System messages are represented by the top-level system field.
+            }
+        }
+        return blocks;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendOrMerge(List<Map<String, Object>> messages, String role,
+                               List<Map<String, Object>> blocks) {
+        if (!messages.isEmpty()) {
+            Map<String, Object> previous = messages.get(messages.size() - 1);
+            if (role.equals(previous.get("role"))) {
+                ((List<Map<String, Object>>) previous.get("content")).addAll(blocks);
+                return;
+            }
+        }
+        LinkedHashMap<String, Object> message = new LinkedHashMap<>();
+        message.put("role", role);
+        message.put("content", new ArrayList<>(blocks));
+        messages.add(message);
+    }
+
+    private Map<String, Object> toTool(AgentLlmToolSchema schema) {
+        LinkedHashMap<String, Object> tool = new LinkedHashMap<>();
+        tool.put("name", schema.toolCode());
+        tool.put("description", schema.description());
+        tool.put("input_schema", AgentJsonCodec.parseObj(schema.parametersJsonSchema()));
+        return tool;
+    }
+
+    private void applyReasoningControls(Map<String, Object> body, AgentLlmExecutionConfig config) {
+        var policy = config.reasoningPolicy();
+        if (policy == null) return;
+        if (policy.explicitSummary() && !"none".equalsIgnoreCase(policy.summary())) {
+            throw BusinessException.of("Anthropic reasoning summaries are not configurable");
+        }
+        if (policy.explicitMode() && !"adaptive".equalsIgnoreCase(policy.mode())) {
+            throw BusinessException.of("Anthropic supports only adaptive reasoning mode");
+        }
+        if (policy.explicitEffort() && !"none".equalsIgnoreCase(policy.effort())) {
+            if (!Set.of("low", "medium", "high", "xhigh", "max").contains(policy.effort())) {
+                throw BusinessException.of("Anthropic does not support reasoning effort " + policy.effort());
+            }
+            body.put("output_config", Map.of("effort", policy.effort()));
+        }
+        if ("adaptive".equalsIgnoreCase(policy.mode()) && !policy.disabled()) {
+            body.put("thinking", Map.of("type", "adaptive"));
+        }
+    }
+
+    private boolean isThinkingBlock(String type) {
+        return "thinking".equalsIgnoreCase(type) || "redacted_thinking".equalsIgnoreCase(type);
+    }
+
+    private ResolvedRequest resolve(AgentLlmTurnRequest request, AgentLlmExecutionConfig config) {
+        if (config == null) throw BusinessException.of("LLM execution config is required");
+        if (request == null || blank(config.apiKey())
+                || blank(config.modelName()) || blank(config.baseUrl())) {
+            throw BusinessException.of("Claude Messages execution config is incomplete");
+        }
+        return new ResolvedRequest(messagesEndpoint(config.baseUrl()));
+    }
+
+    private String messagesEndpoint(String rawBaseUrl) {
+        String baseUrl = rawBaseUrl.trim();
+        while (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        if (baseUrl.endsWith("/messages")) return baseUrl;
+        if (!baseUrl.endsWith("/v1")) baseUrl += "/v1";
+        return baseUrl + "/messages";
+    }
+
+    private int intValue(JSONObject object, String key) {
+        if (object == null) return 0;
+        Integer value = object.getInt(key);
         return value == null ? 0 : Math.max(0, value);
     }
 
-    private List<?> toList(Object value) {
-        if (value instanceof List<?> list) {
-            return list;
-        }
-        return List.of();
+    private boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
-    private Map<String, Object> mapValue(Object value) {
-        if (value instanceof JSONObject object) {
-            return new LinkedHashMap<>(object);
-        }
-        if (value instanceof Map<?, ?> map) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            map.forEach((key, item) -> result.put(String.valueOf(key), item));
-            return result;
-        }
-        return Map.of();
-    }
-
-    private String stringValue(Object value) {
-        return value == null ? "" : String.valueOf(value);
+    private record ResolvedRequest(String endpoint) {
     }
 }
-

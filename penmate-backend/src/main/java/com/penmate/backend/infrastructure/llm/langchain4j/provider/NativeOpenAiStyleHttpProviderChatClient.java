@@ -10,6 +10,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.domain.agent.model.AgentLlmProviderItem;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
@@ -253,7 +254,21 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         if (executionConfig != null && executionConfig.maxOutputTokens() != null) {
             body.set(outputTokenField(), executionConfig.maxOutputTokens());
         }
+        applyReasoningPolicy(body, executionConfig);
         return body.toString();
+    }
+
+    private void applyReasoningPolicy(JSONObject body, AgentLlmExecutionConfig executionConfig) {
+        if (executionConfig == null || executionConfig.reasoningPolicy() == null) return;
+        var policy = executionConfig.reasoningPolicy();
+        if (policy.explicitMode()) {
+            throw BusinessException.of("Reasoning mode requires the OpenAI Responses protocol");
+        }
+        if (policy.explicitSummary()) {
+            throw BusinessException.of("Reasoning summaries are not supported by this chat completions connector");
+        }
+        if (policy.disabled()) body.set("reasoning_effort", "none");
+        else if (policy.explicitEffort()) body.set("reasoning_effort", policy.effort());
     }
 
     protected String outputTokenField() {
@@ -265,6 +280,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                                                     String endpoint) {
         JSONObject body = AgentJsonCodec.parseObj(buildTurnRequestBody(request, modelName, endpoint));
         body.set("stream", true);
+        body.set("stream_options", Map.of("include_usage", true));
         return body.toString();
     }
 
@@ -274,6 +290,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                                                     String endpoint) {
         JSONObject body = AgentJsonCodec.parseObj(buildTurnRequestBody(request, modelName, executionConfig, endpoint));
         body.set("stream", true);
+        body.set("stream_options", Map.of("include_usage", true));
         return body.toString();
     }
 
@@ -406,6 +423,8 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                 StreamingToolCall call = toolCalls.computeIfAbsent(index, ignored -> new StreamingToolCall());
                 String id = delta.getStr("id", null);
                 if (id != null && !id.isBlank()) call.id = id;
+                JSONObject extraContent = delta.getJSONObject("extra_content");
+                if (extraContent != null && !extraContent.isEmpty()) call.extraContent = extraContent;
                 JSONObject function = delta.getJSONObject("function");
                 if (function == null) continue;
                 String name = function.getStr("name", null);
@@ -426,8 +445,12 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             if (calls.isEmpty() && assistantText.isEmpty()) {
                 throw BusinessException.of("LLM stream completed without assistant content");
             }
-            return new AgentLlmTurnResponse(
-                    resolvedFinishReason, assistantText.toString(), calls, "{}", tokenUsage);
+            List<AgentLlmProviderItem> providerItems = toolCalls.values().stream()
+                    .filter(call -> call.extraContent != null && !call.extraContent.isEmpty())
+                    .map(call -> toolCallExtraItem(call.id, call.extraContent))
+                    .toList();
+            return new AgentLlmTurnResponse(resolvedFinishReason, assistantText.toString(), calls, "{}",
+                    tokenUsage, "", "", providerItems);
         }
     }
 
@@ -435,6 +458,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         private String id;
         private String name;
         private final StringBuilder arguments = new StringBuilder();
+        private JSONObject extraContent;
     }
 
     private JSONObject sanitizeTopLevelFunctionParametersSchema(String parametersJsonSchema) {
@@ -546,6 +570,7 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
             }
 
             List<AgentLlmToolCall> calls = new ArrayList<>();
+            List<AgentLlmProviderItem> providerItems = new ArrayList<>();
             if (toolCalls != null) {
                 for (int i = 0; i < toolCalls.size(); i++) {
                     JSONObject item = toolCalls.getJSONObject(i);
@@ -555,15 +580,14 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                             function == null ? null : function.getStr("name"),
                             function == null ? "{}" : function.getStr("arguments", "{}")
                     ));
+                    JSONObject extraContent = item == null ? null : item.getJSONObject("extra_content");
+                    if (item != null && extraContent != null && !extraContent.isEmpty()) {
+                        providerItems.add(toolCallExtraItem(item.getStr("id", ""), extraContent));
+                    }
                 }
             }
-            return new AgentLlmTurnResponse(
-                    finishReason,
-                    content == null ? "" : content,
-                    calls,
-                    responseBody,
-                    tokenUsage
-            );
+            return new AgentLlmTurnResponse(finishReason, content == null ? "" : content, calls,
+                    responseBody, tokenUsage, "", "", providerItems);
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -600,7 +624,16 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
         JSONObject promptDetails = usage.getJSONObject("prompt_tokens_details");
         Integer cachedTokens = promptDetails == null ? null : promptDetails.getInt("cached_tokens");
         if (cachedTokens == null) cachedTokens = usage.getInt("cache_read_input_tokens");
-        Integer cacheCreationTokens = usage.getInt("cache_creation_input_tokens");
+        if (cachedTokens == null) cachedTokens = usage.getInt("prompt_cache_hit_tokens");
+        if (cachedTokens == null) cachedTokens = usage.getInt("cached_content_token_count");
+        if (cachedTokens == null) cachedTokens = usage.getInt("cachedContentTokenCount");
+        if (cachedTokens == null) cachedTokens = usage.getInt("total_cached_tokens");
+        Integer cacheCreationTokens = promptDetails == null ? null : promptDetails.getInt("cache_write_tokens");
+        if (cacheCreationTokens == null) cacheCreationTokens = usage.getInt("cache_write_tokens");
+        if (cacheCreationTokens == null) cacheCreationTokens = usage.getInt("cache_creation_input_tokens");
+        JSONObject completionDetails = usage.getJSONObject("completion_tokens_details");
+        Integer reasoningTokens = completionDetails == null ? null : completionDetails.getInt("reasoning_tokens");
+        if (reasoningTokens == null) reasoningTokens = usage.getInt("thoughts_token_count");
         if (anthropicShape) {
             promptTokens = (promptTokens == null ? 0 : promptTokens)
                     + (cachedTokens == null ? 0 : cachedTokens)
@@ -611,8 +644,17 @@ public abstract class NativeOpenAiStyleHttpProviderChatClient implements Provide
                 completionTokens == null ? 0 : completionTokens,
                 totalTokens == null ? 0 : totalTokens,
                 cachedTokens == null ? 0 : cachedTokens,
-                cacheCreationTokens == null ? 0 : cacheCreationTokens
+                cacheCreationTokens == null ? 0 : cacheCreationTokens,
+                reasoningTokens == null ? 0 : reasoningTokens
         );
+    }
+
+    private static AgentLlmProviderItem toolCallExtraItem(String toolCallId, JSONObject extraContent) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("toolCallId", toolCallId);
+        payload.put("extraContent", new LinkedHashMap<>(extraContent));
+        return new AgentLlmProviderItem(AgentLlmMessagePayloadMapper.CHAT_COMPLETIONS_TOOL_CALL_EXTRA,
+                AgentJsonCodec.toJson(payload));
     }
 
     private String abbreviateForLog(String value) {

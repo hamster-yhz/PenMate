@@ -33,6 +33,7 @@ export const useWorkbenchIntegrations = ({ getUserId, getProjectId }: WorkbenchI
   const activePlugins = ref<string[]>([])
   const activeModelConfigId = ref<string | null>(null)
   const currentModelName = ref('')
+  const currentReasoningLabel = ref('')
 
   const loadActivePlugins = async (projectId: string) => {
     if (!projectId) {
@@ -54,6 +55,7 @@ export const useWorkbenchIntegrations = ({ getUserId, getProjectId }: WorkbenchI
     if (!userId) {
       activeModelConfigId.value = null
       currentModelName.value = ''
+      currentReasoningLabel.value = ''
       return null
     }
     try {
@@ -80,10 +82,16 @@ export const useWorkbenchIntegrations = ({ getUserId, getProjectId }: WorkbenchI
         : undefined
       activeModelConfigId.value = preferred ? modelConfigId(preferred) : null
       currentModelName.value = String(preferred?.modelName || '').trim()
+      const effort = String(preferred?.reasoningEffort || 'AUTO').toUpperCase()
+      const mode = String(preferred?.reasoningMode || 'AUTO').toUpperCase()
+      const labels: Record<string, string> = { AUTO: '自动', NONE: '关闭', MINIMAL: '最小', LOW: '低', MEDIUM: '中', HIGH: '高', XHIGH: '超高', MAX: '最高' }
+      const modeLabels: Record<string, string> = { AUTO: '自动', STANDARD: '标准', PRO: '专业', ADAPTIVE: '自适应', DISABLED: '关闭' }
+      currentReasoningLabel.value = preferred ? `推理 ${labels[effort] || effort} · ${modeLabels[mode] || mode}` : ''
       return activeModelConfigId.value
     } catch {
       activeModelConfigId.value = null
       currentModelName.value = ''
+      currentReasoningLabel.value = ''
       return null
     }
   }
@@ -93,6 +101,7 @@ export const useWorkbenchIntegrations = ({ getUserId, getProjectId }: WorkbenchI
   return {
     activePlugins,
     currentModelName,
+    currentReasoningLabel,
     loadActivePlugins,
     refreshActiveModelInfo,
     ensureModelConfigId,

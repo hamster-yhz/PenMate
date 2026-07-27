@@ -17,13 +17,17 @@ public final class ModelCommands {
             Integer contextWindowTurns,
             Integer maxContextTokens,
             Integer maxOutputTokens,
-            Boolean autoDetectCapacity
+            Boolean autoDetectCapacity,
+            String reasoningEffort,
+            String reasoningMode,
+            String reasoningSummary
     ) {
         public CreateConfigurationCommand(Long providerId, String displayName, String modelType,
                                           String modelName, String baseUrl, String distanceMetric,
                                           String apiKey, Integer contextWindowTurns, Integer maxContextTokens) {
             this(providerId, displayName, modelType, modelName, baseUrl, distanceMetric, null,
-                    apiKey, contextWindowTurns, maxContextTokens, null, maxContextTokens == null);
+                    apiKey, contextWindowTurns, maxContextTokens, null, maxContextTokens == null,
+                    null, null, null);
         }
 
         public CreateConfigurationCommand(Long providerId, String displayName, String modelType,
@@ -31,7 +35,8 @@ public final class ModelCommands {
                                           Integer embeddingDimensions, String apiKey, Integer contextWindowTurns,
                                           Integer maxContextTokens, Integer maxOutputTokens) {
             this(providerId, displayName, modelType, modelName, baseUrl, distanceMetric, embeddingDimensions,
-                    apiKey, contextWindowTurns, maxContextTokens, maxOutputTokens, maxContextTokens == null);
+                    apiKey, contextWindowTurns, maxContextTokens, maxOutputTokens, maxContextTokens == null,
+                    null, null, null);
         }
     }
 
@@ -48,13 +53,17 @@ public final class ModelCommands {
             Integer maxContextTokens,
             Integer maxOutputTokens,
             Boolean autoDetectCapacity,
-            String status
+            String status,
+            String reasoningEffort,
+            String reasoningMode,
+            String reasoningSummary
     ) {
         public UpdateConfigurationCommand(Long providerId, String displayName, String modelName,
                                           String baseUrl, String distanceMetric, String apiKey,
                                           Integer contextWindowTurns, Integer maxContextTokens, String status) {
             this(providerId, displayName, modelName, baseUrl, distanceMetric, null, false, apiKey,
-                    contextWindowTurns, maxContextTokens, null, maxContextTokens == null, status);
+                    contextWindowTurns, maxContextTokens, null, maxContextTokens == null, status,
+                    null, null, null);
         }
 
         public UpdateConfigurationCommand(Long providerId, String displayName, String modelName,
@@ -63,7 +72,7 @@ public final class ModelCommands {
                                           Integer maxContextTokens, Integer maxOutputTokens, String status) {
             this(providerId, displayName, modelName, baseUrl, distanceMetric, embeddingDimensions,
                     embeddingDimensionsSet, apiKey, contextWindowTurns, maxContextTokens, maxOutputTokens,
-                    maxContextTokens == null ? null : false, status);
+                    maxContextTokens == null ? null : false, status, null, null, null);
         }
     }
 

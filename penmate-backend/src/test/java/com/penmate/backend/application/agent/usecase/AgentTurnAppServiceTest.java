@@ -1,5 +1,7 @@
 package com.penmate.backend.application.agent.usecase;
 
+import com.penmate.backend.application.agent.AgentModelRoutingService;
+import com.penmate.backend.application.agent.llm.AgentReasoningPolicy;
 import com.penmate.backend.application.agent.run.*;
 import com.penmate.backend.application.agent.skill.AgentSkillActivationService;
 import com.penmate.backend.application.style.usecase.SessionStyleBindingAppService;
@@ -114,6 +116,40 @@ class AgentTurnAppServiceTest {
         verify(runAppService).createRun(argThat(command ->
                 command.promptSnapshot().startsWith("[Application recovery record]")
                         && command.promptSnapshot().endsWith("continue")));
+    }
+
+    @Test
+    void should_freeze_resolved_reasoning_configuration_in_run_input() {
+        AgentRunAppService runAppService = runAppServiceThatSucceeds();
+        AgentModelRoutingService modelRouting = mock(AgentModelRoutingService.class);
+        when(modelRouting.resolveSnapshot(1001L, 4001L)).thenReturn(
+                new AgentModelRoutingService.ModelExecutionSnapshot(
+                        4001L, new AgentReasoningPolicy("high", "detailed", "pro")));
+        AgentTurnAppService service = new AgentTurnAppService(
+                mock(SessionStyleBindingAppService.class),
+                agentRepository(),
+                sessionRepository(),
+                businessIdGenerator(FAKE_USER_MESSAGE_ID, FAKE_TURN_ID, FAKE_RUN_ID),
+                runAppService,
+                mock(AgentRunDispatcher.class),
+                mock(AgentSkillActivationService.class),
+                recoveryPrompts(),
+                mock(com.penmate.backend.application.agent.safety.AgentSafetyModeApplicationService.class),
+                modelRouting
+        );
+
+        service.createTurn(920001L, 920002L,
+                new AgentTurnCommand(1001L, "plan the revision", java.util.List.of(),
+                        new AgentTurnCommand.TaskRequest(null, java.util.List.of(), 4001L, null)),
+                "trace-reasoning-snapshot");
+
+        verify(runAppService).createRun(argThat(command -> {
+            String snapshot = command.modelSnapshotJson();
+            return snapshot.contains("\"modelConfigId\":4001")
+                    && snapshot.contains("\"reasoningEffort\":\"high\"")
+                    && snapshot.contains("\"reasoningMode\":\"pro\"")
+                    && snapshot.contains("\"reasoningSummary\":\"detailed\"");
+        }));
     }
 
     private static AgentRunAppService runAppServiceThatSucceeds() {

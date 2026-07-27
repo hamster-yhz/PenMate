@@ -21,6 +21,7 @@ public interface ModelMapper {
                    mc.display_name, mc.model_type, mc.model_name, mc.base_url, mc.distance_metric,
                    mc.embedding_dimensions,
                    mc.context_window_turns, mc.max_context_tokens, mc.max_output_tokens,
+                   mc.reasoning_effort, mc.reasoning_mode, mc.reasoning_summary,
                    mc.context_capacity_source, mc.context_capacity_source_url,
                    mc.context_capacity_verified_at,
                    COALESCE(uak.masked_api_key, oak.masked_api_key) AS masked_api_key,
@@ -122,12 +123,15 @@ public interface ModelMapper {
             INSERT INTO model_configurations(
                 model_config_id, scope_type, owner_user_id, provider_id, display_name,
                 model_type, model_name, base_url, distance_metric, embedding_dimensions, context_window_turns,
-                max_context_tokens, max_output_tokens, context_capacity_source,
+                max_context_tokens, max_output_tokens, reasoning_effort, reasoning_mode, reasoning_summary,
+                context_capacity_source,
                 context_capacity_source_url, context_capacity_verified_at, status, created_by, updated_by
             ) VALUES (
                 #{modelConfigId}, #{scopeType}, #{ownerUserId}, #{providerId}, #{displayName},
                 #{modelType}, #{modelName}, #{baseUrl}, #{distanceMetric}, #{embeddingDimensions}, #{contextWindowTurns},
-                #{maxContextTokens}, COALESCE(#{maxOutputTokens}, 8192), COALESCE(#{contextCapacitySource}, 'FALLBACK'),
+                #{maxContextTokens}, COALESCE(#{maxOutputTokens}, 8192),
+                COALESCE(#{reasoningEffort}, 'AUTO'), COALESCE(#{reasoningMode}, 'AUTO'),
+                COALESCE(#{reasoningSummary}, 'AUTO'), COALESCE(#{contextCapacitySource}, 'FALLBACK'),
                 #{contextCapacitySourceUrl}, #{contextCapacityVerifiedAt}, #{status}, #{createdBy}, #{updatedBy}
             )
             """)
@@ -140,6 +144,9 @@ public interface ModelMapper {
                 embedding_dimensions = #{embeddingDimensions},
                 context_window_turns = #{contextWindowTurns}, max_context_tokens = #{maxContextTokens},
                 max_output_tokens = COALESCE(#{maxOutputTokens}, 8192),
+                reasoning_effort = COALESCE(#{reasoningEffort}, 'AUTO'),
+                reasoning_mode = COALESCE(#{reasoningMode}, 'AUTO'),
+                reasoning_summary = COALESCE(#{reasoningSummary}, 'AUTO'),
                 context_capacity_source = COALESCE(#{contextCapacitySource}, context_capacity_source),
                 context_capacity_source_url = #{contextCapacitySourceUrl},
                 context_capacity_verified_at = #{contextCapacityVerifiedAt},

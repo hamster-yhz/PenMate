@@ -4,6 +4,7 @@ import com.penmate.backend.application.agent.context.AgentRunContextArtifactServ
 import com.penmate.backend.application.agent.context.AgentRunContextResolutionService;
 import com.penmate.backend.application.agent.context.AgentRunDependencyValidator;
 import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentReasoningPolicy;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.orchestration.AgentPromptAssembler;
 import com.penmate.backend.application.agent.prompt.PromptComposer;
@@ -111,6 +112,7 @@ public class AgentRunExecutor {
         } else {
             executionConfig = AgentLlmExecutionConfig.builder().build();
         }
+        executionConfig = applyReasoningSnapshot(executionConfig, input.modelSnapshotJson());
         Long projectId = run.projectId();
         Long sessionId = run.sessionId();
         Long turnId = run.turnId();
@@ -278,6 +280,7 @@ public class AgentRunExecutor {
         AgentLlmExecutionConfig executionConfig = modelConfigId == null
                 ? AgentLlmExecutionConfig.builder().build()
                 : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
+        executionConfig = applyReasoningSnapshot(executionConfig, input.modelSnapshotJson());
         AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId, List.of(),
                 resolveToolSchemas(promptArtifact), executionConfig,
@@ -342,6 +345,7 @@ public class AgentRunExecutor {
         AgentLlmExecutionConfig executionConfig = modelConfigId == null
                 ? AgentLlmExecutionConfig.builder().build()
                 : modelRoutingService.resolveExecutionConfig(run.ownerUserId(), modelConfigId, traceId);
+        executionConfig = applyReasoningSnapshot(executionConfig, input.modelSnapshotJson());
         leaseService.assertOwned(lease);
         AgentRunLoopRequest loopRequest = new AgentRunLoopRequest(
                 runId, run.projectId(), run.sessionId(), run.turnId(), traceId,
@@ -402,6 +406,29 @@ public class AgentRunExecutor {
             // ignore parse failures
         }
         return null;
+    }
+
+    private AgentLlmExecutionConfig applyReasoningSnapshot(AgentLlmExecutionConfig config,
+                                                            String modelSnapshotJson) {
+        if (modelSnapshotJson == null || modelSnapshotJson.isBlank()) return config;
+        try {
+            Map<String, Object> values = jsonCodec.readObject(modelSnapshotJson);
+            if (!values.containsKey("reasoningEffort")
+                    && !values.containsKey("reasoningMode")
+                    && !values.containsKey("reasoningSummary")) return config;
+            AgentReasoningPolicy fallback = config.reasoningPolicy();
+            AgentReasoningPolicy policy = new AgentReasoningPolicy(
+                    text(values.get("reasoningEffort"), fallback.effort()),
+                    text(values.get("reasoningSummary"), fallback.summary()),
+                    text(values.get("reasoningMode"), fallback.mode()));
+            return config.withReasoningPolicy(policy);
+        } catch (RuntimeException ignored) {
+            return config;
+        }
+    }
+
+    private String text(Object value, String fallback) {
+        return value == null || String.valueOf(value).isBlank() ? fallback : String.valueOf(value);
     }
 
     private List<AgentLlmToolSchema> resolveToolSchemas(

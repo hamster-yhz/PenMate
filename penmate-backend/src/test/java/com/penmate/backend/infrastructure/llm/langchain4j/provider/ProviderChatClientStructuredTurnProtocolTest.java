@@ -3,18 +3,17 @@ package com.penmate.backend.infrastructure.llm.langchain4j.provider;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.domain.agent.model.AgentLlmMessage;
 import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.ChatMessageType;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
+import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
+import com.penmate.backend.infrastructure.agent.codec.AgentJsonCodec;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.groups.Tuple.tuple;
 
 class ProviderChatClientStructuredTurnProtocolTest {
 
@@ -76,27 +75,19 @@ class ProviderChatClientStructuredTurnProtocolTest {
     }
 
     @Test
-    void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_FAILS_FAST_WHEN_TOOL_RESULT_MESSAGE_CANNOT_BE_BOUND_TO_TOOL_NAME() throws Exception {
+    void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_FAILS_FAST_WHEN_TOOL_RESULT_MESSAGE_CANNOT_BE_BOUND_TO_TOOL_NAME() {
         ClaudeProviderChatClient client = new ClaudeProviderChatClient();
-        Method method = ClaudeProviderChatClient.class.getDeclaredMethod("toChatMessages", List.class);
-        method.setAccessible(true);
 
-        assertThatThrownBy(() -> method.invoke(client, List.of(
-                AgentLlmMessage.tool("call_missing", "done")
-        )))
-                .hasRootCauseInstanceOf(BusinessException.class)
-                .rootCause()
+        assertThatThrownBy(() -> client.buildRequestBody(new AgentLlmTurnRequest(List.of(
+                AgentLlmMessage.tool("call_missing", "done")), List.of(), "none"), claudeConfig()))
+                .isInstanceOf(BusinessException.class)
                 .hasMessage("Claude tool result message is missing matching assistant tool call");
     }
 
     @Test
-    void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_MAPS_ASSISTANT_TOOL_CALL_AND_TOOL_RESULT_MESSAGES_TO_ANTHROPIC_NATIVE_MESSAGE_TYPES() throws Exception {
+    void UT_INFRA_LLM_CLAUDE_PROVIDER_CHAT_CLIENT_MAPS_ASSISTANT_TOOL_CALL_AND_TOOL_RESULT_MESSAGES_TO_ANTHROPIC_NATIVE_MESSAGE_TYPES() {
         ClaudeProviderChatClient client = new ClaudeProviderChatClient();
-        Method method = ClaudeProviderChatClient.class.getDeclaredMethod("toChatMessages", List.class);
-        method.setAccessible(true);
-
-        @SuppressWarnings("unchecked")
-        List<ChatMessage> messages = (List<ChatMessage>) method.invoke(client, List.of(
+        String body = client.buildRequestBody(new AgentLlmTurnRequest(List.of(
                 AgentLlmMessage.assistant(
                         "need tool",
                         List.of(new AgentLlmToolCallPayload(
@@ -107,18 +98,27 @@ class ProviderChatClientStructuredTurnProtocolTest {
                         ))
                 ),
                 AgentLlmMessage.tool("call_1", "tool output")
-        ));
+        ), List.of(), "none"), claudeConfig());
 
-        assertThat(messages).hasSize(2);
-        assertThat(messages.get(0).type()).isEqualTo(ChatMessageType.AI);
-        assertThat(((AiMessage) messages.get(0)).toolExecutionRequests())
-                .extracting(request -> request.id(), request -> request.name(), request -> request.arguments())
-                .containsExactly(tuple("call_1", "custom_tool", "{\"prompt\":\"hello\"}"));
-        assertThat(messages.get(1).type()).isEqualTo(ChatMessageType.TOOL_EXECUTION_RESULT);
-        ToolExecutionResultMessage toolResultMessage = (ToolExecutionResultMessage) messages.get(1);
-        assertThat(toolResultMessage.id()).isEqualTo("call_1");
-        assertThat(toolResultMessage.toolName()).isEqualTo("custom_tool");
-        assertThat(toolResultMessage.text()).isEqualTo("tool output");
+        JSONArray messages = AgentJsonCodec.parseObj(body).getJSONArray("messages");
+        JSONObject toolUse = messages.getJSONObject(0).getJSONArray("content").getJSONObject(1);
+        JSONObject toolResult = messages.getJSONObject(1).getJSONArray("content").getJSONObject(0);
+        assertThat(toolUse.getStr("type")).isEqualTo("tool_use");
+        assertThat(toolUse.getStr("id")).isEqualTo("call_1");
+        assertThat(toolUse.getStr("name")).isEqualTo("custom_tool");
+        assertThat(toolUse.getJSONObject("input").getStr("prompt")).isEqualTo("hello");
+        assertThat(toolResult.getStr("type")).isEqualTo("tool_result");
+        assertThat(toolResult.getStr("tool_use_id")).isEqualTo("call_1");
+        assertThat(toolResult.getStr("content")).isEqualTo("tool output");
+    }
+
+    private AgentLlmExecutionConfig claudeConfig() {
+        return AgentLlmExecutionConfig.builder()
+                .baseUrl("https://api.anthropic.com")
+                .apiKey("test")
+                .modelName("claude-sonnet-4-6")
+                .maxOutputTokens(1024)
+                .build();
     }
 
     private static final class TestOpenAiProviderChatClient extends OpenAiProviderChatClient {

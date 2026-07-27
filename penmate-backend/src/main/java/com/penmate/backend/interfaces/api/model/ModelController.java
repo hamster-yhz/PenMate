@@ -28,8 +28,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -62,6 +64,24 @@ public class ModelController {
         Set<String> permissions = authorization.currentSnapshot(actor).permissions();
         return ApiResponse.success(service.listAccessibleConfigurations(actor).stream()
                 .map(configuration -> configurationView(configuration, permissions)).toList(), traceId);
+    }
+
+    @GetMapping("/reasoning-capabilities")
+    public ApiResponse<Map<String, Object>> getReasoningCapabilities(
+            Authentication authentication,
+            @RequestParam String providerId,
+            @RequestParam String modelName,
+            @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        var capabilities = service.resolveReasoningCapabilities(actor(authentication),
+                id(providerId, "providerId"), modelName);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("efforts", capabilities.efforts());
+        result.put("modes", capabilities.modes());
+        result.put("summaries", capabilities.summaries());
+        result.put("source", capabilities.source());
+        result.put("sourceUrl", capabilities.sourceUrl());
+        result.put("verifiedAt", capabilities.verifiedAt());
+        return ApiResponse.success(result, traceId);
     }
 
     @PostMapping("/configurations")
@@ -256,14 +276,16 @@ public class ModelController {
                 dto.getModelType(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(),
                 dto.getEmbeddingDimensions(), dto.getApiKey(),
                 dto.getContextWindowTurns(), dto.getMaxContextTokens(), dto.getMaxOutputTokens(),
-                dto.getAutoDetectCapacity());
+                dto.getAutoDetectCapacity(), dto.getReasoningEffort(), dto.getReasoningMode(),
+                dto.getReasoningSummary());
     }
 
     private ModelCommands.UpdateConfigurationCommand updateCommand(UpdateModelConfigurationDto dto) {
         return new ModelCommands.UpdateConfigurationCommand(optionalId(dto.getProviderId(), "providerId"),
                 dto.getDisplayName(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(),
                 dto.getEmbeddingDimensions(), dto.isEmbeddingDimensionsSet(), dto.getApiKey(), dto.getContextWindowTurns(),
-                dto.getMaxContextTokens(), dto.getMaxOutputTokens(), dto.getAutoDetectCapacity(), dto.getStatus());
+                dto.getMaxContextTokens(), dto.getMaxOutputTokens(), dto.getAutoDetectCapacity(), dto.getStatus(),
+                dto.getReasoningEffort(), dto.getReasoningMode(), dto.getReasoningSummary());
     }
 
     private ModelCommands.ProbeEmbeddingDimensionCommand probeCommand(ProbeEmbeddingDimensionDto dto) {
@@ -321,6 +343,9 @@ public class ModelController {
         result.put("contextWindowTurns", configuration.getContextWindowTurns());
         result.put("maxContextTokens", configuration.getMaxContextTokens());
         result.put("maxOutputTokens", configuration.getMaxOutputTokens());
+        result.put("reasoningEffort", configuration.getReasoningEffort());
+        result.put("reasoningMode", configuration.getReasoningMode());
+        result.put("reasoningSummary", configuration.getReasoningSummary());
         result.put("contextCapacitySource", configuration.getContextCapacitySource());
         result.put("contextCapacitySourceUrl", configuration.getContextCapacitySourceUrl());
         result.put("contextCapacityVerifiedAt", configuration.getContextCapacityVerifiedAt());

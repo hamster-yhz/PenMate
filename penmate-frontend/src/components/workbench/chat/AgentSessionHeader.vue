@@ -10,6 +10,7 @@ import {
 withDefaults(
   defineProps<{
     currentModelName?: string
+    currentReasoningLabel?: string
     generationStatusText?: string
     agentStatusDetailText?: string
     isGenerating?: boolean
@@ -18,7 +19,7 @@ withDefaults(
     focused?: boolean
   }>(),
   {
-    currentModelName: '', generationStatusText: '就绪', agentStatusDetailText: '',
+    currentModelName: '', currentReasoningLabel: '', generationStatusText: '就绪', agentStatusDetailText: '',
     isGenerating: false, generationPhase: 'idle', boundStyleName: '', focused: false,
   },
 )
@@ -35,6 +36,7 @@ defineEmits<{ 'toggle-history': []; 'create-session': []; 'toggle-focus': [] }>(
     <div class="agent-meta">
       <span :class="['status-dot', { busy: isGenerating, failed: generationPhase === 'failed' }]"></span>
       <span class="model-name" :title="currentModelName || '未选择模型'">{{ currentModelName || '未选择模型' }}</span>
+      <span v-if="currentReasoningLabel" class="reasoning-name">{{ currentReasoningLabel }}</span>
       <span v-if="boundStyleName" class="style-name">{{ boundStyleName }}</span>
       <span v-if="agentStatusDetailText" class="status-detail">{{ agentStatusDetailText }}</span>
     </div>
@@ -59,8 +61,9 @@ defineEmits<{ 'toggle-history': []; 'create-session': []; 'toggle-focus': [] }>(
 .status-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .status-dot.busy { background: var(--warning); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent); }
 .status-dot.failed { background: var(--danger); }
-.model-name, .style-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-name, .reasoning-name, .style-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-name { color: var(--text-secondary); }
+.reasoning-name { padding-left: 7px; border-left: 1px solid var(--border-subtle); }
 .style-name { padding-left: 7px; border-left: 1px solid var(--border-subtle); }
 .status-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--warning); }
 .agent-actions { display: flex; gap: 4px; }

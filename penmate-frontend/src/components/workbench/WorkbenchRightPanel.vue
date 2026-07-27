@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<{
   focused?: boolean
   panelWidth?: number
   currentModelName?: string
+  currentReasoningLabel?: string
   generationStatusText?: string
   agentStatusDetailText?: string
   isGenerating?: boolean
@@ -55,7 +56,7 @@ const props = withDefaults(defineProps<{
   aiUndoDismissBusyOperationId?: string
   aiUndoDismissAllBusy?: boolean
 }>(), {
-  focused: false, panelWidth: 440, currentModelName: '', generationStatusText: '', agentStatusDetailText: '',
+  focused: false, panelWidth: 440, currentModelName: '', currentReasoningLabel: '', generationStatusText: '', agentStatusDetailText: '',
   isGenerating: false, canCancelRun: false, isCancelling: false, canRetryRun: false, isRetrying: false,
   generationPhase: 'idle', boundStyleName: '', showConversationPanel: false, conversationLoading: false,
   conversationList: () => [], deletedConversationList: () => [], currentConversationId: null,
@@ -124,7 +125,7 @@ onUnmounted(() => stopResize?.())
         @keydown.right.prevent="emit('update:panel-width', Math.max(300, panelWidth - 16))"
       ></button>
       <AgentSessionHeader
-        :current-model-name="currentModelName" :generation-status-text="generationStatusText"
+        :current-model-name="currentModelName" :current-reasoning-label="currentReasoningLabel" :generation-status-text="generationStatusText"
         :agent-status-detail-text="agentStatusDetailText" :is-generating="isGenerating"
         :generation-phase="generationPhase" :bound-style-name="boundStyleName" :focused="focused"
         @toggle-history="emit('toggle-history')" @create-session="emit('create-session')" @toggle-focus="emit('toggle-focus')"

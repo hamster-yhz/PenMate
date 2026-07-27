@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -88,6 +89,9 @@ class ModelApplicationServiceTest {
             assertThat(value.getContextWindowTurns()).isEqualTo(6);
             assertThat(value.getMaxContextTokens()).isEqualTo(128000);
             assertThat(value.getDistanceMetric()).isNull();
+            assertThat(value.getReasoningEffort()).isEqualTo("AUTO");
+            assertThat(value.getReasoningMode()).isEqualTo("AUTO");
+            assertThat(value.getReasoningSummary()).isEqualTo("AUTO");
         });
         ArgumentCaptor<ModelCredential> credential = ArgumentCaptor.forClass(ModelCredential.class);
         verify(repository).insertCredential(eq(configuration.getValue()), credential.capture());
@@ -126,6 +130,24 @@ class ModelApplicationServiceTest {
                         null, null, "secret", null, null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Provider does not support EMBEDDING");
+
+        verify(repository, never()).insertConfiguration(any());
+    }
+
+    @Test
+    void rejects_reasoning_controls_that_the_exact_model_does_not_support() {
+        ReflectionTestUtils.setField(service, "capabilityCatalog", new ModelCapabilityCatalogService());
+        ModelProvider provider = provider(1L, "openai", "API_KEY");
+        when(repository.findProvider(1L)).thenReturn(provider);
+        when(repository.findCapability(1L, "CHAT"))
+                .thenReturn(capability(1L, "CHAT", "OPENAI_RESPONSES"));
+
+        assertThatThrownBy(() -> service.createConfiguration(7L, false,
+                new CreateConfigurationCommand(1L, "Legacy", "CHAT", "gpt-4.1",
+                        "https://api.openai.com/v1", null, null, "sk-test", 6,
+                        null, null, true, "HIGH", "AUTO", "AUTO")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("reasoningEffort HIGH is not supported by this model");
 
         verify(repository, never()).insertConfiguration(any());
     }

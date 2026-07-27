@@ -16,6 +16,7 @@ export type AgentSessionContextUsage = {
   usageRatio: number | null
   promptTokens: number
   completionTokens: number
+  reasoningTokens?: number
   modelName?: string | null
   usageSource?: 'PROVIDER_USAGE' | 'ESTIMATE'
   contextCapacitySource?: 'MANUAL' | 'PROVIDER' | 'CATALOG' | 'FALLBACK'

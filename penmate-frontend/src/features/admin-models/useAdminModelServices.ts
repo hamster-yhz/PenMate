@@ -1,9 +1,10 @@
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   modelApi,
   type ModelConfigurationItem,
   type ModelConnectionTestResult,
   type ModelProviderOption,
+  type ModelReasoningCapabilities,
 } from '@/api/modules/model.api'
 
 export type { ModelConfigurationItem }
@@ -20,6 +21,9 @@ const defaultForm = () => ({
   embeddingDimensions: undefined as number | undefined,
   maxContextTokens: undefined as number | undefined,
   maxOutputTokens: undefined as number | undefined,
+  reasoningEffort: 'AUTO' as NonNullable<ModelConfigurationItem['reasoningEffort']>,
+  reasoningMode: 'AUTO' as NonNullable<ModelConfigurationItem['reasoningMode']>,
+  reasoningSummary: 'AUTO' as NonNullable<ModelConfigurationItem['reasoningSummary']>,
   autoDetectCapacity: true,
   enabled: true,
 })
@@ -38,6 +42,11 @@ export const useAdminModelServices = () => {
   const saving = ref(false)
   const formError = ref('')
   const form = reactive(defaultForm())
+  const reasoningCapabilities = ref<ModelReasoningCapabilities>({
+    efforts: ['AUTO'], modes: ['AUTO'], summaries: ['AUTO'], source: 'UNSUPPORTED',
+  })
+  let reasoningRequestSequence = 0
+  let reasoningResolveTimer: ReturnType<typeof setTimeout> | undefined
 
   const filteredConfigurations = computed(() => {
     const term = query.value.trim().toLowerCase()
@@ -50,6 +59,37 @@ export const useAdminModelServices = () => {
   const compatibleProviders = computed(() => providers.value.filter((provider) =>
     !provider.capabilities?.length
     || provider.capabilities.some((capability) => capability.capabilityCode === form.modelType)))
+  const supportsReasoningEffort = computed(() => reasoningCapabilities.value.efforts.length > 1)
+  const supportsReasoningMode = computed(() => reasoningCapabilities.value.modes.length > 1)
+  const supportsReasoningSummary = computed(() => reasoningCapabilities.value.summaries.length > 1)
+
+  const resolveReasoningCapabilities = async () => {
+    const sequence = ++reasoningRequestSequence
+    if (form.modelType !== 'CHAT' || !form.providerId || !form.modelName.trim()) {
+      reasoningCapabilities.value = { efforts: ['AUTO'], modes: ['AUTO'], summaries: ['AUTO'], source: 'UNSUPPORTED' }
+      return
+    }
+    try {
+      const resolved = await modelApi.getReasoningCapabilities(form.providerId, form.modelName.trim())
+      if (sequence !== reasoningRequestSequence) return
+      reasoningCapabilities.value = resolved
+      if (!resolved.efforts.includes(form.reasoningEffort)) form.reasoningEffort = 'AUTO'
+      if (!resolved.modes.includes(form.reasoningMode)) form.reasoningMode = 'AUTO'
+      if (!resolved.summaries.includes(form.reasoningSummary)) form.reasoningSummary = 'AUTO'
+    } catch {
+      if (sequence === reasoningRequestSequence) {
+        reasoningCapabilities.value = { efforts: ['AUTO'], modes: ['AUTO'], summaries: ['AUTO'], source: 'UNSUPPORTED' }
+      }
+    }
+  }
+
+  watch([() => form.providerId, () => form.modelName, () => form.modelType], () => {
+    if (reasoningResolveTimer) clearTimeout(reasoningResolveTimer)
+    reasoningResolveTimer = setTimeout(resolveReasoningCapabilities, 200)
+  })
+  onBeforeUnmount(() => {
+    if (reasoningResolveTimer) clearTimeout(reasoningResolveTimer)
+  })
 
   const load = async () => {
     loading.value = true
@@ -90,6 +130,9 @@ export const useAdminModelServices = () => {
       embeddingDimensions: item.embeddingDimensions ?? undefined,
       maxContextTokens: item.maxContextTokens || 128000,
       maxOutputTokens: item.maxOutputTokens || 8192,
+      reasoningEffort: item.reasoningEffort || 'AUTO',
+      reasoningMode: item.reasoningMode || 'AUTO',
+      reasoningSummary: item.reasoningSummary || 'AUTO',
       autoDetectCapacity: item.contextCapacitySource !== 'MANUAL',
       enabled: item.status !== 'DISABLED',
     })
@@ -183,6 +226,10 @@ export const useAdminModelServices = () => {
     form,
     filteredConfigurations,
     compatibleProviders,
+    reasoningCapabilities,
+    supportsReasoningEffort,
+    supportsReasoningMode,
+    supportsReasoningSummary,
     load,
     openCreate,
     openEdit,

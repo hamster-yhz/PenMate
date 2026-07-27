@@ -7,6 +7,9 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
+import com.penmate.backend.application.agent.llm.AgentReasoningPolicy;
+import com.penmate.backend.domain.agent.model.AgentLlmMessage;
+import com.penmate.backend.domain.agent.model.AgentLlmToolCallPayload;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.application.common.exception.BusinessException;
 import org.apache.logging.log4j.Level;
@@ -54,6 +57,49 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
     }
 
     @Test
+    void adds_explicit_reasoning_effort_to_chat_completions_requests() {
+        AgentLlmTurnRequest request = new AgentLlmTurnRequest(List.of(
+                com.penmate.backend.domain.agent.model.AgentLlmMessage.user("hello")), List.of(), "none");
+        AgentLlmExecutionConfig config = AgentLlmExecutionConfig.builder()
+                .modelName("gpt-test")
+                .reasoningPolicy(new AgentReasoningPolicy("high", "auto"))
+                .build();
+
+        JSONObject body = AgentJsonCodec.parseObj(new TestNativeClient().turnBody(request, config));
+
+        assertThat(body.getStr("reasoning_effort")).isEqualTo("high");
+    }
+
+    @Test
+    void round_trips_chat_completion_tool_call_extra_content() {
+        TestNativeClient client = new TestNativeClient();
+        AgentLlmTurnResponse response = client.extractTurnResponse("""
+                {
+                  "choices":[{"finish_reason":"tool_calls","message":{"content":"","tool_calls":[{
+                    "id":"call-1","type":"function",
+                    "function":{"name":"story_search","arguments":"{}"},
+                    "extra_content":{"google":{"thought_signature":"signed-value"}}
+                  }]}}],
+                  "usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}
+                }
+                """);
+        AgentLlmMessage assistant = AgentLlmMessage.assistant("",
+                List.of(new AgentLlmToolCallPayload("call-1", "function", "story_search", "{}")),
+                response.providerItems());
+        AgentLlmTurnRequest nextRequest = new AgentLlmTurnRequest(List.of(
+                AgentLlmMessage.user("find"), assistant, AgentLlmMessage.tool("call-1", "found")),
+                List.of(), "auto");
+
+        JSONObject body = AgentJsonCodec.parseObj(client.turnBody(nextRequest,
+                AgentLlmExecutionConfig.builder().modelName("gemini-3.1-pro").build()));
+        JSONObject extra = body.getJSONArray("messages").getJSONObject(1)
+                .getJSONArray("tool_calls").getJSONObject(0).getJSONObject("extra_content");
+
+        assertThat(response.providerItems()).hasSize(1);
+        assertThat(extra.getJSONObject("google").getStr("thought_signature")).isEqualTo("signed-value");
+    }
+
+    @Test
     void UT_INFRA_LLM_NATIVE_OPENAI_STYLE_HTTP_PROVIDER_CHAT_CLIENT_BUILDS_TEXT_REQUEST_BODY_WITH_SINGLE_USER_MESSAGE() {
         TestNativeClient client = new TestNativeClient();
 
@@ -76,7 +122,7 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
 
                 data: {"choices":[{"delta":{"content":"lo"}}]}
 
-                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"book_crud","arguments":"{\\"operation\\":"}}]}}]}
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"book_crud","arguments":"{\\"operation\\":"},"extra_content":{"google":{"thought_signature":"signed-stream"}}}]}}]}
 
                 data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"list\\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}
 
@@ -97,6 +143,8 @@ class NativeOpenAiStyleHttpProviderChatClientTest {
             assertThat(call.toolCode()).isEqualTo("book_crud");
             assertThat(call.argumentsJson()).isEqualTo("{\"operation\":\"list\"}");
         });
+        assertThat(response.providerItems()).singleElement().satisfies(item ->
+                assertThat(item.payloadJson()).contains("signed-stream"));
     }
 
     @Test
