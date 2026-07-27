@@ -25,6 +25,10 @@ export interface ModelConfigurationItem extends AnyRecord {
   embeddingDimensions?: number | null
   contextWindowTurns?: number
   maxContextTokens?: number
+  maxOutputTokens?: number
+  contextCapacitySource?: 'MANUAL' | 'PROVIDER' | 'CATALOG' | 'FALLBACK'
+  contextCapacitySourceUrl?: string | null
+  contextCapacityVerifiedAt?: string | null
   maskedApiKey?: string | null
   credentialConfigured?: boolean
   status?: 'ACTIVE' | 'DISABLED'
@@ -82,6 +86,10 @@ const normalizeUserModelConfigPayload = (payload: AnyRecord) => {
     const trimmed = next.status.trim()
     next.status = trimmed || undefined
   }
+  if (next.autoDetectCapacity === true) {
+    delete next.maxContextTokens
+    delete next.maxOutputTokens
+  }
   delete next.id
   delete next.modelConfigId
   next.displayName = typeof next.displayName === 'string' && next.displayName.trim() ? next.displayName.trim() : next.modelName
@@ -99,7 +107,7 @@ const normalizeUserModelPreferencePayload = (payload: AnyRecord) => ({
   defaultCreativeModelConfigId: normalizeBusinessStringId(payload.creativeModelConfigId),
   defaultContextSelectorModelConfigId: normalizeBusinessStringId(payload.contextSelectorModelConfigId),
   defaultEmbeddingModelConfigId: normalizeBusinessStringId(payload.defaultEmbeddingModelConfigId),
-  defaultStoryBibleRoutingMode: payload.defaultStoryBibleRoutingMode ?? 'LLM_SELECTOR',
+  defaultStoryBibleRoutingMode: payload.defaultStoryBibleRoutingMode ?? 'AGENT_DRIVEN',
   defaultChunkTargetCharacters: payload.defaultChunkTargetCharacters ?? 800,
   defaultChunkOverlapCharacters: payload.defaultChunkOverlapCharacters ?? 120,
   defaultChunkMaxCharacters: payload.defaultChunkMaxCharacters ?? 1200,

@@ -12,7 +12,7 @@ import java.time.Instant;
 public interface ProjectAiConfigurationMapper {
 
     String COLUMNS = """
-            project_ai_config_id, project_id, creative_model_config_id, embedding_model_config_id,
+            project_ai_config_id, project_id, creative_model_config_id, embedding_model_config_id, rag_enabled,
             story_bible_routing_mode, router_model_config_id,
             chunk_target_characters, chunk_overlap_characters, chunk_max_characters,
             retrieval_candidates, retrieval_top_k, retrieval_max_per_source, hnsw_ef_search,
@@ -39,14 +39,14 @@ public interface ProjectAiConfigurationMapper {
 
     @Insert("""
             INSERT INTO project_ai_configurations(
-                project_ai_config_id, project_id, creative_model_config_id, embedding_model_config_id,
+                project_ai_config_id, project_id, creative_model_config_id, embedding_model_config_id, rag_enabled,
                 story_bible_routing_mode, router_model_config_id,
                 chunk_target_characters, chunk_overlap_characters, chunk_max_characters,
                 retrieval_candidates, retrieval_top_k, retrieval_max_per_source, hnsw_ef_search,
                 similarity_threshold, index_status, active_index_build_id,
                 last_error_code, last_error_message
             ) VALUES (
-                #{projectAiConfigId}, #{projectId}, #{creativeModelConfigId}, #{embeddingModelConfigId},
+                #{projectAiConfigId}, #{projectId}, #{creativeModelConfigId}, #{embeddingModelConfigId}, #{ragEnabled},
                 #{storyBibleRoutingMode}, #{routerModelConfigId},
                 #{chunkTargetCharacters}, #{chunkOverlapCharacters}, #{chunkMaxCharacters},
                 #{retrievalCandidates}, #{retrievalTopK}, #{retrievalMaxPerSource}, #{hnswEfSearch},
@@ -60,6 +60,7 @@ public interface ProjectAiConfigurationMapper {
             UPDATE project_ai_configurations
             SET creative_model_config_id = #{creativeModelConfigId},
                 embedding_model_config_id = #{embeddingModelConfigId},
+                rag_enabled = #{ragEnabled},
                 story_bible_routing_mode = #{storyBibleRoutingMode},
                 router_model_config_id = #{routerModelConfigId},
                 chunk_target_characters = #{chunkTargetCharacters},

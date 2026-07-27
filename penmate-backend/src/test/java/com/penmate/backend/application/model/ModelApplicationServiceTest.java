@@ -170,11 +170,11 @@ class ModelApplicationServiceTest {
     }
 
     @Test
-    void defaultsPreferencesToLlmSelectorWithoutEmbedding() {
+    void defaultsPreferencesToAgentDrivenWithoutEmbedding() {
         ModelUserPreferences result = service.getUserPreferences(7L);
 
         assertThat(result.getUserId()).isEqualTo(7L);
-        assertThat(result.getDefaultStoryBibleRoutingMode()).isEqualTo("LLM_SELECTOR");
+        assertThat(result.getDefaultStoryBibleRoutingMode()).isEqualTo("AGENT_DRIVEN");
         assertThat(result.getDefaultChunkTargetCharacters()).isEqualTo(800);
         assertThat(result.getDefaultChunkOverlapCharacters()).isEqualTo(120);
         assertThat(result.getDefaultChunkMaxCharacters()).isEqualTo(1200);
@@ -187,7 +187,7 @@ class ModelApplicationServiceTest {
 
         assertThatThrownBy(() -> service.saveUserPreferences(7L, command))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("Projects without an Embedding model must default to LLM_SELECTOR");
+                .hasMessage("Retrieval routing requires an Embedding model");
 
         verify(repository, never()).upsertUserPreferences(any());
     }

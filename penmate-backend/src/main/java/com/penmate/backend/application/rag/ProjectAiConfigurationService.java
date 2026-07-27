@@ -52,7 +52,8 @@ public class ProjectAiConfigurationService {
             configuration.setChunkOverlapCharacters(value(defaults.getDefaultChunkOverlapCharacters(), 120));
             configuration.setChunkMaxCharacters(value(defaults.getDefaultChunkMaxCharacters(), 1200));
         }
-        configuration.setStoryBibleRoutingMode("LLM_SELECTOR");
+        configuration.setStoryBibleRoutingMode("AGENT_DRIVEN");
+        configuration.setRagEnabled(false);
         if (defaults == null || defaults.getDefaultEmbeddingModelConfigId() == null) {
             configuration.setIndexStatus("UNBOUND");
         } else {
@@ -83,6 +84,7 @@ public class ProjectAiConfigurationService {
         ProjectAiConfiguration next = copy(current);
         next.setCreativeModelConfigId(request.creativeModelConfigId());
         next.setEmbeddingModelConfigId(request.embeddingModelConfigId());
+        next.setRagEnabled(request.ragEnabled() == null ? current.getRagEnabled() : request.ragEnabled());
         next.setRouterModelConfigId(request.routerModelConfigId());
         next.setStoryBibleRoutingMode(normalizeRouting(request.storyBibleRoutingMode()));
         next.setChunkTargetCharacters(value(request.chunkTargetCharacters(), current.getChunkTargetCharacters()));
@@ -100,17 +102,13 @@ public class ProjectAiConfigurationService {
                 || !Objects.equals(current.getChunkOverlapCharacters(), next.getChunkOverlapCharacters())
                 || !Objects.equals(current.getChunkMaxCharacters(), next.getChunkMaxCharacters());
         if (nextEffectiveEmbedding == null) {
-            next.setStoryBibleRoutingMode("LLM_SELECTOR");
             next.setIndexStatus("UNBOUND");
             next.setActiveIndexBuildId(null);
         } else if (indexIdentityChanged) {
-            next.setStoryBibleRoutingMode("LLM_SELECTOR");
             next.setIndexStatus("REINDEX_REQUIRED");
             next.setActiveIndexBuildId(null);
             next.setLastErrorCode("PROJECT_AI_CONFIGURATION_CHANGED");
             next.setLastErrorMessage("Embedding or chunk configuration changed; rebuild the project index");
-        } else if (!"READY".equalsIgnoreCase(next.getIndexStatus())) {
-            next.setStoryBibleRoutingMode("LLM_SELECTOR");
         }
         validate(next, actorUserId, nextEffectiveEmbedding);
         if (repository.update(next) != 1) throw BusinessException.of("Failed to update project AI configuration");
@@ -123,13 +121,15 @@ public class ProjectAiConfigurationService {
         ProjectAiConfiguration current = repository.findByProjectIdForUpdate(projectId);
         if (current == null) throw BusinessException.notFound("Project AI configuration not found");
         Long effectiveEmbeddingModelConfigId = current.getEmbeddingModelConfigId();
+        if (!Boolean.TRUE.equals(current.getRagEnabled())) {
+            throw BusinessException.badRequest("Enable RAG before rebuilding the project index");
+        }
         if (effectiveEmbeddingModelConfigId == null) {
             throw BusinessException.badRequest("Bind an Embedding model before rebuilding the project index");
         }
         if ("QUEUED".equals(current.getIndexStatus()) || "BUILDING".equals(current.getIndexStatus())) {
             throw BusinessException.conflict("The project index is already being rebuilt");
         }
-        current.setStoryBibleRoutingMode("LLM_SELECTOR");
         current.setIndexStatus("QUEUED");
         current.setActiveIndexBuildId(null);
         current.setLastErrorCode(null);
@@ -192,7 +192,8 @@ public class ProjectAiConfigurationService {
         ProjectAiConfiguration result = new ProjectAiConfiguration();
         result.setProjectAiConfigId(ids.nextId());
         result.setProjectId(projectId);
-        result.setStoryBibleRoutingMode("LLM_SELECTOR");
+        result.setStoryBibleRoutingMode("AGENT_DRIVEN");
+        result.setRagEnabled(false);
         result.setChunkTargetCharacters(800);
         result.setChunkOverlapCharacters(120);
         result.setChunkMaxCharacters(1200);
@@ -208,8 +209,9 @@ public class ProjectAiConfigurationService {
         requireModel(actor, value.getCreativeModelConfigId(), "CHAT", "Creative model configuration is unavailable");
         requireModel(actor, effectiveEmbeddingModelConfigId, "EMBEDDING", "Embedding model configuration is unavailable");
         requireModel(actor, value.getRouterModelConfigId(), "CHAT", "Router model configuration is unavailable");
-        if (effectiveEmbeddingModelConfigId == null && !"LLM_SELECTOR".equals(value.getStoryBibleRoutingMode())) {
-            throw BusinessException.badRequest("Projects without an Embedding model must use LLM_SELECTOR");
+        if (requiresEmbedding(value.getStoryBibleRoutingMode())
+                && (!Boolean.TRUE.equals(value.getRagEnabled()) || effectiveEmbeddingModelConfigId == null)) {
+            throw BusinessException.badRequest("Retrieval routing requires enabled RAG and an Embedding model");
         }
         if (value.getChunkTargetCharacters() <= 0 || value.getChunkOverlapCharacters() < 0
                 || value.getChunkOverlapCharacters() >= value.getChunkTargetCharacters()
@@ -234,11 +236,15 @@ public class ProjectAiConfigurationService {
     }
 
     private String normalizeRouting(String value) {
-        String mode = value == null || value.isBlank() ? "LLM_SELECTOR" : value.trim().toUpperCase();
-        if (!List.of("RETRIEVAL", "LLM_SELECTOR", "RETRIEVAL_THEN_LLM").contains(mode)) {
+        String mode = value == null || value.isBlank() ? "AGENT_DRIVEN" : value.trim().toUpperCase();
+        if (!List.of("AGENT_DRIVEN", "RETRIEVAL", "LLM_SELECTOR", "RETRIEVAL_THEN_LLM").contains(mode)) {
             throw BusinessException.badRequest("Unsupported Story Bible routing mode");
         }
         return mode;
+    }
+
+    private boolean requiresEmbedding(String mode) {
+        return "RETRIEVAL".equals(mode) || "RETRIEVAL_THEN_LLM".equals(mode);
     }
 
     private int value(Integer candidate, Integer fallback) { return candidate == null ? fallback : candidate; }
@@ -256,6 +262,7 @@ public class ProjectAiConfigurationService {
         result.setProjectId(source.getProjectId());
         result.setCreativeModelConfigId(source.getCreativeModelConfigId());
         result.setEmbeddingModelConfigId(source.getEmbeddingModelConfigId());
+        result.setRagEnabled(source.getRagEnabled());
         result.setStoryBibleRoutingMode(source.getStoryBibleRoutingMode());
         result.setRouterModelConfigId(source.getRouterModelConfigId());
         result.setChunkTargetCharacters(source.getChunkTargetCharacters());
@@ -278,7 +285,19 @@ public class ProjectAiConfigurationService {
                                 Integer chunkOverlapCharacters, Integer chunkMaxCharacters,
                                 Integer retrievalCandidates, Integer retrievalTopK,
                                 Integer retrievalMaxPerSource, Integer hnswEfSearch,
-                                BigDecimal similarityThreshold) {
+                                BigDecimal similarityThreshold, Boolean ragEnabled) {
+        public UpdateRequest(Long creativeModelConfigId, Long embeddingModelConfigId, String storyBibleRoutingMode,
+                             Long routerModelConfigId, Integer chunkTargetCharacters,
+                             Integer chunkOverlapCharacters, Integer chunkMaxCharacters,
+                             Integer retrievalCandidates, Integer retrievalTopK,
+                             Integer retrievalMaxPerSource, Integer hnswEfSearch,
+                             BigDecimal similarityThreshold) {
+            this(creativeModelConfigId, embeddingModelConfigId, storyBibleRoutingMode, routerModelConfigId,
+                    chunkTargetCharacters, chunkOverlapCharacters, chunkMaxCharacters,
+                    retrievalCandidates, retrievalTopK, retrievalMaxPerSource, hnswEfSearch,
+                    similarityThreshold, null);
+        }
+
         public UpdateRequest(Long embeddingModelConfigId, String storyBibleRoutingMode,
                              Long routerModelConfigId, Integer chunkTargetCharacters,
                              Integer chunkOverlapCharacters, Integer chunkMaxCharacters,
@@ -288,7 +307,7 @@ public class ProjectAiConfigurationService {
             this(null, embeddingModelConfigId, storyBibleRoutingMode, routerModelConfigId,
                     chunkTargetCharacters, chunkOverlapCharacters, chunkMaxCharacters,
                     retrievalCandidates, retrievalTopK, retrievalMaxPerSource, hnswEfSearch,
-                    similarityThreshold);
+                    similarityThreshold, null);
         }
     }
 

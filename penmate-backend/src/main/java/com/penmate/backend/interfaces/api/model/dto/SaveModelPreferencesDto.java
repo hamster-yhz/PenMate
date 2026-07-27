@@ -15,7 +15,7 @@ public class SaveModelPreferencesDto {
     @Pattern(regexp = "^$|^[1-9]\\d*$") @JsonDeserialize(using = StringIdOnlyDeserializer.class)
     private String defaultEmbeddingModelConfigId;
     @Pattern(regexp = "^$|^[1-9]\\d*$") @JsonDeserialize(using = StringIdOnlyDeserializer.class)
-    @Pattern(regexp = "RETRIEVAL|LLM_SELECTOR|RETRIEVAL_THEN_LLM")
+    @Pattern(regexp = "AGENT_DRIVEN|RETRIEVAL|LLM_SELECTOR|RETRIEVAL_THEN_LLM")
     private String defaultStoryBibleRoutingMode;
     @Positive private Integer defaultChunkTargetCharacters;
     @PositiveOrZero private Integer defaultChunkOverlapCharacters;

@@ -8,7 +8,7 @@ import { getErrorMessage } from '@/utils/errors'
 import { saveDownload } from '@/utils/download'
 
 export type ProjectSettingsSection = 'general' | 'ai' | 'index' | 'data' | 'danger'
-export type RoutingMode = 'LLM_SELECTOR' | 'RETRIEVAL' | 'RETRIEVAL_THEN_LLM'
+export type RoutingMode = 'AGENT_DRIVEN' | 'LLM_SELECTOR' | 'RETRIEVAL' | 'RETRIEVAL_THEN_LLM'
 
 export interface ModelOption {
   id: string
@@ -35,6 +35,7 @@ export interface ProjectAiSettings {
   creativeModelConfigId: string
   routerModelConfigId: string
   embeddingModelConfigId: string
+  ragEnabled: boolean
   storyBibleRoutingMode: RoutingMode
 }
 
@@ -93,7 +94,8 @@ export const useProjectSettings = (projectId: string) => {
     creativeModelConfigId: '',
     routerModelConfigId: '',
     embeddingModelConfigId: '',
-    storyBibleRoutingMode: 'LLM_SELECTOR' as RoutingMode,
+    ragEnabled: false,
+    storyBibleRoutingMode: 'AGENT_DRIVEN' as RoutingMode,
   })
 
   const index = reactive<ProjectIndexState>({
@@ -113,12 +115,13 @@ export const useProjectSettings = (projectId: string) => {
     creativeModelConfigId: '',
     routerModelConfigId: '',
     embeddingModelConfigId: '',
-    storyBibleRoutingMode: 'LLM_SELECTOR',
+    ragEnabled: false,
+    storyBibleRoutingMode: 'AGENT_DRIVEN',
   })
   const chatModels = computed(() => modelOptions.value.filter((option) => option.type === 'CHAT'))
   const embeddingModels = computed(() => modelOptions.value.filter((option) => option.type === 'EMBEDDING'))
-  const retrievalAvailable = computed(() => index.status === 'READY')
-  const canRebuildIndex = computed(() => Boolean(ai.embeddingModelConfigId))
+  const retrievalAvailable = computed(() => ai.ragEnabled && index.status === 'READY')
+  const canRebuildIndex = computed(() => ai.ragEnabled && Boolean(ai.embeddingModelConfigId))
   const generalSnapshot = () => ({
     title: project.title,
     summary: project.summary,
@@ -183,12 +186,13 @@ export const useProjectSettings = (projectId: string) => {
       ai.creativeModelConfigId = id(configurationResult.creativeModelConfigId)
       ai.routerModelConfigId = id(configurationResult.routerModelConfigId)
       ai.embeddingModelConfigId = id(configurationResult.embeddingModelConfigId)
+      ai.ragEnabled = configurationResult.ragEnabled === true
       applyIndexState(configurationResult)
       const routing = text(configurationResult.storyBibleRoutingMode)
       ai.storyBibleRoutingMode =
         retrievalAvailable.value && (routing === 'RETRIEVAL' || routing === 'RETRIEVAL_THEN_LLM')
           ? routing
-          : 'LLM_SELECTOR'
+          : routing === 'LLM_SELECTOR' ? 'LLM_SELECTOR' : 'AGENT_DRIVEN'
       modelOptions.value = mapModels(Array.isArray(modelsResult) ? modelsResult : [])
       savedGeneral.value = generalSnapshot()
       savedAi.value = aiSnapshot()
@@ -248,8 +252,11 @@ export const useProjectSettings = (projectId: string) => {
   }
 
   const saveAi = async () => {
-    if (ai.storyBibleRoutingMode !== 'LLM_SELECTOR' && !retrievalAvailable.value) {
-      saveError.value = '当前没有可用索引，只能选择智能筛选'
+    if (
+      (ai.storyBibleRoutingMode === 'RETRIEVAL' || ai.storyBibleRoutingMode === 'RETRIEVAL_THEN_LLM') &&
+      !retrievalAvailable.value
+    ) {
+      saveError.value = '当前没有可用索引，请先主动重建索引'
       return false
     }
     beginSave('ai')
@@ -258,13 +265,15 @@ export const useProjectSettings = (projectId: string) => {
         creativeModelConfigId: ai.creativeModelConfigId || null,
         routerModelConfigId: ai.routerModelConfigId || null,
         embeddingModelConfigId: ai.embeddingModelConfigId || null,
+        ragEnabled: ai.ragEnabled,
         storyBibleRoutingMode: ai.storyBibleRoutingMode,
       })
       applyIndexState(result)
       ai.creativeModelConfigId = id(result.creativeModelConfigId)
       ai.routerModelConfigId = id(result.routerModelConfigId)
       ai.embeddingModelConfigId = id(result.embeddingModelConfigId)
-      ai.storyBibleRoutingMode = (text(result.storyBibleRoutingMode) as RoutingMode) || 'LLM_SELECTOR'
+      ai.ragEnabled = result.ragEnabled === true
+      ai.storyBibleRoutingMode = (text(result.storyBibleRoutingMode) as RoutingMode) || 'AGENT_DRIVEN'
       savedAi.value = aiSnapshot()
       finishSave('AI 与上下文设置已保存')
       return true

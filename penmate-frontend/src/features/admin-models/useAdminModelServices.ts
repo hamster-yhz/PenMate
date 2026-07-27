@@ -18,7 +18,9 @@ const defaultForm = () => ({
   apiKey: '',
   distanceMetric: 'COSINE' as 'COSINE' | 'INNER_PRODUCT' | 'L2',
   embeddingDimensions: undefined as number | undefined,
-  maxContextTokens: 128000,
+  maxContextTokens: undefined as number | undefined,
+  maxOutputTokens: undefined as number | undefined,
+  autoDetectCapacity: true,
   enabled: true,
 })
 
@@ -87,6 +89,8 @@ export const useAdminModelServices = () => {
       distanceMetric: item.distanceMetric || 'COSINE',
       embeddingDimensions: item.embeddingDimensions ?? undefined,
       maxContextTokens: item.maxContextTokens || 128000,
+      maxOutputTokens: item.maxOutputTokens || 8192,
+      autoDetectCapacity: item.contextCapacitySource !== 'MANUAL',
       enabled: item.status !== 'DISABLED',
     })
     formError.value = ''

@@ -62,14 +62,15 @@ class ProjectAiConfigurationServiceTest {
             assertThat(value.getCreativeModelConfigId()).isEqualTo(80L);
             assertThat(value.getEmbeddingModelConfigId()).isEqualTo(81L);
             assertThat(value.getRouterModelConfigId()).isEqualTo(82L);
-            assertThat(value.getStoryBibleRoutingMode()).isEqualTo("LLM_SELECTOR");
+            assertThat(value.getStoryBibleRoutingMode()).isEqualTo("AGENT_DRIVEN");
+            assertThat(value.getRagEnabled()).isFalse();
             assertThat(value.getIndexStatus()).isEqualTo("REINDEX_REQUIRED");
             assertThat(value.getChunkTargetCharacters()).isEqualTo(900);
         });
     }
 
     @Test
-    void initializesWithoutEmbeddingAsLlmSelector() {
+    void initializesWithoutEmbeddingAsAgentDriven() {
         when(ids.nextId()).thenReturn(91L);
         when(repository.insert(any())).thenReturn(1);
 
@@ -77,12 +78,12 @@ class ProjectAiConfigurationServiceTest {
 
         ArgumentCaptor<ProjectAiConfiguration> captor = ArgumentCaptor.forClass(ProjectAiConfiguration.class);
         verify(repository).insert(captor.capture());
-        assertThat(captor.getValue().getStoryBibleRoutingMode()).isEqualTo("LLM_SELECTOR");
+        assertThat(captor.getValue().getStoryBibleRoutingMode()).isEqualTo("AGENT_DRIVEN");
         assertThat(captor.getValue().getIndexStatus()).isEqualTo("UNBOUND");
     }
 
     @Test
-    void embeddingChangeDisablesIndexAndPermanentlySelectsLlmRouting() {
+    void embeddingChange_marks_index_for_user_rebuild_without_changing_routing() {
         owner(11L, 7L);
         ProjectAiConfiguration current = current();
         current.setEmbeddingModelConfigId(81L);
@@ -98,7 +99,7 @@ class ProjectAiConfigurationServiceTest {
 
         ArgumentCaptor<ProjectAiConfiguration> captor = ArgumentCaptor.forClass(ProjectAiConfiguration.class);
         verify(repository).update(captor.capture());
-        assertThat(captor.getValue().getStoryBibleRoutingMode()).isEqualTo("LLM_SELECTOR");
+        assertThat(captor.getValue().getStoryBibleRoutingMode()).isEqualTo("RETRIEVAL");
         assertThat(captor.getValue().getIndexStatus()).isEqualTo("REINDEX_REQUIRED");
         assertThat(captor.getValue().getActiveIndexBuildId()).isNull();
     }
@@ -213,6 +214,7 @@ class ProjectAiConfigurationServiceTest {
         value.setProjectAiConfigId(91L);
         value.setProjectId(11L);
         value.setStoryBibleRoutingMode("LLM_SELECTOR");
+        value.setRagEnabled(true);
         value.setChunkTargetCharacters(800);
         value.setChunkOverlapCharacters(120);
         value.setChunkMaxCharacters(1200);

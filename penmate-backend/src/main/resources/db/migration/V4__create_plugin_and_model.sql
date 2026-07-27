@@ -49,6 +49,10 @@ CREATE TABLE model_configurations (
     embedding_dimensions INTEGER NULL,
     context_window_turns INTEGER NOT NULL DEFAULT 6,
     max_context_tokens INTEGER NOT NULL DEFAULT 128000,
+    max_output_tokens INTEGER NOT NULL DEFAULT 8192,
+    context_capacity_source VARCHAR(16) NOT NULL DEFAULT 'FALLBACK',
+    context_capacity_source_url VARCHAR(500) NULL,
+    context_capacity_verified_at TIMESTAMPTZ(3) NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     last_test_status VARCHAR(16) NULL,
     last_test_latency_ms INTEGER NULL,
@@ -65,6 +69,7 @@ CREATE TABLE model_configurations (
         OR (scope_type = 'USER' AND owner_user_id IS NOT NULL)
     ),
     CONSTRAINT ck_model_configuration_type CHECK (model_type IN ('CHAT', 'EMBEDDING')),
+    CONSTRAINT ck_model_configuration_capacity_source CHECK (context_capacity_source IN ('MANUAL', 'PROVIDER', 'CATALOG', 'FALLBACK')),
     CONSTRAINT ck_model_configuration_test_status CHECK (last_test_status IS NULL OR last_test_status IN ('SUCCESS', 'FAILED')),
     CONSTRAINT ck_model_configuration_metric CHECK (
         (model_type = 'CHAT' AND distance_metric IS NULL)
@@ -127,14 +132,14 @@ CREATE TABLE model_user_preferences (
     default_creative_model_config_id BIGINT NULL,
     default_context_selector_model_config_id BIGINT NULL,
     default_embedding_model_config_id BIGINT NULL,
-    default_story_bible_routing_mode VARCHAR(32) NOT NULL DEFAULT 'LLM_SELECTOR',
+    default_story_bible_routing_mode VARCHAR(32) NOT NULL DEFAULT 'AGENT_DRIVEN',
     default_chunk_target_characters INTEGER NOT NULL DEFAULT 800,
     default_chunk_overlap_characters INTEGER NOT NULL DEFAULT 120,
     default_chunk_max_characters INTEGER NOT NULL DEFAULT 1200,
     created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     CONSTRAINT uk_model_user_preferences_user UNIQUE (user_id),
-    CONSTRAINT ck_model_user_preferences_routing CHECK (default_story_bible_routing_mode IN ('RETRIEVAL', 'LLM_SELECTOR', 'RETRIEVAL_THEN_LLM')),
+    CONSTRAINT ck_model_user_preferences_routing CHECK (default_story_bible_routing_mode IN ('AGENT_DRIVEN', 'RETRIEVAL', 'LLM_SELECTOR', 'RETRIEVAL_THEN_LLM')),
     CONSTRAINT ck_model_user_preferences_chunking CHECK (
         default_chunk_target_characters > 0
         AND default_chunk_overlap_characters >= 0

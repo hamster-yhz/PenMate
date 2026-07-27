@@ -23,6 +23,10 @@ public class ModelConfiguration {
     private Integer embeddingDimensions;
     private Integer contextWindowTurns;
     private Integer maxContextTokens;
+    private Integer maxOutputTokens;
+    private String contextCapacitySource;
+    private String contextCapacitySourceUrl;
+    private Instant contextCapacityVerifiedAt;
     private String maskedApiKey;
     private String credentialStatus;
     private String status;

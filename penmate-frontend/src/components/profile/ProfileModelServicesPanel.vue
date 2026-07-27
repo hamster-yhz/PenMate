@@ -18,7 +18,7 @@
     <div v-else class="model-list" role="table" aria-label="个人模型列表">
       <div class="model-row model-header" role="row"><span>模型</span><span>服务商</span><span>密钥</span><span>连接测试</span><span></span></div>
       <div v-for="item in filteredConfigurations" :key="item.modelConfigId" class="model-row" role="row">
-        <div class="model-identity"><strong>{{ item.displayName || item.modelName }}</strong><small>{{ item.modelName }}</small></div>
+        <div class="model-identity"><strong>{{ item.displayName || item.modelName }}</strong><small>{{ item.modelName }}</small><small v-if="item.modelType === 'CHAT'">{{ capacityLabel(item) }}</small></div>
         <span>{{ item.providerName || item.providerCode || '未知' }}</span>
         <code>{{ item.maskedApiKey || (item.credentialConfigured ? '已配置' : '无需密钥') }}</code>
         <div class="test-state" :class="item.lastTestStatus?.toLowerCase()">
@@ -49,7 +49,11 @@
             <label><span>向量维度</span><input v-model.number="form.embeddingDimensions" type="number" min="1" max="4000" placeholder="可在保存后测试获取" /></label>
           </template>
           <template v-else>
-            <label><span>最大上下文 Token</span><input v-model.number="form.maxContextTokens" type="number" min="1" /></label>
+            <label class="switch-line"><span>自动识别模型容量<small>已知模型按能力目录填写，无法识别时使用未验证回退值。</small></span><input v-model="form.autoDetectCapacity" type="checkbox" role="switch" @change="initializeManualCapacity" /></label>
+            <template v-if="!form.autoDetectCapacity">
+              <label><span>最大上下文 Token</span><input v-model.number="form.maxContextTokens" type="number" min="1" required /></label>
+              <label><span>预留输出 Token</span><input v-model.number="form.maxOutputTokens" type="number" min="1" required /></label>
+            </template>
           </template>
           <label v-if="editingId" class="switch-line"><span>启用模型</span><input v-model="form.enabled" type="checkbox" role="switch" /></label>
           <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
@@ -111,6 +115,16 @@ const testConnection = async (item: ModelConfigurationItem) => {
   } catch (cause) { message.error(cause instanceof Error ? cause.message : '连接测试失败') }
 }
 const testLabel = (item: ModelConfigurationItem) => item.lastTestStatus === 'SUCCESS' ? `成功 · ${item.lastTestLatencyMs ?? 0} ms` : item.lastTestStatus === 'FAILED' ? '失败' : '尚未测试'
+const initializeManualCapacity = () => {
+  if (!form.autoDetectCapacity) {
+    form.maxContextTokens ||= 128000
+    form.maxOutputTokens ||= 8192
+  }
+}
+const capacityLabel = (item: ModelConfigurationItem) => {
+  const source = { MANUAL: '手工', PROVIDER: '供应商', CATALOG: '能力目录', FALLBACK: '未验证' }[item.contextCapacitySource || 'FALLBACK']
+  return `${Number(item.maxContextTokens || 0).toLocaleString()} Token · ${source}`
+}
 const formatTime = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 </script>
 

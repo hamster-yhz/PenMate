@@ -20,7 +20,9 @@ public interface ModelMapper {
                    p.auth_type AS provider_auth_type, cap.protocol_code,
                    mc.display_name, mc.model_type, mc.model_name, mc.base_url, mc.distance_metric,
                    mc.embedding_dimensions,
-                   mc.context_window_turns, mc.max_context_tokens,
+                   mc.context_window_turns, mc.max_context_tokens, mc.max_output_tokens,
+                   mc.context_capacity_source, mc.context_capacity_source_url,
+                   mc.context_capacity_verified_at,
                    COALESCE(uak.masked_api_key, oak.masked_api_key) AS masked_api_key,
                    COALESCE(uak.status, oak.status,
                             CASE WHEN p.auth_type = 'NONE' THEN 'ACTIVE' ELSE NULL END) AS credential_status,
@@ -120,11 +122,13 @@ public interface ModelMapper {
             INSERT INTO model_configurations(
                 model_config_id, scope_type, owner_user_id, provider_id, display_name,
                 model_type, model_name, base_url, distance_metric, embedding_dimensions, context_window_turns,
-                max_context_tokens, status, created_by, updated_by
+                max_context_tokens, max_output_tokens, context_capacity_source,
+                context_capacity_source_url, context_capacity_verified_at, status, created_by, updated_by
             ) VALUES (
                 #{modelConfigId}, #{scopeType}, #{ownerUserId}, #{providerId}, #{displayName},
                 #{modelType}, #{modelName}, #{baseUrl}, #{distanceMetric}, #{embeddingDimensions}, #{contextWindowTurns},
-                #{maxContextTokens}, #{status}, #{createdBy}, #{updatedBy}
+                #{maxContextTokens}, COALESCE(#{maxOutputTokens}, 8192), COALESCE(#{contextCapacitySource}, 'FALLBACK'),
+                #{contextCapacitySourceUrl}, #{contextCapacityVerifiedAt}, #{status}, #{createdBy}, #{updatedBy}
             )
             """)
     int insertConfiguration(ModelConfiguration configuration);
@@ -135,6 +139,10 @@ public interface ModelMapper {
                 base_url = #{baseUrl}, distance_metric = #{distanceMetric},
                 embedding_dimensions = #{embeddingDimensions},
                 context_window_turns = #{contextWindowTurns}, max_context_tokens = #{maxContextTokens},
+                max_output_tokens = COALESCE(#{maxOutputTokens}, 8192),
+                context_capacity_source = COALESCE(#{contextCapacitySource}, context_capacity_source),
+                context_capacity_source_url = #{contextCapacitySourceUrl},
+                context_capacity_verified_at = #{contextCapacityVerifiedAt},
                 status = #{status}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP(3)
             WHERE model_config_id = #{modelConfigId} AND scope_type = #{scopeType}
               AND (#{scopeType} = 'SYSTEM' OR owner_user_id = #{ownerUserId}) AND deleted_at IS NULL
@@ -256,7 +264,7 @@ public interface ModelMapper {
 
     @Update("""
             UPDATE project_ai_configurations
-            SET story_bible_routing_mode = 'LLM_SELECTOR', index_status = 'REINDEX_REQUIRED',
+            SET story_bible_routing_mode = 'AGENT_DRIVEN', index_status = 'REINDEX_REQUIRED',
                 active_index_build_id = NULL, last_error_code = 'EMBEDDING_CONFIG_CHANGED',
                 last_error_message = #{reason}, updated_at = CURRENT_TIMESTAMP(3)
             WHERE embedding_model_config_id = #{modelConfigId}
@@ -268,7 +276,7 @@ public interface ModelMapper {
             UPDATE project_ai_configurations
             SET embedding_model_config_id = CASE WHEN embedding_model_config_id = #{modelConfigId} THEN NULL ELSE embedding_model_config_id END,
                 router_model_config_id = CASE WHEN router_model_config_id = #{modelConfigId} THEN NULL ELSE router_model_config_id END,
-                story_bible_routing_mode = 'LLM_SELECTOR', index_status = 'UNBOUND',
+                story_bible_routing_mode = 'AGENT_DRIVEN', index_status = 'UNBOUND',
                 active_index_build_id = NULL, last_error_code = NULL, last_error_message = NULL,
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE embedding_model_config_id = #{modelConfigId}
@@ -281,7 +289,7 @@ public interface ModelMapper {
             SET default_creative_model_config_id = CASE WHEN default_creative_model_config_id = #{modelConfigId} THEN NULL ELSE default_creative_model_config_id END,
                 default_context_selector_model_config_id = CASE WHEN default_context_selector_model_config_id = #{modelConfigId} THEN NULL ELSE default_context_selector_model_config_id END,
                 default_embedding_model_config_id = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN NULL ELSE default_embedding_model_config_id END,
-                default_story_bible_routing_mode = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN 'LLM_SELECTOR' ELSE default_story_bible_routing_mode END,
+                default_story_bible_routing_mode = CASE WHEN default_embedding_model_config_id = #{modelConfigId} THEN 'AGENT_DRIVEN' ELSE default_story_bible_routing_mode END,
                 updated_at = CURRENT_TIMESTAMP(3)
             WHERE default_creative_model_config_id = #{modelConfigId}
                OR default_context_selector_model_config_id = #{modelConfigId}

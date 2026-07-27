@@ -6,6 +6,10 @@
     </header>
     <dl class="status-list">
       <div>
+        <dt>RAG</dt>
+        <dd>{{ ai.ragEnabled ? '已开启' : '已关闭' }}</dd>
+      </div>
+      <div>
         <dt>当前状态</dt>
         <dd>
           <span class="status-badge" :class="index.status.toLowerCase()">{{ indexStatusLabel }}</span>

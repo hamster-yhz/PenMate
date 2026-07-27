@@ -22,6 +22,8 @@ public class UpdateModelConfigurationDto {
     private String apiKey;
     @PositiveOrZero private Integer contextWindowTurns;
     @Positive private Integer maxContextTokens;
+    @Positive private Integer maxOutputTokens;
+    private Boolean autoDetectCapacity;
     @Pattern(regexp = "ACTIVE|DISABLED") private String status;
 
     public void setEmbeddingDimensions(Integer embeddingDimensions) {

@@ -105,8 +105,6 @@ public class RagIndexingService {
                 if (context != null) context.heartbeat(completed, allChunks.size(), "Embedding project sources");
             }
             if (context != null && context.cancellationRequested()) throw new AsyncJobExecutionContext.JobCancelledException();
-            ensureSnapshotCurrent(projectId, sourceSnapshot);
-            if (context != null && context.cancellationRequested()) throw new AsyncJobExecutionContext.JobCancelledException();
             indexes.activateBuild(projectId, buildId, prepared.size(), allChunks.size());
             for (PreparedSource source : prepared) {
                 if ("KNOWLEDGE_DOCUMENT".equals(source.source().sourceType())) {
@@ -165,6 +163,48 @@ public class RagIndexingService {
         if (latest == null || !Objects.equals(latest.sourceRevision(), source.sourceRevision())) return;
         indexes.activateSource(configuration.getActiveIndexBuildId(), source.sourceType(), source.sourceId(), sourceIndexId);
         documents.updateProcessingState(projectId, documentId, "DONE", "DONE", null, null);
+    }
+
+    public boolean indexSource(Long projectId, Long ownerUserId, String sourceType, Long sourceId,
+                               String expectedRevision, AsyncJobExecutionContext context) {
+        RagSourceContent source = sourceCatalog.findSource(projectId, sourceType, sourceId);
+        if (source == null || !Objects.equals(source.sourceRevision(), expectedRevision)) return false;
+        ProjectAiConfiguration configuration = requireBoundConfiguration(projectId);
+        if (configuration.getActiveIndexBuildId() == null || !"READY".equals(configuration.getIndexStatus())) return false;
+        var model = routing.resolve(ownerUserId, configuration.getEmbeddingModelConfigId());
+        RagEmbeddingSpace space = indexes.findActiveSpaceForProject(projectId);
+        if (space == null) return false;
+
+        PreparedSource prepared = prepareSource(source, configuration);
+        if (prepared.chunks().isEmpty()) {
+            indexes.removeSource(projectId, sourceType, sourceId);
+            RagSourceContent latestEmpty = sourceCatalog.findSource(projectId, sourceType, sourceId);
+            return latestEmpty == null || Objects.equals(expectedRevision, latestEmpty.sourceRevision());
+        }
+        Long buildId = configuration.getActiveIndexBuildId();
+        if (indexes.isSourceRevisionActive(buildId, sourceType, sourceId, expectedRevision)) return true;
+        Long sourceIndexId = prepared.sourceIndexId();
+        indexes.resetStagedSource(buildId, sourceType, sourceId, source.sourceRevision());
+        indexes.insertSource(sourceIndexId, buildId, projectId, sourceType, sourceId,
+                source.sourceRevision(), source.title(), prepared.checksum(),
+                prepared.characterCount(), prepared.chunks().size());
+        indexes.insertChunks(sourceIndexId, buildId, projectId, space.embeddingSpaceId(), sourceType, sourceId,
+                prepared.chunks().stream().map(PreparedChunk::write).toList());
+        int completed = 0;
+        for (Batch batch : batches(prepared.chunks())) {
+            List<float[]> vectors = embed(model, batch);
+            validateDimension(vectors, space.embeddingDimension());
+            indexes.insertVectors(space, buildId, projectId, vectorWrites(batch, vectors));
+            completed += batch.chunks().size();
+            if (context != null) context.heartbeat(completed, prepared.chunks().size(), "Embedding source");
+        }
+        RagSourceContent latest = sourceCatalog.findSource(projectId, sourceType, sourceId);
+        if (latest == null || !Objects.equals(latest.sourceRevision(), expectedRevision)) return false;
+        ProjectAiConfiguration latestConfiguration = configurations.findByProjectId(projectId);
+        if (latestConfiguration == null || !Boolean.TRUE.equals(latestConfiguration.getRagEnabled())
+                || !Objects.equals(buildId, latestConfiguration.getActiveIndexBuildId())) return false;
+        indexes.activateSource(buildId, sourceType, sourceId, sourceIndexId);
+        return true;
     }
 
     public void deleteKnowledgeDocument(Long projectId, Long documentId) {
@@ -283,8 +323,9 @@ public class RagIndexingService {
 
     private ProjectAiConfiguration requireBoundConfiguration(Long projectId) {
         ProjectAiConfiguration configuration = configurations.findByProjectId(projectId);
-        if (configuration == null) {
-            throw BusinessException.of("Project has no Embedding model configuration");
+        if (configuration == null || !Boolean.TRUE.equals(configuration.getRagEnabled())
+                || configuration.getEmbeddingModelConfigId() == null) {
+            throw BusinessException.of("Project RAG is disabled or has no Embedding model configuration");
         }
         return configuration;
     }

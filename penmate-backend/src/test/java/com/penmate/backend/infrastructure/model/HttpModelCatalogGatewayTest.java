@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,7 +31,9 @@ class HttpModelCatalogGatewayTest {
             String apiKey = exchange.getRequestHeaders().getFirst("x-api-key");
             assertThat("Bearer secret".equals(bearer) || "secret".equals(apiKey)).isTrue();
             if (apiKey != null) assertThat(exchange.getRequestHeaders().getFirst("anthropic-version")).isEqualTo("2023-06-01");
-            byte[] body = "{\"data\":[{\"id\":\"gpt-5\"},{\"id\":\"gpt-5\"},{\"id\":\"gpt-4.1\"}]}".getBytes(StandardCharsets.UTF_8);
+            byte[] body = ("{\"data\":[{\"id\":\"gpt-5\",\"context_length\":1050000,"
+                    + "\"top_provider\":{\"max_completion_tokens\":128000}},"
+                    + "{\"id\":\"gpt-5\"},{\"id\":\"gpt-4.1\"}]}").getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, body.length);
             exchange.getResponseBody().write(body);
             exchange.close();
@@ -67,6 +70,24 @@ class HttpModelCatalogGatewayTest {
                 baseUrl.replace("/v1", ""), "secret", "claude", "API_KEY", true));
 
         assertThat(models).contains("gpt-5");
+    }
+
+    @Test
+    void readsProviderReportedCapacityForTheSelectedModel() {
+        ModelEndpointPolicy policy = (url, system) -> url;
+        HttpModelCatalogGateway gateway = new HttpModelCatalogGateway(new ObjectMapper(), policy,
+                HttpClient.newHttpClient(), Duration.ofSeconds(3));
+
+        Optional<ModelCatalogGateway.ModelCapacity> capacity = gateway.probeCapacity(
+                new ModelCatalogGateway.DiscoveryRequest(
+                        baseUrl, "secret", "openrouter", "API_KEY", false), "gpt-5");
+
+        assertThat(capacity).hasValueSatisfying(value -> {
+            assertThat(value.maxContextTokens()).isEqualTo(1_050_000);
+            assertThat(value.maxOutputTokens()).isEqualTo(128_000);
+            assertThat(value.sourceUrl()).endsWith("/v1/models");
+            assertThat(value.verifiedAt()).isNotNull();
+        });
     }
 
     @Test

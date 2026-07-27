@@ -53,7 +53,8 @@ public class RagController {
                 optionalId(dto.getCreativeModelConfigId()), optionalId(dto.getEmbeddingModelConfigId()), dto.getStoryBibleRoutingMode(),
                 optionalId(dto.getRouterModelConfigId()), dto.getChunkTargetCharacters(),
                 dto.getChunkOverlapCharacters(), dto.getChunkMaxCharacters(), dto.getRetrievalCandidates(),
-                dto.getRetrievalTopK(), dto.getRetrievalMaxPerSource(), dto.getHnswEfSearch(), dto.getSimilarityThreshold());
+                dto.getRetrievalTopK(), dto.getRetrievalMaxPerSource(), dto.getHnswEfSearch(), dto.getSimilarityThreshold(),
+                dto.getRagEnabled());
         ProjectAiConfiguration configuration = configurations.update(id(projectId), actor(authentication), request);
         return ApiResponse.success(configurationView(configuration, configurations.rebuildState(configuration)), traceId);
     }
@@ -174,6 +175,7 @@ public class RagController {
         result.put("projectId", string(value.getProjectId()));
         result.put("creativeModelConfigId", string(value.getCreativeModelConfigId()));
         result.put("embeddingModelConfigId", string(value.getEmbeddingModelConfigId()));
+        result.put("ragEnabled", Boolean.TRUE.equals(value.getRagEnabled()));
         result.put("storyBibleRoutingMode", value.getStoryBibleRoutingMode());
         result.put("routerModelConfigId", string(value.getRouterModelConfigId()));
         result.put("chunkTargetCharacters", value.getChunkTargetCharacters());

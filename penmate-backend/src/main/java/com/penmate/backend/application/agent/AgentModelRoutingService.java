@@ -53,6 +53,8 @@ public class AgentModelRoutingService {
                 .modelName(config.getModelName())
                 .keySource("MODEL_CONFIG")
                 .contextWindowTurns(config.getContextWindowTurns() == null ? 6 : config.getContextWindowTurns())
+                .maxContextTokens(config.getMaxContextTokens())
+                .maxOutputTokens(config.getMaxOutputTokens())
                 .protocolCode(config.getProtocolCode())
                 .build();
     }

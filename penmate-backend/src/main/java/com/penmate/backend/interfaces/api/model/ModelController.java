@@ -255,14 +255,15 @@ public class ModelController {
         return new ModelCommands.CreateConfigurationCommand(id(dto.getProviderId(), "providerId"), dto.getDisplayName(),
                 dto.getModelType(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(),
                 dto.getEmbeddingDimensions(), dto.getApiKey(),
-                dto.getContextWindowTurns(), dto.getMaxContextTokens());
+                dto.getContextWindowTurns(), dto.getMaxContextTokens(), dto.getMaxOutputTokens(),
+                dto.getAutoDetectCapacity());
     }
 
     private ModelCommands.UpdateConfigurationCommand updateCommand(UpdateModelConfigurationDto dto) {
         return new ModelCommands.UpdateConfigurationCommand(optionalId(dto.getProviderId(), "providerId"),
                 dto.getDisplayName(), dto.getModelName(), dto.getBaseUrl(), dto.getDistanceMetric(),
                 dto.getEmbeddingDimensions(), dto.isEmbeddingDimensionsSet(), dto.getApiKey(), dto.getContextWindowTurns(),
-                dto.getMaxContextTokens(), dto.getStatus());
+                dto.getMaxContextTokens(), dto.getMaxOutputTokens(), dto.getAutoDetectCapacity(), dto.getStatus());
     }
 
     private ModelCommands.ProbeEmbeddingDimensionCommand probeCommand(ProbeEmbeddingDimensionDto dto) {
@@ -319,6 +320,13 @@ public class ModelController {
         result.put("embeddingDimensions", configuration.getEmbeddingDimensions());
         result.put("contextWindowTurns", configuration.getContextWindowTurns());
         result.put("maxContextTokens", configuration.getMaxContextTokens());
+        result.put("maxOutputTokens", configuration.getMaxOutputTokens());
+        result.put("contextCapacitySource", configuration.getContextCapacitySource());
+        result.put("contextCapacitySourceUrl", configuration.getContextCapacitySourceUrl());
+        result.put("contextCapacityVerifiedAt", configuration.getContextCapacityVerifiedAt());
+        result.put("contextCapacitySource", configuration.getContextCapacitySource());
+        result.put("contextCapacitySourceUrl", configuration.getContextCapacitySourceUrl());
+        result.put("contextCapacityVerifiedAt", configuration.getContextCapacityVerifiedAt());
         result.put("maskedApiKey", configuration.getMaskedApiKey());
         result.put("credentialConfigured", configuration.getMaskedApiKey() != null
                 || "NONE".equalsIgnoreCase(configuration.getProviderAuthType()));

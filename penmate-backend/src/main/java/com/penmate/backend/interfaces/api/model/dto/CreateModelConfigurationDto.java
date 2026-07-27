@@ -24,4 +24,6 @@ public class CreateModelConfigurationDto {
     private String apiKey;
     @PositiveOrZero private Integer contextWindowTurns;
     @Positive private Integer maxContextTokens;
+    @Positive private Integer maxOutputTokens;
+    private Boolean autoDetectCapacity;
 }

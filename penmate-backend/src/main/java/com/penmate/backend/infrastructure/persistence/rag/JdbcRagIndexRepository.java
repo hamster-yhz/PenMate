@@ -128,6 +128,16 @@ public class JdbcRagIndexRepository implements RagIndexRepository {
     }
 
     @Override
+    public boolean isSourceRevisionActive(Long buildId, String sourceType, Long sourceId, String revision) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM rag_index_sources
+                WHERE index_build_id = ? AND source_type = ? AND source_id = ?
+                  AND source_revision = ? AND active = TRUE AND source_status = 'ACTIVE'
+                """, Integer.class, buildId, sourceType, sourceId, revision);
+        return count != null && count > 0;
+    }
+
+    @Override
     public void insertChunks(Long sourceIndexId, Long buildId, Long projectId, Long embeddingSpaceId,
                              String sourceType, Long sourceId, List<ChunkWrite> chunks) {
         for (ChunkWrite chunk : chunks) {

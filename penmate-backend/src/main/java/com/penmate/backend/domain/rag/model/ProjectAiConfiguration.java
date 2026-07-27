@@ -11,6 +11,7 @@ public class ProjectAiConfiguration {
     private Long projectId;
     private Long creativeModelConfigId;
     private Long embeddingModelConfigId;
+    private Boolean ragEnabled;
     private String storyBibleRoutingMode;
     private Long routerModelConfigId;
     private Integer chunkTargetCharacters;

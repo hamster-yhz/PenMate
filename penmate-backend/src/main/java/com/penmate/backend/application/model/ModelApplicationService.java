@@ -11,6 +11,7 @@ import com.penmate.backend.domain.model.model.ModelProvider;
 import com.penmate.backend.domain.model.model.ModelProviderCapability;
 import com.penmate.backend.domain.model.model.ModelUserPreferences;
 import com.penmate.backend.domain.model.repository.ModelRepository;
+import com.penmate.backend.domain.model.service.ModelCatalogGateway;
 import com.penmate.backend.domain.model.service.ModelEndpointPolicy;
 import com.penmate.backend.domain.rag.service.EmbeddingDimensionProbeGateway;
 import com.penmate.backend.domain.shared.service.BusinessIdGenerator;
@@ -30,13 +31,15 @@ import java.util.Objects;
 public class ModelApplicationService {
 
     private static final int DEFAULT_CONTEXT_WINDOW_TURNS = 6;
-    private static final int DEFAULT_MAX_CONTEXT_TOKENS = 128000;
+    private static final int DEFAULT_MAX_CONTEXT_TOKENS = ModelCapabilityCatalogService.FALLBACK_CONTEXT_TOKENS;
 
     private final ModelRepository repository;
     private final BusinessIdGenerator idGenerator;
     private final SecretCryptoService secretCryptoService;
     private final ModelEndpointPolicy modelEndpointPolicy;
     private final EmbeddingDimensionProbeGateway embeddingDimensionProbeGateway;
+    private final ModelCapabilityCatalogService capabilityCatalog;
+    private final ModelCatalogGateway modelCatalogGateway;
 
     public List<ProviderView> listProviders() {
         return repository.listProviders().stream()
@@ -120,7 +123,14 @@ public class ModelApplicationService {
         configuration.setDistanceMetric(normalizeMetric(modelType, command.distanceMetric()));
         configuration.setEmbeddingDimensions(normalizeEmbeddingDimensions(modelType, command.embeddingDimensions()));
         configuration.setContextWindowTurns(normalizeContextTurns(command.contextWindowTurns()));
-        configuration.setMaxContextTokens(normalizeMaxTokens(command.maxContextTokens()));
+        ModelCapabilityCatalogService.Resolution capacity = resolveCapacity(provider, configuration.getModelName(),
+                configuration.getBaseUrl(), command.apiKey(), systemScope, modelType,
+                command.maxContextTokens(), command.maxOutputTokens());
+        configuration.setMaxContextTokens(capacity.maxContextTokens());
+        configuration.setMaxOutputTokens(capacity.maxOutputTokens());
+        configuration.setContextCapacitySource(capacity.source());
+        configuration.setContextCapacitySourceUrl(capacity.sourceUrl());
+        configuration.setContextCapacityVerifiedAt(capacity.verifiedAt());
         configuration.setStatus("ACTIVE");
         configuration.setCreatedBy(actor);
         configuration.setUpdatedBy(actor);
@@ -223,8 +233,8 @@ public class ModelApplicationService {
         preferences.setDefaultContextSelectorModelConfigId(command.defaultContextSelectorModelConfigId());
         preferences.setDefaultEmbeddingModelConfigId(command.defaultEmbeddingModelConfigId());
         String routing = normalizeRoutingMode(command.defaultStoryBibleRoutingMode());
-        if (command.defaultEmbeddingModelConfigId() == null && !"LLM_SELECTOR".equals(routing)) {
-            throw BusinessException.of("Projects without an Embedding model must default to LLM_SELECTOR");
+        if (command.defaultEmbeddingModelConfigId() == null && requiresEmbedding(routing)) {
+            throw BusinessException.of("Retrieval routing requires an Embedding model");
         }
         preferences.setDefaultStoryBibleRoutingMode(routing);
         int target = valueOrDefault(command.defaultChunkTargetCharacters(), 800);
@@ -248,6 +258,11 @@ public class ModelApplicationService {
         merged.setScopeType(existing.getScopeType());
         merged.setOwnerUserId(existing.getOwnerUserId());
         merged.setProviderId(providerId);
+        boolean modelIdentityChanged = !Objects.equals(providerId, existing.getProviderId())
+                || (command.modelName() != null && !Objects.equals(
+                existing.getModelName(), command.modelName().trim()))
+                || (command.baseUrl() != null && !Objects.equals(
+                normalized(existing.getBaseUrl()), normalized(command.baseUrl())));
         merged.setDisplayName(command.displayName() == null
                 ? existing.getDisplayName() : requireText(command.displayName(), "displayName"));
         merged.setModelType(existing.getModelType());
@@ -267,8 +282,37 @@ public class ModelApplicationService {
                 : null);
         merged.setContextWindowTurns(command.contextWindowTurns() == null
                 ? existing.getContextWindowTurns() : normalizeContextTurns(command.contextWindowTurns()));
-        merged.setMaxContextTokens(command.maxContextTokens() == null
-                ? existing.getMaxContextTokens() : normalizeMaxTokens(command.maxContextTokens()));
+        boolean autoDetectCapacity = Boolean.TRUE.equals(command.autoDetectCapacity());
+        boolean manualCapacity = !autoDetectCapacity && (command.maxContextTokens() != null
+                || "MANUAL".equalsIgnoreCase(existing.getContextCapacitySource()));
+        String capacityApiKey = capacityProbeApiKey(provider, existing, providerId, command.apiKey());
+        if (command.maxContextTokens() != null && !autoDetectCapacity) {
+            ModelCapabilityCatalogService.Resolution capacity = resolveCapacity(provider, merged.getModelName(),
+                    merged.getBaseUrl(), capacityApiKey, "SYSTEM".equals(existing.getScopeType()), existing.getModelType(),
+                    command.maxContextTokens(), command.maxOutputTokens());
+            merged.setMaxContextTokens(capacity.maxContextTokens());
+            merged.setMaxOutputTokens(capacity.maxOutputTokens());
+            merged.setContextCapacitySource(capacity.source());
+            merged.setContextCapacitySourceUrl(capacity.sourceUrl());
+            merged.setContextCapacityVerifiedAt(capacity.verifiedAt());
+        } else if (autoDetectCapacity || (modelIdentityChanged && !manualCapacity)) {
+            ModelCapabilityCatalogService.Resolution capacity = resolveCapacity(provider, merged.getModelName(),
+                    merged.getBaseUrl(), capacityApiKey, "SYSTEM".equals(existing.getScopeType()), existing.getModelType(),
+                    null, command.maxOutputTokens());
+            merged.setMaxContextTokens(capacity.maxContextTokens());
+            merged.setMaxOutputTokens(capacity.maxOutputTokens());
+            merged.setContextCapacitySource(capacity.source());
+            merged.setContextCapacitySourceUrl(capacity.sourceUrl());
+            merged.setContextCapacityVerifiedAt(capacity.verifiedAt());
+        } else {
+            merged.setMaxContextTokens(existing.getMaxContextTokens());
+            merged.setMaxOutputTokens(command.maxOutputTokens() == null
+                    ? normalizeMaxOutputTokens(existing.getMaxOutputTokens())
+                    : normalizeMaxOutputTokens(command.maxOutputTokens()));
+            merged.setContextCapacitySource(existing.getContextCapacitySource());
+            merged.setContextCapacitySourceUrl(existing.getContextCapacitySourceUrl());
+            merged.setContextCapacityVerifiedAt(existing.getContextCapacityVerifiedAt());
+        }
         merged.setStatus(command.status() == null ? existing.getStatus() : normalizeStatus(command.status()));
         merged.setCreatedBy(existing.getCreatedBy());
         merged.setUpdatedBy(actor);
@@ -303,6 +347,18 @@ public class ModelApplicationService {
         String value = secretCryptoService.decrypt(credential.getEncryptedApiKey());
         if (value == null || value.isBlank()) throw BusinessException.of("Model credential cannot be decrypted");
         return value;
+    }
+
+    private String capacityProbeApiKey(ModelProvider provider, ModelConfiguration existing,
+                                       Long providerId, String suppliedApiKey) {
+        if ("NONE".equalsIgnoreCase(provider.getAuthType())) return "";
+        if (suppliedApiKey != null && !suppliedApiKey.isBlank()) return suppliedApiKey.trim();
+        if (existing == null || !Objects.equals(existing.getProviderId(), providerId)) return "";
+        try {
+            return decryptCredential(repository.findCredential(existing));
+        } catch (RuntimeException exception) {
+            return "";
+        }
     }
 
     private String validateEndpoint(String baseUrl, boolean systemScope) {
@@ -416,11 +472,15 @@ public class ModelApplicationService {
     }
 
     private String normalizeRoutingMode(String value) {
-        String mode = value == null || value.isBlank() ? "LLM_SELECTOR" : value.trim().toUpperCase(Locale.ROOT);
-        if (!List.of("RETRIEVAL", "LLM_SELECTOR", "RETRIEVAL_THEN_LLM").contains(mode)) {
+        String mode = value == null || value.isBlank() ? "AGENT_DRIVEN" : value.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("AGENT_DRIVEN", "RETRIEVAL", "LLM_SELECTOR", "RETRIEVAL_THEN_LLM").contains(mode)) {
             throw BusinessException.of("Unsupported Story Bible routing mode");
         }
         return mode;
+    }
+
+    private boolean requiresEmbedding(String mode) {
+        return "RETRIEVAL".equals(mode) || "RETRIEVAL_THEN_LLM".equals(mode);
     }
 
     private String normalizeStatus(String value) {
@@ -441,6 +501,52 @@ public class ModelApplicationService {
         return result;
     }
 
+    private ModelCapabilityCatalogService.Resolution resolveCapacity(ModelProvider provider, String modelName,
+                                                                     String baseUrl, String apiKey,
+                                                                     boolean systemScope, String modelType,
+                                                                     Integer requestedContext, Integer requestedOutput) {
+        String providerCode = provider == null ? null : provider.getCode();
+        if (requestedContext != null) {
+            if (capabilityCatalog != null) {
+                return capabilityCatalog.resolveForSave(providerCode, modelName, requestedContext, requestedOutput);
+            }
+            int context = normalizeMaxTokens(requestedContext);
+            int output = normalizeMaxOutputTokens(requestedOutput);
+            return new ModelCapabilityCatalogService.Resolution(context, output, "MANUAL", null, null);
+        }
+        if ("CHAT".equals(modelType) && modelCatalogGateway != null && provider != null
+                && ("NONE".equalsIgnoreCase(provider.getAuthType()) || (apiKey != null && !apiKey.isBlank()))) {
+            try {
+                var probed = modelCatalogGateway.probeCapacity(new ModelCatalogGateway.DiscoveryRequest(
+                        baseUrl, apiKey, providerCode, provider.getAuthType(), systemScope), modelName);
+                if (probed.isPresent()) {
+                    ModelCatalogGateway.ModelCapacity capacity = probed.get();
+                    int output = requestedOutput != null ? normalizeMaxOutputTokens(requestedOutput)
+                            : capacity.maxOutputTokens() != null ? capacity.maxOutputTokens()
+                            : capabilityCatalog == null
+                                ? ModelCapabilityCatalogService.FALLBACK_OUTPUT_TOKENS
+                                : capabilityCatalog.resolveForSave(providerCode, modelName, null, null).maxOutputTokens();
+                    return new ModelCapabilityCatalogService.Resolution(capacity.maxContextTokens(), output,
+                            "PROVIDER", capacity.sourceUrl(), capacity.verifiedAt());
+                }
+            } catch (RuntimeException ignored) {
+                // Capability probing is best effort; model configuration saving must still work.
+            }
+        }
+        if (capabilityCatalog != null) {
+            return capabilityCatalog.resolveForSave(providerCode, modelName, null, requestedOutput);
+        }
+        int context = normalizeMaxTokens(requestedContext);
+        int output = normalizeMaxOutputTokens(requestedOutput);
+        return new ModelCapabilityCatalogService.Resolution(context, output, "FALLBACK", null, null);
+    }
+
+    private int normalizeMaxOutputTokens(Integer value) {
+        int result = value == null ? 8_192 : value;
+        if (result <= 0) throw BusinessException.of("maxOutputTokens must be positive");
+        return result;
+    }
+
     private void validateChunking(int target, int overlap, int max) {
         if (target <= 0 || overlap < 0 || overlap >= target || max < target) {
             throw BusinessException.of("Invalid chunk target, overlap, or maximum");
@@ -450,7 +556,7 @@ public class ModelApplicationService {
     private ModelUserPreferences defaultPreferences(Long userId) {
         ModelUserPreferences result = new ModelUserPreferences();
         result.setUserId(userId);
-        result.setDefaultStoryBibleRoutingMode("LLM_SELECTOR");
+        result.setDefaultStoryBibleRoutingMode("AGENT_DRIVEN");
         result.setDefaultChunkTargetCharacters(800);
         result.setDefaultChunkOverlapCharacters(120);
         result.setDefaultChunkMaxCharacters(1200);

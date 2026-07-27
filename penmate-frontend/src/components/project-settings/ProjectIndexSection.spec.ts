@@ -7,6 +7,7 @@ const props = {
     creativeModelConfigId: '',
     routerModelConfigId: '',
     embeddingModelConfigId: '13',
+    ragEnabled: true,
     storyBibleRoutingMode: 'LLM_SELECTOR' as const,
   },
   index: {

@@ -5,7 +5,11 @@ import com.penmate.backend.domain.rag.repository.RagSourceCatalogRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 
 @Repository
@@ -56,8 +60,36 @@ public class JdbcRagSourceCatalogRepository implements RagSourceCatalogRepositor
         return values.isEmpty() ? null : values.getFirst();
     }
 
+    @Override
+    public RagSourceContent findSource(Long projectId, String sourceType, Long sourceId) {
+        return listProjectSources(projectId).stream()
+                .filter(source -> source.sourceType().equals(sourceType) && source.sourceId().equals(sourceId))
+                .findFirst()
+                .orElse(null);
+    }
+
     private RagSourceContent row(java.sql.ResultSet rs) throws java.sql.SQLException {
-        return new RagSourceContent(rs.getString(1), rs.getLong(2), rs.getString(3), rs.getString(4),
-                rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8));
+        String sourceType = rs.getString(1);
+        String rawRevision = rs.getString(3);
+        String title = rs.getString(4);
+        String inlineContent = rs.getString(5);
+        String revision = "KNOWLEDGE_DOCUMENT".equals(sourceType)
+                ? rawRevision
+                : sha256(String.join("\u001f", sourceType, value(title), value(inlineContent)));
+        return new RagSourceContent(sourceType, rs.getLong(2), revision, title,
+                inlineContent, rs.getString(6), rs.getString(7), rs.getString(8));
+    }
+
+    private String value(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 }

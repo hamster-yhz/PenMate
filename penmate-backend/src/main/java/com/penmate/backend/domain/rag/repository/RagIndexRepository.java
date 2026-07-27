@@ -14,6 +14,7 @@ public interface RagIndexRepository {
     Long insertSource(Long sourceIndexId, Long buildId, Long projectId, String sourceType, Long sourceId,
                       String revision, String title, String checksum, long characterCount, int chunkCount);
     void resetStagedSource(Long buildId, String sourceType, Long sourceId, String revision);
+    boolean isSourceRevisionActive(Long buildId, String sourceType, Long sourceId, String revision);
     void insertChunks(Long sourceIndexId, Long buildId, Long projectId, Long embeddingSpaceId,
                       String sourceType, Long sourceId, List<ChunkWrite> chunks);
     void insertVectors(RagEmbeddingSpace space, Long buildId, Long projectId, List<VectorWrite> vectors);

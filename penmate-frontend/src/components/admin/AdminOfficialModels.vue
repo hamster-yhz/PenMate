@@ -21,6 +21,7 @@
         <div class="model-identity">
           <strong>{{ item.displayName || item.modelName }}</strong>
           <small>{{ item.modelName }}<template v-if="item.embeddingDimensions"> · {{ item.embeddingDimensions }} 维</template></small>
+          <small v-if="item.modelType === 'CHAT'">{{ capacityLabel(item) }}</small>
         </div>
         <span>{{ item.providerName || item.providerCode || '未知' }}</span>
         <code>{{ item.maskedApiKey || (item.credentialConfigured ? '已配置' : '无需密钥') }}</code>
@@ -52,7 +53,13 @@
             <label><span>距离算法</span><select v-model="form.distanceMetric"><option value="COSINE">余弦距离</option><option value="INNER_PRODUCT">内积</option><option value="L2">L2 距离</option></select></label>
             <label class="dimension-field"><span>向量维度</span><div><input v-model.number="form.embeddingDimensions" type="number" min="1" max="4000" placeholder="输入或自动探测" /><button type="button" :disabled="probing" @click="handleProbe"><RadarChartOutlined />{{ probing ? '探测中' : '自动探测' }}</button></div></label>
           </template>
-          <label v-else><span>最大上下文 Token</span><input v-model.number="form.maxContextTokens" type="number" min="1" /></label>
+          <template v-else>
+            <label class="switch-line"><span>自动识别模型容量<small>已知模型按能力目录填写，无法识别时使用未验证回退值。</small></span><input v-model="form.autoDetectCapacity" type="checkbox" role="switch" @change="initializeManualCapacity" /></label>
+            <template v-if="!form.autoDetectCapacity">
+              <label><span>最大上下文 Token</span><input v-model.number="form.maxContextTokens" type="number" min="1" required /></label>
+              <label><span>预留输出 Token</span><input v-model.number="form.maxOutputTokens" type="number" min="1" required /></label>
+            </template>
+          </template>
           <label v-if="editingId" class="switch-line"><span>启用模型</span><input v-model="form.enabled" type="checkbox" role="switch" /></label>
           <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
           <footer><button type="button" @click="closeDrawer">取消</button><button type="submit" class="primary-button" :disabled="saving">{{ saving ? '正在保存' : '保存模型' }}</button></footer>
@@ -100,6 +107,16 @@ const testConnection = async (item: ModelConfigurationItem) => {
   } catch (cause) { message.error(cause instanceof Error ? cause.message : '连接测试失败') }
 }
 const testLabel = (item: ModelConfigurationItem) => item.lastTestStatus === 'SUCCESS' ? `成功 · ${item.lastTestLatencyMs ?? 0} ms` : item.lastTestStatus === 'FAILED' ? '失败' : '尚未测试'
+const initializeManualCapacity = () => {
+  if (!form.autoDetectCapacity) {
+    form.maxContextTokens ||= 128000
+    form.maxOutputTokens ||= 8192
+  }
+}
+const capacityLabel = (item: ModelConfigurationItem) => {
+  const source = { MANUAL: '手工', PROVIDER: '供应商', CATALOG: '能力目录', FALLBACK: '未验证' }[item.contextCapacitySource || 'FALLBACK']
+  return `${Number(item.maxContextTokens || 0).toLocaleString()} Token · ${source}`
+}
 const formatTime = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 </script>
 

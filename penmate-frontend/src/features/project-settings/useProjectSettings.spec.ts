@@ -41,7 +41,7 @@ describe('useProjectSettings', () => {
     })
   })
 
-  it('falls back to LLM selection when the retrieval index is unavailable', async () => {
+  it('keeps Agent-driven routing when the retrieval index is unavailable', async () => {
     vi.mocked(ragApi.getConfiguration).mockResolvedValue({
       storyBibleRoutingMode: 'RETRIEVAL_THEN_LLM',
       indexStatus: 'REINDEX_REQUIRED',
@@ -51,7 +51,7 @@ describe('useProjectSettings', () => {
     await settings.load()
 
     expect(settings.retrievalAvailable.value).toBe(false)
-    expect(settings.ai.storyBibleRoutingMode).toBe('LLM_SELECTOR')
+    expect(settings.ai.storyBibleRoutingMode).toBe('AGENT_DRIVEN')
   })
 
   it('clears section-specific feedback when navigating to another section', async () => {
@@ -71,6 +71,7 @@ describe('useProjectSettings', () => {
       creativeModelConfigId: '11',
       routerModelConfigId: '12',
       embeddingModelConfigId: '13',
+      ragEnabled: true,
       storyBibleRoutingMode: 'LLM_SELECTOR',
       indexStatus: 'REINDEX_REQUIRED',
     })
@@ -181,6 +182,7 @@ describe('useProjectSettings', () => {
       creativeModelConfigId: '11',
       routerModelConfigId: '12',
       embeddingModelConfigId: null,
+      ragEnabled: false,
       storyBibleRoutingMode: 'LLM_SELECTOR',
       indexStatus: 'UNBOUND',
     })
@@ -196,6 +198,7 @@ describe('useProjectSettings', () => {
       creativeModelConfigId: '11',
       routerModelConfigId: '12',
       embeddingModelConfigId: null,
+      ragEnabled: false,
       storyBibleRoutingMode: 'LLM_SELECTOR',
     })
     expect(settings.aiDirty.value).toBe(false)

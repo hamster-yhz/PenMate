@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public class UpdateProjectAiConfigurationDto {
     private String creativeModelConfigId;
     private String embeddingModelConfigId;
+    private Boolean ragEnabled;
     private String storyBibleRoutingMode;
     private String routerModelConfigId;
     private Integer chunkTargetCharacters;
