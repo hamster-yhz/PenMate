@@ -16,15 +16,16 @@ public class StoryBibleHistoryDeletionService {
     }
 
     @Transactional
-    public void deleteVerifiedArchive(Long storyBibleId, List<Long> changesetIds, int expectedItemCount) {
+    public void markVerifiedArchive(Long storyBibleId, List<Long> changesetIds, int expectedItemCount,
+                                    java.time.Instant archivedAt) {
         if (changesetIds == null || changesetIds.isEmpty()) return;
-        int deletedItems = repository.deleteChangeItemsByChangesetIds(changesetIds);
-        if (deletedItems != expectedItemCount) {
-            throw new IllegalStateException("Story Bible archive item count changed before deletion");
+        int actualItems = repository.findChangeItemsByChangesetIds(changesetIds).size();
+        if (actualItems != expectedItemCount) {
+            throw new IllegalStateException("Story Bible archive item count changed before archival");
         }
-        int deletedChangesets = repository.deleteChangesetsByIds(storyBibleId, changesetIds);
-        if (deletedChangesets != changesetIds.size()) {
-            throw new IllegalStateException("Story Bible archive changeset count changed before deletion");
+        int archived = repository.archiveChangesets(storyBibleId, changesetIds, archivedAt);
+        if (archived != changesetIds.size()) {
+            throw new IllegalStateException("Story Bible archive changeset count changed before archival");
         }
     }
 }

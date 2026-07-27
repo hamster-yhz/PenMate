@@ -32,7 +32,7 @@ public class StoryBibleInspectApplicationService {
         try {
             InspectArgs args = jsonCodec.read(request.toolArgsJson(), InspectArgs.class);
             Object result = switch (args.operation()) {
-                case "readiness" -> readiness(context.projectId());
+                case "overview" -> overview(context.projectId());
                 case "catalog" -> catalog(context.projectId(), args.typeCode());
                 case "node" -> inspectNode(context, requireNodeId(args.nodeId()));
                 default -> throw new IllegalArgumentException("unsupported operation: " + args.operation());
@@ -43,32 +43,50 @@ public class StoryBibleInspectApplicationService {
         }
     }
 
-    private Map<String, Object> readiness(Long projectId) {
+    private Map<String, Object> overview(Long projectId) {
         var root = storyBible.get(projectId);
         List<StoryBibleNodeType> types = storyBible.listNodeTypes(projectId);
         List<StoryBibleNode> nodes = storyBible.listNodes(projectId, null, null, null);
         Map<Long, StoryBibleNodeType> typesById = types.stream()
                 .collect(Collectors.toMap(StoryBibleNodeType::getTypeId, Function.identity()));
         StoryBibleNode core = nodes.stream()
+                .filter(node -> typesById.get(node.getTypeId()) != null)
                 .filter(node -> "STORY_CORE".equals(typesById.get(node.getTypeId()).getTypeCode()))
                 .findFirst().orElse(null);
-        boolean coreHasContent = core != null && (hasText(core.getSummary()) || hasText(core.getBodyMarkdown())
-                || !jsonCodec.readObject(core.getAttributesJson()).isEmpty());
-        long substantiveNodes = nodes.stream()
-                .filter(node -> node.getCanonStatus() != StoryBibleCanonStatus.ARCHIVED)
-                .filter(node -> core == null || !Objects.equals(node.getNodeId(), core.getNodeId()))
-                .count();
+        List<StoryBibleNode> activeNodes = nodes.stream()
+                .filter(node -> node.getCanonStatus() != StoryBibleCanonStatus.ARCHIVED).toList();
+        List<String> structuralIssues = new java.util.ArrayList<>();
+        nodes.stream().filter(node -> !typesById.containsKey(node.getTypeId()))
+                .forEach(node -> structuralIssues.add("NODE_TYPE_MISSING:" + node.getNodeId()));
+        if (core == null) structuralIssues.add("STORY_CORE_MISSING");
+        List<String> missingCoreFields = core == null ? List.of("storyCore")
+                : missingRequiredFields(core, typesById.get(core.getTypeId()));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("contentRevision", root.getContentRevision());
         result.put("catalogTypeCount", types.size());
-        result.put("activeNodeCount", substantiveNodes + (core == null ? 0 : 1));
-        result.put("contentReady", coreHasContent || substantiveNodes > 0);
-        result.put("storyCore", core == null ? null : renderNodeSummary(core, typesById.get(core.getTypeId())));
-        result.put("nextAction", coreHasContent || substantiveNodes > 0
-                ? "inspect_existing_canon_before_changes"
-                : "analyze_sources_and_present_initialization_plan_for_user_confirmation");
+        result.put("activeNodeCount", activeNodes.size());
+        result.put("archivedNodeCount", nodes.size() - activeNodes.size());
+        result.put("countsByType", activeNodes.stream().filter(node -> typesById.containsKey(node.getTypeId()))
+                .collect(Collectors.groupingBy(node -> typesById.get(node.getTypeId()).getTypeCode(),
+                        java.util.TreeMap::new, Collectors.counting())));
+        result.put("storyCore", core == null ? null : renderNode(core, typesById.get(core.getTypeId())));
+        result.put("missingRequiredStoryCoreFields", missingCoreFields);
+        result.put("structuralIssues", structuralIssues);
+        result.put("latestChanges", storyBible.recentChanges(projectId, 10));
         return result;
+    }
+
+    private List<String> missingRequiredFields(StoryBibleNode node, StoryBibleNodeType type) {
+        if (type == null) return List.of("nodeType");
+        Map<String, Object> schema = jsonCodec.readObject(type.getFieldSchemaJson());
+        Object rawRequired = schema.get("required");
+        if (!(rawRequired instanceof List<?> required)) return List.of();
+        Map<String, Object> attributes = jsonCodec.readObject(node.getAttributesJson());
+        return required.stream().map(String::valueOf)
+                .filter(field -> !attributes.containsKey(field) || attributes.get(field) == null
+                        || attributes.get(field) instanceof String text && text.isBlank())
+                .toList();
     }
 
     private Map<String, Object> catalog(Long projectId, String requestedTypeCode) {
@@ -163,10 +181,6 @@ public class StoryBibleInspectApplicationService {
     private static Long requireNodeId(Long nodeId) {
         if (nodeId == null || nodeId <= 0) throw new IllegalArgumentException("nodeId is required for node inspection");
         return nodeId;
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     private static String message(Throwable error) {

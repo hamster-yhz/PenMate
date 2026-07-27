@@ -15,4 +15,8 @@ public class StoryBibleChangeset {
     private Long sourceRunId;
     private String changeSummary;
     private Instant createdAt;
+    private Instant archivedAt;
+    private Instant undoneAt;
+    private Long undoneBy;
+    private Long undoChangesetId;
 }

@@ -237,6 +237,29 @@ class StoryBibleApplicationServiceTest {
     }
 
     @Test
+    void should_page_changesets_with_a_bounded_exclusive_revision_cursor() {
+        StoryBible root = root();
+        StoryBibleChangeset revision89 = changeset(501L, 89L);
+        StoryBibleChangeset revision88 = changeset(500L, 88L);
+        StoryBibleChangeset revision87 = changeset(499L, 87L);
+        when(repository.findByProjectId(20L)).thenReturn(root);
+        when(repository.findChangesetsPage(10L, 90L, 3))
+                .thenReturn(List.of(revision89, revision88, revision87));
+        when(repository.findChangesetsPage(10L, 88L, 3))
+                .thenReturn(List.of(revision87));
+
+        var firstPage = service.changesetPage(20L, 90L, 2);
+        var finalPage = service.changesetPage(20L, 88L, 2);
+
+        assertThat(firstPage.items()).containsExactly(revision89, revision88);
+        assertThat(firstPage.nextBeforeRevision()).isEqualTo(88L);
+        assertThat(finalPage.items()).containsExactly(revision87);
+        assertThat(finalPage.nextBeforeRevision()).isNull();
+        verify(repository).findChangesetsPage(10L, 90L, 3);
+        verify(repository).findChangesetsPage(10L, 88L, 3);
+    }
+
+    @Test
     void should_record_alias_membership_changes_in_the_same_node_changeset() {
         StoryBible root = root();
         StoryBibleNodeType type = new StoryBibleNodeType();
@@ -378,6 +401,13 @@ class StoryBibleApplicationServiceTest {
         membership.setNodeId(nodeId);
         membership.setTagId(tagId);
         return membership;
+    }
+
+    private StoryBibleChangeset changeset(Long changesetId, Long contentRevision) {
+        StoryBibleChangeset changeset = new StoryBibleChangeset();
+        changeset.setChangesetId(changesetId);
+        changeset.setContentRevision(contentRevision);
+        return changeset;
     }
 
     private StoryBible root() {

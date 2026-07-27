@@ -55,7 +55,7 @@ class StoryBibleHistoryArchiveServiceTest {
     }
 
     @Test
-    void should_archive_monthly_gzip_verify_it_and_only_then_delete_hot_rows() throws Exception {
+    void should_archive_monthly_gzip_verify_it_and_only_then_mark_hot_rows_archived() throws Exception {
         StoryBible root = root();
         StoryBibleChangeset changeset = changeset(501L, java.time.LocalDateTime.of(2025, 1, 12, 10, 30).toInstant(java.time.ZoneOffset.UTC));
         StoryBibleChangeItem item = item(601L, 501L);
@@ -74,7 +74,7 @@ class StoryBibleHistoryArchiveServiceTest {
                 .contains("\"changeItemId\":601");
         verify(storage).putBytes("story-bible-history/22/2025-01.jsonl.gz",
                 uploaded.get(), "application/gzip");
-        verify(deletionService).deleteVerifiedArchive(11L, List.of(501L), 1);
+        verify(deletionService).markVerifiedArchive(eq(11L), eq(List.of(501L)), eq(1), any(Instant.class));
     }
 
     @Test
@@ -99,7 +99,7 @@ class StoryBibleHistoryArchiveServiceTest {
 
         String jsonl = ungzip(uploaded.get());
         assertThat(jsonl).contains("\"changesetId\":501").contains("\"changesetId\":502");
-        verify(deletionService).deleteVerifiedArchive(11L, List.of(502L), 0);
+        verify(deletionService).markVerifiedArchive(eq(11L), eq(List.of(502L)), eq(0), any(Instant.class));
     }
 
     @Test
@@ -119,18 +119,19 @@ class StoryBibleHistoryArchiveServiceTest {
         assertThatThrownBy(() -> service.archiveStoryBible(root, java.time.LocalDateTime.of(2025, 2, 1, 0, 0).toInstant(java.time.ZoneOffset.UTC)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("checksum mismatch");
-        verify(deletionService, never()).deleteVerifiedArchive(any(), any(), any(Integer.class));
+        verify(deletionService, never()).markVerifiedArchive(any(), any(), any(Integer.class), any(Instant.class));
     }
 
     @Test
-    void should_select_only_rows_outside_both_hot_retention_windows() {
+    void should_select_rows_outside_either_hot_retention_window() {
         Instant now = java.time.LocalDateTime.of(2026, 7, 16, 4, 0).toInstant(java.time.ZoneOffset.UTC);
         StoryBible root = root();
-        when(repository.findStoryBiblesWithChangesetsBefore(now.minus(180, java.time.temporal.ChronoUnit.DAYS))).thenReturn(List.of(root));
-        when(repository.findChangesetsBefore(11L, now.minus(180, java.time.temporal.ChronoUnit.DAYS), 5_000)).thenReturn(List.of());
+        when(repository.findStoryBiblesWithChangesetsBefore(
+                now.minus(7, java.time.temporal.ChronoUnit.DAYS), 5_000)).thenReturn(List.of(root));
+        when(repository.findChangesetsBefore(11L, now.minus(7, java.time.temporal.ChronoUnit.DAYS), 5_000)).thenReturn(List.of());
 
         assertThat(service.archiveEligibleHistory(now).changesetCount()).isZero();
-        verify(repository).findChangesetsBefore(11L, now.minus(180, java.time.temporal.ChronoUnit.DAYS), 5_000);
+        verify(repository).findChangesetsBefore(11L, now.minus(7, java.time.temporal.ChronoUnit.DAYS), 5_000);
     }
 
     private void wireSuccessfulStorage(String key) {

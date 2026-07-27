@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 class StoryBibleChangesetServiceTest {
@@ -53,6 +54,31 @@ class StoryBibleChangesetServiceTest {
         assertThatThrownBy(() -> service.append(
                 root, StoryBibleActorType.USER, 9L, null, "Update", List.of()
         )).isInstanceOf(BusinessException.class).hasMessage("Story Bible content revision changed");
+    }
+
+    @Test
+    void aggregates_multiple_mutations_into_one_revision_and_changeset() {
+        StoryBible firstView = root(7L);
+        StoryBible secondView = root(7L);
+        when(repository.incrementContentRevision(10L, 7L)).thenReturn(1);
+        when(repository.insertChangeset(any())).thenReturn(1);
+        when(repository.insertChangeItem(any())).thenReturn(1);
+        when(idGenerator.nextId()).thenReturn(100L, 101L, 102L);
+
+        String result = service.aggregateSingleChangeset(() -> {
+            service.append(firstView, StoryBibleActorType.AGENT, 9L, 88L, "First", List.of(
+                    new StoryBibleChangesetService.ChangeDraft(
+                            "NODE", 51L, StoryBibleChangeOperation.UPDATE, "/title", "\"a\"", "\"b\"")));
+            service.append(secondView, StoryBibleActorType.AGENT, 9L, 88L, "Second", List.of(
+                    new StoryBibleChangesetService.ChangeDraft(
+                            "NODE", 52L, StoryBibleChangeOperation.CREATE, "/", null, "{}")));
+            return "ok";
+        });
+
+        assertThat(result).isEqualTo("ok");
+        verify(repository).incrementContentRevision(10L, 7L);
+        verify(repository).insertChangeset(any());
+        verify(repository, times(2)).insertChangeItem(any());
     }
 
     private StoryBible root(long revision) {

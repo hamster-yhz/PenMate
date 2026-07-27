@@ -33,7 +33,7 @@ import java.util.zip.GZIPOutputStream;
 @Slf4j
 public class StoryBibleHistoryArchiveService {
 
-    static final int HOT_RETENTION_DAYS = 180;
+    static final int HOT_RETENTION_DAYS = 7;
     static final int HOT_RETENTION_COUNT = 5_000;
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
 
@@ -61,9 +61,9 @@ public class StoryBibleHistoryArchiveService {
         int projectCount = 0;
         int changesetCount = 0;
         int archiveCount = 0;
-        for (StoryBible storyBible : repository.findStoryBiblesWithChangesetsBefore(cutoff)) {
+        for (StoryBible storyBible : repository.findStoryBiblesWithChangesetsBefore(cutoff, HOT_RETENTION_COUNT)) {
             try {
-                ArchiveSummary result = archiveStoryBible(storyBible, cutoff);
+                ArchiveSummary result = archiveStoryBible(storyBible, cutoff, now);
                 if (result.changesetCount() > 0) projectCount++;
                 changesetCount += result.changesetCount();
                 archiveCount += result.archiveCount();
@@ -76,6 +76,10 @@ public class StoryBibleHistoryArchiveService {
     }
 
     ArchiveSummary archiveStoryBible(StoryBible storyBible, Instant cutoff) {
+        return archiveStoryBible(storyBible, cutoff, Instant.now());
+    }
+
+    private ArchiveSummary archiveStoryBible(StoryBible storyBible, Instant cutoff, Instant archivedAt) {
         List<StoryBibleChangeset> eligible = repository.findChangesetsBefore(
                 storyBible.getStoryBibleId(), cutoff, HOT_RETENTION_COUNT);
         Map<YearMonth, List<StoryBibleChangeset>> byMonth = new TreeMap<>();
@@ -91,13 +95,14 @@ public class StoryBibleHistoryArchiveService {
 
         int archived = 0;
         for (Map.Entry<YearMonth, List<StoryBibleChangeset>> entry : byMonth.entrySet()) {
-            archiveMonth(storyBible, entry.getKey(), entry.getValue());
+            archiveMonth(storyBible, entry.getKey(), entry.getValue(), archivedAt);
             archived += entry.getValue().size();
         }
         return new ArchiveSummary(archived == 0 ? 0 : 1, byMonth.size(), archived);
     }
 
-    private void archiveMonth(StoryBible storyBible, YearMonth month, List<StoryBibleChangeset> changesets) {
+    private void archiveMonth(StoryBible storyBible, YearMonth month, List<StoryBibleChangeset> changesets,
+                              Instant archivedAt) {
         changesets.sort(Comparator.comparing(StoryBibleChangeset::getCreatedAt)
                 .thenComparing(StoryBibleChangeset::getChangesetId));
         List<Long> changesetIds = changesets.stream().map(StoryBibleChangeset::getChangesetId).toList();
@@ -127,7 +132,7 @@ public class StoryBibleHistoryArchiveService {
             throw new IllegalStateException("Story Bible history archive checksum mismatch");
         }
 
-        deletionService.deleteVerifiedArchive(storyBible.getStoryBibleId(), changesetIds, items.size());
+        deletionService.markVerifiedArchive(storyBible.getStoryBibleId(), changesetIds, items.size(), archivedAt);
         log.info("story_bible.history.archived: projectId={}, storyBibleId={}, month={}, changesets={}, bytes={}, sha256={}",
                 storyBible.getProjectId(), storyBible.getStoryBibleId(), month, changesets.size(),
                 payload.length, sha256(payload));

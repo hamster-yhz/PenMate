@@ -601,7 +601,7 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
-                   source_run_id, change_summary, created_at
+                   source_run_id, change_summary, created_at, archived_at, undone_at, undone_by, undo_changeset_id
             FROM story_bible_changesets
             WHERE story_bible_id = #{storyBibleId}
             ORDER BY created_at DESC, id DESC LIMIT #{limit}
@@ -610,8 +610,23 @@ public interface StoryBibleMapper {
                                                    @Param("limit") int limit);
 
     @Select("""
+            <script>
             SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
-                   source_run_id, change_summary, created_at
+                   source_run_id, change_summary, created_at, archived_at, undone_at, undone_by, undo_changeset_id
+            FROM story_bible_changesets
+            WHERE story_bible_id = #{storyBibleId}
+              <if test="beforeRevision != null">AND content_revision &lt; #{beforeRevision}</if>
+            ORDER BY content_revision DESC, id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<StoryBibleChangeset> findChangesetsPage(@Param("storyBibleId") Long storyBibleId,
+                                                 @Param("beforeRevision") Long beforeRevision,
+                                                 @Param("limit") int limit);
+
+    @Select("""
+            SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
+                   source_run_id, change_summary, created_at, archived_at, undone_at, undone_by, undo_changeset_id
             FROM story_bible_changesets
             WHERE story_bible_id = #{storyBibleId} AND changeset_id = #{changesetId}
             LIMIT 1
@@ -620,8 +635,31 @@ public interface StoryBibleMapper {
                                       @Param("changesetId") Long changesetId);
 
     @Select("""
+            SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
+                   source_run_id, change_summary, created_at, archived_at, undone_at, undone_by, undo_changeset_id
+            FROM story_bible_changesets
+            WHERE story_bible_id = #{storyBibleId} AND source_run_id = #{sourceRunId}
+            ORDER BY content_revision, id
+            """)
+    List<StoryBibleChangeset> findChangesetsBySourceRun(@Param("storyBibleId") Long storyBibleId,
+                                                        @Param("sourceRunId") Long sourceRunId);
+
+    @Select("""
+            SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
+                   source_run_id, change_summary, created_at, archived_at, undone_at, undone_by, undo_changeset_id
+            FROM story_bible_changesets
+            WHERE story_bible_id = #{storyBibleId}
+              AND content_revision BETWEEN #{firstRevision} AND #{lastRevision}
+            ORDER BY content_revision, id
+            """)
+    List<StoryBibleChangeset> findChangesetsByRevisionRange(@Param("storyBibleId") Long storyBibleId,
+                                                            @Param("firstRevision") Long firstRevision,
+                                                            @Param("lastRevision") Long lastRevision);
+
+    @Select("""
             SELECT DISTINCT sc.id, sc.changeset_id, sc.story_bible_id, sc.content_revision,
-                   sc.actor_type, sc.actor_id, sc.source_run_id, sc.change_summary, sc.created_at
+                   sc.actor_type, sc.actor_id, sc.source_run_id, sc.change_summary, sc.created_at, sc.archived_at,
+                   sc.undone_at, sc.undone_by, sc.undo_changeset_id
             FROM story_bible_changesets sc
             JOIN story_bible_change_items ci ON ci.changeset_id = sc.changeset_id
             LEFT JOIN story_bible_relations r
@@ -645,14 +683,14 @@ public interface StoryBibleMapper {
 
     @Select("""
             SELECT id, changeset_id, story_bible_id, content_revision, actor_type, actor_id,
-                   source_run_id, change_summary, created_at
+                   source_run_id, change_summary, created_at, archived_at, undone_at, undone_by, undo_changeset_id
             FROM story_bible_changesets
-            WHERE story_bible_id = #{storyBibleId} AND created_at < #{cutoff}
-              AND changeset_id NOT IN (
+            WHERE story_bible_id = #{storyBibleId} AND archived_at IS NULL
+              AND (created_at < #{cutoff} OR changeset_id NOT IN (
                   SELECT changeset_id FROM story_bible_changesets
                   WHERE story_bible_id = #{storyBibleId}
                   ORDER BY created_at DESC, id DESC LIMIT #{retainCount}
-              )
+              ))
             ORDER BY created_at, id
             """)
     List<StoryBibleChangeset> findChangesetsBefore(@Param("storyBibleId") Long storyBibleId,
@@ -664,10 +702,16 @@ public interface StoryBibleMapper {
                             sb.content_revision, sb.created_at, sb.updated_at, sb.deleted_at
             FROM story_bibles sb
             JOIN story_bible_changesets sc ON sc.story_bible_id = sb.story_bible_id
-            WHERE sb.deleted_at IS NULL AND sc.created_at < #{cutoff}
+            WHERE sb.deleted_at IS NULL AND sc.archived_at IS NULL
+              AND (sc.created_at < #{cutoff} OR sc.changeset_id NOT IN (
+                  SELECT recent.changeset_id FROM story_bible_changesets recent
+                  WHERE recent.story_bible_id = sb.story_bible_id
+                  ORDER BY recent.created_at DESC, recent.id DESC LIMIT #{retainCount}
+              ))
             ORDER BY sb.id
             """)
-    List<StoryBible> findStoryBiblesWithChangesetsBefore(@Param("cutoff") Instant cutoff);
+    List<StoryBible> findStoryBiblesWithChangesetsBefore(@Param("cutoff") Instant cutoff,
+                                                         @Param("retainCount") int retainCount);
 
     @Select("""
             <script>
@@ -682,21 +726,143 @@ public interface StoryBibleMapper {
             """)
     List<StoryBibleChangeItem> findChangeItemsByChangesetIds(@Param("changesetIds") List<Long> changesetIds);
 
-    @Delete("""
+    @Update("""
             <script>
-            DELETE FROM story_bible_change_items WHERE changeset_id IN
+            UPDATE story_bible_changesets SET archived_at = #{archivedAt}
+            WHERE story_bible_id = #{storyBibleId} AND archived_at IS NULL AND changeset_id IN
               <foreach collection="changesetIds" item="id" open="(" separator="," close=")">#{id}</foreach>
             </script>
             """)
-    int deleteChangeItemsByChangesetIds(@Param("changesetIds") List<Long> changesetIds);
+    int archiveChangesets(@Param("storyBibleId") Long storyBibleId,
+                          @Param("changesetIds") List<Long> changesetIds,
+                          @Param("archivedAt") Instant archivedAt);
 
-    @Delete("""
+    @Update("""
+            UPDATE story_bible_changesets
+            SET undone_at = CURRENT_TIMESTAMP(3), undone_by = #{undoneBy}, undo_changeset_id = #{undoChangesetId}
+            WHERE story_bible_id = #{storyBibleId} AND changeset_id = #{changesetId}
+              AND archived_at IS NULL AND undone_at IS NULL
+            """)
+    int markChangesetUndone(@Param("storyBibleId") Long storyBibleId,
+                            @Param("changesetId") Long changesetId,
+                            @Param("undoneBy") Long undoneBy,
+                            @Param("undoChangesetId") Long undoChangesetId);
+
+    @Update("""
             <script>
-            DELETE FROM story_bible_changesets
-            WHERE story_bible_id = #{storyBibleId} AND changeset_id IN
+            UPDATE story_bible_changesets
+            SET undone_at = CURRENT_TIMESTAMP(3), undone_by = #{undoneBy}, undo_changeset_id = #{undoChangesetId}
+            WHERE story_bible_id = #{storyBibleId} AND archived_at IS NULL AND undone_at IS NULL
+              AND changeset_id IN
               <foreach collection="changesetIds" item="id" open="(" separator="," close=")">#{id}</foreach>
             </script>
             """)
-    int deleteChangesetsByIds(@Param("storyBibleId") Long storyBibleId,
-                              @Param("changesetIds") List<Long> changesetIds);
+    int markChangesetsUndone(@Param("storyBibleId") Long storyBibleId,
+                             @Param("changesetIds") List<Long> changesetIds,
+                             @Param("undoneBy") Long undoneBy,
+                             @Param("undoChangesetId") Long undoChangesetId);
+
+    @Select("""
+            SELECT id, node_id, story_bible_id, type_id, title, summary, body_markdown,
+                   CAST(attributes_json AS TEXT) AS attributes_json, inclusion_policy, canon_status, revision,
+                   created_by, updated_by, created_at, updated_at, archived_at, deleted_at
+            FROM story_bible_nodes WHERE story_bible_id = #{storyBibleId} AND node_id = #{nodeId} LIMIT 1
+            """)
+    StoryBibleNode findNodeIncludingDeleted(@Param("storyBibleId") Long storyBibleId, @Param("nodeId") Long nodeId);
+
+    @Update("""
+            UPDATE story_bible_nodes
+            SET type_id = #{node.typeId}, title = #{node.title}, summary = #{node.summary},
+                body_markdown = #{node.bodyMarkdown}, attributes_json = #{node.attributesJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
+                inclusion_policy = #{node.inclusionPolicy}, canon_status = #{node.canonStatus},
+                revision = revision + 1, updated_by = #{node.updatedBy}, deleted_at = NULL,
+                archived_at = CASE WHEN #{node.canonStatus} = 'ARCHIVED' THEN CURRENT_TIMESTAMP(3) ELSE NULL END
+            WHERE story_bible_id = #{node.storyBibleId} AND node_id = #{node.nodeId}
+              AND revision = #{expectedRevision} AND deleted_at IS NOT NULL
+            """)
+    int restoreNode(@Param("node") StoryBibleNode node, @Param("expectedRevision") Long expectedRevision);
+
+    @Select("""
+            SELECT id, relation_id, story_bible_id, source_node_id, relation_type, target_node_id, description,
+                   CAST(attributes_json AS TEXT) AS attributes_json, revision, created_by, updated_by,
+                   created_at, updated_at, deleted_at
+            FROM story_bible_relations WHERE story_bible_id = #{storyBibleId} AND relation_id = #{relationId} LIMIT 1
+            """)
+    StoryBibleRelation findRelationIncludingDeleted(@Param("storyBibleId") Long storyBibleId, @Param("relationId") Long relationId);
+
+    @Update("""
+            UPDATE story_bible_relations
+            SET source_node_id = #{relation.sourceNodeId}, relation_type = #{relation.relationType},
+                target_node_id = #{relation.targetNodeId}, description = #{relation.description},
+                attributes_json = #{relation.attributesJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
+                revision = revision + 1, updated_by = #{relation.updatedBy}, deleted_at = NULL
+            WHERE story_bible_id = #{relation.storyBibleId} AND relation_id = #{relation.relationId}
+              AND revision = #{expectedRevision} AND deleted_at IS NOT NULL
+            """)
+    int restoreRelation(@Param("relation") StoryBibleRelation relation, @Param("expectedRevision") Long expectedRevision);
+
+    @Select("""
+            SELECT id, progression_id, story_bible_id, node_id, anchor_chapter_id, end_chapter_id,
+                   story_event_node_id, CAST(patch_json AS TEXT) AS patch_json, summary, revision,
+                   created_by, updated_by, created_at, updated_at, deleted_at
+            FROM story_bible_progressions WHERE story_bible_id = #{storyBibleId} AND progression_id = #{progressionId} LIMIT 1
+            """)
+    StoryBibleProgression findProgressionIncludingDeleted(@Param("storyBibleId") Long storyBibleId,
+                                                           @Param("progressionId") Long progressionId);
+
+    @Update("""
+            UPDATE story_bible_progressions
+            SET node_id = #{progression.nodeId}, anchor_chapter_id = #{progression.anchorChapterId},
+                end_chapter_id = #{progression.endChapterId}, story_event_node_id = #{progression.storyEventNodeId},
+                patch_json = #{progression.patchJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
+                summary = #{progression.summary}, revision = revision + 1,
+                updated_by = #{progression.updatedBy}, deleted_at = NULL
+            WHERE story_bible_id = #{progression.storyBibleId} AND progression_id = #{progression.progressionId}
+              AND revision = #{expectedRevision} AND deleted_at IS NOT NULL
+            """)
+    int restoreProgression(@Param("progression") StoryBibleProgression progression,
+                           @Param("expectedRevision") Long expectedRevision);
+
+    @Select("""
+            SELECT id, category_id, story_bible_id, parent_category_id, name, sort_order,
+                   created_at, updated_at, deleted_at
+            FROM story_bible_categories WHERE story_bible_id = #{storyBibleId} AND category_id = #{categoryId} LIMIT 1
+            """)
+    StoryBibleCategory findCategoryIncludingDeleted(@Param("storyBibleId") Long storyBibleId,
+                                                     @Param("categoryId") Long categoryId);
+
+    @Update("""
+            UPDATE story_bible_categories SET parent_category_id = #{parentCategoryId}, name = #{name},
+                sort_order = #{sortOrder}, deleted_at = NULL
+            WHERE story_bible_id = #{storyBibleId} AND category_id = #{categoryId} AND deleted_at IS NOT NULL
+            """)
+    int restoreCategory(StoryBibleCategory category);
+
+    @Select("""
+            SELECT id, tag_id, story_bible_id, name, normalized_name, color, created_at, updated_at, deleted_at
+            FROM story_bible_tags WHERE story_bible_id = #{storyBibleId} AND tag_id = #{tagId} LIMIT 1
+            """)
+    StoryBibleTag findTagIncludingDeleted(@Param("storyBibleId") Long storyBibleId, @Param("tagId") Long tagId);
+
+    @Update("""
+            UPDATE story_bible_tags SET name = #{name}, normalized_name = #{normalizedName}, color = #{color}, deleted_at = NULL
+            WHERE story_bible_id = #{storyBibleId} AND tag_id = #{tagId} AND deleted_at IS NOT NULL
+            """)
+    int restoreTag(StoryBibleTag tag);
+
+    @Select("""
+            SELECT id, type_id, story_bible_id, type_code, semantic_family, display_name, icon_code,
+                   CAST(field_schema_json AS TEXT) AS field_schema_json, system, sort_order,
+                   created_at, updated_at, archived_at
+            FROM story_bible_node_types WHERE story_bible_id = #{storyBibleId} AND type_id = #{typeId} LIMIT 1
+            """)
+    StoryBibleNodeType findNodeTypeIncludingArchived(@Param("storyBibleId") Long storyBibleId, @Param("typeId") Long typeId);
+
+    @Update("""
+            UPDATE story_bible_node_types SET display_name = #{displayName}, icon_code = #{iconCode},
+                field_schema_json = #{fieldSchemaJson,typeHandler=com.penmate.backend.infrastructure.persistence.support.JsonbTypeHandler},
+                sort_order = #{sortOrder}, archived_at = NULL
+            WHERE story_bible_id = #{storyBibleId} AND type_id = #{typeId} AND archived_at IS NOT NULL
+            """)
+    int restoreNodeType(StoryBibleNodeType type);
 }

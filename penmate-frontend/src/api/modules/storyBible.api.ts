@@ -4,6 +4,7 @@ import type {
   StoryBibleCategory,
   StoryBibleChangeset,
   StoryBibleChangesetDetails,
+  StoryBibleChangesetPage,
   StoryBibleNode,
   StoryBibleNodeDetails,
   StoryBibleNodePayload,
@@ -14,6 +15,7 @@ import type {
   StoryBibleRelation,
   StoryBibleRelationUpdatePayload,
   StoryBibleRoot,
+  StoryBibleRunUndoResult,
   StoryBibleTag,
   StoryBibleViewPreference,
 } from '@/entities/story-bible/model'
@@ -194,11 +196,19 @@ export const storyBibleApi = {
       `${base(projectId)}/progressions/${progressionId}?expectedRevision=${expectedRevision}${operatorQuery(operatorId)}`,
     )
   },
-  listChanges(projectId: string, limit = 50) {
-    return request.get<StoryBibleChangeset[]>(`${base(projectId)}/changesets?limit=${limit}`)
+  listChanges(projectId: string, limit = 50, beforeRevision?: number | null) {
+    return request.get<StoryBibleChangesetPage>(`${base(projectId)}/changesets`, {
+      params: { limit, ...(beforeRevision == null ? {} : { beforeRevision }) },
+    })
   },
   getChangeset(projectId: string, changesetId: string) {
     return request.get<StoryBibleChangesetDetails>(`${base(projectId)}/changesets/${changesetId}`)
+  },
+  undoChangeset(projectId: string, changesetId: string) {
+    return request.post<StoryBibleChangeset>(`${base(projectId)}/changesets/${changesetId}/undo`)
+  },
+  undoRun(projectId: string, sourceRunId: string) {
+    return request.post<StoryBibleRunUndoResult>(`${base(projectId)}/runs/${sourceRunId}/undo`)
   },
   listNodeChanges(projectId: string, nodeId: string, limit = 50) {
     return request.get<StoryBibleChangeset[]>(`${base(projectId)}/nodes/${nodeId}/changesets?limit=${limit}`)

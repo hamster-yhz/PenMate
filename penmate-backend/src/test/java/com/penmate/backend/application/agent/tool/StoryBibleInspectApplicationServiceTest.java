@@ -27,7 +27,7 @@ class StoryBibleInspectApplicationServiceTest {
     private final StoryBibleInspectApplicationService service = new StoryBibleInspectApplicationService(storyBible, jsonCodec);
 
     @Test
-    void reports_blank_bootstrap_as_not_content_ready() {
+    void overview_reports_facts_without_claiming_semantic_completeness() {
         StoryBible root = new StoryBible();
         root.setContentRevision(3L);
         StoryBibleNodeType coreType = type(11L, "STORY_CORE");
@@ -36,12 +36,13 @@ class StoryBibleInspectApplicationServiceTest {
         when(storyBible.listNodeTypes(7L)).thenReturn(List.of(coreType));
         when(storyBible.listNodes(7L, null, null, null)).thenReturn(List.of(core));
 
-        var result = service.execute(context(7L), request("{\"operation\":\"readiness\"}"));
+        var result = service.execute(context(7L), request("{\"operation\":\"overview\"}"));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         assertThat(jsonCodec.readObject(result.toolOutput()))
-                .containsEntry("contentReady", false)
-                .containsEntry("nextAction", "analyze_sources_and_present_initialization_plan_for_user_confirmation");
+                .containsEntry("activeNodeCount", 1)
+                .containsKeys("storyCore", "missingRequiredStoryCoreFields", "structuralIssues", "latestChanges")
+                .doesNotContainKeys("contentReady", "nextAction");
     }
 
     @Test

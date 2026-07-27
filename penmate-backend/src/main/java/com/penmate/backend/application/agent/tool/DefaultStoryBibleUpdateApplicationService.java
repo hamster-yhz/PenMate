@@ -311,6 +311,28 @@ public class DefaultStoryBibleUpdateApplicationService implements StoryBibleUpda
         return value.trim();
     }
 
+    @Override
+    @Transactional
+    public ToolCallResult executeBatch(AuthorizedAgentRunContext context, List<MutationCommand> mutations) {
+        if (mutations == null || mutations.isEmpty() || mutations.size() > 25) {
+            throw new IllegalArgumentException("Story Bible batch must contain between 1 and 25 items");
+        }
+        return storyBibleApplicationService.executeInSingleChangeset(() -> {
+            AuthorizedToolCall request = new AuthorizedToolCall(context);
+            List<Map<String, Object>> receipts = new ArrayList<>();
+            for (MutationCommand mutation : mutations) {
+                Map<String, Object> operation = new LinkedHashMap<>(mutation.mutation());
+                operation.put("kind", mutation.mutationKind());
+                receipts.add(executeOperation(request, operation));
+            }
+            return ToolCallResult.success(json(Map.of(
+                    "changed", true,
+                    "itemCount", receipts.size(),
+                    "receipts", receipts
+            )));
+        });
+    }
+
     private String text(Map<String, Object> node, String field, String fallback) {
         Object value = node.get(field);
         if (value == null) return fallback;

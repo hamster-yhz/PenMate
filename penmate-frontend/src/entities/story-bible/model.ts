@@ -119,6 +119,10 @@ export interface StoryBibleChangeset {
   sourceRunId?: string | null
   changeSummary: string
   createdAt: string
+  archivedAt?: string | null
+  undoneAt?: string | null
+  undoneBy?: string | null
+  undoChangesetId?: string | null
 }
 
 export interface StoryBibleChangeItem {
@@ -134,6 +138,17 @@ export interface StoryBibleChangeItem {
 }
 
 export interface StoryBibleChangesetDetails { changeset: StoryBibleChangeset; items: StoryBibleChangeItem[] }
+
+export interface StoryBibleRunUndoResult {
+  sourceRunId: string
+  changesetIds: string[]
+  undoChangeset: StoryBibleChangeset
+}
+
+export interface StoryBibleChangesetPage {
+  items: StoryBibleChangeset[]
+  nextBeforeRevision?: number | null
+}
 
 export interface StoryBibleNodePayload {
   typeId: string

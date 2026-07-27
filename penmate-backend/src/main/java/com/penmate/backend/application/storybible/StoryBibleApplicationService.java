@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 @Service
 public class StoryBibleApplicationService {
@@ -70,6 +71,10 @@ public class StoryBibleApplicationService {
         this.effectiveStateResolver = Objects.requireNonNull(effectiveStateResolver, "effectiveStateResolver");
         this.progressionReferenceValidator = Objects.requireNonNull(
                 progressionReferenceValidator, "progressionReferenceValidator");
+    }
+
+    public <T> T executeInSingleChangeset(Supplier<T> action) {
+        return changesetService.aggregateSingleChangeset(action);
     }
 
     public StoryBible get(Long projectId) {
@@ -631,6 +636,21 @@ public class StoryBibleApplicationService {
         return repository.findRecentChangesets(get(projectId).getStoryBibleId(), Math.max(1, Math.min(limit, 200)));
     }
 
+    public ChangesetPage changesetPage(Long projectId, Long beforeRevision, int limit) {
+        int pageSize = Math.max(1, Math.min(limit, 200));
+        if (beforeRevision != null && beforeRevision < 1) {
+            throw BusinessException.badRequest("beforeRevision must be greater than 0");
+        }
+        List<StoryBibleChangeset> fetched = repository.findChangesetsPage(
+                get(projectId).getStoryBibleId(), beforeRevision, pageSize + 1);
+        boolean hasMore = fetched.size() > pageSize;
+        List<StoryBibleChangeset> items = List.copyOf(
+                fetched.subList(0, Math.min(pageSize, fetched.size())));
+        Long nextBeforeRevision = hasMore && !items.isEmpty()
+                ? items.get(items.size() - 1).getContentRevision() : null;
+        return new ChangesetPage(items, nextBeforeRevision);
+    }
+
     public ChangesetDetails getChangeset(Long projectId, Long changesetId) {
         StoryBible root = get(projectId);
         StoryBibleChangeset changeset = repository.findChangeset(root.getStoryBibleId(), changesetId);
@@ -1030,6 +1050,12 @@ public class StoryBibleApplicationService {
             List<com.penmate.backend.domain.storybible.model.StoryBibleChangeItem> items
     ) {
         public ChangesetDetails {
+            items = List.copyOf(items == null ? List.of() : items);
+        }
+    }
+
+    public record ChangesetPage(List<StoryBibleChangeset> items, Long nextBeforeRevision) {
+        public ChangesetPage {
             items = List.copyOf(items == null ? List.of() : items);
         }
     }

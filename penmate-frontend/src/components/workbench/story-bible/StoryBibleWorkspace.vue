@@ -9,12 +9,23 @@
       <div class="status-actions">
         <span v-if="story.errorMessage.value" class="error-text">{{ story.errorMessage.value }}</span>
         <ReloadOutlined v-if="story.loading.value" spin />
+        <button type="button" class="history-button" title="故事圣经变更历史" aria-label="故事圣经变更历史" @click="showHistory = !showHistory"><HistoryOutlined /></button>
         <div class="mobile-tools" role="tablist" aria-label="Story Bible 视图">
           <button type="button" :class="{ active: mobilePane === 'browser' }" @click="mobilePane = 'browser'"><AppstoreOutlined />导航</button>
           <button type="button" :class="{ active: mobilePane === 'detail' }" @click="mobilePane = 'detail'"><UnorderedListOutlined />详情</button>
         </div>
       </div>
     </div>
+
+    <aside v-if="showHistory" class="global-history" aria-label="故事圣经变更历史">
+      <header><strong>变更历史</strong><button type="button" aria-label="关闭变更历史" @click="showHistory = false"><CloseOutlined /></button></header>
+      <StoryBibleHistoryTab
+        :project-id="projectId" :current-revision="story.root.value?.contentRevision"
+        :history="story.history.value" :has-more="story.historyBeforeRevision.value != null"
+        :loading-more="story.historyLoadingMore.value" @load-more="story.loadMoreHistory()"
+        @open-run="emit('openRun', $event)" @undone="story.loadWorkspace()"
+      />
+    </aside>
 
     <div class="workspace-grid">
       <aside class="story-browser" :class="{ 'mobile-hidden': mobilePane !== 'browser' }">
@@ -64,6 +75,8 @@
         :progressions="story.selectedProgressions.value"
         :history="story.nodeHistory.value"
         :effective-state="story.effectiveState.value"
+        :project-id="projectId"
+        :current-revision="story.root.value?.contentRevision"
         @save="story.saveNode()"
         @delete="deleteNode"
         @create-relation="run(() => story.createRelation($event))"
@@ -74,6 +87,7 @@
         @update-progression="run(() => story.updateProgression($event.progressionId, $event.update))"
         @delete-progression="run(() => story.deleteProgression($event))"
         @open-run="emit('openRun', $event)"
+        @history-undone="story.loadWorkspace()"
       />
     </div>
 
@@ -97,7 +111,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AppstoreOutlined, BookOutlined, ReloadOutlined, UnorderedListOutlined } from '@ant-design/icons-vue'
+import { AppstoreOutlined, BookOutlined, CloseOutlined, HistoryOutlined, ReloadOutlined, UnorderedListOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useStoryBible } from '@/composables/workbench/useStoryBible'
 import StoryBibleNavigator from './StoryBibleNavigator.vue'
@@ -105,6 +119,7 @@ import StoryBibleNodeEditor from './StoryBibleNodeEditor.vue'
 import StoryBibleNodeList from './StoryBibleNodeList.vue'
 import StoryBibleSearchToolbar from './StoryBibleSearchToolbar.vue'
 import StoryBibleTypeEditor from './StoryBibleTypeEditor.vue'
+import StoryBibleHistoryTab from './StoryBibleHistoryTab.vue'
 import type { StoryBibleChapterOption } from './storyBibleTypes'
 
 const props = defineProps<{
@@ -119,6 +134,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (event: 'openRun', runId: string): void }>()
 const showTypeEditor = ref(false)
+const showHistory = ref(false)
 const mobilePane = ref<'browser' | 'detail'>('detail')
 const story = useStoryBible({
   getContext: () => ({
@@ -252,6 +268,10 @@ defineExpose({ reload })
 .mobile-tools {
   display: none;
 }
+.history-button { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-subtle); background: transparent; color: var(--text-secondary); cursor: pointer; }
+.global-history { position: absolute; z-index: 20; top: 42px; right: 0; bottom: 0; width: min(420px, 100%); overflow: auto; border-left: 1px solid var(--border-subtle); background: var(--bg-elevated); box-shadow: var(--shadow-md); }
+.global-history header { position: sticky; top: 0; z-index: 1; height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); }
+.global-history header button { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
 .mobile-tools button {
   min-width: 58px;
   height: 32px;

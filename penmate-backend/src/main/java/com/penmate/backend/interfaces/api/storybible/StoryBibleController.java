@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.common.exception.BusinessException;
 import com.penmate.backend.application.storybible.StoryBibleApplicationService;
+import com.penmate.backend.application.storybible.StoryBibleUndoService;
 import com.penmate.backend.application.storybible.command.StoryBibleCommands;
 import com.penmate.backend.domain.storybible.model.StoryBibleActorType;
 import com.penmate.backend.domain.storybible.model.StoryBibleCanonStatus;
@@ -33,10 +34,13 @@ public class StoryBibleController {
 
     private final StoryBibleApplicationService service;
     private final ObjectMapper objectMapper;
+    private final StoryBibleUndoService undoService;
 
-    public StoryBibleController(StoryBibleApplicationService service, ObjectMapper objectMapper) {
+    public StoryBibleController(StoryBibleApplicationService service, ObjectMapper objectMapper,
+                                StoryBibleUndoService undoService) {
         this.service = service;
         this.objectMapper = objectMapper;
+        this.undoService = undoService;
     }
 
     @GetMapping
@@ -286,15 +290,33 @@ public class StoryBibleController {
     }
 
     @GetMapping("/changesets")
-    public ApiResponse<Object> recentChanges(@PathVariable String projectId, @RequestParam(defaultValue = "50") int limit,
+    public ApiResponse<Object> recentChanges(@PathVariable String projectId,
+                                             @RequestParam(required = false) Long beforeRevision,
+                                             @RequestParam(defaultValue = "50") int limit,
                                              @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
-        return success(service.recentChanges(id(projectId, "projectId"), limit), traceId);
+        return success(service.changesetPage(id(projectId, "projectId"), beforeRevision, limit), traceId);
     }
 
     @GetMapping("/changesets/{changesetId}")
     public ApiResponse<Object> getChangeset(@PathVariable String projectId, @PathVariable String changesetId,
                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
         return success(service.getChangeset(id(projectId, "projectId"), id(changesetId, "changesetId")), traceId);
+    }
+
+    @PostMapping("/changesets/{changesetId}/undo")
+    public ApiResponse<Object> undoChangeset(@PathVariable String projectId, @PathVariable String changesetId,
+                                             Authentication authentication,
+                                             @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return success(undoService.undo(id(projectId, "projectId"), id(changesetId, "changesetId"),
+                actor(authentication)), traceId);
+    }
+
+    @PostMapping("/runs/{sourceRunId}/undo")
+    public ApiResponse<Object> undoRun(@PathVariable String projectId, @PathVariable String sourceRunId,
+                                       Authentication authentication,
+                                       @RequestHeader(value = "X-Trace-Id", required = false) String traceId) {
+        return success(undoService.undoRun(id(projectId, "projectId"), id(sourceRunId, "sourceRunId"),
+                actor(authentication)), traceId);
     }
 
     @GetMapping("/nodes/{nodeId}/changesets")

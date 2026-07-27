@@ -55,7 +55,11 @@ describe('storyBibleApi', () => {
       1,
       '/v1/novels/101/story-bible/nodes?status=CANON&query=Captain&categoryId=31&tagId=41',
     )
-    expect(requestMock.get).toHaveBeenNthCalledWith(2, '/v1/novels/101/story-bible/changesets?limit=25')
+    expect(requestMock.get).toHaveBeenNthCalledWith(
+      2,
+      '/v1/novels/101/story-bible/changesets',
+      { params: { limit: 25 } },
+    )
     expect(requestMock.get).toHaveBeenNthCalledWith(3, '/v1/novels/101/story-bible/changesets/51')
     expect(requestMock.get).toHaveBeenNthCalledWith(4, '/v1/novels/101/story-bible/nodes/71/changesets?limit=20')
   })

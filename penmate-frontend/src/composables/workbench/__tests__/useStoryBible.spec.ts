@@ -74,7 +74,7 @@ describe('useStoryBible', () => {
     vi.spyOn(storyBibleApi, 'listTags').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listRelations').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'listProgressions').mockResolvedValue([])
-    vi.spyOn(storyBibleApi, 'listChanges').mockResolvedValue([])
+    vi.spyOn(storyBibleApi, 'listChanges').mockResolvedValue({ items: [], nextBeforeRevision: null })
     vi.spyOn(storyBibleApi, 'listNodeChanges').mockResolvedValue([])
     vi.spyOn(storyBibleApi, 'getNode').mockResolvedValue({
       node,
@@ -167,5 +167,38 @@ describe('useStoryBible', () => {
     expect(story.progressions.value[0]).toEqual(updatedProgression)
     expect(storyBibleApi.get).toHaveBeenCalledTimes(2)
     expect(storyBibleApi.listChanges).toHaveBeenCalledTimes(3)
+  })
+
+  it('appends unique archived history records from older pages', async () => {
+    const recent = {
+      changesetId: '501',
+      storyBibleId: '11',
+      contentRevision: 50,
+      actorType: 'AGENT' as const,
+      sourceRunId: '801',
+      changeSummary: 'Recent update',
+      createdAt: new Date().toISOString(),
+    }
+    const archived = {
+      changesetId: '499',
+      storyBibleId: '11',
+      contentRevision: 48,
+      actorType: 'AGENT' as const,
+      sourceRunId: '799',
+      changeSummary: 'Archived update',
+      createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+      archivedAt: new Date().toISOString(),
+    }
+    vi.mocked(storyBibleApi.listChanges)
+      .mockResolvedValueOnce({ items: [recent], nextBeforeRevision: 50 })
+      .mockResolvedValueOnce({ items: [recent, archived], nextBeforeRevision: null })
+    const story = useStoryBible({ getContext: () => ({ projectId: '101', operatorId: '7' }) })
+
+    await story.loadWorkspace()
+    await story.loadMoreHistory()
+
+    expect(storyBibleApi.listChanges).toHaveBeenLastCalledWith('101', 50, 50)
+    expect(story.history.value).toEqual([recent, archived])
+    expect(story.historyBeforeRevision.value).toBeNull()
   })
 })

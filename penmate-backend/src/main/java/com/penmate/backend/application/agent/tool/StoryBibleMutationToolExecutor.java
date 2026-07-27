@@ -26,27 +26,53 @@ public class StoryBibleMutationToolExecutor {
 
     public void validate(ToolCallRequest request, Map<String, OperationSpec> operations) {
         if (request == null) throw new IllegalArgumentException("request is required");
+        if (request.toolArgsJson().length() > 100_000) {
+            throw new IllegalArgumentException("serialized Story Bible batch exceeds 100000 characters");
+        }
         Map<String, Object> arguments = jsonCodec.readObject(request.toolArgsJson());
-        OperationSpec spec = requireOperation(arguments, operations);
-        requireFields(arguments, spec.requiredFields());
+        for (Map<String, Object> item : items(arguments)) {
+            OperationSpec spec = requireOperation(item, operations);
+            requireFields(item, spec.requiredFields());
+        }
     }
 
     public ToolCallResult execute(AuthorizedAgentRunContext context, ToolCallRequest request,
                                   Map<String, OperationSpec> operations) {
         try {
             Map<String, Object> arguments = jsonCodec.readObject(request.toolArgsJson());
-            OperationSpec spec = requireOperation(arguments, operations);
-            requireFields(arguments, spec.requiredFields());
-
-            Map<String, Object> mutation = new LinkedHashMap<>(arguments);
-            mutation.remove("operation");
-            moveStructuredJson(mutation, "attributes", "attributesJson");
-            moveStructuredJson(mutation, "patch", "patchJson");
-            moveStructuredJson(mutation, "fieldSchema", "fieldSchemaJson");
-            return updateService.execute(context, spec.mutationKind(), mutation);
+            List<StoryBibleUpdateApplicationService.MutationCommand> commands = new ArrayList<>();
+            for (Map<String, Object> item : items(arguments)) {
+                OperationSpec spec = requireOperation(item, operations);
+                requireFields(item, spec.requiredFields());
+                Map<String, Object> mutation = new LinkedHashMap<>(item);
+                mutation.remove("operation");
+                moveStructuredJson(mutation, "attributes", "attributesJson");
+                moveStructuredJson(mutation, "patch", "patchJson");
+                moveStructuredJson(mutation, "fieldSchema", "fieldSchemaJson");
+                commands.add(new StoryBibleUpdateApplicationService.MutationCommand(spec.mutationKind(), mutation));
+            }
+            return updateService.executeBatch(context, commands);
         } catch (RuntimeException exception) {
             return ToolCallResult.failed("STORY_BIBLE_WRITE_FAILED", message(exception));
         }
+    }
+
+    private static List<Map<String, Object>> items(Map<String, Object> arguments) {
+        Object raw = arguments.get("items");
+        if (!(raw instanceof List<?> values)) {
+            throw new IllegalArgumentException("items is required and must be an array");
+        }
+        if (values.isEmpty() || values.size() > 25) {
+            throw new IllegalArgumentException("items must contain between 1 and 25 mutations");
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> map)) throw new IllegalArgumentException("Every batch item must be an object");
+            Map<String, Object> item = new LinkedHashMap<>();
+            map.forEach((key, itemValue) -> item.put(String.valueOf(key), itemValue));
+            result.add(item);
+        }
+        return List.copyOf(result);
     }
 
     private static OperationSpec requireOperation(Map<String, Object> arguments,

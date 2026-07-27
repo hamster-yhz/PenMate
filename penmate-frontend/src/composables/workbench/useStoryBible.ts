@@ -76,6 +76,8 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const relations = ref<StoryBibleRelation[]>([])
   const progressions = ref<StoryBibleProgression[]>([])
   const history = ref<StoryBibleChangeset[]>([])
+  const historyBeforeRevision = ref<number | null>(null)
+  const historyLoadingMore = ref(false)
   const nodeHistory = ref<StoryBibleChangeset[]>([])
   const selectedNodeId = ref('')
   const selectedTypeId = ref('')
@@ -129,13 +131,14 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
   const refreshRevisionAndHistory = async () => {
     const { projectId } = requireContext()
     const selectedId = selectedNodeId.value
-    const [nextRoot, nextHistory, nextNodeHistory] = await Promise.all([
+    const [nextRoot, nextHistoryPage, nextNodeHistory] = await Promise.all([
       storyBibleApi.get(projectId),
       storyBibleApi.listChanges(projectId),
       selectedId ? storyBibleApi.listNodeChanges(projectId, selectedId) : Promise.resolve([]),
     ])
     root.value = nextRoot
-    history.value = nextHistory
+    history.value = nextHistoryPage.items
+    historyBeforeRevision.value = nextHistoryPage.nextBeforeRevision ?? null
     nodeHistory.value = nextNodeHistory
   }
 
@@ -168,7 +171,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
         context.operatorId,
         context.projectTitle || 'Story Bible',
       )
-      const [nextViews, nextTypes, nextNodes, nextCategories, nextTags, nextRelations, nextProgressions, nextHistory] =
+      const [nextViews, nextTypes, nextNodes, nextCategories, nextTags, nextRelations, nextProgressions, nextHistoryPage] =
         await Promise.all([
           storyBibleApi.listViews(context.projectId),
           storyBibleApi.listNodeTypes(context.projectId),
@@ -186,7 +189,8 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
       tags.value = nextTags
       relations.value = nextRelations
       progressions.value = nextProgressions
-      history.value = nextHistory
+      history.value = nextHistoryPage.items
+      historyBeforeRevision.value = nextHistoryPage.nextBeforeRevision ?? null
       if (selectedNodeId.value && nodes.value.some((node) => node.nodeId === selectedNodeId.value)) {
         await selectNode(selectedNodeId.value)
       }
@@ -257,7 +261,9 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
       else nodes.value.unshift(saved)
       selectedNodeId.value = saved.nodeId
       await selectNode(saved.nodeId)
-      history.value = await storyBibleApi.listChanges(context.projectId)
+      const historyPage = await storyBibleApi.listChanges(context.projectId)
+      history.value = historyPage.items
+      historyBeforeRevision.value = historyPage.nextBeforeRevision ?? null
       options.notifySuccess?.('Story Bible saved')
     } catch (error) {
       reportError(error, 'Failed to save Story Bible node')
@@ -277,7 +283,9 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
       draft.value = null
       effectiveState.value = null
       nodeHistory.value = []
-      history.value = await storyBibleApi.listChanges(context.projectId)
+      const historyPage = await storyBibleApi.listChanges(context.projectId)
+      history.value = historyPage.items
+      historyBeforeRevision.value = historyPage.nextBeforeRevision ?? null
       options.notifySuccess?.('Story Bible node deleted')
     } catch (error) {
       reportError(error, 'Failed to delete Story Bible node')
@@ -420,6 +428,23 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     await refreshRevisionAndHistory()
   }
 
+  const loadMoreHistory = async () => {
+    const beforeRevision = historyBeforeRevision.value
+    if (beforeRevision == null || historyLoadingMore.value) return
+    historyLoadingMore.value = true
+    try {
+      const { projectId } = requireContext()
+      const page = await storyBibleApi.listChanges(projectId, 50, beforeRevision)
+      const known = new Set(history.value.map((item) => item.changesetId))
+      history.value.push(...page.items.filter((item) => !known.has(item.changesetId)))
+      historyBeforeRevision.value = page.nextBeforeRevision ?? null
+    } catch (error) {
+      reportError(error, 'Failed to load earlier Story Bible history')
+    } finally {
+      historyLoadingMore.value = false
+    }
+  }
+
   return {
     root,
     views,
@@ -432,6 +457,8 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     relations,
     progressions,
     history,
+    historyBeforeRevision,
+    historyLoadingMore,
     nodeHistory,
     selectedNodeId,
     selectedNode,
@@ -467,6 +494,7 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     saveTag,
     deleteTag,
     saveViewPreference,
+    loadMoreHistory,
   }
 }
 

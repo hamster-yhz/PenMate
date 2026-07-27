@@ -18,8 +18,8 @@ class StoryBibleV2ToolDefinitionsTest {
                 .isEqualTo("story_bible_relation_write");
         assertThat(new StoryBibleProgressionWriteToolDefinition().descriptor().toolCode())
                 .isEqualTo("story_bible_progression_write");
-        assertThat(new StoryBibleStructureWriteToolDefinition().descriptor().exposure().executionProfiles())
-                .containsExactly("world-build");
+        assertThat(new StoryBibleStructureWriteToolDefinition().descriptor().exposure().lifecycleStatus())
+                .isEqualTo(ToolLifecycleStatus.ACTIVE);
     }
 
     @Test
@@ -29,11 +29,11 @@ class StoryBibleV2ToolDefinitionsTest {
         validator.register(descriptor.toolCode(), descriptor.exposure().parametersJsonSchema());
 
         validator.validate(descriptor.toolCode(), """
-                {"operation":"update","nodeId":71,"expectedRevision":3,
-                 "attributes":{"pointOfView":true,"traits":["patient"]}}
+                {"items":[{"operation":"update","nodeId":71,"expectedRevision":3,
+                 "attributes":{"pointOfView":true,"traits":["patient"]}}]}
                 """);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> validator.validate(
-                        descriptor.toolCode(), "{\"operation\":\"update\",\"rawJson\":\"{}\"}"))
+                        descriptor.toolCode(), "{\"items\":[{\"operation\":\"update\",\"rawJson\":\"{}\"}]}"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

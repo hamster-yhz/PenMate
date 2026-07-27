@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,19 +30,21 @@ class StoryBibleMutationToolExecutorTest {
     void converts_structured_attributes_to_one_transactional_node_mutation() {
         AuthorizedAgentRunContext context = mock(AuthorizedAgentRunContext.class);
         ToolCallRequest request = request("""
-                {"operation":"update","nodeId":71,"expectedRevision":4,
-                 "attributes":{"coreMotivation":"protect the city","pointOfView":true}}
+                {"items":[{"operation":"update","nodeId":71,"expectedRevision":4,
+                 "attributes":{"coreMotivation":"protect the city","pointOfView":true}}]}
                 """);
-        when(updateService.execute(any(), eq("update_node"), any())).thenReturn(ToolCallResult.success("{}"));
+        when(updateService.executeBatch(any(), any())).thenReturn(ToolCallResult.success("{}"));
 
         ToolCallResult result = executor.execute(context, request, Map.of(
                 "update", OperationSpec.of("update_node", "nodeId", "expectedRevision")));
 
         assertThat(result.status()).isEqualTo("SUCCESS");
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, Object>> captured = ArgumentCaptor.forClass(Map.class);
-        verify(updateService).execute(any(), eq("update_node"), captured.capture());
-        Map<String, Object> mutation = captured.getValue();
+        ArgumentCaptor<List<StoryBibleUpdateApplicationService.MutationCommand>> captured = ArgumentCaptor.forClass(List.class);
+        verify(updateService).executeBatch(any(), captured.capture());
+        assertThat(captured.getValue()).singleElement().extracting(StoryBibleUpdateApplicationService.MutationCommand::mutationKind)
+                .isEqualTo("update_node");
+        Map<String, Object> mutation = captured.getValue().getFirst().mutation();
         assertThat(mutation.get("nodeId")).isEqualTo(71);
         assertThat(mutation.get("expectedRevision")).isEqualTo(4);
         assertThat(mutation).doesNotContainKeys("operation", "kind");
@@ -53,7 +56,7 @@ class StoryBibleMutationToolExecutorTest {
 
     @Test
     void rejects_an_update_without_an_inspected_revision() {
-        ToolCallRequest request = request("{\"operation\":\"update\",\"nodeId\":71}");
+        ToolCallRequest request = request("{\"items\":[{\"operation\":\"update\",\"nodeId\":71}]}");
         Map<String, OperationSpec> operations = Map.of(
                 "update", OperationSpec.of("update_node", "nodeId", "expectedRevision"));
 
@@ -64,7 +67,7 @@ class StoryBibleMutationToolExecutorTest {
 
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.errorMessage()).contains("expectedRevision");
-        verify(updateService, never()).execute(any(), any(), any());
+        verify(updateService, never()).executeBatch(any(), any());
     }
 
     private ToolCallRequest request(String arguments) {

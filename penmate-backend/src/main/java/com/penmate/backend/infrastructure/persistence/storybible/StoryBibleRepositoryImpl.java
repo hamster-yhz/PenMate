@@ -84,13 +84,29 @@ public class StoryBibleRepositoryImpl implements StoryBibleRepository {
     @Override public int insertChangeset(StoryBibleChangeset changeset) { return mapper.insertChangeset(changeset); }
     @Override public int insertChangeItem(StoryBibleChangeItem item) { return mapper.insertChangeItem(item); }
     @Override public List<StoryBibleChangeset> findRecentChangesets(Long storyBibleId, int limit) { return mapper.findRecentChangesets(storyBibleId, limit); }
+    @Override public List<StoryBibleChangeset> findChangesetsPage(Long storyBibleId, Long beforeRevision, int limit) { return mapper.findChangesetsPage(storyBibleId, beforeRevision, limit); }
     @Override public StoryBibleChangeset findChangeset(Long storyBibleId, Long changesetId) { return mapper.findChangeset(storyBibleId, changesetId); }
+    @Override public List<StoryBibleChangeset> findChangesetsBySourceRun(Long storyBibleId, Long sourceRunId) { return mapper.findChangesetsBySourceRun(storyBibleId, sourceRunId); }
+    @Override public List<StoryBibleChangeset> findChangesetsByRevisionRange(Long storyBibleId, Long firstRevision, Long lastRevision) { return mapper.findChangesetsByRevisionRange(storyBibleId, firstRevision, lastRevision); }
     @Override public List<StoryBibleChangeset> findChangesetsForNode(Long storyBibleId, Long nodeId, int limit) { return mapper.findChangesetsForNode(storyBibleId, nodeId, limit); }
     @Override public List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, Instant cutoff, int retainCount) { return mapper.findChangesetsBefore(storyBibleId, cutoff, retainCount); }
-    @Override public List<StoryBible> findStoryBiblesWithChangesetsBefore(Instant cutoff) { return mapper.findStoryBiblesWithChangesetsBefore(cutoff); }
+    @Override public List<StoryBible> findStoryBiblesWithChangesetsBefore(Instant cutoff, int retainCount) { return mapper.findStoryBiblesWithChangesetsBefore(cutoff, retainCount); }
     @Override public List<StoryBibleChangeItem> findChangeItemsByChangesetIds(List<Long> changesetIds) { return empty(changesetIds) ? List.of() : mapper.findChangeItemsByChangesetIds(changesetIds); }
-    @Override public int deleteChangeItemsByChangesetIds(List<Long> changesetIds) { return empty(changesetIds) ? 0 : mapper.deleteChangeItemsByChangesetIds(changesetIds); }
-    @Override public int deleteChangesetsByIds(Long storyBibleId, List<Long> changesetIds) { return empty(changesetIds) ? 0 : mapper.deleteChangesetsByIds(storyBibleId, changesetIds); }
+    @Override public int archiveChangesets(Long storyBibleId, List<Long> changesetIds, Instant archivedAt) { return empty(changesetIds) ? 0 : mapper.archiveChangesets(storyBibleId, changesetIds, archivedAt); }
+    @Override public int markChangesetUndone(Long storyBibleId, Long changesetId, Long undoneBy, Long undoChangesetId) { return mapper.markChangesetUndone(storyBibleId, changesetId, undoneBy, undoChangesetId); }
+    @Override public int markChangesetsUndone(Long storyBibleId, List<Long> changesetIds, Long undoneBy, Long undoChangesetId) { return empty(changesetIds) ? 0 : mapper.markChangesetsUndone(storyBibleId, changesetIds, undoneBy, undoChangesetId); }
+    @Override public StoryBibleNode findNodeIncludingDeleted(Long storyBibleId, Long nodeId) { return mapper.findNodeIncludingDeleted(storyBibleId, nodeId); }
+    @Override public int restoreNode(StoryBibleNode node, Long expectedRevision) { return mapper.restoreNode(node, expectedRevision); }
+    @Override public StoryBibleRelation findRelationIncludingDeleted(Long storyBibleId, Long relationId) { return mapper.findRelationIncludingDeleted(storyBibleId, relationId); }
+    @Override public int restoreRelation(StoryBibleRelation relation, Long expectedRevision) { return mapper.restoreRelation(relation, expectedRevision); }
+    @Override public StoryBibleProgression findProgressionIncludingDeleted(Long storyBibleId, Long progressionId) { return mapper.findProgressionIncludingDeleted(storyBibleId, progressionId); }
+    @Override public int restoreProgression(StoryBibleProgression progression, Long expectedRevision) { return mapper.restoreProgression(progression, expectedRevision); }
+    @Override public StoryBibleCategory findCategoryIncludingDeleted(Long storyBibleId, Long categoryId) { return mapper.findCategoryIncludingDeleted(storyBibleId, categoryId); }
+    @Override public int restoreCategory(StoryBibleCategory category) { return mapper.restoreCategory(category); }
+    @Override public StoryBibleTag findTagIncludingDeleted(Long storyBibleId, Long tagId) { return mapper.findTagIncludingDeleted(storyBibleId, tagId); }
+    @Override public int restoreTag(StoryBibleTag tag) { return mapper.restoreTag(tag); }
+    @Override public StoryBibleNodeType findNodeTypeIncludingArchived(Long storyBibleId, Long typeId) { return mapper.findNodeTypeIncludingArchived(storyBibleId, typeId); }
+    @Override public int restoreNodeType(StoryBibleNodeType type) { return mapper.restoreNodeType(type); }
 
     private boolean empty(List<Long> ids) {
         return ids == null || ids.isEmpty();

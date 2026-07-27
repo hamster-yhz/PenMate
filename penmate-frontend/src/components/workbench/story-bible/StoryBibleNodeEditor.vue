@@ -58,8 +58,11 @@
         />
         <StoryBibleHistoryTab
           v-else-if="activeTab === 'history'"
+          :project-id="projectId"
+          :current-revision="currentRevision"
           :history="history"
           @open-run="emit('openRun', $event)"
+          @undone="emit('historyUndone')"
         />
         <div v-else class="empty-state">保存节点后可编辑此内容</div>
       </div>
@@ -100,6 +103,8 @@ import StoryBibleRelationsTab from './StoryBibleRelationsTab.vue'
 import type { StoryBibleChapterOption } from './storyBibleTypes'
 
 const props = defineProps<{
+  projectId: string
+  currentRevision?: number
   draft: StoryBibleNodeDraft | null
   saving: boolean
   chapterId?: string
@@ -128,6 +133,7 @@ const emit = defineEmits<{
   (event: 'updateProgression', payload: { progressionId: string; update: StoryBibleProgressionUpdatePayload }): void
   (event: 'deleteProgression', payload: StoryBibleProgression): void
   (event: 'openRun', runId: string): void
+  (event: 'historyUndone'): void
 }>()
 const activeTab = ref('base')
 const tabs = [

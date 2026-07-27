@@ -4,7 +4,6 @@ import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.Set;
 
 public final class StoryBibleV2ToolDefinitions {
     private StoryBibleV2ToolDefinitions() { }
@@ -35,7 +34,7 @@ class StoryBibleInspectToolDefinition implements AgentToolDefinition {
             {
               "type":"object",
               "properties":{
-                "operation":{"type":"string","enum":["readiness","catalog","node"]},
+                "operation":{"type":"string","enum":["overview","catalog","node"]},
                 "nodeId":{"type":"integer","minimum":1},
                 "typeCode":{"type":"string","minLength":1}
               },
@@ -49,8 +48,8 @@ class StoryBibleInspectToolDefinition implements AgentToolDefinition {
                 "story_bible_inspect",
                 new ToolPresentation("故事设定精确读取"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Inspect Story Bible readiness, exact type schemas, or one complete node. Use node inspection before every update or archive; it returns required revisions, relations, and progressions.",
-                        SCHEMA, Set.of("default", "world-build")),
+                        "Inspect the factual Story Bible overview, exact type catalog, or one complete node. Overview reports counts, Story Core fields, structural issues, and recent changes without claiming semantic completeness.",
+                        SCHEMA),
                 StoryBibleV2ToolDefinitions.readOnly());
     }
 }
@@ -59,8 +58,8 @@ class StoryBibleInspectToolDefinition implements AgentToolDefinition {
 class StoryBibleNodeWriteToolDefinition implements AgentToolDefinition {
     private static final String SCHEMA = """
             {
-              "type":"object",
-              "properties":{
+              "type":"object","properties":{"items":{"type":"array","minItems":1,"maxItems":25,"items":{
+              "type":"object","properties":{
                 "operation":{"type":"string","enum":["create","update","archive"]},
                 "nodeId":{"type":"integer","minimum":1},
                 "expectedRevision":{"type":"integer","minimum":1},
@@ -75,8 +74,8 @@ class StoryBibleNodeWriteToolDefinition implements AgentToolDefinition {
                 "categoryIds":{"type":"array","items":{"type":"integer","minimum":1}},
                 "tagIds":{"type":"array","items":{"type":"integer","minimum":1}}
               },
-              "required":["operation"],
-              "additionalProperties":false
+              "required":["operation"],"additionalProperties":false
+              }}},"required":["items"],"additionalProperties":false
             }
             """;
 
@@ -85,8 +84,8 @@ class StoryBibleNodeWriteToolDefinition implements AgentToolDefinition {
                 "story_bible_node_write",
                 new ToolPresentation("故事设定节点写入"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Create, minimally update, or archive one Story Bible node. Pass attributes as an object. Updates and archives require the exact revision returned by story_bible_inspect.",
-                        SCHEMA, Set.of("default", "world-build")),
+                        "Atomically create, minimally update, or archive 1-25 Story Bible nodes. Pass items as an array. Updates and archives require exact revisions; the whole batch rolls back if any item fails.",
+                        SCHEMA),
                 StoryBibleV2ToolDefinitions.write("STORY_BIBLE_NODE_MUTATION", 3,
                         "create", "update", "archive"));
     }
@@ -96,8 +95,8 @@ class StoryBibleNodeWriteToolDefinition implements AgentToolDefinition {
 class StoryBibleRelationWriteToolDefinition implements AgentToolDefinition {
     private static final String SCHEMA = """
             {
-              "type":"object",
-              "properties":{
+              "type":"object","properties":{"items":{"type":"array","minItems":1,"maxItems":25,"items":{
+              "type":"object","properties":{
                 "operation":{"type":"string","enum":["create","update","delete"]},
                 "relationId":{"type":"integer","minimum":1},
                 "expectedRevision":{"type":"integer","minimum":1},
@@ -107,8 +106,8 @@ class StoryBibleRelationWriteToolDefinition implements AgentToolDefinition {
                 "description":{"type":["string","null"]},
                 "attributes":{"type":"object","additionalProperties":true}
               },
-              "required":["operation"],
-              "additionalProperties":false
+              "required":["operation"],"additionalProperties":false
+              }}},"required":["items"],"additionalProperties":false
             }
             """;
 
@@ -117,8 +116,8 @@ class StoryBibleRelationWriteToolDefinition implements AgentToolDefinition {
                 "story_bible_relation_write",
                 new ToolPresentation("故事设定关系写入"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Create, minimally update, or delete one durable relation between Story Bible nodes. Inspect an endpoint first; updates and deletes require the returned relation revision.",
-                        SCHEMA, Set.of("default", "world-build")),
+                        "Atomically create, minimally update, or delete 1-25 Story Bible relations. Updates and deletes require exact revisions; the whole batch rolls back if any item fails.",
+                        SCHEMA),
                 StoryBibleV2ToolDefinitions.write("STORY_BIBLE_RELATION_MUTATION", 3,
                         "create", "update", "delete"));
     }
@@ -128,8 +127,8 @@ class StoryBibleRelationWriteToolDefinition implements AgentToolDefinition {
 class StoryBibleProgressionWriteToolDefinition implements AgentToolDefinition {
     private static final String SCHEMA = """
             {
-              "type":"object",
-              "properties":{
+              "type":"object","properties":{"items":{"type":"array","minItems":1,"maxItems":25,"items":{
+              "type":"object","properties":{
                 "operation":{"type":"string","enum":["create","update","delete"]},
                 "progressionId":{"type":"integer","minimum":1},
                 "expectedRevision":{"type":"integer","minimum":1},
@@ -140,8 +139,8 @@ class StoryBibleProgressionWriteToolDefinition implements AgentToolDefinition {
                 "patch":{"type":"array","minItems":1,"items":{"type":"object"}},
                 "summary":{"type":["string","null"]}
               },
-              "required":["operation"],
-              "additionalProperties":false
+              "required":["operation"],"additionalProperties":false
+              }}},"required":["items"],"additionalProperties":false
             }
             """;
 
@@ -150,8 +149,8 @@ class StoryBibleProgressionWriteToolDefinition implements AgentToolDefinition {
                 "story_bible_progression_write",
                 new ToolPresentation("故事设定演化写入"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Create, minimally update, or delete a chapter-scoped Story Bible state progression. Pass patch as RFC 6902 operations. Inspect the node first; updates and deletes require the returned progression revision.",
-                        SCHEMA, Set.of("default", "world-build")),
+                        "Atomically create, minimally update, or delete 1-25 chapter-scoped Story Bible progressions. Pass patches as RFC 6902 operations. The whole batch rolls back if any item fails.",
+                        SCHEMA),
                 StoryBibleV2ToolDefinitions.write("STORY_BIBLE_PROGRESSION_MUTATION", 3,
                         "create", "update", "delete"));
     }
@@ -161,8 +160,8 @@ class StoryBibleProgressionWriteToolDefinition implements AgentToolDefinition {
 class StoryBibleStructureWriteToolDefinition implements AgentToolDefinition {
     private static final String SCHEMA = """
             {
-              "type":"object",
-              "properties":{
+              "type":"object","properties":{"items":{"type":"array","minItems":1,"maxItems":25,"items":{
+              "type":"object","properties":{
                 "operation":{"type":"string","enum":["create_type","update_type","archive_type","create_category","update_category","delete_category","create_tag","update_tag","delete_tag"]},
                 "typeId":{"type":"integer","minimum":1},
                 "categoryId":{"type":"integer","minimum":1},
@@ -177,8 +176,8 @@ class StoryBibleStructureWriteToolDefinition implements AgentToolDefinition {
                 "color":{"type":["string","null"]},
                 "sortOrder":{"type":"integer"}
               },
-              "required":["operation"],
-              "additionalProperties":false
+              "required":["operation"],"additionalProperties":false
+              }}},"required":["items"],"additionalProperties":false
             }
             """;
 
@@ -187,8 +186,8 @@ class StoryBibleStructureWriteToolDefinition implements AgentToolDefinition {
                 "story_bible_structure_write",
                 new ToolPresentation("故事设定结构管理"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Manage custom Story Bible types, categories, and tags only after catalog inspection and explicit user approval. Never structurally edit system types.",
-                        SCHEMA, Set.of("world-build")),
+                        "Atomically manage 1-25 custom Story Bible types, categories, or tags after catalog inspection. Never structurally edit system types; the whole batch rolls back if any item fails.",
+                        SCHEMA),
                 StoryBibleV2ToolDefinitions.write("STORY_BIBLE_STRUCTURE_MUTATION", 4,
                         "create_type", "update_type", "archive_type", "create_category", "update_category",
                         "delete_category", "create_tag", "update_tag", "delete_tag"));

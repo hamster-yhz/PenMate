@@ -130,17 +130,38 @@ public interface StoryBibleRepository {
 
     List<StoryBibleChangeset> findRecentChangesets(Long storyBibleId, int limit);
 
+    List<StoryBibleChangeset> findChangesetsPage(Long storyBibleId, Long beforeRevision, int limit);
+
     StoryBibleChangeset findChangeset(Long storyBibleId, Long changesetId);
+
+    List<StoryBibleChangeset> findChangesetsBySourceRun(Long storyBibleId, Long sourceRunId);
+
+    List<StoryBibleChangeset> findChangesetsByRevisionRange(Long storyBibleId, Long firstRevision, Long lastRevision);
 
     List<StoryBibleChangeset> findChangesetsForNode(Long storyBibleId, Long nodeId, int limit);
 
     List<StoryBibleChangeset> findChangesetsBefore(Long storyBibleId, Instant cutoff, int retainCount);
 
-    List<StoryBible> findStoryBiblesWithChangesetsBefore(Instant cutoff);
+    List<StoryBible> findStoryBiblesWithChangesetsBefore(Instant cutoff, int retainCount);
 
     List<StoryBibleChangeItem> findChangeItemsByChangesetIds(List<Long> changesetIds);
 
-    int deleteChangeItemsByChangesetIds(List<Long> changesetIds);
+    int archiveChangesets(Long storyBibleId, List<Long> changesetIds, Instant archivedAt);
 
-    int deleteChangesetsByIds(Long storyBibleId, List<Long> changesetIds);
+    int markChangesetUndone(Long storyBibleId, Long changesetId, Long undoneBy, Long undoChangesetId);
+
+    int markChangesetsUndone(Long storyBibleId, List<Long> changesetIds, Long undoneBy, Long undoChangesetId);
+
+    StoryBibleNode findNodeIncludingDeleted(Long storyBibleId, Long nodeId);
+    int restoreNode(StoryBibleNode node, Long expectedRevision);
+    StoryBibleRelation findRelationIncludingDeleted(Long storyBibleId, Long relationId);
+    int restoreRelation(StoryBibleRelation relation, Long expectedRevision);
+    StoryBibleProgression findProgressionIncludingDeleted(Long storyBibleId, Long progressionId);
+    int restoreProgression(StoryBibleProgression progression, Long expectedRevision);
+    StoryBibleCategory findCategoryIncludingDeleted(Long storyBibleId, Long categoryId);
+    int restoreCategory(StoryBibleCategory category);
+    StoryBibleTag findTagIncludingDeleted(Long storyBibleId, Long tagId);
+    int restoreTag(StoryBibleTag tag);
+    StoryBibleNodeType findNodeTypeIncludingArchived(Long storyBibleId, Long typeId);
+    int restoreNodeType(StoryBibleNodeType type);
 }

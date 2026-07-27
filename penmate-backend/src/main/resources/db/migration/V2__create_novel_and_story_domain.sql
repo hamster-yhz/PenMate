@@ -424,6 +424,10 @@ CREATE TABLE IF NOT EXISTS story_bible_changesets (
     source_run_id BIGINT NULL,
     change_summary VARCHAR(500) NOT NULL,
     created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    archived_at TIMESTAMPTZ(3) NULL,
+    undone_at TIMESTAMPTZ(3) NULL,
+    undone_by BIGINT NULL,
+    undo_changeset_id BIGINT NULL,
     CONSTRAINT uk_story_bible_changesets_changeset_id UNIQUE (changeset_id),
     CONSTRAINT uk_story_bible_changesets_revision UNIQUE (story_bible_id, content_revision)
 );
