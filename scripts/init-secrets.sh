@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "This script requires Bash. Run: bash ./scripts/init-secrets.sh" >&2
+  exit 1
+fi
+
 set -euo pipefail
 
 umask 077

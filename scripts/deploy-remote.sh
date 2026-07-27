@@ -164,7 +164,7 @@ require_value STORAGE_ACCESS_KEY
 require_value STORAGE_SECRET_KEY
 require_value STORAGE_BUCKET
 require_value BOOTSTRAP_ADMIN_EMAIL
-require_minimum_secret_length BOOTSTRAP_ADMIN_PASSWORD 16
+require_value BOOTSTRAP_ADMIN_PASSWORD
 validate_optional_group BOOTSTRAP_CHAT
 validate_optional_group BOOTSTRAP_EMBEDDING
 validate_image BACKEND_IMAGE "$BACKEND_IMAGE"
