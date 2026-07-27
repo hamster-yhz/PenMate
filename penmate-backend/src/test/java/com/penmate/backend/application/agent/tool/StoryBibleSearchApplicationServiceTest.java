@@ -8,10 +8,12 @@ import com.penmate.backend.application.agent.context.StoryBibleContextResolver;
 import com.penmate.backend.application.agent.context.StoryBibleRouteDecision;
 import com.penmate.backend.application.agent.context.StoryBibleRouteRequest;
 import com.penmate.backend.application.agent.context.StoryBibleRoutingMode;
+import com.penmate.backend.application.agent.AgentModelRoutingService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallRequest;
 import com.penmate.backend.application.agent.tool.runtime.AuthorizedAgentRunContext;
 import com.penmate.backend.application.common.serialization.JsonCodec;
 import com.penmate.backend.domain.agent.run.repository.AgentRunRepository;
+import com.penmate.backend.domain.agent.context.model.AgentContextEpoch;
 import com.penmate.backend.domain.storybible.model.StoryBibleRelation;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +39,7 @@ class StoryBibleSearchApplicationServiceTest {
     @Mock private AgentContextEpochService epochs;
     @Mock private StoryBibleContextResolver resolver;
     @Mock private AgentWorkingSetPromotionService workingSetPromotions;
+    @Mock private AgentModelRoutingService modelRouting;
 
     @Test
     void should_search_only_the_run_bound_epoch_and_promote_returned_nodes() throws Exception {
@@ -94,6 +98,37 @@ class StoryBibleSearchApplicationServiceTest {
         assertThat(service.execute(context(null), request("{\"query\":\"Mira\"}"))).extracting(
                 value -> value.status(), value -> value.errorCode())
                 .containsExactly("FAILED", "STORY_BIBLE_EPOCH_MISSING");
+    }
+
+    @Test
+    void agent_driven_run_uses_retrieval_for_explicit_search() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        JsonCodec jsonCodec = new JacksonJsonCodec(objectMapper);
+        ContextEpochSnapshotCodec codec = new ContextEpochSnapshotCodec(jsonCodec);
+        StoryBibleSearchApplicationService service = new StoryBibleSearchApplicationService(
+                runs, epochs, codec, resolver, workingSetPromotions, jsonCodec, modelRouting);
+        var catalog = List.of(new StoryBibleRouteRequest.CatalogEntry(
+                71L, "CHARACTER", "CHARACTER", "Mira", List.of(), "Pilot", List.of(), "",
+                "AUTO_RETRIEVE", "CANON"));
+        var snapshot = new ContextEpochSnapshotCodec.Snapshot(
+                2, 101L, 11L, 9L, 4L, 301L, 1L, List.of(), catalog);
+        when(epochs.loadVerifiedSnapshot(88001L)).thenReturn(codec.encode(snapshot));
+        when(epochs.get(88001L)).thenReturn(new AgentContextEpoch(
+                88001L, 90001L, 1, "fingerprint", 9L, 4L, 301L, 1L, 0L,
+                "AGENT_DRIVEN", null, "prompt", "skills", "tools", "snapshot", "hash",
+                100L, Instant.now(), null));
+        when(resolver.resolve(any())).thenReturn(new StoryBibleContextResolver.ResolvedContext(
+                new StoryBibleRouteDecision(StoryBibleRoutingMode.RETRIEVAL, List.of(71L),
+                        Map.of(71L, "lexical"), false, 0L, false, List.of()),
+                List.of(), List.of()));
+
+        assertThat(service.execute(context(88001L), request("{\"query\":\"Mira\"}")).status())
+                .isEqualTo("SUCCESS");
+
+        ArgumentCaptor<StoryBibleRouteRequest> route = ArgumentCaptor.forClass(StoryBibleRouteRequest.class);
+        verify(resolver).resolve(route.capture());
+        assertThat(route.getValue().routingMode()).isEqualTo(StoryBibleRoutingMode.RETRIEVAL);
+        assertThat(route.getValue().epochCatalog()).isEqualTo(catalog);
     }
 
     private ToolCallRequest request(String args) {

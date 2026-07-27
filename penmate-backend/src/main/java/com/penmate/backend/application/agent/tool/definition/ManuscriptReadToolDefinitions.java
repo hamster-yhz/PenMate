@@ -44,7 +44,7 @@ class ManuscriptChapterReadToolDefinition implements AgentToolDefinition {
     @Override public AgentToolDescriptor descriptor() {
         return new AgentToolDescriptor("manuscript_chapter_read", new ToolPresentation("Read manuscript chapters"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Read one or more arbitrary manuscript chapter ranges selected from manuscript_manifest. Up to 50 selections and 20,000 returned Unicode characters total. The call fails instead of truncating when the total exceeds the limit.", SCHEMA),
+                        "Read one or more arbitrary manuscript chapter ranges selected from manuscript_manifest. Up to 50 selections and 20,000 returned Unicode characters per call. Requests over the limit succeed with truncated=true and exact nextSelections for continuation; continue with those ranges when more text is needed.", SCHEMA),
                 new ToolGovernancePolicy(new ApprovalPolicyDecision(false, ""), 0, Map.of()));
     }
 }

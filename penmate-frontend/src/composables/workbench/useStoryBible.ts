@@ -160,17 +160,28 @@ export const useStoryBible = (options: UseStoryBibleOptions) => {
     }
   }
 
+  const bootstrapWithConflictRetry = async (context: ReturnType<typeof requireContext>) => {
+    const bootstrap = () => storyBibleApi.bootstrap(
+      context.projectId,
+      context.operatorId,
+      context.projectTitle || 'Story Bible',
+    )
+    try {
+      return await bootstrap()
+    } catch (error) {
+      const record = error && typeof error === 'object' ? error as { errorCode?: unknown; status?: unknown } : null
+      if (String(record?.errorCode || '') !== 'RESOURCE_CONFLICT' && Number(record?.status) !== 409) throw error
+      return bootstrap()
+    }
+  }
+
   const loadWorkspace = async () => {
     const context = requireContext()
     latestNodeQuery += 1
     loading.value = true
     errorMessage.value = ''
     try {
-      root.value = await storyBibleApi.bootstrap(
-        context.projectId,
-        context.operatorId,
-        context.projectTitle || 'Story Bible',
-      )
+      root.value = await bootstrapWithConflictRetry(context)
       const [nextViews, nextTypes, nextNodes, nextCategories, nextTags, nextRelations, nextProgressions, nextHistoryPage] =
         await Promise.all([
           storyBibleApi.listViews(context.projectId),

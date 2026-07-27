@@ -69,8 +69,8 @@ public class ManuscriptReadApplicationService {
         if (requested.isEmpty() || requested.size() > MAX_SELECTIONS) {
             throw BusinessException.badRequest("selections must contain between 1 and " + MAX_SELECTIONS + " items");
         }
-        int total = 0;
-        java.util.ArrayList<ChapterSlice> results = new java.util.ArrayList<>();
+        long totalRequested = 0;
+        java.util.ArrayList<ResolvedSelection> resolved = new java.util.ArrayList<>();
         for (Selection selection : requested) {
             if (selection == null || selection.chapterId() == null) {
                 throw BusinessException.badRequest("Every selection requires chapterId");
@@ -84,17 +84,42 @@ public class ManuscriptReadApplicationService {
             if (start < 0 || end < start || end > characters) {
                 throw BusinessException.badRequest("Invalid range for chapter " + selection.chapterId());
             }
-            int returned = end - start;
-            total += returned;
-            if (total > MAX_RETURNED_CHARACTERS) {
-                throw BusinessException.badRequest("Requested manuscript content exceeds "
-                        + MAX_RETURNED_CHARACTERS + " characters");
-            }
-            results.add(new ChapterSlice(chapter.getChapterId(), chapter.getVolumeId(), chapter.getTitle(),
-                    value(chapter.getContentRevision(), 0L), sha256(content), characters, start, end,
-                    slice(content, start, end), start == 0 && end == characters));
+            totalRequested += end - start;
+            resolved.add(new ResolvedSelection(chapter, content, characters, start, end));
         }
-        return new ChapterRead(List.copyOf(results), total);
+        int totalReturned = 0;
+        java.util.ArrayList<ChapterSlice> results = new java.util.ArrayList<>();
+        java.util.ArrayList<Selection> nextSelections = new java.util.ArrayList<>();
+        for (int index = 0; index < resolved.size(); index++) {
+            ResolvedSelection selection = resolved.get(index);
+            int available = MAX_RETURNED_CHARACTERS - totalReturned;
+            if (available <= 0) {
+                appendRemainingSelections(resolved, index, nextSelections);
+                break;
+            }
+            int sliceEnd = Math.min(selection.end(), selection.start() + available);
+            NovelChapter chapter = selection.chapter();
+            results.add(new ChapterSlice(chapter.getChapterId(), chapter.getVolumeId(), chapter.getTitle(),
+                    value(chapter.getContentRevision(), 0L), sha256(selection.content()), selection.characters(),
+                    selection.start(), sliceEnd, slice(selection.content(), selection.start(), sliceEnd),
+                    selection.start() == 0 && sliceEnd == selection.characters()));
+            totalReturned += sliceEnd - selection.start();
+            if (sliceEnd < selection.end()) {
+                nextSelections.add(new Selection(chapter.getChapterId(), sliceEnd, selection.end()));
+                appendRemainingSelections(resolved, index + 1, nextSelections);
+                break;
+            }
+        }
+        return new ChapterRead(List.copyOf(results), totalReturned, totalRequested,
+                !nextSelections.isEmpty(), List.copyOf(nextSelections));
+    }
+
+    private void appendRemainingSelections(List<ResolvedSelection> resolved, int startIndex,
+                                           List<Selection> target) {
+        for (int index = startIndex; index < resolved.size(); index++) {
+            ResolvedSelection remaining = resolved.get(index);
+            target.add(new Selection(remaining.chapter().getChapterId(), remaining.start(), remaining.end()));
+        }
     }
 
     private NovelProject requireProject(Long projectId) {
@@ -124,8 +149,12 @@ public class ManuscriptReadApplicationService {
                                   Integer sortOrder, Integer displayNo, Long contentRevision,
                                   int characterCount, String contentHash) {}
     public record Selection(Long chapterId, Integer start, Integer end) {}
-    public record ChapterRead(List<ChapterSlice> chapters, int totalCharacters) {}
+    public record ChapterRead(List<ChapterSlice> chapters, int totalCharacters,
+                              long totalRequestedCharacters, boolean truncated,
+                              List<Selection> nextSelections) {}
     public record ChapterSlice(Long chapterId, Long volumeId, String title, Long contentRevision,
                                String contentHash, int characterCount, int start, int end,
                                String content, boolean isComplete) {}
+    private record ResolvedSelection(NovelChapter chapter, String content, int characters,
+                                     int start, int end) {}
 }

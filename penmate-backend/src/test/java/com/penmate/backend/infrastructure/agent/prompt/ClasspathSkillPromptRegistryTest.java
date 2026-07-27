@@ -49,7 +49,7 @@ class ClasspathSkillPromptRegistryTest {
             assertThat(checkerPrompt.descriptor().name()).isEqualTo("novel-review");
             assertThat(storyBiblePrompt.descriptor().name()).isEqualTo("canon-maintenance");
             assertThat(storyBiblePrompt.instructions().content())
-                    .contains("Inspect the complete catalog before considering any structural mutation")
+                    .contains("Call `story_bible_inspect` with `operation=types` and no filters")
                     .contains("never call it for a one-off node")
                     .contains("story_bible_structure_write");
         }

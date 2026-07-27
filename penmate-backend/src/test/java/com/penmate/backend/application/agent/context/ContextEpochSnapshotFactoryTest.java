@@ -110,7 +110,7 @@ class ContextEpochSnapshotFactoryTest {
     }
 
     @Test
-    void agent_driven_snapshot_binds_revisions_without_preloading_story_bible_content() {
+    void agent_driven_snapshot_binds_revisions_and_search_catalog_without_preloading_core_content() {
         StoryBibleRepository bibles = mock(StoryBibleRepository.class);
         NovelGateway novels = mock(NovelGateway.class);
         StoryBibleEffectiveStateResolver states = mock(StoryBibleEffectiveStateResolver.class);
@@ -126,6 +126,17 @@ class ContextEpochSnapshotFactoryTest {
         NovelChapter chapter = new NovelChapter();
         chapter.setContentRevision(3L);
         when(novels.findChapterByIdAndProjectId(1L, 50L)).thenReturn(chapter);
+        StoryBibleNodeType type = new StoryBibleNodeType();
+        type.setTypeId(20L);
+        type.setTypeCode("CHARACTER");
+        type.setSemanticFamily(StoryBibleSemanticFamily.CHARACTER);
+        type.setSortOrder(1);
+        StoryBibleNode mira = node(30L, "Mira", StoryBibleInclusionPolicy.AUTO_RETRIEVE);
+        when(bibles.findNodeTypes(10L)).thenReturn(List.of(type));
+        when(bibles.findNodes(10L, null, StoryBibleCanonStatus.CANON.name(), null))
+                .thenReturn(List.of(mira));
+        when(bibles.findAliasesByNodeIds(10L, List.of(30L))).thenReturn(List.of());
+        when(bibles.findRelations(10L, List.of(30L))).thenReturn(List.of());
 
         var snapshot = factory.create(1L, 50L, StoryBibleRoutingMode.AGENT_DRIVEN);
 
@@ -133,9 +144,12 @@ class ContextEpochSnapshotFactoryTest {
         assertThat(snapshot.manuscriptRevision()).isEqualTo(4L);
         assertThat(snapshot.activeChapterContentRevision()).isEqualTo(3L);
         assertThat(snapshot.coreContext()).isEmpty();
-        assertThat(snapshot.selectorCatalog()).isEmpty();
-        verify(bibles, never()).findNodeTypes(10L);
-        verify(bibles, never()).findNodes(eq(10L), any(), any(), any());
+        assertThat(snapshot.selectorCatalog()).singleElement().satisfies(entry -> {
+            assertThat(entry.nodeId()).isEqualTo(30L);
+            assertThat(entry.title()).isEqualTo("Mira");
+            assertThat(entry.currentChapterStateSummary()).isEmpty();
+        });
+        verify(states, never()).resolve(any(), any(), any(), any(), any());
     }
 
     private StoryBibleNode node(Long id, String title, StoryBibleInclusionPolicy policy) {

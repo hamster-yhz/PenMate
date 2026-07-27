@@ -63,13 +63,15 @@ public class StoryBibleSearchApplicationService {
         catch (RuntimeException ex) { return ToolCallResult.failed("STORY_BIBLE_SEARCH_INVALID", "Invalid search arguments"); }
         var snapshot = codec.decode(epochs.loadVerifiedSnapshot(context.contextEpochId()));
         var epoch = modelRouting == null ? null : epochs.get(context.contextEpochId());
-        StoryBibleRoutingMode routingMode = epoch == null ? StoryBibleRoutingMode.RETRIEVAL
+        StoryBibleRoutingMode configuredMode = epoch == null ? StoryBibleRoutingMode.RETRIEVAL
                 : StoryBibleRoutingMode.valueOf(epoch.routingMode());
-        var selectorConfig = routingMode == StoryBibleRoutingMode.RETRIEVAL || modelRouting == null ? null
+        StoryBibleRoutingMode searchMode = configuredMode == StoryBibleRoutingMode.AGENT_DRIVEN
+                ? StoryBibleRoutingMode.RETRIEVAL : configuredMode;
+        var selectorConfig = !searchMode.usesSelector() || modelRouting == null ? null
                 : modelRouting.resolveExecutionConfig(context.ownerUserId(), epoch.routerModelConfigId(), context.traceId());
         var resolved = resolver.resolve(new StoryBibleRouteRequest(
                 context.projectId(), context.sessionId(), context.runId(), context.input().chapterId(), args.query(), args.mentionedEntities(),
-                routingMode, snapshot.storyBibleRevision(), snapshot.selectorCatalog(), List.of(), selectorConfig));
+                searchMode, snapshot.storyBibleRevision(), snapshot.selectorCatalog(), List.of(), selectorConfig));
         List<Long> usedIds = resolved.nodes().stream().map(StoryBibleContextResolver.RenderedNode::nodeId).toList();
         workingSetPromotions.promoteBestEffort(context.sessionId(), context.turnId(), usedIds, BigDecimal.ONE);
         Map<Long, StoryBibleRouteRequest.CatalogEntry> catalogById = snapshot.selectorCatalog().stream()

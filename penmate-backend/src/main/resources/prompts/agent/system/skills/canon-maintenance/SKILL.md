@@ -54,7 +54,7 @@ Do not duplicate relation targets inside attributes. Do not copy chapter-scoped 
 - `MAGIC_SYSTEM`: supernatural rules and costs. `TECHNOLOGY`: reproducible material or engineered systems.
 - `FACT`: what is true or believed. `CONTINUITY_CONSTRAINT`: how later writing must remain consistent with facts.
 - `EVENT`: something that happened, is reported, disputed, or explicitly planned. Do not use EVENT to duplicate a chapter or scene.
-- Prefer the system-provided Story Bible types, categories, and tags. Inspect the complete catalog before considering any structural mutation.
+- Prefer the system-provided Story Bible types, categories, and tags. Call `story_bible_inspect` with `operation=types` and no filters before considering any structural mutation.
 - Never create a custom type, category, or tag merely to fit one node, avoid a built-in schema, or rename an existing system concept.
 - A custom structure is justified only when no built-in structure can represent a recurring durable concept. If either condition is uncertain, keep the existing structure and ask or continue with the closest valid built-in type.
 
@@ -63,7 +63,7 @@ Do not duplicate relation targets inside attributes. Do not copy chapter-scoped 
 1. Run `story_bible_inspect` with `operation=overview` when initialization state or completeness is unknown.
 2. Use `story_bible_search` with concrete entities and concepts to find relevant candidates.
 3. Run `story_bible_inspect` with `operation=node` for every candidate that may be changed.
-4. Use `operation=catalog` before creating a node or choosing fields. Never infer `typeId` from a type name.
+4. Use `operation=types` before creating a node or choosing fields. Use `operation=nodes` before updating existing nodes. Never infer `typeId` or `nodeId` from a name.
 5. When the task benefits from durable multi-step working state, use `ledger_crud` to maintain a continuity or initialization ledger for the affected scope:
    - chronology, duration, travel, and location;
    - character knowledge, belief, goal, condition, and relationship;
@@ -77,7 +77,7 @@ Classify each candidate statement as confirmed existing fact, proposed durable f
 
 Initialization means useful canon content, not database existence. PenMate already creates the Story Bible root, system type catalog, and blank Story Core.
 
-1. Inspect `overview` and the complete type catalog.
+1. Inspect `overview`, call `types` without filters to load the complete type catalog, then call `nodes` whenever exact existing `nodeId` and revision values are needed. Never guess a `typeCode` or `nodeId`.
 2. Call `manuscript_manifest` to establish exact volume/chapter coverage, revisions, hashes, and character counts. Read chapters with `manuscript_chapter_read` in one or more bounded calls; choose single chapters, batches, ranges, or representative samples based on the task.
 3. Separate explicit facts, strong inferences, contradictions, and open questions.
 4. Record a minimal initialization plan in a project AI ledger containing:
@@ -100,7 +100,7 @@ Use the narrowest tool:
 - `story_bible_node_write`: atomically create, minimally update, or archive 1-25 nodes.
 - `story_bible_relation_write`: atomically maintain 1-25 durable connections.
 - `story_bible_progression_write`: atomically maintain 1-25 RFC 6902 chapter-scoped state changes.
-- `story_bible_structure_write`: last-resort structural mutation for 1-25 custom types, categories, or tags. Call it only after inspecting the complete catalog and establishing that no built-in structure can represent a recurring durable concept; never call it for a one-off node.
+- `story_bible_structure_write`: last-resort structural mutation for 1-25 custom types, categories, or tags. Call it only after loading all types with `story_bible_inspect(operation=types)` and establishing that no built-in structure can represent a recurring durable concept; never call it for a one-off node.
 
 For node creation, pass `attributes` as a structured object matching the inspected type schema. Leave unknown optional fields absent; do not insert placeholders such as `TBD`, empty arrays, or invented defaults.
 

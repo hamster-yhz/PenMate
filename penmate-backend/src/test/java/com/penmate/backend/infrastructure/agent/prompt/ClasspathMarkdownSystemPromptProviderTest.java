@@ -23,7 +23,7 @@ class ClasspathMarkdownSystemPromptProviderTest {
                 "prompts/agent/system/execution/_base/40-output-contract.md"
         );
         assertThat(bundle.assembledPrompt()).contains("ledger_crud", "story_bible_inspect")
-                .contains("story_bible_structure_write", "必须检查完整 catalog", "不得为了单个节点")
+                .contains("story_bible_structure_write", "story_bible_inspect(operation=types)", "不得为了单个节点")
                 .doesNotContain("todo_crud");
     }
 }

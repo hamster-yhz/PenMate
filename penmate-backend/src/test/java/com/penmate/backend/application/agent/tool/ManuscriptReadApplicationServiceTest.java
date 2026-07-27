@@ -43,17 +43,22 @@ class ManuscriptReadApplicationServiceTest {
     }
 
     @Test
-    void rejects_the_complete_call_instead_of_truncating_over_limit() {
+    void truncates_over_limit_and_returns_exact_continuation_ranges() {
         NovelChapter first = chapter(10L, "a".repeat(10_001), 1L);
         NovelChapter second = chapter(11L, "b".repeat(10_000), 1L);
         when(novels.findChapterByIdAndProjectId(1L, 10L)).thenReturn(first);
         when(novels.findChapterByIdAndProjectId(1L, 11L)).thenReturn(second);
 
-        assertThatThrownBy(() -> service.read(1L, List.of(
+        var result = service.read(1L, List.of(
                 new ManuscriptReadApplicationService.Selection(10L, null, null),
-                new ManuscriptReadApplicationService.Selection(11L, null, null))))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("exceeds 20000");
+                new ManuscriptReadApplicationService.Selection(11L, null, null)));
+
+        assertThat(result.totalCharacters()).isEqualTo(20_000);
+        assertThat(result.totalRequestedCharacters()).isEqualTo(20_001);
+        assertThat(result.truncated()).isTrue();
+        assertThat(result.nextSelections()).containsExactly(
+                new ManuscriptReadApplicationService.Selection(11L, 9_999, 10_000));
+        assertThat(result.chapters()).hasSize(2);
     }
 
     private NovelChapter chapter(Long id, String content, Long revision) {

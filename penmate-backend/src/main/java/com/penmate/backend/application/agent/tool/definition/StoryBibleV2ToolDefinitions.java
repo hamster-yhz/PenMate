@@ -34,9 +34,14 @@ class StoryBibleInspectToolDefinition implements AgentToolDefinition {
             {
               "type":"object",
               "properties":{
-                "operation":{"type":"string","enum":["overview","catalog","node"]},
-                "nodeId":{"type":"integer","minimum":1},
-                "typeCode":{"type":"string","minLength":1}
+                "operation":{"type":"string","enum":["overview","types","nodes","node"]},
+                "nodeId":{"type":"integer","minimum":1,"description":"Required only for operation=node. Use an exact nodeId returned by search, nodes, or overview."},
+                "typeCode":{"type":"string","minLength":1,"description":"Optional types/nodes filter. Use only an exact typeCode returned by operation=types; never guess this value."},
+                "semanticFamily":{"type":"string","enum":["CORE","CHARACTER","WORLD","THING","NARRATIVE","TIMELINE"],"description":"Optional types/nodes filter by broad semantic family."},
+                "query":{"type":"string","description":"Optional title or summary filter for operation=nodes."},
+                "canonStatus":{"type":"string","enum":["DRAFT","CANON","ARCHIVED"],"description":"Optional status filter for operation=nodes."},
+                "offset":{"type":"integer","minimum":0,"description":"Optional nodes pagination offset."},
+                "limit":{"type":"integer","minimum":1,"maximum":100,"description":"Optional nodes page size; defaults to 50."}
               },
               "required":["operation"],
               "additionalProperties":false
@@ -48,7 +53,7 @@ class StoryBibleInspectToolDefinition implements AgentToolDefinition {
                 "story_bible_inspect",
                 new ToolPresentation("故事设定精确读取"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Inspect the factual Story Bible overview, exact type catalog, or one complete node. Overview reports counts, Story Core fields, structural issues, and recent changes without claiming semantic completeness.",
+                        "Inspect the factual Story Bible. Use types for the type catalog, nodes to enumerate exact nodeId/revision values with stable pagination, and node for one complete node. Never guess nodeId or typeCode. Overview reports counts, Story Core fields, structural issues, and recent changes without claiming semantic completeness.",
                         SCHEMA),
                 StoryBibleV2ToolDefinitions.readOnly());
     }
@@ -186,7 +191,7 @@ class StoryBibleStructureWriteToolDefinition implements AgentToolDefinition {
                 "story_bible_structure_write",
                 new ToolPresentation("故事设定结构管理"),
                 new ToolExposure(ToolLifecycleStatus.ACTIVE,
-                        "Atomically manage 1-25 custom Story Bible types, categories, or tags after catalog inspection. Never structurally edit system types; the whole batch rolls back if any item fails.",
+                        "Atomically manage 1-25 custom Story Bible types, categories, or tags after calling story_bible_inspect with operation=types and no filters. Never structurally edit system types; the whole batch rolls back if any item fails.",
                         SCHEMA),
                 StoryBibleV2ToolDefinitions.write("STORY_BIBLE_STRUCTURE_MUTATION", 4,
                         "create_type", "update_type", "archive_type", "create_category", "update_category",

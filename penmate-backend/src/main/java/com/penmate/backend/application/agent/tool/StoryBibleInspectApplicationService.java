@@ -8,9 +8,11 @@ import com.penmate.backend.application.storybible.StoryBibleApplicationService;
 import com.penmate.backend.domain.storybible.model.StoryBibleCanonStatus;
 import com.penmate.backend.domain.storybible.model.StoryBibleNode;
 import com.penmate.backend.domain.storybible.model.StoryBibleNodeType;
+import com.penmate.backend.domain.storybible.model.StoryBibleSemanticFamily;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,7 +35,8 @@ public class StoryBibleInspectApplicationService {
             InspectArgs args = jsonCodec.read(request.toolArgsJson(), InspectArgs.class);
             Object result = switch (args.operation()) {
                 case "overview" -> overview(context.projectId());
-                case "catalog" -> catalog(context.projectId(), args.typeCode());
+                case "types" -> types(context.projectId(), args.typeCode(), args.semanticFamily());
+                case "nodes" -> nodes(context.projectId(), args);
                 case "node" -> inspectNode(context, requireNodeId(args.nodeId()));
                 default -> throw new IllegalArgumentException("unsupported operation: " + args.operation());
             };
@@ -89,15 +92,11 @@ public class StoryBibleInspectApplicationService {
                 .toList();
     }
 
-    private Map<String, Object> catalog(Long projectId, String requestedTypeCode) {
-        List<StoryBibleNodeType> types = storyBible.listNodeTypes(projectId).stream()
-                .filter(type -> requestedTypeCode == null || requestedTypeCode.isBlank()
-                        || type.getTypeCode().equalsIgnoreCase(requestedTypeCode.trim()))
-                .toList();
-        if (types.isEmpty() && requestedTypeCode != null && !requestedTypeCode.isBlank()) {
-            throw new IllegalArgumentException("Story Bible node type not found: " + requestedTypeCode);
-        }
-        List<Map<String, Object>> renderedTypes = types.stream().map(type -> {
+    private Map<String, Object> types(Long projectId, String requestedTypeCode,
+                                      StoryBibleSemanticFamily requestedFamily) {
+        List<StoryBibleNodeType> allTypes = storyBible.listNodeTypes(projectId);
+        TypeFilter filter = resolveTypeFilter(allTypes, requestedTypeCode, requestedFamily, false);
+        List<Map<String, Object>> renderedTypes = filter.types().stream().map(type -> {
             Map<String, Object> value = new LinkedHashMap<>();
             value.put("typeId", String.valueOf(type.getTypeId()));
             value.put("typeCode", type.getTypeCode());
@@ -109,11 +108,115 @@ public class StoryBibleInspectApplicationService {
             value.put("nodeCount", storyBible.listNodes(projectId, type.getTypeId(), null, null).size());
             return value;
         }).toList();
-        return Map.of(
-                "types", renderedTypes,
-                "categories", storyBible.listCategories(projectId),
-                "tags", storyBible.listTags(projectId)
-        );
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("types", renderedTypes);
+        result.put("categories", storyBible.listCategories(projectId));
+        result.put("tags", storyBible.listTags(projectId));
+        result.put("resolvedFilter", filter.resolvedFilter());
+        if (filter.warning() != null) result.put("warning", filter.warning());
+        result.put("availableTypes", availableTypes(allTypes));
+        return result;
+    }
+
+    private Map<String, Object> nodes(Long projectId, InspectArgs args) {
+        List<StoryBibleNodeType> allTypes = storyBible.listNodeTypes(projectId);
+        TypeFilter filter = resolveTypeFilter(allTypes, args.typeCode(), args.semanticFamily(), true);
+        Map<Long, StoryBibleNodeType> typesById = allTypes.stream()
+                .collect(Collectors.toMap(StoryBibleNodeType::getTypeId, Function.identity()));
+        java.util.Set<Long> allowedTypeIds = filter.types().stream()
+                .map(StoryBibleNodeType::getTypeId).collect(Collectors.toSet());
+        List<StoryBibleNode> matches = storyBible.listNodes(
+                        projectId, null, args.canonStatus(), normalizeQuery(args.query())).stream()
+                .filter(node -> allowedTypeIds.contains(node.getTypeId()))
+                .sorted(Comparator
+                        .comparing((StoryBibleNode node) -> {
+                            StoryBibleNodeType type = typesById.get(node.getTypeId());
+                            return type == null || type.getSortOrder() == null
+                                    ? Integer.MAX_VALUE : type.getSortOrder();
+                        })
+                        .thenComparing(StoryBibleNode::getTitle, Comparator.nullsLast(String::compareTo))
+                        .thenComparing(StoryBibleNode::getNodeId))
+                .toList();
+        int offset = args.offset() == null ? 0 : Math.max(0, args.offset());
+        int limit = args.limit() == null ? 50 : Math.max(1, Math.min(100, args.limit()));
+        int from = Math.min(offset, matches.size());
+        int to = Math.min(matches.size(), from + limit);
+        List<Map<String, Object>> items = matches.subList(from, to).stream().map(node -> {
+            StoryBibleNodeType type = typesById.get(node.getTypeId());
+            Map<String, Object> value = renderNodeSummary(node, type);
+            value.put("semanticFamily", type == null ? "UNKNOWN" : type.getSemanticFamily());
+            value.put("summary", node.getSummary());
+            value.put("inclusionPolicy", node.getInclusionPolicy());
+            value.put("canonStatus", node.getCanonStatus());
+            return value;
+        }).toList();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("items", items);
+        result.put("total", matches.size());
+        result.put("offset", from);
+        result.put("limit", limit);
+        result.put("hasMore", to < matches.size());
+        result.put("nextOffset", to < matches.size() ? to : null);
+        result.put("resolvedFilter", filter.resolvedFilter());
+        if (filter.warning() != null) result.put("warning", filter.warning());
+        result.put("availableTypes", availableTypes(allTypes));
+        return result;
+    }
+
+    private TypeFilter resolveTypeFilter(List<StoryBibleNodeType> allTypes, String requestedTypeCode,
+                                         StoryBibleSemanticFamily requestedFamily,
+                                         boolean ignoreUnknownTypeCode) {
+        List<StoryBibleNodeType> filtered = allTypes;
+        String warning = null;
+        String resolvedFilter = null;
+        if (requestedTypeCode != null && !requestedTypeCode.isBlank()) {
+            String normalized = requestedTypeCode.trim();
+            filtered = allTypes.stream()
+                    .filter(type -> type.getTypeCode().equalsIgnoreCase(normalized)).toList();
+            if (filtered.isEmpty()) {
+                StoryBibleSemanticFamily family = parseFamily(normalized);
+                if (family != null) {
+                    filtered = allTypes.stream().filter(type -> type.getSemanticFamily() == family).toList();
+                    resolvedFilter = "semanticFamily";
+                    warning = "typeCode '" + normalized + "' is a semantic family; matched semanticFamily instead";
+                } else if (requestedFamily != null) {
+                    filtered = allTypes.stream().filter(type -> type.getSemanticFamily() == requestedFamily).toList();
+                    resolvedFilter = "semanticFamily";
+                    warning = "Unknown typeCode '" + normalized
+                            + "' was ignored; matched the explicit semanticFamily instead.";
+                } else {
+                    filtered = ignoreUnknownTypeCode ? allTypes : List.of();
+                    warning = "Unknown typeCode '" + normalized
+                            + "'. Use one of availableTypes.typeCode or omit the filter.";
+                }
+            } else {
+                resolvedFilter = "typeCode";
+            }
+        } else if (requestedFamily != null) {
+            filtered = allTypes.stream().filter(type -> type.getSemanticFamily() == requestedFamily).toList();
+            resolvedFilter = "semanticFamily";
+        }
+        return new TypeFilter(filtered, resolvedFilter, warning);
+    }
+
+    private List<Map<String, Object>> availableTypes(List<StoryBibleNodeType> types) {
+        return types.stream().map(type -> Map.<String, Object>of(
+                "typeCode", type.getTypeCode(),
+                "semanticFamily", type.getSemanticFamily(),
+                "displayName", type.getDisplayName()
+        )).toList();
+    }
+
+    private String normalizeQuery(String query) {
+        return query == null || query.isBlank() ? null : query.trim();
+    }
+
+    private StoryBibleSemanticFamily parseFamily(String value) {
+        try {
+            return StoryBibleSemanticFamily.valueOf(value.toUpperCase());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private Map<String, Object> inspectNode(AuthorizedAgentRunContext context, Long nodeId) {
@@ -173,8 +276,8 @@ public class StoryBibleInspectApplicationService {
         value.put("nodeId", String.valueOf(node.getNodeId()));
         value.put("revision", node.getRevision());
         value.put("title", node.getTitle());
-        value.put("typeId", String.valueOf(type.getTypeId()));
-        value.put("typeCode", type.getTypeCode());
+        value.put("typeId", type == null ? null : String.valueOf(type.getTypeId()));
+        value.put("typeCode", type == null ? "UNKNOWN" : type.getTypeCode());
         return value;
     }
 
@@ -188,7 +291,11 @@ public class StoryBibleInspectApplicationService {
                 ? error.getClass().getSimpleName() : error.getMessage();
     }
 
-    public record InspectArgs(String operation, Long nodeId, String typeCode) {
+    private record TypeFilter(List<StoryBibleNodeType> types, String resolvedFilter, String warning) { }
+
+    public record InspectArgs(String operation, Long nodeId, String typeCode,
+                              StoryBibleSemanticFamily semanticFamily, String query,
+                              StoryBibleCanonStatus canonStatus, Integer offset, Integer limit) {
         public InspectArgs {
             operation = operation == null ? "" : operation.trim().toLowerCase();
         }

@@ -54,11 +54,7 @@ public class ContextEpochSnapshotFactory {
                 : novels.findChapterByIdAndProjectId(projectId, activeChapterId);
         long chapterRevision = activeChapter == null || activeChapter.getContentRevision() == null
                 ? 0L : activeChapter.getContentRevision();
-        if (routingMode == StoryBibleRoutingMode.AGENT_DRIVEN) {
-            return new ContextEpochSnapshotCodec.Snapshot(2, projectId, root.getStoryBibleId(),
-                    root.getContentRevision(), project.getStructureRevision() == null ? 0L : project.getStructureRevision(),
-                    activeChapterId, chapterRevision, List.of(), List.of());
-        }
+        boolean preparesContext = routingMode.preparesContext();
         Map<Long, StoryBibleNodeType> types = new HashMap<>();
         for (StoryBibleNodeType type : storyBibles.findNodeTypes(root.getStoryBibleId())) types.put(type.getTypeId(), type);
         List<StoryBibleNode> nodes = storyBibles.findNodes(
@@ -73,13 +69,14 @@ public class ContextEpochSnapshotFactory {
                 .stream().collect(Collectors.groupingBy(StoryBibleAlias::getNodeId));
         List<StoryBibleRelation> relations = nodeIds.isEmpty() ? List.of()
                 : storyBibles.findRelations(root.getStoryBibleId(), nodeIds);
-        Map<Long, List<StoryBibleProgression>> progressions = (nodeIds.isEmpty() ? List.<StoryBibleProgression>of()
+        Map<Long, List<StoryBibleProgression>> progressions = (!preparesContext || nodeIds.isEmpty()
+                ? List.<StoryBibleProgression>of()
                 : storyBibles.findProgressions(root.getStoryBibleId(), nodeIds))
                 .stream().collect(Collectors.groupingBy(StoryBibleProgression::getNodeId));
         Map<Long, StoryBibleNode> nodesById = nodes.stream()
                 .collect(Collectors.toMap(StoryBibleNode::getNodeId, node -> node));
         Map<Long, StoryBibleEffectiveStateResolver.EffectiveState> stateByNode = new HashMap<>();
-        for (StoryBibleNode node : nodes) {
+        for (StoryBibleNode node : preparesContext ? nodes : List.<StoryBibleNode>of()) {
             StoryBibleNodeType type = types.get(node.getTypeId());
             if (type == null) continue;
             var state = activeChapterId == null
@@ -88,7 +85,7 @@ public class ContextEpochSnapshotFactory {
                     progressions.getOrDefault(node.getNodeId(), List.of()));
             stateByNode.put(node.getNodeId(), state);
         }
-        List<ContextEpochSnapshotCodec.CoreNode> core = nodes.stream()
+        List<ContextEpochSnapshotCodec.CoreNode> core = (preparesContext ? nodes : List.<StoryBibleNode>of()).stream()
                 .filter(node -> node.getInclusionPolicy() == StoryBibleInclusionPolicy.ALWAYS_INCLUDE)
                 .map(node -> toCoreNode(node, types.get(node.getTypeId()), stateByNode.get(node.getNodeId())))
                 .filter(Objects::nonNull)

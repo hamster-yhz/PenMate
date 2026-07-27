@@ -99,6 +99,28 @@ describe('useStoryBible', () => {
     expect(storyBibleApi.listNodeChanges).toHaveBeenCalledWith('101', '71')
   })
 
+  it('retries bootstrap once when an Agent write advances the Story Bible revision concurrently', async () => {
+    const root = {
+      storyBibleId: '11',
+      projectId: '101',
+      title: 'Bible',
+      contentRevision: 7,
+    }
+    vi.mocked(storyBibleApi.bootstrap)
+      .mockRejectedValueOnce(Object.assign(new Error('revision conflict'), {
+        status: 409,
+        errorCode: 'RESOURCE_CONFLICT',
+      }))
+      .mockResolvedValueOnce(root)
+    const story = useStoryBible({ getContext: () => ({ projectId: '101', operatorId: '7' }) })
+
+    await story.loadWorkspace()
+
+    expect(storyBibleApi.bootstrap).toHaveBeenCalledTimes(2)
+    expect(story.root.value).toEqual(root)
+    expect(story.errorMessage.value).toBe('')
+  })
+
   it('delegates category tag and alias filtering to the backend without hiding alias matches locally', async () => {
     const aliasMatch = { ...node, title: 'Mira' }
     const story = useStoryBible({ getContext: () => ({ projectId: '101', operatorId: '7' }) })
