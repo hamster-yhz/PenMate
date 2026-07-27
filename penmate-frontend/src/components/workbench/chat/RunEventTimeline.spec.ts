@@ -102,10 +102,10 @@ describe('RunEventTimeline', () => {
 
     await wrapper.get('.attempt-summary').trigger('click')
     expect(wrapper.text()).toContain('已开始')
-    expect(wrapper.text()).toContain('上下文准备完成')
+    expect(wrapper.text()).toContain('运行环境准备完成')
     expect(wrapper.text()).not.toContain('正在生成回复')
     expect(wrapper.text()).toContain('运行完成')
-    expect(wrapper.text()).not.toContain('正在准备上下文')
+    expect(wrapper.text()).not.toContain('正在准备运行环境')
     expect(wrapper.text()).not.toContain('模型轮次完成')
     expect(wrapper.text()).not.toContain('回答已生成')
   })

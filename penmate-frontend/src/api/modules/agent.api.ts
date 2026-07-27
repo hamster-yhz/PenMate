@@ -5,6 +5,7 @@ import {
   type AgentRunStreamListener,
 } from '@/api/agentRunStream'
 import type { AgentSkillCatalogItem } from '@/api/types'
+import type { AgentQueuedRequest, AgentSafetyMode, AgentSessionContextUsage } from '@/entities/agent/model'
 
 type AnyRecord = Record<string, unknown>
 
@@ -52,6 +53,16 @@ const buildRunStreamUrl = (projectId: string, runId: string, after = '0') => {
 }
 
 export const agentApi = {
+  getSafetyMode() {
+    return request.get<{ mode: AgentSafetyMode; maximumAutomaticRisk: number }>(
+      '/agent/preferences/safety',
+    )
+  },
+  saveSafetyMode(mode: AgentSafetyMode) {
+    return request.put<{ mode: AgentSafetyMode; maximumAutomaticRisk: number }>(
+      '/agent/preferences/safety', { mode },
+    )
+  },
   listSkills(projectId: string) {
     return request.get<AgentSkillCatalogItem[]>(`/v1/novels/${projectId}/agent/skills`)
   },
@@ -87,6 +98,22 @@ export const agentApi = {
       `/v1/novels/${projectId}/agent/sessions/${sessionId}/turns`,
       withoutActorFields(payload),
     )
+  },
+  getQueuedRequest(projectId: string, sessionId: string) {
+    return request.get<AgentQueuedRequest | null>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/queued-request`)
+  },
+  registerQueuedRequest(projectId: string, sessionId: string, payload: AnyRecord) {
+    return request.post<AgentQueuedRequest>(
+      `/v1/novels/${projectId}/agent/sessions/${sessionId}/queued-request`, payload,
+    )
+  },
+  withdrawQueuedRequest(projectId: string, sessionId: string, requestId: string) {
+    return request.delete<string>(
+      `/v1/novels/${projectId}/agent/sessions/${sessionId}/queued-request/${requestId}`,
+    )
+  },
+  getSessionTokenUsage(projectId: string, sessionId: string) {
+    return request.get<AgentSessionContextUsage>(`/v1/novels/${projectId}/agent/sessions/${sessionId}/token-usage`)
   },
   cancelRun(projectId: string, runId: string, payload: AnyRecord) {
     return request.post<AgentRunRecord>(`/v1/novels/${projectId}/agent/runs/${runId}/cancel`, withoutActorFields(payload))

@@ -92,6 +92,7 @@ const clearSelection = (activeChapter: { value: string }, currentChapterTitle: {
 export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   const outlineData = ref<OutlineVolumeNode[]>([])
   const activeChapter = ref('')
+  const selectedChapterIds = ref<string[]>([])
   const currentChapterTitle = ref('')
   const outlineOpBusy = ref(false)
   const structureRevision = ref(0)
@@ -108,6 +109,8 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   ) => {
     const mapped = mapNovelDirectory(volumes, chapters)
     outlineData.value = mapped
+    const available = new Set(mapped.flatMap((volume) => volume.children.map((chapter) => chapter.chapterId || chapter.key)))
+    selectedChapterIds.value = selectedChapterIds.value.filter((chapterId) => available.has(chapterId))
     structureRevision.value = Number(revision) || 0
     return mapped
   }
@@ -128,8 +131,25 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   }
 
   const selectChapter = (chapter: OutlineChapterNode) => {
-    activeChapter.value = chapter.chapterId || chapter.key
+    const chapterId = chapter.chapterId || chapter.key
+    activeChapter.value = chapterId
     currentChapterTitle.value = chapter.title
+    selectedChapterIds.value = [chapterId]
+  }
+
+  const sortChapterIds = (chapterIds: string[]) => {
+    const order = new Map(outlineData.value
+      .flatMap((volume) => volume.children)
+      .map((chapter, index) => [chapter.chapterId || chapter.key, index]))
+    return [...new Set(chapterIds)].sort((left, right) => (order.get(left) ?? Number.MAX_SAFE_INTEGER)
+      - (order.get(right) ?? Number.MAX_SAFE_INTEGER))
+  }
+
+  const toggleChapterSelection = (chapter: OutlineChapterNode) => {
+    const chapterId = chapter.chapterId || chapter.key
+    selectedChapterIds.value = selectedChapterIds.value.includes(chapterId)
+      ? selectedChapterIds.value.filter((item) => item !== chapterId)
+      : sortChapterIds([...selectedChapterIds.value, chapterId])
   }
 
   const addVolume = async () => {
@@ -210,6 +230,8 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
         if (removedActive) {
           clearSelection(activeChapter, currentChapterTitle)
         }
+        const removedIds = new Set(volume.children.map((chapter) => chapter.chapterId || chapter.key))
+        selectedChapterIds.value = selectedChapterIds.value.filter((chapterId) => !removedIds.has(chapterId))
       } catch (error: unknown) {
         deps.notify?.(error instanceof Error ? error.message : '删除分卷失败')
       }
@@ -231,6 +253,9 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
         if (activeChapter.value === (chapter.chapterId || chapter.key)) {
           clearSelection(activeChapter, currentChapterTitle)
         }
+        selectedChapterIds.value = selectedChapterIds.value.filter(
+          (chapterId) => chapterId !== (chapter.chapterId || chapter.key),
+        )
       } catch (error: unknown) {
         deps.notify?.(error instanceof Error ? error.message : '删除章节失败')
       }
@@ -372,12 +397,14 @@ export const useWorkbenchOutline = (deps: UseWorkbenchOutlineDeps) => {
   return {
     outlineData,
     activeChapter,
+    selectedChapterIds,
     currentChapterTitle,
     outlineOpBusy,
     structureRevision,
     pendingMoveUndo,
     loadOutline,
     selectChapter,
+    toggleChapterSelection,
     addVolume,
     addChapter,
     deleteVolume,

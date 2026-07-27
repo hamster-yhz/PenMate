@@ -11,6 +11,7 @@ import { logoutCurrentSession } from '@/composables/auth/useAuthSession'
 import { useWorkbenchContext } from '@/composables/workbench/useWorkbenchContext'
 import { createChapterLoadGuard, useWorkbenchDraft } from '@/composables/workbench/useWorkbenchDraft'
 import { useWorkbenchOutline } from '@/composables/workbench/useWorkbenchOutline'
+import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
 import { useWorkbenchEditor } from '@/composables/workbench/useWorkbenchEditor'
 import { useChapterEditingSession } from '@/composables/workbench/useChapterEditingSession'
 import { useWorkbenchIntegrations } from './useWorkbenchIntegrations'
@@ -75,7 +76,10 @@ export const useWorkbenchPageController = () => {
   const showPluginWorkshop = ref(false)
   const chapterContents = ref<Record<string, string>>({})
   const storyBibleChapters = ref<StoryBibleChapterOption[]>([])
-  const workbenchMode = ref<'writing' | 'story-bible'>(route.query.mode === 'story-bible' ? 'story-bible' : 'writing')
+  const attachedChapterIds = ref<string[]>([])
+  const routeWorkbenchMode = () => route.query.mode === 'story-bible' ? 'story-bible'
+    : route.query.mode === 'ledger' ? 'ledger' : 'writing'
+  const workbenchMode = ref<'writing' | 'story-bible' | 'ledger'>(routeWorkbenchMode())
   const storyBibleNodeId = computed(() => (typeof route.query.nodeId === 'string' ? route.query.nodeId : ''))
   const storyBibleWorkspaceRef = ref<{ reload: () => Promise<void> } | null>(null)
 
@@ -133,10 +137,10 @@ export const useWorkbenchPageController = () => {
     storyBibleWorkspaceRef.value = instance as { reload: () => Promise<void> } | null
   }
 
-  const setWorkbenchMode = (mode: 'writing' | 'story-bible') => {
+  const setWorkbenchMode = (mode: 'writing' | 'story-bible' | 'ledger') => {
     workbenchMode.value = mode
     const query = { ...route.query }
-    if (mode === 'story-bible') query.mode = 'story-bible'
+    if (mode === 'story-bible' || mode === 'ledger') query.mode = mode
     else {
       delete query.mode
       delete query.nodeId
@@ -156,11 +160,13 @@ export const useWorkbenchPageController = () => {
   const {
     outlineData,
     activeChapter,
+    selectedChapterIds,
     currentChapterTitle,
     outlineOpBusy,
     pendingMoveUndo,
     loadOutline,
     selectChapter,
+    toggleChapterSelection,
     addVolume,
     addChapter,
     deleteVolume,
@@ -184,6 +190,50 @@ export const useWorkbenchPageController = () => {
     notify: (text) => message.warning(text),
     notifySuccess: (text) => message.success(text),
   })
+
+  const orderedChapters = computed(() => outlineData.value.flatMap((volume) => volume.children)
+    .map((chapter, index) => ({
+      chapterId: chapter.chapterId || chapter.key,
+      title: chapter.title,
+      displayNo: index + 1,
+    })))
+  const resolvedAttachedChapterIds = computed(() => {
+    const attached = new Set(attachedChapterIds.value)
+    return orderedChapters.value.filter((chapter) => attached.has(chapter.chapterId)).map((chapter) => chapter.chapterId)
+  })
+  const attachedChapterRanges = computed(() => {
+    const attached = new Set(resolvedAttachedChapterIds.value)
+    const selected = orderedChapters.value.filter((chapter) => attached.has(chapter.chapterId))
+    const ranges: Array<{ key: string; label: string; chapterIds: string[] }> = []
+    for (const chapter of selected) {
+      const previous = ranges[ranges.length - 1]
+      const previousLastId = previous?.chapterIds[previous.chapterIds.length - 1]
+      const previousIndex = previousLastId
+        ? orderedChapters.value.findIndex((item) => item.chapterId === previousLastId)
+        : -2
+      const chapterIndex = orderedChapters.value.findIndex((item) => item.chapterId === chapter.chapterId)
+      if (previous && chapterIndex === previousIndex + 1) {
+        previous.chapterIds.push(chapter.chapterId)
+        const first = orderedChapters.value.find((item) => item.chapterId === previous.chapterIds[0])!
+        previous.key = previous.chapterIds.join(':')
+        previous.label = `第${first.displayNo}章到第${chapter.displayNo}章`
+      } else {
+        ranges.push({
+          key: chapter.chapterId,
+          label: `第${chapter.displayNo}章 · ${chapter.title}`,
+          chapterIds: [chapter.chapterId],
+        })
+      }
+    }
+    return ranges
+  })
+  const addAttachedChapters = (chapterIds: string[]) => {
+    attachedChapterIds.value = [...new Set([...attachedChapterIds.value, ...chapterIds])]
+  }
+  const removeAttachedChapters = (chapterIds: string[]) => {
+    const removed = new Set(chapterIds)
+    attachedChapterIds.value = attachedChapterIds.value.filter((chapterId) => !removed.has(chapterId))
+  }
 
   const {
     editorContent,
@@ -335,6 +385,10 @@ export const useWorkbenchPageController = () => {
     streamingAssistantMsgId,
     runtimeEventSource,
     currentConversationId,
+    queuedRequest,
+    contextUsage,
+    safetyMode,
+    safetyModeSaving,
     toggleConversationPanel,
     loadDeletedConversations,
     renameConversation,
@@ -346,6 +400,10 @@ export const useWorkbenchPageController = () => {
     loadSkillCatalog,
     addActiveSkill,
     removeActiveSkill,
+    requestContextCompression,
+    withdrawQueuedRequest,
+    loadSafetyMode,
+    saveSafetyMode,
     isApprovalBusy,
     handleApprove,
     handleReject,
@@ -360,13 +418,17 @@ export const useWorkbenchPageController = () => {
     getContext,
     getProjectId: getAgentProjectId,
     getOperatorId: getAgentOperatorId,
-    getActiveChapterKey: () => activeChapter.value,
+    getActiveChapterKey: () => resolvedAttachedChapterIds.value[0] || '',
+    getAttachedChapterIds: () => [...resolvedAttachedChapterIds.value],
     getSelectedText: () => selectedText.value,
     activePlugins,
     ensureModelConfigId,
     refreshActiveModelInfo,
     requestModelSelection: () => {
       void router.push('/profile?section=agent')
+    },
+    onMessageRegistered: () => {
+      attachedChapterIds.value = activeChapter.value ? [activeChapter.value] : []
     },
     onRecoveryContext: (context) => {
       const chapterId = String(context.chapterId ?? '').trim()
@@ -378,7 +440,7 @@ export const useWorkbenchPageController = () => {
 
   const {
     updateTitle,
-    selectOutlineChapter: handleOutlineSelectChapter,
+    selectOutlineChapter: selectProjectOutlineChapter,
     loadProject,
   } = useWorkbenchProjectController({
     novelTitle,
@@ -399,6 +461,12 @@ export const useWorkbenchPageController = () => {
     loadActivePlugins,
     refreshActiveModelInfo,
   })
+
+  const handleOutlineSelectChapter = async (chapter: OutlineChapterNode) => {
+    const chapterId = chapter.chapterId || chapter.key
+    attachedChapterIds.value = [chapterId]
+    await selectProjectOutlineChapter(chapter)
+  }
   loadWorkbenchData = loadProject
 
   const chapterTitleById = (chapterId: string) => {
@@ -519,7 +587,7 @@ export const useWorkbenchPageController = () => {
   }
 
   const sendMessage = async () => {
-    if (activeChapter.value) {
+    if (activeChapter.value && !canCancelRun.value) {
       await saveContent()
       if (chapterEditing.saveStatus.value.includes('失败')
         || chapterEditing.saveStatus.value === '版本冲突'
@@ -555,7 +623,7 @@ export const useWorkbenchPageController = () => {
     userEmail.value = sessionUserEmail || userEmail.value
     try {
       restoreLayout()
-      await loadAdminAccess()
+      await Promise.all([loadAdminAccess(), loadSafetyMode()])
       const projectId = getCurrentProjectId()
       if (projectId) {
         await loadWorkbenchData(projectId)
@@ -596,7 +664,7 @@ export const useWorkbenchPageController = () => {
   watch(
     () => route.query.mode,
     (mode) => {
-      workbenchMode.value = mode === 'story-bible' ? 'story-bible' : 'writing'
+      workbenchMode.value = mode === 'story-bible' ? 'story-bible' : mode === 'ledger' ? 'ledger' : 'writing'
     },
   )
   watch(runtimeEventSource, (event) => {
@@ -641,7 +709,10 @@ export const useWorkbenchPageController = () => {
     }
   })
   watch(activeChapter, (chapterId) => {
-    if (chapterId) void refreshChapterAiUndo(chapterId)
+    if (chapterId) {
+      attachedChapterIds.value = [chapterId]
+      void refreshChapterAiUndo(chapterId)
+    }
   })
   watch([layoutPreset, leftPanelWidth, chatPanelWidth, leftCollapsedPreference, rightCollapsed, workbenchMode], () => {
     localStorage.setItem(layoutStorageKey(), JSON.stringify({
@@ -691,9 +762,14 @@ export const useWorkbenchPageController = () => {
     resolveOperatorId,
     outlineData,
     activeChapter,
+    selectedChapterIds,
+    attachedChapterRanges,
     currentChapterTitle,
     outlineOpBusy,
     pendingMoveUndo,
+    toggleChapterSelection,
+    addAttachedChapters,
+    removeAttachedChapters,
     renameNode,
     moveNode,
     undoLastMove,
@@ -754,6 +830,10 @@ export const useWorkbenchPageController = () => {
     agentStatusDetailText,
     streamingAssistantMsgId,
     currentConversationId,
+    queuedRequest,
+    contextUsage,
+    safetyMode,
+    safetyModeSaving,
     toggleConversationPanel,
     loadDeletedConversations,
     renameConversation,
@@ -765,6 +845,9 @@ export const useWorkbenchPageController = () => {
     loadSkillCatalog,
     addActiveSkill,
     removeActiveSkill,
+    requestContextCompression,
+    withdrawQueuedRequest,
+    saveSafetyMode,
     isApprovalBusy,
     handleApprove,
     handleReject,

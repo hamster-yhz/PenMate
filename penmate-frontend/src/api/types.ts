@@ -80,18 +80,6 @@ export interface WorkbenchActiveRunRuntimeSnapshot {
   activeToolCallsSnapshot?: WorkbenchRuntimeToolCall[] | null
 }
 
-export interface WorkbenchTaskProfileSnapshot {
-  intentTags?: string[] | null
-  executionProfile?: string | null
-  tools?: string[] | null
-  hardConstraints?: string[] | null
-  outputExpectation?: string | null
-  needsApproval?: boolean
-  includeStoryBible?: boolean
-  includeRag?: boolean
-  reasoningSummary?: string | null
-}
-
 export interface WorkbenchPromptPlanModuleSnapshot {
   moduleKey?: string | null
   source?: string | null
@@ -101,7 +89,6 @@ export interface WorkbenchPromptPlanModuleSnapshot {
 
 export interface WorkbenchPromptPlanSnapshot {
   modules?: WorkbenchPromptPlanModuleSnapshot[] | null
-  finalProfile?: string | null
   assembledPromptPreview?: string | null
 }
 
@@ -139,7 +126,6 @@ export interface WorkbenchRecoveryContextSnapshot {
   activePlugins?: string[] | null
   modelConfigId?: string | null
   outlineSnapshot?: Record<string, unknown> | null
-  taskProfile?: WorkbenchTaskProfileSnapshot | null
   promptPlan?: WorkbenchPromptPlanSnapshot | null
   contextPackage?: WorkbenchContextPackageSnapshot | null
   activeRunRuntime?: WorkbenchActiveRunRuntimeSnapshot | null

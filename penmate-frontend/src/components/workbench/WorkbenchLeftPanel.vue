@@ -27,8 +27,10 @@
         <OutlineTree
           :volumes="filteredOutline"
           :active-chapter-key="activeChapter"
+          :selected-chapter-ids="selectedChapterIds"
           :busy="outlineOpBusy"
           @select-chapter="$emit('select-chapter', $event)"
+          @toggle-chapter-selection="$emit('toggle-chapter-selection', $event)"
           @rename-node="$emit('rename-node', $event)"
           @move-node="$emit('move-node', $event)"
           @add-volume="$emit('add-volume')"
@@ -62,19 +64,21 @@ import OutlineTree from '@/components/workbench/outline/OutlineTree.vue'
 import type { WorkbenchOutlineData } from '@/components/workbench/workbenchTypes'
 import type { OutlineChapterNode } from '@/composables/workbench/workbenchOutline'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   collapsed: boolean
   panelWidth: number
   outlineData: WorkbenchOutlineData
   activeChapter: string
+  selectedChapterIds?: string[]
   outlineOpBusy: boolean
   pendingMoveUndo?: { label: string } | null
-}>()
+}>(), { selectedChapterIds: () => [] })
 const emit = defineEmits<{
   'toggle-collapse': []
   'update:panel-width': [number]
   'reset-panel-width': []
   'select-chapter': [OutlineChapterNode]
+  'toggle-chapter-selection': [OutlineChapterNode]
   'rename-node': [unknown]
   'move-node': [unknown]
   'undo-move': []

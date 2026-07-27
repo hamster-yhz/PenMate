@@ -6,6 +6,7 @@ import { applyAssistantEventMetadata, createChatTimeline, type ChatRecord } from
 import { createAgentRunRuntime, normalizeRunStatus, type AgentRunStatus } from './useAgentRunRuntime'
 import { useWorkbenchRunTimeline } from './useWorkbenchRunTimeline'
 import { pickBusinessArray, pickBusinessRecord } from '@/utils/apiPayload'
+import type { AgentQueuedRequest, AgentSessionContextUsage } from '@/entities/agent/model'
 
 type ContextProfile = {
   projectId?: string | null
@@ -18,6 +19,7 @@ type UseWorkbenchChatDeps = {
   getContext: () => ContextProfile
   getCurrentProjectId: () => string
   getActiveChapterKey: () => string
+  getAttachedChapterIds?: () => string[]
   getSelectedText: () => string
   getActivePlugins: () => string[]
   listSkills?: (projectId: string) => Promise<AgentSkillCatalogItem[]>
@@ -28,6 +30,10 @@ type UseWorkbenchChatDeps = {
   getSessionRecovery: (projectId: string, sessionId: string) => Promise<unknown>
   listSessionRuns: (projectId: string, sessionId: string) => Promise<unknown>
   createTurn: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<unknown>
+  getQueuedRequest?: (projectId: string, sessionId: string) => Promise<AgentQueuedRequest | null>
+  registerQueuedRequest?: (projectId: string, sessionId: string, payload: Record<string, unknown>) => Promise<AgentQueuedRequest>
+  withdrawQueuedRequest?: (projectId: string, sessionId: string, requestId: string) => Promise<unknown>
+  getSessionTokenUsage?: (projectId: string, sessionId: string) => Promise<AgentSessionContextUsage>
   cancelRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
   retryRun: (projectId: string, runId: string, payload: Record<string, unknown>) => Promise<unknown>
   openRunStream: (projectId: string, runId: string, after?: string) => AgentRunEventStream
@@ -40,9 +46,11 @@ type UseWorkbenchChatDeps = {
   notifyWarning?: (message: string) => void
   debugChatState?: (stage: string, extra?: Record<string, unknown>) => void
   onRequireModelSelection?: () => void
+  onMessageRegistered?: () => void
 }
 
 export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
+  const attachedChapterIds = () => deps.getAttachedChapterIds?.() ?? (deps.getActiveChapterKey() ? [deps.getActiveChapterKey()] : [])
   const messages = ref<ChatMessage[]>([])
   const showConversationPanel = ref(false)
   const conversationLoading = ref(false)
@@ -77,6 +85,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     runStatus: '',
   })
   const recoveredSelectedText = ref('')
+  const queuedRequest = ref<AgentQueuedRequest | null>(null)
+  const contextUsage = ref<AgentSessionContextUsage | null>(null)
 
   const canCancelRun = computed(() => {
     if (!currentActiveRun.value.runId) return false
@@ -92,6 +102,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
   let msgIdCounter = 1
   let runStream: AgentRunEventStream | null = null
   let foregroundEpoch = 0
+  let queuedPollTimer: ReturnType<typeof setTimeout> | null = null
 
   const generationStatusText = computed(() => {
     if (isGenerating.value && generationTaskStatus.value) return `运行中 · ${generationTaskStatus.value}`
@@ -116,6 +127,29 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       messageCount: messages.value.length,
       ...extra,
     })
+  }
+
+  const applyContextUsageEvent = (payload: Record<string, unknown>) => {
+    const number = (value: unknown) => {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+    }
+    const inputTokens = number(payload.estimatedInputTokens)
+    const reservedOutputTokens = number(payload.reservedOutputTokens)
+    const protectedTokens = number(payload.protectedTokens)
+    const maxContextTokens = number(payload.maxContextTokens)
+    const usageRatio = number(payload.usageRatio)
+    if (inputTokens == null || reservedOutputTokens == null) return
+    contextUsage.value = {
+      usedTokens: Math.round(protectedTokens ?? inputTokens + reservedOutputTokens),
+      maxContextTokens: maxContextTokens == null ? null : Math.round(maxContextTokens),
+      usageRatio,
+      promptTokens: Math.round(inputTokens),
+      completionTokens: Math.round(reservedOutputTokens),
+      modelName: contextUsage.value?.modelName ?? null,
+      usageSource: payload.usageSource === 'PROVIDER_USAGE' ? 'PROVIDER_USAGE' : 'ESTIMATE',
+      contextCapacitySource: contextUsage.value?.contextCapacitySource,
+    }
   }
 
   const listSessions = (projectId: string) => deps.listSessions(projectId)
@@ -218,6 +252,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
       runtimeEventSource.value = value
     },
     onEvent: (eventName, payload) => {
+      if (eventName === 'context.usage.updated') applyContextUsageEvent(payload)
       runTimeline.appendEvent(
         eventName,
         payload,
@@ -381,6 +416,10 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     streamingAssistantMsgId.value = null
     runtimeEventSource.value = null
     activeSkills.value = []
+    queuedRequest.value = null
+    contextUsage.value = null
+    if (queuedPollTimer) clearTimeout(queuedPollTimer)
+    queuedPollTimer = null
     currentActiveRun.value = {
       sessionId: null,
       turnId: null,
@@ -596,12 +635,121 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
           agentStatusDetailText.value = ''
         }
         await scrollChat()
+        if (queuedRequest.value) void watchQueuedExecution(sessionId)
       }
     }
   }
 
+  const refreshSessionAuxiliary = async () => {
+    const projectId = deps.getCurrentProjectId()
+    const sessionId = currentConversationId.value || ''
+    if (!projectId || !sessionId) {
+      queuedRequest.value = null
+      contextUsage.value = null
+      return
+    }
+    const [queued, usage] = await Promise.all([
+      deps.getQueuedRequest ? deps.getQueuedRequest(projectId, sessionId) : Promise.resolve(null),
+      deps.getSessionTokenUsage ? deps.getSessionTokenUsage(projectId, sessionId) : Promise.resolve(null),
+    ])
+    queuedRequest.value = queued
+    contextUsage.value = usage
+    if (queued) void watchQueuedExecution(sessionId)
+  }
+
+  const watchQueuedExecution = async (sessionId: string) => {
+    if (queuedPollTimer) clearTimeout(queuedPollTimer)
+    const projectId = deps.getCurrentProjectId()
+    if (!projectId || currentConversationId.value !== sessionId) return
+    try {
+      const previous = queuedRequest.value
+      const queued = deps.getQueuedRequest ? await deps.getQueuedRequest(projectId, sessionId) : null
+      queuedRequest.value = queued
+      if (queued) {
+        queuedPollTimer = setTimeout(() => void watchQueuedExecution(sessionId), 900)
+        return
+      }
+      contextUsage.value = deps.getSessionTokenUsage ? await deps.getSessionTokenUsage(projectId, sessionId) : null
+      if (!previous) return
+      const snapshot = pickBusinessRecord(await deps.getSessionRecovery(projectId, sessionId)) as WorkbenchRecoverySnapshot
+      hydrateFromRecoverySnapshot(snapshot)
+      await loadRunHistory(projectId, sessionId)
+      const runId = String(snapshot.activeRun?.runId ?? '')
+      const status = normalizeRunStatus(snapshot.activeRun?.runStatus)
+      if (runId && ['pending', 'running', 'suspended'].includes(status)) {
+        await consumeRun(projectId, sessionId, runId, String(snapshot.activeRun?.latestSequence ?? '0'),
+          String(snapshot.activeRun?.turnId ?? ''), true)
+      }
+    } catch (error) {
+      deps.notifyWarning?.(runtime.getErrorMessage(error))
+    }
+  }
+
+  const registerQueuedMessage = async (userText: string) => {
+    const { projectId } = deps.getContext()
+    const sessionId = currentConversationId.value || ''
+    if (!projectId || !sessionId) throw new Error('当前会话尚未创建')
+    const modelConfigId = await deps.ensureModelConfigId(projectId)
+    if (!modelConfigId) throw new Error('未选择可用模型')
+    const selectedText = String(deps.getSelectedText?.() ?? '').trim() || recoveredSelectedText.value
+    if (!deps.registerQueuedRequest) throw new Error('待执行请求接口不可用')
+    queuedRequest.value = await deps.registerQueuedRequest(projectId, sessionId, {
+      type: 'MESSAGE',
+      userMessage: userText,
+      activeSkills: [...activeSkills.value],
+      taskRequest: {
+        chapterId: deps.getActiveChapterKey() || null,
+        chapterIds: attachedChapterIds(),
+        selectedText,
+        modelConfigId,
+      },
+    })
+    deps.onMessageRegistered?.()
+    chatInput.value = ''
+    void watchQueuedExecution(sessionId)
+  }
+
+  const requestContextCompression = async () => {
+    const { projectId } = deps.getContext()
+    const sessionId = currentConversationId.value || ''
+    if (!projectId || !sessionId) {
+      deps.notifyWarning?.('当前没有可压缩的会话')
+      return
+    }
+    try {
+      if (!deps.registerQueuedRequest) throw new Error('待执行请求接口不可用')
+      queuedRequest.value = await deps.registerQueuedRequest(projectId, sessionId, { type: 'COMPRESS' })
+      void watchQueuedExecution(sessionId)
+    } catch (error) {
+      deps.notifyWarning?.(runtime.getErrorMessage(error))
+    }
+  }
+
+  const withdrawQueuedRequest = async () => {
+    const projectId = deps.getCurrentProjectId()
+    const sessionId = currentConversationId.value || ''
+    const requestId = queuedRequest.value?.requestId || ''
+    if (!projectId || !sessionId || !requestId || queuedRequest.value?.status !== 'PENDING' || !deps.withdrawQueuedRequest) return
+    try {
+      await deps.withdrawQueuedRequest(projectId, sessionId, requestId)
+      queuedRequest.value = null
+      if (queuedPollTimer) clearTimeout(queuedPollTimer)
+      queuedPollTimer = null
+    } catch (error) {
+      deps.notifyWarning?.(runtime.getErrorMessage(error))
+    }
+  }
+
   const sendMessage = async () => {
-    if (!chatInput.value.trim() || isGenerating.value || canCancelRun.value) return
+    if (!chatInput.value.trim()) return
+    if (isGenerating.value || canCancelRun.value) {
+      try {
+        await registerQueuedMessage(chatInput.value.trim())
+      } catch (error) {
+        deps.notifyWarning?.(runtime.getErrorMessage(error))
+      }
+      return
+    }
     const sendEpoch = foregroundEpoch
     const userText = chatInput.value.trim()
     const userMessage: ChatMessage = { id: msgIdCounter++, role: 'user', text: userText }
@@ -652,8 +800,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
           userMessage: userText,
           activeSkills: [...activeSkills.value],
           taskRequest: {
-            taskType: 'WRITE',
             chapterId: deps.getActiveChapterKey() || null,
+            chapterIds: attachedChapterIds(),
             selectedText,
             modelConfigId,
             activePlugins: deps.getActivePlugins() || [],
@@ -669,6 +817,7 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
           startedAt?: string | null
         }
       }
+      deps.onMessageRegistered?.()
       if (sendEpoch !== foregroundEpoch) return
       const runId = created.activeRun?.runId
       if (runId == null || String(runId).trim() === '' || String(runId) === '0') {
@@ -830,6 +979,8 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     streamingAssistantMsgId,
     runtimeEventSource,
     currentConversationId,
+    queuedRequest,
+    contextUsage,
     currentModelName,
     loadConversationList,
     loadRunHistory,
@@ -842,9 +993,15 @@ export const useWorkbenchChat = (deps: UseWorkbenchChatDeps) => {
     loadSkillCatalog,
     addActiveSkill,
     removeActiveSkill,
+    requestContextCompression,
+    withdrawQueuedRequest,
+    refreshSessionAuxiliary,
     detachCurrentSession,
     activateEmptySession,
-    dispose: runtime.closeRunStream,
+    dispose: () => {
+      if (queuedPollTimer) clearTimeout(queuedPollTimer)
+      runtime.closeRunStream()
+    },
     resumeRunningRun,
     consumeRunStream: runtime.consumeRunStream,
     scrollChat,

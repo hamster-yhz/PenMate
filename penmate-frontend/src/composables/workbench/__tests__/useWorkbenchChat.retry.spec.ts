@@ -24,6 +24,60 @@ const event = (payload: Record<string, unknown>) =>
   }) as MessageEvent<string>
 
 describe('useWorkbenchChat terminal Run retry', () => {
+  it('shows live context usage published before each model invocation', async () => {
+    const stream = new FakeEventSource()
+    const chat = useWorkbenchChat({
+      getContext: () => ({ projectId: '10', operatorId: '50' }),
+      getCurrentProjectId: () => '10',
+      getActiveChapterKey: () => '',
+      getSelectedText: () => '',
+      getActivePlugins: () => [],
+      ensureModelConfigId: async () => '90',
+      listSessions: async () => [],
+      createSession: async () => ({}),
+      getSessionRecovery: async () => ({}),
+      listSessionRuns: async () => [],
+      createTurn: async () => ({}),
+      cancelRun: async () => ({}),
+      retryRun: async () => ({}),
+      openRunStream: () => stream,
+      addStreamListener: (_source, eventName, listener) => {
+        stream.listeners.set(eventName, listener)
+      },
+      scrollChat: () => undefined,
+      nextTick: async () => undefined,
+    })
+    chat.hydrateFromRecoverySnapshot({
+      session: { sessionId: '30' },
+      activeRun: { turnId: '80', runId: '61', runStatus: 'RUNNING', latestSequence: '2' },
+      messages: [],
+    })
+
+    const consuming = chat.resumeRunningRun('10', '61', '2')
+    await vi.waitFor(() => expect(stream.listeners.has('agent.event')).toBe(true))
+    stream.listeners.get('agent.event')?.(event({
+      type: 'context.usage.updated',
+      payloadJson: JSON.stringify({
+        estimatedInputTokens: 72_000,
+        reservedOutputTokens: 8_000,
+        protectedTokens: 80_000,
+        maxContextTokens: 100_000,
+        usageRatio: 0.8,
+      }),
+      sequence: '3',
+    }))
+
+    expect(chat.contextUsage.value).toMatchObject({
+      usedTokens: 80_000,
+      promptTokens: 72_000,
+      completionTokens: 8_000,
+      maxContextTokens: 100_000,
+      usageRatio: 0.8,
+    })
+    stream.listeners.get('run.cancelled')?.(event({ status: 'cancelled', sequence: '4' }))
+    await consuming
+  })
+
   it('requests_one_successor_and_consumes_its_stream_in_the_existing_message_slot', async () => {
     const stream = new FakeEventSource()
     const openRunStream = vi.fn(() => stream)
@@ -273,11 +327,17 @@ describe('useWorkbenchChat terminal Run retry', () => {
     const stream = new FakeEventSource()
     const openRunStream = vi.fn(() => stream)
     let resolveCreateTurn: ((value: unknown) => void) | undefined
-    const createTurn = vi.fn(() => new Promise<unknown>((resolve) => { resolveCreateTurn = resolve }))
+    const createTurn = vi.fn((projectId: string, sessionId: string, payload: unknown) => {
+      void projectId
+      void sessionId
+      void payload
+      return new Promise<unknown>((resolve) => { resolveCreateTurn = resolve })
+    })
     const chat = useWorkbenchChat({
       getContext: () => ({ projectId: '10', operatorId: '50' }),
       getCurrentProjectId: () => '10',
-      getActiveChapterKey: () => '',
+      getActiveChapterKey: () => '301',
+      getAttachedChapterIds: () => ['301', '302', '305'],
       getSelectedText: () => '',
       getActivePlugins: () => [],
       ensureModelConfigId: async () => '90',
@@ -298,6 +358,9 @@ describe('useWorkbenchChat terminal Run retry', () => {
 
     const sending = chat.sendMessage()
     await vi.waitFor(() => expect(createTurn).toHaveBeenCalledOnce())
+    expect(createTurn.mock.calls[0]?.[2]).toMatchObject({
+      taskRequest: { chapterId: '301', chapterIds: ['301', '302', '305'] },
+    })
     chat.activateEmptySession('31')
     resolveCreateTurn?.({ activeRun: { turnId: '80', runId: '60', runStatus: 'PENDING' } })
     await sending

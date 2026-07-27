@@ -2,12 +2,13 @@
   <a-dropdown :trigger="['contextmenu']">
     <div
       class="tree-item chapter"
-      :class="{ active: isActive }"
+      :class="{ active: isActive, selected: isSelected }"
       :data-testid="`chapter-node-${chapter.key}`"
       role="button"
+      :aria-selected="isSelected"
       tabindex="0"
       :draggable="!isEditing"
-      @click="emit('select-chapter', chapter)"
+      @click="handleClick"
       @keydown.enter="emit('select-chapter', chapter)"
       @keydown.space.prevent="emit('select-chapter', chapter)"
       @dragstart.stop="handleDragStart"
@@ -55,15 +56,18 @@ import type {
   RenameNodePayload,
 } from '@/composables/workbench/useWorkbenchOutline'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   chapter: OutlineChapterNode
   parentKey: string
   isActive: boolean
+  isSelected?: boolean
+  selectedChapterIds?: string[]
   displayNo: number
-}>()
+}>(), { isSelected: false, selectedChapterIds: () => [] })
 
 const emit = defineEmits<{
   (event: 'select-chapter', chapter: OutlineChapterNode): void
+  (event: 'toggle-chapter-selection', chapter: OutlineChapterNode): void
   (event: 'rename-node', payload: RenameNodePayload): void
   (event: 'move-node', payload: MoveNodePayload): void
   (event: 'add-chapter'): void
@@ -73,6 +77,14 @@ const emit = defineEmits<{
 const isEditing = ref(false)
 const renameValue = ref('')
 const renameInputRef = ref<HTMLInputElement | null>(null)
+
+const handleClick = (event: MouseEvent) => {
+  if (event.ctrlKey || event.metaKey) {
+    emit('toggle-chapter-selection', props.chapter)
+    return
+  }
+  emit('select-chapter', props.chapter)
+}
 
 const startRename = async () => {
   renameValue.value = props.chapter.title
@@ -111,12 +123,17 @@ type DraggedDirectoryNode = {
 }
 
 const handleDragStart = (event: DragEvent) => {
+  const chapterId = props.chapter.chapterId || props.chapter.key
+  const selectedIds = props.isSelected && props.selectedChapterIds?.length
+    ? props.selectedChapterIds
+    : [chapterId]
   event.dataTransfer?.setData('application/x-penmate-directory-node', JSON.stringify({
-    nodeKey: props.chapter.chapterId || props.chapter.key,
+    nodeKey: chapterId,
     parentKey: props.parentKey,
     nodeType: 'CHAPTER',
   } satisfies DraggedDirectoryNode))
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer?.setData('application/x-penmate-chat-chapters', JSON.stringify({ chapterIds: selectedIds }))
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copyMove'
 }
 
 const handleDrop = (event: DragEvent) => {
@@ -175,6 +192,8 @@ const handleMenuClick = ({ key, domEvent }: { key: string | number; domEvent: Ev
 }
 .tree-item:hover { background: var(--bg-subtle); color: var(--text-primary); }
 .tree-item.active { background: var(--accent-soft); color: var(--text-primary); }
+.tree-item.selected { box-shadow: inset 2px 0 0 var(--accent); background: var(--bg-subtle); color: var(--text-primary); }
+.tree-item.active.selected { background: var(--accent-soft); }
 
 .chapter-no {
   flex: 0 0 auto;

@@ -40,6 +40,9 @@
       <button type="button" aria-label="Story Bible" title="Story Bible" :class="{ active: workbenchMode === 'story-bible' }" @click="$emit('update:workbench-mode', 'story-bible')">
         <BookOutlined aria-hidden="true" /><span class="mode-label">Story Bible</span>
       </button>
+      <button type="button" aria-label="AI 台账" title="AI 台账" :class="{ active: workbenchMode === 'ledger' }" @click="$emit('update:workbench-mode', 'ledger')">
+        <DatabaseOutlined aria-hidden="true" /><span class="mode-label">AI 台账</span>
+      </button>
     </div>
 
     <div class="header-actions">
@@ -80,6 +83,7 @@
 import { Dropdown as ADropdown, Menu as AMenu, MenuDivider as AMenuDivider, MenuItem as AMenuItem } from 'ant-design-vue'
 import {
   BookOutlined,
+  DatabaseOutlined,
   DownOutlined,
   EditOutlined,
   LogoutOutlined,
@@ -98,7 +102,7 @@ withDefaults(defineProps<{
   saveHint?: string
   username: string
   canAccessRbacAdmin: boolean
-  workbenchMode?: 'writing' | 'story-bible'
+  workbenchMode?: 'writing' | 'story-bible' | 'ledger'
   layoutPreset?: WorkbenchLayoutPreset
   directoryCollapsed?: boolean
   aiCollapsed?: boolean
@@ -112,7 +116,7 @@ const emit = defineEmits<{
   'go-rbac-admin': []
   logout: []
   'open-project-settings': []
-  'update:workbench-mode': ['writing' | 'story-bible']
+  'update:workbench-mode': ['writing' | 'story-bible' | 'ledger']
   'update:layout-preset': [WorkbenchLayoutPreset]
   'restore-directory': []
   'restore-ai': []

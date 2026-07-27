@@ -13,6 +13,7 @@ const mockAiLockedWorkbench = async (page: Page) => {
       userId: '1001',
       userName: '测试作者',
       userEmail: 'writer@example.com',
+      permissionCodes: ['app:access'],
     }))
   })
   await page.route('**/api/v1/**', async (route) => {
@@ -22,7 +23,7 @@ const mockAiLockedWorkbench = async (page: Page) => {
       return route.fulfill({ json: envelope({ accessToken: 'visual-access-token' }) })
     }
     if (path.endsWith('/v1/auth/me')) {
-      return route.fulfill({ json: envelope({ id: '1001', email: 'writer@example.com', displayName: '测试作者' }) })
+      return route.fulfill({ json: envelope({ id: '1001', email: 'writer@example.com', displayName: '测试作者', permissions: [{ code: 'app:access' }] }) })
     }
     if (path.endsWith('/v1/profile/menus')) {
       return route.fulfill({ json: envelope([{ menuId: '1', path: '/admin', title: '管理员工作台' }]) })
@@ -42,19 +43,18 @@ const mockAiLockedWorkbench = async (page: Page) => {
         ],
       }) })
     }
-    if (path.endsWith('/v1/novels/2001/chapters/3001/lease')) {
+    if (path.endsWith('/v1/novels/2001/chapters/3001')) {
       return route.fulfill({ json: envelope({
-        editable: false,
-        ownerType: 'AI',
+        leaseOwnerType: 'AI',
+        leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
         contentRevision: 8,
         content: '雨水沿着檐角落下。\n\n沈砚听见门外传来三声短促的叩响。',
-        reason: 'AI 正在编辑当前章节',
       }) })
     }
-    if (path.endsWith('/v1/novels/2001/chapters/3001/ai-undo')) {
+    if (path.endsWith('/v1/novels/2001/ai-undo')) {
       return route.fulfill({ json: envelope([{
         operationId: '8801', runId: '7701', chapterId: '3001', chapterTitle,
-        status: 'AVAILABLE', sequenceNo: 1, expiresAt: '2026-07-23T02:00:00Z',
+        status: 'AVAILABLE', sequenceNo: 1, expiresAt: new Date(Date.now() + 60_000).toISOString(),
       }]) })
     }
     if (path.endsWith('/v1/model/preferences')) {
@@ -132,6 +132,7 @@ test('AI locked chapter stays legible and exposes undo without layout overflow',
     }
     const directoryPanel = page.locator('.panel-left')
     const aiPanel = page.locator('.panel-right')
+    const headerRestore = page.getByLabel('恢复工作台面板')
 
     await chooseLayout('AI 协作')
     await expect(directoryPanel).toHaveClass(/collapsed/)
@@ -145,8 +146,8 @@ test('AI locked chapter stays legible and exposes undo without layout overflow',
     await chooseLayout('专注写作')
     await expect(directoryPanel).toHaveClass(/collapsed/)
     await expect(aiPanel).toHaveClass(/collapsed/)
-    await expect(page.getByRole('button', { name: '展开作品目录' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '展开 AI 协作' })).toBeVisible()
+    await expect(headerRestore.getByRole('button', { name: '展开作品目录' })).toBeVisible()
+    await expect(headerRestore.getByRole('button', { name: '展开 AI 协作' })).toBeVisible()
 
     await chooseLayout('均衡')
     await expect(directoryPanel).not.toHaveClass(/collapsed/)
@@ -160,13 +161,13 @@ test('AI locked chapter stays legible and exposes undo without layout overflow',
     await page.setViewportSize({ width: 1080, height: 720 })
     await expect(directoryPanel).toHaveClass(/collapsed/)
     await expect(aiPanel).not.toHaveClass(/collapsed/)
-    await expect(page.getByRole('button', { name: '展开作品目录' })).toBeVisible()
+    await expect(headerRestore.getByRole('button', { name: '展开作品目录' })).toBeVisible()
     expect((await page.locator('.panel-center').boundingBox())!.width).toBeGreaterThanOrEqual(520)
     expect(await page.evaluate(() => JSON.parse(
       localStorage.getItem('penmate.layout.1001.2001.writing') || '{}',
     ).leftCollapsed)).toBe(false)
 
-    await page.getByRole('button', { name: '展开作品目录' }).click()
+    await headerRestore.getByRole('button', { name: '展开作品目录' }).click()
     await expect(directoryPanel).not.toHaveClass(/collapsed/)
     await expect(page.locator('.workbench-shell')).toHaveClass(/directory-overlay-mode/)
     expect((await page.locator('.panel-center').boundingBox())!.width).toBeGreaterThanOrEqual(520)
@@ -183,7 +184,7 @@ test('AI locked chapter stays legible and exposes undo without layout overflow',
 test('plain text editor handles Chinese punctuation, paste, undo, and redo', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     localStorage.setItem('penmate.session', JSON.stringify({
-      userId: '1001', userName: '测试作者', userEmail: 'writer@example.com',
+      userId: '1001', userName: '测试作者', userEmail: 'writer@example.com', permissionCodes: ['app:access'],
     }))
   })
   await page.route('**/api/v1/**', async (route) => {
@@ -191,7 +192,7 @@ test('plain text editor handles Chinese punctuation, paste, undo, and redo', asy
     const path = url.pathname
     if (path.endsWith('/v1/auth/refresh')) return route.fulfill({ json: envelope({ accessToken: 'editor-token' }) })
     if (path.endsWith('/v1/auth/me')) {
-      return route.fulfill({ json: envelope({ id: '1001', email: 'writer@example.com', displayName: '测试作者' }) })
+      return route.fulfill({ json: envelope({ id: '1001', email: 'writer@example.com', displayName: '测试作者', permissions: [{ code: 'app:access' }] }) })
     }
     if (path.endsWith('/v1/novels/2001')) {
       return route.fulfill({ json: envelope({ projectId: '2001', title: '雾港来信' }) })
@@ -206,11 +207,8 @@ test('plain text editor handles Chinese punctuation, paste, undo, and redo', asy
         }],
       }) })
     }
-    if (path.endsWith('/v1/novels/2001/chapters/3001/lease') && route.request().method() === 'POST') {
+    if (path.endsWith('/v1/novels/2001/chapters/3001') && route.request().method() === 'GET') {
       return route.fulfill({ json: envelope({
-        editable: true,
-        ownerType: 'USER',
-        leaseToken: 'editor-lease',
         contentRevision: 1,
         content: '雨落在雾港的石板路上。\n\n沈砚拆开那封没有署名的来信，纸页间夹着一枚褪色的车票。\n\n远处的钟楼敲过午夜，旧城的灯一盏接一盏熄灭。',
       }) })

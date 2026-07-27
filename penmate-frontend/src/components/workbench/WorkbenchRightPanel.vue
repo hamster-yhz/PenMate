@@ -9,6 +9,8 @@ import AiEditActivity from '@/components/workbench/chat/AiEditActivity.vue'
 import ConversationHistoryPanel from '@/components/workbench/chat/ConversationHistoryPanel.vue'
 import type { ChapterAiUndoOperation } from '@/entities/chapter/model'
 import type { AgentRunAttempt, ChatMessage, ConversationItem, GenerationPhase, WorkbenchSkillCatalogItem } from '@/components/workbench/workbenchTypes'
+import type { AgentQueuedRequest, AgentSafetyMode, AgentSessionContextUsage } from '@/entities/agent/model'
+import type { ChapterContextRange } from '@/composables/workbench/workbenchOutline'
 
 const props = withDefaults(defineProps<{
   collapsed: boolean
@@ -40,8 +42,12 @@ const props = withDefaults(defineProps<{
   skillCatalog?: WorkbenchSkillCatalogItem[]
   activeSkills?: string[]
   skillCatalogLoading?: boolean
+  queuedRequest?: AgentQueuedRequest | null
+  contextUsage?: AgentSessionContextUsage | null
+  safetyMode?: AgentSafetyMode
+  safetyModeSaving?: boolean
   activePlugins?: string[]
-  activeChapterTitle?: string
+  attachedChapterRanges?: ChapterContextRange[]
   selectedText?: string
   aiUndoOperations?: ChapterAiUndoOperation[]
   aiUndoBusyOperationId?: string
@@ -56,7 +62,8 @@ const props = withDefaults(defineProps<{
   recentlyDeletedConversation: null,
   messages: () => [], runAttempts: () => [], streamingAssistantMsgId: null, chatInput: '', activePlugins: () => [],
   skillCatalog: () => [], activeSkills: () => [], skillCatalogLoading: false,
-  activeChapterTitle: '', selectedText: '', showScrollToBottom: false,
+  queuedRequest: null, contextUsage: null, safetyMode: 'STANDARD', safetyModeSaving: false,
+  attachedChapterRanges: () => [], selectedText: '', showScrollToBottom: false,
   aiUndoOperations: () => [], aiUndoBusyOperationId: '', aiUndoBusyRunId: '',
   aiUndoDismissBusyOperationId: '', aiUndoDismissAllBusy: false,
 })
@@ -69,7 +76,10 @@ const emit = defineEmits<{
   'open-story-bible': [payload: string]; 'update:chat-input': [payload: string]; send: [];
   'add-skill': [payload: string]; 'remove-skill': [payload: string]; 'refresh-skill-catalog': [];
   'cancel-run': []; 'retry-run': []; 'open-model-settings': [];
+  'compress-context': []; 'withdraw-queued-request': [];
+  'update:safety-mode': [mode: AgentSafetyMode];
   'clear-selected-text': [];
+  'remove-chapters': [chapterIds: string[]]; 'drop-chapters': [chapterIds: string[]];
   'scroll-to-bottom': [];
   'undo-ai': [operationId: string]; 'undo-ai-run': [runId: string];
   'dismiss-ai-undo': [operationId: string]; 'dismiss-all-ai-undo': [];
@@ -173,13 +183,20 @@ onUnmounted(() => stopResize?.())
         :model-value="chatInput" :is-generating="isGenerating" :can-cancel-run="canCancelRun"
         :skill-catalog="skillCatalog" :active-skills="activeSkills" :skill-catalog-loading="skillCatalogLoading"
         :is-cancelling="isCancelling"
-        :current-model-name="currentModelName" :active-plugins="activePlugins" :active-chapter-title="activeChapterTitle"
+        :current-model-name="currentModelName" :active-plugins="activePlugins" :attached-chapter-ranges="attachedChapterRanges"
         :selected-text="selectedText" :bound-style-name="boundStyleName"
+        :queued-request="queuedRequest" :context-usage="contextUsage"
+        :safety-mode="safetyMode" :safety-mode-saving="safetyModeSaving"
         @update:model-value="emit('update:chat-input', $event)" @send="emit('send')" @cancel="emit('cancel-run')"
         @add-skill="emit('add-skill', $event)" @remove-skill="emit('remove-skill', $event)"
         @refresh-skill-catalog="emit('refresh-skill-catalog')"
         @open-model-settings="emit('open-model-settings')"
         @clear-selected-text="emit('clear-selected-text')"
+        @remove-chapters="emit('remove-chapters', $event)"
+        @drop-chapters="emit('drop-chapters', $event)"
+        @compress-context="emit('compress-context')"
+        @withdraw-queued-request="emit('withdraw-queued-request')"
+        @update:safety-mode="emit('update:safety-mode', $event)"
       />
     </div>
   </aside>

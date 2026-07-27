@@ -38,8 +38,8 @@ watch(
 
 const eventMeta: Record<string, { label: string; tone: string; icon: typeof ApiOutlined }> = {
   'run.started': { label: '已开始', tone: 'progress', icon: ClockCircleOutlined },
-  'turn.route.completed': { label: '正在准备上下文', tone: 'context', icon: ApiOutlined },
-  'context.resolved': { label: '上下文准备完成', tone: 'context', icon: CheckCircleOutlined },
+  'turn.route.completed': { label: '正在准备运行环境', tone: 'context', icon: ApiOutlined },
+  'context.resolved': { label: '运行环境准备完成', tone: 'context', icon: CheckCircleOutlined },
   'model.commentary.snapshot': { label: '过程说明', tone: 'commentary', icon: MessageOutlined },
   'model.commentary.completed': { label: '过程说明', tone: 'commentary', icon: MessageOutlined },
   'model.reasoning_summary.snapshot': { label: '分析过程', tone: 'reasoning', icon: BulbOutlined },

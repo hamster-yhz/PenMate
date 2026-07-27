@@ -1,5 +1,6 @@
 export type OutlineChapterNode = { title: string; key: string; chapterId?: string }
 export type OutlineVolumeNode = { title: string; key: string; expanded: boolean; children: OutlineChapterNode[] }
+export type ChapterContextRange = { key: string; label: string; chapterIds: string[] }
 
 const businessId = (value: unknown) => String(value ?? '').trim()
 const sortOrder = (item: Record<string, unknown>) => Number(item.sortOrder ?? 0)

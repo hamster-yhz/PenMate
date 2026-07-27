@@ -57,4 +57,16 @@ describe('outline context menus', () => {
 
     expect(wrapper.emitted('add-chapter')).toEqual([[volume]])
   })
+
+  it('uses Ctrl click for chapter multi-selection without navigation', async () => {
+    const wrapper = shallowMount(OutlineChapterNode, {
+      props: { chapter, parentKey: volume.key, isActive: false, isSelected: true, selectedChapterIds: ['101'], displayNo: 1 },
+      global: { stubs: menuStubs },
+    })
+
+    await wrapper.get('[data-testid="chapter-node-chapter-1"]').trigger('click', { ctrlKey: true })
+
+    expect(wrapper.emitted('toggle-chapter-selection')).toEqual([[chapter]])
+    expect(wrapper.emitted('select-chapter')).toBeUndefined()
+  })
 })

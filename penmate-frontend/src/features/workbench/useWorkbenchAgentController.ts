@@ -7,6 +7,7 @@ import { useWorkbenchApprovals } from '@/composables/workbench/useWorkbenchAppro
 import { useWorkbenchChat } from '@/composables/workbench/useWorkbenchChat'
 import { useWorkbenchSessionRecovery } from '@/composables/workbench/useWorkbenchSessionRecovery'
 import { pickBusinessRecord } from '@/utils/apiPayload'
+import type { AgentSafetyMode } from '@/entities/agent/model'
 
 type NullableContext = { projectId: string | null; operatorId: string | null }
 
@@ -15,12 +16,14 @@ type WorkbenchAgentOptions = {
   getProjectId: () => string
   getOperatorId: () => string
   getActiveChapterKey: () => string
+  getAttachedChapterIds: () => string[]
   getSelectedText: () => string
   activePlugins: Ref<string[]>
   ensureModelConfigId: () => Promise<string>
   refreshActiveModelInfo: () => Promise<string | null>
   requestModelSelection: () => void
   onRecoveryContext: (context: Record<string, unknown>) => void
+  onMessageRegistered: () => void
 }
 
 export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
@@ -29,6 +32,8 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
   const boundStyleName = ref('')
   const deletedConversationList = ref<ConversationItem[]>([])
   const recentlyDeletedConversation = ref<ConversationItem | null>(null)
+  const safetyMode = ref<AgentSafetyMode>('STANDARD')
+  const safetyModeSaving = ref(false)
   let clearDeletedUndoTimer: ReturnType<typeof setTimeout> | null = null
 
   const syncBoundStyleName = (value: Record<string, unknown> | null | undefined) => {
@@ -75,6 +80,28 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
   }
   const showScrollToBottom = computed(() => !isChatFollowing.value)
 
+  const loadSafetyMode = async () => {
+    try {
+      safetyMode.value = (await agentApi.getSafetyMode()).mode
+    } catch {
+      safetyMode.value = 'STANDARD'
+    }
+  }
+  const saveSafetyMode = async (mode: AgentSafetyMode) => {
+    if (safetyModeSaving.value) return
+    const previous = safetyMode.value
+    safetyMode.value = mode
+    safetyModeSaving.value = true
+    try {
+      safetyMode.value = (await agentApi.saveSafetyMode(mode)).mode
+    } catch (error) {
+      safetyMode.value = previous
+      message.warning(error instanceof Error ? error.message : '安全模式保存失败')
+    } finally {
+      safetyModeSaving.value = false
+    }
+  }
+
   const {
     messages,
     showConversationPanel,
@@ -97,6 +124,8 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     streamingAssistantMsgId,
     runtimeEventSource,
     currentConversationId,
+    queuedRequest,
+    contextUsage,
     loadConversationList,
     loadRunHistory,
     toggleConversationPanel,
@@ -111,10 +140,14 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     loadSkillCatalog,
     addActiveSkill,
     removeActiveSkill,
+    requestContextCompression,
+    withdrawQueuedRequest,
+    refreshSessionAuxiliary,
   } = useWorkbenchChat({
     getContext: options.getContext,
     getCurrentProjectId: options.getProjectId,
     getActiveChapterKey: options.getActiveChapterKey,
+    getAttachedChapterIds: options.getAttachedChapterIds,
     getSelectedText: options.getSelectedText,
     getActivePlugins: () => options.activePlugins.value,
     listSkills: agentApi.listSkills,
@@ -129,7 +162,6 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
         projectId,
         sessionId,
         operatorId: payload.operatorId,
-        taskType: (payload.taskRequest as Record<string, unknown> | undefined)?.taskType || '',
         chapterId: (payload.taskRequest as Record<string, unknown> | undefined)?.chapterId ?? null,
         userMessageLength: String(payload.userMessage || '').length,
       })
@@ -137,6 +169,10 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
       syncBoundStyleName(result.session as Record<string, unknown> | null | undefined)
       return result
     },
+    getQueuedRequest: agentApi.getQueuedRequest,
+    registerQueuedRequest: agentApi.registerQueuedRequest,
+    withdrawQueuedRequest: agentApi.withdrawQueuedRequest,
+    getSessionTokenUsage: agentApi.getSessionTokenUsage,
     cancelRun: agentApi.cancelRun,
     retryRun: agentApi.retryRun,
     openRunStream: (projectId, runId, after) => {
@@ -151,6 +187,7 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     notifyWarning: (text) => message.warning(text),
     debugChatState,
     onRequireModelSelection: options.requestModelSelection,
+    onMessageRegistered: options.onMessageRegistered,
   })
 
   const visibleMessages = computed(() =>
@@ -180,6 +217,7 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
       const sessionId = String((normalized.session as Record<string, unknown> | undefined)?.sessionId ?? '')
       const projectId = options.getProjectId()
       if (projectId && sessionId) void loadRunHistory(projectId, sessionId)
+      if (projectId && sessionId) void refreshSessionAuxiliary()
       syncBoundStyleName(normalized.session as Record<string, unknown> | null | undefined)
       options.onRecoveryContext((normalized.workbenchContext || {}) as Record<string, unknown>)
     },
@@ -312,6 +350,10 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     streamingAssistantMsgId,
     runtimeEventSource,
     currentConversationId,
+    queuedRequest,
+    contextUsage,
+    safetyMode,
+    safetyModeSaving,
     toggleConversationPanel,
     loadDeletedConversations,
     renameConversation,
@@ -323,6 +365,10 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
     loadSkillCatalog,
     addActiveSkill,
     removeActiveSkill,
+    requestContextCompression,
+    withdrawQueuedRequest,
+    loadSafetyMode,
+    saveSafetyMode,
     isApprovalBusy,
     handleApprove,
     handleReject,

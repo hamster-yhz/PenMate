@@ -2,7 +2,7 @@
   <div class="approval-card" :class="{ resolved: card.resolved }">
     <div class="ac-glow"></div>
     <div class="ac-header">
-      <span class="ac-badge">⚡ 设定审批</span>
+      <span class="ac-badge">工具审批</span>
       <span class="ac-time">{{ card.time }}</span>
     </div>
     <div class="ac-body">
@@ -16,14 +16,14 @@
     </div>
     <div class="ac-actions" v-if="!card.resolved">
       <button class="btn-approve" :disabled="busy" @click="$emit('approve', card.id)">
-        {{ busy ? '处理中...' : '✅ 确认归档' }}
+        <CheckOutlined />{{ busy ? '处理中...' : '批准执行' }}
       </button>
       <button class="btn-reject" :disabled="busy" @click="$emit('reject', card.id)">
-        {{ busy ? '处理中...' : '❌ 拒绝' }}
+        <CloseOutlined />{{ busy ? '处理中...' : '拒绝' }}
       </button>
     </div>
     <button
-      v-if="isStoryBibleWrite"
+      v-if="isStoryBibleWrite && targetNodeId"
       type="button"
       class="btn-open-bible"
       @click="emit('open-story-bible', targetNodeId)"
@@ -32,7 +32,7 @@
     </button>
     <div class="ac-resolved" v-else>
       <span :class="card.resolvedAction">
-        {{ card.resolvedAction === 'approved' ? '✅ 已归档至数据库' : '❌ 已拒绝' }}
+        {{ card.resolvedAction === 'approved' ? '已批准执行' : '已拒绝' }}
       </span>
     </div>
   </div>
@@ -40,7 +40,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BookOutlined } from '@ant-design/icons-vue'
+import { BookOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import type { ApprovalCardData } from './approvalCard.types'
 
 const props = withDefaults(defineProps<{ card: ApprovalCardData; busy?: boolean }>(), {
@@ -165,6 +165,10 @@ const targetNodeId = computed(() => String(
   border-radius: 6px;
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;

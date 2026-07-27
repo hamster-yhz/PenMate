@@ -44,12 +44,14 @@
         :panel-width="leftPanelWidth"
         :outline-data="outlineData"
         :active-chapter="activeChapter"
+        :selected-chapter-ids="selectedChapterIds"
         :outline-op-busy="outlineOpBusy"
         :pending-move-undo="pendingMoveUndo"
         @toggle-collapse="toggleLeftPanel"
         @update:panel-width="leftPanelWidth = $event"
         @reset-panel-width="resetLayoutPreset"
         @select-chapter="selectMobileChapter"
+        @toggle-chapter-selection="toggleChapterSelection"
         @rename-node="renameNode($event as any)"
         @move-node="moveNode($event as any)"
         @undo-move="undoLastMove"
@@ -89,7 +91,7 @@
       </Suspense>
 
       <StoryBibleWorkspace
-        v-else
+        v-else-if="workbenchMode === 'story-bible'"
         :ref="bindStoryBibleWorkspace"
         :project-id="getCurrentProjectId()"
         :operator-id="resolveOperatorId()"
@@ -100,6 +102,8 @@
         :project-title="novelTitle"
         :initial-node-id="storyBibleNodeId"
       />
+
+      <LedgerWorkspace v-else :project-id="getCurrentProjectId()" />
 
       <Suspense>
         <WorkbenchRightPanel
@@ -122,6 +126,10 @@
           :deleted-conversation-list="deletedConversationList"
           :recently-deleted-conversation="recentlyDeletedConversation"
           :current-conversation-id="currentConversationId"
+          :queued-request="queuedRequest"
+          :context-usage="contextUsage"
+          :safety-mode="safetyMode"
+          :safety-mode-saving="safetyModeSaving"
           :bound-style-name="boundStyleName"
           :bind-chat-container="bindChatContainer"
           :show-scroll-to-bottom="showScrollToBottom"
@@ -134,7 +142,7 @@
           :active-skills="activeSkills"
           :skill-catalog-loading="skillCatalogLoading"
           :active-plugins="activePlugins"
-          :active-chapter-title="currentChapterTitle"
+          :attached-chapter-ranges="attachedChapterRanges"
           :selected-text="selectedText"
           :ai-undo-operations="aiUndoOperations"
           :ai-undo-busy-operation-id="aiUndoBusyOperationId"
@@ -160,10 +168,15 @@
           @remove-skill="removeActiveSkill"
           @refresh-skill-catalog="loadSkillCatalog"
           @send="sendMessage"
+          @compress-context="requestContextCompression"
+          @withdraw-queued-request="withdrawQueuedRequest"
+          @update:safety-mode="saveSafetyMode"
           @cancel-run="cancelCurrentRun"
           @retry-run="retryCurrentRun"
           @open-model-settings="router.push('/profile?section=agent')"
           @clear-selected-text="selectedText = ''"
+          @remove-chapters="removeAttachedChapters"
+          @drop-chapters="addAttachedChapters"
           @scroll-to-bottom="scrollChatToBottom"
           @undo-ai="undoAiEdit"
           @undo-ai-run="undoAiRun"
@@ -197,6 +210,7 @@ import { useWorkbenchPageController } from '@/features/workbench/useWorkbenchPag
 const StyleManager = defineAsyncComponent(() => import('@/components/workbench/StyleManager.vue'))
 const PluginWorkshop = defineAsyncComponent(() => import('@/components/workbench/PluginWorkshop.vue'))
 const StoryBibleWorkspace = defineAsyncComponent(() => import('@/components/workbench/story-bible/StoryBibleWorkspace.vue'))
+const LedgerWorkspace = defineAsyncComponent(() => import('@/components/workbench/ledger/LedgerWorkspace.vue'))
 const WorkbenchEditorPanel = defineAsyncComponent(() => import('@/components/workbench/WorkbenchEditorPanel.vue'))
 const WorkbenchRightPanel = defineAsyncComponent(() => import('@/components/workbench/WorkbenchRightPanel.vue'))
 
@@ -234,9 +248,14 @@ const {
   resolveOperatorId,
   outlineData,
   activeChapter,
+  selectedChapterIds,
+  attachedChapterRanges,
   currentChapterTitle,
   outlineOpBusy,
   pendingMoveUndo,
+  toggleChapterSelection,
+  addAttachedChapters,
+  removeAttachedChapters,
   renameNode,
   moveNode,
   undoLastMove,
@@ -294,12 +313,19 @@ const {
   agentStatusDetailText,
   streamingAssistantMsgId,
   currentConversationId,
+  queuedRequest,
+  contextUsage,
+  safetyMode,
+  safetyModeSaving,
   toggleConversationPanel,
   loadDeletedConversations,
   renameConversation,
   deleteConversation,
   restoreConversation,
   sendMessage,
+  requestContextCompression,
+  withdrawQueuedRequest,
+  saveSafetyMode,
   cancelCurrentRun,
   retryCurrentRun,
   loadSkillCatalog,

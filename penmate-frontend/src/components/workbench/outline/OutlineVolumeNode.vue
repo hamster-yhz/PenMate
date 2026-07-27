@@ -48,8 +48,11 @@
         :chapter="chapter"
         :parent-key="volume.key"
         :is-active="activeChapterKey === String(chapter.chapterId || chapter.key)"
+        :is-selected="selectedChapterIds.includes(String(chapter.chapterId || chapter.key))"
+        :selected-chapter-ids="selectedChapterIds"
         :display-no="chapterIndex + 1"
         @select-chapter="emit('select-chapter', $event)"
+        @toggle-chapter-selection="emit('toggle-chapter-selection', $event)"
         @rename-node="emit('rename-node', $event)"
         @move-node="emit('move-node', $event)"
         @add-chapter="emit('add-chapter', volume)"
@@ -73,14 +76,16 @@ import type {
 
 import OutlineChapterNode from './OutlineChapterNode.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   volume: OutlineVolumeNode
   displayIndex: number
   activeChapterKey: string
-}>()
+  selectedChapterIds?: string[]
+}>(), { selectedChapterIds: () => [] })
 
 const emit = defineEmits<{
   (event: 'select-chapter', payload: OutlineVolumeNode['children'][number]): void
+  (event: 'toggle-chapter-selection', payload: OutlineVolumeNode['children'][number]): void
   (event: 'rename-node', payload: RenameNodePayload): void
   (event: 'move-node', payload: MoveNodePayload): void
   (event: 'add-chapter', volume: OutlineVolumeNode): void

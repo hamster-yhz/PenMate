@@ -136,4 +136,16 @@ describe('useWorkbenchOutline', () => {
     ])
     expect(deps.notify).toHaveBeenCalledWith('move failed')
   })
+
+  it('toggles Ctrl-style chapter selections in manuscript order', () => {
+    const outline = useWorkbenchOutline(createDeps())
+    outline.outlineData.value = directoryFixture()
+
+    outline.toggleChapterSelection(outline.outlineData.value[0].children[1])
+    outline.toggleChapterSelection(outline.outlineData.value[0].children[0])
+    expect(outline.selectedChapterIds.value).toEqual(['chapter-301', 'chapter-302'])
+
+    outline.toggleChapterSelection(outline.outlineData.value[0].children[1])
+    expect(outline.selectedChapterIds.value).toEqual(['chapter-301'])
+  })
 })

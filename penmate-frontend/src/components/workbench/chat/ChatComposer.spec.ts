@@ -12,6 +12,10 @@ const mountChatComposer = (
     activePlugins: string[]
     skillCatalog: Array<{ name: string; description: string }>
     activeSkills: string[]
+    safetyMode: 'STRICT' | 'STANDARD' | 'AUTONOMOUS' | 'FULL_AUTHORITY'
+    contextUsage: { usedTokens: number; maxContextTokens: number | null; usageRatio: number | null }
+    queuedRequest: { requestId: string; type: 'MESSAGE' | 'COMPRESS'; status: 'PENDING' | 'EXECUTING' }
+    attachedChapterRanges: Array<{ key: string; label: string; chapterIds: string[] }>
   }> = {},
 ) =>
   mount(ChatComposer, {
@@ -25,7 +29,7 @@ const mountChatComposer = (
   })
 
 describe('ChatComposer', () => {
-  it('disables_send_when_input_blank_or_generating', async () => {
+  it('disables blank sends and registers input while a run is active', async () => {
     const blankWrapper = await mountChatComposer({
       modelValue: '   ',
       isGenerating: false,
@@ -40,9 +44,13 @@ describe('ChatComposer', () => {
     const busyWrapper = await mountChatComposer({
       modelValue: '继续写第三章',
       isGenerating: true,
+      canCancelRun: true,
     })
 
-    expect((busyWrapper.get('[data-testid="chat-send"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect(busyWrapper.find('[data-testid="chat-send"]').exists()).toBe(false)
+    expect(busyWrapper.find('[data-testid="chat-cancel"]').exists()).toBe(true)
+    await busyWrapper.get('[data-testid="chat-input"]').trigger('keydown', { key: 'Enter' })
+    expect(busyWrapper.emitted('send')).toEqual([[]])
 
     const readyWrapper = await mountChatComposer({
       modelValue: '继续写第三章',
@@ -120,7 +128,7 @@ describe('ChatComposer', () => {
     expect(wrapper.emitted('open-model-settings')).toEqual([[]])
   })
 
-  it('activates_a_clicked_slash_candidate_without_leaving_the_token_in_user_text', async () => {
+  it('registers context compression without leaving the slash token in user text', async () => {
     const wrapper = await mountChatComposer({
       modelValue: '请用 /wri',
       skillCatalog: [
@@ -134,10 +142,26 @@ describe('ChatComposer', () => {
     await textarea.trigger('click')
 
     expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(1)
+    expect(wrapper.get('[role="option"]').text()).toContain('压缩上下文')
     await wrapper.get('[role="option"]').trigger('mousedown')
 
-    expect(wrapper.emitted('add-skill')).toEqual([['writer']])
-    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['请用 '])
+    expect(wrapper.emitted('compress-context')).toEqual([[]])
+    expect(String(wrapper.emitted('update:modelValue')?.at(-1)?.[0])).not.toContain('/')
+  })
+
+  it('shows live usage and emits persistent safety mode changes', async () => {
+    const wrapper = await mountChatComposer({
+      safetyMode: 'STANDARD',
+      contextUsage: { usedTokens: 95_000, maxContextTokens: 100_000, usageRatio: 0.95 },
+      queuedRequest: { requestId: '7', type: 'COMPRESS', status: 'PENDING' },
+    })
+
+    expect(wrapper.text()).toContain('上下文占用 95%')
+    expect(wrapper.text()).toContain('压缩上下文')
+    await wrapper.get('[aria-label="Agent 安全模式"]').setValue('AUTONOMOUS')
+
+    expect(wrapper.emitted('update:safety-mode')).toEqual([['AUTONOMOUS']])
   })
 
   it('renders_active_skills_as_removable_tags', async () => {
@@ -150,5 +174,25 @@ describe('ChatComposer', () => {
     await remove.trigger('click')
 
     expect(wrapper.emitted('remove-skill')).toEqual([['writer']])
+  })
+
+  it('removes chapter ranges and accepts multi-chapter outline drops', async () => {
+    const wrapper = await mountChatComposer({
+      attachedChapterRanges: [{ key: '301:302:303', label: '第3章到第5章', chapterIds: ['301', '302', '303'] }],
+    })
+
+    await wrapper.get('[aria-label="移除 第3章到第5章"]').trigger('click')
+    expect(wrapper.emitted('remove-chapters')).toEqual([[['301', '302', '303']]])
+
+    const dataTransfer = {
+      types: ['application/x-penmate-chat-chapters'],
+      dropEffect: 'none',
+      getData: () => JSON.stringify({ chapterIds: ['303', '304', '303'] }),
+    }
+    await wrapper.get('[data-testid="chat-composer"]').trigger('dragover', { dataTransfer })
+    expect(wrapper.get('[data-testid="chat-composer"]').classes()).toContain('chapter-drag-over')
+    await wrapper.get('[data-testid="chat-composer"]').trigger('drop', { dataTransfer })
+
+    expect(wrapper.emitted('drop-chapters')).toEqual([[['303', '304']]])
   })
 })

@@ -7,7 +7,9 @@
         :volume="volume"
         :display-index="volumes.indexOf(volume)"
         :active-chapter-key="activeChapterKey"
+        :selected-chapter-ids="selectedChapterIds"
         @select-chapter="emit('select-chapter', $event)"
+        @toggle-chapter-selection="emit('toggle-chapter-selection', $event)"
         @rename-node="emit('rename-node', $event)"
         @move-node="emit('move-node', $event)"
         @add-chapter="emit('add-chapter', $event)"
@@ -42,14 +44,16 @@ defineOptions({
   },
 })
 
-defineProps<{
+withDefaults(defineProps<{
   volumes: OutlineVolume[]
   activeChapterKey: string
+  selectedChapterIds?: string[]
   busy: boolean
-}>()
+}>(), { selectedChapterIds: () => [] })
 
 const emit = defineEmits<{
   (event: 'select-chapter', payload: OutlineChapterNode): void
+  (event: 'toggle-chapter-selection', payload: OutlineChapterNode): void
   (event: 'rename-node', payload: RenameNodePayload): void
   (event: 'move-node', payload: MoveNodePayload): void
   (event: 'add-volume'): void
