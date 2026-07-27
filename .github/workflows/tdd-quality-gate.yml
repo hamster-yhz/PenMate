@@ -8,22 +8,47 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      backend_code: ${{ steps.filter.outputs.backend_code }}
+      backend_image: ${{ steps.filter.outputs.backend_image }}
+      frontend_code: ${{ steps.filter.outputs.frontend_code }}
+      frontend_image: ${{ steps.filter.outputs.frontend_image }}
+      deployment: ${{ steps.filter.outputs.deployment }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            backend:
-              - 'penmate-backend/**'
-            frontend:
-              - 'penmate-frontend/**'
+            backend_code:
+              - 'penmate-backend/src/**'
+              - 'penmate-backend/pom.xml'
+            backend_image:
+              - 'penmate-backend/Dockerfile'
+              - '.dockerignore'
+            frontend_code:
+              - 'penmate-frontend/src/**'
+              - 'penmate-frontend/e2e/**'
+              - 'penmate-frontend/public/**'
+              - 'penmate-frontend/package.json'
+              - 'penmate-frontend/package-lock.json'
+              - 'penmate-frontend/index.html'
+              - 'penmate-frontend/tsconfig*.json'
+              - 'penmate-frontend/vite.config.*'
+              - 'penmate-frontend/playwright.config.*'
+              - 'penmate-frontend/eslint.config.*'
+              - 'penmate-frontend/scripts/**'
+            frontend_image:
+              - 'penmate-frontend/Dockerfile'
+              - 'penmate-frontend/nginx.conf'
+              - '.dockerignore'
+            deployment:
+              - 'docker-compose.prod.yml'
+              - '.env.example'
+              - 'scripts/deploy-remote.sh'
 
   backend-test:
     needs: changes
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.backend == 'true' }}
+    if: ${{ needs.changes.outputs.backend_code == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,12 +59,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: maven
       - name: Run backend tests
         run: mvn -B -Pci-postgresql-tests verify
 
   frontend-test:
     needs: changes
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.frontend == 'true' }}
+    if: ${{ needs.changes.outputs.frontend_code == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -70,26 +96,43 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:prod
 
+  deployment-validate:
+    needs: changes
+    if: ${{ needs.changes.outputs.deployment == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment shell script
+        run: bash -n scripts/deploy-remote.sh
+      - name: Validate production Compose configuration
+        run: docker compose --env-file .env.example -f docker-compose.prod.yml config --quiet
+
   docker-build:
     needs: [changes, backend-test, frontend-test]
     if: |
       always() &&
-      (github.event_name == 'pull_request' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true') &&
-      needs.backend-test.result != 'failure' &&
-      needs.frontend-test.result != 'failure'
+      (needs.changes.outputs.backend_code == 'true' ||
+       needs.changes.outputs.backend_image == 'true' ||
+       needs.changes.outputs.frontend_code == 'true' ||
+       needs.changes.outputs.frontend_image == 'true') &&
+      (needs.backend-test.result == 'success' || needs.backend-test.result == 'skipped') &&
+      (needs.frontend-test.result == 'success' || needs.frontend-test.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
+        if: ${{ needs.changes.outputs.backend_code == 'true' || needs.changes.outputs.backend_image == 'true' }}
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
       - name: Package backend jar for image
+        if: ${{ needs.changes.outputs.backend_code == 'true' || needs.changes.outputs.backend_image == 'true' }}
         working-directory: penmate-backend
-        run: mvn -B -DskipTests package
+        run: mvn -B -Dmaven.test.skip=true package
       - uses: docker/setup-buildx-action@v3
       - name: Build backend image
+        if: ${{ needs.changes.outputs.backend_code == 'true' || needs.changes.outputs.backend_image == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -99,6 +142,7 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
       - name: Build frontend image
+        if: ${{ needs.changes.outputs.frontend_code == 'true' || needs.changes.outputs.frontend_image == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
