@@ -199,13 +199,6 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
       return hasText || !!item.approval || isStreaming
     }),
   )
-  const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
-    getContext: options.getContext,
-    getMessages: () => messages.value,
-    approve: approvalApi.approve,
-    reject: approvalApi.reject,
-    notifyWarning: (text) => message.warning(text),
-  })
   const recovery = useWorkbenchSessionRecovery({
     getSessionRecovery: agentApi.getSessionRecovery,
     resumeSession: agentApi.resumeSession,
@@ -221,6 +214,19 @@ export const useWorkbenchAgentController = (options: WorkbenchAgentOptions) => {
       syncBoundStyleName(normalized.session as Record<string, unknown> | null | undefined)
       options.onRecoveryContext((normalized.workbenchContext || {}) as Record<string, unknown>)
     },
+  })
+  const { isApprovalBusy, handleApprove, handleReject } = useWorkbenchApprovals({
+    getContext: options.getContext,
+    getMessages: () => messages.value,
+    approve: approvalApi.approve,
+    reject: approvalApi.reject,
+    onResolved: async () => {
+      const { projectId, operatorId } = options.getContext()
+      const sessionId = currentConversationId.value
+      if (!projectId || !operatorId || !sessionId) return
+      await recovery.restore(projectId, sessionId, operatorId)
+    },
+    notifyWarning: (text) => message.warning(text),
   })
 
   const resumeSession = async (sessionId: string) => {

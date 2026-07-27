@@ -51,6 +51,8 @@ public class AgentRunLlmLoop {
     private final AgentCheckpointBoundaryService checkpointBoundary;
     private final AgentRunContinuationArtifactService continuations;
     private final AgentStreamingMessageService streamingMessages;
+    private final AgentRunLeaseService leaseService;
+    private final AgentRunLeaseHeartbeat leaseHeartbeat;
     private final JsonCodec jsonCodec;
 
     public AgentRunLlmLoop(AgentLlmInvocationService llmInvocations,
@@ -60,6 +62,8 @@ public class AgentRunLlmLoop {
                            AgentCheckpointBoundaryService checkpointBoundary,
                            AgentRunContinuationArtifactService continuations,
                            AgentStreamingMessageService streamingMessages,
+                           AgentRunLeaseService leaseService,
+                           AgentRunLeaseHeartbeat leaseHeartbeat,
                            JsonCodec jsonCodec) {
         this.llmInvocations = llmInvocations;
         this.toolDefinitionSource = toolDefinitionSource;
@@ -68,6 +72,8 @@ public class AgentRunLlmLoop {
         this.checkpointBoundary = checkpointBoundary;
         this.continuations = continuations;
         this.streamingMessages = streamingMessages;
+        this.leaseService = leaseService;
+        this.leaseHeartbeat = leaseHeartbeat;
         this.jsonCodec = jsonCodec;
     }
 
@@ -218,6 +224,7 @@ public class AgentRunLlmLoop {
 
         int iteration = initialIterationIndex;
         while (true) {
+            assertExecutionOwned(request);
             saveContinuation(AgentRunContinuation.readyForLlm(
                     request.runId(), messages, turnIndex, iteration,
                     fullAssistantText.toString(), totalUsage, noProgress.state()));
@@ -238,6 +245,7 @@ public class AgentRunLlmLoop {
                     request.runId(), request.turnId(), turnIndex, fullAssistantText.toString());
             AgentLlmTurnResponse response;
             try {
+                assertExecutionOwned(request);
                 response = llmInvocations.invokeStreamingEvents(
                         request.runId(),
                         new AgentLlmTurnRequest(
@@ -248,6 +256,7 @@ public class AgentRunLlmLoop {
                         request.executionConfig(),
                         streamSession::acceptEvent
                 );
+                assertExecutionOwned(request);
                 streamSession.complete(response);
             } catch (RuntimeException ex) {
                 streamSession.flushPending();
@@ -266,7 +275,8 @@ public class AgentRunLlmLoop {
                             "completionTokens", response.tokenUsage().completionTokens(),
                             "totalTokens", response.tokenUsage().totalTokens(),
                             "cachedPromptTokens", response.tokenUsage().cachedPromptTokens(),
-                            "cacheCreationPromptTokens", response.tokenUsage().cacheCreationPromptTokens()
+                            "cacheCreationPromptTokens", response.tokenUsage().cacheCreationPromptTokens(),
+                            "reasoningTokens", response.tokenUsage().reasoningTokens()
                     )
             ));
 
@@ -297,7 +307,7 @@ public class AgentRunLlmLoop {
                                               List<AgentLlmMessage> originalMessages,
                                               int turnIndex,
                                               ContextUsageAnchor anchor) {
-        List<AgentLlmMessage> slimmed = slimToolResults(originalMessages);
+        List<AgentLlmMessage> slimmed = slimConsumedToolResults(originalMessages);
         ContextUsage usage = estimateUsage(slimmed, request.toolSchemas(), request.executionConfig(), anchor);
         publishContextUsage(request.runId(), request.executionConfig().modelConfigId(), turnIndex, usage, "READY");
         if (usage.ratio() < CONTEXT_COMPRESSION_THRESHOLD) {
@@ -320,6 +330,7 @@ public class AgentRunLlmLoop {
         ));
         AgentLlmTurnResponse response;
         try {
+            assertExecutionOwned(request);
             response = llmInvocations.invokeBuffered(new AgentLlmTurnRequest(
                     List.of(
                             AgentLlmMessage.system(compressionSystemPrompt()),
@@ -328,6 +339,9 @@ public class AgentRunLlmLoop {
                     List.of(),
                     "none"
             ), request.executionConfig());
+            assertExecutionOwned(request);
+        } catch (AgentRunLeaseService.AgentRunLeaseLostException ex) {
+            throw ex;
         } catch (RuntimeException ex) {
             String failure = "Context compression failed: "
                     + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
@@ -356,6 +370,7 @@ public class AgentRunLlmLoop {
                 .forEach(compactedMessages::add);
         compactedMessages.add(AgentLlmMessage.system(COMPACTED_CONTEXT_MARKER + "\n"
                 + jsonCodec.writeCanonical(compacted) + "\n</compacted_conversation_context>"));
+        compactedMessages.addAll(latestUnconsumedToolExchange(slimmed));
         ContextUsage compactedUsage = estimateUsage(
                 compactedMessages, request.toolSchemas(), request.executionConfig(), null);
         publishContextUsage(request.runId(), request.executionConfig().modelConfigId(),
@@ -378,10 +393,12 @@ public class AgentRunLlmLoop {
         return new ContextPreparation(List.copyOf(compactedMessages), null, response.tokenUsage());
     }
 
-    private List<AgentLlmMessage> slimToolResults(List<AgentLlmMessage> messages) {
+    private List<AgentLlmMessage> slimConsumedToolResults(List<AgentLlmMessage> messages) {
+        Set<String> unconsumedToolCallIds = latestAssistantToolCallIds(messages);
         List<AgentLlmMessage> slimmed = new ArrayList<>(messages.size());
         for (AgentLlmMessage message : messages) {
-            if (message.toolCallId() == null || message.content().codePointCount(0, message.content().length())
+            if (message.toolCallId() == null || unconsumedToolCallIds.contains(message.toolCallId())
+                    || message.content().codePointCount(0, message.content().length())
                     <= TOOL_RESULT_SLIM_LIMIT) {
                 slimmed.add(message);
                 continue;
@@ -398,6 +415,28 @@ public class AgentRunLlmLoop {
             slimmed.add(AgentLlmMessage.tool(message.toolCallId(), jsonCodec.writeCanonical(reduced)));
         }
         return List.copyOf(slimmed);
+    }
+
+    private Set<String> latestAssistantToolCallIds(List<AgentLlmMessage> messages) {
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            AgentLlmMessage message = messages.get(index);
+            if (message.role() != com.penmate.backend.domain.agent.model.AgentLlmMessageRole.ASSISTANT
+                    || message.toolCalls().isEmpty()) continue;
+            return message.toolCalls().stream().map(AgentLlmToolCallPayload::id)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+        return Set.of();
+    }
+
+    private List<AgentLlmMessage> latestUnconsumedToolExchange(List<AgentLlmMessage> messages) {
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            AgentLlmMessage message = messages.get(index);
+            if (message.role() == com.penmate.backend.domain.agent.model.AgentLlmMessageRole.ASSISTANT
+                    && !message.toolCalls().isEmpty()) {
+                return List.copyOf(messages.subList(index, messages.size()));
+            }
+        }
+        return List.of();
     }
 
     private ContextUsage estimateUsage(List<AgentLlmMessage> messages,
@@ -523,6 +562,7 @@ public class AgentRunLlmLoop {
                                                  boolean recovered,
                                                  NoProgressTracker noProgress) {
         for (int index = startIndex; index < toolCalls.size(); index++) {
+            assertExecutionOwned(request);
             AgentLlmToolCallPayload toolCall = toolCalls.get(index);
             saveContinuation(AgentRunContinuation.readyForTool(
                     request.runId(), messages, turnIndex, iterationIndex, index,
@@ -582,6 +622,10 @@ public class AgentRunLlmLoop {
                 observationResult = result.toolOutput();
                 messages.add(AgentLlmMessage.tool(toolCall.id(), observationResult));
             } else {
+                if ("AGENT_RUN_EXECUTION_FENCED".equals(result.errorCode())) {
+                    throw new AgentRunLeaseService.AgentRunLeaseLostException(
+                            request.runId(), request.executionToken());
+                }
                 String error = result.errorMessage() == null ? "Unknown error" : result.errorMessage();
                 boolean rejected = "USER_REJECTED".equals(result.errorCode());
                 publishBoundary(request.runId(), rejected ? "tool.call.rejected" : "tool.call.failed", eventPayload(
@@ -603,6 +647,11 @@ public class AgentRunLlmLoop {
             if (stopped != null) return stopped;
         }
         return null;
+    }
+
+    private void assertExecutionOwned(AgentRunLoopRequest request) {
+        leaseHeartbeat.assertHealthy(request.runId(), request.executionToken());
+        leaseService.assertExecutionOwned(request.runId(), request.executionToken());
     }
 
     private boolean wasRejected(List<AgentLlmMessage> messages, AgentLlmToolCallPayload candidate) {

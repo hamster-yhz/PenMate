@@ -31,6 +31,7 @@ describe('useWorkbenchApprovals', () => {
   it('approves_message_approval_and_clears_busy_state', async () => {
     const useWorkbenchApprovals = await loadUseWorkbenchApprovals()
     const approve = vi.fn().mockResolvedValue('ok')
+    const onResolved = vi.fn().mockResolvedValue(undefined)
     const messages = [
       {
         id: 'message-1',
@@ -50,6 +51,7 @@ describe('useWorkbenchApprovals', () => {
       getMessages: () => messages,
       approve,
       reject: vi.fn(),
+      onResolved,
       notifyWarning: vi.fn(),
     })
 
@@ -63,6 +65,7 @@ describe('useWorkbenchApprovals', () => {
       resolved: true,
       resolvedAction: 'approved',
     })
+    expect(onResolved).toHaveBeenCalledWith('approved', '42')
     expect(approvals.isApprovalBusy('42')).toBe(false)
     expect(approvals.approvalBusyIds.value).toEqual([])
   })
@@ -143,6 +146,33 @@ describe('useWorkbenchApprovals', () => {
       resolvedAction: undefined,
     })
     expect(approvals.isApprovalBusy('44')).toBe(false)
+    expect(approvals.approvalBusyIds.value).toEqual([])
+  })
+
+  it('keeps_the_approval_resolved_when_run_refresh_fails', async () => {
+    const useWorkbenchApprovals = await loadUseWorkbenchApprovals()
+    const notifyWarning = vi.fn()
+    const messages = [
+      {
+        id: 'message-refresh',
+        role: 'assistant',
+        text: '待审批消息',
+        approval: { id: '46', message: '刷新失败场景', time: '20:06', resolved: false },
+      },
+    ] as ChatMessage[]
+    const approvals = useWorkbenchApprovals({
+      getContext: () => ({ projectId: 'project-101', operatorId: 'operator-201' }),
+      getMessages: () => messages,
+      approve: vi.fn().mockResolvedValue('ok'),
+      reject: vi.fn(),
+      onResolved: vi.fn().mockRejectedValue(new Error('refresh failed')),
+      notifyWarning,
+    })
+
+    await approvals.handleApprove('46')
+
+    expect(messages[0].approval).toMatchObject({ resolved: true, resolvedAction: 'approved' })
+    expect(notifyWarning).toHaveBeenCalledWith('审批已完成，但运行状态刷新失败')
     expect(approvals.approvalBusyIds.value).toEqual([])
   })
 

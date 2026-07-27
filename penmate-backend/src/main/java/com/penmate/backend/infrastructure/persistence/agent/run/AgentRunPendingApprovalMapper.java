@@ -45,9 +45,9 @@ public interface AgentRunPendingApprovalMapper {
                 pending_status AS pendingStatus,
                 operator_id AS operatorId,
                 trace_id AS traceId,
-                approval_binding_json AS approvalBindingJson,
                 created_at AS createdAt,
-                updated_at AS updatedAt
+                updated_at AS updatedAt,
+                approval_binding_json AS approvalBindingJson
             FROM agent_run_pending_approvals
             WHERE approval_id = #{approvalId}
             """)
@@ -59,7 +59,8 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt,
+                   approval_binding_json AS approvalBindingJson
             FROM agent_run_pending_approvals
             WHERE idempotency_key = #{idempotencyKey}
             """)
@@ -71,7 +72,8 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt,
+                   approval_binding_json AS approvalBindingJson
             FROM agent_run_pending_approvals
             WHERE run_id = #{runId} AND pending_status = 'APPROVED'
             ORDER BY updated_at DESC, id DESC LIMIT 1
@@ -84,7 +86,8 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt,
+                   approval_binding_json AS approvalBindingJson
             FROM agent_run_pending_approvals
             WHERE run_id = #{runId} AND pending_status = 'REJECTED'
             ORDER BY updated_at DESC, id DESC LIMIT 1
@@ -97,7 +100,8 @@ public interface AgentRunPendingApprovalMapper {
                    tool_call_id AS toolCallId, tool_code AS toolCode, tool_args_json AS toolArgsJson,
                    tool_context_json AS toolContextJson, resume_payload_json AS resumePayloadJson,
                    idempotency_key AS idempotencyKey, pending_status AS pendingStatus, operator_id AS operatorId,
-                   trace_id AS traceId, approval_binding_json AS approvalBindingJson, created_at AS createdAt, updated_at AS updatedAt
+                   trace_id AS traceId, created_at AS createdAt, updated_at AS updatedAt,
+                   approval_binding_json AS approvalBindingJson
             FROM agent_run_pending_approvals
             WHERE run_id = #{runId} AND pending_status = 'PENDING'
             ORDER BY updated_at DESC, id DESC LIMIT 1
@@ -146,9 +150,9 @@ public interface AgentRunPendingApprovalMapper {
                 pending_status AS pendingStatus,
                 operator_id AS operatorId,
                 trace_id AS traceId,
-                approval_binding_json AS approvalBindingJson,
                 created_at AS createdAt,
-                updated_at AS updatedAt
+                updated_at AS updatedAt,
+                approval_binding_json AS approvalBindingJson
             FROM agent_run_pending_approvals
             WHERE pending_status IN ('RESUMING', 'APPROVED')
               AND updated_at < CURRENT_TIMESTAMP(3) - (#{timeoutMinutes} * INTERVAL '1 minute')

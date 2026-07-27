@@ -353,6 +353,17 @@ export const createAgentRunRuntime = (deps: {
         deps.onToolCall?.(payload)
         deps.scrollChat()
       })
+      const listenToolFailure = (eventName: 'tool.call.failed' | 'tool.call.rejected') => {
+        listen(eventName, (event) => {
+          const payload = parseSseData(event) as Record<string, unknown>
+          publish(eventName, payload)
+          deps.onToolCall?.(payload)
+          deps.setRunPhase('streaming')
+          deps.scrollChat()
+        })
+      }
+      listenToolFailure('tool.call.failed')
+      listenToolFailure('tool.call.rejected')
       listen('tool.call.waiting_approval', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('tool.call.waiting_approval', payload)
@@ -369,6 +380,17 @@ export const createAgentRunRuntime = (deps: {
         deps.setRunStatus('waiting_approval')
         deps.scrollChat()
       })
+      const listenApprovalResolved = (eventName: 'approval.approved' | 'approval.rejected') => {
+        listen(eventName, (event) => {
+          const payload = parseSseData(event) as Record<string, unknown>
+          publish(eventName, payload)
+          deps.setRunPhase('streaming')
+          deps.setRunStatus('running')
+          deps.scrollChat()
+        })
+      }
+      listenApprovalResolved('approval.approved')
+      listenApprovalResolved('approval.rejected')
       listen('message.completed', (event) => {
         const payload = parseSseData(event) as Record<string, unknown>
         publish('message.completed', payload)

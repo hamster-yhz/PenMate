@@ -15,6 +15,7 @@ import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
+import com.penmate.backend.application.approval.command.CreateToolApprovalCommand;
 import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
@@ -93,36 +94,20 @@ public class ToolCallApplicationService {
                         "Existing tool approval is already terminal: " + existing.pendingStatus());
             }
             ToolApprovalView approvalView = toolApprovalViewFactory.create(descriptor, decision);
-            ApprovalRequest approvalRequest = approvalApplicationService.create(new CreateApprovalCommand(
+            String approvalBinding = approvalBinding(context, request);
+            ApprovalRequest approvalRequest = approvalApplicationService.createForTool(new CreateApprovalCommand(
                     context.projectId(),
                     context.runId(),
                     decision.approvalType(),
                     request.toolArgsJson(),
                     approvalView.riskLevel() == null ? descriptor.governancePolicy().riskLevel() : approvalView.riskLevel(),
                     context.ownerUserId()
+            ), new CreateToolApprovalCommand(
+                    context.runId(), context.projectId(), context.sessionId(), context.turnId(),
+                    request.toolCallId(), request.toolCode(), request.toolArgsJson(), request.continuationJson(),
+                    request.conversationMessagesJson(), request.idempotencyKey(), context.ownerUserId(),
+                    context.traceId(), approvalBinding
             ), context.traceId());
-            String approvalBinding = approvalBinding(context, request);
-            pendingApprovalRepository.save(new AgentRunPendingApproval(
-                    null,
-                    approvalRequest.getApprovalRequestId(),
-                    approvalRequest.getApprovalRequestId(),
-                    context.runId(),
-                    context.projectId(),
-                    context.sessionId(),
-                    context.turnId(),
-                    request.toolCallId(),
-                    request.toolCode(),
-                    request.toolArgsJson(),
-                    request.continuationJson(),
-                    request.conversationMessagesJson(),
-                    request.idempotencyKey(),
-                    "PENDING",
-                    context.ownerUserId(),
-                    context.traceId(),
-                    null,
-                    null,
-                    approvalBinding
-            ));
             log.info("agent.tool.call.waiting_approval: toolCode={}, operationCode={}, approvalId={}, runId={}, traceId={}",
                     request.toolCode(), operationCode, approvalRequest.getApprovalRequestId(), context.runId(), context.traceId());
             return ToolCallResult.waitingApproval(approvalRequest.getApprovalRequestId(), approvalPreview);
@@ -132,10 +117,11 @@ public class ToolCallApplicationService {
             log.info("agent.tool.call.success: toolCode={}, operationCode={}, runId={}, traceId={}",
                     request.toolCode(), operationCode, context.runId(), context.traceId());
         } else {
-            log.warn("agent.tool.call.failed: toolCode={}, operationCode={}, status={}, errorCode={}, runId={}, traceId={}",
+            log.warn("agent.tool.call.failed: toolCode={}, operationCode={}, status={}, errorCode={}, errorMessage={}, runId={}, traceId={}",
                     request.toolCode(), operationCode,
                     result == null ? null : result.status(),
                     result == null ? null : result.errorCode(),
+                    result == null ? "Tool call returned no result" : result.errorMessage(),
                     context.runId(), context.traceId());
         }
         return result;

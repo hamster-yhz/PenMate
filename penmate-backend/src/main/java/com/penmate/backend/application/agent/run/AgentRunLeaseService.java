@@ -35,6 +35,12 @@ public class AgentRunLeaseService {
         }
     }
 
+    public void assertExecutionOwned(Long runId, Long executionToken) {
+        if (!runs.ownsExecutionToken(runId, executionToken, Instant.now())) {
+            throw new AgentRunLeaseLostException(runId, executionToken);
+        }
+    }
+
     public boolean renew(AgentRunLease lease) {
         return runs.renewLease(lease, Instant.now().plus(LEASE_DURATION));
     }

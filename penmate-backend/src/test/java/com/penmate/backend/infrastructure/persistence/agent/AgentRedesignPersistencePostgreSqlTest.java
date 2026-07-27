@@ -1,6 +1,9 @@
 package com.penmate.backend.infrastructure.persistence.agent;
 
 import com.penmate.backend.infrastructure.persistence.storybible.StoryBibleMapper;
+import com.penmate.backend.infrastructure.persistence.agent.run.AgentRunPendingApprovalMapper;
+import com.penmate.backend.infrastructure.persistence.agent.run.AgentRunProjectionMapper;
+import com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval;
 import com.penmate.backend.testinfra.PostgreSqlTestDatabase;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
@@ -32,6 +35,8 @@ class AgentRedesignPersistencePostgreSqlTest {
         configuration.setMapUnderscoreToCamelCase(true);
         configuration.addMapper(AgentSafetyPreferenceMapper.class);
         configuration.addMapper(AgentQueuedRequestMapper.class);
+        configuration.addMapper(AgentRunPendingApprovalMapper.class);
+        configuration.addMapper(AgentRunProjectionMapper.class);
         configuration.addMapper(StoryBibleMapper.class);
         sessions = new SqlSessionFactoryBuilder().build(configuration);
     }
@@ -39,6 +44,8 @@ class AgentRedesignPersistencePostgreSqlTest {
     @BeforeEach
     void reset() throws Exception {
         execute("DELETE FROM agent_session_queued_requests WHERE request_id = 940101");
+        execute("DELETE FROM agent_run_pending_approvals WHERE approval_id = 940501");
+        execute("DELETE FROM agent_tool_call_projections WHERE run_id = 940701");
         execute("DELETE FROM user_agent_preferences WHERE user_id = 940201");
         execute("DELETE FROM iam_users WHERE user_id = 940201");
         execute("DELETE FROM story_bible_changesets WHERE story_bible_id IN (940301, 940302)");
@@ -101,6 +108,44 @@ class AgentRedesignPersistencePostgreSqlTest {
                     .extracting(root -> root.getStoryBibleId())
                     .containsExactly(940301L, 940302L);
         }
+    }
+
+    @Test
+    void pending_tool_approval_maps_json_binding_after_timestamps() {
+        String binding = "{\"toolCode\":\"story_bible_node_write\",\"contextEpochId\":940601}";
+        AgentRunPendingApproval pending = new AgentRunPendingApproval(
+                null, 940501L, 940501L, 940502L, 940503L, 940504L, 940505L,
+                "call-940501", "story_bible_node_write", "{}", "{}", "[]",
+                "940502:call-940501", "PENDING", 940506L, "trace-940501",
+                null, null, binding);
+
+        try (SqlSession session = sessions.openSession(true)) {
+            AgentRunPendingApprovalMapper mapper = session.getMapper(AgentRunPendingApprovalMapper.class);
+            assertThat(mapper.insert(pending)).isOne();
+            AgentRunPendingApproval loaded = mapper.findByApprovalId(940501L);
+
+            assertThat(loaded.createdAt()).isNotNull();
+            assertThat(loaded.updatedAt()).isNotNull();
+            assertThat(loaded.approvalBindingJson()).contains("story_bible_node_write", "940601");
+        }
+    }
+
+    @Test
+    void tool_projection_preserves_started_arguments_when_completion_has_only_output() throws Exception {
+        try (SqlSession session = sessions.openSession(true)) {
+            AgentRunProjectionMapper mapper = session.getMapper(AgentRunProjectionMapper.class);
+            assertThat(mapper.upsertToolCall(940701L, "call-940701", "story_bible_inspect", "Inspect",
+                    "running", 3, "{\"operation\":\"catalog\"}", null, null, null, null, null)).isOne();
+            assertThat(mapper.upsertToolCall(940701L, "call-940701", "story_bible_inspect", null,
+                    "success", null, null, "ok", null, null, null, null)).isOne();
+        }
+
+        assertThat(queryString("SELECT arguments_preview_json::text FROM agent_tool_call_projections "
+                + "WHERE run_id = 940701 AND tool_call_id = 'call-940701'"))
+                .contains("catalog");
+        assertThat(queryString("SELECT status FROM agent_tool_call_projections "
+                + "WHERE run_id = 940701 AND tool_call_id = 'call-940701'"))
+                .isEqualTo("success");
     }
 
     private static void execute(String sql) throws Exception {

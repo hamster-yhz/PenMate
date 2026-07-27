@@ -133,7 +133,8 @@ public class AgentCheckpointService {
         }
         if (event.eventType().equals("tool.call.started")
                 || event.eventType().equals("tool.call.completed")
-                || event.eventType().equals("tool.call.failed")) {
+                || event.eventType().equals("tool.call.failed")
+                || event.eventType().equals("tool.call.rejected")) {
             return true;
         }
         if (event.eventType().equals("run.completed")) {

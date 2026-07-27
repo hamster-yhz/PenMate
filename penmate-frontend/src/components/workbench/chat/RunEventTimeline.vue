@@ -47,6 +47,7 @@ const eventMeta: Record<string, { label: string; tone: string; icon: typeof ApiO
   'tool.call.started': { label: '工具调用开始', tone: 'tool', icon: ToolOutlined },
   'tool.call.completed': { label: '工具调用完成', tone: 'success', icon: ToolOutlined },
   'tool.call.failed': { label: '工具调用失败', tone: 'error', icon: ExclamationCircleOutlined },
+  'tool.call.rejected': { label: '工具调用已拒绝', tone: 'error', icon: ExclamationCircleOutlined },
   'tool.call.waiting_approval': { label: '工具等待审批', tone: 'approval', icon: SafetyCertificateOutlined },
   'approval.requested': { label: '已请求审批', tone: 'approval', icon: SafetyCertificateOutlined },
   'approval.approved': { label: '审批已通过', tone: 'success', icon: SafetyCertificateOutlined },

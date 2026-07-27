@@ -16,14 +16,18 @@ public class AgentRunInitialExecutionService {
     private final AgentRunEventPublisher eventPublisher;
     private final AgentRunLeaseService leaseService;
     private final AgentRunOutputEventService outputs;
+    private final AgentRunLeaseHeartbeat leaseHeartbeat;
 
     public void execute(Long runId, String traceId) {
         var lease = leaseService.tryAcquire(runId).orElse(null);
         if (lease == null) return;
-        try {
+        try (var heartbeat = leaseHeartbeat.start(lease)) {
             agentRunExecutor.execute(runId, traceId, lease);
         } catch (AgentLlmInvocationCancelledException exception) {
             log.info("agent run model invocation cancelled: runId={}, traceId={}", runId, traceId);
+        } catch (AgentRunLeaseService.AgentRunLeaseLostException exception) {
+            log.info("agent run execution stopped after lease loss: runId={}, traceId={}, executionToken={}",
+                    runId, traceId, lease.executionToken());
         } catch (Exception exception) {
             log.error("agent run dispatch failed: runId={}, traceId={}", runId, traceId, exception);
             try {

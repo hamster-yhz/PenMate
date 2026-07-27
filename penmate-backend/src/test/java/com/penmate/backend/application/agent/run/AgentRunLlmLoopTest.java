@@ -11,7 +11,6 @@ import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.domain.agent.run.model.LlmTokenUsage;
 import com.penmate.backend.infrastructure.serialization.JacksonJsonCodec;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.penmate.backend.application.agent.tool.definition.AgentToolDefinitionSource;
 import com.penmate.backend.application.agent.tool.gateway.ToolCallApplicationService;
 import com.penmate.backend.application.agent.tool.runtime.ToolCallResult;
@@ -33,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -59,6 +59,10 @@ class AgentRunLlmLoopTest {
     private AgentLlmCancellationPort cancellations;
     @Mock
     private AgentPartialMessageCheckpointStore partialMessages;
+    @Mock
+    private AgentRunLeaseService leaseService;
+    @Mock
+    private AgentRunLeaseHeartbeat leaseHeartbeat;
 
     @BeforeEach
     void setUp() {
@@ -163,6 +167,60 @@ class AgentRunLlmLoopTest {
                 ArgumentCaptor.forClass(com.penmate.backend.application.agent.tool.runtime.ToolCallRequest.class);
         verify(toolCallService).executeToolCall(toolRequest.capture());
         assertThat(toolRequest.getValue().executionToken()).isEqualTo(7L);
+    }
+
+    @Test
+    void aborts_immediately_when_a_tool_call_is_fenced() {
+        when(llmGateway.generateTurn(any(), any())).thenReturn(new AgentLlmTurnResponse(
+                "tool_calls", "", List.of(new AgentLlmToolCall(
+                "call-fenced", "story_bible_inspect", "{\"operation\":\"nodes\"}")),
+                "{}", new LlmTokenUsage(1, 1, 2)));
+        when(toolCallService.executeToolCall(any())).thenReturn(ToolCallResult.failed(
+                "AGENT_RUN_EXECUTION_FENCED", "Agent Run no longer owns the current execution token"));
+
+        assertThatThrownBy(() -> newLoop().execute(requestWithTool("story_bible_inspect")))
+                .isInstanceOf(AgentRunLeaseService.AgentRunLeaseLostException.class);
+
+        verify(llmGateway).generateTurn(any(), any());
+        verify(eventPublisher, never()).publish(eq(70001L), eq("tool.call.failed"), any());
+    }
+
+    @Test
+    void preserves_fresh_tool_results_for_one_turn_then_slims_them() {
+        String largeResult = "begin-" + "x".repeat(9_000) + "-end";
+        when(llmGateway.generateTurn(any(), any())).thenReturn(
+                new AgentLlmTurnResponse("tool_calls", "", List.of(
+                        new AgentLlmToolCall("call-large", "manuscript_chapter_read", "{}")),
+                        "{}", new LlmTokenUsage(1, 1, 2)),
+                new AgentLlmTurnResponse("tool_calls", "", List.of(
+                        new AgentLlmToolCall("call-small", "story_bible_search", "{}")),
+                        "{}", new LlmTokenUsage(1, 1, 2)),
+                new AgentLlmTurnResponse("stop", "Done", List.of(), "{}",
+                        new LlmTokenUsage(1, 1, 2)));
+        when(toolCallService.executeToolCall(any())).thenReturn(
+                ToolCallResult.success(largeResult),
+                ToolCallResult.success("{\"nodeId\":\"71\"}"));
+
+        AgentRunLoopResult result = newLoop().execute(new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace", List.of(AgentLlmMessage.user("Work")),
+                List.of(
+                        new AgentLlmToolSchema("manuscript_chapter_read", "read", "{\"type\":\"object\"}"),
+                        new AgentLlmToolSchema("story_bible_search", "search", "{\"type\":\"object\"}")),
+                AgentLlmExecutionConfig.builder().build(), 201L, 7L));
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        ArgumentCaptor<AgentLlmTurnRequest> requests = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway, org.mockito.Mockito.times(3)).generateTurn(requests.capture(), any());
+        AgentLlmMessage fresh = requests.getAllValues().get(1).messages().stream()
+                .filter(message -> "call-large".equals(message.toolCallId())).findFirst().orElseThrow();
+        assertThat(fresh.content()).isEqualTo(largeResult);
+        AgentLlmMessage consumed = requests.getAllValues().get(2).messages().stream()
+                .filter(message -> "call-large".equals(message.toolCallId())).findFirst().orElseThrow();
+        assertThat(consumed.content()).contains("\"slimmed\":true", "begin-", "-end")
+                .hasSizeLessThan(largeResult.length());
+        AgentLlmMessage newest = requests.getAllValues().get(2).messages().stream()
+                .filter(message -> "call-small".equals(message.toolCallId())).findFirst().orElseThrow();
+        assertThat(newest.content()).isEqualTo("{\"nodeId\":\"71\"}");
     }
 
     @Test
@@ -505,6 +563,67 @@ class AgentRunLlmLoopTest {
     }
 
     @Test
+    void preserves_the_latest_tool_exchange_when_compressing_consumed_history() {
+        String freshResult = "fresh-begin-" + "y".repeat(5_000) + "-fresh-end";
+        AgentLlmToolCallPayload freshCall = new AgentLlmToolCallPayload(
+                "call-fresh", "function", "manuscript_chapter_read", "{}");
+        List<AgentLlmMessage> messages = List.of(
+                AgentLlmMessage.user("old-history-" + "x".repeat(40_000)),
+                AgentLlmMessage.assistant("", List.of(freshCall)),
+                AgentLlmMessage.tool("call-fresh", freshResult));
+        AgentRunContinuation continuation = AgentRunContinuation.readyForLlm(
+                70001L, messages, 2, 1, "", LlmTokenUsage.ZERO);
+        when(llmGateway.generateTurn(any(), any())).thenReturn(
+                new AgentLlmTurnResponse("stop", """
+                        {"summary":"Keep prior decisions","decisions":[],"completed":[],
+                         "resourceState":[],"unresolved":[],"nextAction":"Continue"}
+                        """, List.of(), "{}", new LlmTokenUsage(40, 10, 50)),
+                new AgentLlmTurnResponse("stop", "Completed", List.of(), "{}",
+                        new LlmTokenUsage(30, 5, 35)));
+        AgentRunLoopRequest request = new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace", List.of(),
+                List.of(new AgentLlmToolSchema(
+                        "manuscript_chapter_read", "read", "{\"type\":\"object\"}")),
+                AgentLlmExecutionConfig.builder().maxContextTokens(10_000).maxOutputTokens(100).build(),
+                201L, 7L);
+
+        AgentRunLoopResult result = newLoop().resume(request, continuation);
+
+        assertThat(result.status()).isEqualTo(AgentRunLoopResult.Status.COMPLETED);
+        ArgumentCaptor<AgentLlmTurnRequest> requests = ArgumentCaptor.forClass(AgentLlmTurnRequest.class);
+        verify(llmGateway, org.mockito.Mockito.times(2)).generateTurn(requests.capture(), any());
+        AgentLlmTurnRequest mainRequest = requests.getAllValues().get(1);
+        AgentLlmMessage preservedResult = mainRequest.messages().stream()
+                .filter(message -> "call-fresh".equals(message.toolCallId()))
+                .findFirst().orElseThrow();
+        assertThat(preservedResult.content()).isEqualTo(freshResult);
+        assertThat(mainRequest.messages()).anyMatch(message -> message.toolCalls().stream()
+                .anyMatch(call -> "call-fresh".equals(call.id())));
+    }
+
+    @Test
+    void propagates_lease_loss_after_context_compression() {
+        when(llmGateway.generateTurn(any(), any())).thenReturn(
+                new AgentLlmTurnResponse("stop", """
+                        {"summary":"Keep the active request","decisions":[],"completed":[],
+                         "resourceState":[],"unresolved":[],"nextAction":"Continue"}
+                        """, List.of(), "{}", new LlmTokenUsage(40, 10, 50)));
+        org.mockito.Mockito.doNothing().doNothing()
+                .doThrow(new AgentRunLeaseService.AgentRunLeaseLostException(70001L, 7L))
+                .when(leaseService).assertExecutionOwned(70001L, 7L);
+        AgentRunLoopRequest request = new AgentRunLoopRequest(
+                70001L, 101L, 90001L, 50001L, "trace",
+                List.of(AgentLlmMessage.user("x".repeat(3_000))), List.of(),
+                AgentLlmExecutionConfig.builder().maxContextTokens(1_000).maxOutputTokens(100).build(),
+                201L, 7L);
+
+        assertThatThrownBy(() -> newLoop().execute(request))
+                .isInstanceOf(AgentRunLeaseService.AgentRunLeaseLostException.class);
+
+        verify(eventPublisher, never()).publish(eq(70001L), eq("context.compression.failed"), any());
+    }
+
+    @Test
     void compression_failure_fails_run_without_a_second_attempt() {
         when(llmGateway.generateTurn(any(), any())).thenReturn(
                 new AgentLlmTurnResponse("stop", "not json", List.of(), "{}", LlmTokenUsage.ZERO));
@@ -533,7 +652,7 @@ class AgentRunLlmLoopTest {
         AgentLlmInvocationService invocations = new AgentLlmInvocationService(llmGateway, cancellations);
         AgentStreamingMessageService streaming = new AgentStreamingMessageService(eventPublisher, partialMessages);
         return new AgentRunLlmLoop(invocations, toolDefinitionSource, eventPublisher, toolCallService,
-                checkpointBoundary, continuations, streaming,
+                checkpointBoundary, continuations, streaming, leaseService, leaseHeartbeat,
                 new JacksonJsonCodec(new ObjectMapper().findAndRegisterModules()));
     }
 }

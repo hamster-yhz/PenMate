@@ -54,13 +54,14 @@ public class AgentRuntimeStateReducer {
                     state.assistantToolCallsJson(),
                     Math.max(0, state.remainingToolCalls() - 1),
                     event.sequence());
-            case "tool.call.completed", "tool.call.failed" -> state.withLastEventSeq(event.sequence());
+            case "tool.call.completed", "tool.call.failed", "tool.call.rejected" -> state.withLastEventSeq(event.sequence());
             case "tool.call.waiting_approval" -> applyToolCallWaitingApproval(state, payload, event.sequence());
             case "approval.requested" -> state.withActiveApproval(longValue(payload, "approvalId"), event.sequence());
             case "approval.approved" -> state.withToolCallApproved(
                     text(payload, "approvedPayload", ""),
                     event.sequence());
-            case "approval.rejected", "run.cancelled" -> state.withStatusAndPhase("CANCELLED", "cancelled", event.sequence());
+            case "approval.rejected" -> state.withToolCallRejected(event.sequence());
+            case "run.cancelled" -> state.withStatusAndPhase("CANCELLED", "cancelled", event.sequence());
             case "run.suspended" -> state.withStatusAndPhase("SUSPENDED", "suspended", event.sequence());
             case "run.superseded" -> state.withStatusAndPhase("SUPERSEDED", "superseded", event.sequence());
             case "message.delta" -> state.appendAssistantDraft(text(payload, "text", ""), event.sequence());
@@ -137,7 +138,8 @@ public class AgentRuntimeStateReducer {
         int total = nestedIntValue(values, "totalTokens");
         int cached = nestedIntValue(values, "cachedPromptTokens");
         int cacheCreation = nestedIntValue(values, "cacheCreationPromptTokens");
-        return current.add(new LlmTokenUsage(prompt, completion, total, cached, cacheCreation));
+        int reasoning = nestedIntValue(values, "reasoningTokens");
+        return current.add(new LlmTokenUsage(prompt, completion, total, cached, cacheCreation, reasoning));
     }
 
     private int nestedIntValue(Map<?, ?> values, String fieldName) {

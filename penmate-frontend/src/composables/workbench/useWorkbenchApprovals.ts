@@ -12,6 +12,7 @@ type UseWorkbenchApprovalsDeps = {
   getMessages: () => ChatMessage[]
   approve: (projectId: string, approvalId: string, payload: Record<string, unknown>) => Promise<unknown>
   reject: (projectId: string, approvalId: string, payload: Record<string, unknown>) => Promise<unknown>
+  onResolved?: (resolvedAction: 'approved' | 'rejected', approvalId: string) => Promise<void> | void
   notifyWarning?: (message: string) => void
 }
 
@@ -51,6 +52,11 @@ export const useWorkbenchApprovals = (deps: UseWorkbenchApprovalsDeps) => {
       })
       messageItem.approval.resolved = true
       messageItem.approval.resolvedAction = resolvedAction
+      try {
+        await deps.onResolved?.(resolvedAction, approvalId)
+      } catch {
+        deps.notifyWarning?.('审批已完成，但运行状态刷新失败')
+      }
     } catch (error: unknown) {
       deps.notifyWarning?.(getErrorMessage(error, failureMessage))
     } finally {

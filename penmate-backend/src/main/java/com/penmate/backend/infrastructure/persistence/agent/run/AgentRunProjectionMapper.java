@@ -120,10 +120,10 @@ public interface AgentRunProjectionMapper {
             )
             ON CONFLICT (run_id, tool_call_id) DO UPDATE SET
                 tool_code = EXCLUDED.tool_code,
-                tool_name = EXCLUDED.tool_name,
+                tool_name = COALESCE(EXCLUDED.tool_name, agent_tool_call_projections.tool_name),
                 status = EXCLUDED.status,
-                iteration = EXCLUDED.iteration,
-                arguments_preview_json = EXCLUDED.arguments_preview_json,
+                iteration = COALESCE(EXCLUDED.iteration, agent_tool_call_projections.iteration),
+                arguments_preview_json = COALESCE(EXCLUDED.arguments_preview_json, agent_tool_call_projections.arguments_preview_json),
                 output_preview = EXCLUDED.output_preview,
                 output_artifact_id = EXCLUDED.output_artifact_id,
                 approval_id = EXCLUDED.approval_id,

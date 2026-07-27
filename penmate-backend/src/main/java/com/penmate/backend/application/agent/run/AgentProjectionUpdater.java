@@ -57,13 +57,22 @@ public class AgentProjectionUpdater {
                     event.runId(), text(payload, "toolCallId", ""), text(payload, "toolCode", ""), text(payload, "toolName", null),
                     "failed", intValue(payload, "iteration"), raw(payload, "argumentsPreview"), null, null, null,
                     errorCode(payload, "AGENT_TOOL_CALL_FAILED"), errorMessage(payload), event.sequence());
-            case "tool.call.waiting_approval" -> runProjectionRepository.updateRunState(
-                    event.runId(), "WAITING_APPROVAL", null, longValue(payload, "approvalId"), event.sequence(), null, null);
+            case "tool.call.rejected" -> runProjectionRepository.upsertToolCall(
+                    event.runId(), text(payload, "toolCallId", ""), text(payload, "toolCode", ""), text(payload, "toolName", null),
+                    "rejected", intValue(payload, "iteration"), raw(payload, "argumentsPreview"), null, null, null,
+                    errorCode(payload, "USER_REJECTED"), errorMessage(payload), event.sequence());
+            case "tool.call.waiting_approval" -> {
+                runProjectionRepository.upsertToolCall(
+                        event.runId(), text(payload, "toolCallId", ""), text(payload, "toolCode", ""), text(payload, "toolName", null),
+                        "waiting_approval", intValue(payload, "iteration"), raw(payload, "argumentsPreview"), null, null,
+                        longValue(payload, "approvalId"), null, null, event.sequence());
+                runProjectionRepository.updateRunState(
+                        event.runId(), "WAITING_APPROVAL", null, longValue(payload, "approvalId"), event.sequence(), null, null);
+            }
             case "approval.approved" -> runProjectionRepository.updateRunState(
                     event.runId(), "RUNNING", null, null, event.sequence(), null, null);
             case "approval.rejected" -> runProjectionRepository.updateRunState(
-                    event.runId(), "CANCELLED", "cancelled", null, event.sequence(),
-                    errorCode(payload, "AGENT_APPROVAL_REJECTED"), errorMessage(payload));
+                    event.runId(), "RUNNING", "executing", null, event.sequence(), null, null);
             case "run.suspended" -> runProjectionRepository.updateRunState(
                     event.runId(), "SUSPENDED", "suspended", null, event.sequence(),
                     errorCode(payload, "AGENT_RUN_TRANSIENT_FAILURE"), errorMessage(payload));

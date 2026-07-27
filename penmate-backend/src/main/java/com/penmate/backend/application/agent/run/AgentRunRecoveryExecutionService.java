@@ -14,12 +14,16 @@ public class AgentRunRecoveryExecutionService {
     private final AgentRunExecutor agentRunExecutor;
     private final AgentRunLeaseService leaseService;
     private final AgentRunEventPublisher eventPublisher;
+    private final AgentRunLeaseHeartbeat leaseHeartbeat;
 
     public void execute(Long runId, String traceId) {
         var lease = leaseService.tryAcquire(runId).orElse(null);
         if (lease == null) return;
-        try {
+        try (var heartbeat = leaseHeartbeat.start(lease)) {
             agentRunExecutor.recover(runId, traceId, lease);
+        } catch (AgentRunLeaseService.AgentRunLeaseLostException exception) {
+            log.info("agent run recovery stopped after lease loss: runId={}, traceId={}, executionToken={}",
+                    runId, traceId, lease.executionToken());
         } catch (Exception exception) {
             log.error("agent run resume dispatch failed: runId={}, traceId={}", runId, traceId, exception);
             try {

@@ -28,7 +28,8 @@ export const useWorkbenchSessionRecovery = (deps: {
     const runId = snapshot?.activeRun?.runId
     const runStatus = String(snapshot?.activeRun?.runStatus ?? '').toUpperCase()
     const latestSequence = String(snapshot?.activeRun?.latestSequence ?? '0')
-    if (runId != null && String(runId).trim() !== '' && String(runId) !== '0' && runStatus === 'RUNNING') {
+    const shouldResumeRun = ['PENDING', 'RUNNING', 'SUSPENDED'].includes(runStatus)
+    if (runId != null && String(runId).trim() !== '' && String(runId) !== '0' && shouldResumeRun) {
       if (deps.resumeRunningRun) {
         void deps.resumeRunningRun(projectId, runId, latestSequence).catch(() => undefined)
       } else {

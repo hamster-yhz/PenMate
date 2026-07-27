@@ -62,6 +62,20 @@ class AgentRuntimeStateReducerContractTest {
         assertThat(reduced.lastEventSeq()).isEqualTo(6L);
     }
 
+    @Test
+    void rejected_approval_clears_waiting_state_and_keeps_run_resumable() {
+        AgentRuntimeState waiting = reducer.applyAll(AgentRuntimeState.empty(70001L), List.of(
+                event(1L, "run.started", "{\"phase\":\"executing\"}"),
+                event(2L, "tool.call.waiting_approval", "{\"toolCallId\":\"call-1\",\"approvalId\":88001}")
+        ));
+
+        AgentRuntimeState resumed = reducer.apply(waiting, event(3L, "approval.rejected", "{\"approvalId\":88001}"));
+
+        assertThat(resumed.status()).isEqualTo("RUNNING");
+        assertThat(resumed.phase()).isEqualTo("executing");
+        assertThat(resumed.activeApprovalId()).isNull();
+    }
+
     private AgentEvent event(Long sequence, String eventType, String payloadJson) {
         return AgentEvent.replay(sequence, 70001L, sequence, eventType, payloadJson);
     }

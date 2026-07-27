@@ -251,6 +251,31 @@ describe('createAgentRunRuntime', () => {
     await expect(consuming).resolves.toBe('cancelled')
   })
 
+  it('keeps the Run active while publishing recoverable tool and approval failures', async () => {
+    const harness = createRuntimeHarness()
+    const consuming = harness.consume()
+
+    harness.stream.listeners.get('tool.call.failed')?.(
+      agentRunEventDto('tool.call.failed', { toolCallId: 'call-1', errorMessage: 'retry with less text' }, '7'),
+    )
+    expect(harness.runtimeEvent).toMatchObject({
+      eventName: 'tool.call.failed',
+      payload: { toolCallId: 'call-1', errorMessage: 'retry with less text' },
+    })
+    expect(harness.runPhase).toBe('streaming')
+
+    harness.stream.listeners.get('approval.rejected')?.(
+      agentRunEventDto('approval.rejected', { approvalId: '88001' }, '8'),
+    )
+    expect(harness.runStatus).toBe('running')
+    expect(harness.runPhase).toBe('streaming')
+
+    harness.stream.listeners.get('run.cancelled')?.(
+      agentRunEventDto('run.cancelled', { status: 'cancelled' }, '9'),
+    )
+    await expect(consuming).resolves.toBe('cancelled')
+  })
+
   it('settles successfully when reconciliation finds a completed Run after a stream error', async () => {
     const harness = createRuntimeHarness('completed')
     const consuming = harness.consume()

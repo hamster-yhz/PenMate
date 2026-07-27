@@ -86,8 +86,14 @@ public record AgentRuntimeState(
     }
 
     public AgentRuntimeState withToolCallApproved(String payload, Long sequence) {
-        return new AgentRuntimeState(runId, status, phase, activeApprovalId, sequence, assistantDraft,
+        return new AgentRuntimeState(runId, "RUNNING", "executing", null, sequence, assistantDraft,
                 llmMessages, llmTurnIndex, pendingToolCallId, payload, assistantToolCallsJson,
+                remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
+    }
+
+    public AgentRuntimeState withToolCallRejected(Long sequence) {
+        return new AgentRuntimeState(runId, "RUNNING", "executing", null, sequence, assistantDraft,
+                llmMessages, llmTurnIndex, pendingToolCallId, approvedToolPayload, assistantToolCallsJson,
                 remainingToolCalls, tokenUsage, activeTodoProjections, artifactRefs, assistantMessageCompleted);
     }
 

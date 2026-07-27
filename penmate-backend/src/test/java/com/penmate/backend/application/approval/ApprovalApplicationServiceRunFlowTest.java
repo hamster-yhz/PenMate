@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApprovalApplicationServiceRunFlowTest {
@@ -109,6 +110,84 @@ class ApprovalApplicationServiceRunFlowTest {
 
         verify(eventPublisher, never()).publish(eq(70001L), eq("approval.approved"), any());
         verify(runResumeDispatcher, never()).dispatchResume(any(), any());
+    }
+
+    @Test
+    void concurrent_duplicate_approval_reloads_the_committed_status_instead_of_rejecting_a_stale_snapshot() {
+        ApprovalRequestRepository approvals = mock(ApprovalRequestRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovals = mock(AgentRunPendingApprovalRepository.class);
+        AgentRunEventPublisher events = mock(AgentRunEventPublisher.class);
+        AgentRunResumeDispatcher resumes = mock(AgentRunResumeDispatcher.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
+        ApprovalApplicationService service = new ApprovalApplicationService(
+                approvals, pendingApprovals, events, resumes, mock(AgentRunLeaseService.class),
+                mock(BusinessIdGenerator.class), accessGuard);
+        ApprovalRequest staleApproval = approvalRequest(88001L, 70001L);
+        ApprovalRequest committedApproval = approvalRequest(88001L, 70001L);
+        committedApproval.setStatus("approved");
+        AgentRunPendingApproval committedPending = mock(AgentRunPendingApproval.class);
+        when(committedPending.pendingStatus()).thenReturn("APPROVED");
+
+        when(accessGuard.requireApproval(9001L, 88001L, 201L)).thenReturn(staleApproval);
+        when(approvals.approveByApprovalRequestId(9001L, 88001L, 201L, "ok")).thenReturn(0);
+        when(approvals.findByApprovalRequestId(88001L)).thenReturn(committedApproval);
+        when(pendingApprovals.findByApprovalId(88001L)).thenReturn(committedPending);
+
+        assertThatCode(() -> service.approve(
+                9001L, 88001L, new ReviewApprovalCommand(201L, "ok"), "trace-concurrent"))
+                .doesNotThrowAnyException();
+
+        verify(events, never()).publish(eq(70001L), eq("approval.approved"), any());
+        verify(resumes, never()).dispatchResume(any(), any());
+    }
+
+    @Test
+    void committed_approval_is_not_reported_as_failed_when_async_dispatch_is_rejected() {
+        ApprovalRequestRepository approvals = mock(ApprovalRequestRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovals = mock(AgentRunPendingApprovalRepository.class);
+        AgentRunEventPublisher events = mock(AgentRunEventPublisher.class);
+        AgentRunResumeDispatcher resumes = mock(AgentRunResumeDispatcher.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
+        ApprovalApplicationService service = new ApprovalApplicationService(
+                approvals, pendingApprovals, events, resumes, mock(AgentRunLeaseService.class),
+                mock(BusinessIdGenerator.class), accessGuard);
+
+        when(accessGuard.requireApproval(9001L, 88001L, 201L)).thenReturn(approvalRequest(88001L, 70001L));
+        when(approvals.approveByApprovalRequestId(9001L, 88001L, 201L, "ok")).thenReturn(1);
+        when(pendingApprovals.findByApprovalId(88001L)).thenReturn(pendingApproval(88001L, 70001L));
+        when(pendingApprovals.markStatus(88001L, "PENDING", "APPROVED")).thenReturn(1);
+        doThrow(new IllegalStateException("executor rejected"))
+                .when(resumes).dispatchResume(70001L, "trace-dispatch");
+
+        assertThatCode(() -> service.approve(
+                9001L, 88001L, new ReviewApprovalCommand(201L, "ok"), "trace-dispatch"))
+                .doesNotThrowAnyException();
+
+        verify(events).publish(eq(70001L), eq("approval.approved"), any(Map.class));
+        verify(resumes).dispatchResume(70001L, "trace-dispatch");
+    }
+
+    @Test
+    void duplicate_approval_repairs_a_pending_tool_transition_and_resumes_the_run() {
+        ApprovalRequestRepository approvals = mock(ApprovalRequestRepository.class);
+        AgentRunPendingApprovalRepository pendingApprovals = mock(AgentRunPendingApprovalRepository.class);
+        AgentRunEventPublisher events = mock(AgentRunEventPublisher.class);
+        AgentRunResumeDispatcher resumes = mock(AgentRunResumeDispatcher.class);
+        AgentResourceAccessGuard accessGuard = mock(AgentResourceAccessGuard.class);
+        ApprovalApplicationService service = new ApprovalApplicationService(
+                approvals, pendingApprovals, events, resumes, mock(AgentRunLeaseService.class),
+                mock(BusinessIdGenerator.class), accessGuard);
+        ApprovalRequest approval = approvalRequest(88001L, 70001L);
+        approval.setStatus("approved");
+        when(accessGuard.requireApproval(9001L, 88001L, 201L)).thenReturn(approval);
+        when(approvals.approveByApprovalRequestId(9001L, 88001L, 201L, "retry")).thenReturn(0);
+        when(pendingApprovals.findByApprovalId(88001L)).thenReturn(pendingApproval(88001L, 70001L));
+        when(pendingApprovals.markStatus(88001L, "PENDING", "APPROVED")).thenReturn(1);
+
+        service.approve(9001L, 88001L, new ReviewApprovalCommand(201L, "retry"), "trace-repair");
+
+        verify(events).publish(eq(70001L), eq("approval.approved"), any(Map.class));
+        verify(resumes).dispatchResume(70001L, "trace-repair");
     }
 
     @Test

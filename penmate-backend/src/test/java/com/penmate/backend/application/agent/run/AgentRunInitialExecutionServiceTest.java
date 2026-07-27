@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,11 +28,37 @@ class AgentRunInitialExecutionServiceTest {
         when(leaseService.tryAcquire(70001L)).thenReturn(Optional.of(lease));
         when(leaseService.handleFailure(eq(lease), any())).thenReturn(AgentRunStatus.FAILED);
         doThrow(new IllegalStateException("boom")).when(executor).execute(70001L, "trace-1", lease);
+        AgentRunLeaseHeartbeat heartbeat = mock(AgentRunLeaseHeartbeat.class);
+        AgentRunLeaseHeartbeat.Registration registration = mock(AgentRunLeaseHeartbeat.Registration.class);
+        when(heartbeat.start(lease)).thenReturn(registration);
         AgentRunInitialExecutionService service = new AgentRunInitialExecutionService(
-                executor, eventPublisher, leaseService, mock(AgentRunOutputEventService.class));
+                executor, eventPublisher, leaseService, mock(AgentRunOutputEventService.class), heartbeat);
 
         service.execute(70001L, "trace-1");
 
         verify(eventPublisher).publish(eq(70001L), eq("run.failed"), any(Map.class));
+    }
+
+    @Test
+    void stops_without_failure_transition_when_execution_lease_is_lost() {
+        AgentRunExecutor executor = mock(AgentRunExecutor.class);
+        AgentRunEventPublisher eventPublisher = mock(AgentRunEventPublisher.class);
+        AgentRunLeaseService leaseService = mock(AgentRunLeaseService.class);
+        AgentRunOutputEventService outputs = mock(AgentRunOutputEventService.class);
+        AgentRunLease lease = new AgentRunLease(70001L, "worker", 1L, 3,
+                AgentRunStatus.PENDING, Instant.now().plusSeconds(60));
+        when(leaseService.tryAcquire(70001L)).thenReturn(Optional.of(lease));
+        doThrow(new AgentRunLeaseService.AgentRunLeaseLostException(70001L, 1L))
+                .when(executor).execute(70001L, "trace-1", lease);
+        AgentRunLeaseHeartbeat heartbeat = mock(AgentRunLeaseHeartbeat.class);
+        when(heartbeat.start(lease)).thenReturn(mock(AgentRunLeaseHeartbeat.Registration.class));
+        AgentRunInitialExecutionService service = new AgentRunInitialExecutionService(
+                executor, eventPublisher, leaseService, outputs, heartbeat);
+
+        service.execute(70001L, "trace-1");
+
+        verify(leaseService, never()).handleFailure(eq(lease), any());
+        verify(eventPublisher, never()).publish(eq(70001L), any(), any());
+        verify(outputs, never()).persistInterrupted(70001L);
     }
 }

@@ -19,6 +19,7 @@ import com.penmate.backend.application.approval.ApprovalApplicationService;
 import com.penmate.backend.application.approval.ApprovalPolicyDecision;
 import com.penmate.backend.application.approval.DefaultApprovalPolicyEngine;
 import com.penmate.backend.application.approval.command.CreateApprovalCommand;
+import com.penmate.backend.application.approval.command.CreateToolApprovalCommand;
 import com.penmate.backend.domain.agent.repository.AgentRepository;
 import com.penmate.backend.domain.agent.run.repository.AgentRunPendingApprovalRepository;
 import com.penmate.backend.domain.approval.model.ApprovalRequest;
@@ -122,7 +123,8 @@ class ToolCallApplicationServiceTest {
         when(toolDefinitionSource.getRequired("book_crud")).thenReturn(descriptor);
         when(approvalPolicyEngine.evaluate(descriptor, request, "STANDARD")).thenReturn(decision);
         when(toolApprovalViewFactory.create(descriptor, decision)).thenReturn(approvalView);
-        when(approvalApplicationService.create(any(CreateApprovalCommand.class), eq("trace-approval"))).thenReturn(approvalRequest);
+        when(approvalApplicationService.createForTool(any(CreateApprovalCommand.class),
+                any(CreateToolApprovalCommand.class), eq("trace-approval"))).thenReturn(approvalRequest);
 
         ToolCallResult result = toolCallApplicationService.executeToolCall(request);
 
@@ -130,17 +132,15 @@ class ToolCallApplicationServiceTest {
         assertThat(result.approvalId()).isEqualTo(88001L);
 
         ArgumentCaptor<CreateApprovalCommand> commandCaptor = ArgumentCaptor.forClass(CreateApprovalCommand.class);
-        verify(approvalApplicationService).create(commandCaptor.capture(), eq("trace-approval"));
+        ArgumentCaptor<CreateToolApprovalCommand> toolCommandCaptor =
+                ArgumentCaptor.forClass(CreateToolApprovalCommand.class);
+        verify(approvalApplicationService).createForTool(
+                commandCaptor.capture(), toolCommandCaptor.capture(), eq("trace-approval"));
         assertThat(commandCaptor.getValue().approvalType()).isEqualTo("BOOK_DELETE");
         assertThat(commandCaptor.getValue().riskLevel()).isEqualTo(5);
         assertThat(commandCaptor.getValue().payloadJson()).isEqualTo(request.toolArgsJson());
 
-        ArgumentCaptor<com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval> pendingCaptor =
-                ArgumentCaptor.forClass(com.penmate.backend.domain.agent.run.model.AgentRunPendingApproval.class);
-        verify(pendingApprovalRepository).save(pendingCaptor.capture());
-        assertThat(pendingCaptor.getValue().approvalId()).isEqualTo(88001L);
-        assertThat(pendingCaptor.getValue().pendingApprovalId()).isEqualTo(88001L);
-        assertThat(pendingCaptor.getValue().approvalBindingJson())
+        assertThat(toolCommandCaptor.getValue().approvalBindingJson())
                 .contains("book_crud", "toolArgsHash", "contextEpochId", "safetyMode", "expectedState");
         verify(toolDefinitionSource).getRequired("book_crud");
         verify(toolApprovalViewFactory).create(descriptor, decision);
