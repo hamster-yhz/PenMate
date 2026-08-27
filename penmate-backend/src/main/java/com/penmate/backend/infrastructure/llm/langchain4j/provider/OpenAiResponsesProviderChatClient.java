@@ -8,6 +8,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmInvocationCancelledExce
 import com.penmate.backend.application.agent.llm.AgentLlmProtocol;
 import com.penmate.backend.application.agent.llm.AgentLlmStreamEvent;
 import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
+import com.penmate.backend.application.agent.llm.AgentLlmTransientException;
 import com.penmate.backend.application.agent.llm.AgentLlmToolCall;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
@@ -114,7 +115,7 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
             return readResponsesEventStream(reader, observer);
         } catch (IOException ex) {
             if (observer.isCancelled()) throw new AgentLlmInvocationCancelledException();
-            throw BusinessException.of("OpenAI Responses stream read failed: " + ex.getMessage());
+            throw new AgentLlmTransientException("OpenAI Responses stream read failed: " + ex.getMessage(), ex);
         }
     }
 
@@ -222,7 +223,7 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
         JSONObject event = AgentJsonCodec.parseObj(payload);
         String type = event.getStr("type", "");
         if ("error".equals(type) || "response.failed".equals(type)) {
-            throw BusinessException.of("OpenAI Responses stream failed: " + payload);
+            throw streamFailure(event, payload);
         }
         observer.onResponseStarted();
 
@@ -290,8 +291,32 @@ public class OpenAiResponsesProviderChatClient implements ProviderChatClient {
         } catch (CompletionException ex) {
             if (observer.isCancelled()) throw new AgentLlmInvocationCancelledException();
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();
-            throw BusinessException.of("OpenAI Responses stream failed: " + cause.getMessage());
+            throw new AgentLlmTransientException("OpenAI Responses stream failed: " + cause.getMessage(), cause);
         }
+    }
+
+    private RuntimeException streamFailure(JSONObject event, String payload) {
+        JSONObject error = event.getJSONObject("error");
+        if (error == null) {
+            JSONObject response = event.getJSONObject("response");
+            if (response != null) error = response.getJSONObject("error");
+        }
+        String errorType = error == null ? null : error.getStr("type", null);
+        String errorCode = error == null ? null : error.getStr("code", null);
+        String message = "OpenAI Responses stream failed: " + payload;
+        if (isTransientProviderError(errorType) || isTransientProviderError(errorCode)) {
+            return new AgentLlmTransientException(message);
+        }
+        return BusinessException.of(message);
+    }
+
+    private boolean isTransientProviderError(String value) {
+        if (value == null || value.isBlank()) return false;
+        return switch (value.trim().toLowerCase()) {
+            case "upstream_error", "stream_read_error", "server_error", "rate_limit_error",
+                    "overloaded_error", "timeout_error", "connection_error" -> true;
+            default -> false;
+        };
     }
 
     private HttpRequest.Builder baseRequest(ResolvedRequest resolved, String body) {

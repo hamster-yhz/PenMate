@@ -88,8 +88,7 @@ public class AgentRunEventStreamService {
                 return true;
             } catch (IOException | IllegalStateException ex) {
                 log.debug("agent run SSE heartbeat failed: runId={}", connection.runId, ex);
-                connection.emitter.completeWithError(ex);
-                close(connection);
+                fail(connection, ex);
                 return false;
             }
         }
@@ -156,8 +155,7 @@ public class AgentRunEventStreamService {
             } catch (RuntimeException ex) {
                 log.debug("agent run SSE poll failed: runId={}, cursor={}",
                         connection.runId, connection.cursor.get(), ex);
-                connection.emitter.completeWithError(ex);
-                close(connection);
+                fail(connection, ex);
             }
         }
     }
@@ -179,8 +177,7 @@ public class AgentRunEventStreamService {
         } catch (IOException | IllegalStateException ex) {
             log.debug("agent run SSE send failed: runId={}, sequence={}, eventType={}",
                     event.runId(), event.sequence(), event.eventType(), ex);
-            connection.emitter.completeWithError(ex);
-            close(connection);
+            fail(connection, ex);
             return false;
         }
     }
@@ -200,16 +197,25 @@ public class AgentRunEventStreamService {
         } catch (IOException | IllegalStateException ex) {
             log.debug("agent run SSE reset failed: runId={}, cursor={}",
                     connection.runId, requestedAfter, ex);
-            connection.emitter.completeWithError(ex);
-            close(connection);
+            fail(connection, ex);
             return false;
         }
     }
 
-    private void close(StreamConnection connection) {
-        if (!connection.closed.compareAndSet(false, true)) return;
+    private void fail(StreamConnection connection, Throwable failure) {
+        if (!close(connection)) return;
+        try {
+            connection.emitter.completeWithError(failure);
+        } catch (IllegalStateException ex) {
+            log.debug("agent run SSE completion ignored after container error: runId={}", connection.runId, ex);
+        }
+    }
+
+    private boolean close(StreamConnection connection) {
+        if (!connection.closed.compareAndSet(false, true)) return false;
         activeStreams.remove(connection.streamId, connection);
         connection.unsubscribe.run();
+        return true;
     }
 
     private boolean isTerminal(AgentEvent event) {

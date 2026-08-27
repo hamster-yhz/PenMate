@@ -125,9 +125,22 @@ class AgentRunEventStreamServiceTest {
                 .allSatisfy(dto -> assertThat(dto.payloadJson()).contains("partial answer", "\"channel\":\"final\""));
     }
 
+    @Test
+    void ignores_completion_race_after_the_container_has_already_failed_the_stream() {
+        AgentRunEventRepository events = mock(AgentRunEventRepository.class);
+        InMemoryAgentRunEventBus bus = mock(InMemoryAgentRunEventBus.class);
+        when(bus.subscribe(any(), any())).thenReturn(() -> { });
+        FailingEmitter emitter = new FailingEmitter();
+
+        service(events, bus, emitter).openStream(70L, 0L);
+
+        assertThat(emitter.completionAttempts).isEqualTo(1);
+        verify(events, never()).findWindow(any());
+    }
+
     private AgentRunEventStreamService service(AgentRunEventRepository events,
                                                InMemoryAgentRunEventBus bus,
-                                               CapturingEmitter emitter) {
+                                               SseEmitter emitter) {
         return new AgentRunEventStreamService(
                 events, bus, new AgentEventPayloadResolver(
                 mock(AgentArtifactRepository.class), new JacksonJsonCodec(new ObjectMapper())),
@@ -154,6 +167,21 @@ class AgentRunEventStreamServiceTest {
 
         private List<Object> payloads() {
             return payloads;
+        }
+    }
+
+    private static final class FailingEmitter extends SseEmitter {
+        private int completionAttempts;
+
+        @Override
+        public void send(SseEventBuilder builder) {
+            throw new IllegalStateException("container stream already failed");
+        }
+
+        @Override
+        public void completeWithError(Throwable ex) {
+            completionAttempts++;
+            throw new IllegalStateException("AsyncContext already completed");
         }
     }
 }

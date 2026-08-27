@@ -6,6 +6,7 @@ import com.penmate.backend.application.agent.llm.AgentLlmExecutionConfig;
 import com.penmate.backend.application.agent.llm.AgentLlmStreamEvent;
 import com.penmate.backend.application.agent.llm.AgentLlmStreamObserver;
 import com.penmate.backend.application.agent.llm.AgentLlmToolSchema;
+import com.penmate.backend.application.agent.llm.AgentLlmTransientException;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnRequest;
 import com.penmate.backend.application.agent.llm.AgentLlmTurnResponse;
 import com.penmate.backend.application.agent.llm.AgentReasoningPolicy;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OpenAiResponsesProviderChatClientTest {
 
@@ -234,6 +236,28 @@ class OpenAiResponsesProviderChatClientTest {
 
         assertThat(response.assistantText()).isEmpty();
         assertThat(response.commentaryText()).isEqualTo("working");
+    }
+
+    @Test
+    void classifies_upstream_stream_read_errors_as_transient() {
+        assertThatThrownBy(() -> client.readResponsesEventStream(
+                new BufferedReader(new StringReader("""
+                        data: {"type":"error","sequence_number":0,"error":{"type":"upstream_error","message":"stream_read_error","code":"stream_read_error"}}
+
+                        """)), new CollectingObserver(new ArrayList<>())))
+                .isInstanceOf(AgentLlmTransientException.class)
+                .hasMessageContaining("stream_read_error");
+    }
+
+    @Test
+    void keeps_invalid_request_stream_errors_terminal() {
+        assertThatThrownBy(() -> client.readResponsesEventStream(
+                new BufferedReader(new StringReader("""
+                        data: {"type":"response.failed","response":{"error":{"type":"invalid_request_error","code":"invalid_request"}}}
+
+                        """)), new CollectingObserver(new ArrayList<>())))
+                .isInstanceOf(com.penmate.backend.application.common.exception.BusinessException.class)
+                .isNotInstanceOf(AgentLlmTransientException.class);
     }
 
     private static final class CollectingObserver implements AgentLlmStreamObserver {
